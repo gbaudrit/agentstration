@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Storage.Abstractions;
-using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Flows;
+using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -40,6 +40,7 @@ public sealed class WorkplaceFlowConversationProjectionTests
             {
                 Id = interactionId,
                 WorkspaceId = workspaceId,
+                OwnerPrincipalId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 EntryId = new("game"),
                 StartedAt = now,
                 LastActivityAt = now,

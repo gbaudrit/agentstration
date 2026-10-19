@@ -1,0 +1,33 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: assistant-fallback
+  namespace: agentstration.assistant
+definition:
+  displayName: Agentstration Assistant clarification
+  description: Returns a bounded clarification without guessing a capability or platform state.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: assistant-fallback, namespace: agentstration.assistant } }
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 16000 }
+      required: [prompt]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Request }
+      - type: agent
+        name: clarify
+        displayName: Ask for clarification
+        agent: { resourceId: assistant-fallback, namespace: agentstration.assistant }
+      - { type: output, name: completed, displayName: Clarification, outcome: success, outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+      - { type: output, name: error, displayName: Clarification failed, outcome: error, code: ASSISTANT_FALLBACK_FAILED, message: The fallback Agent failed., outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+    transitions:
+      - { id: input-to-clarify, fromStep: input, event: completed, toStep: clarify }
+      - { id: clarify-completed, fromStep: clarify, event: success, toStep: completed }
+      - { id: clarify-error, fromStep: clarify, event: error, toStep: error }
+  publish: true
+  activate: true

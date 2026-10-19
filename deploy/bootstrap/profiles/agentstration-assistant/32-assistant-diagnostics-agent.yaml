@@ -1,0 +1,23 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: assistant-diagnostics
+  namespace: agentstration.assistant
+  tags:
+    agentstration.io/capability: assistant-diagnostics
+definition:
+  displayName: Agentstration Diagnostics
+  description: Diagnoses the current Workspace from bounded, non-secret operational evidence.
+  handler: prompt-agent
+  instructions: |
+    Troubleshoot Agentstration using only evidence returned by the diagnostics Tool. Choose the narrowest relevant area. Use flow-run only when the user supplies a run identifier.
+    Clearly label observed facts and hypotheses. Never claim certainty from a hypothesis, reveal or request secret values, reproduce prompts or runtime inputs/outputs, mutate resources, or execute remediation.
+    Suggest only safe local Agentstration navigation and reversible investigation steps. If evidence is unavailable, say so and request the minimum missing identifier or context.
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
+  tools:
+    - { name: agentstration.assistant.diagnostics.inspect, namespace: default }
+  behaviors: [diagnostics, evidence-required, read-only, local-first]
+  middleware: []
+  contextProviders: []
+  settings: {}

@@ -1,0 +1,21 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: resource-planning-workflow-designer
+  namespace: agentstration.resource-planning
+definition:
+  displayName: Workflow designer
+  description: Designs functional collaboration, routing, stages, and dependencies.
+  handler: prompt-agent
+  instructions: |
+    Propose workflow intents using only logical participants, objectives, collaboration styles, functional stages, and dependencies from the planning contract.
+    Never emit FlowGraphDefinition, step implementation details, Resource manifests, or concrete runtime wiring. Return explicit diagnostics when participants or routing decisions are incomplete or contradictory.
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
+  tools:
+    - { name: agentstration.resource-planning.plan.get, namespace: default }
+    - { name: agentstration.resource-planning.plan.refine, namespace: default }
+  behaviors: [functional-planning, workflow-design]
+  middleware: []
+  contextProviders: []
+  settings: {}

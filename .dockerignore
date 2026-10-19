@@ -14,3 +14,5 @@ aep/cli
 aep/inspector
 aep/samples
 aep/tests
+deploy/compose/.env.foundry
+deploy/compose/.env.postgresql

@@ -38,7 +38,7 @@ public sealed class AepValidator : IAepValidator
             if (!capability.Key.StartsWith("aep.", StringComparison.Ordinal)) issues.Add(new("AEP020", $"Capability '{capability.Key}' is outside the AEP namespace.", AepValidationSeverity.Warning, $"capabilities.{capability.Key}"));
             if (string.IsNullOrWhiteSpace(capability.Value.Version)) issues.Add(new("AEP021", $"Capability '{capability.Key}' has no version.", AepValidationSeverity.Error, $"capabilities.{capability.Key}.version"));
         }
-        foreach (var descriptorIssue in AepDescriptorValidator.Validate(manifest)) issues.Add(new("AEP100", descriptorIssue, AepValidationSeverity.Error, "contributions.tools"));
+        foreach (var descriptorIssue in AepDescriptorValidator.Validate(manifest)) issues.Add(new("AEP100", descriptorIssue, AepValidationSeverity.Error, "manifest"));
         try
         {
             var health = await client.GetHealthAsync(cancellationToken);

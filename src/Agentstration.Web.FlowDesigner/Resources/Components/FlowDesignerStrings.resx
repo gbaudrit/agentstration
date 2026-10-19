@@ -13,19 +13,40 @@
   <data name="Mode.Designer"><value>Designer</value></data>
   <data name="Mode.Definition"><value>Definition</value></data>
   <data name="Mode.Split"><value>Split</value></data>
+  <data name="EditorModes"><value>Designer view modes</value></data>
   <data name="Undo"><value>Undo</value></data><data name="Redo"><value>Redo</value></data>
-  <data name="Validate"><value>Validate</value></data><data name="RunDraft"><value>Run draft</value></data>
+  <data name="Validate"><value>Check</value></data><data name="RunDraft"><value>Run draft</value></data><data name="RunningDraft"><value>Starting draft run…</value></data>
   <data name="Save"><value>Save</value></data><data name="Version"><value>Version</value></data>
-  <data name="PublishVersion"><value>Publish version</value></data><data name="Publish"><value>Publish</value></data>
+  <data name="MoreActions"><value>More actions</value></data>
+  <data name="PublishVersion"><value>Publish version</value></data><data name="Publish"><value>Publish</value></data><data name="Publishing"><value>Publishing…</value></data>
+  <data name="ActionFailed"><value>Action could not be completed</value></data><data name="DismissError"><value>Dismiss error</value></data>
+  <data name="PublishVersionExists"><value>Version {0} is already published. Choose another version.</value></data><data name="InvalidSourceBeforePublish"><value>Correct the YAML definition errors before publishing.</value></data>
   <data name="Steps"><value>Steps</value></data>
+  <data name="StepPalette"><value>Step palette</value></data><data name="ShowStepPalette"><value>Show step palette</value></data><data name="HideStepPalette"><value>Hide step palette</value></data><data name="CloseStepPalette"><value>Close step palette</value></data>
+  <data name="ViewControls"><value>View</value></data>
+  <data name="WorkspaceControls"><value>Designer workspace controls</value></data><data name="ShowInspector"><value>Show inspector</value></data><data name="HideInspector"><value>Hide inspector</value></data><data name="CloseInspector"><value>Close inspector</value></data><data name="EnterFocusMode"><value>Enter full screen mode</value></data><data name="ExitFocusMode"><value>Exit</value></data>
   <data name="Step.input"><value>Input</value></data><data name="Step.agent"><value>Agent</value></data>
   <data name="Step.router"><value>Router</value></data><data name="Step.condition"><value>Condition</value></data>
   <data name="Step.transform"><value>Transform</value></data><data name="Step.output"><value>Output</value></data>
   <data name="Step.failure"><value>Failure</value></data>
+  <data name="Step.flow"><value>Flow</value></data>
+  <data name="Step.tool"><value>Tool</value></data>
   <data name="HorizontalLayout"><value>Horizontal layout</value></data><data name="VerticalLayout"><value>Vertical layout</value></data><data name="Center"><value>Center</value></data>
+  <data name="ShowErrorTransitions"><value>Show error paths</value></data><data name="HideErrorTransitions"><value>Hide error paths</value></data>
   <data name="Inspector"><value>Inspector</value></data><data name="SelectStep"><value>Select a step to edit it.</value></data>
   <data name="DisplayName"><value>Display name</value></data><data name="TechnicalName"><value>Technical name</value></data><data name="Type"><value>Type</value></data>
+  <data name="StepDetails"><value>Step</value></data><data name="StepDisplayName"><value>Step display name</value></data><data name="StepId"><value>Step ID</value></data><data name="OutputOutcome"><value>Output outcome</value></data><data name="OutputOutcome.Success"><value>Success</value></data><data name="OutputOutcome.Error"><value>Error</value></data><data name="OutputMapping"><value>Output mapping</value></data><data name="OutputSchema"><value>Output schema</value></data><data name="ErrorDetailsExpression"><value>Error details expression</value></data><data name="OutputNameInvalid"><value>The output name may contain only letters, digits, '-' and '_'.</value></data><data name="OutputNameDuplicate"><value>An output or step named '{0}' already exists.</value></data><data name="OutputMappingInvalid"><value>The output mapping must be valid JSON.</value></data><data name="OutputSchemaInvalid"><value>The output schema must be a valid JSON object.</value></data>
+  <data name="CalledResource"><value>Called resource</value></data><data name="CalledAgent"><value>Agent</value></data><data name="AgentId"><value>Agent ID</value></data><data name="FlowId"><value>Flow ID</value></data>
+  <data name="ToolId"><value>Tool ID</value></data><data name="CurrentToolUnavailable"><value>Current Tool is not in the available list</value></data>
+  <data name="SearchTools"><value>Search Tools</value></data><data name="NoMatchingTools"><value>No matching Tools</value></data>
   <data name="Agent"><value>Agent</value></data><data name="RouterOutput"><value>Router output</value></data>
+  <data name="OpenAgent"><value>Open agent</value></data><data name="OpenAgentInNewTab"><value>Open agent in a new tab</value></data>
+  <data name="OpenFlow"><value>Open Flow</value></data><data name="OpenFlowInNewTab"><value>Open Flow in a new tab</value></data>
+  <data name="CalledFlow"><value>Called Flow</value></data><data name="VersionStrategy"><value>Version strategy</value></data>
+  <data name="VersionStrategy.Active"><value>Active version</value></data><data name="VersionStrategy.Exact"><value>Exact version</value></data>
+  <data name="ExactVersion"><value>Exact version</value></data><data name="InputMapping"><value>Input mapping</value></data><data name="PassIncomingTransitionOutput"><value>Pass incoming transition output</value></data><data name="PassIncomingTransitionOutputHelp"><value>The child Flow receives the complete output carried by the transition taken into this step.</value></data><data name="AvailableOutput"><value>Available output properties</value></data>
+  <data name="CalledTool"><value>Called Tool</value></data><data name="ArgumentsMapping"><value>Arguments mapping</value></data>
+  <data name="ToolDisabled"><value>This Tool is disabled.</value></data><data name="ToolUnavailable"><value>This Tool is unavailable from its provider.</value></data><data name="ToolApprovalRequired"><value>This Tool requires approval before invocation.</value></data>
   <data name="LoadAgents"><value>Load agents</value></data><data name="AddAll"><value>Add all</value></data>
   <data name="AvailableAgents.One"><value>{0} agent available. Routes are explicit and remain immutable references when published.</value></data>
   <data name="AvailableAgents.Many"><value>{0} agents available. Routes are explicit and remain immutable references when published.</value></data>
@@ -33,19 +54,21 @@
   <data name="LeftValue"><value>Left value</value></data><data name="Operator"><value>Operator</value></data><data name="RightValue"><value>Right value</value></data>
   <data name="ErrorCode"><value>Error code</value></data><data name="Message"><value>Message</value></data><data name="DeleteStep"><value>Delete step</value></data>
   <data name="Transitions"><value>Transitions</value></data><data name="From"><value>From</value></data><data name="Event"><value>Event</value></data><data name="To"><value>To</value></data><data name="AddTransition"><value>Add transition</value></data>
-  <data name="Validation"><value>Validation</value></data><data name="IssueCount.One"><value>{0} issue</value></data><data name="IssueCount.Many"><value>{0} issues</value></data>
+  <data name="TransitionDetails"><value>Selected transition</value></data><data name="TransitionId"><value>Transition ID</value></data><data name="TransitionCondition"><value>Condition</value></data><data name="TransitionPriority"><value>Priority</value></data><data name="DeleteTransition"><value>Delete transition</value></data><data name="DeleteTransitionNamed"><value>Delete transition {0}</value></data>
+  <data name="InputConnectionHandle"><value>Incoming transition handle</value></data><data name="OutputConnectionHandle"><value>Outgoing transition handle</value></data><data name="NamedOutputConnectionHandle"><value>Outgoing {0} transition handle</value></data><data name="NamedOutputConnectionHandleWithOutcome"><value>Outgoing {0} transition handle ({1})</value></data>
+  <data name="Validation"><value>Verification</value></data><data name="RunValidation"><value>Run verification</value></data><data name="ShowValidationDetails"><value>Show verification details</value></data><data name="HideValidationDetails"><value>Hide verification details</value></data><data name="IssueCount.One"><value>{0} issue</value></data><data name="IssueCount.Many"><value>{0} issues</value></data>
   <data name="PublishedDefinitionHelp"><value>This published definition is displayed without creating a Draft.</value></data>
-  <data name="ValidationHelp"><value>Validate the Draft to check structure, reachability, expressions and resources.</value></data>
+  <data name="ValidationHelp"><value>Check the Draft structure, reachability, expressions and resources.</value></data>
   <data name="RunDraftRevision"><value>Run Draft revision {0}</value></data><data name="InputJson"><value>Input JSON</value></data><data name="Cancel"><value>Cancel</value></data>
   <data name="SaveState.Saving"><value>Saving…</value></data><data name="SaveState.UnsavedChanges"><value>Unsaved changes</value></data><data name="SaveState.SaveFailed"><value>Save failed</value></data><data name="SaveState.Saved"><value>Saved</value></data>
   <data name="FlowDiagram"><value>Flow diagram</value></data><data name="DiagramZoomControls"><value>Diagram zoom controls</value></data>
   <data name="ZoomOut"><value>Zoom out</value></data><data name="ZoomIn"><value>Zoom in</value></data><data name="Fit"><value>Fit</value></data>
-  <data name="YamlDefinition"><value>YAML definition</value></data><data name="ApplyValidYaml"><value>Apply valid YAML</value></data>
-  <data name="InvalidSourceHelp"><value>Invalid source is preserved; the canvas continues to show the last valid definition.</value></data>
-  <data name="Declared"><value>Declared</value></data><data name="Observed"><value>Observed</value></data><data name="NotSelected"><value>Not selected</value></data>
+  <data name="YamlDefinition"><value>Flow definition (YAML)</value></data><data name="ApplyAndSaveYaml"><value>Apply and save</value></data><data name="ApplyingYaml"><value>Applying and saving…</value></data>
+  <data name="SourceEditorHelp"><value>Apply to update the graph and save the draft. If validation fails, your text is kept and the graph remains unchanged.</value></data>
+  <data name="Declared"><value>Declared</value></data><data name="Observed"><value>Observed</value></data><data name="ObservedFailure"><value>Error</value></data><data name="NotSelected"><value>Not selected</value></data>
   <data name="TopologyZoomControls"><value>Topology zoom controls</value></data><data name="NoTopology"><value>No topology is available for this Flow.</value></data>
   <data name="TurnCount.One"><value>{0} turn</value></data><data name="TurnCount.Many"><value>{0} turns</value></data><data name="InitialParticipant"><value>initial participant</value></data>
-  <data name="EdgeDescription"><value>{0} to {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>declared</value></data><data name="EdgeState.Observed"><value>observed</value></data><data name="EdgeState.Inactive"><value>not selected</value></data>
+  <data name="EdgeDescription"><value>{0} to {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>declared</value></data><data name="EdgeState.Observed"><value>observed</value></data><data name="EdgeState.Failed"><value>observed error</value></data><data name="EdgeState.Inactive"><value>not selected</value></data>
   <data name="ExpandTopology"><value>Expand</value></data><data name="ReduceTopology"><value>Reduce</value></data><data name="ShowInfo"><value>Details</value></data><data name="HideInfo"><value>Hide details</value></data>
   <data name="Replay"><value>Replay</value></data><data name="Replaying"><value>Replaying…</value></data><data name="ReplaySequence"><value>Replay the execution sequence</value></data><data name="ReplayInProgress"><value>Execution sequence replay in progress</value></data><data name="ReplayElapsedCounter"><value>Original execution elapsed time</value></data>
 </root>

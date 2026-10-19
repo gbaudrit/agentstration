@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
+using Agentstration.Models;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.ModelProviders;

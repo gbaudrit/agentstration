@@ -2,9 +2,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Management.Abstractions;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Identity.Contracts;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -32,7 +32,7 @@ public sealed class WorkplaceFlowInputProjectionSink(
         try
         {
             var workspaceId = run.WorkspaceId;
-            var interaction = await repository.GetInteractionAsync(workspaceId, new(interactionId), cancellationToken);
+            var interaction = await repository.GetInteractionForProjectionAsync(workspaceId, new(interactionId), cancellationToken);
             if (interaction is null) return;
 
             var actionId = new PendingActionId(DeterministicGuid(request.Id));

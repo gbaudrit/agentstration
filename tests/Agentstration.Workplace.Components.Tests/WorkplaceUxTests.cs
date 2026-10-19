@@ -430,12 +430,12 @@ public sealed class WorkplaceUxTests
                 .Add(value => value.Task, TaskResponse(taskId, now.AddMinutes(-1), now, WorkTaskStatus.Completed))
                 .Add(value => value.Results, [result])
                 .Add(value => value.DiagnosticsEnabled, true)
-                .Add(value => value.RealtimeConnected, true)
                 .Add(value => value.ArtifactContentUrl, _ => "/content"));
 
-            StringAssert.Contains(conversation.Markup, "Demande actuelle");
             StringAssert.Contains(conversation.Markup, "Nouvelle conversation");
-            StringAssert.Contains(conversation.Markup, "En direct");
+            Assert.IsFalse(conversation.Markup.Contains("Demande actuelle", StringComparison.Ordinal));
+            Assert.IsFalse(conversation.Markup.Contains("En direct", StringComparison.Ordinal));
+            Assert.IsFalse(conversation.Markup.Contains("Reconnexion", StringComparison.Ordinal));
             StringAssert.Contains(conversation.Markup, "Tâche");
             StringAssert.Contains(conversation.Markup, "Terminée");
             StringAssert.Contains(conversation.Markup, "Détails d’exécution");

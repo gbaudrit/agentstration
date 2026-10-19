@@ -12,7 +12,30 @@ Do not commit API keys. HTTP payload capture is disabled by default, and sensiti
 
 ## Extension discovery
 
-`Agentstration:Extensions:DiscoverOnStartup` defaults to `true`. It synchronizes extension endpoints declared below `Agentstration:Extensions` and Aspire `*-extension` connection strings into every active Workspace after persistence initialization and before declarative bootstrap. A second idempotent pass covers the initial Workspace when bootstrap creates it. Set the option to `false` (or `Agentstration__Extensions__DiscoverOnStartup=false`) to keep discovery manual through the Console or `POST /api/extensions/discover`.
+`Agentstration:Extensions:DiscoverOnStartup` defaults to `false`. PairingCode and SharedKeyFile extensions initiate enrollment and provide their running endpoint, so Agentstration does not need a compiled-in extension catalog. Set it to `true` only for the internal compatibility path that synchronizes explicitly configured endpoints after persistence initialization and declarative bootstrap. This synchronization has no Console action or public HTTP command.
+
+## Official Source registry transport
+
+The official Source registry registration is persisted Management state; its enabled flag and index URL are administered through `/api/sourceregistries`. Host configuration controls only bounded transport behavior:
+
+```json
+{
+  "Agentstration": {
+    "Sources": {
+      "Registries": {
+        "Transport": {
+          "TimeoutSeconds": 15,
+          "MaximumRedirects": 3,
+          "ConnectTimeoutSeconds": 5,
+          "PooledConnectionLifetimeSeconds": 120
+        }
+      }
+    }
+  }
+}
+```
+
+Only public HTTPS JSON/YAML endpoints are accepted. Redirects must remain on the configured origin, automatic redirects are disabled, DNS results are filtered again when connecting, credentials/query/fragment/percent-encoded paths are rejected, and index/shard byte limits remain fixed by the Registry v1 contract. Startup never contacts the registry; refresh is currently manual. Scheduling, retry/backoff, arbitrary private registrations, credentials, discovery merging, trust, import, and cache retention are separate increments.
 
 ## Authentication
 
@@ -22,7 +45,7 @@ Local mode uses ASP.NET Core Identity and `ConnectionStrings:Identity`, defaulti
 
 The Identity schema is managed by versioned EF Core migrations. Existing databases created by the earlier `EnsureCreated` implementation are baselined only after every expected legacy table is verified; a partial schema stops startup. ASP.NET Core Data Protection keys persist under `Agentstration:Authentication:DataProtectionKeysPath`, or in `data-protection-keys` beside the local data file by default. The directory must be writable and must be protected and backed up as sensitive instance state. Restoring the Identity database without its corresponding key ring invalidates existing cookies and lifecycle tokens. See [ADR-0044](../decisions/0044-durable-identity-schema-and-data-protection.md).
 
-The optional PostgreSQL profile, its six schemas, Aspire and Compose setup, worktree-isolated volume lifecycle, first-start diagnostics, and backup/restore requirements are documented in [Configuration](../getting-started/configuration.md#postgresql-storage-profile) and [ADR-0078](../decisions/0078-postgresql-is-an-optional-server-storage-profile.md).
+The optional PostgreSQL profile, its seven schemas, Aspire and Compose setup, worktree-isolated volume lifecycle, first-start diagnostics, and backup/restore requirements are documented in [Configuration](../getting-started/configuration.md#postgresql-storage-profile) and [ADR-0078](../decisions/0078-postgresql-is-an-optional-server-storage-profile.md).
 
 After bootstrap, Platform administrators manage local accounts through `/api/identity/accounts` or Console **Organization > Members**. Workspace memberships are exposed under `/api/identity/workspaces/{workspaceId}/memberships`. Built-in roles are `Owner`, `Admin`, `Member`, and `Viewer`; the last Owner cannot be removed or demoted.
 
@@ -33,6 +56,18 @@ Authenticated local users manage their credential from `/account/security`. Chan
 Security-sensitive identity and authorization operations are appended to `SecurityAuditEvents` in the Management Control Plane database. Platform administrators can inspect the latest 200 records through `/api/identity/audit-events` or Console **Organization > Security audit**. Events contain identifiers, bounded outcome codes, scope, timestamps, and trace correlation only; they never contain credentials, submitted usernames, email addresses, claims, or tokens. Retention, export, and cryptographic sealing are not yet implemented. See [ADR-0045](../decisions/0045-security-events-are-an-append-only-management-log.md).
 
 OIDC mode requires `Authority`, `Audience`, and `ClientId`; `ClientSecret` is required for confidential clients. `RequireHttpsMetadata` defaults to `true`. OIDC uses authorization code with PKCE and APIs validate JWT bearer access tokens. Agentstration never uses email as a subject, never maps an IdP tenant to a Workspace automatically, and never issues OAuth access tokens. See [ADR-0042](../decisions/0042-authentication-and-authorization-boundaries.md).
+
+### AWP Worker identity
+
+Independent Runtime Workers use the dedicated AWP workload scheme; Console BFF, AEP, human-session, PAT, and internal-delegation credentials are not accepted on `/api/awp/v1`. Enable it with `Agentstration:AwpWorkerTrust:Enabled=true` and set a stable, deployment-specific `Agentstration:AwpWorkerTrust:InstanceId`. Signed requests carry a stable Worker ID, a new Worker Session ID for each process start, a credential ID, the target instance, timestamp, nonce, content hash, and HMAC signature. Each process registers its session through `/api/awp/v1/session`; that session supersedes the previous session for the Worker. The default replay window is five minutes; retries must generate a new nonce. `MaximumBodyBytes` defaults to 2 MiB so the bounded 1 MiB Artifact operation remains representable after JSON/base64 framing.
+
+After authenticating the process session, the Worker registers its capacity and compatible Runtime/execution-material versions through `/api/awp/v1/workers/register`, then pulls work through `/api/awp/v1/assignments/claim`. `Agentstration:RuntimeWorker:Dispatch:MaximumLongPollSeconds` bounds a claim wait to 30 seconds by default and accepts values from 1 through 120 seconds. `MaximumWorkerCapacity` bounds one registration to 64 concurrent assignments by default and accepts values from 1 through 1024. Capacity is also enforced by the atomic durable claim; it is not trusted solely from the Worker's `AvailableCapacity` value. Long-poll wake-ups are process-local optimizations only: every request first and finally rechecks durable assignments, and a Worker registers again after an API restart.
+
+Heartbeat uses `/api/awp/v1/assignments/heartbeat`. The default `Agentstration:RuntimeWorker:Lease:HeartbeatInterval` is 10 seconds and `LeaseDuration` is 45 seconds; the lease must be at least three heartbeat intervals and may not exceed 15 minutes. `MinimumSideEffectLeaseRemaining` defaults to 5 seconds: the authority rejects a new model, Tool, child-Flow or Artifact side effect inside that margin and cancels an accepted call before lease expiry. A short HTTP interruption therefore does not release ownership, but the Worker receives no client-side grace after server-observed expiry. Registering a new session for the same Worker interrupts any assignment still owned by an older session as `worker_lost`; ownership is never transferred.
+
+A Worker can announce itself at `/api/awp/enrollment/announce`. A Platform administrator reviews the pending identity and issues a five-minute, single-use pairing code through `/api/identity/awp-workers/{workerId}/pairing-code`; the outbound-only Worker exchanges it at `/api/awp/enrollment/claim`. The returned credential is shown once and must be written to a protected Worker-owned file. Agentstration keeps its copy encrypted in the local Secret vault. Rotation creates an overlapping credential so a Worker can switch safely before an administrator explicitly revokes the old credential. Enrollment, authentication failures, rotation, and revocation are security-audited without recording codes or secrets.
+
+Aspire and Compose may instead provision credentials as configuration entries under `Agentstration:AwpWorkerTrust:Credentials`. Each entry contains `WorkerId`, `CredentialId`, and `SharedKeyFile`, with optional `NotBefore`, `ExpiresAt`, and `Revoked`. The key file contains the opaque secret as a single line, must be at least 32 bytes, and must be mounted read-only with access limited to the server identity. A configured credential and a paired credential have identical AWP authority; neither grants Management CRUD, Workspace membership, generic Run enumeration, or Secret retrieval.
 
 Platform administrators link an existing Principal to an external identity through `/api/identity/principals/{principalId}/external-identities` or Console **Organization > Members > Member details**. Enter the exact case-sensitive `iss` and `sub` values emitted by the configured provider. The pair is instance-unique; the same subject from another issuer remains distinct. Agentstration rejects removal of the final authentication method and does not auto-link by email or auto-provision unknown logins. See [ADR-0047](../decisions/0047-external-identities-are-explicitly-linked-to-principals.md).
 

@@ -23,6 +23,9 @@ definition:
       targetKind: sourceProvider
   channels:
     - name: stable
+      compatibility:
+        agentstration:
+          minVersion: 0.2.0-alpha.1
       provider:
         binding: distribution
       configuration:
@@ -64,6 +67,14 @@ Branches and tags are resolved to an immutable commit SHA before content is acqu
 
 The standalone extension requires `git` on `PATH` and can be started with `dotnet run --project src/Agentstration.Extensions.Git`; its default development endpoint is `http://localhost:5290`. `GitSourceProvider:GitExecutable`, `GitSourceProvider:MaximumRepositoryBytes`, and `GitSourceProvider:ResolveTimeoutSeconds` configure its executable and hard limits. Local file repositories remain disabled unless `GitSourceProvider:AllowLocalRepositories=true` is set explicitly for development or offline tests. Aspire starts and registers the extension automatically.
 
+## Local Source Providers
+
+A local `SourceProvider` is an instance-owned Management resource that selects one `source-provider` contribution from an instance-visible `ExtensionRegistration`. The registration remains the only owner of the endpoint, enabled state, expected extension identity, and credentials. Repository, ref, path, locale, and all other transport values remain immutable Channel configuration.
+
+Platform administrators manage these resources under **Configure > Source providers**. The Extensions view links each discovered source-provider contribution to a prefilled creation form. The provider detail view reports the observed contribution status, advertised source-channel option contracts, and every Source binding that references it. A referenced provider cannot be deleted.
+
+The REST surface is `/api/sourceproviders`: list, create, get, update, and delete operations are complemented by `/{providerName}/status` and `/{providerName}/usages`. Writes use ETags. Source binding forms only list already configured providers and never create or select one automatically.
+
 Three concerns remain separate:
 
 - the immutable published Source Version;
@@ -74,4 +85,48 @@ The display name is initialized from the first Source Version default, falling b
 
 List Sources with `GET /api/sources`, inspect their versions with `GET /api/sources/{publisher}/{name}/versions?scopeRef=...`, and update the local display name with an ETag-protected `PUT /api/sources/{publisher}/{name}/display-name?scopeRef=...`.
 
-Git Channel acquisition is available through AEP. Source Provider binding selection, durable Channel snapshots, compatibility evaluation, periodic refresh, catalog browsing, and Bootstrap/Pack consumption are introduced by the related Source feature increments.
+The published `publisher/name` pair is immutable and cannot be changed by refreshing a Source. Renaming that identity requires deleting the local Source and importing the manifest under its new identity. The ETag-protected `DELETE /api/sources/{publisher}/{name}?scopeRef=...` operation removes the Source definition, versions, local configuration, import history, and Channel snapshot metadata. It does not uninstall Packs already installed from the Source, delete their retained provenance, or modify the external registry.
+
+## Source registries
+
+Every installation seeds the instance-owned `agentstration-official` registration, pointing to `https://registry.agentstration.io/v1/index.json`, only when that registration is absent. A Platform administrator can change that URL or disable the registration with an ETag-protected `PUT /api/sourceregistries/agentstration-official`; startup never overwrites the persisted choice.
+
+Platform administrators can also create independent community and private enterprise registrations through `POST /api/sourceregistries`, then update, enable, disable, refresh, or delete them through the same canonical API. Every registration stores independent trust, endpoint, authentication, refresh, and cache policies. Private authentication retains only an explicitly instance-scoped Secret reference; the Bearer value is resolved immediately before a request and is never included in Registry resources, observations, cache, errors, logs, or audit records. HTTPS and public network destinations are required unless the exact registration explicitly opts into HTTP or private-network access.
+
+`POST /api/sourceregistries/{name}/refresh` retrieves the selected registry index, selects every shard whose Agentstration Semantic Version interval contains the running version, validates each shard's canonical digest, and writes the complete publication to a new cache observation before making it current. It does not retrieve SourceVersion manifests or create Sources or Channels.
+
+`GET /api/sourceregistries/discovery` deterministically merges current cached observations by portable identity and exact opaque version. It retains equal observations, exposes digest conflicts, and keeps each shard's `latest` marker local to that observation. `POST /api/sourceregistries/discovery/imports` accepts the retained selection returned by discovery, reapplies current trust and conflict policy, retrieves only that manifest, verifies its canonical identity/version/digest, and delegates to the ordinary immutable Source import lifecycle. It never materializes a Channel. The imported SourceVersion records the complete Registry observation and trust snapshot, and a later definition requires another exact observation selection rather than a silent URL refresh.
+
+Configured state, observed state, immutable refresh history, and cached bytes remain separate. `GET /api/sourceregistries` and `GET /api/sourceregistries/agentstration-official` expose disabled, never-fetched, fresh, stale, invalid, and no-compatible-catalog states; `GET /api/sourceregistries/agentstration-official/refreshes` exposes bounded history. ETag and Last-Modified validators are reused on subsequent index requests. HTTP 304 keeps the exact current observation and catalogue provenance. Any invalid or unavailable replacement records an actionable error while retaining the previous last-known-good observation.
+
+Startup only ensures the local official registration and observed-state records; it performs no network request. Deleting an external registration removes desired configuration but preserves immutable refresh history and retained cache bytes for later provenance and retention processing. Registry availability therefore has no effect on direct Source imports or on already imported Sources, snapshots, Bootstrap Profiles, and Packs. See the [registration reference](../reference/source-registries.md) for the complete API and enterprise example.
+
+The Platform-administrator Console mirrors this boundary under **System > Source registries**: registration management and Registry refresh stay separate from imported Source and Channel administration. Discovery shows all retained observations and their independent trust evidence before an exact selection is confirmed; the resulting Source then continues through the existing Source, Channel, Bootstrap, and Pack workflows.
+
+## Optional verification index
+
+Agentstration can consult a static verification index without making it a startup or offline dependency:
+
+```json
+{
+  "Agentstration": {
+    "Sources": {
+      "VerificationIndex": {
+        "Url": "https://registry.example/verified-sources.yaml",
+        "TimeoutSeconds": 10,
+        "MaximumBytes": 1048576
+      }
+    }
+  }
+}
+```
+
+No URL is configured by default. The index is loaded only when an import or verification query asks for it. An unavailable or invalid index reports verification as unavailable but never rolls back an import or invalidates a retained Source Version or snapshot.
+
+Definition verification matches the exact `publisher/name`, opaque Source Version, and canonical manifest digest. The origin URL is not part of trust, so pasted YAML and the same document retrieved from a moving or immutable URL produce the same result. Query it with `GET /api/sources/{publisher}/{name}/versions/{versionUid}/verification?scopeRef=...`.
+
+Snapshot verification is independent and additionally requires the exact Channel, immutable provider revision, and complete snapshot archive digest. Query it with `GET /api/sources/{publisher}/{name}/versions/{versionUid}/channels/{channel}/snapshots/{snapshotUid}/verification?scopeRef=...`. A verified definition alone does not verify Channel content, and a locale or descendant path never establishes trust.
+
+Git Channel acquisition, explicit Source Provider administration and binding selection, durable Channel snapshots, compatibility evaluation, catalog browsing, Bootstrap application, and Pack installation are available through their respective Management APIs and the Console. A Source Pack request identifies an exact Source version, Channel snapshot, catalog, and entry without accepting a client path or digest. Preview resolves the archive server-side and returns an installation pin plus a digest covering provenance, Pack identity, bindings, target scope, replacement options, and current conflict state. Installation rebuilds that preview and rejects a stale digest before delegating replacement, ownership, and uninstall to the existing Pack lifecycle. Periodic refresh remains a separate increment.
+
+Source owns the generic catalog and immutable snapshot-content resolution boundary. Pack owns the `PackCatalog` schema, catalog handler, preview and installation orchestration. The dependency is deliberately one-way from Packs to Source contracts; Source and Source Registry do not reference or execute the Pack lifecycle.

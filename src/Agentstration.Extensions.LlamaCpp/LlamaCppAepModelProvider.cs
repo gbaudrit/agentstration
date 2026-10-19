@@ -93,21 +93,28 @@ public sealed class LlamaCppAepModelProvider(HttpClient httpClient) : IAepModelP
         using var document = await JsonDocument.ParseAsync(
             await response.Content.ReadAsStreamAsync(cancellationToken),
             cancellationToken: cancellationToken);
-        var capabilities = await GetModelCapabilitiesAsync(cancellationToken);
+        var specification = await GetModelSpecificationAsync(cancellationToken);
         if (!document.RootElement.TryGetProperty("data", out var models) || models.ValueKind != JsonValueKind.Array) return [];
         var results = new List<AepModelDescriptor>();
         foreach (var model in models.EnumerateArray())
         {
             var id = GetString(model, "id");
             if (string.IsNullOrWhiteSpace(id)) continue;
-            var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
+            long? contextTokens = null;
             if (model.TryGetProperty("meta", out var meta) && meta.ValueKind == JsonValueKind.Object)
             {
-                AddMetadata(meta, metadata, "n_ctx_train", "contextLength");
-                AddMetadata(meta, metadata, "n_params", "parameterCount");
-                AddMetadata(meta, metadata, "size", "sizeBytes");
+                if (meta.TryGetProperty("n_ctx_train", out var context)
+                    && (context.ValueKind == JsonValueKind.Number && context.TryGetInt64(out var parsed)
+                        || context.ValueKind == JsonValueKind.String
+                        && long.TryParse(context.GetString(), System.Globalization.NumberStyles.None,
+                            System.Globalization.CultureInfo.InvariantCulture, out parsed))
+                    && parsed > 0)
+                    contextTokens = parsed;
             }
-            results.Add(new AepModelDescriptor(id, id, capabilities, metadata));
+            results.Add(new AepModelDescriptor(id, id, specification with
+            {
+                Limits = new AepModelLimits { ContextTokens = contextTokens }
+            }, new AepModelIdentity(Model: id)));
         }
         return results;
     }
@@ -127,27 +134,68 @@ public sealed class LlamaCppAepModelProvider(HttpClient httpClient) : IAepModelP
         catch (HttpRequestException exception) { return new AepProviderHealth("unreachable", exception.Message); }
     }
 
-    private async Task<IReadOnlyList<string>> GetModelCapabilitiesAsync(CancellationToken cancellationToken)
+    private async Task<AepModelSpecification> GetModelSpecificationAsync(CancellationToken cancellationToken)
     {
-        var capabilities = new List<string> { "chat", "streaming", "structuredOutput" };
+        bool? tools = null;
+        bool? reasoning = null;
+        bool? vision = null;
         try
         {
             using var response = await httpClient.GetAsync("props", cancellationToken);
-            if (!response.IsSuccessStatusCode) return capabilities;
-            using var document = await JsonDocument.ParseAsync(
-                await response.Content.ReadAsStreamAsync(cancellationToken),
-                cancellationToken: cancellationToken);
-            var root = document.RootElement;
-            if (ContainsEnabledCapability(root, "tool")) capabilities.Add("tools");
-            if (ContainsEnabledCapability(root, "reason")) capabilities.Add("reasoning");
-            if (root.TryGetProperty("modalities", out var modalities) && SupportsVision(modalities)) capabilities.Add("vision");
+            if (response.IsSuccessStatusCode)
+            {
+                using var document = await JsonDocument.ParseAsync(
+                    await response.Content.ReadAsStreamAsync(cancellationToken),
+                    cancellationToken: cancellationToken);
+                var root = document.RootElement;
+                tools = ContainsEnabledCapability(root, "tool");
+                reasoning = ContainsEnabledCapability(root, "reason");
+                vision = root.TryGetProperty("modalities", out var modalities) && SupportsVision(modalities);
+            }
         }
         catch (HttpRequestException)
         {
             // Model discovery remains useful when optional capability inspection is unavailable.
         }
-        return capabilities;
+        return new AepModelSpecification
+        {
+            Input = vision == true ? [AepModelContentType.Text, AepModelContentType.Image] : [AepModelContentType.Text],
+            Output = [AepModelContentType.Text],
+            Features = new AepModelFeatureSpecifications
+            {
+                Streaming = new() { Support = AepModelFeatureSupport.Native },
+                Tools = new()
+                {
+                    Support = ObservedSupport(tools),
+                    Modes = tools == true
+                        ? new Dictionary<AepModelToolMode, AepModelToolModeSpecification>
+                        {
+                            [AepModelToolMode.Function] = new()
+                        }
+                        : new Dictionary<AepModelToolMode, AepModelToolModeSpecification>()
+                },
+                StructuredOutput = new()
+                {
+                    Support = AepModelFeatureSupport.Native,
+                    Formats = new Dictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification>
+                    {
+                        [AepModelStructuredOutputFormat.JsonSchema] = new()
+                    }
+                },
+                Reasoning = new()
+                {
+                    Support = ObservedSupport(reasoning)
+                }
+            }
+        };
     }
+
+    private static AepModelFeatureSupport ObservedSupport(bool? value) => value switch
+    {
+        true => AepModelFeatureSupport.Native,
+        false => AepModelFeatureSupport.Unsupported,
+        null => AepModelFeatureSupport.Unknown
+    };
 
     private static JsonObject BuildRequest(AepChatRequest request, bool streaming)
     {
@@ -415,8 +463,6 @@ public sealed class LlamaCppAepModelProvider(HttpClient httpClient) : IAepModelP
     private static string MapRole(AepRole role) => role == AepRole.System ? "system" : role == AepRole.Assistant ? "assistant" : role == AepRole.Tool ? "tool" : "user";
     private static AepRole? MapRole(string? role) => role == "system" ? AepRole.System : role == "assistant" ? AepRole.Assistant : role == "tool" ? AepRole.Tool : role == "user" ? AepRole.User : null;
     private static AepFinishReason? MapFinishReason(string? reason) => reason == "stop" ? AepFinishReason.Stop : reason == "length" ? AepFinishReason.Length : reason == "tool_calls" ? AepFinishReason.ToolCalls : reason == "content_filter" ? AepFinishReason.ContentFilter : reason is null ? null : AepFinishReason.Other;
-    private static void AddMetadata(JsonElement source, IDictionary<string, string> target, string sourceName, string targetName) { if (source.TryGetProperty(sourceName, out var value)) target[targetName] = value.ToString(); }
-
     private sealed class ToolCallAccumulator
     {
         public string? Id { get; set; }

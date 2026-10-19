@@ -1,0 +1,57 @@
+{
+  "solution": {
+    "summary": "Coordinate customer support triage and resolution",
+    "outcomes": ["Classify requests", "Resolve known issues", "Escalate uncertain cases"],
+    "constraints": ["Require approval before external system access"]
+  },
+  "roles": [
+    {
+      "logicalId": "triage",
+      "displayName": "Triage specialist",
+      "purpose": "Classify incoming requests",
+      "responsibilities": ["Classify intent", "Assess urgency"],
+      "capabilities": ["Text analysis"]
+    },
+    {
+      "logicalId": "resolver",
+      "displayName": "Resolution specialist",
+      "purpose": "Prepare a grounded resolution",
+      "responsibilities": ["Research known guidance", "Draft resolution"],
+      "capabilities": ["Reasoning", "Retrieval"]
+    }
+  ],
+  "workflows": [
+    {
+      "logicalId": "support-resolution",
+      "displayName": "Support resolution",
+      "objective": "Resolve or explicitly escalate every request",
+      "participants": ["triage", "resolver"],
+      "collaboration": "Ordered"
+    }
+  ],
+  "integrations": [
+    {
+      "logicalId": "knowledge-access",
+      "displayName": "Knowledge access",
+      "purpose": "Retrieve approved support guidance",
+      "requiredCapabilities": ["Search support knowledge"],
+      "dataClassification": "internal",
+      "requiresHumanApproval": true
+    }
+  ],
+  "experiences": [
+    {
+      "logicalId": "support-chat",
+      "displayName": "Support chat",
+      "purpose": "Let employees request assistance",
+      "workflow": "support-resolution",
+      "audiences": ["employees"],
+      "interaction": "Conversation"
+    }
+  ],
+  "dependencies": [
+    { "from": "resolver", "to": "knowledge-access", "relationship": "requires" },
+    { "from": "support-chat", "to": "support-resolution", "relationship": "invokes" }
+  ],
+  "runtime": { "localOnly": false, "cloudAllowed": true }
+}

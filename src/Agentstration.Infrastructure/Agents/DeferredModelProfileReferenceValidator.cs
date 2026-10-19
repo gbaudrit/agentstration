@@ -1,4 +1,4 @@
-using Agentstration.Management.Abstractions;
+using Agentstration.Agents;
 using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.Agents;

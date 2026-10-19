@@ -1,12 +1,24 @@
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
+using Agentstration.Extensions;
+using Agentstration.Extensions.Aep;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Identity;
 using Agentstration.Infrastructure.Declarative;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
+using Agentstration.Models;
+using Agentstration.Parameters;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Core;
+using Agentstration.Runtime.Profiles;
+using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -15,6 +27,7 @@ namespace Agentstration.Infrastructure.Bootstrap;
 internal static class WorkspaceBootstrapResource
 {
     public const string ActiveFlowPlanningKind = "Flow:Active";
+    public static string PublishedFlowPlanningKind(string version) => $"Flow:Published:{version}";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public static T Parse<T>(BootstrapResourceDocument resource) =>
@@ -26,9 +39,10 @@ internal static class WorkspaceBootstrapResource
         BootstrapPlanningContext planning,
         string kind,
         string name,
-        ResourceNamespace @namespace)
+        ResourceNamespace @namespace,
+        BootstrapResourceDocument? resource = null)
     {
-        planning.Register(kind, name, PlanningParent(@namespace));
+        planning.Register(kind, name, PlanningParent(@namespace), resource);
         return new(BootstrapResourceDisposition.Create);
     }
 
@@ -46,7 +60,7 @@ internal static class WorkspaceBootstrapResource
 
 public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagementService service) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.ModelProvider;
+    public string Kind => ModelResourceKinds.ModelProvider;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -56,9 +70,24 @@ public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagemen
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<ModelProviderResource>(resource);
-        if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
-        await service.ValidateForCreateAsync(value, cancellationToken);
+        var plannedParameters = new Dictionary<ScopedResourceAddress, JsonElement>();
+        foreach (var binding in value.Definition.ValueBindings.Where(candidate =>
+                     candidate.Kind == ModelProviderValueBindingKind.Parameter))
+        {
+            var parameter = binding.Parameter!;
+            if (!planning.TryGetDocument(ParameterResourceKinds.Parameter, parameter.Address.Name,
+                    WorkspaceBootstrapResource.PlanningParent(parameter.Address.Namespace), out var planned))
+                continue;
+            var plannedParameter = WorkspaceBootstrapResource.Parse<ParameterResource>(planned);
+            var plannedScope = plannedParameter.ScopeRef ?? TargetScope(operation);
+            plannedParameters[ScopedResourceAddress.Create(plannedScope, plannedParameter.Namespace,
+                ParameterResourceKinds.Parameter, plannedParameter.Name)] = plannedParameter.Definition.Value;
+        }
+        await service.ValidateForCreateAsync(value, plannedParameters, cancellationToken);
         return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace);
     }
 
@@ -68,16 +97,61 @@ public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagemen
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<ModelProviderResource>(resource);
-        if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
         _ = await service.CreateAsync(value, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }
+
+    private static ResourceScopeRef TargetScope(BootstrapResourceOperationContext operation) =>
+        ResourceScopeRef.Tenant(operation.Target?.TenantId
+            ?? throw new InvalidOperationException("A Model Provider bootstrap resource requires an explicit Tenant target."));
+}
+
+public sealed class ParameterBootstrapResourceHandler(ParameterManagementService service) : IBootstrapResourceHandler
+{
+    public string Kind => ParameterResourceKinds.Parameter;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
+
+    public async Task<BootstrapResourcePlanResult> PlanAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        BootstrapPlanningContext planning,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<ParameterResource>(resource);
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Name, cancellationToken) is not null)
+            return new(BootstrapResourceDisposition.Skip);
+        await service.ValidateForCreateAsync(value, cancellationToken);
+        return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace, resource);
+    }
+
+    public async Task<BootstrapResourceApplyResult> ApplyAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<ParameterResource>(resource);
+        var scopeRef = value.ScopeRef ?? TargetScope(operation);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, value.Name, cancellationToken) is not null)
+            return BootstrapResourceApplyResult.Skipped;
+        _ = await service.CreateAsync(value, cancellationToken);
+        return BootstrapResourceApplyResult.Created;
+    }
+
+    private static ResourceScopeRef TargetScope(BootstrapResourceOperationContext operation) =>
+        ResourceScopeRef.Tenant(operation.Target?.TenantId
+            ?? throw new InvalidOperationException("A Parameter bootstrap resource requires an explicit Tenant target."));
 }
 
 public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagementService service) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.RuntimeProfile;
+    public string Kind => RuntimeProfileResourceKinds.RuntimeProfile;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -110,7 +184,7 @@ public sealed class ModelProfileBootstrapResourceHandler(
     ModelProfileManagementService service,
     ModelProviderManagementService providers) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.ModelProfile;
+    public string Kind => ModelResourceKinds.ModelProfile;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -123,7 +197,7 @@ public sealed class ModelProfileBootstrapResourceHandler(
         if (await service.GetAsync(value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         ValidateBasic(value);
-        var provider = value.Definition.Provider.Resolve(value.Namespace, ResourceKinds.ModelProvider);
+        var provider = value.Definition.Provider.Resolve(value.Namespace, ModelResourceKinds.ModelProvider);
         var existingProvider = await providers.GetAsync(provider.Namespace, provider.Name, cancellationToken);
         if (existingProvider is null
             && !WorkspaceBootstrapResource.IsAvailable(planning, provider.Kind, provider.Name, provider.Namespace))
@@ -155,12 +229,50 @@ public sealed class ModelProfileBootstrapResourceHandler(
     }
 }
 
+public sealed class ToolSetBootstrapResourceHandler(ToolSetService service) : IBootstrapResourceHandler
+{
+    public string Kind => ToolResourceKinds.ToolSet;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+
+    public async Task<BootstrapResourcePlanResult> PlanAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        BootstrapPlanningContext planning,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<ToolSetResource>(resource) with
+        {
+            ScopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value)
+        };
+        if (await service.GetExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
+            return new(BootstrapResourceDisposition.Skip);
+        ToolSetService.Validate(value);
+        return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace, resource);
+    }
+
+    public async Task<BootstrapResourceApplyResult> ApplyAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<ToolSetResource>(resource) with
+        {
+            ScopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value)
+        };
+        if (await service.GetExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
+            return BootstrapResourceApplyResult.Skipped;
+        _ = await service.CreateAsync(value, cancellationToken);
+        return BootstrapResourceApplyResult.Created;
+    }
+}
+
 public sealed class AgentBootstrapResourceHandler(
     AgentManagementService service,
     ModelProfileManagementService modelProfiles,
-    RuntimeProfileManagementService runtimeProfiles) : IBootstrapResourceHandler
+    RuntimeProfileManagementService runtimeProfiles,
+    ToolSetService serviceToolSets) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.Agent;
+    public string Kind => AgentResourceKinds.Agent;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -173,15 +285,24 @@ public sealed class AgentBootstrapResourceHandler(
         if (await service.GetAgentAsync(value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         ValidateBasic(value);
-        var model = value.Definition.ModelProfile.Resolve(value.Namespace, ResourceKinds.ModelProfile);
-        var runtime = value.Definition.RuntimeProfile.Resolve(value.Namespace, ResourceKinds.RuntimeProfile);
+        var model = value.Definition.ModelProfile.Resolve(value.Namespace, ModelResourceKinds.ModelProfile);
+        var runtime = value.Definition.RuntimeProfile.Resolve(value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
         var modelExists = await modelProfiles.GetAsync(model.Namespace, model.Name, cancellationToken) is not null;
         var runtimeExists = await runtimeProfiles.GetAsync(runtime.Namespace, runtime.Name, cancellationToken) is not null;
+        var toolSetsExist = true;
+        foreach (var assignment in value.Definition.ToolSets)
+        {
+            var ns = assignment.ToolSet.Namespace ?? value.Namespace;
+            var exists = await serviceToolSets.GetVersionAsync(ns, assignment.ToolSet.Name, assignment.Version, cancellationToken) is not null;
+            if (!exists && !WorkspaceBootstrapResource.IsAvailable(planning, ToolResourceKinds.ToolSet, assignment.ToolSet.Name, ns))
+                throw new InvalidOperationException($"Referenced ToolSet '{ns}/{assignment.ToolSet.Name}:{assignment.Version}' does not exist and was not planned earlier.");
+            toolSetsExist &= exists;
+        }
         if (!modelExists && !WorkspaceBootstrapResource.IsAvailable(planning, model.Kind, model.Name, model.Namespace))
             throw new InvalidOperationException($"Referenced model profile '{model}' does not exist and was not planned earlier.");
         if (!runtimeExists && !WorkspaceBootstrapResource.IsAvailable(planning, runtime.Kind, runtime.Name, runtime.Namespace))
             throw new InvalidOperationException($"Referenced runtime profile '{runtime}' does not exist and was not planned earlier.");
-        if (modelExists && runtimeExists)
+        if (modelExists && runtimeExists && toolSetsExist)
             await service.ValidateForCreateAsync(value, cancellationToken);
         return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace);
     }
@@ -210,7 +331,7 @@ public sealed class FlowBootstrapResourceHandler(
     IFlowDefinitionValidator graphValidator,
     TimeProvider timeProvider) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.Flow;
+    public string Kind => FlowResourceKinds.Flow;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -250,6 +371,11 @@ public sealed class FlowBootstrapResourceHandler(
                 WorkspaceBootstrapResource.ActiveFlowPlanningKind,
                 value.Metadata.Name,
                 WorkspaceBootstrapResource.PlanningParent(value.Metadata.Namespace));
+        if (value.Definition.Publish)
+            planning.Register(
+                WorkspaceBootstrapResource.PublishedFlowPlanningKind(value.Definition.Version),
+                value.Metadata.Name,
+                WorkspaceBootstrapResource.PlanningParent(value.Metadata.Namespace));
         return result;
     }
 
@@ -279,6 +405,121 @@ public sealed class FlowBootstrapResourceHandler(
     }
 }
 
+public sealed class KnowledgeSourceBootstrapResourceHandler(
+    KnowledgeSourceManagementService service,
+    DataSourceManagementService dataSources,
+    IKnowledgeFlowResolver flows) : IBootstrapResourceHandler
+{
+    public string Kind => KnowledgeResourceKinds.KnowledgeSource;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+
+    public async Task<BootstrapResourcePlanResult> PlanAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        BootstrapPlanningContext planning,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<KnowledgeSourceResource>(resource);
+        var scopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value);
+        value = value with { ScopeRef = scopeRef };
+        var id = new KnowledgeSourceId(value.Name, value.Namespace);
+        if (await service.GetExactAsync(scopeRef, id, cancellationToken) is not null)
+            return new(BootstrapResourceDisposition.Skip);
+        KnowledgeSourceManagementService.ValidateStructure(value);
+        foreach (var binding in value.Definition.DataSources)
+        {
+            var reference = binding.DataSource;
+            var ns = reference.Namespace ?? value.Namespace;
+            if (!WorkspaceBootstrapResource.IsAvailable(planning, DataSourceResourceKinds.DataSource,
+                    reference.Name, ns)
+                && await dataSources.GetAsync(ns, reference.Name, reference.ScopeRef, cancellationToken) is null)
+                throw new InvalidOperationException($"Referenced DataSource '{ns}/{reference.Name}' does not exist and was not planned earlier.");
+            await ValidateBindingAsync(value, binding.TransformationFlow, planning, flows, cancellationToken);
+        }
+        await ValidateBindingAsync(value, value.Definition.ProjectionFlow, planning, flows, cancellationToken);
+        await ValidateBindingAsync(value, value.Definition.RetrievalFlow, planning, flows, cancellationToken);
+        return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace, resource);
+    }
+
+    public async Task<BootstrapResourceApplyResult> ApplyAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<KnowledgeSourceResource>(resource);
+        var scopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value);
+        value = value with { ScopeRef = scopeRef };
+        if (await service.GetExactAsync(scopeRef, new(value.Name, value.Namespace), cancellationToken) is not null)
+            return BootstrapResourceApplyResult.Skipped;
+        _ = await service.CreateAsync(value, cancellationToken);
+        return BootstrapResourceApplyResult.Created;
+    }
+
+    private static async Task ValidateBindingAsync(
+        KnowledgeSourceResource source,
+        KnowledgeFlowTarget? target,
+        BootstrapPlanningContext planning,
+        IKnowledgeFlowResolver flows,
+        CancellationToken cancellationToken)
+    {
+        if (target is null) return;
+        var ns = target.Namespace ?? source.Namespace;
+        var plannedKind = target.UseActiveVersion
+            ? WorkspaceBootstrapResource.ActiveFlowPlanningKind
+            : WorkspaceBootstrapResource.PublishedFlowPlanningKind(target.Version!);
+        if (WorkspaceBootstrapResource.IsAvailable(planning, plannedKind, target.Name, ns)) return;
+        _ = await flows.ResolveAsync(source.ScopeRef!.Value, source.Namespace, target, cancellationToken);
+    }
+}
+
+internal sealed record DeclarativeKnowledgeSourceToolExposureDefinition
+{
+    public string Version { get; init; } = "1.0.0";
+    public bool RequiresApproval { get; init; }
+}
+
+public sealed class KnowledgeSourceToolExposureBootstrapResourceHandler(
+    KnowledgeSourceManagementService sources,
+    KnowledgeSourceToolExposureService exposures) : IBootstrapResourceHandler
+{
+    public string Kind => KnowledgeResourceKinds.KnowledgeSourceToolExposure;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+
+    public async Task<BootstrapResourcePlanResult> PlanAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        BootstrapPlanningContext planning,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeKnowledgeSourceToolExposureDefinition>>(resource);
+        var id = new KnowledgeSourceId(value.Metadata.Name, value.Metadata.Namespace);
+        if (await exposures.GetAsync(id, cancellationToken) is not null)
+            return new(BootstrapResourceDisposition.Skip);
+
+        var source = await sources.GetAsync(id, cancellationToken);
+        if (source is null && !WorkspaceBootstrapResource.IsAvailable(
+                planning, KnowledgeResourceKinds.KnowledgeSource, id.Value, id.Namespace))
+            throw new InvalidOperationException($"Referenced KnowledgeSource '{id}' does not exist and was not planned earlier.");
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(value.Definition.Version);
+        planning.Register(ToolResourceKinds.ToolSet, id.Value, WorkspaceBootstrapResource.PlanningParent(id.Namespace));
+        return WorkspaceBootstrapResource.Created(planning, Kind, id.Value, id.Namespace, resource);
+    }
+
+    public async Task<BootstrapResourceApplyResult> ApplyAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        CancellationToken cancellationToken)
+    {
+        var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeKnowledgeSourceToolExposureDefinition>>(resource);
+        var id = new KnowledgeSourceId(value.Metadata.Name, value.Metadata.Namespace);
+        if (await exposures.GetAsync(id, cancellationToken) is not null)
+            return BootstrapResourceApplyResult.Skipped;
+        _ = await exposures.PublishAsync(id, value.Definition.Version, value.Definition.RequiresApproval, cancellationToken);
+        return BootstrapResourceApplyResult.Created;
+    }
+}
+
 public sealed class EntryBootstrapResourceHandler(
     EntryAdministrationService service,
     IWorkplaceRepository repository,
@@ -286,7 +527,7 @@ public sealed class EntryBootstrapResourceHandler(
     FlowService flows,
     TimeProvider timeProvider) : IBootstrapResourceHandler
 {
-    public string Kind => ResourceKinds.Entry;
+    public string Kind => EntryResourceKinds.Entry;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
@@ -336,6 +577,7 @@ public sealed class EntryBootstrapResourceHandler(
             DisplayName = value.Definition.DisplayName ?? value.Metadata.Name,
             Description = value.Definition.Description,
             Presentation = value.Definition.Presentation,
+            Exposure = value.Definition.Exposure,
             Binding = value.Definition.Binding,
             Behavior = value.Definition.Behavior,
             UpdatedAt = now
@@ -354,7 +596,7 @@ public sealed class EntryBootstrapResourceHandler(
             var exists = await agents.GetAgentAsync(targetNamespace, draft.Binding.ResourceId, cancellationToken) is not null;
             if (!exists && !WorkspaceBootstrapResource.IsAvailable(
                     planning,
-                    ResourceKinds.Agent,
+                    AgentResourceKinds.Agent,
                     draft.Binding.ResourceId,
                     targetNamespace))
                 throw new InvalidOperationException(

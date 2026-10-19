@@ -1,7 +1,9 @@
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.ModelProviders;
@@ -21,16 +23,55 @@ public sealed record ModelProviderConfiguration
     public string? DisplayName { get; init; }
     public ExtensionRegistrationSource RegistrationSource { get; init; } = ExtensionRegistrationSource.Manual;
     public string? EndpointDisplayName { get; init; }
+    public ResourceScopeRef? ExtensionScopeRef { get; init; }
+    public AepTransportAuthenticationMode AuthenticationMode { get; init; }
     public ResourceReference? Credential { get; init; }
+    public IReadOnlyList<ModelProviderValueBinding> ValueBindings { get; init; } = [];
+    public IReadOnlyDictionary<string, ModelSpecificationOverride> SpecificationOverrides { get; init; }
+        = new Dictionary<string, ModelSpecificationOverride>(StringComparer.Ordinal);
 }
 
 public sealed record ModelDeploymentConfiguration
 {
     public required string Name { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     public required string ProviderName { get; init; }
     public ResourceNamespace ProviderNamespace { get; init; } = ResourceNamespace.Default;
     public required string ModelName { get; init; }
+    public ModelSpecification? EffectiveSpecification { get; init; }
     public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
+    public IReadOnlyList<SecretBinding> SecretBindings { get; init; } = [];
+}
+
+public static class ModelSpecificationCapabilities
+{
+    public static AgentRuntimeCapabilities Map(ModelSpecification specification)
+    {
+        ArgumentNullException.ThrowIfNull(specification);
+        return new AgentRuntimeCapabilities
+        {
+            Streaming = Feature(specification.Features.Streaming?.Support),
+            Tools = Feature(specification.Features.Tools?.Support),
+            StructuredOutput = Feature(specification.Features.StructuredOutput?.Support),
+            Reasoning = new ReasoningCapability
+            {
+                Support = Support(specification.Features.Reasoning?.Support),
+                SupportedEfforts = specification.Features.Reasoning?.Efforts.Keys
+                    .Select(value => value.ToString().ToLowerInvariant())
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? []
+            }
+        };
+    }
+
+    private static FeatureCapability Feature(ModelFeatureSupport? support) => new(Support(support));
+
+    private static CapabilitySupport Support(ModelFeatureSupport? support) => support switch
+    {
+        ModelFeatureSupport.Native => CapabilitySupport.Native,
+        ModelFeatureSupport.Emulated => CapabilitySupport.Emulated,
+        ModelFeatureSupport.Partial => CapabilitySupport.Partial,
+        _ => CapabilitySupport.Unsupported
+    };
 }
 
 public sealed record ModelProfileConfiguration
@@ -66,8 +107,11 @@ public sealed record DiscoveredModel(
     string Name,
     string DisplayName,
     string Status,
-    IReadOnlyList<string> Capabilities,
-    IReadOnlyDictionary<string, string> Metadata);
+    ModelSpecification Specification,
+    ModelIdentity? Identity = null,
+    ModelSpecification? ObservedSpecification = null,
+    ModelSpecificationOverride? SpecificationOverride = null,
+    string? ResourceName = null);
 
 public sealed record ModelProviderHealth(string Status, string? Details = null);
 

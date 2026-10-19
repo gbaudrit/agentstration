@@ -1,9 +1,12 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Management.Core;
+using Agentstration.Extensions;
+using Agentstration.Extensions.Aep;
+using Agentstration.Identity;
+using Agentstration.Models;
+using Agentstration.Packs;
+using Agentstration.ResourceManagement;
 using YamlDotNet.Core;
 
 namespace Agentstration.Infrastructure.Packs;

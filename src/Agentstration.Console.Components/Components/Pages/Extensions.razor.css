@@ -1,0 +1,153 @@
+.enrollment-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 32px;
+}
+
+.enrollment-cell .text-button {
+    padding: 4px 0;
+}
+
+.enrollment-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.enrollment-status {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.enrollment-status small {
+    display: block;
+    line-height: 1.35;
+}
+
+.enrollment-list {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.enrollment-card {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.15fr) minmax(200px, .9fr) minmax(360px, 1.6fr);
+    gap: var(--space-4);
+    align-items: center;
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.enrollment-card-summary,
+.enrollment-identity,
+.enrollment-endpoint,
+.enrollment-action-layout {
+    min-width: 0;
+}
+
+.enrollment-card-summary {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.enrollment-identity,
+.enrollment-endpoint {
+    display: grid;
+    gap: 4px;
+}
+
+.enrollment-identity code,
+.enrollment-endpoint a {
+    overflow-wrap: anywhere;
+}
+
+.enrollment-version,
+.enrollment-identity small,
+.enrollment-endpoint small,
+.enrollment-label {
+    color: var(--muted);
+}
+
+.enrollment-label {
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.enrollment-action-layout {
+    display: grid;
+    gap: var(--space-3);
+    padding-left: var(--space-4);
+    border-left: 1px solid var(--border);
+}
+
+.enrollment-management-actions {
+    justify-content: flex-start;
+}
+
+.inventory-contribution-actions {
+    display: grid;
+    gap: 4px;
+    margin-top: var(--space-2);
+    font-size: .75rem;
+}
+
+.enrollment-scope {
+    max-width: none;
+}
+
+.enrollment-scope ::deep label {
+    display: grid;
+    grid-template-columns: minmax(180px, 230px) minmax(170px, 1fr);
+    align-items: center;
+    gap: 5px 10px;
+    margin: 0;
+}
+
+.enrollment-scope ::deep label > span {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.enrollment-scope ::deep select {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+}
+
+@media (max-width: 1180px) {
+    .enrollment-card {
+        grid-template-columns: minmax(210px, .9fr) minmax(200px, .8fr) minmax(300px, 1.2fr);
+    }
+
+    .enrollment-scope ::deep label {
+        grid-template-columns: 1fr;
+    }
+
+    .enrollment-scope ::deep label > span {
+        grid-column: 1;
+    }
+}
+
+@media (max-width: 860px) {
+    .enrollment-card {
+        grid-template-columns: 1fr;
+    }
+
+    .enrollment-action-layout {
+        padding-top: var(--space-3);
+        padding-left: 0;
+        border-top: 1px solid var(--border);
+        border-left: 0;
+    }
+
+}

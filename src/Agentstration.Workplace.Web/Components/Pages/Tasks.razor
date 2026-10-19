@@ -16,11 +16,11 @@ else if (error is not null)
 }
 else
 {
-    <div class="activity-tabs" role="tablist" aria-label="@T("Activity")">
-        <button id="conversations-tab" type="button" role="tab" class="@(activeTab == ActivityTab.Conversations ? "is-active" : null)" aria-selected="@(activeTab == ActivityTab.Conversations ? "true" : "false")" aria-controls="conversations-panel" @onclick="() => activeTab = ActivityTab.Conversations">
+    <div class="activity-tabs" role="tablist" aria-label="@T("Activity")" data-testid="workplace-activity">
+        <button id="conversations-tab" type="button" role="tab" class="@(activeTab == ActivityTab.Conversations ? "is-active" : null)" aria-selected="@(activeTab == ActivityTab.Conversations ? "true" : "false")" aria-controls="conversations-panel" @onclick="() => activeTab = ActivityTab.Conversations" data-testid="workplace-conversations-tab">
             <span>@T("Conversations")</span><span class="tab-count">@conversations.Count</span>
         </button>
-        <button id="tasks-tab" type="button" role="tab" class="@(activeTab == ActivityTab.Tasks ? "is-active" : null)" aria-selected="@(activeTab == ActivityTab.Tasks ? "true" : "false")" aria-controls="tasks-panel" @onclick="() => activeTab = ActivityTab.Tasks">
+        <button id="tasks-tab" type="button" role="tab" class="@(activeTab == ActivityTab.Tasks ? "is-active" : null)" aria-selected="@(activeTab == ActivityTab.Tasks ? "true" : "false")" aria-controls="tasks-panel" @onclick="() => activeTab = ActivityTab.Tasks" data-testid="workplace-tasks-tab">
             <span>@T("Tasks")</span><span class="tab-count">@tasks.Count</span>
         </button>
     </div>
@@ -41,7 +41,7 @@ else
                     <div class="conversation-cards">
                         @foreach (var conversation in conversations)
                         {
-                            <a class="conversation-list-card" href="@ConversationUrl(conversation.Id)">
+                            <a class="conversation-list-card" href="@ConversationUrl(conversation.Id)" data-testid="workplace-conversation-card" data-conversation-id="@conversation.Id">
                                 <span class="conversation-icon" aria-hidden="true"><UiIcon Name="message-chatbot" /></span>
                                 <span class="conversation-copy">
                                     <strong>@ConversationTitle(conversation)</strong>
@@ -85,7 +85,7 @@ else
                     <div class="task-cards">
                         @foreach (var task in FilteredTasks)
                         {
-                            <a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")">
+                            <a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")" data-testid="workplace-task-card" data-task-id="@task.Id">
                                 <div><TaskStatusBadge Value="task.Status" /><h3>@task.Title</h3></div>
                                 <small>@T("Updated") @task.UpdatedAt.LocalDateTime.ToString("g")</small>
                             </a>

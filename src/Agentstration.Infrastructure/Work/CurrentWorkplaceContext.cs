@@ -1,5 +1,5 @@
 using Agentstration.Application.Work;
-using Agentstration.Management.Abstractions;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.Work;
@@ -7,4 +7,5 @@ namespace Agentstration.Infrastructure.Work;
 public sealed class CurrentWorkplaceContext(ICurrentRequestContext requestContext) : IWorkplaceContext
 {
     public WorkspaceId WorkspaceId => new(requestContext.Current.WorkspaceId);
+    public Guid PrincipalId => requestContext.Current.PrincipalId;
 }

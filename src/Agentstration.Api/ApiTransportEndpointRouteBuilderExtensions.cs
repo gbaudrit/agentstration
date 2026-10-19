@@ -1,0 +1,63 @@
+using Agentstration.Agents.Api;
+using Agentstration.Artifacts.Api;
+using Agentstration.Bootstrap.Api;
+using Agentstration.DataSources.Api;
+using Agentstration.Extensions.Api;
+using Agentstration.Flows.Api;
+using Agentstration.Identity.Api;
+using Agentstration.Infrastructure;
+using Agentstration.Knowledge.Api;
+using Agentstration.Models.Api;
+using Agentstration.Packs.Api;
+using Agentstration.Parameters.Api;
+using Agentstration.ResourcePlanning.Api;
+using Agentstration.Resources.Api;
+using Agentstration.Runtime.Api;
+using Agentstration.Schemas.Api;
+using Agentstration.Secrets.Api;
+using Agentstration.Sources.Api;
+using Agentstration.Tools.Api;
+using Agentstration.Triggers.Api;
+using Agentstration.Web.Configuration;
+using Agentstration.Work.Api;
+using Agentstration.Workplace.Api;
+
+namespace Agentstration.Web;
+
+public static class ApiTransportEndpointRouteBuilderExtensions
+{
+    public static WebApplication MapAgentstrationApi(this WebApplication app)
+    {
+        if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+            app.MapAgentstrationOpenApi();
+
+        app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
+        app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
+        app.MapGet("/health/ready", (IInstanceInitializationCoordinator initialization) => initialization.IsReady
+            ? Results.Ok(new { status = "ready" })
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)).AllowAnonymous();
+        app.MapIdentityApi();
+        app.MapArtifactsApi();
+        app.MapKnowledgeApi();
+        app.MapDataSourcesApi();
+        app.MapBootstrapApi();
+        app.MapAgentsApi();
+        app.MapTriggersApi();
+        app.MapSourcesApi();
+        app.MapModelsApi();
+        app.MapPacksApi();
+        app.MapParametersApi();
+        app.MapSchemasApi();
+        app.MapSecretsApi();
+        app.MapToolsApi();
+        app.MapResourcesApi();
+        app.MapResourcePlanningApi();
+        app.MapExtensionsApi();
+        app.MapWorkApi();
+        app.MapWorkplaceApi();
+        app.MapFlowsApi();
+        app.MapRuntimeApi();
+        if (app.Environment.IsDevelopment()) app.MapModelDiagnostics();
+        return app;
+    }
+}

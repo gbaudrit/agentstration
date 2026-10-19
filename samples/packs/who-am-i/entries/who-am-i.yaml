@@ -5,6 +5,12 @@ metadata:
 definition:
   displayName: Who Am I?
   description: Open the conversational shell of the Who Am I? sample.
+  exposure:
+    version: 1
+    surfaces:
+      - workplace
+    workplacePlacements:
+      - owningSpace
   presentation:
     kind: prompt
     placeholder: Ask a yes-or-no question or make an identity guess…

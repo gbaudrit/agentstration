@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Management.Abstractions;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Models;
 
 namespace Agentstration.ModelProviders;
 
@@ -54,7 +55,8 @@ public sealed record ExtensionInspection(
     ExtensionIdentity? Extension,
     IReadOnlyList<ExtensionContribution> Contributions,
     IReadOnlyList<ExtensionOptionSet> OptionSets,
-    string? Details = null);
+    string? Details = null,
+    IReadOnlyList<AepValueRequirement>? ValueRequirements = null);
 
 public interface IExtensionInspector
 {
@@ -67,6 +69,10 @@ public interface IExtensionInspector
         string registrationName,
         Uri endpoint,
         CancellationToken cancellationToken = default);
+    ValueTask<ExtensionInspection> InspectAsync(
+        ExtensionRegistrationResource registration,
+        CancellationToken cancellationToken = default) =>
+        InspectAsync(registration.Name, registration.Definition.Endpoint, cancellationToken);
 }
 
 public sealed record ExtensionOptionValidationIssue(string Path, string Code, string Message);

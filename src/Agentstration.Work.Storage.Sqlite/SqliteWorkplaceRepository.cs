@@ -178,6 +178,19 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpsertEntryDraftAsync(EntryDraft draft, long? expectedRevision, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(draft);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var key = EntryStorageKey(draft.WorkspaceId, draft.Id);
+        var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        var actualRevision = document is null ? (long?)null : Deserialize<EntryDraft>(document.Payload).Revision;
+        if (actualRevision != expectedRevision) throw new WorkValidationException("entry_revision_conflict", "The Entry changed since the proposal was verified.");
+        if (document is null) context.EntryDrafts.Add(new EntryDraftDocument { Id = key, WorkspaceId = draft.WorkspaceId.ToString(), Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -205,7 +218,7 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         }
     }
 
-    public async Task<IReadOnlyList<WorkplaceInteraction>> ListEntryInteractionsAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceInteraction>> ListEntryInteractionsForAdministrationAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payloads = await context.Interactions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
@@ -220,7 +233,16 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         catch (DbUpdateException exception) { throw new WorkplaceConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
     }
 
-    public async Task<WorkplaceInteraction?> GetInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
+    public async Task<WorkplaceInteraction?> GetInteractionAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, InteractionId interactionId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.Interactions.AsNoTracking()
+            .Where(value => value.Id == interactionId.ToString() && value.WorkspaceId == workspaceId.ToString() && value.OwnerPrincipalId == ownerPrincipalId.ToString("D"))
+            .Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceInteraction>(payload);
+    }
+
+    public async Task<WorkplaceInteraction?> GetInteractionForProjectionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payload = await context.Interactions.AsNoTracking()
@@ -229,11 +251,11 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         return payload is null ? null : Deserialize<WorkplaceInteraction>(payload);
     }
 
-    public async Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, int take, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, int take, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payloads = await context.Interactions.AsNoTracking()
-            .Where(value => value.WorkspaceId == workspaceId.ToString())
+            .Where(value => value.WorkspaceId == workspaceId.ToString() && value.OwnerPrincipalId == ownerPrincipalId.ToString("D"))
             .OrderByDescending(value => value.LastActivityAt)
             .Take(Math.Clamp(take, 1, 100))
             .Select(value => value.Payload)
@@ -245,7 +267,8 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         if (interaction.Version <= expectedVersion) throw new WorkplaceConcurrencyException("The Interaction version must increase before it is saved.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Interactions.SingleOrDefaultAsync(value => value.Id == interaction.Id.ToString() && value.WorkspaceId == interaction.WorkspaceId.ToString(), cancellationToken)
+        var ownerKey = interaction.OwnerPrincipalId.ToString("D");
+        var document = await context.Interactions.SingleOrDefaultAsync(value => value.Id == interaction.Id.ToString() && value.WorkspaceId == interaction.WorkspaceId.ToString() && value.OwnerPrincipalId == ownerKey, cancellationToken)
             ?? throw new KeyNotFoundException($"Interaction '{interaction.Id}' was not found in Workspace '{interaction.WorkspaceId}'.");
         if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The supplied Interaction version is stale.");
         document.Status = interaction.Status;
@@ -367,6 +390,7 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         Id = interaction.Id.ToString(),
         WorkspaceId = interaction.WorkspaceId.ToString(),
+        OwnerPrincipalId = interaction.OwnerPrincipalId.ToString("D"),
         EntryId = interaction.EntryId.Value,
         Status = interaction.Status,
         LastActivityAt = interaction.LastActivityAt,

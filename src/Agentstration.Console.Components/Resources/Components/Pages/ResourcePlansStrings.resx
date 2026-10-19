@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title" xml:space="preserve"><value>Resource Plans</value></data>
+  <data name="ListDescription" xml:space="preserve"><value>Review functional plans and proposed resource changes before any application.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Filters" xml:space="preserve"><value>Plan filters</value></data>
+  <data name="Status" xml:space="preserve"><value>Status</value></data>
+  <data name="AllStatuses" xml:space="preserve"><value>All statuses</value></data>
+  <data name="CurrentWorkspace" xml:space="preserve"><value>Workspace: {0}</value></data>
+  <data name="Loading" xml:space="preserve"><value>Loading Resource Plans…</value></data>
+  <data name="EmptyTitle" xml:space="preserve"><value>No Resource Plans</value></data>
+  <data name="EmptyDescription" xml:space="preserve"><value>Plans created by a Flow or the API in this Workspace will appear here.</value></data>
+  <data name="ListLabel" xml:space="preserve"><value>Resource Plans</value></data>
+  <data name="Plan" xml:space="preserve"><value>Plan</value></data>
+  <data name="Scope" xml:space="preserve"><value>Workspace</value></data>
+  <data name="Changes" xml:space="preserve"><value>Proposed changes</value></data>
+  <data name="Validation" xml:space="preserve"><value>Verification</value></data>
+  <data name="Updated" xml:space="preserve"><value>Updated</value></data>
+  <data name="Revision" xml:space="preserve"><value>Revision {0}</value></data>
+  <data name="Stale" xml:space="preserve"><value>Stale</value></data>
+  <data name="NotValidated" xml:space="preserve"><value>Proposal not checked yet</value></data>
+  <data name="Page" xml:space="preserve"><value>Page {0}</value></data>
+  <data name="Pages" xml:space="preserve"><value>Plan pages</value></data>
+  <data name="Previous" xml:space="preserve"><value>Previous</value></data>
+  <data name="Next" xml:space="preserve"><value>Next</value></data>
+  <data name="Open" xml:space="preserve"><value>Open</value></data>
+  <data name="DetailDescription" xml:space="preserve"><value>Review the functional proposal and its materialized changes.</value></data>
+  <data name="BackToPlans" xml:space="preserve"><value>Back to plans</value></data>
+  <data name="NotFound" xml:space="preserve"><value>Plan not found</value></data>
+  <data name="NotFoundDescription" xml:space="preserve"><value>This Resource Plan is unavailable in the current Workspace.</value></data>
+  <data name="PlanIdentity" xml:space="preserve"><value>Plan identity</value></data>
+  <data name="Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="StaleChangeSet" xml:space="preserve"><value>ChangeSet belongs to an earlier revision</value></data>
+  <data name="Rematerialize" xml:space="preserve"><value>Refresh proposal</value></data>
+  <data name="CreateChangeSet" xml:space="preserve"><value>Save this proposal</value></data>
+  <data name="Revalidate" xml:space="preserve"><value>Check proposal</value></data>
+  <data name="Materialization" xml:space="preserve"><value>Current materialization</value></data>
+  <data name="Proposals" xml:space="preserve"><value>{0} proposed resources</value></data>
+  <data name="ReviewViews" xml:space="preserve"><value>Resource Plan review views</value></data>
+  <data name="FunctionalIntent" xml:space="preserve"><value>Functional intent</value></data>
+  <data name="Solution" xml:space="preserve"><value>Solution</value></data>
+  <data name="Roles" xml:space="preserve"><value>Roles</value></data>
+  <data name="Workflows" xml:space="preserve"><value>Workflows</value></data>
+  <data name="Integrations" xml:space="preserve"><value>Integrations</value></data>
+  <data name="Experiences" xml:space="preserve"><value>Experiences</value></data>
+  <data name="Retirements" xml:space="preserve"><value>Planned retirements</value></data>
+  <data name="Retirement.Role" xml:space="preserve"><value>Role</value></data>
+  <data name="Retirement.Workflow" xml:space="preserve"><value>Workflow</value></data>
+  <data name="Retirement.Experience" xml:space="preserve"><value>Experience</value></data>
+  <data name="NothingPlanned" xml:space="preserve"><value>Nothing planned for this plan.</value></data>
+  <data name="FunctionalBoundary" xml:space="preserve"><value>Functional intent is separate from the concrete Resources proposed by Agentstration.</value></data>
+  <data name="NoChangeSets" xml:space="preserve"><value>No proposal has been saved for this revision. Choose agent profiles to review a plan proposal.</value></data>
+  <data name="ChangeSet" xml:space="preserve"><value>Displayed proposal</value></data>
+  <data name="ChangeSetOption" xml:space="preserve"><value>Revision {0} · {1}</value></data>
+  <data name="ChangeSetRevision" xml:space="preserve"><value>Plan revision {0}</value></data>
+  <data name="DependsOn" xml:space="preserve"><value>Depends on:</value></data>
+  <data name="NoDifferences" xml:space="preserve"><value>No resource fields differ.</value></data>
+  <data name="Field" xml:space="preserve"><value>Field</value></data>
+  <data name="Current" xml:space="preserve"><value>Current</value></data>
+  <data name="Proposed" xml:space="preserve"><value>Proposed</value></data>
+  <data name="Graph" xml:space="preserve"><value>Dependency graph</value></data>
+  <data name="GraphLabel" xml:space="preserve"><value>Directed dependency graph of proposed Resources</value></data>
+  <data name="GraphHint" xml:space="preserve"><value>Select a resource to see its details. Arrows point from a dependency to the resource that uses it.</value></data>
+  <data name="CloseNodeDetails" xml:space="preserve"><value>Close resource details</value></data>
+  <data name="ResourceKind" xml:space="preserve"><value>Resource type</value></data>
+  <data name="Operation" xml:space="preserve"><value>Change</value></data>
+  <data name="ResourceName" xml:space="preserve"><value>Proposed name</value></data>
+  <data name="NoDependencies" xml:space="preserve"><value>None</value></data>
+  <data name="ValidatedAt" xml:space="preserve"><value>Checked:</value></data>
+  <data name="StaleValidation" xml:space="preserve"><value>Verification is stale</value></data>
+  <data name="NoIssues" xml:space="preserve"><value>No issues found.</value></data>
+  <data name="ConcreteProposal" xml:space="preserve"><value>Materialized proposal</value></data>
+  <data name="ChangesIntro" xml:space="preserve"><value>Review the resources Agentstration proposes to create or change. Expand a card’s details to compare its fields.</value></data>
+  <data name="CreatedAt" xml:space="preserve"><value>Created {0}</value></data>
+  <data name="ChangeSummary" xml:space="preserve"><value>Change summary</value></data>
+  <data name="ShowFields" xml:space="preserve"><value>Compare {0} fields</value></data>
+  <data name="ShowField" xml:space="preserve"><value>Compare 1 field</value></data>
+  <data name="Yes" xml:space="preserve"><value>Yes</value></data>
+  <data name="No" xml:space="preserve"><value>No</value></data>
+  <data name="OperationPlural.Create" xml:space="preserve"><value>Creations</value></data>
+  <data name="OperationPlural.Update" xml:space="preserve"><value>Updates</value></data>
+  <data name="OperationPlural.Delete" xml:space="preserve"><value>Deletions</value></data>
+  <data name="OperationPlural.NoOp" xml:space="preserve"><value>No changes</value></data>
+  <data name="TechnicalDetails" xml:space="preserve"><value>Technical details</value></data>
+  <data name="Kind.Agent" xml:space="preserve"><value>Agent</value></data>
+  <data name="Kind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="Kind.Entry" xml:space="preserve"><value>Entry</value></data>
+  <data name="Field.Other" xml:space="preserve"><value>Other property</value></data>
+  <data name="Field.FlowSpec" xml:space="preserve"><value>Flow configuration</value></data>
+  <data name="Field.Presentation" xml:space="preserve"><value>Presentation</value></data>
+  <data name="Field.Binding" xml:space="preserve"><value>Target binding</value></data>
+  <data name="Field.definition.displayName" xml:space="preserve"><value>Display name</value></data>
+  <data name="Field.definition.description" xml:space="preserve"><value>Description</value></data>
+  <data name="Field.definition.instructions" xml:space="preserve"><value>Instructions</value></data>
+  <data name="Field.definition.behaviors" xml:space="preserve"><value>Capabilities</value></data>
+  <data name="Field.definition.handler" xml:space="preserve"><value>Agent type</value></data>
+  <data name="Field.definition.modelProfile.name" xml:space="preserve"><value>Model profile</value></data>
+  <data name="Field.definition.modelProfile.namespace" xml:space="preserve"><value>Model profile namespace</value></data>
+  <data name="Field.definition.runtimeProfile.name" xml:space="preserve"><value>Runtime profile</value></data>
+  <data name="Field.definition.runtimeProfile.namespace" xml:space="preserve"><value>Runtime profile namespace</value></data>
+  <data name="Field.definition.tools" xml:space="preserve"><value>Tools</value></data>
+  <data name="Field.definition.version" xml:space="preserve"><value>Version</value></data>
+  <data name="Field.definition.enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="Field.definition.spec.flowKind" xml:space="preserve"><value>Flow type</value></data>
+  <data name="Field.definition.spec.pattern.strategy" xml:space="preserve"><value>Collaboration mode</value></data>
+  <data name="Field.definition.presentation.kind" xml:space="preserve"><value>Experience type</value></data>
+  <data name="Field.definition.binding.resourceId" xml:space="preserve"><value>Connected flow</value></data>
+  <data name="Field.definition.behavior.allowConversation" xml:space="preserve"><value>Conversation allowed</value></data>
+  <data name="Field.definition.publish" xml:space="preserve"><value>Publish</value></data>
+  <data name="Field.definition.activate" xml:space="preserve"><value>Activate</value></data>
+  <data name="Value.definition.spec.flowKind.direct" xml:space="preserve"><value>Direct</value></data>
+  <data name="Value.definition.spec.flowKind.routing" xml:space="preserve"><value>Routing</value></data>
+  <data name="Value.definition.spec.flowKind.workflow" xml:space="preserve"><value>Workflow</value></data>
+  <data name="Value.definition.spec.flowKind.orchestration" xml:space="preserve"><value>Orchestration</value></data>
+  <data name="Value.definition.spec.flowKind.composite" xml:space="preserve"><value>Composite</value></data>
+  <data name="Value.definition.spec.pattern.strategy.sequential" xml:space="preserve"><value>Sequential</value></data>
+  <data name="Value.definition.spec.pattern.strategy.concurrent" xml:space="preserve"><value>Parallel</value></data>
+  <data name="Value.definition.spec.pattern.strategy.handoff" xml:space="preserve"><value>Handoff</value></data>
+  <data name="Value.definition.spec.pattern.strategy.groupChat" xml:space="preserve"><value>Group chat</value></data>
+  <data name="Value.definition.spec.pattern.strategy.magentic" xml:space="preserve"><value>Adaptive</value></data>
+  <data name="ReviewResult" xml:space="preserve"><value>Review result</value></data>
+  <data name="ValidationIntro" xml:space="preserve"><value>Check what needs attention before these resources can be applied.</value></data>
+  <data name="ValidationState" xml:space="preserve"><value>Verification result</value></data>
+  <data name="ValidationReadyTitle" xml:space="preserve"><value>Ready for the next step</value></data>
+  <data name="ValidationReadyDescription" xml:space="preserve"><value>No blocking issue was found. Review any warnings below.</value></data>
+  <data name="ValidationIssueSingular" xml:space="preserve"><value>1 issue to resolve</value></data>
+  <data name="ValidationIssuePlural" xml:space="preserve"><value>{0} issues to resolve</value></data>
+  <data name="ValidationBlockedDescription" xml:space="preserve"><value>Resolve the issues below, then check the proposal again.</value></data>
+  <data name="Severity.Error" xml:space="preserve"><value>Blocking issue</value></data>
+  <data name="Severity.Warning" xml:space="preserve"><value>Warning</value></data>
+  <data name="UnknownProfile" xml:space="preserve"><value>unknown</value></data>
+  <data name="Issue.ModelProfile.Title" xml:space="preserve"><value>Model profile needs attention</value></data>
+  <data name="Issue.ModelProfile.Description" xml:space="preserve"><value>The model profile “{0}” referenced by this resource is missing or invalid.</value></data>
+  <data name="Issue.ModelProfile.Action" xml:space="preserve"><value>Create or repair this model profile, then check the proposal again.</value></data>
+  <data name="Issue.Canonical.Title" xml:space="preserve"><value>Proposed resource is invalid</value></data>
+  <data name="Issue.Canonical.Description" xml:space="preserve"><value>This resource does not satisfy the platform validation rules. Open technical details for the exact reason.</value></data>
+  <data name="Issue.Conflict.Title" xml:space="preserve"><value>Resource already exists</value></data>
+  <data name="Issue.Conflict.Description" xml:space="preserve"><value>The resource changed since materialization. Re-materialize the plan before continuing.</value></data>
+  <data name="Issue.Stale.Title" xml:space="preserve"><value>Current resource has changed</value></data>
+  <data name="Issue.Stale.Description" xml:space="preserve"><value>The saved comparison is no longer current. Re-materialize the plan before continuing.</value></data>
+  <data name="Issue.Dependency.Title" xml:space="preserve"><value>Dependency needs attention</value></data>
+  <data name="Issue.Dependency.Description" xml:space="preserve"><value>A required resource is missing or ordered incorrectly. Review the dependencies and materialize again.</value></data>
+  <data name="Issue.Generic.Title" xml:space="preserve"><value>Review required</value></data>
+  <data name="Issue.Generic.Description" xml:space="preserve"><value>This proposal needs attention. Open technical details for the exact reason.</value></data>
+  <data name="Activity" xml:space="preserve"><value>Activity and provenance</value></data>
+  <data name="ActivityKicker" xml:space="preserve"><value>Plan history</value></data>
+  <data name="ActivityIntro" xml:space="preserve"><value>Review where this plan came from and the actions recorded throughout its lifecycle.</value></data>
+  <data name="OriginTitle" xml:space="preserve"><value>Plan origin</value></data>
+  <data name="OriginDescription" xml:space="preserve"><value>Identifiers associated with the creation of this plan.</value></data>
+  <data name="HistoryTitle" xml:space="preserve"><value>Event history</value></data>
+  <data name="HistoryDescription" xml:space="preserve"><value>Most recent events first.</value></data>
+  <data name="HistoryCount" xml:space="preserve"><value>Events: {0}</value></data>
+  <data name="HistoryEmpty" xml:space="preserve"><value>No event has been recorded yet.</value></data>
+  <data name="Principal" xml:space="preserve"><value>Created by</value></data>
+  <data name="AppliedBy" xml:space="preserve"><value>Applied by</value></data>
+  <data name="Work" xml:space="preserve"><value>Originating Work</value></data>
+  <data name="OpenTasks" xml:space="preserve"><value>Open tasks</value></data>
+  <data name="FlowRun" xml:space="preserve"><value>Flow Run</value></data>
+  <data name="Correlation" xml:space="preserve"><value>Correlation</value></data>
+  <data name="Materialized" xml:space="preserve"><value>Proposal refreshed: {0} proposed resources.</value></data>
+  <data name="ChangeSetCreated" xml:space="preserve"><value>Proposal saved. You can now check it.</value></data>
+  <data name="Validated" xml:space="preserve"><value>Saved proposal checked.</value></data>
+  <data name="Status.Draft" xml:space="preserve"><value>Draft</value></data>
+  <data name="Status.Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Status.Materialized" xml:space="preserve"><value>Materialized</value></data>
+  <data name="Status.Validated" xml:space="preserve"><value>Validated</value></data>
+  <data name="Status.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Status.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Status.Archived" xml:space="preserve"><value>Archived</value></data>
+  <data name="Status.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="Readiness.Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Readiness.Blocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="View.Overview" xml:space="preserve"><value>Overview</value></data>
+  <data name="View.Changes" xml:space="preserve"><value>Proposed changes</value></data>
+  <data name="View.Graph" xml:space="preserve"><value>Graph</value></data>
+  <data name="View.Validation" xml:space="preserve"><value>Verification</value></data>
+  <data name="View.Application" xml:space="preserve"><value>Application</value></data>
+  <data name="View.Activity" xml:space="preserve"><value>Activity</value></data>
+  <data name="Operation.Create" xml:space="preserve"><value>Create</value></data>
+  <data name="Operation.Update" xml:space="preserve"><value>Update</value></data>
+  <data name="Operation.Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="Operation.NoOp" xml:space="preserve"><value>No change</value></data>
+  <data name="Activity.Created" xml:space="preserve"><value>Created</value></data>
+  <data name="Activity.Refined" xml:space="preserve"><value>Refined</value></data>
+  <data name="Activity.StatusChanged" xml:space="preserve"><value>StatusChanged</value></data>
+  <data name="Activity.Materialized" xml:space="preserve"><value>Materialized</value></data>
+  <data name="Activity.Validated" xml:space="preserve"><value>Checked</value></data>
+  <data name="Activity.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Activity.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Activity.Archived" xml:space="preserve"><value>Archived</value></data>
+  <data name="Activity.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="BindingsTitle" xml:space="preserve"><value>Plan bindings</value></data>
+  <data name="BindingsIntro" xml:space="preserve"><value>Choose agent profiles and integration Tools. Your choices remain saved when you leave this page.</value></data>
+  <data name="BindingsProgress" xml:space="preserve"><value>{0} of {1} bindings configured</value></data>
+  <data name="BindingsSavedAutomatically" xml:space="preserve"><value>Choices saved automatically</value></data>
+  <data name="BindingsSaving" xml:space="preserve"><value>Saving choices…</value></data>
+  <data name="BindingsNotSavedYet" xml:space="preserve"><value>Each choice will be saved automatically on this plan.</value></data>
+  <data name="BindingsSaveFailed" xml:space="preserve"><value>Could not save the choices. Retry without leaving the page.</value></data>
+  <data name="BindingsConflict" xml:space="preserve"><value>The plan or its choices changed elsewhere. Reload the profiles before continuing.</value></data>
+  <data name="ReloadBindings" xml:space="preserve"><value>Reload profiles</value></data>
+  <data name="RetrySaveBindings" xml:space="preserve"><value>Retry</value></data>
+  <data name="BindingsOutdated" xml:space="preserve"><value>The plan changed since your last choices. Select profiles for this revision.</value></data>
+  <data name="ReviewChangesAction" xml:space="preserve"><value>Review plan proposal</value></data>
+  <data name="ReviewPath" xml:space="preserve"><value>Review steps</value></data>
+  <data name="StepProfiles" xml:space="preserve"><value>Choose bindings</value></data>
+  <data name="StepProfilesHint" xml:space="preserve"><value>Choices saved on the plan</value></data>
+  <data name="StepPreview" xml:space="preserve"><value>Review proposal</value></data>
+  <data name="StepPreviewHint" xml:space="preserve"><value>Calculated with chosen profiles</value></data>
+  <data name="StepChangeSet" xml:space="preserve"><value>Save proposal</value></data>
+  <data name="StepChangeSetHint" xml:space="preserve"><value>Recorded proposal</value></data>
+  <data name="StepValidation" xml:space="preserve"><value>Check</value></data>
+  <data name="StepValidationHint" xml:space="preserve"><value>Checks on the saved proposal</value></data>
+  <data name="SavedChangeSetOption" xml:space="preserve"><value>Saved proposal · Revision {0} · {1}</value></data>
+  <data name="ModelProfile" xml:space="preserve"><value>Model profile</value></data>
+  <data name="RuntimeProfile" xml:space="preserve"><value>Runtime profile</value></data>
+  <data name="SelectProfile" xml:space="preserve"><value>Select a profile</value></data>
+  <data name="CreateModelProfile" xml:space="preserve"><value>Create a model profile to continue →</value></data>
+  <data name="CreateRuntimeProfile" xml:space="preserve"><value>Create a runtime profile to continue →</value></data>
+  <data name="ReviewedBindings" xml:space="preserve"><value>Reviewed agent profiles</value></data>
+  <data name="CurrentPreview" xml:space="preserve"><value>Plan proposal</value></data>
+  <data name="CurrentPreviewDescription" xml:space="preserve"><value>Calculated with the selected profiles, not yet saved. No resources have been applied.</value></data>
+  <data name="CurrentPreviewBlockedDescription" xml:space="preserve"><value>Resolve the issues below before saving this proposal.</value></data>
+  <data name="PendingPreview" xml:space="preserve"><value>Profiles changed</value></data>
+  <data name="PendingPreviewDescription" xml:space="preserve"><value>Finish selecting profiles to preview the corresponding changes.</value></data>
+  <data name="RecordedChangeSet" xml:space="preserve"><value>Saved proposal</value></data>
+  <data name="PreviewRequiresChangeSet" xml:space="preserve"><value>Save the plan proposal before checking it. Saved proposals remain available in the Proposed changes tab.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_required" xml:space="preserve"><value>Choose both profiles for this agent.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_not_found" xml:space="preserve"><value>The selected profile is not available in this workspace.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_unavailable" xml:space="preserve"><value>The selected profile is not ready.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_incompatible" xml:space="preserve"><value>The selected profile has an invalid configuration.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_outside_scope" xml:space="preserve"><value>The selected profile is outside this workspace.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_ambiguous" xml:space="preserve"><value>Choose a profile with an exact scope.</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_unknown_role" xml:space="preserve"><value>This binding does not match a planned agent.</value></data>
+  <data name="MaterializationDiagnostic.planning_materialization_stale" xml:space="preserve"><value>Refresh the proposal before saving it.</value></data>
+  <data name="StepApplication" xml:space="preserve"><value>Apply</value></data>
+  <data name="StepApplicationHint" xml:space="preserve"><value>Create or update resources</value></data>
+  <data name="ApplyTitle" xml:space="preserve"><value>Apply the verified proposal</value></data>
+  <data name="ApplyDescription" xml:space="preserve"><value>Resources are processed in dependency order. Application stops on failure; successful operations remain recorded.</value></data>
+  <data name="ApplyProposal" xml:space="preserve"><value>Apply proposal</value></data>
+  <data name="RetryApply" xml:space="preserve"><value>Resume application</value></data>
+  <data name="ApplicationResult" xml:space="preserve"><value>Application result</value></data>
+  <data name="ApplicationKicker" xml:space="preserve"><value>Resource deployment</value></data>
+  <data name="ValidationNextTitle" xml:space="preserve"><value>Ready for application</value></data>
+  <data name="ValidationNextDescription" xml:space="preserve"><value>Review the application step to apply and track the verified resources.</value></data>
+  <data name="OpenApplication" xml:space="preserve"><value>View application</value></data>
+  <data name="ApplicationIntro" xml:space="preserve"><value>Track which resources were applied and review any operation that needs attention.</value></data>
+  <data name="ApplicationPendingTitle" xml:space="preserve"><value>Verify the proposal first</value></data>
+  <data name="ApplicationPendingDescription" xml:space="preserve"><value>Save and verify a proposal before applying its resources.</value></data>
+  <data name="ApplicationProgress" xml:space="preserve"><value>Application progress</value></data>
+  <data name="ApplicationAppliedCount" xml:space="preserve"><value>Applied</value></data>
+  <data name="ApplicationSkippedCount" xml:space="preserve"><value>Unchanged</value></data>
+  <data name="ApplicationFailedCount" xml:space="preserve"><value>Failed</value></data>
+  <data name="ApplicationOperations" xml:space="preserve"><value>Resources processed</value></data>
+  <data name="ApplicationNoOperations" xml:space="preserve"><value>No resource has been processed yet.</value></data>
+  <data name="ApplicationCompletedAt" xml:space="preserve"><value>Completed</value></data>
+  <data name="ApplicationSummary.Applying" xml:space="preserve"><value>Application in progress</value></data>
+  <data name="ApplicationSummary.Applied" xml:space="preserve"><value>Resources applied</value></data>
+  <data name="ApplicationSummary.PartiallyApplied" xml:space="preserve"><value>Application needs attention</value></data>
+  <data name="ApplicationSummary.Failed" xml:space="preserve"><value>Application failed</value></data>
+  <data name="ApplicationDescription.Applying" xml:space="preserve"><value>The resources are being processed in dependency order.</value></data>
+  <data name="ApplicationDescription.Applied" xml:space="preserve"><value>All planned operations completed. Review each resource below.</value></data>
+  <data name="ApplicationDescription.PartiallyApplied" xml:space="preserve"><value>Some resources were applied. Review the failed operation before resuming.</value></data>
+  <data name="ApplicationDescription.Failed" xml:space="preserve"><value>No operation completed successfully. Review the error before resuming.</value></data>
+  <data name="ApplicationAttempts" xml:space="preserve"><value>Attempts: {0}</value></data>
+  <data name="Application.Applying" xml:space="preserve"><value>Applying</value></data>
+  <data name="Application.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Application.PartiallyApplied" xml:space="preserve"><value>Partially applied</value></data>
+  <data name="Application.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Outcome.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Outcome.AlreadyApplied" xml:space="preserve"><value>Already applied</value></data>
+  <data name="Outcome.Skipped" xml:space="preserve"><value>Unchanged</value></data>
+  <data name="Outcome.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="ToolBindingsTitle" xml:space="preserve"><value>Integration Tool bindings</value></data>
+  <data name="NoBindingsRequired" xml:space="preserve"><value>No bindings required for this plan.</value></data>
+  <data name="ToolBindingsIntro" xml:space="preserve"><value>Select an existing Tool for each integration. Agents that depend on it can use it.</value></data>
+  <data name="ToolBinding" xml:space="preserve"><value>Tool</value></data>
+  <data name="SelectTool" xml:space="preserve"><value>Select a Tool</value></data>
+  <data name="ManageTools" xml:space="preserve"><value>Create or configure a Tool</value></data>
+  <data name="MaterializationDiagnostic.planning_binding_unknown_integration" xml:space="preserve"><value>This Tool does not match a planned integration.</value></data>
+  <data name="MaterializationDiagnostic.planning_integration_agent_required" xml:space="preserve"><value>Connect this integration to at least one planned agent through a dependency.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_required" xml:space="preserve"><value>Select an existing Tool for this integration.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_not_found" xml:space="preserve"><value>The selected Tool is not visible in this workspace.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_unavailable" xml:space="preserve"><value>The selected Tool is disabled or unavailable.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_outside_scope" xml:space="preserve"><value>The selected Tool is outside the accessible scopes.</value></data>
+  <data name="MaterializationDiagnostic.planning_tool_binding_ambiguous" xml:space="preserve"><value>Choose a Tool with an exact scope.</value></data>
+  <data name="MaterializationDiagnostic.planning_resource_name_collision" xml:space="preserve"><value>Two plan elements target the same resource name.</value></data>
+  <data name="Issue.BindingStale.Title" xml:space="preserve"><value>Binding needs updating</value></data>
+  <data name="Issue.BindingStale.Description" xml:space="preserve"><value>A selected profile or Tool changed. Refresh the proposal, then verify again.</value></data>
+</root>

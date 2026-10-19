@@ -11,10 +11,11 @@ The repository keeps reviewable governance files in Git:
 - `.github/workflows/codeql.yml` scans C# on pull requests, `main`, and a weekly schedule;
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce known vulnerabilities of moderate severity or higher;
 - `.github/workflows/release.yml` validates version tags, rebuilds and retests the product, packages the server and Workplace, and creates GitHub prereleases;
+- `.github/workflows/release-source-registry-tool.yml` independently rebuilds, tests, packages, and publishes timestamped development or version-aligned release packages of the Source Registry tool;
 - `.github/dependabot.yml` checks the root and autonomous AEP NuGet manifests plus GitHub Actions each week;
 - `.github/CODEOWNERS`, the pull request template, and issue forms provide lightweight contribution ownership and prompts;
 - `.github/rulesets/main.json` is the reproducible source definition for `main` protection;
-- `.github/labels.json` is the reproducible catalog for issue classification, priority, and agent-triage labels.
+- `.github/labels.json` is the reproducible catalog for issue classification, priority, agent-triage, and AI-defect labels.
 
 Documentation validation and publication remain independent in `documentation.yml` and `publish-documentation.yml`. Publication is manual and has the only workflow permissions needed for GitHub Pages.
 
@@ -54,6 +55,45 @@ When a maintainer supplied the complete classification and the agent only applie
 
 GitHub API clients do not execute issue forms. Automation and coding agents must therefore reproduce the selected form's required sections, labels, and ordering explicitly. Repository-wide instructions for coding agents are maintained in `AGENTS.md`.
 
+### Issue hierarchy and relationships
+
+When an issue is a genuine child or decomposition of a parent issue, create it and attach it to the parent with GitHub's native Sub-issue relationship. A textual `Parent: #123` or `Child of #123` reference, reciprocal links in issue bodies, or a checklist entry never replaces that relationship. Textual references may remain as a readability aid.
+
+Use `Depends on` / `Blocked by` for execution dependencies and `Related to` for non-hierarchical relationships. These relationships serve different purposes: an issue can be a Sub-issue of one parent and also depend on another issue. Before closing a parent, verify that all its Sub-issues are closed or that an explicit maintainer-approved exception is documented on the parent issue.
+
+### UX test scenario follow-up
+
+A feature request that adds or materially changes a Console or Workplace journey records its UX impact and planned browser scenario in the feature form. After the feature request has a number, create a distinct child issue with the Technical task form and both `technical-task` and `test-scenario-task` labels. Attach it to the parent as a native Sub-issue and link the two issues in both bodies for readability before opening the UX implementation pull request. The child describes the routes, deterministic prerequisites, user actions, and observable success and expected-failure assertions. If an existing Playwright journey already covers the change, document that evidence and mark the follow-up `Not applicable` instead.
+
+The UX pull request links the child in its Validation section. It still includes tests for behavior changes, repairs affected existing Playwright tests, and reports desktop and mobile smoke results. Only the new reusable Playwright journey is deferred. Mark the child blocked until the maintainer explicitly validates the UX in the pull request or parent issue and the UX pull request merges. Record the validation and merged pull request in the child before starting its implementation.
+
+Keep the parent feature request open until the child scenario merges and the catalog marks its surface `covered`, unless a maintainer documents an explicit reasoned waiver. Before closing the parent, verify that every Sub-issue is closed or a maintainer-approved exception is documented on the parent. The UX-only pull request must not auto-close the parent issue.
+
+### Architecture documentation reconciliation
+
+Architecture documentation uses a transverse reconciliation task when a planned review is due or when accumulated implementation changes warrant a repository-wide comparison. Individual feature and technical issues still update directly affected documentation; they do not each need to audit the entire DAT.
+
+Create the reconciliation with the Technical task form. Apply `technical-task` as its one issue type, then add `documentation` and `documentation:architecture`. `documentation` identifies documentation work generally; `documentation:architecture` specializes it for DAT, C4, architectural diagrams, and related maintenance. This classification is independent from `test-scenario-task`, which is reserved for the deferred UX automation workflow.
+
+The issue records a baseline or change range and inspects:
+
+- executable composition, module/storage boundaries, architecture tests, and other implementation evidence;
+- the shared LikeC4 model and published L1–L3 views;
+- DAT narrative plus Mermaid dynamic and deployment views;
+- links to accepted ADRs and whether the documented consequences still match implementation.
+
+Reconciliation may update documentation to reflect behavior that is both implemented and already decided. It may also report a discrepancy or a missing decision. It must not silently rewrite an accepted ADR, normalize implementation drift as if it were intentional, or invent a product architecture choice. A significant missing choice remains owned by the feature or technical change that introduced or proposes it, and that owning change supplies the ADR.
+
+Validation includes LikeC4 validation and the complete Docusaurus build. Run or cite focused architecture tests when the reconciliation touches or makes claims about enforced project boundaries.
+
+## AI defect learning
+
+The `ai-defect` label marks a structural, architectural, behavioral, or code-quality defect introduced by an AI-generated or AI-assisted change. It supplements the issue's type and priority labels; it does not replace either.
+
+When an agent resolves a labeled issue, the corrective pull request must also carry `ai-defect` and add or update one [AI Defect CAR](../ai-defects/index.md). The CAR uses the issue number as its identifier and captures evidence, faulty assumptions, missed signals, safeguard gaps, the correction, prevention, and completed validation. This is distinct from an ADR: a CAR identifies and addresses the causes of a defect, while an ADR records a durable architectural decision.
+
+The pull request metadata check runs when labels change and rejects an `ai-defect` pull request that does not change a numbered CAR under `docs/ai-defects/` or link that CAR from the pull request description.
+
 ## Apply the issue label catalog
 
 GitHub stores labels remotely. Committing `.github/labels.json` documents the intended classification, priority, and agent-triage labels but does not create them by itself.
@@ -84,7 +124,7 @@ Pull requests to `main` run these workflows:
 
 | Check | Purpose | Required by the prepared ruleset |
 |---|---|---|
-| `pull-request-metadata` | Require a Conventional Commit title and the ordered Summary, Changes, Validation, and Breaking changes sections | Yes |
+| `pull-request-metadata` | Require PR metadata and an AI Defect CAR for `ai-defect` remediation | Yes |
 | `build-and-test` | Restore, Release build, tests, and changed-file formatting for Agentstration and the complete AEP solution | Yes |
 | `container` | Validate the production Docker build after code validation | No |
 | `CodeQL / C#` | Static security analysis | No; review after initial successful scans |
@@ -157,13 +197,32 @@ Docker Hub publication requires an existing `agentstration/agentstration` reposi
 - `DOCKERHUB_USERNAME`: the Docker Hub account allowed to push the repository;
 - `DOCKERHUB_TOKEN`: a scoped Docker Hub access token with write permission. Do not store an account password.
 
-For example, after the release change has merged and all required checks have passed:
+For example, after the release change has merged, the version and release notes have been advanced to a new immutable version, and all required checks have passed:
 
 ```powershell
 git switch main
 git pull --ff-only
-git tag -a v0.2.0-alpha.1 -m "Agentstration 0.2.0-alpha.1"
-git push origin v0.2.0-alpha.1
+$version = "0.2.0-alpha.2" # Example; it must match Directory.Build.props and docs/releases/$version.md.
+git tag -a "v$version" -m "Agentstration $version"
+git push origin "v$version"
 ```
 
-GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.
+GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha container releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.
+
+## Source Registry tool releases
+
+`Agentstration.SourceRegistry.Tool` deliberately shares the central product version because it implements the contracts accepted by that Agentstration release. The dedicated `release-source-registry-tool.yml` workflow has two publication paths:
+
+- a relevant push to `main` publishes a development prerelease such as `0.3.0-alpha.1.dev.20260910213045.<run-id>.<attempt>`; the UTC timestamp makes the build recognizable, while the run identity and attempt make concurrent runs and reruns unique;
+- the shared immutable `v<version>` tag publishes the exact central version. A suffix such as `-alpha.2` produces an official NuGet prerelease, while a version without a suffix produces a stable package.
+
+Both paths run the focused tests and installed-package smoke test before publication. There is no independent tool tag or version file. Development packages are CI snapshots, not release identities, and consumers must pin their full exact version.
+
+NuGet.org publication uses trusted publishing and does not use a long-lived API-key secret. The NuGet account `gbaudrit` must own `Agentstration.SourceRegistry.Tool` and configure a trusted publishing policy with:
+
+- repository owner: `gbaudrit`;
+- repository: `agentstration`;
+- workflow file: `release-source-registry-tool.yml`;
+- environment: empty, because the release job does not select a GitHub environment.
+
+The policy may remain pending until its first successful publication. Create or reactivate it before merging a change that should publish the first development package, or before pushing the shared release tag. NuGet.org uses the dedicated workflow's GitHub OIDC identity to activate and bind the policy. The package and its `SHA256SUMS` are retained as workflow artifacts, while the product workflow remains responsible for the shared GitHub Release. Package versions are immutable and must never be reused.

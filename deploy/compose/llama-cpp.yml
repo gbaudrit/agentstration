@@ -1,0 +1,106 @@
+name: agentstration
+
+services:
+  aep-key-provisioner:
+    image: alpine:3.22
+    command: >-
+      sh -ec 'provision() { target="$$1/token"; if [ ! -f "$$target" ]; then temporary="$$target.tmp"; head -c 32 /dev/urandom | base64 | tr -d "\r\n" > "$$temporary"; chmod 600 "$$temporary"; mv "$$temporary" "$$target"; fi; test "$$(wc -c < "$$target")" -ge 32; }; provision /keys/llamacpp; provision /keys/utilities'
+    volumes:
+      - aep-llamacpp-key:/keys/llamacpp
+      - aep-utilities-key:/keys/utilities
+    restart: "no"
+
+  llama-cpp:
+    image: ${LLAMA_CPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-b10830}
+    command:
+      - -m
+      - /models/${LLAMA_CPP_MODEL:-model.gguf}
+      - --alias
+      - ${LLAMA_CPP_MODEL_ALIAS:-local-gguf}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --jinja
+    volumes:
+      - ${LLAMA_CPP_MODELS_PATH:-../../.models/llama-cpp}:/models:ro
+
+  llama-cpp-extension:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.extension
+      args:
+        PROJECT: src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj
+        ENTRYPOINT_DLL: Agentstration.Extensions.LlamaCpp.dll
+    depends_on:
+      aep-key-provisioner:
+        condition: service_completed_successfully
+      llama-cpp:
+        condition: service_started
+    environment:
+      LlamaCpp__Endpoint: http://llama-cpp:8080
+      Aep__EnrollmentMode: SharedKeyFile
+      Aep__SharedKeyFile__Path: /run/aep-key/token
+    volumes:
+      - aep-llamacpp-key:/run/aep-key:ro
+
+  utilities-extension:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.extension
+      args:
+        PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
+        ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll
+    environment:
+      Aep__EnrollmentMode: SharedKeyFile
+      Aep__SharedKeyFile__Path: /run/aep-key/token
+    volumes:
+      - aep-utilities-key:/run/aep-key:ro
+    depends_on:
+      aep-key-provisioner:
+        condition: service_completed_successfully
+
+  agentstration:
+    build:
+      context: ../..
+    depends_on:
+      aep-key-provisioner:
+        condition: service_completed_successfully
+      llama-cpp-extension:
+        condition: service_started
+      utilities-extension:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AGENTSTRATION_HTTP_PORT:-5100}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      AI__Provider: ${AI_PROVIDER:-Managed}
+      Data__Directory: /data
+      Data__ControlPlanePath: /data/control-plane.db
+      Data__WorkPlanePath: /data/work-plane.db
+      Data__FlowPath: /data/flow-plane.db
+      Agentstration__ManagementApi__BaseAddress: http://localhost:8080/
+      Agentstration__RuntimeApi__BaseAddress: http://localhost:8080/
+      Agentstration__WorkApi__BaseAddress: http://localhost:8080/
+      Agentstration__FlowApi__BaseAddress: http://localhost:8080/
+      Agentstration__Aep__Transport__AllowedHttpHosts__0: llama-cpp-extension
+      Agentstration__Aep__Transport__AllowedHttpHosts__1: utilities-extension
+      Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__0: llama-cpp-extension
+      Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__1: utilities-extension
+      Agentstration__Extensions__Agentstration.Extensions.LlamaCpp__Endpoint: http://llama-cpp-extension:8080
+      Agentstration__Extensions__Agentstration.Extensions.LlamaCpp__AuthenticationMode: StaticBearer
+      Agentstration__Extensions__Agentstration.Extensions.LlamaCpp__EnrollmentMode: SharedKeyFile
+      Agentstration__Extensions__Agentstration.Extensions.LlamaCpp__SharedKeyFile__Path: /run/aep-keys/llamacpp/token
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint: http://utilities-extension:8080
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__AuthenticationMode: StaticBearer
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__EnrollmentMode: SharedKeyFile
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__SharedKeyFile__Path: /run/aep-keys/utilities/token
+    volumes:
+      - agentstration-data:/data
+      - aep-llamacpp-key:/run/aep-keys/llamacpp:ro
+      - aep-utilities-key:/run/aep-keys/utilities:ro
+
+volumes:
+  agentstration-data:
+  aep-llamacpp-key:
+  aep-utilities-key:

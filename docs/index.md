@@ -17,6 +17,7 @@ This site is the documentation for the current development branch (**Next**). Ag
 - **Understand the codebase:** explore [Architecture](architecture/overview.md).
 - **Look up a contract:** use the [Reference](reference/overview.md).
 - **Configure identity and access:** read the [Identity and authorization reference](reference/identity-and-authorization.md).
+- **Review extension Secret access:** read the [AEP Secret access security model](security/aep-secret-access.md).
 - **Understand why:** consult the [Architecture Decision Records](decisions/index.md).
 - **Contribute:** read the [contributor guide](contributing/overview.md).
 

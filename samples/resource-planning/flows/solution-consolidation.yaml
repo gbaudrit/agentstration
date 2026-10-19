@@ -1,0 +1,22 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata: { name: resource-planning-solution-consolidation }
+definition:
+  displayName: Resource Planning - solution consolidation
+  description: Durable contradiction detection and functional consolidation child Flow.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: resource-planning-solution-consolidator } }
+  graph:
+    entryStep: input
+    steps:
+      - { type: input, name: input, displayName: Specialist contributions }
+      - { type: agent, name: consolidate, displayName: Consolidate plan, agent: { resourceId: resource-planning-solution-consolidator }, inputMapping: "${input}" }
+      - { type: output, name: completed, displayName: Coherent functional plan, outcome: success, outputMapping: "${steps.consolidate.output}" }
+      - { type: output, name: error, displayName: Plan consolidation failed, outcome: error, code: RESOURCE_PLANNING_AGENT_FAILED, message: The solution consolidation Agent failed., outputMapping: "${transition.output}" }
+    transitions:
+      - { id: input-to-consolidate, fromStep: input, event: completed, toStep: consolidate }
+      - { id: consolidate-completed, fromStep: consolidate, event: success, toStep: completed }
+      - { id: consolidate-error, fromStep: consolidate, event: error, toStep: error }
+  publish: true
+  activate: true

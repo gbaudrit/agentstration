@@ -111,15 +111,46 @@ public sealed class LocalAiAepModelProvider(HttpClient httpClient) : IAepModelPr
             var nativeCapabilities = Strings(model, "capabilities");
             if (string.IsNullOrWhiteSpace(id) || !nativeCapabilities.Contains("chat", StringComparer.OrdinalIgnoreCase)) continue;
 
-            var capabilities = new List<string> { "chat", "streaming" };
-            if (nativeCapabilities.Contains("tools", StringComparer.OrdinalIgnoreCase)) capabilities.Add("tools");
-            if (nativeCapabilities.Contains("thinking", StringComparer.OrdinalIgnoreCase)) capabilities.Add("reasoning");
-            var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
-            AddMetadataList(model, metadata, "input_modalities", "inputModalities");
-            AddMetadataList(model, metadata, "output_modalities", "outputModalities");
-            results.Add(new AepModelDescriptor(id, id, capabilities, metadata));
+            var tools = nativeCapabilities.Contains("tools", StringComparer.OrdinalIgnoreCase);
+            var reasoning = nativeCapabilities.Contains("thinking", StringComparer.OrdinalIgnoreCase);
+            results.Add(new AepModelDescriptor(id, id, new AepModelSpecification
+            {
+                Input = ContentTypes(model, "input_modalities"),
+                Output = ContentTypes(model, "output_modalities"),
+                Features = new AepModelFeatureSpecifications
+                {
+                    Streaming = new() { Support = AepModelFeatureSupport.Native },
+                    Tools = new()
+                    {
+                        Support = tools ? AepModelFeatureSupport.Native : AepModelFeatureSupport.Unsupported,
+                        Modes = tools
+                            ? new Dictionary<AepModelToolMode, AepModelToolModeSpecification>
+                            {
+                                [AepModelToolMode.Function] = new()
+                            }
+                            : new Dictionary<AepModelToolMode, AepModelToolModeSpecification>()
+                    },
+                    StructuredOutput = new() { Support = AepModelFeatureSupport.Unsupported },
+                    Reasoning = new()
+                    {
+                        Support = reasoning ? AepModelFeatureSupport.Native : AepModelFeatureSupport.Unsupported
+                    }
+                }
+            }, new AepModelIdentity(Model: id)));
         }
         return results;
+    }
+
+    private static IReadOnlyList<AepModelContentType>? ContentTypes(JsonElement model, string property)
+    {
+        var values = Strings(model, property).Select(value => value.ToLowerInvariant() switch
+        {
+            "text" => AepModelContentType.Text,
+            "image" => AepModelContentType.Image,
+            "audio" => AepModelContentType.Audio,
+            _ => (AepModelContentType?)null
+        }).Where(value => value.HasValue).Select(value => value!.Value).Distinct().Order().ToArray();
+        return values.Length == 0 ? null : values;
     }
 
     public async Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default)
@@ -344,12 +375,6 @@ public sealed class LocalAiAepModelProvider(HttpClient httpClient) : IAepModelPr
         value.TryGetProperty(name, out var items) && items.ValueKind == JsonValueKind.Array
             ? items.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).ToArray()
             : [];
-
-    private static void AddMetadataList(JsonElement source, IDictionary<string, string> target, string sourceName, string targetName)
-    {
-        var values = Strings(source, sourceName);
-        if (values.Count > 0) target[targetName] = string.Join(',', values);
-    }
 
     private static JsonElement ParseArguments(string? value)
     {

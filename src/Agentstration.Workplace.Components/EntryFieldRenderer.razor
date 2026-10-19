@@ -1,4 +1,4 @@
-<label class="entry-field">
+<label class="entry-field" data-testid="workplace-form-input" data-field-name="@Definition.Name" data-field-type="@Definition.Type">
     <span>@(Definition.Label ?? Definition.Name)@if (Definition.Required) { <em>@Localizer["Required"]</em> }</span>
     @if (Definition.Type is EntryFieldType.Textarea or EntryFieldType.Prompt)
     {

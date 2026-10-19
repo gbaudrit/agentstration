@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Agentstration.Management.Abstractions;
+using Agentstration.Identity.Contracts;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Http;
@@ -34,6 +34,25 @@ public sealed class ConsoleApiSessionHandlerTests
         Assert.AreEqual("part-two", Cookie(terminal.Request!, $"{SessionCookie}C2"));
         Assert.IsNull(Cookie(terminal.Request!, "unrelated"));
         Assert.AreEqual(workspaceId.ToString("D"), terminal.Request!.Headers.GetValues(PrincipalResolutionMiddleware.WorkspaceHeader).Single());
+    }
+
+    [TestMethod]
+    public async Task DevelopmentSessionForwardsWorkspaceWithoutApplicationCookie()
+    {
+        var workspaceId = Guid.NewGuid();
+        var terminal = new CaptureHandler();
+        using var handler = new ConsoleApiSessionHandler(
+            new HttpContextAccessor { HttpContext = AuthenticatedContext(string.Empty) },
+            new TestRequestContext(workspaceId),
+            TrustedOrigin,
+            SessionCookie)
+        { InnerHandler = terminal };
+        using var client = new HttpClient(handler);
+
+        using var response = await client.GetAsync(new Uri(TrustedOrigin, "/api/identity/context"));
+
+        Assert.IsFalse(terminal.Request!.Headers.Contains(HeaderNames.Cookie));
+        Assert.AreEqual(workspaceId.ToString("D"), terminal.Request.Headers.GetValues(PrincipalResolutionMiddleware.WorkspaceHeader).Single());
     }
 
     [TestMethod]

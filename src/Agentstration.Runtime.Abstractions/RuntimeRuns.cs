@@ -89,6 +89,7 @@ public sealed record RuntimeRunStatus
     public DateTimeOffset? CompletedAt { get; init; }
     public string? Response { get; init; }
     public string? Error { get; init; }
+    public string? ErrorCode { get; init; }
     public string Runtime { get; init; } = "Local";
     public string? ModelProfile { get; init; }
     public string? ResolvedModel { get; init; }
@@ -164,19 +165,13 @@ public interface IRuntimeRunQueue
 {
     ValueTask EnqueueAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken);
     IAsyncEnumerable<RuntimeRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask RequestCancellationAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 public interface IRuntimeRunExecutionScope
 {
     ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken);
     IDisposable Enter(RuntimeRunScope scope);
-}
-
-public interface IRuntimeRunCancellationRegistry
-{
-    CancellationToken Register(RuntimeRunKey key, CancellationToken stoppingToken);
-    bool Cancel(RuntimeRunKey key);
-    void Complete(RuntimeRunKey key);
 }
 
 public sealed class RuntimeRunNotFoundException(string runId) : Exception($"Runtime run '{runId}' was not found.");

@@ -11,7 +11,18 @@ builder.Services.AddAgentstrationAep(options =>
     options.Tools.Add(new AepToolContribution("hash.compute", "Compute SHA-256", new("utilities", "hash_compute"), "Compute a SHA-256 digest."));
     options.Tools.Add(new AepToolContribution("json.compact", "Compact JSON", new("utilities", "json_compact"), "Normalize JSON to a compact representation."));
     options.Tools.Add(new AepToolContribution("text.upper", "Uppercase text", new("utilities", "text_upper"), "Convert text to invariant uppercase."));
+    options.SchemaFormats.Add(new AepSchemaFormatContribution(
+        "json-schema.validation",
+        "json-schema",
+        "JSON Schema (AEP sample)",
+        "1.0",
+        ["https://json-schema.org/draft/2020-12/schema"],
+        new(
+            new("utilities", "schema_validate_definition"),
+            new("utilities", "schema_validate_instance")),
+        Description: "Sample MCP-backed JSON Schema validation contribution."));
 });
+builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
 var app = builder.Build();
 app.MapAgentstrationAep();

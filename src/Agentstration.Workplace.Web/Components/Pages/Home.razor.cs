@@ -32,7 +32,6 @@ public partial class Home
     private string? interactionError;
     private Guid? loadedInteractionId;
     private string? loadedRoute;
-    private bool RealtimeConnected => Realtime.State.ToString() == "Connected";
     private string CurrentWorkspaceName => WorkspaceName ?? workspace?.Name ?? throw new InvalidOperationException("A Workspace route is required.");
     private string CurrentDashboardName => dashboard?.Name ?? DashboardName ?? throw new InvalidOperationException("A Dashboard route is required.");
     private string UserDisplayName => WorkplaceContext.Current?.UserDisplayName is { Length: > 0 } displayName ? displayName : T("You");

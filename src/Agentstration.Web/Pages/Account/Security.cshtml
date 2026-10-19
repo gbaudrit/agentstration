@@ -4,7 +4,7 @@
     ViewData["Title"] = Auth["AccountSecurity"];
 }
 
-<header class="auth-heading">
+<header class="auth-heading" data-testid="console-admin-account-security">
     <p class="eyebrow">@Auth["Account"]</p>
     <h1>@Auth["Security"]</h1>
     @if (Model.Account is not null)

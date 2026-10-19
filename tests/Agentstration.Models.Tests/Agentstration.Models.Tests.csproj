@@ -1,0 +1,6 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Models/Agentstration.Models.csproj" />
+    <ProjectReference Include="../../src/Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
+  </ItemGroup>
+</Project>

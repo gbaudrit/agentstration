@@ -38,6 +38,16 @@ flowchart LR
 
 The management plane is the source of truth for agent definitions and desired state; runtime `AIAgent` instances are reconstructible. The Work Plane owns the functional lifecycle, interactions, history, and result of each `WorkItem`. Its architectural principle is **Microsoft-first, provider-neutral, cloud-optional**.
 
+The official static Source registry is available as an optional instance-owned discovery input, and Platform administrators can add independent community or private enterprise registrations. Registrations have ETag-protected CRUD, explicit trust/network/refresh/cache policies, and optional instance Secret references resolved only for exact same-origin requests. Manual and opt-in scheduled refreshes retrieve only compatible Registry v1 shards, validate canonical digests, retain a bounded last-known-good cache, and persist conditional HTTP, backoff, staleness, failure, and recovery state across restart. Registry trust evaluation preserves every observation, gates remote publisher assertions through local policy, rejects accepted digest conflicts and revocation, and feeds the existing exact SourceVersion verification boundary. Merged discovery remains offline; an explicit retained-observation selection retrieves and imports only one exact manifest with complete Registry provenance and no Channel materialization. It never equates a trusted origin or verified SourceVersion with a verified mutable Channel Snapshot or makes startup depend on the public network. See [Source registry registrations](source-registries.md).
+
+The Console exposes these operations under **System > Source registries**. It supports registration CRUD, enablement, manual refresh, refresh history, Secret-reference selection, merged discovery filters, all observation evidence, and exact import confirmation. The official registration, local origin policy, publisher evidence, SourceVersion verification, and later Snapshot verification are presented separately on responsive desktop and mobile layouts.
+
+## Data Sources and Knowledge projection
+
+Data Sources govern acquisition from an origin independently of Knowledge. Instance-, tenant-, and Workspace-scoped Data Sources resolve a visible active Data Source Profile, then execute its exact `datasource.acquisition/v1` Flow in a consuming Workspace. The accepted acquisition retains source and profile generations, the immutable profile revision, resolved Flow and Tool/provider evidence, effective limits and policies, and a bounded durable Artifact manifest.
+
+Workspace-owned Knowledge Sources bind one to thirty-two visible Data Sources. Each binding may run an optional `artifact.transform/v1` Flow before one `knowledge.projection/v1` Flow receives every prepared input. Each successful projection creates and activates a distinct immutable Snapshot; failure retains the previous active Snapshot. The built-in projection preserves heterogeneous Artifacts unchanged, while the built-in `knowledge.retrieval/v1` Flow provides bounded local search, query, and read restricted to the selected Snapshot. See [Data Sources and Knowledge Sources](../concepts/data-sources-and-knowledge.md) and [Built-in Data Source Profiles](builtin-data-source-profiles.md).
+
 ## Schedule Triggers
 
 Agentstration can submit autonomous Work from a declarative Workspace-scoped `Trigger`. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.
@@ -77,7 +87,7 @@ Packs are a Management/distribution concept above these planes: they install ord
 
 Agent declaration belongs to the Management Plane. It owns the desired state, generation, provisioning status, resource version, canonical resource identifiers, reference validation, and lifecycle events. The Runtime Plane owns dependency resolution, materialization, lifecycle, and execution. Microsoft Agent Framework is an execution implementation detail confined to the runtime adapter and does not appear in Management resources or events.
 
-The module is physically isolated: `Agentstration.Management.Abstractions` contains its canonical resources, ports, and published events, while `Agentstration.Management.Core` contains validation and use cases. No Management model or service remains in the general Domain or Application projects.
+The module is physically isolated: agent resources, kind constants, validation and lifecycle use cases live in `Agentstration.Agents`. Other managed kinds follow the same plural resource-family ownership model; there is no shared Management abstractions assembly. No resource-family service remains in the general Domain or Application projects.
 
 Agents use the Agentstration-native resource envelope in both JSON and YAML:
 
@@ -107,7 +117,7 @@ The server generates an immutable UID; logical identity is `(Workspace, Agent, m
 
 The Management Plane persists `Agentstration.Tools/toolProviders` and the `Agentstration.Tools/tools` resources materialized by discovery. Tool Providers support AEP and MCP; MCP connections support STDIO and Streamable HTTP using the official SDK. Creation/configuration performs an initial discovery attempt and the Console exposes manual test and refresh operations. Refresh reports new, changed, unchanged, and unavailable counts without deleting disappeared tools or overwriting enablement.
 
-AEP itself is staged as an autonomous repository under `aep/`, with protocol `2026-08-01`, canonical discovery at `/.well-known/aep`, versioned capability descriptors, a reusable validator and tracing client, a headless CLI, a generic sample, and a standalone Blazor Inspector. Agentstration uses local project references during extraction and can switch to versioned packages with `UseLocalAepProjects=false` after publication.
+AEP itself is staged as an autonomous repository under `aep/`, with protocol `2026-09-18`, canonical discovery at `/.well-known/aep`, contribution-scoped Value Requirements with optional typed allowed values, bounded inline/Secret-grant invocation values, versioned capability descriptors, a reusable validator and tracing client, a headless CLI, a generic sample, and a standalone Blazor Inspector. Agentstration uses local project references during extraction and can switch to versioned packages with `UseLocalAepProjects=false` after publication. Registered AEP extensions can use request-scoped Static Bearer authentication backed by a scope-visible Secret; the value is resolved for every request and expected extension identity is checked centrally before functional calls.
 
 The Tools Console separates Providers and Catalog, displays provider status, schemas, and whether approval is required, and defaults every newly discovered tool to disabled. The Agent editor assigns canonical Tool resource IDs and warns when an existing assignment is unavailable. Runtime resolution requires provider enabled, tool enabled, tool available, and assignment before creating an Agentstration-owned MAF function adapter. MAF never receives the native invocable MCP Tool: every effective call crosses the provider-neutral Agentstration Tool Execution Pipeline, then the MCP invoker performs `tools/call`. Tools governed with `requiresApproval` wrap the Agentstration adapter in MAF `ApprovalRequiredAIFunction`, so approval pauses remain ordinary durable Flow input requests and the resumed invocation still crosses the pipeline.
 
@@ -116,6 +126,12 @@ When the AppHost Utilities extension is available, standalone sample data includ
 ## Work, Flow, Run, and Agent
 
 Published Workplace Entries always target an immutable Flow version. The Console may present Agent or Flow as an authoring convenience; an Agent selection is normalized at publication through a hidden system-managed Direct Agent Flow. Consequently every submitted Entry follows `Entry -> FlowReference -> FlowRun -> Runtime`.
+
+Every Entry remains owned and executed by exactly one Workspace. Its versioned exposure policy independently selects Workplace and Console presentation; Workplace further distinguishes the owning space from explicit Tenant-home promotion. Existing Entries default to Workplace in their owning space. `GET /api/entries` accepts `surface` and `placement` filters, searches only Workspaces the caller may read, and returns the owning Workspace ID with every result. Exposure never makes sibling Workspace resources visible, and invocation still selects the Entry owner's Workspace before resolving its pinned Flow.
+
+Console-targeted discovery additionally projects whether the exact pinned Flow is executable, disabled, or unavailable, with stable reason codes for localization. Draft-only and unauthorized Entries are omitted. The typed Console client invokes an eligible Entry through its owner-Workspace route with `surface=Console`, and submission rechecks the same readiness decision. The independent Console host now owns its opaque interactive session and will use this contract once downstream delegation is available; discovery does not weaken or bypass the BFF trust boundary.
+
+Console-exposed Entries may declare the `Fallback` Console role. When search has no authorized page, command, or resource match, Console offers every executable fallback Entry as an explicit choice carrying its owner Workspace and the exact typed query. No execution starts until the user selects an action; an absent, non-executable, or unauthorized fallback retains the ordinary empty result.
 
 ```text
 Work  = what needs to be accomplished
@@ -140,9 +156,9 @@ Runtime
 Agents
 ```
 
-The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
+The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. A generic `Flow` call selects a namespaced published Flow by active or exact version, maps its input schema, exposes its output schema, and blocks missing targets, incompatible mappings, and dependency cycles at publication. Flow calls execute as deterministic durable child FlowRuns with bounded nesting and descendant counts. The provider-neutral `repeat` step composes the same child boundary for a finite number of iterations, persists its current mapped input for recovery, and retains every child in causal diagnostics without enabling arbitrary graph cycles. The local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Flow`, `Repeat`, governed `Tool`, `ToolRoute`, `Output`, and `Failure` steps. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
 
-The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework.
+The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, routes requests to an exact generation, and assigns every Runtime Run to a separately launched AWP Worker. Microsoft Agent Framework is materialized only in that Worker process; the authoritative server has no in-process execution fallback.
 
 ## Prerequisites
 
@@ -188,15 +204,17 @@ dotnet run --project src/Agentstration.AppHost
 
 The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`), the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`), and the LocalAI extension to `LocalAI:Endpoint` (default `http://localhost:8081`). It provisions no inference server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
-Or with containers:
+Or with one provider-specific AEP container topology, for example Ollama:
 
 ```powershell
-docker compose up --build
+docker compose -f deploy/compose/ollama.yml up --build
 ```
 
 ## AI modes
 
 The normal `Managed` mode resolves the provider, extension registration, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local`, `llama-cpp-local`, and `localai-local` providers reference extension registrations whose URLs are AEP endpoints, never native inference-server URLs.
+
+The Model Provider inventory links every retained observation to a responsive Model detail page. Creating a provider from the Console persists the declaration and immediately attempts initial model discovery; failure leaves the declaration available for correction or retry. Provider details expose an explicit refresh action with created, updated, unchanged, missing, reappeared, and total counts. The Model detail overview presents provider identity, reconciliation freshness, modalities, feature support, known limits and explicit observed-versus-effective provenance. The secondary YAML tab copies the deterministic canonical persisted `Model` resource; computed effective values are deliberately not written into that document. Missing and failed observations remain readable, and these GET-driven views never trigger provider discovery.
 
 Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
@@ -253,18 +271,20 @@ $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
+`Agentstration.Models.Application` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.MicrosoftAgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
 
 Current limitations are deliberate: credentials are not stored on provider resources, llama.cpp reasoning output is not represented as a distinct AEP content kind, and image input is not yet effective through the AEP-to-`IChatClient` adapter. Separate Flow Runs are not dispatched in parallel and there is no conversation persistence. Other legacy OpenAI-compatible endpoints still use host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
 ### Model provider and profile APIs
 
-Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Model Profile resolution exposes provider/model/adapter capability levels, their effective intersection, and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and explicit model discovery. Discovery reconciles governed provider-owned `Model` resources; GET requests read the retained inventory without contacting the provider. A provider can retain bounded per-model `specificationOverrides` keyed by exact external model identifier. Provider inventory and Model Profile resolution expose observed, override, and effective model specifications separately. The effective model capability level is intersected with provider, adapter, and runtime support, so an override cannot elevate explicit unsupported support or bypass Tool governance. Model Profile resolution exposes those capability levels and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5100/api/modelproviders
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/models
+Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/models/refresh
+Invoke-RestMethod http://localhost:5100/api/models
 Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/test
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/usages
 Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/status
@@ -273,7 +293,7 @@ Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/models
 ```
 
-Create or edit Ollama, llama.cpp, and LocalAI extension registrations from the Blazor console at `/extensions`, then bind their model-provider contributions at `/modelproviders`. Extension URLs must be absolute HTTP(S) AEP endpoints without embedded credentials, query strings, or fragments. Saving a provider does not require its native inference server to be online; health and installed models remain observed state. LocalAI discovery requires `/v1/models/capabilities` and filters non-chat models. Deleting a provider is rejected while a model profile references its exact resource ID.
+Create or edit Ollama, llama.cpp, and LocalAI extension registrations from the Blazor console at `/extensions`, then bind their model-provider contributions at `/modelproviders`. Extension URLs must be absolute HTTP(S) AEP endpoints without embedded credentials, query strings, or fragments. Console creation attempts discovery after the provider is durably saved, while the detail page can refresh it later. The native inference server therefore does not have to be online to retain the provider declaration; a failed initial attempt is surfaced as a warning. LocalAI discovery requires `/v1/models/capabilities` and filters non-chat models. Deleting a provider is rejected while a model profile references its exact resource ID.
 
 Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
 
@@ -363,6 +383,12 @@ Flow definitions are stored in `.agentstration/flow-plane.db`. Published version
 
 The Flow console at `/flows` provides creation templates, a four-zone visual designer, Designer/Definition/Split modes, YAML source editing, validation, optimistic draft saving, publication, published versions and per-Flow Runs. The specialized UI lives in the `Agentstration.Web.FlowDesigner` Razor Class Library: Z.Blazor.Diagrams owns canvas interaction and BlazorMonaco provides the locally served Monaco editor, while `Agentstration.Web` supplies backend and resource adapters. A Draft Run validates its JSON input and retains its exact draft revision, hash, and immutable definition snapshot. Run details receive differential SignalR events with replay from persisted history; `/flow-runs` provides the global searchable Run history. Flow data remains in the independent `.agentstration/flow-plane.db` store.
 
+### Reusable Schemas
+
+The Schema library at `/schemas` owns scoped format-neutral drafts and immutable published versions. The built-in `json-schema` handler supports the 2020-12 dialect without AEP and exposes governed definition and instance validation through `/api/schemas/formats`. Provider selection uses explicit identities, capabilities, availability and default designation; ambiguous providers are rejected instead of being selected by registration order.
+
+The reusable editor offers visual authoring for the bounded common JSON Schema subset, Monaco source editing and instance preview. Definitions using unsupported composition or reference constructs remain source-only and are preserved without a lossy visual round trip. See [Schemas](../concepts/schemas.md) and [ADR-0170](../decisions/0170-schema-format-resolution-is-explicit.md).
+
 ## MCP
 
 The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5100/mcp`. Example VS Code `.vscode/mcp.json`:
@@ -378,7 +404,7 @@ The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5100/mcp`. 
 }
 ```
 
-The server endpoint remains available as generic MCP infrastructure, but it currently publishes no built-in platform tools. Governed external MCP and AEP tool providers continue to be discovered and executed through the Tool catalog.
+The authenticated server dynamically publishes enabled Workspace Tool Definitions and bounded internal Tools through `tools/list`. Built-in Tools cross the ordinary governance and audit pipeline, while Flow-backed Tool Definitions use the durable root Flow submission boundary and return operation receipts. The endpoint does not expose generic Management CRUD or an unrestricted Flow launcher. Governed external MCP and AEP tool providers continue to be discovered and executed through the Tool catalog rather than being republished automatically.
 
 ## Runtime and MAF observability
 
@@ -426,7 +452,7 @@ The capture creates a correlated `gen_ai.http.payload_capture` span between the 
 
 ```powershell
 dotnet build Agentstration.slnx --configuration Release
-dotnet test Agentstration.slnx --configuration Release
+dotnet test --solution Agentstration.slnx --configuration Release --minimum-expected-tests 1
 ```
 
 Warnings are errors, .NET analyzers are enabled, and NuGet audit findings fail restore. The test suite covers Management, Work, Workplace, Flow, Runtime, Triggers, Packs, Agents, workspace isolation, MCP infrastructure, REST startup, and dependency rules.

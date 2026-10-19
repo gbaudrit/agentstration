@@ -1,0 +1,13 @@
+{
+  "journey": "inspect-flow-observability",
+  "input": {
+    "prompt": "Prepare a deterministic Flow observability report."
+  },
+  "captures": [
+    { "checkpoint": "flow-observability-task", "file": "flow-task.png" },
+    { "checkpoint": "flow-observability-task-run", "file": "flow-task-run.png" },
+    { "checkpoint": "flow-observability-global-run", "file": "flow-run.png" },
+    { "checkpoint": "flow-observability-agent-run", "file": "agent-run.png" },
+    { "checkpoint": "flow-observability-events", "file": "run-events.png" }
+  ]
+}

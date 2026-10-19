@@ -1,12 +1,16 @@
 # Model providers
 
-A Model Provider describes how Agentstration reaches an out-of-process AEP extension contribution and what that provider can do. Provider declarations are durable Management resources with connectivity testing, dynamic model discovery, ETag concurrency, usage visibility, and deletion protection.
+A Model Provider describes how Agentstration reaches an out-of-process AEP extension contribution and what that provider can do. Provider declarations are durable Management resources with connectivity testing, explicit model discovery, ETag concurrency, usage visibility, and deletion protection. An authorized discovery refresh reconciles provider-owned `Model` resources using the provider UID and exact external identifier. Reads use that retained inventory: a missing or failed observation remains inspectable with its last valid typed specification, and opening a page or calling GET never starts discovery.
+
+When discovery omits a property that an exact deployed model supports, an administrator can add a provider-owned `specificationOverrides` entry keyed by that model's exact external identifier. The override is saved with the Model Provider's ETag; it is not a separate resource and cannot target a model owned by another provider. Agentstration exposes the provider observation, explicit override, and computed effective specification separately. Unknown support may be completed, but explicit `unsupported` support cannot be elevated and known limits can only be restricted. Provider, adapter, runtime, and Tool-governance limits are still intersected during execution. Removing the map entry restores the current observed value.
+
+When an AEP contribution declares configuration value requirements, the Console binds each requirement to an exact scoped `Parameter` or `Secret`. The Model Provider editor can create either resource in place and selects the returned exact reference automatically. Its editable name suggestion uses `mp-<provider>-<requirement>` to make the creation context recognizable without changing namespace semantics or preventing later reuse. These creation dialogs are shared Console components rather than Model Provider-specific forms, so other resource editors can reuse the same governed flow and supply their own naming convention. When a standard requirement declares `allowedValues`, the shared Parameter creator renders those invariant technical values as a select list and persists the selected value with its declared scalar type. A Parameter otherwise keeps its visible typed value; a Secret requires an eligible Vault and its value remains write-only. The Console never reads a Secret value back, and server-side scope, grant, type, format, and allowed-value validation still applies when the provider is saved and used.
 
 Ollama, llama.cpp, and LocalAI are implemented as independent AEP contributions in their corresponding `Agentstration.Extensions.*` hosts. The persisted endpoint is always the extension URL rather than the native inference-server URL. Cloud services are optional. Provider endpoints and credentials do not belong in portable Agent definitions.
 
 ## LocalAI
 
-Start an existing LocalAI server on host port 8081. This avoids colliding with the default llama.cpp endpoint on port 8080. A container that listens on 8080 can be published with a host mapping such as `8081:8080`.
+For direct or Aspire startup, start an existing LocalAI server on host port 8081. This avoids colliding with the default llama.cpp endpoint on port 8080. A container that listens on 8080 can be published with a host mapping such as `8081:8080`. Alternatively, `deploy/compose/localai.yml` starts both LocalAI and its AEP extension on an internal Docker network.
 
 Aspire starts only the Agentstration extension. For direct startup:
 
@@ -49,12 +53,14 @@ The default tests use fake HTTP. To run the optional real-server smoke test:
 $env:AGENTSTRATION_LOCALAI_ENDPOINT = "http://localhost:8081"
 $env:AGENTSTRATION_LOCALAI_MODEL = "your-chat-model"
 # Optional: $env:AGENTSTRATION_LOCALAI_API_KEY = "..."
-dotnet test tests/Agentstration.ModelProviders.Tests --filter TestCategory=Integration
+dotnet test --project tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
 ```
 
 ## llama.cpp
 
-Start an existing `llama-server` with a local GGUF model. Giving the model a stable alias makes the Model Profile independent from its filesystem path:
+For direct or Aspire startup, start an existing `llama-server` with a local GGUF model. Giving the model a stable alias makes the Model Profile independent from its filesystem path. Alternatively, `deploy/compose/llama-cpp.yml` starts both llama-server and its AEP extension after a GGUF file is placed in `.models/llama-cpp`.
+
+The native command is:
 
 ```powershell
 llama-server -m C:\models\model.gguf --alias local-gguf --host 127.0.0.1 --port 8080 --jinja
@@ -109,7 +115,7 @@ definition:
 
 Supported functional capabilities are chat completions, true SSE streaming, model discovery, readiness, schema-constrained structured output, and tool calling when `/props` reports a tool-capable chat template. Reasoning controls are mapped when the model/template supports them, but reasoning remains partial because AEP does not yet expose reasoning content as a distinct content kind. Vision may be reported by llama.cpp discovery but is not effective through the current text/tool AEP adapter. The native `/completion` endpoint is intentionally not exposed as chat; the managed Runtime currently consumes chat completions through `IChatClient`.
 
-The Model Provider page can test the AEP connection and shows discovered models with their reported capabilities. The Extensions page can persist workspace-owned endpoint registrations and enable, disable, edit, or delete them with optimistic concurrency. It also discovers read-only endpoints declared under `Agentstration:Extensions` (including Aspire service-discovery injection) before a Model Provider exists; it does not scan the network. An observed model-provider contribution can prefill the creation form. The page shows live option-set versions, schema digests, migration paths, and every pinned usage or incompatibility. When an extension publishes a path to its preferred version, the operator can preview the current and proposed envelopes and explicitly apply an ETag-protected migration. The Model Profile page adds a runtime-independent compatibility diagnosis: it intersects provider, selected model, and AEP adapter capabilities, then checks the profile's reasoning and structured-output requirements. Runtime capabilities and an agent's tool requirements are evaluated later when that agent is resolved, so the profile diagnosis deliberately does not claim full execution compatibility.
+The Model Provider page can test the AEP connection and shows discovered models with their reported capabilities. Creating a provider from the Console persists it first and then immediately attempts the initial discovery; a discovery failure is reported without rolling back the provider declaration. The same page exposes an explicit **Refresh models** action and reports the reconciliation counts. Each retained model links to a read-only detail page: its overview summarizes identity, observation freshness, modalities, capabilities, limits and observed-versus-effective provenance, while its YAML tab serializes the exact persisted `Model` resource. The YAML intentionally excludes the provider-owned override and computed effective projection. Disappeared or failed observations remain inspectable, and opening either tab performs no discovery or write. The Extensions page can persist workspace-owned endpoint registrations and enable, disable, edit, or delete them with optimistic concurrency. It also discovers read-only endpoints declared under `Agentstration:Extensions` (including Aspire service-discovery injection) before a Model Provider exists; it does not scan the network. An observed model-provider contribution can prefill the creation form. The page shows live option-set versions, schema digests, migration paths, and every pinned usage or incompatibility. When an extension publishes a path to its preferred version, the operator can preview the current and proposed envelopes and explicitly apply an ETag-protected migration. The Model Profile page adds a runtime-independent compatibility diagnosis: it intersects provider, selected model, and AEP adapter capabilities, then checks the profile's reasoning and structured-output requirements. Runtime capabilities and an agent's tool requirements are evaluated later when that agent is resolved, so the profile diagnosis deliberately does not claim full execution compatibility.
 
 Provider-specific keys currently mapped by the extension include `minP`, `typicalP`, `repeatPenalty`, `repeatLastN`, `mirostat`, `mirostatTau`, `mirostatEta`, `reasoningFormat`, `reasoningEffort`, `chatTemplateKwargs`, and `additionalOptions`. They live under the versioned envelope's `values` member. Portable temperature, top-p, top-k, seed, stop sequences, maximum output tokens, reasoning intent, and output format remain canonical Model Profile fields.
 
@@ -118,5 +124,5 @@ The default tests use fake HTTP and require no model. To run the optional real-s
 ```powershell
 $env:AGENTSTRATION_LLAMA_CPP_ENDPOINT = "http://localhost:8080"
 $env:AGENTSTRATION_LLAMA_CPP_MODEL = "local-gguf"
-dotnet test tests/Agentstration.ModelProviders.Tests --filter TestCategory=Integration
+dotnet test --project tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
 ```

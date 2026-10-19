@@ -1,11 +1,23 @@
+using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
+using Agentstration.Extensions.Contracts;
+using Agentstration.Models;
+using Agentstration.Parameters;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 
 namespace Agentstration.ModelProviders;
 
-public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
+public sealed class AepModelProvider(
+    IHttpClientFactory httpClients,
+    ISecretResolver? secrets = null,
+    ISecretCapabilityService? capabilities = null,
+    IParameterResolver? parameters = null,
+    IConfiguration? configuration = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
 {
     public const string AdapterType = "aep";
     public string ProviderType => AdapterType;
@@ -15,15 +27,129 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(deployment);
+        RequireEnabled(provider);
         if (string.IsNullOrWhiteSpace(deployment.ModelName))
             throw new ModelProviderConfigurationException($"AEP deployment '{deployment.Name}' must specify a model name.");
-        var client = httpClients.CreateClient("agentstration-aep");
-        client.BaseAddress = provider.Endpoint;
         deployment.ProviderOptions.TryGetValue(provider.ContributionId, out var nativeOptions);
+        var client = CreateClient(provider);
         return new AepChatClient(
-            new AepClient(client).CreateModelProvider(provider.ContributionId),
+            client.CreateModelProvider(provider.ContributionId),
             deployment.ModelName,
-            nativeOptions is null ? null : Map(nativeOptions));
+            nativeOptions is null ? null : Map(nativeOptions),
+            token => IssueBoundValuesAsync(provider, deployment, client, null, token),
+            deployment.EffectiveSpecification is null ? null : Map(deployment.EffectiveSpecification));
+    }
+
+    private async Task<AepBoundValuesLease> IssueBoundValuesAsync(
+        ModelProviderConfiguration provider,
+        ModelDeploymentConfiguration deployment,
+        AepClient client,
+        AepManifest? discoveredManifest,
+        CancellationToken cancellationToken)
+    {
+        var manifest = discoveredManifest ?? await client.DiscoverAsync(cancellationToken);
+        var providerIssues = ModelProviderValueBindingValidator.Validate(
+            provider.ValueBindings,
+            manifest.ValueRequirements,
+            provider.ContributionId,
+            requireAll: false);
+        var overrideIssues = ExtensionSecretBindingValidator.Validate(
+            deployment.SecretBindings,
+            manifest.ValueRequirements,
+            AepContributionKinds.ModelProvider,
+            provider.ContributionId,
+            requireAll: false);
+        if (providerIssues.Count > 0) throw new ModelProviderConfigurationException(providerIssues[0].Message);
+        if (overrideIssues.Count > 0) throw new ModelProviderConfigurationException(overrideIssues[0].Message);
+        var bindings = ModelProviderValueBindingValidator.Merge(provider.ValueBindings, deployment.SecretBindings);
+        var mergedIssues = ModelProviderValueBindingValidator.Validate(
+            bindings,
+            manifest.ValueRequirements,
+            provider.ContributionId,
+            requireAll: true);
+        if (mergedIssues.Count > 0) throw new ModelProviderConfigurationException(mergedIssues[0].Message);
+        if (bindings.Count == 0) return new AepBoundValuesLease([], static () => { });
+        if (!manifest.Capabilities.TryGetValue(AepCapabilityNames.BoundValues, out var boundValues)
+            || boundValues.Version != AepProtocol.BoundValuesCapabilityVersion)
+            throw new ModelProviderConfigurationException("The AEP extension does not support Bound Values version 1.0.");
+
+        var providerScope = provider.ScopeRef is { } scopeRef && scopeRef != default
+            ? scopeRef
+            : throw new ModelProviderConfigurationException("AEP Value Bindings require a scoped Model Provider.");
+        var consumer = new ScopedResourceAddress(providerScope, provider.Namespace, ModelResourceKinds.ModelProvider, provider.Name);
+        var parameterContext = new ParameterResolutionContext(providerScope, consumer.Address);
+        var secretBindings = bindings.Where(value => value.Kind == ModelProviderValueBindingKind.Secret).ToArray();
+        Uri? secretEndpoint = null;
+        ScopedResourceAddress extension = default;
+        if (secretBindings.Length > 0)
+        {
+            if (capabilities is null || configuration is null
+                || provider.ExtensionScopeRef is not { } extensionScope || extensionScope == default
+                || string.IsNullOrWhiteSpace(provider.ExpectedExtensionId))
+                throw new ModelProviderConfigurationException("AEP Secret access requires a scoped extension, a pinned extension identity and the host capability service.");
+            if (!manifest.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var secretAccess)
+                || secretAccess.Version != AepProtocol.SecretAccessVersion)
+                throw new ModelProviderConfigurationException("The AEP extension does not support Secret access version 1.0.");
+            var publicBaseUrl = configuration["Agentstration:Aep:SecretAccess:PublicBaseUrl"];
+            if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var baseUri)
+                || baseUri.Scheme != Uri.UriSchemeHttps && !(baseUri.Scheme == Uri.UriSchemeHttp && baseUri.IsLoopback))
+                throw new ModelProviderConfigurationException("AEP Secret access requires a HTTPS or loopback host PublicBaseUrl.");
+            secretEndpoint = new Uri(baseUri, AepProtocol.SecretAccessPath);
+            var extensionAddress = provider.Extension.Resolve(provider.Namespace, ExtensionKinds.ExtensionRegistration);
+            extension = new ScopedResourceAddress(extensionScope, extensionAddress.Namespace, extensionAddress.Kind, extensionAddress.Name);
+        }
+
+        var executionId = Guid.NewGuid().ToString("N");
+        var declared = (manifest.ValueRequirements ?? [])
+            .Where(value => string.Equals(value.ContributionKind, AepContributionKinds.ModelProvider, StringComparison.Ordinal)
+                && string.Equals(value.ContributionId, provider.ContributionId, StringComparison.OrdinalIgnoreCase))
+            .Select(value => value.Id)
+            .ToArray();
+        var handles = new List<SecretCapabilityHandle>();
+        var values = new List<AepBoundValue>();
+        try
+        {
+            foreach (var binding in bindings)
+            {
+                if (binding.Kind == ModelProviderValueBindingKind.Parameter)
+                {
+                    if (parameters is null)
+                        throw new ModelProviderConfigurationException("The host Parameter resolver is unavailable.");
+                    ResolvedParameter? resolved;
+                    try { resolved = await parameters.ResolveAsync(binding.Parameter!, parameterContext, cancellationToken); }
+                    catch (ParameterAccessDeniedException exception) { throw new ModelProviderConfigurationException(exception.Message); }
+                    if (resolved is null)
+                        throw new ModelProviderConfigurationException($"Parameter for Value requirement '{binding.RequirementId}' was not found.");
+                    values.Add(AepBoundValue.Inline(binding.RequirementId, resolved.Value));
+                    continue;
+                }
+
+                var secretBinding = new SecretBinding(binding.RequirementId, binding.Secret!);
+                var context = new SecretCapabilityContext(extension, manifest.Extension.Id, consumer, binding.RequirementId, executionId);
+                var handle = await capabilities!.IssueAsync(context, secretBinding, declared, cancellationToken, cancellationToken);
+                handles.Add(handle);
+                values.Add(AepBoundValue.Secured(binding.RequirementId, new AepSecretAccessGrant(
+                    AepProtocol.SecretAccessVersion,
+                    secretEndpoint!,
+                    manifest.Extension.Id,
+                    binding.RequirementId,
+                    executionId,
+                    handle.RevealForTransport())));
+            }
+            var valueIssues = AepBoundValueValidator.Validate(values, manifest.ValueRequirements,
+                AepContributionKinds.ModelProvider, provider.ContributionId, requireAll: true);
+            if (valueIssues.Count > 0)
+                throw new ModelProviderConfigurationException($"Value requirement '{valueIssues[0].RequirementId}' failed validation ({valueIssues[0].Code}).");
+            return new AepBoundValuesLease(values, () =>
+            {
+                foreach (var handle in handles) capabilities!.Revoke(handle);
+            });
+        }
+        catch
+        {
+            foreach (var handle in handles) capabilities!.Revoke(handle);
+            throw;
+        }
     }
 
     public void Validate(IReadOnlyDictionary<string, System.Text.Json.JsonElement> providerOptions)
@@ -39,9 +165,6 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         {
             var client = CreateClient(provider);
             var descriptor = await client.DiscoverAsync(cancellationToken);
-            if (provider.ExpectedExtensionId is { Length: > 0 } expectedId
-                && !string.Equals(descriptor.Extension.Id, expectedId, StringComparison.Ordinal))
-                return new ModelProviderHealth("incompatible", $"Expected extension '{expectedId}', but endpoint reports '{descriptor.Extension.Id}'.");
             var contribution = descriptor.Contributions.ModelProviders.FirstOrDefault(value => string.Equals(value.Id, provider.ContributionId, StringComparison.OrdinalIgnoreCase));
             if (contribution is null) return new ModelProviderHealth("unavailable", $"The extension does not contribute model provider '{provider.ContributionId}'.");
             var health = await client.CreateModelProvider(provider.ContributionId).GetHealthAsync(cancellationToken);
@@ -49,20 +172,36 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         }
         catch (AepProtocolException exception)
         {
-            return new ModelProviderHealth(exception.Code == "protocol_incompatible" ? "incompatible" : "unavailable", exception.Message);
+            return new ModelProviderHealth(exception.Code is "protocol_incompatible" or "extension_identity_mismatch" ? "incompatible" : "unavailable", exception.Message);
         }
         catch (HttpRequestException exception) { return new ModelProviderHealth("unreachable", exception.Message); }
     }
 
     public async ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default)
     {
-        var models = await CreateClient(provider).CreateModelProvider(provider.ContributionId).ListModelsAsync(cancellationToken);
+        RequireEnabled(provider);
+        var client = CreateClient(provider);
+        using var values = await IssueBoundValuesAsync(provider, new ModelDeploymentConfiguration
+        {
+            Name = provider.Name,
+            ScopeRef = provider.ScopeRef,
+            ProviderName = provider.Name,
+            ProviderNamespace = provider.Namespace,
+            ModelName = string.Empty
+        }, client, null, cancellationToken);
+        var models = await client.CreateModelProvider(provider.ContributionId)
+            .ListModelsAsync(values.Values, cancellationToken);
         return models.Select(value => new DiscoveredModel(
             value.Id,
             value.DisplayName,
             "available",
-            value.Capabilities ?? [],
-            value.Metadata ?? new Dictionary<string, string>())).ToArray();
+            Map(value.Specification),
+            value.Identity is null ? null : new ModelIdentity
+            {
+                Publisher = value.Identity.Publisher,
+                Model = value.Identity.Model,
+                Version = value.Identity.Version
+            })).ToArray();
     }
 
     public async ValueTask<ResolvedModelProviderCapabilities> ResolveCapabilitiesAsync(
@@ -70,11 +209,9 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         ModelDeploymentConfiguration deployment,
         CancellationToken cancellationToken = default)
     {
+        RequireEnabled(provider);
         var client = CreateClient(provider);
         var manifest = await client.DiscoverAsync(cancellationToken);
-        if (provider.ExpectedExtensionId is { Length: > 0 } expectedId
-            && !string.Equals(manifest.Extension.Id, expectedId, StringComparison.Ordinal))
-            throw new ModelProviderConfigurationException($"Expected extension '{expectedId}', but endpoint reports '{manifest.Extension.Id}'.");
         var contribution = manifest.Contributions.ModelProviders.SingleOrDefault(
             value => string.Equals(value.Id, provider.ContributionId, StringComparison.OrdinalIgnoreCase))
             ?? throw new ModelProviderConfigurationException($"The AEP extension does not contribute model provider '{provider.ContributionId}'.");
@@ -83,12 +220,13 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
             var catalog = await client.GetConfigurationAsync(cancellationToken);
             ValidateNativeOptions(provider.ContributionId, nativeOptions, catalog);
         }
-        var models = await client.CreateModelProvider(provider.ContributionId).ListModelsAsync(cancellationToken);
+        using var values = await IssueBoundValuesAsync(provider, deployment, client, manifest, cancellationToken);
+        var models = await client.CreateModelProvider(provider.ContributionId).ListModelsAsync(values.Values, cancellationToken);
         var model = models.SingleOrDefault(value => string.Equals(value.Id, deployment.ModelName, StringComparison.Ordinal));
         if (model is null) throw new ModelProviderConfigurationException($"Model '{deployment.ModelName}' is not available from provider '{provider.Name}'.");
         return new ResolvedModelProviderCapabilities(
             Map(contribution.Capabilities),
-            Map(model.Capabilities ?? []),
+            MapCapabilities(model.Specification),
             new AgentRuntimeCapabilities
             {
                 Streaming = new(CapabilitySupport.Native),
@@ -100,19 +238,40 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
 
     public bool CanInspectEndpoint(Uri endpoint) => endpoint.Scheme is "http" or "https";
 
-    public ValueTask<ExtensionInspection> InspectAsync(
+    public async ValueTask<ExtensionInspection> InspectAsync(
         ModelProviderConfiguration provider,
-        CancellationToken cancellationToken = default) =>
-        InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        RequireEnabled(provider);
+        return await InspectAsync(provider.Name, provider.Endpoint, CreateClient(provider), cancellationToken);
+    }
 
     public async ValueTask<ExtensionInspection> InspectAsync(
         string registrationName,
         Uri endpoint,
         CancellationToken cancellationToken = default)
+        => await InspectAsync(registrationName, endpoint, CreateClient(endpoint), cancellationToken);
+
+    public async ValueTask<ExtensionInspection> InspectAsync(
+        ExtensionRegistrationResource registration,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        return await InspectAsync(
+            registration.Name,
+            registration.Definition.Endpoint,
+            CreateClient(registration),
+            cancellationToken);
+    }
+
+    private static async ValueTask<ExtensionInspection> InspectAsync(
+        string registrationName,
+        Uri endpoint,
+        AepClient client,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var client = CreateClient(endpoint);
             var manifest = await client.DiscoverAsync(cancellationToken);
             var catalog = await client.GetConfigurationAsync(cancellationToken);
             return new ExtensionInspection(
@@ -130,8 +289,13 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.Tool, value.Id)))
                     .Concat((manifest.Contributions.SourceProviders ?? [])
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.SourceProvider, value.Id)))
+                    .Concat((manifest.Contributions.DataSourceProfileBundles ?? [])
+                        .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.DataSourceProfileBundle, value.Id)))
+                    .Concat((manifest.Contributions.SchemaFormats ?? [])
+                        .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.SchemaFormat, value.Id)))
                     .ToArray(),
-                catalog.OptionSets.Select(Map).ToArray());
+                catalog.OptionSets.Select(Map).ToArray(),
+                ValueRequirements: manifest.ValueRequirements);
         }
         catch (AepProtocolException exception)
         {
@@ -154,12 +318,13 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         }
     }
 
-    public async ValueTask<Agentstration.Management.Abstractions.VersionedExtensionOptions> MigrateAsync(
+    public async ValueTask<Agentstration.Models.VersionedExtensionOptions> MigrateAsync(
         ModelProviderConfiguration provider,
-        Agentstration.Management.Abstractions.VersionedExtensionOptions source,
+        Agentstration.Models.VersionedExtensionOptions source,
         string targetVersion,
         CancellationToken cancellationToken = default)
     {
+        RequireEnabled(provider);
         try
         {
             var response = await CreateClient(provider).MigrateOptionsAsync(new(
@@ -168,7 +333,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
                 source.SchemaDigest,
                 targetVersion,
                 source.Values.Clone()), cancellationToken);
-            return new Agentstration.Management.Abstractions.VersionedExtensionOptions
+            return new Agentstration.Models.VersionedExtensionOptions
             {
                 OptionSet = response.Options.OptionSet,
                 Version = response.Options.Version,
@@ -183,18 +348,54 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
     }
 
     private AepClient CreateClient(ModelProviderConfiguration provider)
-        => CreateClient(provider.Endpoint);
+    {
+        var client = httpClients.CreateClient("agentstration-aep");
+        if (client.BaseAddress != provider.Endpoint) client.BaseAddress = provider.Endpoint;
+        return new AepClient(
+            client,
+            AepExtensionCredentials.Create(
+                provider.AuthenticationMode,
+                provider.Credential,
+                provider.Namespace,
+                provider.ExtensionScopeRef,
+                provider.Extension.Name,
+                secrets),
+            expectedExtensionId: provider.ExpectedExtensionId);
+    }
+
+    private static void RequireEnabled(ModelProviderConfiguration provider)
+    {
+        if (!provider.ExtensionEnabled)
+            throw new ModelProviderConfigurationException($"Extension registration '{provider.Extension.Name}' is disabled.");
+    }
 
     private AepClient CreateClient(Uri endpoint)
     {
         var client = httpClients.CreateClient("agentstration-aep");
-        client.BaseAddress = endpoint;
+        if (client.BaseAddress != endpoint) client.BaseAddress = endpoint;
         return new AepClient(client);
+    }
+
+    private AepClient CreateClient(ExtensionRegistrationResource registration)
+    {
+        var definition = registration.Definition;
+        var client = httpClients.CreateClient("agentstration-aep");
+        if (client.BaseAddress != definition.Endpoint) client.BaseAddress = definition.Endpoint;
+        return new AepClient(
+            client,
+            AepExtensionCredentials.Create(
+                definition.AuthenticationMode,
+                definition.Credential,
+                registration.Namespace,
+                registration.ScopeRef,
+                registration.Name,
+                secrets),
+            expectedExtensionId: definition.ExpectedExtensionId);
     }
 
     private static void ValidateNativeOptions(
         string providerType,
-        Agentstration.Management.Abstractions.VersionedExtensionOptions options,
+        Agentstration.Models.VersionedExtensionOptions options,
         Agentstration.Aep.Abstractions.AepConfigurationCatalog catalog)
     {
         if (string.IsNullOrWhiteSpace(options.OptionSet)
@@ -222,7 +423,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
     }
 
     private static Agentstration.Aep.Abstractions.AepVersionedOptions Map(
-        Agentstration.Management.Abstractions.VersionedExtensionOptions value) =>
+        Agentstration.Models.VersionedExtensionOptions value) =>
         new(value.OptionSet, value.Version, value.SchemaDigest, value.Values.Clone());
 
     private static ExtensionOptionSet Map(Agentstration.Aep.Abstractions.AepOptionSetDescriptor value) => new(
@@ -248,16 +449,184 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         Reasoning = new ReasoningCapability { Support = value.Thinking ? CapabilitySupport.Native : CapabilitySupport.Unsupported }
     };
 
-    private static AgentRuntimeCapabilities Map(IReadOnlyList<string> values)
+    private static AgentRuntimeCapabilities MapCapabilities(AepModelSpecification? specification)
     {
-        bool Has(string name) => values.Contains(name, StringComparer.OrdinalIgnoreCase);
-        FeatureCapability Feature(string name) => new(Has(name) ? CapabilitySupport.Native : CapabilitySupport.Unsupported);
+        static CapabilitySupport Support(AepModelFeatureSupport? support) => support switch
+        {
+            AepModelFeatureSupport.Native => CapabilitySupport.Native,
+            AepModelFeatureSupport.Emulated => CapabilitySupport.Emulated,
+            AepModelFeatureSupport.Partial => CapabilitySupport.Partial,
+            _ => CapabilitySupport.Unsupported
+        };
         return new AgentRuntimeCapabilities
         {
-            Streaming = Feature("streaming"),
-            Tools = Feature("tools"),
-            StructuredOutput = Feature("structuredOutput"),
-            Reasoning = new ReasoningCapability { Support = Has("reasoning") || Has("thinking") ? CapabilitySupport.Native : CapabilitySupport.Unsupported }
+            Streaming = new(Support(specification?.Features.Streaming?.Support)),
+            Tools = new(Support(specification?.Features.Tools?.Support)),
+            StructuredOutput = new(Support(specification?.Features.StructuredOutput?.Support)),
+            Reasoning = new ReasoningCapability { Support = Support(specification?.Features.Reasoning?.Support) }
         };
     }
+
+    private static ModelSpecification Map(AepModelSpecification? specification) => new()
+    {
+        Input = specification?.Input?.Select(Map).ToArray(),
+        Output = specification?.Output?.Select(Map).ToArray(),
+        Features = new ModelFeatureSpecifications
+        {
+            Streaming = specification?.Features.Streaming is { } streaming
+                ? new ModelStreamingFeatureSpecification { Support = Map(streaming.Support) } : null,
+            Tools = specification?.Features.Tools is { } tools
+                ? new ModelToolsFeatureSpecification
+                {
+                    Support = Map(tools.Support),
+                    Modes = tools.Modes.ToDictionary(value => Map(value.Key), _ => new ModelToolModeSpecification())
+                } : null,
+            StructuredOutput = specification?.Features.StructuredOutput is { } structured
+                ? new ModelStructuredOutputFeatureSpecification
+                {
+                    Support = Map(structured.Support),
+                    Formats = structured.Formats.ToDictionary(
+                        value => Map(value.Key),
+                        value => new ModelStructuredOutputFormatSpecification
+                        {
+                            SupportsStrict = value.Value.SupportsStrict
+                        })
+                } : null,
+            Reasoning = specification?.Features.Reasoning is { } reasoning
+                ? new ModelReasoningFeatureSpecification
+                {
+                    Support = Map(reasoning.Support),
+                    Efforts = reasoning.Efforts.Where(value => value.Key != AepModelReasoningEffort.None)
+                        .ToDictionary(value => Map(value.Key), _ => new ModelReasoningEffortSpecification())
+                } : null
+        },
+        Limits = new ModelLimits
+        {
+            ContextTokens = specification?.Limits.ContextTokens,
+            MaxOutputTokens = specification?.Limits.MaxOutputTokens
+        }
+    };
+
+    private static AepModelSpecification Map(ModelSpecification specification) => new()
+    {
+        Input = specification.Input?.Select(Map).ToArray(),
+        Output = specification.Output?.Select(Map).ToArray(),
+        Features = new AepModelFeatureSpecifications
+        {
+            Streaming = specification.Features.Streaming is { } streaming
+                ? new AepModelStreamingFeatureSpecification { Support = Map(streaming.Support) } : null,
+            Tools = specification.Features.Tools is { } tools
+                ? new AepModelToolsFeatureSpecification
+                {
+                    Support = Map(tools.Support),
+                    Modes = tools.Modes.ToDictionary(value => Map(value.Key), _ => new AepModelToolModeSpecification())
+                } : null,
+            StructuredOutput = specification.Features.StructuredOutput is { } structured
+                ? new AepModelStructuredOutputFeatureSpecification
+                {
+                    Support = Map(structured.Support),
+                    Formats = structured.Formats.ToDictionary(
+                        value => Map(value.Key),
+                        value => new AepModelStructuredOutputFormatSpecification
+                        {
+                            SupportsStrict = value.Value.SupportsStrict
+                        })
+                } : null,
+            Reasoning = specification.Features.Reasoning is { } reasoning
+                ? new AepModelReasoningFeatureSpecification
+                {
+                    Support = Map(reasoning.Support),
+                    Efforts = reasoning.Efforts.ToDictionary(
+                        value => Map(value.Key),
+                        _ => new AepModelReasoningEffortSpecification())
+                } : null
+        },
+        Limits = new AepModelLimits
+        {
+            ContextTokens = specification.Limits.ContextTokens,
+            MaxOutputTokens = specification.Limits.MaxOutputTokens
+        }
+    };
+
+    private static ModelContentType Map(AepModelContentType value) => value switch
+    {
+        AepModelContentType.Text => ModelContentType.Text,
+        AepModelContentType.Image => ModelContentType.Image,
+        AepModelContentType.Audio => ModelContentType.Audio,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static AepModelContentType Map(ModelContentType value) => value switch
+    {
+        ModelContentType.Text => AepModelContentType.Text,
+        ModelContentType.Image => AepModelContentType.Image,
+        ModelContentType.Audio => AepModelContentType.Audio,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static ModelFeatureSupport Map(AepModelFeatureSupport value) => value switch
+    {
+        AepModelFeatureSupport.Unknown => ModelFeatureSupport.Unknown,
+        AepModelFeatureSupport.Unsupported => ModelFeatureSupport.Unsupported,
+        AepModelFeatureSupport.Native => ModelFeatureSupport.Native,
+        AepModelFeatureSupport.Emulated => ModelFeatureSupport.Emulated,
+        AepModelFeatureSupport.Partial => ModelFeatureSupport.Partial,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static AepModelFeatureSupport Map(ModelFeatureSupport value) => value switch
+    {
+        ModelFeatureSupport.Unknown => AepModelFeatureSupport.Unknown,
+        ModelFeatureSupport.Unsupported => AepModelFeatureSupport.Unsupported,
+        ModelFeatureSupport.Native => AepModelFeatureSupport.Native,
+        ModelFeatureSupport.Emulated => AepModelFeatureSupport.Emulated,
+        ModelFeatureSupport.Partial => AepModelFeatureSupport.Partial,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static ModelToolMode Map(AepModelToolMode value) => value switch
+    {
+        AepModelToolMode.Function => ModelToolMode.Function,
+        AepModelToolMode.Parallel => ModelToolMode.Parallel,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static AepModelToolMode Map(ModelToolMode value) => value switch
+    {
+        ModelToolMode.Function => AepModelToolMode.Function,
+        ModelToolMode.Parallel => AepModelToolMode.Parallel,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static ModelStructuredOutputFormat Map(AepModelStructuredOutputFormat value) => value switch
+    {
+        AepModelStructuredOutputFormat.JsonObject => ModelStructuredOutputFormat.JsonObject,
+        AepModelStructuredOutputFormat.JsonSchema => ModelStructuredOutputFormat.JsonSchema,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static AepModelStructuredOutputFormat Map(ModelStructuredOutputFormat value) => value switch
+    {
+        ModelStructuredOutputFormat.JsonObject => AepModelStructuredOutputFormat.JsonObject,
+        ModelStructuredOutputFormat.JsonSchema => AepModelStructuredOutputFormat.JsonSchema,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static Agentstration.Models.ReasoningEffort Map(AepModelReasoningEffort value) => value switch
+    {
+        AepModelReasoningEffort.Minimal => Agentstration.Models.ReasoningEffort.Minimal,
+        AepModelReasoningEffort.Low => Agentstration.Models.ReasoningEffort.Low,
+        AepModelReasoningEffort.Medium => Agentstration.Models.ReasoningEffort.Medium,
+        AepModelReasoningEffort.High => Agentstration.Models.ReasoningEffort.High,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
+
+    private static AepModelReasoningEffort Map(Agentstration.Models.ReasoningEffort value) => value switch
+    {
+        Agentstration.Models.ReasoningEffort.Minimal => AepModelReasoningEffort.Minimal,
+        Agentstration.Models.ReasoningEffort.Low => AepModelReasoningEffort.Low,
+        Agentstration.Models.ReasoningEffort.Medium => AepModelReasoningEffort.Medium,
+        Agentstration.Models.ReasoningEffort.High => AepModelReasoningEffort.High,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
 }

@@ -23,6 +23,9 @@ public sealed partial class GenAiHttpPayloadCaptureHandler(
         "password",
         "refreshtoken",
         "secret",
+        "secretaccess",
+        "secretcapability",
+        "secretvaluebase64",
         "token"
     };
 

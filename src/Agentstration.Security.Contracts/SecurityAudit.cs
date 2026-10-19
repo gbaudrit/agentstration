@@ -1,0 +1,122 @@
+namespace Agentstration.Security.Contracts;
+
+public enum SecurityAuditOutcome
+{
+    Succeeded,
+    Failed
+}
+
+public static class SecurityAuditActions
+{
+    public const string InstanceBootstrapped = "instance.bootstrapped";
+    public const string PlatformAdministratorGranted = "platform-administrator.granted";
+    public const string PlatformAdministratorRevoked = "platform-administrator.revoked";
+    public const string LocalLogin = "local-account.login";
+    public const string LocalLogout = "local-account.logout";
+    public const string LocalAccountCreated = "local-account.created";
+    public const string LocalAccountEnabled = "local-account.enabled";
+    public const string LocalAccountDisabled = "local-account.disabled";
+    public const string LocalPasswordChanged = "local-account.password-changed";
+    public const string LocalSessionsRevoked = "local-account.sessions-revoked";
+    public const string ExternalIdentityLinked = "external-identity.linked";
+    public const string ExternalIdentityUnlinked = "external-identity.unlinked";
+    public const string WorkspaceMembershipSet = "workspace-membership.set";
+    public const string WorkspaceMembershipRemoved = "workspace-membership.removed";
+    public const string AgentRevisionPurged = "agent-revision.purged";
+    public const string AgentRevisionForcePurged = "agent-revision.force-purged";
+    public const string PersonalAccessTokenCreated = "personal-access-token.created";
+    public const string PersonalAccessTokenRevoked = "personal-access-token.revoked";
+    public const string PersonalAccessTokensRevoked = "personal-access-token.revoked-all";
+    public const string BffWorkloadEnrolled = "bff-workload.enrolled";
+    public const string BffWorkloadCredentialRotated = "bff-workload.credential-rotated";
+    public const string BffWorkloadCredentialRevoked = "bff-workload.credential-revoked";
+    public const string BffWorkloadAuthenticated = "bff-workload.authenticated";
+    public const string BffWorkloadAuthenticationFailed = "bff-workload.authentication-failed";
+    public const string AwpWorkerEnrollmentAnnounced = "awp-worker.enrollment-announced";
+    public const string AwpWorkerPairingCodeIssued = "awp-worker.pairing-code-issued";
+    public const string AwpWorkerCredentialIssued = "awp-worker.credential-issued";
+    public const string AwpWorkerCredentialRotated = "awp-worker.credential-rotated";
+    public const string AwpWorkerCredentialRevoked = "awp-worker.credential-revoked";
+    public const string AwpWorkerSessionStarted = "awp-worker.session-started";
+    public const string AwpWorkerEnrollmentFailed = "awp-worker.enrollment-failed";
+    public const string AwpWorkerAuthenticated = "awp-worker.authenticated";
+    public const string AwpWorkerAuthenticationFailed = "awp-worker.authentication-failed";
+    public const string BootstrapProfileApplied = "bootstrap-profile.applied";
+    public const string AepEnrollmentAnnounced = "aep-enrollment.announced";
+    public const string AepPairingCodeIssued = "aep-enrollment.code-issued";
+    public const string AepCredentialIssued = "aep-enrollment.credential-issued";
+    public const string AepEnrollmentAvailable = "aep-enrollment.available";
+    public const string AepEnrollmentRejected = "aep-enrollment.rejected";
+    public const string AepEnrollmentCancelled = "aep-enrollment.cancelled";
+    public const string AepCredentialRotated = "aep-enrollment.credential-rotated";
+    public const string AepCredentialRevoked = "aep-enrollment.credential-revoked";
+    public const string AepEnrollmentUnenrolled = "aep-enrollment.unenrolled";
+    public const string AepEnrollmentFailed = "aep-enrollment.failed";
+    public const string SourceRegistryCreated = "source-registry.created";
+    public const string SourceRegistryConfigurationUpdated = "source-registry.configuration-updated";
+    public const string SourceRegistryDeleted = "source-registry.deleted";
+    public const string SourceRegistryRefreshed = "source-registry.refreshed";
+    public const string SourceRegistrySourceImported = "source-registry.source-imported";
+    public const string DataSourceCreated = "data-source.created";
+    public const string DataSourceUpdated = "data-source.updated";
+    public const string DataSourceDeleted = "data-source.deleted";
+    public const string DataSourceProfileCreated = "data-source-profile.created";
+    public const string DataSourceProfileUpdated = "data-source-profile.updated";
+    public const string DataSourceProfileDeleted = "data-source-profile.deleted";
+    public const string DataSourceProfileRevisionPublished = "data-source-profile.revision-published";
+    public const string DataSourceProfileRevisionActivated = "data-source-profile.revision-activated";
+    public const string DataSourceAcquisitionStarted = "data-source-acquisition.started";
+    public const string DataSourceAcquisitionCancelled = "data-source-acquisition.cancelled";
+    public const string DataSourceAcquisitionRetried = "data-source-acquisition.retried";
+    public const string KnowledgeSourceCreated = "knowledge-source.created";
+    public const string KnowledgeSourceToolExposurePublished = "knowledge-source.tool-exposure-published";
+    public const string KnowledgeSourceUpdated = "knowledge-source.updated";
+    public const string KnowledgeSourceEnabled = "knowledge-source.enabled";
+    public const string KnowledgeSourceDisabled = "knowledge-source.disabled";
+    public const string KnowledgeSourceDeleted = "knowledge-source.deleted";
+    public const string KnowledgeSnapshotPublished = "knowledge-snapshot.published";
+    public const string KnowledgeSnapshotActivated = "knowledge-snapshot.activated";
+    public const string KnowledgeRetrievalCompleted = "knowledge-retrieval.completed";
+    public const string KnowledgeRetrievalFailed = "knowledge-retrieval.failed";
+    public const string ToolSetCreated = "tool-set.created";
+    public const string ToolSetUpdated = "tool-set.updated";
+    public const string ToolSetDeleted = "tool-set.deleted";
+    public const string ToolSetVersionPublished = "tool-set.version-published";
+    public const string SchemaCreated = "schema.created";
+    public const string SchemaUpdated = "schema.updated";
+    public const string SchemaVersionPublished = "schema.version-published";
+}
+
+public sealed record SecurityAuditEvent(
+    Guid Id,
+    string Action,
+    SecurityAuditOutcome Outcome,
+    Guid? ActorPrincipalId,
+    Guid? TargetPrincipalId,
+    Guid? TargetAccountId,
+    Guid? TenantId,
+    Guid? WorkspaceId,
+    string? ReasonCode,
+    string? CorrelationId,
+    DateTimeOffset OccurredAt);
+
+public sealed record SecurityAuditWrite(
+    string Action,
+    SecurityAuditOutcome Outcome = SecurityAuditOutcome.Succeeded,
+    Guid? ActorPrincipalId = null,
+    Guid? TargetPrincipalId = null,
+    Guid? TargetAccountId = null,
+    Guid? TenantId = null,
+    Guid? WorkspaceId = null,
+    string? ReasonCode = null);
+
+public interface ISecurityAuditWriter
+{
+    Task WriteAsync(SecurityAuditWrite entry, CancellationToken cancellationToken);
+}
+
+public interface ISecurityAuditStore
+{
+    Task AppendAsync(SecurityAuditEvent entry, CancellationToken cancellationToken);
+    Task<IReadOnlyList<SecurityAuditEvent>> ListLatestAsync(int limit, CancellationToken cancellationToken);
+}

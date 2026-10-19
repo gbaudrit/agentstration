@@ -1,0 +1,38 @@
+name: Resource Plan UX
+
+on:
+  pull_request:
+    branches: [main, feature/fr-322-resource-planning-integration]
+    paths:
+      - '.github/workflows/resource-plan-ux.yml'
+      - 'src/**'
+      - 'tests/Agentstration.Console.Playwright/**'
+      - 'deploy/bootstrap/**'
+      - 'Directory.*.props'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/Agentstration.Console.Playwright/package-lock.json
+      - run: dotnet restore Agentstration.slnx
+      - run: dotnet build src/Agentstration.Web/Agentstration.Web.csproj --configuration Release --no-restore
+      - run: npm ci
+        working-directory: tests/Agentstration.Console.Playwright
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests/Agentstration.Console.Playwright
+      - run: npm test
+        working-directory: tests/Agentstration.Console.Playwright

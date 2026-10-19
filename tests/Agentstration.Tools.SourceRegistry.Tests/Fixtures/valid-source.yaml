@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: SourceVersion
+metadata:
+  name: official-samples
+definition:
+  version: "1"
+  displayName: Agentstration official samples
+  publisher:
+    name: agentstration
+  bindings: []
+  channels: []
+  catalogs: []

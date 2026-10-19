@@ -1,0 +1,64 @@
+@implements IDisposable
+@inject IAgentstrationEventStream EventStream
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
+
+<article class="panel" data-testid="latest-run-events" aria-busy="@(loading ? "true" : "false")">
+    <div class="panel-header"><h2>@T("LatestRunEvents")</h2><a href="/run-events">@T("OpenRunActivity") →</a></div>
+    @if (loading)
+    {
+        <LoadingState Message="@T("LoadingRunEvents")" />
+    }
+    else if (unavailable)
+    {
+        <EmptyState Title="@T("RunEventsUnavailable")" Message="" />
+    }
+    else
+    {
+        <EventList Items="events" EmptyTitle="@T("NoRunEvents")" EmptyMessage="@T("NoRunEventsMessage")" />
+    }
+</article>
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<EventListItem> events = [];
+    private bool loading = true;
+    private bool unavailable;
+    private bool disposed;
+    private string T(string key) => Localizer[key];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await LoadEventsAsync();
+        if (!disposed)
+            await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        try
+        {
+            events = (await EventStream.GetRecentEventsAsync(cancellation.Token)).Take(5).ToArray();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            unavailable = true;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

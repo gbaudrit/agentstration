@@ -1,0 +1,34 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: news-alert-parent
+definition:
+  displayName: News alert parent
+  description: Demonstrates a parent Workflow calling the delivery Flow through the generic Flow card.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: direct
+    target:
+      kind: agent
+      id: unused-graph-target
+  graph:
+    entryStep: input
+    steps:
+      - { type: input, name: input, displayName: News alert }
+      - type: flow
+        name: deliver
+        displayName: Deliver notification
+        flow:
+          resourceId: notification-delivery
+          versionStrategy: active
+        inputMapping: "${input}"
+      - type: output
+        name: output
+        displayName: Delivery receipt
+        outputMapping: "${steps.deliver.output}"
+    transitions:
+      - { id: input-to-delivery, fromStep: input, event: completed, toStep: deliver }
+      - { id: delivery-to-output, fromStep: deliver, event: completed, toStep: output }
+  publish: true
+  activate: true

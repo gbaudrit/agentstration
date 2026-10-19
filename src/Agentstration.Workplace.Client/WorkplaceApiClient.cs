@@ -15,8 +15,10 @@ public interface IWorkplaceApiClient
     Task<IReadOnlyList<WorkplaceDashboardResponse>> ListDashboardsAsync(string workspaceName, CancellationToken token);
     Task<WorkplaceDashboardResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken token);
     Task<WorkplaceDashboardResponse> GetDefaultDashboardAsync(string workspaceName, CancellationToken token);
+    Task<IReadOnlyList<EntryResponse>> DiscoverEntriesAsync(EntryExposureSurface surface, EntryWorkplacePlacement? placement, CancellationToken token);
     Task<EntryResponse> GetEntryAsync(EntryId entryId, CancellationToken token);
     Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token);
+    Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, EntryWorkplacePlacement placement, CancellationToken token);
     Task<InteractionResponse> GetInteractionAsync(string workspaceName, Guid interactionId, CancellationToken token);
     Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(string workspaceName, int take, CancellationToken token);
     Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(string workspaceName, Guid interactionId, CancellationToken token);
@@ -45,8 +47,17 @@ public sealed class WorkplaceApiClient(HttpClient httpClient) : IWorkplaceApiCli
     public async Task<IReadOnlyList<WorkplaceDashboardResponse>> ListDashboardsAsync(string workspaceName, CancellationToken token) => await httpClient.GetFromJsonAsync<WorkplaceDashboardResponse[]>($"api/workspaces/{E(workspaceName)}/dashboards", token) ?? [];
     public Task<WorkplaceDashboardResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken token) => GetAsync<WorkplaceDashboardResponse>($"api/workspaces/{E(workspaceName)}/dashboards/{E(dashboardName)}", token);
     public Task<WorkplaceDashboardResponse> GetDefaultDashboardAsync(string workspaceName, CancellationToken token) => GetAsync<WorkplaceDashboardResponse>($"api/workspaces/{E(workspaceName)}/dashboard", token);
+    public async Task<IReadOnlyList<EntryResponse>> DiscoverEntriesAsync(EntryExposureSurface surface, EntryWorkplacePlacement? placement, CancellationToken token)
+    {
+        var query = $"api/entries?surface={E(surface.ToString())}";
+        if (placement is not null) query += $"&placement={E(placement.Value.ToString())}";
+        return await httpClient.GetFromJsonAsync<EntryResponse[]>(query, token) ?? [];
+    }
     public Task<EntryResponse> GetEntryAsync(EntryId entryId, CancellationToken token) => GetAsync<EntryResponse>($"api/{EntryPath(entryId)}", token);
-    public async Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token) => await PostAsync<CreateInteractionRequest, EntrySubmissionResponse>($"api/workspaces/{E(workspaceName)}/{EntryPath(entryId)}/interactions", new CreateInteractionRequest(values), token);
+    public Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token) =>
+        SubmitAsync(workspaceName, entryId, values, EntryWorkplacePlacement.OwningSpace, token);
+    public async Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, EntryWorkplacePlacement placement, CancellationToken token) =>
+        await PostAsync<CreateInteractionRequest, EntrySubmissionResponse>($"api/workspaces/{E(workspaceName)}/{EntryPath(entryId)}/interactions?placement={E(placement.ToString())}", new CreateInteractionRequest(values), token);
     public Task<InteractionResponse> GetInteractionAsync(string workspaceName, Guid interactionId, CancellationToken token) => GetAsync<InteractionResponse>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}", token);
     public async Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(string workspaceName, int take, CancellationToken token) => (await GetAsync<InteractionPageResponse>($"api/workspaces/{E(workspaceName)}/interactions?take={Math.Clamp(take, 1, 100)}", token)).Value;
     public async Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(string workspaceName, Guid interactionId, CancellationToken token) => await httpClient.GetFromJsonAsync<ConversationMessage[]>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}/messages", token) ?? [];

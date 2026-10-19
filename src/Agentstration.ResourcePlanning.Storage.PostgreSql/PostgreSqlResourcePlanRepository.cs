@@ -1,0 +1,403 @@
+using System.Text.Json;
+using Agentstration.ResourcePlanning.Contracts;
+using Agentstration.ResourcePlanning.Storage.Abstractions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Agentstration.ResourcePlanning.Storage.PostgreSql;
+
+public sealed class ResourcePlanningDbContext(DbContextOptions<ResourcePlanningDbContext> options) : DbContext(options)
+{
+    internal DbSet<ResourcePlanDocument> Plans => Set<ResourcePlanDocument>();
+    internal DbSet<ResourcePlanActivityDocument> Activities => Set<ResourcePlanActivityDocument>();
+    internal DbSet<ResourcePlanBindingDraftDocument> BindingDrafts => Set<ResourcePlanBindingDraftDocument>();
+    internal DbSet<ResourceChangeSetDocument> ChangeSets => Set<ResourceChangeSetDocument>();
+    internal DbSet<ResourceChangeSetValidationDocument> Validations => Set<ResourceChangeSetValidationDocument>();
+    internal DbSet<ResourceChangeSetApplicationDocument> Applications => Set<ResourceChangeSetApplicationDocument>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema("resource_planning");
+        var plan = modelBuilder.Entity<ResourcePlanDocument>();
+        plan.ToTable("ResourcePlans");
+        plan.HasKey(value => new { value.WorkspaceId, value.Id });
+        plan.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        plan.Property(value => value.Payload).IsRequired();
+        plan.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
+        plan.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.Status, value.UpdatedAt, value.Id });
+
+        var activity = modelBuilder.Entity<ResourcePlanActivityDocument>();
+        activity.ToTable("ResourcePlanActivities");
+        activity.HasKey(value => value.Id);
+        activity.Property(value => value.Payload).IsRequired();
+        activity.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
+        activity.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.PlanId, value.CreatedAt, value.Id });
+
+        var bindings = modelBuilder.Entity<ResourcePlanBindingDraftDocument>();
+        bindings.ToTable("ResourcePlanBindingDrafts");
+        bindings.HasKey(value => new { value.WorkspaceId, value.PlanId });
+        bindings.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        bindings.Property(value => value.Payload).IsRequired();
+
+        var changeSet = modelBuilder.Entity<ResourceChangeSetDocument>();
+        changeSet.ToTable("ResourceChangeSets");
+        changeSet.HasKey(value => new { value.WorkspaceId, value.Id });
+        changeSet.Property(value => value.MaterializationDigest).HasMaxLength(80);
+        changeSet.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        changeSet.Property(value => value.Payload).IsRequired();
+        changeSet.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
+        changeSet.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.PlanId, value.PlanRevision, value.MaterializationDigest }).IsUnique();
+        changeSet.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.CreatedAt, value.Id });
+
+        var validation = modelBuilder.Entity<ResourceChangeSetValidationDocument>();
+        validation.ToTable("ResourceChangeSetValidations");
+        validation.HasKey(value => value.Id);
+        validation.Property(value => value.ChangeSetDigest).HasMaxLength(80);
+        validation.Property(value => value.Payload).IsRequired();
+        validation.Property(value => value.ValidatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
+        validation.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.ChangeSetId, value.ValidatedAt, value.Id });
+
+        var application = modelBuilder.Entity<ResourceChangeSetApplicationDocument>();
+        application.ToTable("ResourceChangeSetApplications");
+        application.HasKey(value => new { value.WorkspaceId, value.ChangeSetId });
+        application.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        application.Property(value => value.Payload).IsRequired();
+    }
+}
+
+internal sealed class ResourcePlanDocument
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public ResourcePlanStatus Status { get; set; }
+    public long Revision { get; set; }
+    public required string Payload { get; set; }
+    public required string ETag { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+internal sealed class ResourcePlanActivityDocument
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid PlanId { get; set; }
+    public long PlanRevision { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal sealed class ResourcePlanBindingDraftDocument
+{
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid PlanId { get; set; }
+    public required string Payload { get; set; }
+    public required string ETag { get; set; }
+}
+
+internal sealed class ResourceChangeSetDocument
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid PlanId { get; set; }
+    public long PlanRevision { get; set; }
+    public required string MaterializationDigest { get; set; }
+    public ResourceChangeSetStatus Status { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public required string Payload { get; set; }
+    public required string ETag { get; set; }
+}
+
+internal sealed class ResourceChangeSetValidationDocument
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid ChangeSetId { get; set; }
+    public required string ChangeSetDigest { get; set; }
+    public DateTimeOffset ValidatedAt { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal sealed class ResourceChangeSetApplicationDocument
+{
+    public Guid TenantId { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid ChangeSetId { get; set; }
+    public required string Payload { get; set; }
+    public required string ETag { get; set; }
+}
+
+public sealed class PostgreSqlResourcePlanRepository(
+    IDbContextFactory<ResourcePlanningDbContext> contextFactory) : IResourcePlanRepository, IResourceChangeSetRepository
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public async Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        if (!await context.Database.CanConnectAsync(cancellationToken))
+            throw new InvalidOperationException("The PostgreSQL Resource Planning store is not accessible.");
+    }
+
+    public async Task<ResourcePlanSnapshot> CreateAsync(ResourcePlan plan, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = ToDocument(plan);
+        context.Plans.Add(document);
+        await SaveCreateAsync(context, cancellationToken);
+        return Snapshot(document);
+    }
+
+    public async Task<ResourcePlanSnapshot?> GetAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Plans.AsNoTracking().SingleOrDefaultAsync(value =>
+            value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.Id == id.Value,
+            cancellationToken);
+        return document is null ? null : Snapshot(document);
+    }
+
+    public async Task<ResourcePlanPage> ListAsync(ResourcePlanScope scope, ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = context.Plans.AsNoTracking().Where(value => value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value);
+        if (status is not null) query = query.Where(value => value.Status == status);
+        var documents = await query.OrderByDescending(value => value.UpdatedAt).ThenByDescending(value => value.Id)
+            .Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
+        return new(documents.Take(take).Select(Snapshot).ToArray(), documents.Length > take);
+    }
+
+    public async Task<ResourcePlanSnapshot> UpdateAsync(ResourcePlan plan, string expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Plans.SingleOrDefaultAsync(value =>
+            value.TenantId == plan.Scope.TenantId && value.WorkspaceId == plan.Scope.WorkspaceId.Value && value.Id == plan.Id.Value,
+            cancellationToken) ?? throw new ResourcePlanNotFoundException(plan.Id);
+        if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal))
+            throw new ResourcePlanConcurrencyException("The Resource Plan was modified concurrently.");
+        document.Status = plan.Status;
+        document.Revision = plan.Revision;
+        document.Payload = JsonSerializer.Serialize(plan, JsonOptions);
+        document.ETag = NewETag();
+        document.UpdatedAt = plan.UpdatedAt;
+        await SaveUpdateAsync(context, cancellationToken);
+        return Snapshot(document);
+    }
+
+    public async Task AddActivityAsync(ResourcePlanActivity activity, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.Activities.Add(new()
+        {
+            Id = activity.Id,
+            TenantId = activity.Scope.TenantId,
+            WorkspaceId = activity.Scope.WorkspaceId.Value,
+            PlanId = activity.PlanId.Value,
+            PlanRevision = activity.PlanRevision,
+            CreatedAt = activity.CreatedAt,
+            Payload = JsonSerializer.Serialize(activity, JsonOptions)
+        });
+        await SaveCreateAsync(context, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.Activities.AsNoTracking().Where(value =>
+                value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.PlanId == id.Value)
+            .OrderBy(value => value.CreatedAt).ThenBy(value => value.Id).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<ResourcePlanActivity>).ToArray();
+    }
+
+    public async Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(ResourcePlanScope scope, ResourcePlanId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var value = await context.BindingDrafts.AsNoTracking().SingleOrDefaultAsync(item =>
+            item.TenantId == scope.TenantId && item.WorkspaceId == scope.WorkspaceId.Value && item.PlanId == id.Value, cancellationToken);
+        return value is null ? null : new(Deserialize<ResourcePlanBindingDraft>(value.Payload), value.ETag);
+    }
+
+    public async Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(ResourcePlanBindingDraft draft, string? expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var value = await context.BindingDrafts.SingleOrDefaultAsync(item =>
+            item.TenantId == draft.Scope.TenantId && item.WorkspaceId == draft.Scope.WorkspaceId.Value && item.PlanId == draft.PlanId.Value, cancellationToken);
+        if (value?.ETag != expectedETag) throw new ResourcePlanConcurrencyException("Profile selections changed. Reload the plan before editing them.");
+        if (value is null)
+        {
+            value = new()
+            {
+                TenantId = draft.Scope.TenantId,
+                WorkspaceId = draft.Scope.WorkspaceId.Value,
+                PlanId = draft.PlanId.Value,
+                Payload = string.Empty,
+                ETag = NewETag()
+            };
+            context.BindingDrafts.Add(value);
+        }
+        else value.ETag = NewETag();
+        value.Payload = JsonSerializer.Serialize(draft, JsonOptions);
+        await SaveCreateAsync(context, cancellationToken);
+        return new(draft, value.ETag);
+    }
+
+    public async Task<ResourceChangeSetSnapshot> CreateAsync(ResourceChangeSet changeSet, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = ToDocument(changeSet);
+        context.ChangeSets.Add(document);
+        await SaveCreateAsync(context, cancellationToken);
+        return Snapshot(document);
+    }
+
+    public async Task<ResourceChangeSetSnapshot?> GetAsync(ResourcePlanScope scope, ResourceChangeSetId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.ChangeSets.AsNoTracking().SingleOrDefaultAsync(value => value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.Id == id.Value, cancellationToken);
+        return document is null ? null : Snapshot(document);
+    }
+
+    public async Task<ResourceChangeSetSnapshot?> FindAsync(ResourcePlanScope scope, ResourcePlanId planId, long planRevision, string materializationDigest, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.ChangeSets.AsNoTracking().SingleOrDefaultAsync(value => value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.PlanId == planId.Value && value.PlanRevision == planRevision && value.MaterializationDigest == materializationDigest, cancellationToken);
+        return document is null ? null : Snapshot(document);
+    }
+
+    public async Task<ResourceChangeSetPage> ListAsync(ResourcePlanScope scope, ResourcePlanId? planId, int skip, int take, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = context.ChangeSets.AsNoTracking().Where(value => value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value);
+        if (planId is not null) query = query.Where(value => value.PlanId == planId.Value.Value);
+        var documents = await query.OrderByDescending(value => value.CreatedAt).ThenByDescending(value => value.Id).Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
+        return new(documents.Take(take).Select(Snapshot).ToArray(), documents.Length > take);
+    }
+
+    public async Task<ResourceChangeSetSnapshot> UpdateAsync(ResourceChangeSet changeSet, string expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.ChangeSets.SingleOrDefaultAsync(value => value.TenantId == changeSet.Scope.TenantId && value.WorkspaceId == changeSet.Scope.WorkspaceId.Value && value.Id == changeSet.Id.Value, cancellationToken)
+            ?? throw new ResourceChangeSetNotFoundException(changeSet.Id);
+        if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal)) throw new ResourcePlanConcurrencyException("The Resource ChangeSet was modified concurrently.");
+        document.Status = changeSet.Status;
+        document.Payload = JsonSerializer.Serialize(changeSet, JsonOptions);
+        document.ETag = NewETag();
+        await SaveUpdateAsync(context, cancellationToken);
+        return Snapshot(document);
+    }
+
+    public async Task AddValidationAsync(ResourceChangeSetValidation validation, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.Validations.Add(new()
+        {
+            Id = validation.Id,
+            TenantId = validation.Scope.TenantId,
+            WorkspaceId = validation.Scope.WorkspaceId.Value,
+            ChangeSetId = validation.ChangeSetId.Value,
+            ChangeSetDigest = validation.ChangeSetDigest,
+            ValidatedAt = validation.ValidatedAt,
+            Payload = JsonSerializer.Serialize(validation, JsonOptions)
+        });
+        await SaveCreateAsync(context, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ResourceChangeSetValidation>> ListValidationsAsync(ResourcePlanScope scope, ResourceChangeSetId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.Validations.AsNoTracking().Where(value => value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.ChangeSetId == id.Value)
+            .OrderBy(value => value.ValidatedAt).ThenBy(value => value.Id).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<ResourceChangeSetValidation>).ToArray();
+    }
+
+    public async Task<ResourceChangeSetApplicationSnapshot?> GetApplicationAsync(ResourcePlanScope scope, ResourceChangeSetId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Applications.AsNoTracking().SingleOrDefaultAsync(value =>
+            value.TenantId == scope.TenantId && value.WorkspaceId == scope.WorkspaceId.Value && value.ChangeSetId == id.Value, cancellationToken);
+        return document is null ? null : new(Deserialize<ResourceChangeSetApplication>(document.Payload), document.ETag);
+    }
+
+    public async Task<ResourceChangeSetApplicationSnapshot> SaveApplicationAsync(ResourceChangeSetApplication application, string? expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Applications.SingleOrDefaultAsync(value => value.TenantId == application.Scope.TenantId &&
+            value.WorkspaceId == application.Scope.WorkspaceId.Value && value.ChangeSetId == application.ChangeSetId.Value, cancellationToken);
+        if (document?.ETag != expectedETag) throw new ResourcePlanConcurrencyException("The Resource ChangeSet application changed concurrently.");
+        if (document is null)
+        {
+            document = new()
+            {
+                TenantId = application.Scope.TenantId,
+                WorkspaceId = application.Scope.WorkspaceId.Value,
+                ChangeSetId = application.ChangeSetId.Value,
+                Payload = string.Empty,
+                ETag = NewETag()
+            };
+            context.Applications.Add(document);
+        }
+        else document.ETag = NewETag();
+        document.Payload = JsonSerializer.Serialize(application, JsonOptions);
+        await SaveCreateAsync(context, cancellationToken);
+        return new(application, document.ETag);
+    }
+
+    private static ResourcePlanDocument ToDocument(ResourcePlan plan) => new()
+    {
+        Id = plan.Id.Value,
+        TenantId = plan.Scope.TenantId,
+        WorkspaceId = plan.Scope.WorkspaceId.Value,
+        Status = plan.Status,
+        Revision = plan.Revision,
+        Payload = JsonSerializer.Serialize(plan, JsonOptions),
+        ETag = NewETag(),
+        UpdatedAt = plan.UpdatedAt
+    };
+
+    private static ResourcePlanSnapshot Snapshot(ResourcePlanDocument value) => new(Deserialize<ResourcePlan>(value.Payload), value.ETag);
+    private static ResourceChangeSetDocument ToDocument(ResourceChangeSet value) => new()
+    {
+        Id = value.Id.Value,
+        TenantId = value.Scope.TenantId,
+        WorkspaceId = value.Scope.WorkspaceId.Value,
+        PlanId = value.PlanId.Value,
+        PlanRevision = value.PlanRevision,
+        MaterializationDigest = value.MaterializationDigest,
+        Status = value.Status,
+        CreatedAt = value.CreatedAt,
+        Payload = JsonSerializer.Serialize(value, JsonOptions),
+        ETag = NewETag()
+    };
+    private static ResourceChangeSetSnapshot Snapshot(ResourceChangeSetDocument value) => new(Deserialize<ResourceChangeSet>(value.Payload), value.ETag);
+    private static T Deserialize<T>(string payload) => JsonSerializer.Deserialize<T>(payload, JsonOptions) ?? throw new InvalidOperationException("Stored Resource Planning data is invalid.");
+    private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
+
+    private static async Task SaveCreateAsync(ResourcePlanningDbContext context, CancellationToken cancellationToken)
+    {
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) { throw new ResourcePlanConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
+    }
+
+    private static async Task SaveUpdateAsync(ResourcePlanningDbContext context, CancellationToken cancellationToken)
+    {
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException exception) { throw new ResourcePlanConcurrencyException(exception.Message); }
+    }
+}
+
+public static class SqliteResourcePlanningServiceCollectionExtensions
+{
+    public static IServiceCollection AddPostgreSqlResourcePlanning(this IServiceCollection services, string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        services.AddDbContextFactory<ResourcePlanningDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddSingleton<IResourcePlanRepository, PostgreSqlResourcePlanRepository>();
+        services.AddSingleton<IResourceChangeSetRepository>(provider => provider.GetRequiredService<IResourcePlanRepository>() as PostgreSqlResourcePlanRepository
+            ?? throw new InvalidOperationException("The PostgreSQL Resource Planning repository registration is invalid."));
+        return services;
+    }
+}

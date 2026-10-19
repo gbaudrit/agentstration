@@ -33,6 +33,18 @@ body:
         - Developer experience
     validations:
       required: true
+  - type: dropdown
+    id: ux-impact
+    attributes:
+      label: Console or Workplace UX impact
+      description: Does this request add or materially change a user journey in either browser application?
+      options:
+        - No Console or Workplace UX change
+        - Console UX change
+        - Workplace UX change
+        - Console and Workplace UX change
+    validations:
+      required: true
   - type: textarea
     id: need
     attributes:
@@ -95,6 +107,17 @@ body:
       placeholder: |
         - [ ] ...
         - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: ux-test-followup
+    attributes:
+      label: UX test scenario follow-up
+      description: For a Console or Workplace UX change, describe the scenario, then create a separate Technical task labeled test-scenario-task after this request exists. Link both issues before opening the UX PR. The test task starts only after maintainer UX validation and merge. Otherwise explain why no new scenario is needed.
+      placeholder: |
+        Scenario to cover: ...
+        Child issue: pending creation after this feature request has a number
+        Or: Not applicable — existing journey ... already covers the change.
     validations:
       required: true
   - type: textarea

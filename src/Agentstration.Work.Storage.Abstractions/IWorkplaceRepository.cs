@@ -20,13 +20,15 @@ public interface IWorkplaceRepository
     Task<EntryResource?> GetEntryAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
     Task DeleteEntryAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
     Task UpsertEntryDraftAsync(EntryDraft draft, CancellationToken cancellationToken);
+    Task UpsertEntryDraftAsync(EntryDraft draft, long? expectedRevision, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken);
     Task<EntryDraft?> GetEntryDraftAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
     Task DeleteEntryDraftAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<WorkplaceInteraction>> ListEntryInteractionsAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceInteraction>> ListEntryInteractionsForAdministrationAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken);
     Task CreateInteractionAsync(WorkplaceInteraction interaction, CancellationToken cancellationToken);
-    Task<WorkplaceInteraction?> GetInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, int take, CancellationToken cancellationToken);
+    Task<WorkplaceInteraction?> GetInteractionAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, InteractionId interactionId, CancellationToken cancellationToken);
+    Task<WorkplaceInteraction?> GetInteractionForProjectionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, int take, CancellationToken cancellationToken);
     Task SaveInteractionAsync(WorkplaceInteraction interaction, long expectedVersion, CancellationToken cancellationToken);
     Task AddMessageAsync(ConversationMessage message, CancellationToken cancellationToken);
     Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken);

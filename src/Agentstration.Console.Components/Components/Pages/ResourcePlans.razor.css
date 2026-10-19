@@ -1,0 +1,19 @@
+.resource-plan-workspace { display: inline-flex; align-items: center; min-height: 38px; padding: 0 .8rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface-2); color: var(--muted); font-size: .8rem; }
+.resource-plan-list { overflow: hidden; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); box-shadow: var(--shadow); }
+.resource-plan-list ::deep .data-grid-wrap { overflow-x: auto; border: 0; border-radius: 0; box-shadow: none; }
+.resource-plan-list ::deep .data-grid { min-width: 55rem; table-layout: fixed; white-space: normal; }
+.resource-plan-list ::deep th:nth-child(1) { width: 39%; }
+.resource-plan-list ::deep th:nth-child(2) { width: 13%; }
+.resource-plan-list ::deep th:nth-child(3) { width: 10%; }
+.resource-plan-list ::deep th:nth-child(4) { width: 15%; }
+.resource-plan-list ::deep th:nth-child(5) { width: 16%; }
+.resource-plan-list ::deep th:nth-child(6) { width: 7%; }
+.resource-plan-list ::deep td { vertical-align: middle; }
+.resource-plan-list ::deep td:first-child { overflow-wrap: anywhere; }
+.resource-plan-list ::deep .resource-name-link { font-size: .9rem; }
+.resource-plan-list ::deep .resource-plan-goal { max-width: 36rem; line-height: 1.4; }
+.resource-plan-list ::deep .resource-plan-change-count { color: var(--primary); font-size: 1rem; }
+.resource-plan-list ::deep time { color: var(--muted); white-space: nowrap; }
+.resource-plan-pagination { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .8rem; }
+.resource-plan-pagination div { display: flex; gap: .5rem; }
+@media (max-width: 700px) { .resource-plan-workspace { max-width: 100%; } .resource-plan-pagination { flex-wrap: wrap; } }

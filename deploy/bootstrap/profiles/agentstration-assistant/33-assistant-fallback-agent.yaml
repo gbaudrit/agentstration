@@ -1,0 +1,21 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: assistant-fallback
+  namespace: agentstration.assistant
+  tags:
+    agentstration.io/capability: assistant-fallback
+definition:
+  displayName: Agentstration Assistant clarification
+  description: Produces a bounded clarification when no Assistant capability can be selected safely.
+  handler: prompt-agent
+  instructions: |
+    Explain briefly that the request cannot yet be routed with confidence. Ask one precise clarification question that distinguishes product help, installation diagnostics, and agentic resource planning.
+    Do not invent documentation, diagnostic evidence, configuration state, or resource changes. Do not invoke Tools.
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
+  tools: []
+  behaviors: [assistant-fallback, clarification-first]
+  middleware: []
+  contextProviders: []
+  settings: {}

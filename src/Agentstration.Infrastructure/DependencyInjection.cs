@@ -1,32 +1,58 @@
+using Agentstration.Agents;
 using Agentstration.Application.Work;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.PostgreSql;
-using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Artifacts;
+using Agentstration.Artifacts.Contracts;
+using Agentstration.DataSources;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.PostgreSql;
+using Agentstration.Flows.Storage.Sqlite;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Knowledge;
+using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.Packs;
+using Agentstration.Infrastructure.ResourcePlanning;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
+using Agentstration.Infrastructure.Tools;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
-using Agentstration.Management.Storage.PostgreSql;
-using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Knowledge;
 using Agentstration.ModelProviders;
+using Agentstration.Packs;
+using Agentstration.Parameters;
+using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Storage.PostgreSql;
+using Agentstration.ResourceManagement.Storage.Sqlite;
+using Agentstration.ResourcePlanning;
+using Agentstration.ResourcePlanning.Storage.PostgreSql;
+using Agentstration.ResourcePlanning.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
+using Agentstration.Runtime.MicrosoftAgentFramework;
+using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.PostgreSql;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Schemas;
+using Agentstration.Schemas.Aep;
+using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Local;
+using Agentstration.Security.Contracts;
+using Agentstration.Sources;
+using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
+using Agentstration.Triggers;
 using Agentstration.Work;
+using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Work.Storage.PostgreSql;
 using Agentstration.Work.Storage.Sqlite;
@@ -49,13 +75,21 @@ public static class DependencyInjection
         string? flowConnectionString = null,
         string? runtimeConnectionString = null,
         AgentstrationStorageOptions? storageOptions = null,
-        bool enableHostedServices = true)
+        bool enableHostedServices = true,
+        SourceVerificationIndexOptions? sourceVerificationIndexOptions = null,
+        SourceRegistryTransportOptions? sourceRegistryTransportOptions = null,
+        RuntimeWorkerLeaseOptions? runtimeWorkerLeaseOptions = null,
+        RuntimeWorkerDispatchOptions? runtimeWorkerDispatchOptions = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
         services.TryAddSingleton<CurrentRequestContext>();
         services.TryAddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
+        services.TryAddSingleton<ITriggerExecutionContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
+        services.TryAddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
+        services.TryAddSingleton<ResourceScopeOperationService>();
+        services.TryAddSingleton<IResourceScopeOperations>(provider => provider.GetRequiredService<ResourceScopeOperationService>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
         services.AddSingleton<IManagementEventPublisher, InProcessManagementEventPublisher>();
@@ -75,25 +109,56 @@ public static class DependencyInjection
         storageOptions ??= new AgentstrationStorageOptions();
         var storageProvider = storageOptions.GetProvider();
         services.AddSingleton(storageOptions);
+        services.AddSingleton<InstanceInitializationOptions>();
+        services.AddSingleton<IInstanceInitializationCoordinator, InstanceInitializationCoordinator>();
+        services.AddSingleton<WorkspacePlatformResourceProvisioner>();
+        services.AddSingleton<IWorkspacePlatformResourceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
+        services.AddSingleton<IWorkspaceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddSingleton<IAgentstrationStorageInitializer, PostgreSqlStorageInitializer>();
         else
             services.AddSingleton<IAgentstrationStorageInitializer, SqliteStorageInitializer>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
-            services.AddPostgreSqlControlPlane(storageOptions.ConnectionString!);
+            services.AddPostgreSqlResourceManagement(storageOptions.ConnectionString!);
         else
         {
             controlPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "control-plane.db")}";
-            services.AddSqliteControlPlane(controlPlaneConnectionString);
+            services.AddSqliteResourceManagement(controlPlaneConnectionString);
         }
+        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+            services.AddPostgreSqlResourcePlanning(storageOptions.ConnectionString!);
+        else
+            services.AddSqliteResourcePlanning($"Data Source={Path.Combine(dataDirectory, "resource-planning.db")};Pooling=False");
+        services.AddSingleton<IResourcePlanContentValidator, FunctionalResourcePlanValidator>();
+        services.AddSingleton<ResourcePlanService>();
+        services.AddSingleton(new ResourcePlanningMaterializationOptions());
+        services.AddSingleton<IResourcePlanningStateReader, ManagementResourcePlanningStateReader>();
+        services.AddSingleton<ResourcePlanMaterializationService>();
+        services.AddSingleton<ResourceChangeSetService>();
+        services.AddSingleton<IPlannedResourceValidator, CanonicalPlannedResourceValidator>();
+        services.AddSingleton<ResourceChangeSetValidationService>();
+        services.AddSingleton<IPlannedResourceApplier, CanonicalPlannedResourceApplier>();
+        services.AddSingleton<ResourceChangeSetApplicationService>();
         var secretPath = Path.Combine(dataDirectory, "secrets");
         services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
         services.AddSingleton<IMasterKeyProvider>(provider => provider.GetRequiredService<EnvironmentMasterKeyProvider>());
         services.AddSingleton<ISecretVaultProvider>(provider => new LocalSecretVaultProvider(
             secretPath,
             provider.GetRequiredService<IMasterKeyProvider>()));
+        services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
+        services.AddSingleton<DescendantResourceUseAuthorizer>();
+        services.AddSingleton<ParameterManagementService>();
+        services.AddSingleton<DataSourceProfileService>();
+        services.AddSingleton<DataSourceManagementService>();
+        services.AddSingleton<DataSourceAcquisitionService>();
+        services.AddSingleton<KnowledgeSourceManagementService>();
+        services.AddSingleton<KnowledgeProjectionService>();
+        services.AddSingleton<KnowledgeRetrievalService>();
+        services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
+        services.AddSingleton<ISecretAccessAuthorizer>(provider => provider.GetRequiredService<SecretManagementService>());
+        services.AddSingleton<ISecretCapabilityService, SecretCapabilityService>();
         services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();
         services.AddSingleton<IInitialPrincipalProvisioner, InitialPrincipalProvisioner>();
         services.AddSingleton<IInitialTopologyProvisioner, InitialTopologyProvisioner>();
@@ -113,50 +178,61 @@ public static class DependencyInjection
         services.AddScoped<IBootstrapResourceHandler, WorkspaceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PrincipalDefaultContextBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PackInstallationBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ParameterBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProviderBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, RuntimeProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProfileBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ToolSetBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, AgentBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, FlowBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, DataSourceProfileBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, DataSourceBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceToolExposureBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, EntryBootstrapResourceHandler>();
         services.AddSingleton<WorkspaceMembershipAdministrationService>();
         services.AddSingleton<IdentityExperienceService>();
         services.AddSingleton<PrincipalPreferencesService>();
         services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
-        services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
+        services.AddSingleton<IRuntimeAgentResolver, ResourceRuntimeAgentResolver>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
         if (!useManagedProfileResolver)
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
         services.AddAgentstrationMcpTools();
-        services.AddSingleton<AgentRuntimeContext>();
-        services.AddSingleton<AgentFrameworkRuntimeFactory>();
-        services.AddSingleton<Agentstration.Runtime.Abstractions.IAgentRuntimeFactory>(services =>
-            services.GetRequiredService<AgentFrameworkRuntimeFactory>());
-        services.AddSingleton<IRuntimeRegistry, RuntimeRegistry>();
-        services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
-        services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
+        services.AddSingleton<IRuntimeRunQueue, AwpRuntimeRunQueue>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
-        services.AddSingleton<IAgentDeploymentProvisioner, InProcessAgentProvisioner>();
-        services.AddSingleton<IAgentDeploymentProvisioner, SharedHostAgentProvisioner>();
-        services.AddSingleton<IAgentDeploymentReconciler, LocalAgentDeploymentReconciler>();
+        services.AddSingleton<IAgentDeploymentReconciler, ExternalWorkerAgentDeploymentReconciler>();
         services.AddSingleton<IAgentRouter, AgentFrameworkAgentRouter>();
         services.AddSingleton(new AgentRevisionRetentionOptions());
         services.AddSingleton<AgentManagementService>();
         services.AddSingleton<AgentExecutionCoordinator>();
+        services.AddSingleton<IAgentExecutionCoordinator>(provider => provider.GetRequiredService<AgentExecutionCoordinator>());
+        services.AddSingleton<IAgentRuntimePreparationService, AgentRuntimePreparationService>();
         services.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
         services.AddSingleton<IPackArtifactStore>(_ => new FileSystemPackArtifactStore(Path.Combine(dataDirectory, "pack-artifacts")));
         services.AddSingleton<IPackResourceHandler, ModelProviderPackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, ParameterPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, RuntimeProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, ToolSetPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, DataSourceProfilePackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, DataSourcePackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, KnowledgeSourcePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, EntryPackResourceHandler>();
         services.AddSingleton<IPackWorkspaceResourceCatalog, WorkspacePackResourceCatalog>();
         services.AddSingleton<PackManagementService>();
         services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<PackCompositionService>();
-        services.AddSingleton<ISourceManifestReader, Agentstration.Management.Contracts.SourceManifestReader>();
+        services.AddSingleton<PackSourceCatalogHandler>();
+        services.AddSingleton<ISourceCatalogHandler>(provider => provider.GetRequiredService<PackSourceCatalogHandler>());
+        services.AddSingleton<PackSourceInstallationService>();
+        services.AddSingleton<ISourceScopeResolver, SourceScopeResolver>();
+        services.AddSingleton<Agentstration.Sources.SourceManifestValidator>();
+        services.AddSingleton<ISourceManifestReader, Agentstration.Sources.SourceManifestReader>();
+        services.AddSingleton<ISourceVerificationIndexReader, Agentstration.Sources.SourceVerificationIndexReader>();
         services.AddHttpClient<ISourceManifestRetriever, HttpSourceManifestRetriever>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(15);
@@ -166,9 +242,61 @@ public static class DependencyInjection
             AllowAutoRedirect = true,
             MaxAutomaticRedirections = 5
         });
+        sourceVerificationIndexOptions ??= new SourceVerificationIndexOptions();
+        if (sourceVerificationIndexOptions.TimeoutSeconds is < 1 or > 60)
+            throw new InvalidOperationException("Source verification index timeout must be between 1 and 60 seconds.");
+        if (sourceVerificationIndexOptions.MaximumBytes is < 1024 or > Agentstration.Sources.SourceVerificationIndexReader.MaximumIndexBytes)
+            throw new InvalidOperationException($"Source verification index maximum bytes must be between 1024 and {Agentstration.Sources.SourceVerificationIndexReader.MaximumIndexBytes}.");
+        services.AddSingleton(sourceVerificationIndexOptions);
+        services.AddHttpClient<ISourceVerificationIndexProvider, HttpSourceVerificationIndexProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(sourceVerificationIndexOptions.TimeoutSeconds);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Source-Verification/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 5
+        });
         services.AddSingleton<SourceManagementService>();
+        services.AddSingleton<SourceVerificationService>();
+        services.AddSingleton<SourceBindingManagementService>();
+        services.AddSingleton<IAgentstrationVersionProvider, AssemblyAgentstrationVersionProvider>();
+        services.AddSingleton<SourceChannelCompatibilityEvaluator>();
+        services.AddSingleton<ISourceSnapshotArtifactStore>(_ => new FileSystemSourceSnapshotArtifactStore(Path.Combine(dataDirectory, "source-snapshots")));
+        services.AddSingleton<ISourceSnapshotContentReader, ZipSourceSnapshotContentReader>();
+        services.AddSingleton<ISourceCatalogManifestReader, Agentstration.Sources.SourceCatalogManifestReader>();
+        services.AddSingleton(new SourceMaterializationLimits());
+        services.AddSingleton<SourceChannelSnapshotService>();
+        services.AddSingleton<SourceRefreshScheduler>();
+        services.AddSingleton<ISourceCatalogContentResolver, SourceCatalogContentResolver>();
+        services.AddSingleton<SourceCatalogService>();
+        services.AddSingleton<ISourceRegistryIndexReader, SourceRegistryIndexReader>();
+        services.AddSingleton<ISourceRegistryReader, SourceRegistryReader>();
+        services.AddSingleton<ISourceRegistryReferenceResolver, SourceRegistryRuntimeReferenceResolver>();
+        sourceRegistryTransportOptions ??= new();
+        sourceRegistryTransportOptions.Validate();
+        services.AddSingleton(sourceRegistryTransportOptions);
+        services.AddHttpClient<ISourceRegistryDocumentRetriever, HttpSourceRegistryDocumentRetriever>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(sourceRegistryTransportOptions.TimeoutSeconds);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Source-Registry/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => HttpSourceRegistryDocumentRetriever.CreatePrimaryHandler(sourceRegistryTransportOptions));
+        services.AddSingleton<ISourceRegistryCacheStore>(_ => new FileSystemSourceRegistryCacheStore(Path.Combine(dataDirectory, "source-registry-cache")));
+        services.AddSingleton<SourceRegistryManagementService>();
+        services.AddSingleton<SourceRegistryTrustEvaluationService>();
+        services.AddSingleton<SourceRegistryDiscoveryService>();
+        services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<ToolCategoryService>();
+        services.AddSingleton<ToolSetService>();
+        services.AddSingleton<ISchemaFormatHandler, BuiltinJsonSchemaFormatHandler>();
+        services.AddSingleton(new AepSchemaFormatOptions());
+        services.AddSingleton<ISchemaFormatHandlerSource, AepSchemaFormatHandlerSource>();
+        services.AddSingleton<ISchemaFormatRegistry, SchemaFormatRegistry>();
+        services.AddSingleton<SchemaManagementService>();
+        services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
+        services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();
         services.AddSingleton<RuntimeProfileManagementService>();
         services.AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>();
         services.AddSingleton<ITriggerTargetValidator, FlowTriggerTargetValidator>();
@@ -219,12 +347,26 @@ public static class DependencyInjection
         }
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
+        services.TryAddSingleton(runtimeWorkerLeaseOptions ?? new RuntimeWorkerLeaseOptions());
+        services.TryAddSingleton(runtimeWorkerDispatchOptions ?? new RuntimeWorkerDispatchOptions());
+        services.AddSingleton<RuntimeAssignmentAvailabilitySignal>();
+        services.AddSingleton<RuntimeAssignmentLeaseGuardRegistry>();
+        services.AddSingleton<IRuntimeAssignmentProjection, AwpAssignmentProjection>();
+        services.AddSingleton<RuntimeWorkerAssignmentService>();
+        services.AddSingleton<IRuntimeExecutionMaterialResolver, RuntimeExecutionMaterialResolver>();
+        services.AddSingleton<RuntimeWorkerExecutionService>();
+        services.AddSingleton<IRuntimeWorkerOperationGateway, RuntimeWorkerOperationGateway>();
+        services.AddSingleton<RuntimeWorkerDispatchService>();
+        services.AddSingleton<IRuntimeObservabilityQueryService, Runtime.RuntimeObservabilityQueryService>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionEventSink, FlowToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionHookResolver, ManagementToolExecutionHookResolver>();
         services.AddSingleton<IToolGovernanceAuditReader, ToolGovernanceAuditReader>();
         services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
+        services.AddSingleton<IFlowToolExecutor, ManagedFlowToolExecutor>();
+        services.AddSingleton<IFlowToolSetResolver, ManagementFlowToolSetResolver>();
+        services.AddSingleton<IToolSetDeletionGuard, ToolSetDeletionGuard>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddPostgreSqlWorkPlane(storageOptions.ConnectionString!);
@@ -234,11 +376,69 @@ public static class DependencyInjection
             services.AddSqliteWorkPlane(workPlaneConnectionString);
         }
         services.AddSingleton<IArtifactStore>(_ => new FileSystemArtifactStore(Path.Combine(dataDirectory, "artifacts")));
+        services.AddSingleton<IArtifactContentStore>(_ => new FileSystemStagedArtifactContentStore(Path.Combine(dataDirectory, "staged-artifacts")));
+        services.AddSingleton<IArtifactDurableStore>(_ => new FileSystemDurableArtifactStore(Path.Combine(dataDirectory, "durable-artifacts")));
+        services.AddSingleton<IArtifactStagingToolExecutor, ToolSetArtifactStagingExecutor>();
+        services.AddSingleton<ArtifactManagementService>();
+        services.AddSingleton<IArtifactContentMaterializationGateway, ArtifactContentMaterializationGateway>();
+        services.AddSingleton<ArtifactPlatformResourceProvisioner>();
+        services.AddSingleton<KnowledgePlatformResourceProvisioner>();
+        services.AddHttpClient<IHttpContentFetcher, SafeHttpContentFetcher>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-DataSources/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(SafeHttpContentFetcher.CreatePrimaryHandler);
+        services.AddSingleton(new StagedArtifactCleanupOptions());
+        if (enableHostedServices) services.AddHostedService<StagedArtifactCleanupWorker>();
         services.AddSingleton<LocalWorkExecutionGateway>();
         services.AddSingleton<IWorkExecutionGateway>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
+        services.AddSingleton<IEntryDiscoveryAuthorization, EntryDiscoveryAuthorization>();
+        services.AddSingleton<EntryDiscoveryService>();
+        services.AddSingleton<IWorkOperationsQueryService, WorkOperationsQueryService>();
+        services.AddSingleton<WorkNotificationMcpToolDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<WorkNotificationMcpToolDefinitionProvider>());
+        services.AddSingleton<WorkNotificationMcpTool>();
+        services.AddSingleton(provider => new AssistantDocumentationCatalog(
+            Path.Combine(provider.GetService<IHostEnvironment>()?.ContentRootPath ?? dataDirectory, "docs")));
+        AddInternalTool<AssistantDocumentationMcpTool>(services);
+        AddInternalTool<AssistantDiagnosticsMcpTool>(services);
+        AddInternalTool<DateTimeMcpTool>(services);
+        AddInternalTool<ResourcePlanCreateMcpTool>(services);
+        AddInternalTool<ResourcePlanGetMcpTool>(services);
+        AddInternalTool<ResourcePlanRefineMcpTool>(services);
+        AddInternalTool<ResourcePlanSubmitMcpTool>(services);
+        AddInternalTool<ResourcePlanMaterializeMcpTool>(services);
+        AddInternalTool<ResourceChangeSetCreateMcpTool>(services);
+        AddInternalTool<ResourceChangeSetValidateMcpTool>(services);
+        AddInternalTool<ArtifactStagingCreateMcpTool>(services);
+        AddInternalTool<ArtifactStagingWriteMcpTool>(services);
+        AddInternalTool<ArtifactStagingReadMcpTool>(services);
+        AddInternalTool<ArtifactStagingStatMcpTool>(services);
+        AddInternalTool<ArtifactStagingDeleteMcpTool>(services);
+        AddInternalTool<StagedArtifactCreateMcpTool>(services);
+        AddInternalTool<StagedArtifactWriteMcpTool>(services);
+        AddInternalTool<StagedArtifactSealMcpTool>(services);
+        AddInternalTool<StagedArtifactInspectMcpTool>(services);
+        AddInternalTool<StagedArtifactReadContentMcpTool>(services);
+        AddInternalTool<StagedArtifactCreateLeaseMcpTool>(services);
+        AddInternalTool<StagedArtifactHandoffMcpTool>(services);
+        AddInternalTool<StagedArtifactManageRetentionMcpTool>(services);
+        AddInternalTool<StagedArtifactPurgeMcpTool>(services);
+        AddInternalTool<ArtifactStorageWriteMcpTool>(services);
+        AddInternalTool<ArtifactStorageReadMcpTool>(services);
+        AddInternalTool<DataSourceArtifactImportMcpTool>(services);
+        AddInternalTool<WebFetchMcpTool>(services);
+        AddInternalTool<RestGetMcpTool>(services);
+        AddInternalTool<KnowledgeRetrievalSearchMcpTool>(services);
+        AddInternalTool<KnowledgeRetrievalQueryMcpTool>(services);
+        AddInternalTool<KnowledgeRetrievalReadMcpTool>(services);
+        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
+        services.AddSingleton<InternalMcpToolProjectionService>();
+        services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
+            () => provider.GetServices<IInternalMcpToolHandler>()));
         services.AddSingleton<WorkTaskDeletionService>();
         services.AddSingleton<IWorkTaskEventSink, WorkplaceProjectionSink>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
@@ -249,33 +449,66 @@ public static class DependencyInjection
             services.AddSqliteFlowStorage(flowConnectionString);
         }
         services.AddSingleton<FlowService>();
+        services.AddSingleton<IEntryExecutionResolver, EntryExecutionResolver>();
+        services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
+        services.AddSingleton<IKnowledgeFlowResolver, KnowledgeFlowResolver>();
+        services.AddSingleton<IDataSourceAcquisitionCompositionResolver, DataSourceAcquisitionCompositionResolver>();
+        services.AddSingleton<IDataSourceAcquisitionFlowGateway, DataSourceAcquisitionFlowGateway>();
+        services.AddSingleton<IDataSourceArtifactReferenceValidator, DataSourceArtifactReferenceValidator>();
+        services.AddScoped<AepDataSourceProfileBundleInstaller>();
+        services.AddSingleton<IKnowledgeProjectionInputResolver, KnowledgeProjectionInputResolver>();
+        services.AddSingleton<IKnowledgeProjectionFlowGateway, KnowledgeProjectionFlowGateway>();
+        services.AddSingleton<IKnowledgeRetrievalFlowGateway, KnowledgeRetrievalFlowGateway>();
+        services.AddSingleton<IKnowledgeArtifactReferenceValidator, KnowledgeArtifactReferenceValidator>();
+        services.AddSingleton<IKnowledgeSnapshotArtifactResolver, KnowledgeSnapshotArtifactResolver>();
+        services.AddSingleton<KnowledgeSnapshotService>();
+        if (enableHostedServices) services.AddHostedService<DataSourceAcquisitionRecoveryWorker>();
+        services.AddSingleton<KnowledgeSourceToolExposureService>();
+        services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
+        services.AddSingleton<IFlowVersionActivationGuard, KnowledgeFlowActivationGuard>();
+        services.AddSingleton<IFlowVersionActivationGuard, ArtifactTransformationFlowActivationGuard>();
+        services.AddSingleton<IFlowVersionActivationGuard, DataSourceFlowActivationGuard>();
+        services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
+        services.AddSingleton<IFlowDeletionGuard, KnowledgeFlowDeletionGuard>();
+        services.AddSingleton<IFlowRunDeletionGuard, KnowledgeSnapshotFlowRunDeletionGuard>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
         services.AddSingleton<EntryResourceDeletionGuard>();
-        services.AddSingleton<IManagementResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
+        services.AddSingleton<IResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
         services.AddSingleton<IFlowDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
         services.AddSingleton<EntryAdministrationService>();
         services.AddSingleton<IWorkplaceContext, CurrentWorkplaceContext>();
         services.AddSingleton<DashboardAdministrationService>();
-        services.AddSingleton<IFlowRunQueue, LocalFlowRunQueue>();
+        services.AddSingleton<IFlowRunQueue, AwpFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
+        services.AddSingleton<IRootFlowTargetResolver, RootFlowTargetResolver>();
+        services.AddSingleton<IRootFlowRunGateway, RootFlowRunGateway>();
+        services.AddSingleton<IRootFlowSubmissionAuthorizer, RootFlowSubmissionAuthorizer>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
         services.AddSingleton<IFlowInputRequestSink, WorkplaceFlowInputProjectionSink>();
         services.AddSingleton<IWorkplaceExternalInputResponder, WorkplaceFlowInputResponder>();
         services.AddSingleton<FlowRevisionRetentionService>();
         services.AddSingleton<IAgentRevisionRunRetention, AgentRevisionRunRetention>();
-        services.AddSingleton<IFlowAgentExecutor, ManagedFlowAgentExecutor>();
-        services.AddSingleton<AgentFrameworkFlowOrchestrationEngine>();
-        services.AddSingleton<IFlowOrchestrationEngine, ManagedFlowOrchestrationEngine>();
         services.AddSingleton<IFlowResourceReferenceResolver, ManagementFlowResourceReferenceResolver>();
         services.AddSingleton<FlowExpressionParser>();
         services.AddSingleton<IExpressionParser>(provider => provider.GetRequiredService<FlowExpressionParser>());
         services.AddSingleton<IExpressionValidator>(provider => provider.GetRequiredService<FlowExpressionParser>());
         services.AddSingleton<IExpressionEvaluator>(provider => provider.GetRequiredService<FlowExpressionParser>());
         services.AddSingleton<IFlowDefinitionValidator, FlowGraphValidator>();
+        services.AddSingleton<IFlowStepArtifactCapture, FlowStepArtifactCapture>();
         services.AddSingleton<FlowDraftService>();
         services.AddSingleton<FlowRunService>();
+        services.AddSingleton<RootFlowSubmissionService>();
+        services.AddSingleton<IToolDefinitionExecutor, ToolDefinitionExecutor>();
+        services.AddSingleton(provider => new Lazy<IToolDefinitionExecutor>(provider.GetRequiredService<IToolDefinitionExecutor>));
         return services;
+    }
+
+    private static void AddInternalTool<TTool>(IServiceCollection services) where TTool : class, IInternalMcpToolHandler
+    {
+        services.AddSingleton<TTool>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => provider.GetRequiredService<TTool>());
+        services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<TTool>());
     }
 }

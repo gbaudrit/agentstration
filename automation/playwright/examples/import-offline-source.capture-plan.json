@@ -1,0 +1,13 @@
+{
+  "journey": "import-source",
+  "input": {
+    "publisher": "playwright",
+    "name": "offline-source",
+    "version": "1",
+    "displayName": "Playwright offline source"
+  },
+  "captures": [
+    { "checkpoint": "source-import-form", "file": "source-import-form.png" },
+    { "checkpoint": "source-imported", "file": "source-imported.png" }
+  ]
+}

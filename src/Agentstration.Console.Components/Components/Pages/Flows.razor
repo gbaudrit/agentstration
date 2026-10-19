@@ -1,0 +1,28 @@
+@page "/flows"
+@implements IDisposable
+@inject IFlowApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings> Localizer
+<PageTitle>@T("PageTitle")</PageTitle>
+<div data-testid="flow-observability-flows">
+<PageHeader Title="@T("Flows")" Description="@T("Description")">
+    <Actions><a class="button-primary" href="/flows/new">@T("NewFlow")</a><a class="button-secondary" href="/flow-runs">@T("ViewAllRuns")</a></Actions>
+</PageHeader>
+<nav class="section-tabs" aria-label="@T("FlowSections")"><a class="active" href="/flows">@T("Definitions")</a><a href="/flow-runs">@T("Runs")</a><a href="/flows#deployments">@T("Deployments")</a></nav>
+@if (items is null) { <LoadingState /> }
+else if (items.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
+else
+{
+    <DataGrid TItem="FlowSummary" Items="items">
+        <Header><tr><th>@T("Flow")</th><th>@T("Namespace")</th><th>@T("Status")</th><th>@T("Kind")</th><th>@T("Version")</th><th>@T("Updated")</th></tr></Header>
+        <Row Context="item"><tr><td><span class="resource-name-with-scope"><strong><a class="resource-name-link" href="@item.DetailsUrl">@item.Name</a></strong><ResourceScopeBadge Kind="@ResourceScopeKind.Workspace" Compact /></span><code>@item.Id</code></td><td><code>@item.Namespace.Value</code></td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.Kind</td><td>@item.Version</td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
+    </DataGrid>
+}
+</div>
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<FlowSummary>? items;
+    protected override async Task OnInitializedAsync() => items = await Client.GetFlowsAsync(cancellation.Token);
+    private string T(string key) => Localizer[key];
+    private string StatusLabel(string value) { var localized = Localizer[$"Status.{value}"]; return localized.ResourceNotFound ? value : localized.Value; }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

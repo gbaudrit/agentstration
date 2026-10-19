@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -6,7 +7,7 @@ namespace Agentstration.Aep.Abstractions;
 
 public static class AepProtocol
 {
-    public const string Version = "2026-08-01";
+    public const string Version = "2026-09-22";
     public const string DiscoveryPath = "/.well-known/aep";
     public const string LegacyDiscoveryPath = "/.well-known/agentstration";
     public const string HealthPath = "/aep/health";
@@ -14,6 +15,11 @@ public static class AepProtocol
     public const string SourceProvidersPath = "/aep/source-providers";
     public const string ConfigurationPath = "/aep/configuration";
     public const string ConfigurationMigrationPath = "/aep/configuration/migrate";
+    public const string ValueRequirementsCapabilityVersion = "1.0";
+    public const string BoundValuesCapabilityVersion = "1.0";
+    public const string SecretAccessVersion = "1.0";
+    public const string ModelProviderCapabilityVersion = "1.0";
+    public const string SecretAccessPath = "/api/aep/secrets/redeem";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
 
@@ -32,6 +38,10 @@ public static class AepCapabilityNames
     public const string SourceProvider = "aep.source-provider";
     public const string Tools = "aep.tools";
     public const string Configuration = "aep.configuration";
+    public const string ValueRequirements = "aep.value-requirements";
+    public const string BoundValues = "aep.bound-values";
+    public const string SecretAccess = "aep.secret-access";
+    public const string SchemaFormats = "aep.schema-formats";
 }
 
 public sealed record AepExtensionIdentity(string Id, string Name, string Version, string? Description = null);
@@ -46,6 +56,8 @@ public static class AepContributionKinds
     public const string ModelProvider = "model-provider";
     public const string SourceProvider = "source-provider";
     public const string Tool = "tool";
+    public const string DataSourceProfileBundle = "data-source-profile-bundle";
+    public const string SchemaFormat = "schema-format";
 }
 
 public static class AepOptionScopes
@@ -228,14 +240,208 @@ public sealed record AepManifest(
     AepExtensionIdentity Extension,
     IReadOnlyDictionary<string, AepCapabilityDescriptor> Capabilities,
     AepContributions Contributions,
-    AepMcpDescriptor? Mcp = null);
+    AepMcpDescriptor? Mcp = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepValueRequirement>? ValueRequirements = null);
+
+public enum AepValueProtection { Standard, Secured }
+public enum AepValueType
+{
+    [JsonStringEnumMemberName("string")] Text,
+    [JsonStringEnumMemberName("integer")] WholeNumber,
+    [JsonStringEnumMemberName("number")] DecimalNumber,
+    [JsonStringEnumMemberName("boolean")] Logical
+}
+
+public sealed record AepValueRequirement(
+    string ContributionKind,
+    string ContributionId,
+    string Id,
+    [property: JsonRequired] bool Required,
+    AepValueType Type = AepValueType.Text,
+    AepValueProtection Protection = AepValueProtection.Standard,
+    string? Format = null,
+    string? Description = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<JsonElement>? AllowedValues = null);
+
+public enum AepBoundValueKind { Inline, SecretGrant }
+
+public sealed record AepBoundValue(
+    string RequirementId,
+    AepBoundValueKind Kind,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? InlineValue = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AepSecretAccessGrant? SecretGrant = null)
+{
+    public static AepBoundValue Inline(string requirementId, JsonElement value) =>
+        new(requirementId, AepBoundValueKind.Inline, value.Clone());
+
+    public static AepBoundValue Secured(string requirementId, AepSecretAccessGrant grant) =>
+        new(requirementId, AepBoundValueKind.SecretGrant, SecretGrant: grant);
+
+    public override string ToString() => "[REDACTED]";
+}
+
+public sealed record AepBoundValuesRequest(
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepBoundValue>? BoundValues = null);
+
+public sealed record AepBoundValueValidationIssue(string Code, string RequirementId);
+
+public static class AepBoundValueValidator
+{
+    public const int MaximumBoundValues = 64;
+    public const int MaximumInlineValueBytes = 65_536;
+    public const int MaximumAllowedValues = 64;
+    public const int MaximumAllowedValuesBytes = 65_536;
+
+    public static IReadOnlyList<AepBoundValueValidationIssue> Validate(
+        IReadOnlyList<AepBoundValue>? values,
+        IReadOnlyList<AepValueRequirement>? requirements,
+        string contributionKind,
+        string contributionId,
+        bool requireAll)
+    {
+        var issues = new List<AepBoundValueValidationIssue>();
+        var applicable = (requirements ?? [])
+            .Where(value => string.Equals(value.ContributionKind, contributionKind, StringComparison.Ordinal)
+                && string.Equals(value.ContributionId, contributionId, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(value => value.Id, StringComparer.Ordinal);
+        var supplied = values ?? [];
+        if (supplied.Count > MaximumBoundValues)
+            issues.Add(new("bound_values_too_many", string.Empty));
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in supplied.Take(MaximumBoundValues))
+        {
+            if (value is null || string.IsNullOrWhiteSpace(value.RequirementId))
+            {
+                issues.Add(new("bound_value_invalid", string.Empty));
+                continue;
+            }
+            if (!seen.Add(value.RequirementId))
+                issues.Add(new("bound_value_duplicate", value.RequirementId));
+            if (!applicable.TryGetValue(value.RequirementId, out var requirement))
+            {
+                issues.Add(new("bound_value_unknown", value.RequirementId));
+                continue;
+            }
+            var validVariant = value.Kind switch
+            {
+                AepBoundValueKind.Inline => value.InlineValue is not null && value.SecretGrant is null,
+                AepBoundValueKind.SecretGrant => value.InlineValue is null && value.SecretGrant is not null,
+                _ => false
+            };
+            if (!validVariant)
+            {
+                issues.Add(new("bound_value_variant_invalid", value.RequirementId));
+                continue;
+            }
+            if (value.Kind == AepBoundValueKind.Inline)
+            {
+                if (requirement.Protection == AepValueProtection.Secured)
+                    issues.Add(new("bound_value_protection_invalid", value.RequirementId));
+                else if (JsonSerializer.SerializeToUtf8Bytes(value.InlineValue!.Value, AepProtocol.JsonOptions).Length > MaximumInlineValueBytes)
+                    issues.Add(new("bound_value_too_large", value.RequirementId));
+                else if (!MatchesType(value.InlineValue.Value, requirement.Type))
+                    issues.Add(new("bound_value_type_invalid", value.RequirementId));
+                else if (requirement.AllowedValues is { } allowedValues && !Contains(allowedValues, value.InlineValue.Value))
+                    issues.Add(new("bound_value_not_allowed", value.RequirementId));
+            }
+            else
+            {
+                if (!string.Equals(value.SecretGrant!.Version, AepProtocol.SecretAccessVersion, StringComparison.Ordinal)
+                    || !string.Equals(value.SecretGrant.RequirementId, value.RequirementId, StringComparison.Ordinal))
+                    issues.Add(new("bound_value_grant_invalid", value.RequirementId));
+                else if (requirement.AllowedValues is not null)
+                    issues.Add(new("bound_value_allowed_values_require_inline", value.RequirementId));
+            }
+        }
+        if (requireAll)
+        {
+            foreach (var requirement in applicable.Values.Where(value => value.Required && !seen.Contains(value.Id)))
+                issues.Add(new("bound_value_required", requirement.Id));
+        }
+        return issues;
+    }
+
+    internal static bool MatchesType(JsonElement value, AepValueType type) => type switch
+    {
+        AepValueType.Text => value.ValueKind == JsonValueKind.String,
+        AepValueType.WholeNumber => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
+        AepValueType.DecimalNumber => value.ValueKind == JsonValueKind.Number,
+        AepValueType.Logical => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
+        _ => false
+    };
+
+    internal static bool Contains(IReadOnlyList<JsonElement> values, JsonElement candidate) =>
+        values.Any(value => JsonElement.DeepEquals(value, candidate));
+}
+
+public sealed record AepSecretAccessGrant(
+    string Version,
+    Uri Endpoint,
+    string ExtensionId,
+    string RequirementId,
+    string ExecutionId,
+    string SecretCapability)
+{
+    public override string ToString() => "[REDACTED]";
+}
+
+public sealed record AepSecretAccessRequest(
+    string Version,
+    string ExtensionId,
+    string RequirementId,
+    string ExecutionId,
+    string SecretCapability)
+{
+    public override string ToString() => "[REDACTED]";
+}
+
+public sealed record AepSecretAccessResponse(string Version, string SecretValueBase64)
+{
+    public override string ToString() => "[REDACTED]";
+}
 
 public sealed record AepHealth(string Status, string? Details = null);
 
 public sealed record AepContributions(
     IReadOnlyList<AepModelProviderDescriptor> ModelProviders,
     IReadOnlyList<AepToolContribution>? Tools = null,
-    IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null);
+    IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null,
+    IReadOnlyList<AepDataSourceProfileBundleContribution>? DataSourceProfileBundles = null,
+    IReadOnlyList<AepSchemaFormatContribution>? SchemaFormats = null);
+
+public sealed record AepSchemaFormatOperations(
+    AepMcpToolMapping ValidateDefinition,
+    AepMcpToolMapping ValidateInstance);
+
+public sealed record AepSchemaFormatContribution(
+    string Id,
+    string Format,
+    string DisplayName,
+    string Version,
+    IReadOnlyList<string> Dialects,
+    AepSchemaFormatOperations Operations,
+    bool IsDefault = false,
+    string? Description = null,
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+
+public sealed record AepSchemaDefinitionValidationRequest(JsonElement Definition, string? Dialect = null);
+
+public sealed record AepSchemaInstanceValidationRequest(
+    JsonElement Definition,
+    JsonElement Instance,
+    string? Dialect = null);
+
+public sealed record AepSchemaValidationIssue(string Path, string Code, string Message);
+
+public sealed record AepSchemaValidationResult(IReadOnlyList<AepSchemaValidationIssue> Issues);
+
+public sealed record AepDataSourceProfileBundleContribution(
+    string Id,
+    string DisplayName,
+    string Version,
+    IReadOnlyList<string> ResourceManifests,
+    string? Description = null,
+    IReadOnlyList<string>? RequiredTools = null);
 
 public sealed record AepSourceProviderDescriptor(
     string Id,
@@ -291,6 +497,9 @@ public sealed record AepToolContribution(
 
 public static class AepDescriptorValidator
 {
+    private static readonly SearchValues<char> ValueRequirementIdCharacters =
+        SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-");
+
     public static IReadOnlyList<string> Validate(AepManifest descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
@@ -312,12 +521,113 @@ public static class AepDescriptorValidator
             if (string.IsNullOrWhiteSpace(tool.Mcp.Server) || !servers.Contains(tool.Mcp.Server))
                 errors.Add($"Tool contribution '{tool.Id}' references unknown MCP server '{tool.Mcp.Server}'.");
         }
+        var schemaFormats = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var format in descriptor.Contributions.SchemaFormats ?? [])
+        {
+            if (format is null)
+            {
+                errors.Add("A Schema format contribution cannot be null.");
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(format.Id)) errors.Add("Schema format contribution id is required.");
+            else if (!schemaFormats.Add(format.Id)) errors.Add($"Schema format contribution '{format.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(format.Format)) errors.Add($"Schema format contribution '{format.Id}' format is required.");
+            if (string.IsNullOrWhiteSpace(format.DisplayName)) errors.Add($"Schema format contribution '{format.Id}' displayName is required.");
+            if (string.IsNullOrWhiteSpace(format.Version)) errors.Add($"Schema format contribution '{format.Id}' version is required.");
+            if (format.Dialects is null || format.Dialects.Any(string.IsNullOrWhiteSpace)
+                || format.Dialects.Distinct(StringComparer.Ordinal).Count() != format.Dialects.Count)
+                errors.Add($"Schema format contribution '{format.Id}' must declare distinct non-empty dialects.");
+            if (format.Operations is null)
+                errors.Add($"Schema format contribution '{format.Id}' operations are required.");
+            else
+            {
+                ValidateSchemaOperation(format.Id, "validateDefinition", format.Operations.ValidateDefinition, servers, errors);
+                ValidateSchemaOperation(format.Id, "validateInstance", format.Operations.ValidateInstance, servers, errors);
+            }
+        }
+        var hasSchemaFormats = schemaFormats.Count > 0;
+        var hasSchemaCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.SchemaFormats,
+            out var schemaCapability);
+        if (hasSchemaFormats && !hasSchemaCapability)
+            errors.Add("Schema format contributions need the aep.schema-formats capability.");
+        if (hasSchemaCapability && !string.Equals(schemaCapability!.Version, "1.0", StringComparison.Ordinal))
+            errors.Add($"Schema formats capability version '{schemaCapability.Version}' is not supported.");
+        if (hasSchemaCapability && !hasSchemaFormats)
+            errors.Add("The aep.schema-formats capability needs at least one Schema format contribution.");
         var sourceProviders = new HashSet<string>(StringComparer.Ordinal);
         foreach (var provider in descriptor.Contributions.SourceProviders ?? [])
         {
             if (string.IsNullOrWhiteSpace(provider.Id)) errors.Add("Source provider contribution id is required.");
             else if (!sourceProviders.Add(provider.Id)) errors.Add($"Source provider contribution '{provider.Id}' is duplicated.");
             if (string.IsNullOrWhiteSpace(provider.DisplayName)) errors.Add($"Source provider contribution '{provider.Id}' displayName is required.");
+        }
+        var profileBundles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var bundle in descriptor.Contributions.DataSourceProfileBundles ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(bundle.Id)) errors.Add("Data Source Profile bundle contribution id is required.");
+            else if (!profileBundles.Add(bundle.Id)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(bundle.DisplayName)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' displayName is required.");
+            if (string.IsNullOrWhiteSpace(bundle.Version)) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' version is required.");
+            if (bundle.ResourceManifests.Count == 0) errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' requires resource manifests.");
+            if (bundle.ResourceManifests.Count > 32 || bundle.ResourceManifests.Any(value => value.Length > 256 * 1024))
+                errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' exceeds resource manifest limits.");
+            if (bundle.RequiredTools?.Any(string.IsNullOrWhiteSpace) == true)
+                errors.Add($"Data Source Profile bundle contribution '{bundle.Id}' contains an invalid required Tool id.");
+        }
+        var requirements = descriptor.ValueRequirements ?? [];
+        var hasCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.ValueRequirements, out var valueCapability);
+        if (requirements.Count > 0 && !hasCapability)
+            errors.Add("Value requirements need the aep.value-requirements capability.");
+        if (hasCapability && !string.Equals(valueCapability!.Version, AepProtocol.ValueRequirementsCapabilityVersion, StringComparison.Ordinal))
+            errors.Add($"Value requirements capability version '{valueCapability.Version}' is not supported.");
+        if (hasCapability && requirements.Count == 0)
+            errors.Add("The aep.value-requirements capability needs at least one value requirement.");
+        if (requirements.Count > 0
+            && (!descriptor.Capabilities.TryGetValue(AepCapabilityNames.BoundValues, out var boundValuesCapability)
+                || !string.Equals(boundValuesCapability.Version, AepProtocol.BoundValuesCapabilityVersion, StringComparison.Ordinal)))
+            errors.Add("Value requirements need the aep.bound-values capability version 1.0.");
+        if (requirements.Any(requirement => requirement?.Protection == AepValueProtection.Secured)
+            && (!descriptor.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var secretAccessCapability)
+                || !string.Equals(secretAccessCapability.Version, AepProtocol.SecretAccessVersion, StringComparison.Ordinal)))
+            errors.Add("Secured value requirements need the aep.secret-access capability version 1.0.");
+        var requirementIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var requirement in requirements)
+        {
+            if (requirement is null)
+            {
+                errors.Add("A value requirement cannot be null.");
+                continue;
+            }
+            var contributionKey = $"{requirement.ContributionKind}\n{requirement.ContributionId}\n{requirement.Id}";
+            if (!IsKnownContribution(descriptor.Contributions, requirement.ContributionKind, requirement.ContributionId))
+                errors.Add($"Value requirement '{requirement.Id}' targets unknown contribution '{requirement.ContributionKind}/{requirement.ContributionId}'.");
+            if (!IsValidValueRequirementId(requirement.Id))
+                errors.Add($"Value requirement id '{requirement.Id}' must start with a lowercase ASCII letter and contain only ASCII letters, digits, '.', '_' or '-' (maximum 64 characters).");
+            else if (!requirementIds.Add(contributionKey))
+                errors.Add($"Value requirement '{requirement.Id}' is duplicated for contribution '{requirement.ContributionKind}/{requirement.ContributionId}'.");
+            if (requirement.Format is { Length: > 64 } || requirement.Format?.Any(char.IsControl) == true)
+                errors.Add($"Value requirement '{requirement.Id}' format must contain at most 64 printable characters.");
+            if (requirement.Description is { Length: > 256 } || requirement.Description?.Any(char.IsControl) == true)
+                errors.Add($"Value requirement '{requirement.Id}' description must contain at most 256 printable characters.");
+            if (requirement.AllowedValues is { } allowedValues)
+            {
+                if (requirement.Protection == AepValueProtection.Secured)
+                    errors.Add($"Secured Value requirement '{requirement.Id}' cannot declare allowed values.");
+                if (allowedValues.Count == 0)
+                    errors.Add($"Value requirement '{requirement.Id}' allowedValues must contain at least one value when present.");
+                if (allowedValues.Count > AepBoundValueValidator.MaximumAllowedValues)
+                    errors.Add($"Value requirement '{requirement.Id}' allowedValues may contain at most {AepBoundValueValidator.MaximumAllowedValues} values.");
+                if (allowedValues.All(value => value.ValueKind != JsonValueKind.Undefined)
+                    && JsonSerializer.SerializeToUtf8Bytes(allowedValues, AepProtocol.JsonOptions).Length > AepBoundValueValidator.MaximumAllowedValuesBytes)
+                    errors.Add($"Value requirement '{requirement.Id}' allowedValues exceeds the maximum serialized size.");
+                for (var index = 0; index < allowedValues.Count; index++)
+                {
+                    if (!AepBoundValueValidator.MatchesType(allowedValues[index], requirement.Type))
+                        errors.Add($"Value requirement '{requirement.Id}' allowedValues contains a value that does not match its declared type.");
+                    if (allowedValues.Take(index).Any(value => JsonElement.DeepEquals(value, allowedValues[index])))
+                        errors.Add($"Value requirement '{requirement.Id}' allowedValues contains a duplicate value.");
+                }
+            }
         }
         return errors;
     }
@@ -342,6 +652,41 @@ public static class AepDescriptorValidator
         if (string.IsNullOrWhiteSpace(endpoint) || !Uri.TryCreate(endpoint, UriKind.RelativeOrAbsolute, out var uri)) return false;
         return !uri.IsAbsoluteUri || uri.Scheme is "http" or "https";
     }
+
+    private static bool IsKnownContribution(AepContributions contributions, string kind, string id) =>
+        string.Equals(kind, AepContributionKinds.ModelProvider, StringComparison.Ordinal)
+            && contributions.ModelProviders.Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.SourceProvider, StringComparison.Ordinal)
+            && (contributions.SourceProviders ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.Tool, StringComparison.Ordinal)
+            && (contributions.Tools ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.DataSourceProfileBundle, StringComparison.Ordinal)
+            && (contributions.DataSourceProfileBundles ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.SchemaFormat, StringComparison.Ordinal)
+            && (contributions.SchemaFormats ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    private static void ValidateSchemaOperation(
+        string contributionId,
+        string operation,
+        AepMcpToolMapping? mapping,
+        HashSet<string> servers,
+        List<string> errors)
+    {
+        if (mapping is null)
+        {
+            errors.Add($"Schema format contribution '{contributionId}' {operation} MCP mapping is required.");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(mapping.Tool))
+            errors.Add($"Schema format contribution '{contributionId}' {operation} MCP tool name is required.");
+        if (string.IsNullOrWhiteSpace(mapping.Server) || !servers.Contains(mapping.Server))
+            errors.Add($"Schema format contribution '{contributionId}' {operation} references unknown MCP server '{mapping.Server}'.");
+    }
+
+    private static bool IsValidValueRequirementId(string? id) =>
+        id is { Length: >= 1 and <= 64 }
+        && id[0] is >= 'a' and <= 'z'
+        && id.AsSpan(1).IndexOfAnyExcept(ValueRequirementIdCharacters) < 0;
 }
 
 public sealed record AepModelProviderDescriptor(
@@ -363,8 +708,149 @@ public sealed record AepModelProviderCapabilities(
 public sealed record AepModelDescriptor(
     string Id,
     string DisplayName,
-    IReadOnlyList<string>? Capabilities = null,
-    IReadOnlyDictionary<string, string>? Metadata = null);
+    AepModelSpecification? Specification = null,
+    AepModelIdentity? Identity = null);
+
+public sealed record AepModelIdentity(
+    string? Publisher = null,
+    string? Model = null,
+    string? Version = null);
+
+public enum AepModelContentType { Text, Image, Audio }
+public enum AepModelFeatureSupport { Unknown, Unsupported, Native, Emulated, Partial }
+public enum AepModelToolMode { Function, Parallel }
+public enum AepModelStructuredOutputFormat { JsonObject, JsonSchema }
+public enum AepModelReasoningEffort { None, Minimal, Low, Medium, High }
+
+public record AepModelFeatureSpecification
+{
+    public AepModelFeatureSupport Support { get; init; } = AepModelFeatureSupport.Unknown;
+}
+
+public sealed record AepModelStreamingFeatureSpecification : AepModelFeatureSpecification;
+public sealed record AepModelToolModeSpecification;
+
+public sealed record AepModelToolsFeatureSpecification : AepModelFeatureSpecification
+{
+    public IReadOnlyDictionary<AepModelToolMode, AepModelToolModeSpecification> Modes { get; init; }
+        = new Dictionary<AepModelToolMode, AepModelToolModeSpecification>();
+}
+
+public sealed record AepModelStructuredOutputFormatSpecification
+{
+    public bool? SupportsStrict { get; init; }
+}
+
+public sealed record AepModelStructuredOutputFeatureSpecification : AepModelFeatureSpecification
+{
+    public IReadOnlyDictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification> Formats { get; init; }
+        = new Dictionary<AepModelStructuredOutputFormat, AepModelStructuredOutputFormatSpecification>();
+}
+
+public sealed record AepModelReasoningEffortSpecification;
+
+public sealed record AepModelReasoningFeatureSpecification : AepModelFeatureSpecification
+{
+    public IReadOnlyDictionary<AepModelReasoningEffort, AepModelReasoningEffortSpecification> Efforts { get; init; }
+        = new Dictionary<AepModelReasoningEffort, AepModelReasoningEffortSpecification>();
+}
+
+public sealed record AepModelFeatureSpecifications
+{
+    public AepModelStreamingFeatureSpecification? Streaming { get; init; }
+    public AepModelToolsFeatureSpecification? Tools { get; init; }
+    public AepModelStructuredOutputFeatureSpecification? StructuredOutput { get; init; }
+    public AepModelReasoningFeatureSpecification? Reasoning { get; init; }
+}
+
+public sealed record AepModelLimits
+{
+    public long? ContextTokens { get; init; }
+    public long? MaxOutputTokens { get; init; }
+}
+
+public sealed record AepModelSpecification
+{
+    public IReadOnlyList<AepModelContentType>? Input { get; init; }
+    public IReadOnlyList<AepModelContentType>? Output { get; init; }
+    public AepModelFeatureSpecifications Features { get; init; } = new();
+    public AepModelLimits Limits { get; init; } = new();
+}
+
+public static class AepModelObservationValidator
+{
+    public const int MaximumModels = 1_000;
+    public const int MaximumIdentifierLength = 256;
+    public const int MaximumDisplayNameLength = 256;
+    public const int MaximumIdentityPartLength = 128;
+    public const long MaximumTokenLimit = 10_000_000_000;
+
+    public static string? FindIssue(IReadOnlyList<AepModelDescriptor> models)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        if (models.Count > MaximumModels) return "The model observation exceeds the model count limit.";
+        if (models.Any(model => model is null)) return "A model observation entry is required.";
+        if (models.Select(model => model.Id).Distinct(StringComparer.Ordinal).Count() != models.Count)
+            return "Model observation identifiers must be unique.";
+        foreach (var model in models)
+        {
+            if (!IsSafeRequired(model.Id, MaximumIdentifierLength)) return "A model observation identifier is invalid.";
+            if (!IsSafeRequired(model.DisplayName, MaximumDisplayNameLength)) return "A model observation display name is invalid.";
+            if (!IsSafeOptional(model.Identity?.Publisher, MaximumIdentityPartLength)
+                || !IsSafeOptional(model.Identity?.Model, MaximumIdentityPartLength)
+                || !IsSafeOptional(model.Identity?.Version, MaximumIdentityPartLength))
+                return "A model observation identity is invalid.";
+            if (FindSpecificationIssue(model.Specification) is { } issue) return issue;
+        }
+        return null;
+    }
+
+    public static string? FindSpecificationIssue(AepModelSpecification? specification)
+    {
+        if (specification is null) return null;
+        if (specification.Features is null || specification.Limits is null)
+            return "Model observation features and limits are required objects.";
+        if (!IsDistinctAndBounded(specification.Input) || !IsDistinctAndBounded(specification.Output))
+            return "Model observation content types must be unique and bounded.";
+        if (specification.Limits.ContextTokens is <= 0 or > MaximumTokenLimit
+            || specification.Limits.MaxOutputTokens is <= 0 or > MaximumTokenLimit)
+            return "Model observation limits must be positive and bounded.";
+        if (!IsSupport(specification.Features.Streaming)
+            || !IsSupport(specification.Features.Tools)
+            || !IsSupport(specification.Features.StructuredOutput)
+            || !IsSupport(specification.Features.Reasoning))
+            return "A model observation feature support value is invalid.";
+        if (!IsBounded(specification.Features.Tools?.Modes)
+            || !IsBounded(specification.Features.StructuredOutput?.Formats)
+            || !IsBounded(specification.Features.Reasoning?.Efforts))
+            return "Model observation feature details exceed their limit.";
+        if (HasDetailsWhenUnsupported(specification.Features.Tools?.Support, specification.Features.Tools?.Modes?.Count)
+            || HasDetailsWhenUnsupported(specification.Features.StructuredOutput?.Support, specification.Features.StructuredOutput?.Formats?.Count)
+            || HasDetailsWhenUnsupported(specification.Features.Reasoning?.Support, specification.Features.Reasoning?.Efforts?.Count))
+            return "An unsupported model feature cannot publish supported details.";
+        return null;
+    }
+
+    private static bool IsSafeRequired(string? value, int maximum) =>
+        value is { Length: > 0 } && value.Length <= maximum && value == value.Trim() && !value.Any(char.IsControl);
+
+    private static bool IsSafeOptional(string? value, int maximum) =>
+        value is null || IsSafeRequired(value, maximum);
+
+    private static bool IsDistinctAndBounded<T>(IReadOnlyList<T>? values) where T : struct, Enum =>
+        values is null || values.Count <= 16 && values.Count == values.Distinct().Count()
+            && values.All(Enum.IsDefined);
+
+    private static bool IsBounded<TKey, TValue>(IReadOnlyDictionary<TKey, TValue>? values)
+        where TKey : struct, Enum where TValue : class =>
+        values is null || values.Count <= 16 && values.All(value => Enum.IsDefined(value.Key) && value.Value is not null);
+
+    private static bool IsSupport(AepModelFeatureSpecification? feature) =>
+        feature is null || Enum.IsDefined(feature.Support);
+
+    private static bool HasDetailsWhenUnsupported(AepModelFeatureSupport? support, int? count) =>
+        support == AepModelFeatureSupport.Unsupported && count > 0;
+}
 
 public sealed record AepProviderHealth(string Status, string? Details = null);
 
@@ -409,7 +895,9 @@ public sealed record AepChatRequest(
     IReadOnlyList<AepMessage> Messages,
     AepModelOptions? Options = null,
     IReadOnlyList<AepToolDefinition>? Tools = null,
-    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AepBoundValue>? BoundValues = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AepModelSpecification? EffectiveSpecification = null);
 
 public sealed record AepUsage(long? InputTokens = null, long? OutputTokens = null, long? TotalTokens = null);
 

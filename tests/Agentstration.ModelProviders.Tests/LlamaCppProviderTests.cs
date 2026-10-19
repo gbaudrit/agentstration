@@ -107,9 +107,12 @@ public sealed class LlamaCppProviderTests
 
         var model = (await provider.ListModelsAsync()).Single();
 
-        CollectionAssert.IsSubsetOf(new[] { "chat", "streaming", "structuredOutput", "tools", "reasoning", "vision" }, model.Capabilities!.ToArray());
-        Assert.AreEqual("32768", model.Metadata?["contextLength"]);
-        Assert.AreEqual("7000000000", model.Metadata?["parameterCount"]);
+        Assert.AreEqual(AepModelFeatureSupport.Native, model.Specification!.Features.Streaming!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Native, model.Specification.Features.Tools!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Native, model.Specification.Features.Reasoning!.Support);
+        Assert.AreEqual(AepModelFeatureSupport.Native, model.Specification.Features.StructuredOutput!.Support);
+        CollectionAssert.Contains(model.Specification.Input!.ToArray(), AepModelContentType.Image);
+        Assert.AreEqual(32768, model.Specification.Limits.ContextTokens);
     }
 
     [TestMethod]

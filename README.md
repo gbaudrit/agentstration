@@ -35,10 +35,13 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 - workspace Dashboards that organize published Entries without exposing runtime details;
 - a responsive, conversation-first Workplace that projects agent turns, progress, human input and outcomes;
 - an operations Console for configuration, supervision, run inspection and governance.
+- a generic Console Entry interaction surface that reuses durable conversations, tasks, pending actions, results and artifacts for Console-exposed Entries;
+- a permission-aware Console Conversations view for returning to durable Entry interactions in the selected Workspace;
+- Console Resource Plan review with saved per-agent profile choices, proposed changes, dependency graph, validation, and activity history.
 
 ### Packs and automation
 
-- immutable, explicitly scoped Source identities and versioned publisher definitions, plus a bounded AEP Git provider that pins explicit Channel refs to exact commits before materialization;
+- immutable, explicitly scoped Source identities and versioned publisher definitions, per-Channel Agentstration compatibility, optional exact-digest publisher verification, plus a bounded AEP Git provider that pins explicit Channel refs to exact commits before materialization;
 - offline ZIP Pack installation with deterministic `publisher.name` namespaces and retained provenance;
 - Pack inventory, resource bindings, exact-source forks, local authoring and builds, replacement and modification-safe uninstall;
 - Pack Studio and workspace composition for ordinary Agentstration resources—Packs distribute resources but are never executed;
@@ -54,7 +57,7 @@ Agentstration is a modular monolith with explicit **Management**, **Runtime**, *
 - the **Work Plane** receives, represents and tracks delegated work and its outcomes;
 - the **Flow module** owns composition, publication, orchestration and durable Flow Runs.
 
-Packs form a distribution layer above these boundaries. The repository produces multiple local hosts from one codebase: the operations Console and authoritative server, the standalone Workplace, the Work API and an Aspire AppHost. SQLite-backed stores keep the main module boundaries explicit.
+Packs form a distribution layer above these boundaries. The repository produces multiple local hosts from one codebase: the operations Console and authoritative server, the standalone Workplace, the Work API and an Aspire AppHost. SQLite-backed stores keep the main module boundaries explicit. Resource Planning owns durable reviewed proposals outside executable Management state.
 
 The Agentstration Extension Protocol SDK, conformance validator, CLI, samples and standalone Inspector are staged autonomously in [`aep/`](aep/README.md). AEP gives extensions versioned discovery, capability and option contracts without leaking provider-specific concerns into portable Agentstration resources.
 
@@ -79,9 +82,41 @@ dotnet run --project src/Agentstration.Web
 
 Open the operations Console at [http://localhost:5100](http://localhost:5100). In local Development, the default `http` and `https` launch profiles enable the `development` profile from the versioned bootstrap catalog and create the public fixture `admin / admin`, Tenant `dev`, and Workspace `default` on a fresh instance.
 
+The operations Console also has an independently hostable process shell. Keep the authoritative server running and start it from another terminal:
+
+```powershell
+dotnet run --project src/Agentstration.Console.Web --launch-profile https
+```
+
+Open [https://localhost:7190](https://localhost:7190). Its Management, Work, Flow, and Runtime origins are configured independently under `Agentstration:*Api:BaseAddress`. Private BFF calls use a dedicated instance-bound workload credential. Local login creates an opaque secure cookie backed by server-side BFF state and revalidates the Principal and selected context with the authoritative server on every request. The Console now obtains short-lived internal delegations for server-side API calls to those origins. External OIDC login still depends on #204.
+
+For a manually launched separated Console, provision a credential without displaying it:
+
+```powershell
+./scripts/security/provision-bff-workload.ps1 -OutputPath ./.agentstration/bff-workload/console-bff/primary.key
+```
+
+Configure `Agentstration:BffWorkload` on `Agentstration.Console.Web` and `Agentstration:BffWorkloadTrust` on the authoritative `Agentstration.Web` with the same workload ID (`console-bff`), credential ID, credential-file path, and target/authoritative instance ID. Add a second credential entry for overlap, move the Console to it, then set `Revoked=true` on the old server entry. Aspire and Compose provision their development credential automatically; committed configuration never contains its value.
+
+The authoritative server generates its RS256 delegation key in `Data:Directory` on first use. For a stable multi-instance deployment, configure `Agentstration:InternalDelegation:SigningKeyFile` to the same protected private-key file on every authoritative API replica. To rotate, switch to a new private-key file and list the old public-key PEM under `Agentstration:InternalDelegation:PreviousPublicKeyFiles`; retain it for at least the configured token lifetime (120 seconds by default), then remove it. The separated Console's in-memory session store is a single-replica default; a shared `IBffServerSessionStore` is required for session continuity across Console replicas. See ADR-0115 and ADR-0116.
+
 Use `--launch-profile http-NoBootstrap` or `--launch-profile https-NoBootstrap` to start Development without applying initial profiles. These launch profiles retain the catalog path and selected profiles but set `InitialBootstrapEnabled` to `false`. Published applications, Production, and runs using `--no-launch-profile` do not activate the Development profile. Without declarative bootstrap, `/bootstrap` remains available to create the first global local administrator plus the initial Tenant and Workspace interactively.
 
 When `Agentstration.AppHost` is the Visual Studio startup project, select its `https` profile for the default bootstrap or `https-NoBootstrap` to disable it for the orchestrated Console resource.
+
+Aspire also starts one independent Microsoft Agent Framework Runtime Worker by default. Set
+`Agentstration:RuntimeWorkers:Count` on the AppHost to start between 1 and 16 independently
+identified Worker processes. For direct startup, keep the authoritative server running and launch
+the Worker from another terminal:
+
+```powershell
+./scripts/runtime/start-maf-worker.ps1 -AuthorityUrl http://localhost:5100
+```
+
+On first start the Worker announces its stable identity and waits for a pairing code entered through
+standard input. Issue that code from the AWP Worker administration API, then enter it in the Worker
+terminal. The resulting credential is stored in the ignored `.agentstration` state directory. The
+pairing code and credential value are never accepted as ordinary command-line arguments.
 
 After initialization, a Platform administrator can open **System > Bootstrap profiles** to compose profiles in a defined order, preview every create, skip, conflict, or validation error, select an explicit Tenant or Workspace target when required, and confirm the application. Manual applications are retained in durable history. A profile declares its scope in a reserved `profile.yaml`:
 
@@ -176,32 +211,38 @@ For Aspire orchestration and its local dashboard:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-Or use Compose:
+Or use one of the provider-specific Compose topologies. For Ollama:
 
 ```powershell
-docker compose up --build
+docker compose -f deploy/compose/ollama.yml up --build
 ```
 
-SQLite remains the standalone default. To start the optional PostgreSQL 17 profile, create an uncommitted `.env` from `.env.postgresql.example`, replace the development password, and run:
+This topology includes Ollama, its AEP extension, the Utilities extension, and a persistent model volume. Pull models explicitly with `docker compose -f deploy/compose/ollama.yml exec ollama ollama pull <model>`; Compose never downloads one implicitly. The `deploy/compose/llama-cpp.yml` and `deploy/compose/localai.yml` topologies likewise include their inference server, matching AEP extension, Utilities, and persistent model storage. llama.cpp expects an explicitly supplied GGUF file; LocalAI starts with an empty model catalog. Each extension authenticates through an isolated Compose-owned SharedKeyFile volume. Set `AI_PROVIDER=Deterministic` for the explicit offline fallback. `deploy/compose/base.yml` retains the canonical deterministic extension topology without an inference server.
+
+SQLite remains the standalone default. To start the optional PostgreSQL 17 variant, create the ignored environment file, replace its disposable development password, and combine a topology with the shared PostgreSQL overlay:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.postgresql.yml up --build
+Copy-Item deploy/compose/.env.postgresql.example deploy/compose/.env.postgresql
+docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/ollama.yml -f deploy/compose/postgresql.yml up --build
 ```
 
-PostgreSQL stores relational module data in six schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data and does not enable multi-instance operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
+Replace `ollama.yml` with `base.yml`, `llama-cpp.yml`, or `localai.yml` to select another PostgreSQL-backed variant. PostgreSQL stores relational module data in seven schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data. Startup bootstrap is coordinated through a durable fenced initialization lease, but this does not by itself make every runtime subsystem safe for horizontally scaled operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
 
 For Aspire, set `Agentstration:Storage:Provider=PostgreSql`. Its generated password is persisted in user-secrets and relational data is kept in the worktree-isolated Docker volume `agentstration-<slot>-<instance-id>-postgresql`; file-backed state remains under the slot data directory. See [configuration](docs/getting-started/configuration.md#postgresql-storage-profile) for startup behavior, reset, troubleshooting, and backup guidance.
 
-Aspire starts Agentstration and its AEP extensions, but does not install inference servers or download models. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
+Aspire starts Agentstration's local AEP extensions against existing inference servers. The Microsoft Foundry extension is opt-in through `Foundry:Enabled=true` or the optional Compose overlay; each Model Provider supplies its own endpoints and downstream identity through AEP Value Bindings. It supports deployment discovery, text chat, streaming and governed Tool calls. The optional Crawl4AI acquisition extension uses `Crawl4AI:Enabled=true`; Aspire then starts its pinned, authenticated Crawl4AI container by default, while `Crawl4AI:Provisioning=External` preserves connection to an independently operated service. See [Crawl4AI web acquisition](docs/reference/crawl4ai-web-acquisition.md). Provider-specific Compose files isolate Ollama, llama.cpp, and LocalAI, with each topology owning its inference service and model storage. No topology downloads a model implicitly. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
 
 ## Build and test
 
 ```powershell
 dotnet build Agentstration.slnx --configuration Release
-dotnet test Agentstration.slnx --configuration Release
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 1
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 1
 ```
 
-Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The default tests are designed to remain offline and cost-free; real-provider smoke tests are opt-in.
+Browser-level UX smoke tests and the reusable capture runner live under `automation/playwright`. They start isolated local Console and Workplace hosts with deterministic AI. See [Browser automation](docs/contributing/browser-automation.md) for setup and commands.
+
+Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The fast and integration lanes together provide complete required functional validation while remaining offline and cost-free; real-provider and performance workloads are opt-in. See the [test lane guide](docs/contributing/testing.md) for project classification and focused commands.
 
 ## Documentation
 

@@ -1,0 +1,56 @@
+.descendant-grants > p { margin: 0; line-height: 1.5; }
+.grant-list { display: grid; gap: 10px; }
+.grant-list:empty { display: none; }
+.grant-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px 24px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-2);
+}
+.grant-target { display: grid; gap: 6px; min-width: 0; }
+.grant-field-label { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.grant-target-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.grant-target-identity strong { overflow-wrap: anywhere; font-size: .85rem; }
+.grant-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.grant-checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: .8rem; font-weight: 600; }
+.grant-checkbox input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    min-height: 17px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--primary);
+    box-shadow: none;
+}
+.grant-remove,
+.grant-add-button { width: auto; min-height: 38px; white-space: nowrap; }
+.grant-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+.grant-add label { display: grid; gap: 7px; min-width: 0; }
+.grant-add select {
+    width: 100%;
+    min-height: var(--field-height, 42px);
+    padding: 9px 12px;
+    border: 1px solid var(--field-border, var(--border));
+    border-radius: var(--field-radius, 8px);
+    background: var(--field-background, var(--surface-2));
+    color: var(--text);
+    box-shadow: var(--field-shadow, none);
+}
+.grant-add select:focus-visible {
+    outline: 0;
+    border-color: var(--primary);
+    background: var(--surface);
+    box-shadow: var(--field-focus-ring, 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent));
+}
+@media (max-width: 620px) {
+    .grant-row { align-items: stretch; }
+    .grant-controls { width: 100%; justify-content: space-between; }
+    .grant-add { grid-template-columns: 1fr; }
+    .grant-add-button { justify-self: start; }
+}

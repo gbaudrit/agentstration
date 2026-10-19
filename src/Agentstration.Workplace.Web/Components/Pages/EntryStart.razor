@@ -18,7 +18,7 @@ else if (loadError is not null)
 }
 else if (entry is not null)
 {
-    <section class="entry-start-page" aria-labelledby="entry-start-heading">
+    <section class="entry-start-page" aria-labelledby="entry-start-heading" data-testid="workplace-entry-start" data-entry-id="@entry.Id" data-entry-namespace="@entry.Namespace.Value">
         <a class="entry-start-back" href="@DashboardUrl"><UiIcon Name="arrow-left" /> <span>@T("BackToDashboard")</span></a>
         <header class="entry-start-header">
             <span class="entry-start-icon" aria-hidden="true"><UiIcon Name="@(entry.Presentation.Icon ?? "sparkle")" /></span>

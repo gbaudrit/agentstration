@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Aep.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -17,6 +19,9 @@ public interface IAepModelProvider
     IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(AepChatRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<AepModelDescriptor>>(Descriptor.Models ?? []);
+    Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(
+        IReadOnlyList<AepBoundValue>? boundValues,
+        CancellationToken cancellationToken = default) => ListModelsAsync(cancellationToken);
     Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(new AepProviderHealth("available"));
 }
@@ -34,7 +39,10 @@ public sealed class AepExtensionOptions
     public IDictionary<string, AepCapabilityDescriptor> Capabilities { get; } = new Dictionary<string, AepCapabilityDescriptor>(StringComparer.Ordinal);
     public IList<AepMcpServerDescriptor> McpServers { get; } = [];
     public IList<AepToolContribution> Tools { get; } = [];
+    public IList<AepDataSourceProfileBundleContribution> DataSourceProfileBundles { get; } = [];
+    public IList<AepSchemaFormatContribution> SchemaFormats { get; } = [];
     public IList<AepOptionSetDescriptor> OptionSets { get; } = [];
+    public IList<AepValueRequirement> ValueRequirements { get; } = [];
     public AepSourceMaterializationLimits SourceMaterializationLimits { get; set; } = new(
         MaxArchiveBytes: 64 * 1024 * 1024,
         MaxEntries: 10_000,
@@ -67,26 +75,110 @@ public static class AepServerExtensions
 
     public static IEndpointRouteBuilder MapAgentstrationAep(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet(AepProtocol.DiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepSourceProvider> sourceProviders, IEnumerable<IAepOptionMigrator> migrators) =>
-            Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.LegacyDiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepSourceProvider> sourceProviders, IEnumerable<IAepOptionMigrator> migrators) =>
-            Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.HealthPath, () => Results.Json(new AepHealth("available"), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.ModelProvidersPath, (IEnumerable<IAepModelProvider> providers) =>
-            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.SourceProvidersPath, (IEnumerable<IAepSourceProvider> providers) =>
-            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepOptionMigrator> migrators) =>
-            Results.Json(CreateConfigurationCatalog(options.Value.OptionSets, migrators), AepProtocol.JsonOptions));
-        endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync);
-        endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync);
-        endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync);
-        endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync);
-        endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/health", ProviderHealthAsync);
-        endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/resolve", ResolveSourceAsync);
-        endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/materialize", MaterializeSourceAsync);
-        endpoints.MapHealthChecks("/health");
+        var protocolEndpoints = new List<IEndpointConventionBuilder>();
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.DiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepSourceProvider> sourceProviders, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.LegacyDiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepSourceProvider> sourceProviders, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.HealthPath, () => Results.Json(new AepHealth("available"), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.ModelProvidersPath, (IEnumerable<IAepModelProvider> providers) =>
+        {
+            var descriptors = providers.Select(value => value.Descriptor).ToArray();
+            ValidatePublishedModels(descriptors);
+            return Results.Json(descriptors, AepProtocol.JsonOptions);
+        }));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.SourceProvidersPath, (IEnumerable<IAepSourceProvider> providers) =>
+            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateConfigurationCatalog(options.Value.OptionSets, migrators), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync));
+        protocolEndpoints.Add(endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/health", ProviderHealthAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/resolve", ResolveSourceAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/materialize", MaterializeSourceAsync));
+        if (endpoints.ServiceProvider.GetService<AepPairingStateStore>() is not null)
+        {
+            protocolEndpoints.Add(endpoints.MapPost(AepEnrollmentProtocol.CredentialRotationPath,
+                (AepCredentialRotation request, ClaimsPrincipal principal, AepPairingStateStore state) =>
+                {
+                    var clientId = principal.FindFirst(AepAuthenticationDefaults.ClientIdClaim)?.Value;
+                    if (!string.Equals(clientId, request.ClientId, StringComparison.Ordinal) || request.InstanceId != state.InstanceId)
+                        return Results.Json(new { error = new AepEnrollmentError("identity_mismatch", "The credential identity does not match this extension instance.") }, statusCode: 409);
+                    state.Rotate(request.ClientId, request.AccessToken);
+                    return Results.Ok(new AepCredentialLifecycleResponse("rotated"));
+                }));
+            protocolEndpoints.Add(endpoints.MapPost(AepEnrollmentProtocol.PreviousCredentialRevocationPath,
+                (AepPairingStateStore state) =>
+                {
+                    state.RevokePrevious();
+                    return Results.Ok(new AepCredentialLifecycleResponse("previousRevoked"));
+                }));
+            protocolEndpoints.Add(endpoints.MapPost(AepEnrollmentProtocol.CredentialRevocationPath,
+                (AepPairingStateStore state) =>
+                {
+                    state.Revoke();
+                    return Results.Ok(new AepCredentialLifecycleResponse("revoked"));
+                }));
+            protocolEndpoints.Add(endpoints.MapPost(AepEnrollmentProtocol.UnenrollmentPath,
+                (HttpRequest request, AepPairingStateStore state) =>
+                {
+                    const string prefix = "Bearer ";
+                    var authorization = request.Headers.Authorization.ToString();
+                    var token = authorization.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                        ? authorization[prefix.Length..].Trim()
+                        : null;
+                    return state.TryUnenroll(token)
+                        ? Results.Ok(new AepCredentialLifecycleResponse("unenrolled"))
+                        : Results.Json(
+                            new { error = new AepEnrollmentError("authentication_failed", "A valid current enrollment credential is required.") },
+                            statusCode: StatusCodes.Status401Unauthorized);
+                }));
+        }
+        endpoints.MapHealthChecks("/health").AllowAnonymous();
+        if (endpoints.ServiceProvider.GetService<AepPairingCoordinator>() is { } pairing)
+        {
+            endpoints.MapGet(AepPairingBrand.MarkPath, () =>
+                Results.Stream(AepPairingBrand.OpenMark(), "image/png"))
+                .AllowAnonymous();
+            endpoints.MapGet(AepPairingBrand.DarkLockupPath, () =>
+                Results.Stream(AepPairingBrand.OpenDarkLockup(), "image/png"))
+                .AllowAnonymous();
+            endpoints.MapGet(AepPairingBrand.LightLockupPath, () =>
+                Results.Stream(AepPairingBrand.OpenLightLockup(), "image/png"))
+                .AllowAnonymous();
+            endpoints.MapGet(AepPairingBrand.CloseScriptPath, () =>
+                Results.Text(AepPairingBrand.CloseScript, "text/javascript; charset=utf-8"))
+                .AllowAnonymous();
+            endpoints.MapGet(AepEnrollmentProtocol.PairingPath, (HttpRequest request, HttpResponse response) =>
+            {
+                ProtectPairingResponse(response);
+                return Results.Content(pairing.PairingForm(request.Headers.AcceptLanguage, request.Query["theme"]), "text/html; charset=utf-8");
+            }).AllowAnonymous();
+            endpoints.MapPost(AepEnrollmentProtocol.PairingPath, async (HttpRequest request, HttpResponse response, CancellationToken token) =>
+            {
+                ProtectPairingResponse(response);
+                var form = await request.ReadFormAsync(token);
+                var theme = form["theme"].ToString();
+                if (string.IsNullOrWhiteSpace(theme)) theme = request.Query["theme"];
+                var result = await pairing.PairAsync(form["code"].ToString(), request.Headers.AcceptLanguage, theme, token);
+                return Results.Content(result.Html, "text/html; charset=utf-8", statusCode: result.Status);
+            }).AllowAnonymous();
+        }
+        if (endpoints.ServiceProvider.GetService<AepAuthenticationMarker>() is not null)
+        {
+            foreach (var endpoint in protocolEndpoints)
+                endpoint.RequireAuthorization(AepAuthenticationDefaults.Policy);
+        }
         return endpoints;
+    }
+
+    private static void ProtectPairingResponse(HttpResponse response)
+    {
+        response.Headers.CacheControl = "no-store";
+        response.Headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
+        response.Headers["Referrer-Policy"] = "no-referrer";
     }
 
     public static IEndpointRouteBuilder MapAep(this IEndpointRouteBuilder endpoints) => endpoints.MapAgentstrationAep();
@@ -99,24 +191,40 @@ public static class AepServerExtensions
     {
         var modelProviders = providers.Select(value => value.Descriptor).ToArray();
         var sources = sourceProviders.Select(value => value.Descriptor).ToArray();
+        ValidatePublishedModels(modelProviders);
         ValidateOptionSets(options.OptionSets, modelProviders, sources, migrators);
         var capabilities = new Dictionary<string, AepCapabilityDescriptor>(options.Capabilities, StringComparer.Ordinal)
         {
             [AepCapabilityNames.Health] = new("1.0", AepProtocol.HealthPath)
         };
-        if (modelProviders.Length > 0) capabilities[AepCapabilityNames.ModelProvider] = new("1.0", AepProtocol.ModelProvidersPath);
+        if (modelProviders.Length > 0) capabilities[AepCapabilityNames.ModelProvider] = new(AepProtocol.ModelProviderCapabilityVersion, AepProtocol.ModelProvidersPath);
         if (sources.Length > 0) capabilities[AepCapabilityNames.SourceProvider] = new("1.0", AepProtocol.SourceProvidersPath);
         if (options.Tools.Count > 0) capabilities[AepCapabilityNames.Tools] = new("1.0");
+        if (options.SchemaFormats.Count > 0) capabilities[AepCapabilityNames.SchemaFormats] = new("1.0");
         if (options.OptionSets.Count > 0) capabilities[AepCapabilityNames.Configuration] = new("1.0", AepProtocol.ConfigurationPath);
+        if (options.ValueRequirements.Count > 0)
+        {
+            capabilities[AepCapabilityNames.ValueRequirements] = new(AepProtocol.ValueRequirementsCapabilityVersion);
+            capabilities[AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion);
+        }
         var descriptor = new AepManifest(
             AepProtocol.Version,
             options.Extension,
             capabilities,
-            new AepContributions(modelProviders, options.Tools.ToArray(), sources),
-            options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()));
+            new AepContributions(modelProviders, options.Tools.ToArray(), sources,
+                options.DataSourceProfileBundles.ToArray(), options.SchemaFormats.ToArray()),
+            options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()),
+            options.ValueRequirements.Count == 0 ? null : options.ValueRequirements.ToArray());
         var errors = AepDescriptorValidator.Validate(descriptor);
         if (errors.Count > 0) throw new InvalidOperationException($"The AEP extension descriptor is invalid: {string.Join(" ", errors)}");
         return descriptor;
+    }
+
+    private static void ValidatePublishedModels(IEnumerable<AepModelProviderDescriptor> providers)
+    {
+        foreach (var provider in providers)
+            if (provider.Models is { } models && AepModelObservationValidator.FindIssue(models) is { } issue)
+                throw new InvalidOperationException($"The AEP model provider descriptor is invalid: {issue}");
     }
 
     private static void ValidateOptionSets(
@@ -381,11 +489,23 @@ public static class AepServerExtensions
         return Results.Json(await provider.GetHealthAsync(cancellationToken), AepProtocol.JsonOptions);
     }
 
-    private static async Task<IResult> ListModelsAsync(string providerId, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)
+    private static async Task<IResult> ListModelsAsync(
+        string providerId,
+        AepBoundValuesRequest request,
+        IEnumerable<IAepModelProvider> providers,
+        IOptions<AepExtensionOptions> options,
+        CancellationToken cancellationToken)
     {
         var provider = Find(providers, providerId);
         if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
-        try { return Results.Json(await provider.ListModelsAsync(cancellationToken), AepProtocol.JsonOptions); }
+        try
+        {
+            ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
+            var models = await provider.ListModelsAsync(request.BoundValues, cancellationToken);
+            if (AepModelObservationValidator.FindIssue(models) is { } issue)
+                throw new AepServerException("model_observation_invalid", issue, StatusCodes.Status502BadGateway);
+            return Results.Json(models, AepProtocol.JsonOptions);
+        }
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
     }
 
@@ -400,7 +520,9 @@ public static class AepServerExtensions
         if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
         try
         {
+            ValidateEffectiveSpecification(request.EffectiveSpecification);
             ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
+            ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
             return Results.Json(await provider.ChatAsync(request, cancellationToken), AepProtocol.JsonOptions);
         }
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
@@ -421,7 +543,12 @@ public static class AepServerExtensions
             await response.WriteAsJsonAsync(new AepErrorResponse(new AepError("provider_unavailable", $"Model provider '{providerId}' is not registered.")), AepProtocol.JsonOptions, cancellationToken);
             return;
         }
-        try { ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets); }
+        try
+        {
+            ValidateEffectiveSpecification(request.EffectiveSpecification);
+            ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
+            ValidateBoundValues(providerId, request.BoundValues, options.Value.ValueRequirements.ToArray());
+        }
         catch (AepServerException exception)
         {
             response.StatusCode = exception.StatusCode;
@@ -445,6 +572,12 @@ public static class AepServerExtensions
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
+    private static void ValidateEffectiveSpecification(AepModelSpecification? specification)
+    {
+        if (AepModelObservationValidator.FindSpecificationIssue(specification) is { } issue)
+            throw new AepServerException("effective_model_specification_invalid", issue, StatusCodes.Status422UnprocessableEntity);
+    }
+
     private static IAepModelProvider? Find(IEnumerable<IAepModelProvider> providers, string id) =>
         providers.FirstOrDefault(value => string.Equals(value.Descriptor.Id, id, StringComparison.OrdinalIgnoreCase));
 
@@ -458,6 +591,27 @@ public static class AepServerExtensions
     {
         if (nativeOptions is null) return;
         ValidateVersionedOptions(providerId, nativeOptions, optionSets, AepContributionKinds.ModelProvider, AepOptionScopes.ModelProfile);
+    }
+
+    private static void ValidateBoundValues(
+        string providerId,
+        IReadOnlyList<AepBoundValue>? values,
+        IReadOnlyList<AepValueRequirement> requirements)
+    {
+        var issues = AepBoundValueValidator.Validate(
+            values,
+            requirements,
+            AepContributionKinds.ModelProvider,
+            providerId,
+            requireAll: true);
+        if (issues.Count == 0) return;
+        var issue = issues[0];
+        throw new AepServerException(
+            issue.Code,
+            string.IsNullOrEmpty(issue.RequirementId)
+                ? "The bound values are invalid."
+                : $"Bound value '{issue.RequirementId}' is invalid.",
+            StatusCodes.Status422UnprocessableEntity);
     }
 
     private static void ValidateVersionedOptions(

@@ -23,6 +23,7 @@ public sealed class WorkplaceRecentConversationNavigationProvider(
         var dashboard = Uri.EscapeDataString(dashboardName);
         return (await api.ListInteractionsAsync(workspaceName, 5, cancellationToken))
             .Select(interaction => new RecentConversationNavigationItem(
+                interaction.Id.ToString(),
                 Title(interaction),
                 $"/w/{workspace}/d/{dashboard}/conversations/{interaction.Id}"))
             .ToArray();

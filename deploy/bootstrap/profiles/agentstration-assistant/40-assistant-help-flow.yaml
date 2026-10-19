@@ -1,0 +1,33 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: assistant-help
+  namespace: agentstration.assistant
+definition:
+  displayName: Agentstration Help and Documentation
+  description: Produces evidence-backed product help from the bundled documentation boundary.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: assistant-help, namespace: agentstration.assistant } }
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 16000 }
+      required: [prompt]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Help request }
+      - type: agent
+        name: answer
+        displayName: Search documentation and answer
+        agent: { resourceId: assistant-help, namespace: agentstration.assistant }
+      - { type: output, name: completed, displayName: Documented answer, outcome: success, outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+      - { type: output, name: error, displayName: Help failed, outcome: error, code: ASSISTANT_HELP_FAILED, message: The Help Agent failed., outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+    transitions:
+      - { id: input-to-answer, fromStep: input, event: completed, toStep: answer }
+      - { id: answer-completed, fromStep: answer, event: success, toStep: completed }
+      - { id: answer-error, fromStep: answer, event: error, toStep: error }
+  publish: true
+  activate: true

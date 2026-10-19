@@ -1,8 +1,10 @@
+using Agentstration.Agents;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
+using Agentstration.Tools;
 
 namespace Agentstration.Web.Hosting;
 
@@ -40,8 +42,8 @@ public static class InteractiveFlowDemoData
         {
             provider = await tools.PutProviderAsync(new ToolProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ToolProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolProvider,
                 Metadata = new ResourceMetadata
                 {
                     Name = ProviderName,
@@ -94,10 +96,8 @@ public static class InteractiveFlowDemoData
         }
 
         var agents = services.GetRequiredService<AgentManagementService>();
-        var store = services.GetRequiredService<IControlPlaneStore>();
         await ManagementDemoData.EnsureAgentAsync(
             agents,
-            store,
             AgentName,
             "Computes a real SHA-256 digest through the Utilities AEP extension after explicit user approval.",
             Instructions,
@@ -119,7 +119,7 @@ public static class InteractiveFlowDemoData
                 }
             }, agent.ETag, false, cancellationToken);
         }
-        await agents.PrepareLocalRuntimeAsync(AgentName, agent.Value.Generation, cancellationToken);
+        await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default, AgentName, agent.Value.Generation, cancellationToken);
 
         var flows = services.GetRequiredService<FlowService>();
         var definition = new OrchestrationFlowDefinition(

@@ -1,0 +1,19 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: agentstration-assistant
+definition:
+  displayName: Bootstrap Agentstration Assistant
+  description: Creates the official Resource Planning and Assistant resources in the dedicated Assistant Workspace.
+  targetScope: workspace
+  bindings:
+    - name: assistant-model
+      targetKind: modelProfile
+      displayName: Assistant and planning model
+      description: Model profile shared by the official Assistant and Resource Planning Agents.
+      required: true
+    - name: assistant-runtime
+      targetKind: runtimeProfile
+      displayName: Assistant and planning runtime
+      description: Local runtime profile shared by the official Assistant and Resource Planning Agents.
+      required: true

@@ -1,5 +1,6 @@
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Agents;
+using Agentstration.Extensions;
+using Agentstration.Models;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
@@ -12,15 +13,14 @@ public static class ManagementDemoData
         var providers = services.GetRequiredService<ModelProviderManagementService>();
         var extensions = services.GetRequiredService<ExtensionRegistrationManagementService>();
         var profiles = services.GetRequiredService<ModelProfileManagementService>();
-        var store = services.GetRequiredService<IControlPlaneStore>();
         var configuration = services.GetRequiredService<IConfiguration>();
         if (await extensions.GetAsync(ResourceNamespace.Default, "ollama-extension", cancellationToken) is not null
             && await providers.GetAsync("ollama-local", cancellationToken) is null)
         {
             await providers.CreateAsync(new ModelProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ModelProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
                 Metadata = new ResourceMetadata { Name = "ollama-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
                 Definition = new ModelProviderProperties
                 {
@@ -36,8 +36,8 @@ public static class ManagementDemoData
         {
             await providers.CreateAsync(new ModelProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ModelProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
                 Metadata = new ResourceMetadata { Name = "llama-cpp-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
                 Definition = new ModelProviderProperties
                 {
@@ -53,8 +53,8 @@ public static class ManagementDemoData
         {
             await providers.CreateAsync(new ModelProviderResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ModelProvider,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProvider,
                 Metadata = new ResourceMetadata { Name = "localai-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
                 Definition = new ModelProviderProperties
                 {
@@ -70,8 +70,8 @@ public static class ManagementDemoData
         {
             await profiles.CreateAsync(new ModelProfileResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.ModelProfile,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ModelResourceKinds.ModelProfile,
                 Metadata = new ResourceMetadata { Name = "reasoning-default" },
                 Definition = new ModelProfileProperties
                 {
@@ -86,13 +86,12 @@ public static class ManagementDemoData
 
         if (await profiles.GetAsync("reasoning-default", cancellationToken) is null) return;
 
-        await EnsureAgentAsync(agents, store, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], [], cancellationToken);
-        await EnsureAgentAsync(agents, store, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], [], cancellationToken);
+        await EnsureAgentAsync(agents, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], [], cancellationToken);
+        await EnsureAgentAsync(agents, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], [], cancellationToken);
     }
 
     internal static async Task EnsureAgentAsync(
         AgentManagementService management,
-        IControlPlaneStore store,
         string name,
         string description,
         string instructions,
@@ -105,8 +104,8 @@ public static class ManagementDemoData
         {
             agent = await management.PutAgentAsync(new AgentResource
             {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.Agent,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = AgentResourceKinds.Agent,
                 Metadata = new ResourceMetadata
                 {
                     Name = name,
@@ -125,13 +124,7 @@ public static class ManagementDemoData
             }, null, true, cancellationToken);
         }
 
-        var revisions = await store.ListAllAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken);
-        var revision = revisions.Where(value => value.Value.AgentUid == agent.Value.Uid).OrderByDescending(value => value.Value.CreatedAt).FirstOrDefault();
-        var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-builtin", HostingMode = AgentHostingMode.InProcess };
-        revision ??= await management.CreateRevisionAsync(name, spec, cancellationToken);
-        var deployment = await management.GetDeploymentAsync(name, cancellationToken)
-            ?? await management.CreateDeploymentAsync(name, revision.Value.Metadata.Name, spec, cancellationToken);
-        if (deployment.Value.OperationalState != OperationalState.Ready) await management.ReconcileAsync(deployment, cancellationToken);
+        _ = await management.EnsureExecutionRevisionAsync(ResourceNamespace.Default, name, agent.Value.Generation, cancellationToken);
     }
 
 }

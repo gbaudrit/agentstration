@@ -1,0 +1,98 @@
+import type { Locator, Page } from '@playwright/test';
+import { TestIds } from '../contracts/test-ids.js';
+import { AgentEditorPage } from './agent-editor.page.js';
+import { FlowEditorPage } from './flow-editor.page.js';
+import { FlowDesignerPage } from './flow-designer.page.js';
+import { EntryEditorPage } from './entry-editor.page.js';
+import { LoginPage } from './login.page.js';
+import { OrganizationWorkspacesPage } from './organization-workspaces.page.js';
+import { WorkplacePage } from './workplace.page.js';
+import { DashboardEditorPage } from './dashboard-editor.page.js';
+import { DistributionPage } from './distribution.page.js';
+import { FlowObservabilityPage } from './flow-observability.page.js';
+import { ConsoleAdministrationPage } from './console-administration.page.js';
+import { OperationsPage } from './operations.page.js';
+import { ResourceAdministrationPage } from './resource-administration.page.js';
+import { ModelAdministrationPage } from './model-administration.page.js';
+import { DescendantSecretsPage } from './descendant-secrets.page.js';
+import { ConsoleEntryInteractionPage } from './console-entry-interaction.page.js';
+import { PlatformHealthPage } from './platform-health.page.js';
+import { ResourceNamingPage } from './resource-naming.page.js';
+import { FoundrySecretBindingPage } from './foundry-secret-binding.page.js';
+import { ArtifactAdministrationPage } from './artifact-administration.page.js';
+import { PlatformOverviewPage } from './platform-overview.page.js';
+import { ToolExecutionPage } from './tool-execution.page.js';
+import { RuntimeWorkerObservabilityPage } from './runtime-worker-observability.page.js';
+import { AgentInstanceObservabilityPage } from './agent-instance-observability.page.js';
+import { SchemaDrivenSourcesPage } from './schema-driven-sources.page.js';
+import { SchemaAdministrationPage } from './schema-administration.page.js';
+
+export class ProductPages {
+  public readonly agentEditor: AgentEditorPage;
+  public readonly flowEditor: FlowEditorPage;
+  public readonly flowDesigner: FlowDesignerPage;
+  public readonly entryEditor: EntryEditorPage;
+  public readonly login: LoginPage;
+  public readonly organizationWorkspaces: OrganizationWorkspacesPage;
+  public readonly workplace: WorkplacePage;
+  public readonly dashboardEditor: DashboardEditorPage;
+  public readonly distribution: DistributionPage;
+  public readonly flowObservability: FlowObservabilityPage;
+  public readonly consoleAdministration: ConsoleAdministrationPage;
+  public readonly operations: OperationsPage;
+  public readonly resourceAdministration: ResourceAdministrationPage;
+  public readonly modelAdministration: ModelAdministrationPage;
+  public readonly descendantSecrets: DescendantSecretsPage;
+  public readonly consoleEntryInteraction: ConsoleEntryInteractionPage;
+  public readonly platformHealth: PlatformHealthPage;
+  public readonly resourceNaming: ResourceNamingPage;
+  public readonly foundrySecretBinding: FoundrySecretBindingPage;
+  public readonly artifacts: ArtifactAdministrationPage;
+  public readonly platformOverview: PlatformOverviewPage;
+  public readonly toolExecution: ToolExecutionPage;
+  public readonly runtimeWorkerObservability: RuntimeWorkerObservabilityPage;
+  public readonly agentInstanceObservability: AgentInstanceObservabilityPage;
+  public readonly schemaDrivenSources: SchemaDrivenSourcesPage;
+  public readonly schemaAdministration: SchemaAdministrationPage;
+
+  public constructor(public readonly page: Page) {
+    this.agentEditor = new AgentEditorPage(page);
+    this.flowEditor = new FlowEditorPage(page);
+    this.flowDesigner = new FlowDesignerPage(page);
+    this.entryEditor = new EntryEditorPage(page);
+    this.login = new LoginPage(page);
+    this.organizationWorkspaces = new OrganizationWorkspacesPage(page);
+    this.workplace = new WorkplacePage(page);
+    this.dashboardEditor = new DashboardEditorPage(page);
+    this.distribution = new DistributionPage(page);
+    this.flowObservability = new FlowObservabilityPage(page);
+    this.consoleAdministration = new ConsoleAdministrationPage(page);
+    this.operations = new OperationsPage(page);
+    this.resourceAdministration = new ResourceAdministrationPage(page);
+    this.modelAdministration = new ModelAdministrationPage(page);
+    this.descendantSecrets = new DescendantSecretsPage(page);
+    this.consoleEntryInteraction = new ConsoleEntryInteractionPage(page);
+    this.platformHealth = new PlatformHealthPage(page);
+    this.resourceNaming = new ResourceNamingPage(page);
+    this.foundrySecretBinding = new FoundrySecretBindingPage(page);
+    this.artifacts = new ArtifactAdministrationPage(page);
+    this.platformOverview = new PlatformOverviewPage(page);
+    this.toolExecution = new ToolExecutionPage(page);
+    this.runtimeWorkerObservability = new RuntimeWorkerObservabilityPage(page);
+    this.agentInstanceObservability = new AgentInstanceObservabilityPage(page);
+    this.schemaDrivenSources = new SchemaDrivenSourcesPage(page);
+    this.schemaAdministration = new SchemaAdministrationPage(page);
+  }
+
+  public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {
+    const shell = this.page.getByTestId(TestIds.console.shell);
+    await this.page.locator(`[data-testid="${TestIds.console.shell}"][data-preferences-ready="true"]`).waitFor({ state: 'visible' });
+    if (await shell.evaluate((element, expected) => element.classList.contains(`theme-${expected}`), theme)) return;
+    await this.page.getByTestId(TestIds.console.themeToggle).click();
+    await this.page.locator(`[data-testid="${TestIds.console.shell}"].theme-${theme}`).waitFor({ state: 'visible' });
+  }
+
+  public get readyPlatformOverview(): Locator {
+    return this.page.locator(`[data-testid="${TestIds.console.platformOverview}"][aria-busy="false"]`);
+  }
+}

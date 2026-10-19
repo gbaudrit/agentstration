@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -15,6 +16,37 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureWorkplaceTaskProjectionAsync(context, cancellationToken);
+    }
+
+    private static async Task EnsureWorkplaceTaskProjectionAsync(WorkDbContext context, CancellationToken cancellationToken)
+    {
+        var connection = context.Database.GetDbConnection();
+        var closeConnection = connection.State != ConnectionState.Open;
+        if (closeConnection) await connection.OpenAsync(cancellationToken);
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('WorkItems') WHERE name = 'IsWorkplaceTask';";
+            var exists = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture) > 0;
+            if (exists) return;
+
+            command.CommandText = "ALTER TABLE \"WorkItems\" ADD COLUMN \"IsWorkplaceTask\" INTEGER NOT NULL DEFAULT 0;";
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            command.CommandText = """
+                UPDATE "WorkItems"
+                SET "IsWorkplaceTask" = 1
+                WHERE ("EntryId" IS NOT NULL AND length("InteractionId") = 36)
+                   OR json_extract("Payload", '$.metadata.origin') = 'trigger';
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            command.CommandText = "CREATE INDEX \"IX_WorkItems_WorkspaceId_OwnerPrincipalId_IsWorkplaceTask_UpdatedAt\" ON \"WorkItems\" (\"WorkspaceId\", \"OwnerPrincipalId\", \"IsWorkplaceTask\", \"UpdatedAt\");";
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        finally
+        {
+            if (closeConnection) await connection.CloseAsync();
+        }
     }
 
     public async Task<StoredWorkItem> CreateAsync(WorkItem workItem, CancellationToken cancellationToken)
@@ -27,7 +59,16 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         return Stored(workItem);
     }
 
-    public async Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
+        var document = await context.WorkItems.AsNoTracking().SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && value.Id == id.ToString(), cancellationToken);
+        return document is null ? null : FromDocument(document);
+    }
+
+    public async Task<StoredWorkItem?> GetForExecutionAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workspaceKey = workspaceId.ToString();
@@ -41,7 +82,8 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         if (workItem.Version <= expectedVersion) throw new WorkItemConcurrencyException("The work item version must increase before it is saved.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workspaceKey = workItem.WorkspaceId.ToString();
-        var document = await context.WorkItems.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.Id == workItem.Id.ToString(), cancellationToken)
+        var ownerKey = workItem.OwnerPrincipalId.ToString("D");
+        var document = await context.WorkItems.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && value.Id == workItem.Id.ToString(), cancellationToken)
             ?? throw new KeyNotFoundException($"Work item '{workItem.Id}' was not found.");
         if (document.Version != expectedVersion) throw new WorkItemConcurrencyException("The supplied version does not match the current work item version.");
         Apply(document, workItem);
@@ -57,7 +99,8 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         var take = Math.Min(query.Take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workspaceKey = query.WorkspaceId.ToString();
-        IQueryable<WorkItemDocument> documents = context.WorkItems.AsNoTracking().Where(value => value.WorkspaceId == workspaceKey);
+        var ownerKey = query.OwnerPrincipalId.ToString("D");
+        IQueryable<WorkItemDocument> documents = context.WorkItems.AsNoTracking().Where(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey);
         if (query.Status is not null && !query.OperationalTasks) documents = documents.Where(value => value.Status == query.Status);
         if (!string.IsNullOrWhiteSpace(query.Type)) documents = documents.Where(value => value.Type == query.Type);
         if (!string.IsNullOrWhiteSpace(query.RequesterIdentity)) documents = documents.Where(value => value.RequesterIdentity == query.RequesterIdentity);
@@ -71,17 +114,18 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         if (!string.IsNullOrWhiteSpace(query.AnchorTaskId)) documents = documents.Where(value => value.AnchorTaskId == query.AnchorTaskId);
         if (query.IsContinuation == true) documents = documents.Where(value => value.AnchorTaskId != null);
         if (query.IsContinuation == false) documents = documents.Where(value => value.AnchorTaskId == null && value.WorkspaceId != null);
+        if (query.WorkplaceTasksOnly) documents = documents.Where(value => value.IsWorkplaceTask);
         if (query.OperationalTasks)
         {
             documents = documents.Where(value => value.AnchorTaskId == null && value.WorkspaceId != null);
             if (query.Status is not null)
             {
                 documents = documents.Where(anchor =>
-                    context.WorkItems.Where(child => child.WorkspaceId == workspaceKey && child.AnchorTaskId == anchor.Id)
+                    context.WorkItems.Where(child => child.WorkspaceId == workspaceKey && child.OwnerPrincipalId == ownerKey && child.AnchorTaskId == anchor.Id)
                         .OrderByDescending(child => child.UpdatedAt)
                         .Select(child => (WorkItemStatus?)child.Status)
                         .FirstOrDefault() == query.Status
-                    || !context.WorkItems.Any(child => child.WorkspaceId == workspaceKey && child.AnchorTaskId == anchor.Id) && anchor.Status == query.Status);
+                    || !context.WorkItems.Any(child => child.WorkspaceId == workspaceKey && child.OwnerPrincipalId == ownerKey && child.AnchorTaskId == anchor.Id) && anchor.Status == query.Status);
             }
             if (query.HasPendingAction is not null)
             {
@@ -106,6 +150,7 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
 
     public async Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
         WorkspaceId workspaceId,
+        Guid ownerPrincipalId,
         IReadOnlyCollection<WorkTaskId> taskIds,
         CancellationToken cancellationToken)
     {
@@ -113,10 +158,11 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         if (taskIds.Count == 0) return new Dictionary<WorkTaskId, StoredWorkItem>();
 
         var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
         var taskKeys = taskIds.Select(value => value.ToString()).Distinct(StringComparer.Ordinal).ToArray();
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.WorkItems.AsNoTracking()
-            .Where(value => value.WorkspaceId == workspaceKey && value.AnchorTaskId != null && taskKeys.Contains(value.AnchorTaskId))
+            .Where(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && value.AnchorTaskId != null && taskKeys.Contains(value.AnchorTaskId))
             .GroupBy(value => value.AnchorTaskId)
             .Select(group => group.OrderByDescending(value => value.CreatedAt).ThenBy(value => value.Id).First())
             .ToArrayAsync(cancellationToken);
@@ -127,16 +173,18 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
 
     public async Task<DeletedWorkTask> DeleteTaskAsync(
         WorkspaceId workspaceId,
+        Guid ownerPrincipalId,
         WorkTaskId taskId,
         string expectedETag,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedETag);
         var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
         var taskKey = taskId.ToString();
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workItems = await context.WorkItems
-            .Where(value => value.WorkspaceId == workspaceKey && (value.Id == taskKey || value.AnchorTaskId == taskKey))
+            .Where(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && (value.Id == taskKey || value.AnchorTaskId == taskKey))
             .ToArrayAsync(cancellationToken);
         var anchor = workItems.SingleOrDefault(value => value.Id == taskKey && value.AnchorTaskId == null)
             ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
@@ -216,10 +264,12 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         Title = item.Title,
         Description = item.Description,
         WorkspaceId = item.WorkspaceId.ToString(),
+        OwnerPrincipalId = item.OwnerPrincipalId.ToString("D"),
         InteractionId = Metadata(item, "workplace.interactionId"),
         EntryId = Metadata(item, "workplace.entryId"),
         AnchorTaskId = Metadata(item, "workplace.taskId"),
         FlowRunId = Metadata(item, "flowRunId"),
+        IsWorkplaceTask = WorkplaceTaskIdentity.IsTask(item),
         CreatedAt = item.CreatedAt,
         UpdatedAt = item.UpdatedAt,
         Version = item.Version,
@@ -237,10 +287,13 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         document.Title = updated.Title;
         document.Description = updated.Description;
         document.WorkspaceId = updated.WorkspaceId;
+        if (!string.Equals(document.OwnerPrincipalId, updated.OwnerPrincipalId, StringComparison.Ordinal))
+            throw new WorkItemConcurrencyException("Work item ownership is immutable.");
         document.InteractionId = updated.InteractionId;
         document.EntryId = updated.EntryId;
         document.AnchorTaskId = updated.AnchorTaskId;
         document.FlowRunId = updated.FlowRunId;
+        document.IsWorkplaceTask = updated.IsWorkplaceTask;
         document.UpdatedAt = updated.UpdatedAt;
         document.Version = updated.Version;
         document.Payload = updated.Payload;

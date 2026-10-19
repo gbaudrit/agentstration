@@ -36,13 +36,16 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.SelectedAgentId).HasMaxLength(1024);
         item.Property(value => value.Title).HasMaxLength(512);
         item.Property(value => value.WorkspaceId).HasMaxLength(36).IsRequired();
+        item.Property(value => value.OwnerPrincipalId).HasMaxLength(36).IsRequired();
         item.Property(value => value.InteractionId).HasMaxLength(36);
         item.Property(value => value.EntryId).HasMaxLength(512);
         item.Property(value => value.AnchorTaskId).HasMaxLength(36);
         item.Property(value => value.FlowRunId).HasMaxLength(128);
+        item.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.IsWorkplaceTask, value.UpdatedAt });
         item.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.HasIndex(value => new { value.WorkspaceId, value.Status, value.UpdatedAt });
+        item.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.UpdatedAt });
         item.HasIndex(value => new { value.WorkspaceId, value.InteractionId, value.UpdatedAt });
         item.HasIndex(value => new { value.WorkspaceId, value.AnchorTaskId, value.UpdatedAt });
         item.HasIndex(value => new { value.WorkspaceId, value.FlowRunId });
@@ -73,6 +76,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         entryDraft.Property(value => value.Id).HasMaxLength(768);
         entryDraft.Property(value => value.WorkspaceId).HasMaxLength(36);
         entryDraft.Property(value => value.Name).HasMaxLength(128);
+        entryDraft.Property(value => value.Payload).IsConcurrencyToken();
         entryDraft.HasIndex(value => new { value.WorkspaceId, value.Name });
 
         var interaction = modelBuilder.Entity<InteractionDocument>();
@@ -80,11 +84,12 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         interaction.HasKey(value => value.Id);
         interaction.Property(value => value.Id).HasMaxLength(36);
         interaction.Property(value => value.WorkspaceId).HasMaxLength(512);
+        interaction.Property(value => value.OwnerPrincipalId).HasMaxLength(36).IsRequired();
         interaction.Property(value => value.EntryId).HasMaxLength(512);
         interaction.Property(value => value.Status).HasConversion<string>().HasMaxLength(32);
         interaction.Property(value => value.LastActivityAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         interaction.Property(value => value.Version).IsConcurrencyToken();
-        interaction.HasIndex(value => new { value.WorkspaceId, value.LastActivityAt });
+        interaction.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.LastActivityAt });
 
         ConfigureConversationMessage(modelBuilder.Entity<ConversationMessageDocument>());
         ConfigurePendingAction(modelBuilder.Entity<PendingActionDocument>());
@@ -179,6 +184,7 @@ internal sealed class InteractionDocument
 {
     public required string Id { get; set; }
     public required string WorkspaceId { get; set; }
+    public required string OwnerPrincipalId { get; set; }
     public required string EntryId { get; set; }
     public InteractionStatus Status { get; set; }
     public DateTimeOffset LastActivityAt { get; set; }
@@ -243,10 +249,12 @@ internal sealed class WorkItemDocument
     public string? Title { get; set; }
     public string? Description { get; set; }
     public string? WorkspaceId { get; set; }
+    public required string OwnerPrincipalId { get; set; }
     public string? InteractionId { get; set; }
     public string? EntryId { get; set; }
     public string? AnchorTaskId { get; set; }
     public string? FlowRunId { get; set; }
+    public bool IsWorkplaceTask { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public long Version { get; set; }
@@ -273,7 +281,16 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         return Stored(workItem);
     }
 
-    public async Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
+        var document = await context.WorkItems.AsNoTracking().SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && value.Id == id.ToString(), cancellationToken);
+        return document is null ? null : FromDocument(document);
+    }
+
+    public async Task<StoredWorkItem?> GetForExecutionAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workspaceKey = workspaceId.ToString();
@@ -287,7 +304,8 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         if (workItem.Version <= expectedVersion) throw new WorkItemConcurrencyException("The work item version must increase before it is saved.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workspaceKey = workItem.WorkspaceId.ToString();
-        var document = await context.WorkItems.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.Id == workItem.Id.ToString(), cancellationToken)
+        var ownerKey = workItem.OwnerPrincipalId.ToString("D");
+        var document = await context.WorkItems.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && value.Id == workItem.Id.ToString(), cancellationToken)
             ?? throw new KeyNotFoundException($"Work item '{workItem.Id}' was not found.");
         if (document.Version != expectedVersion) throw new WorkItemConcurrencyException("The supplied version does not match the current work item version.");
         Apply(document, workItem);
@@ -303,7 +321,8 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         var take = Math.Min(query.Take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workspaceKey = query.WorkspaceId.ToString();
-        IQueryable<WorkItemDocument> documents = context.WorkItems.AsNoTracking().Where(value => value.WorkspaceId == workspaceKey);
+        var ownerKey = query.OwnerPrincipalId.ToString("D");
+        IQueryable<WorkItemDocument> documents = context.WorkItems.AsNoTracking().Where(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey);
         if (query.Status is not null && !query.OperationalTasks) documents = documents.Where(value => value.Status == query.Status);
         if (!string.IsNullOrWhiteSpace(query.Type)) documents = documents.Where(value => value.Type == query.Type);
         if (!string.IsNullOrWhiteSpace(query.RequesterIdentity)) documents = documents.Where(value => value.RequesterIdentity == query.RequesterIdentity);
@@ -317,17 +336,18 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         if (!string.IsNullOrWhiteSpace(query.AnchorTaskId)) documents = documents.Where(value => value.AnchorTaskId == query.AnchorTaskId);
         if (query.IsContinuation == true) documents = documents.Where(value => value.AnchorTaskId != null);
         if (query.IsContinuation == false) documents = documents.Where(value => value.AnchorTaskId == null && value.WorkspaceId != null);
+        if (query.WorkplaceTasksOnly) documents = documents.Where(value => value.IsWorkplaceTask);
         if (query.OperationalTasks)
         {
             documents = documents.Where(value => value.AnchorTaskId == null && value.WorkspaceId != null);
             if (query.Status is not null)
             {
                 documents = documents.Where(anchor =>
-                    context.WorkItems.Where(child => child.WorkspaceId == workspaceKey && child.AnchorTaskId == anchor.Id)
+                    context.WorkItems.Where(child => child.WorkspaceId == workspaceKey && child.OwnerPrincipalId == ownerKey && child.AnchorTaskId == anchor.Id)
                         .OrderByDescending(child => child.UpdatedAt)
                         .Select(child => (WorkItemStatus?)child.Status)
                         .FirstOrDefault() == query.Status
-                    || !context.WorkItems.Any(child => child.WorkspaceId == workspaceKey && child.AnchorTaskId == anchor.Id) && anchor.Status == query.Status);
+                    || !context.WorkItems.Any(child => child.WorkspaceId == workspaceKey && child.OwnerPrincipalId == ownerKey && child.AnchorTaskId == anchor.Id) && anchor.Status == query.Status);
             }
             if (query.HasPendingAction is not null)
             {
@@ -352,6 +372,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
 
     public async Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
         WorkspaceId workspaceId,
+        Guid ownerPrincipalId,
         IReadOnlyCollection<WorkTaskId> taskIds,
         CancellationToken cancellationToken)
     {
@@ -359,10 +380,11 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         if (taskIds.Count == 0) return new Dictionary<WorkTaskId, StoredWorkItem>();
 
         var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
         var taskKeys = taskIds.Select(value => value.ToString()).Distinct(StringComparer.Ordinal).ToArray();
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.WorkItems.AsNoTracking()
-            .Where(value => value.WorkspaceId == workspaceKey && value.AnchorTaskId != null && taskKeys.Contains(value.AnchorTaskId))
+            .Where(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && value.AnchorTaskId != null && taskKeys.Contains(value.AnchorTaskId))
             .GroupBy(value => value.AnchorTaskId)
             .Select(group => group.OrderByDescending(value => value.CreatedAt).ThenBy(value => value.Id).First())
             .ToArrayAsync(cancellationToken);
@@ -373,16 +395,18 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
 
     public async Task<DeletedWorkTask> DeleteTaskAsync(
         WorkspaceId workspaceId,
+        Guid ownerPrincipalId,
         WorkTaskId taskId,
         string expectedETag,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedETag);
         var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
         var taskKey = taskId.ToString();
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workItems = await context.WorkItems
-            .Where(value => value.WorkspaceId == workspaceKey && (value.Id == taskKey || value.AnchorTaskId == taskKey))
+            .Where(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && (value.Id == taskKey || value.AnchorTaskId == taskKey))
             .ToArrayAsync(cancellationToken);
         var anchor = workItems.SingleOrDefault(value => value.Id == taskKey && value.AnchorTaskId == null)
             ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
@@ -462,10 +486,12 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         Title = item.Title,
         Description = item.Description,
         WorkspaceId = item.WorkspaceId.ToString(),
+        OwnerPrincipalId = item.OwnerPrincipalId.ToString("D"),
         InteractionId = Metadata(item, "workplace.interactionId"),
         EntryId = Metadata(item, "workplace.entryId"),
         AnchorTaskId = Metadata(item, "workplace.taskId"),
         FlowRunId = Metadata(item, "flowRunId"),
+        IsWorkplaceTask = WorkplaceTaskIdentity.IsTask(item),
         CreatedAt = item.CreatedAt,
         UpdatedAt = item.UpdatedAt,
         Version = item.Version,
@@ -483,10 +509,13 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         document.Title = updated.Title;
         document.Description = updated.Description;
         document.WorkspaceId = updated.WorkspaceId;
+        if (!string.Equals(document.OwnerPrincipalId, updated.OwnerPrincipalId, StringComparison.Ordinal))
+            throw new WorkItemConcurrencyException("Work item ownership is immutable.");
         document.InteractionId = updated.InteractionId;
         document.EntryId = updated.EntryId;
         document.AnchorTaskId = updated.AnchorTaskId;
         document.FlowRunId = updated.FlowRunId;
+        document.IsWorkplaceTask = updated.IsWorkplaceTask;
         document.UpdatedAt = updated.UpdatedAt;
         document.Version = updated.Version;
         document.Payload = updated.Payload;
@@ -679,6 +708,19 @@ public sealed class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContex
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpsertEntryDraftAsync(EntryDraft draft, long? expectedRevision, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(draft);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var key = EntryStorageKey(draft.WorkspaceId, draft.Id);
+        var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        var actualRevision = document is null ? (long?)null : Deserialize<EntryDraft>(document.Payload).Revision;
+        if (actualRevision != expectedRevision) throw new WorkValidationException("entry_revision_conflict", "The Entry changed since the proposal was verified.");
+        if (document is null) context.EntryDrafts.Add(new EntryDraftDocument { Id = key, WorkspaceId = draft.WorkspaceId.ToString(), Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -706,7 +748,7 @@ public sealed class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContex
         }
     }
 
-    public async Task<IReadOnlyList<WorkplaceInteraction>> ListEntryInteractionsAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceInteraction>> ListEntryInteractionsForAdministrationAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payloads = await context.Interactions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
@@ -721,7 +763,16 @@ public sealed class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContex
         catch (DbUpdateException exception) { throw new WorkplaceConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
     }
 
-    public async Task<WorkplaceInteraction?> GetInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
+    public async Task<WorkplaceInteraction?> GetInteractionAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, InteractionId interactionId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.Interactions.AsNoTracking()
+            .Where(value => value.Id == interactionId.ToString() && value.WorkspaceId == workspaceId.ToString() && value.OwnerPrincipalId == ownerPrincipalId.ToString("D"))
+            .Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceInteraction>(payload);
+    }
+
+    public async Task<WorkplaceInteraction?> GetInteractionForProjectionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payload = await context.Interactions.AsNoTracking()
@@ -730,11 +781,11 @@ public sealed class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContex
         return payload is null ? null : Deserialize<WorkplaceInteraction>(payload);
     }
 
-    public async Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, int take, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, int take, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payloads = await context.Interactions.AsNoTracking()
-            .Where(value => value.WorkspaceId == workspaceId.ToString())
+            .Where(value => value.WorkspaceId == workspaceId.ToString() && value.OwnerPrincipalId == ownerPrincipalId.ToString("D"))
             .OrderByDescending(value => value.LastActivityAt)
             .Take(Math.Clamp(take, 1, 100))
             .Select(value => value.Payload)
@@ -746,7 +797,8 @@ public sealed class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContex
     {
         if (interaction.Version <= expectedVersion) throw new WorkplaceConcurrencyException("The Interaction version must increase before it is saved.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Interactions.SingleOrDefaultAsync(value => value.Id == interaction.Id.ToString() && value.WorkspaceId == interaction.WorkspaceId.ToString(), cancellationToken)
+        var ownerKey = interaction.OwnerPrincipalId.ToString("D");
+        var document = await context.Interactions.SingleOrDefaultAsync(value => value.Id == interaction.Id.ToString() && value.WorkspaceId == interaction.WorkspaceId.ToString() && value.OwnerPrincipalId == ownerKey, cancellationToken)
             ?? throw new KeyNotFoundException($"Interaction '{interaction.Id}' was not found in Workspace '{interaction.WorkspaceId}'.");
         if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The supplied Interaction version is stale.");
         document.Status = interaction.Status;
@@ -868,6 +920,7 @@ public sealed class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContex
     {
         Id = interaction.Id.ToString(),
         WorkspaceId = interaction.WorkspaceId.ToString(),
+        OwnerPrincipalId = interaction.OwnerPrincipalId.ToString("D"),
         EntryId = interaction.EntryId.Value,
         Status = interaction.Status,
         LastActivityAt = interaction.LastActivityAt,

@@ -27,6 +27,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.OptionSets.Add(OllamaOptionContracts.ModelProfile);
 })
     .AddModelProvider<OllamaAepModelProvider>();
+builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 
 var app = builder.Build();
 app.MapAgentstrationAep();

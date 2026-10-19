@@ -1,0 +1,414 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Agentstration.Aep.Abstractions;
+using Agentstration.Api.Contracts;
+using Agentstration.Extensions.Contracts;
+using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.Models.Contracts;
+using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace Agentstration.Management.Tests;
+
+[TestClass]
+public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
+{
+    [TestMethod]
+    public async Task SeededOllamaProviderUsesAepExtensionEndpointInsteadOfNativeOllamaEndpoint()
+    {
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("AI:Provider", "Managed");
+            builder.UseSetting("AI:Endpoint", "http://localhost:11434");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint", "http://localhost:5265");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/ollama-local");
+        var extension = await client.GetFromJsonAsync<ExtensionRegistrationResource>("/api/extensionregistrations/ollama-extension");
+
+        Assert.IsNotNull(provider);
+        Assert.AreEqual("ollama-extension", provider.Definition.Extension.Name);
+        Assert.AreEqual(new Uri("http://localhost:5265/"), extension!.Definition.Endpoint);
+        Assert.AreNotEqual(new Uri("http://localhost:11434"), extension.Definition.Endpoint);
+    }
+
+    [TestMethod]
+    public async Task SeededLlamaCppProviderUsesItsAepExtensionEndpoint()
+    {
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("AI:Provider", "Managed");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.LlamaCpp:Endpoint", "http://localhost:5275");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.LlamaCpp:RegistrationName", "llama-cpp-extension");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/llama-cpp-local");
+        var extension = await client.GetFromJsonAsync<ExtensionRegistrationResource>("/api/extensionregistrations/llama-cpp-extension");
+
+        Assert.IsNotNull(provider);
+        Assert.AreEqual("llamacpp", provider.Definition.ContributionId);
+        Assert.AreEqual("llama-cpp-extension", provider.Definition.Extension.Name);
+        Assert.AreEqual(new Uri("http://localhost:5275/"), extension!.Definition.Endpoint);
+    }
+
+    [TestMethod]
+    public async Task SeededLocalAiProviderUsesItsAepExtensionEndpoint()
+    {
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("AI:Provider", "Managed");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.LocalAI:Endpoint", "http://localhost:5285");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/localai-local");
+        var extension = await client.GetFromJsonAsync<ExtensionRegistrationResource>("/api/extensionregistrations/localai-extension");
+
+        Assert.IsNotNull(provider);
+        Assert.AreEqual("localai", provider.Definition.ContributionId);
+        Assert.AreEqual("localai-extension", provider.Definition.Extension.Name);
+        Assert.AreEqual(new Uri("http://localhost:5285/"), extension!.Definition.Endpoint);
+    }
+
+    [TestMethod]
+    public async Task GitSourceExtensionConfigurationUsesTheAspireRegistrationIdentity()
+    {
+        await using var factory = new ApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Git:Endpoint", "http://localhost:5295");
+            builder.UseSetting("ConnectionStrings:git-source-extension", "Endpoint=http://localhost:5295");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        var extension = await client.GetFromJsonAsync<ExtensionRegistrationResource>(
+            "/api/extensionregistrations/git-source-extension");
+
+        Assert.IsNotNull(extension);
+        Assert.AreEqual("Agentstration.Extensions.Git", extension.Definition.ExpectedExtensionId);
+        Assert.AreEqual(new Uri("http://localhost:5295/"), extension.Definition.Endpoint);
+    }
+
+    [TestMethod]
+    public async Task ExtensionsApiReportsConfiguredProvidersWithoutRequiringThemToBeOnline()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        var extension = response!.Value.Single(value => value.RegistrationName == "ollama-extension");
+
+        Assert.AreEqual("unavailable", extension.Status);
+        Assert.AreEqual("http://127.0.0.1:1/", extension.Endpoint.AbsoluteUri);
+        Assert.IsEmpty(extension.OptionSets);
+        Assert.IsTrue(extension.Providers.Any(value => value.Name == "ollama-local" && value.ContributionId == "ollama"));
+    }
+
+    [TestMethod]
+    public async Task ExtensionsApiProjectsCanonicalValueRequirementTypesFormatsAndAllowedValues()
+    {
+        AepValueRequirement[] requirements =
+        [
+            new(AepContributionKinds.ModelProvider, "discovered", "text", true, AepValueType.Text, Format: "uri",
+                AllowedValues: [JsonSerializer.SerializeToElement("primary"), JsonSerializer.SerializeToElement("secondary")]),
+            new(AepContributionKinds.ModelProvider, "discovered", "integer", true, AepValueType.WholeNumber,
+                AllowedValues: [JsonSerializer.SerializeToElement(1), JsonSerializer.SerializeToElement(2)]),
+            new(AepContributionKinds.ModelProvider, "discovered", "number", true, AepValueType.DecimalNumber,
+                AllowedValues: [JsonSerializer.SerializeToElement(0.25m), JsonSerializer.SerializeToElement(0.5m)]),
+            new(AepContributionKinds.ModelProvider, "discovered", "boolean", true, AepValueType.Logical,
+                AllowedValues: [JsonSerializer.SerializeToElement(true), JsonSerializer.SerializeToElement(false)])
+        ];
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IExtensionInspector>();
+            services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector(requirements));
+        }));
+        using var client = factory.CreateClient();
+
+        var response = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        var projected = response!.Value.Single(value => value.RegistrationName == "ollama-extension").ValueRequirements!;
+
+        Assert.AreEqual("string", projected.Single(value => value.Id == "text").ValueType);
+        Assert.AreEqual("uri", projected.Single(value => value.Id == "text").Format);
+        Assert.AreEqual("integer", projected.Single(value => value.Id == "integer").ValueType);
+        Assert.AreEqual("number", projected.Single(value => value.Id == "number").ValueType);
+        Assert.AreEqual("boolean", projected.Single(value => value.Id == "boolean").ValueType);
+        Assert.IsTrue(projected.Where(value => value.Id != "text").All(value => value.Format is null));
+        CollectionAssert.AreEqual(
+            new[] { "primary", "secondary" },
+            projected.Single(value => value.Id == "text").AllowedValues!.Select(value => value.GetString()).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { 1, 2 },
+            projected.Single(value => value.Id == "integer").AllowedValues!.Select(value => value.GetInt32()).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { 0.25m, 0.5m },
+            projected.Single(value => value.Id == "number").AllowedValues!.Select(value => value.GetDecimal()).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { true, false },
+            projected.Single(value => value.Id == "boolean").AllowedValues!.Select(value => value.GetBoolean()).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExtensionInventoryCombinesConnectionAndAvailabilityState()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetFromJsonAsync<ValueResponse<ExtensionInventoryItemResponse>>("/api/extensions/inventory");
+        var extension = response!.Value.Single(value => value.RegistrationName == "ollama-extension");
+
+        Assert.AreEqual("Ollama AEP extension", extension.DisplayName);
+        Assert.AreEqual("aspire", extension.RegistrationSource);
+        Assert.IsTrue(extension.RegistrationEnabled);
+        Assert.AreEqual("unavailable", extension.AvailabilityStatus);
+        Assert.IsNull(extension.EnrollmentStatus);
+        Assert.IsNotNull(extension.Extension);
+        Assert.IsGreaterThanOrEqualTo(1, extension.Connections.Count);
+        StringAssert.Contains(extension.Key, "ollama-extension");
+    }
+
+    [TestMethod]
+    public async Task ExtensionsApiDoesNotAcceptManualDiscoveryCommand()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        using var discoveryResponse = await client.PostAsync("/api/extensions/discover", null);
+        Assert.AreEqual(HttpStatusCode.NotFound, discoveryResponse.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ExtensionRegistrationCrudUsesETagAndControlsDiscovery()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IExtensionInspector>();
+                services.AddSingleton<IExtensionInspector, ConfiguredEndpointInspector>();
+            }));
+        using var client = factory.CreateClient();
+        var properties = new ExtensionRegistrationProperties
+        {
+            DisplayName = "Registered extension",
+            Endpoint = new("http://127.0.0.1:6789"),
+            Enabled = true
+        };
+
+        using var createdResponse = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("registered-extension", properties));
+
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        Assert.IsNotNull(createdResponse.Headers.ETag);
+        var created = await createdResponse.Content.ReadFromJsonAsync<ExtensionRegistrationResource>();
+        Assert.IsNotNull(created);
+        Assert.AreEqual("http://127.0.0.1:6789/", created.Definition.Endpoint.AbsoluteUri);
+        var registrations = await client.GetFromJsonAsync<ValueResponse<ExtensionRegistrationResource>>("/api/extensionregistrations");
+        Assert.IsTrue(registrations!.Value.Any(value => value.Name == created.Name));
+        var discovered = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        Assert.AreEqual("manual", discovered!.Value.Single(value => value.RegistrationName == created.Name).DiscoverySource);
+
+        using var disable = new HttpRequestMessage(HttpMethod.Put, $"/api/extensionregistrations/{created.Name}")
+        {
+            Content = JsonContent.Create(new PutExtensionRegistrationRequest(created.Definition with { Enabled = false }))
+        };
+        disable.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var disabledResponse = await client.SendAsync(disable);
+        Assert.AreEqual(HttpStatusCode.OK, disabledResponse.StatusCode);
+        Assert.IsNotNull(disabledResponse.Headers.ETag);
+        discovered = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        Assert.AreEqual("disabled", discovered!.Value.Single(value => value.RegistrationName == created.Name).Status);
+
+        using var stale = new HttpRequestMessage(HttpMethod.Put, $"/api/extensionregistrations/{created.Name}")
+        {
+            Content = JsonContent.Create(new PutExtensionRegistrationRequest(created.Definition))
+        };
+        stale.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var staleResponse = await client.SendAsync(stale);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, $"/api/extensionregistrations/{created.Name}");
+        delete.Headers.IfMatch.Add(disabledResponse.Headers.ETag);
+        using var deletedResponse = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deletedResponse.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ExtensionRegistrationRejectsUnsafeAndDuplicateEndpoints()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var unsafeProperties = new ExtensionRegistrationProperties
+        {
+            DisplayName = "Unsafe",
+            Endpoint = new("https://user:password@example.test/aep")
+        };
+
+        using var unsafeResponse = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("unsafe-extension", unsafeProperties));
+
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, unsafeResponse.StatusCode);
+
+        using var insecureRemoteResponse = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("insecure-remote-extension", unsafeProperties with
+            {
+                DisplayName = "Insecure remote",
+                Endpoint = new("http://extension.example/aep")
+            }));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, insecureRemoteResponse.StatusCode);
+
+        var endpoint = new ExtensionRegistrationProperties { DisplayName = "First", Endpoint = new("http://127.0.0.1:6790") };
+        using var first = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("first-extension", endpoint, "extensions"));
+        Assert.AreEqual(HttpStatusCode.Created, first.StatusCode);
+        using var duplicate = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("duplicate-extension", endpoint with { DisplayName = "Duplicate" }, "extensions"));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, duplicate.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ExtensionRegistrationRequiresCredentialAndAuthenticationModeTogether()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var properties = new ExtensionRegistrationProperties
+        {
+            DisplayName = "Authenticated extension",
+            Endpoint = new("https://extension.example/aep")
+        };
+
+        using var ignoredCredential = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("ignored-credential", properties with
+            {
+                Credential = new ResourceReference("extension-token")
+            }));
+        using var missingCredential = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("missing-credential", properties with
+            {
+                AuthenticationMode = AepTransportAuthenticationMode.StaticBearer
+            }));
+
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, ignoredCredential.StatusCode);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, missingCredential.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ExtensionRegistrationDeletionIsBlockedWhileAProviderReferencesIt()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        using var registrationResponse = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("bound-extension", new ExtensionRegistrationProperties
+            {
+                DisplayName = "Bound extension",
+                Endpoint = new Uri("http://127.0.0.1:6792")
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, registrationResponse.StatusCode);
+        using var providerResponse = await client.PostAsJsonAsync(
+            "/api/modelproviders",
+            new CreateModelProviderRequest("bound-provider", new ModelProviderProperties
+            {
+                DisplayName = "Bound provider",
+                Extension = new ResourceReference("bound-extension"),
+                ContributionId = "ollama"
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
+
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/extensionregistrations/bound-extension");
+        delete.Headers.IfMatch.Add(registrationResponse.Headers.ETag!);
+        using var response = await client.SendAsync(delete);
+
+        Assert.AreEqual(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.AreEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [TestMethod]
+    public async Task ProviderCrudUsesETagAndPersistsItsExtensionBinding()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        using var registrationResponse = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("ollama-lab-extension", new ExtensionRegistrationProperties
+            {
+                DisplayName = "Ollama lab extension",
+                Endpoint = new Uri("http://127.0.0.1:11435")
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, registrationResponse.StatusCode);
+        var properties = new ModelProviderProperties
+        {
+            DisplayName = "Ollama lab",
+            Extension = new ResourceReference("ollama-lab-extension"),
+            ContributionId = "ollama"
+        };
+
+        using var createdResponse = await client.PostAsJsonAsync(
+            "/api/modelproviders",
+            new CreateModelProviderRequest("ollama-lab", properties));
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        Assert.IsNotNull(createdResponse.Headers.ETag);
+        var created = await createdResponse.Content.ReadFromJsonAsync<ModelProviderResource>();
+        Assert.IsNotNull(created);
+        Assert.AreEqual("ollama-lab-extension", created.Definition.Extension.Name);
+        Assert.AreEqual("ollama", created.Definition.ContributionId);
+
+        using var getResponse = await client.GetAsync("/api/modelproviders/ollama-lab");
+        Assert.AreEqual(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.AreEqual(createdResponse.Headers.ETag, getResponse.Headers.ETag);
+
+        var updatedProperties = created.Definition with
+        {
+            DisplayName = "Ollama workstation"
+        };
+        using var update = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/ollama-lab")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(updatedProperties))
+        };
+        update.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var updatedResponse = await client.SendAsync(update);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode);
+        Assert.AreNotEqual(createdResponse.Headers.ETag, updatedResponse.Headers.ETag);
+
+        using var staleUpdate = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/ollama-lab")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(updatedProperties))
+        };
+        staleUpdate.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var staleResponse = await client.SendAsync(staleUpdate);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        var usages = await client.GetFromJsonAsync<ModelProviderUsagesResponse>("/api/modelproviders/ollama-lab/usages");
+        Assert.AreEqual(0, usages!.Count);
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/modelproviders/ollama-lab");
+        delete.Headers.IfMatch.Add(updatedResponse.Headers.ETag!);
+        using var deleted = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+        using var missing = await client.GetAsync("/api/modelproviders/ollama-lab");
+        Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+}
+

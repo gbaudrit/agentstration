@@ -8,7 +8,13 @@ using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Application.Work;
 
-public sealed record SubmitEntryCommand(WorkspaceId WorkspaceId, EntryId EntryId, IReadOnlyDictionary<string, JsonElement> Values, IReadOnlyList<WorkAttachment>? Attachments = null);
+public sealed record SubmitEntryCommand(
+    WorkspaceId WorkspaceId,
+    EntryId EntryId,
+    IReadOnlyDictionary<string, JsonElement> Values,
+    IReadOnlyList<WorkAttachment>? Attachments = null,
+    EntryExposureSurface Surface = EntryExposureSurface.Workplace,
+    EntryWorkplacePlacement? WorkplacePlacement = EntryWorkplacePlacement.OwningSpace);
 public sealed record EntrySubmission(WorkplaceInteraction Interaction, WorkplaceAction Action, WorkTask? Task);
 public sealed record PendingActionResolution(PendingAction PendingAction, WorkplaceAction NextAction, WorkplaceInteraction? Interaction, WorkTask? Task);
 public sealed record ConversationContextMessage(Guid Id, ConversationRole Role, string Content, DateTimeOffset CreatedAt);
@@ -43,18 +49,23 @@ public sealed partial class WorkplaceService(
     TimeProvider timeProvider,
     IEnumerable<IWorkplaceEventSink> eventSinks,
     IEnumerable<IWorkplaceExternalInputResponder> externalInputResponders,
-    IWorkplaceContext context)
+    IWorkplaceContext context,
+    IEntryExecutionResolver entryExecutionResolver,
+    RootFlowSubmissionService? rootFlows = null)
 {
     private const int WorkItemQueryPageSize = 200;
     private const string WorkspaceMetadata = "workplace.workspaceId";
-    private const string EntryMetadata = "workplace.entryId";
-    private const string InteractionMetadata = "workplace.interactionId";
+    private const string EntryMetadata = WorkplaceTaskIdentity.EntryMetadata;
+    private const string InteractionMetadata = WorkplaceTaskIdentity.InteractionMetadata;
     private const string FlowRunMetadata = "flowRunId";
     private const string TaskMetadata = "workplace.taskId";
     private const string ParentFlowRunMetadata = "workplace.parentFlowRunId";
     private const string TriggerMessageMetadata = "workplace.triggerMessageId";
     private const string ContinuationMetadata = "workplace.continuation";
     private long eventSequence;
+
+    private RootFlowSubmissionService RequiredRootFlows() => rootFlows
+        ?? throw new WorkValidationException("root_flow_submission_unavailable", "Root Flow submission is not configured.");
 
 
 

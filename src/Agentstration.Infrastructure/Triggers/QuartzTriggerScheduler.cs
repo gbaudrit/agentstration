@@ -1,6 +1,7 @@
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Triggers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
@@ -87,7 +88,7 @@ public sealed class TriggerQuartzJob(
 }
 
 public sealed class TriggerSchedulerReconciler(
-    IControlPlaneStore store,
+    IResourceStore store,
     ITriggerSchedulerProjection scheduler,
     IRequestContextScopeFactory scopes,
     ILogger<TriggerSchedulerReconciler> logger) : IHostedService
@@ -95,7 +96,7 @@ public sealed class TriggerSchedulerReconciler(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using var system = scopes.PushSystem();
-        var triggers = await store.ListAllAsync<TriggerResource>(ResourceKinds.Trigger, cancellationToken);
+        var triggers = await store.ListAllAsync<TriggerResource>(TriggerResourceKinds.Trigger, cancellationToken);
         foreach (var trigger in triggers)
         {
             try { await scheduler.ReconcileAsync(trigger.Value, cancellationToken); }

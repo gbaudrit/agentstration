@@ -1,0 +1,17 @@
+{
+  "journey": "authenticate-console",
+  "locale": "en-US",
+  "theme": "dark",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "captures": [
+    {
+      "checkpoint": "console-home",
+      "file": "console-home.png",
+      "scope": "page",
+      "fullPage": true
+    }
+  ]
+}

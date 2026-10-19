@@ -1,0 +1,25 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: foundry
+definition:
+  displayName: Microsoft Foundry model provider
+  description: Binds the optional Foundry extension for one workspace. Select a discovered deployment in a Model Profile afterward.
+  targetScope: workspace
+  bindings:
+    - name: project-endpoint
+      targetKind: parameter
+      displayName: Foundry project endpoint
+      required: true
+    - name: inference-endpoint
+      targetKind: parameter
+      displayName: Foundry inference endpoint
+      required: true
+    - name: authentication-mode
+      targetKind: parameter
+      displayName: Foundry authentication mode
+      required: true
+    - name: credential
+      targetKind: secret
+      displayName: Foundry API credential
+      required: true

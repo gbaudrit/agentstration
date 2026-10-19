@@ -1,4 +1,4 @@
-<form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)">
+<form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)" data-testid="workplace-form-form" data-interactive="@(interactive ? "true" : "false")">
     <header><div><h2>@Definition.DisplayName</h2>@if (Definition.Description is not null) { <p>@Definition.Description</p> }</div></header>
     <div class="entry-fields">
         @foreach (var field in Definition.Presentation.Fields.OrderBy(value => value.Order))
@@ -6,7 +6,7 @@
             <EntryFieldRenderer Definition="field" Value="GetValue(field)" ValueChanged="value => values[field.Name] = value" Disabled="@(Disabled || Busy || submitting)" />
         }
     </div>
-    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)"><UiIcon Name="send" /> @(Busy || submitting ? Localizer["Sending"] : Localizer["Continue"])</button>
+    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)" data-testid="workplace-form-submit"><UiIcon Name="send" /> @(Busy || submitting ? Localizer["Sending"] : Localizer["Continue"])</button>
     @if (error is not null) { <p class="entry-error" role="alert">@error</p> }
 </form>
 
@@ -15,9 +15,21 @@
     [Parameter, EditorRequired] public required EventCallback<IReadOnlyDictionary<string, JsonElement>> OnSubmit { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool Busy { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, JsonElement> InitialValues { get; set; } = new Dictionary<string, JsonElement>();
     private readonly Dictionary<string, JsonElement> values = new(StringComparer.Ordinal);
     private string? error;
     private bool submitting;
+    private bool interactive;
+    private bool initialValuesApplied;
+
+    protected override void OnParametersSet()
+    {
+        if (initialValuesApplied) return;
+        foreach (var value in InitialValues) values[value.Key] = value.Value;
+        initialValuesApplied = true;
+    }
+
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private JsonElement GetValue(EntryFieldDefinition field) => values.TryGetValue(field.Name, out var value) ? value : field.DefaultValue ?? default;
     private async Task SubmitAsync()
     {

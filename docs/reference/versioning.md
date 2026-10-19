@@ -4,7 +4,7 @@ Several independent versions coexist in Agentstration. They must not be substitu
 
 | Version | Example | What changes it |
 | --- | --- | --- |
-| Product version | `0.2.0-alpha.1` | A product release under Semantic Versioning. |
+| Product version | `0.3.0-alpha.1` | A product release under Semantic Versioning. |
 | HTTP API version | Current unversioned `/api` routes | A breaking HTTP contract change, not every product release. |
 | Resource `apiVersion` | `agentstration.io/v1` | The schema of a declarative Management resource. |
 | Resource revision/generation | Agent generation `3` | A change to one resource instance or immutable snapshot. |
@@ -16,6 +16,8 @@ Several independent versions coexist in Agentstration. They must not be substitu
 Agentstration uses Semantic Versioning: `MAJOR.MINOR.PATCH`, with prereleases such as `0.2.0-alpha.1`, `0.2.0-beta.1`, and `0.2.0-rc.1`. During `0.x`, public contracts remain under development.
 
 The product version is centralized in the root `Directory.Build.props`. The autonomous AEP workspace keeps its own package version under `aep/`; changing the Agentstration product version does not change the AEP protocol or packages.
+
+The Source Registry .NET tool is version-aligned with the product rather than autonomous: it implements the Source contracts accepted by that release. Relevant `main` builds add `.dev.<UTC timestamp>.<run-id>.<attempt>` to an existing product prerelease suffix, or add `-dev...` to a stable product version, so development packages remain unique without advancing the product version. The same `v<version>` tag publishes the exact official package version. A product prerelease produces an official NuGet prerelease package, while a product version without a prerelease suffix produces a stable package.
 
 Product prereleases use annotated Git tags named `v<version>`. Pushing a matching tag from a commit contained in `main` runs the release workflow, repeats the offline Release build and test suite, publishes framework-dependent server and Workplace archives, writes SHA-256 checksums, pushes a multi-platform server/Console image to Docker Hub, and creates a GitHub prerelease from the matching file under `docs/releases/`. A tag that disagrees with the central version or does not point into `main` fails closed. Prereleases publish an immutable version container tag and a moving channel tag such as `alpha`, but never `latest`.
 

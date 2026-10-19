@@ -86,3 +86,17 @@ public sealed record WorkTaskOperationsDetailResponse(
     IReadOnlyList<WorkTaskArtifactResponse> Artifacts,
     IReadOnlyList<WorkTaskActivity> Activities,
     IReadOnlyList<ConversationMessage> Messages);
+
+public sealed record WorkOperationsQueryScope(Guid TenantId, Guid WorkspaceId, Guid PrincipalId);
+
+public sealed record WorkTaskOperationsDetailProjection(WorkTaskOperationsDetailResponse Value, string ETag);
+
+public interface IWorkOperationsQueryService
+{
+    Task<WorkTaskOperationsPageResponse> ListAsync(WorkOperationsQueryScope scope, WorkTaskStatus? status, string? search,
+        bool? hasPendingAction, int page, int pageSize, string? sort, string? direction, CancellationToken cancellationToken);
+    Task<WorkTaskOperationsCountersResponse> GetCountersAsync(WorkOperationsQueryScope scope, CancellationToken cancellationToken);
+    Task<WorkTaskOperationsDetailProjection> GetDetailAsync(WorkOperationsQueryScope scope, Guid taskId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkTaskFlowRunResponse>> ListFlowRunsAsync(WorkOperationsQueryScope scope, Guid taskId, CancellationToken cancellationToken);
+    Task<object> GetFlowRunAsync(WorkOperationsQueryScope scope, Guid taskId, string runId, CancellationToken cancellationToken);
+}

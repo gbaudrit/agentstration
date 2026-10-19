@@ -1,0 +1,633 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Agentstration.Agents;
+using Agentstration.Agents.Contracts;
+using Agentstration.Api.Contracts;
+using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Storage.Sqlite;
+using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
+using Agentstration.Runtime.Core;
+using Agentstration.Runtime.Local;
+using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Work.Contracts;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace Agentstration.Runtime.Tests;
+
+[TestClass]
+public sealed class RuntimeRunTests
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    [TestMethod]
+    public async Task OpaqueRuntimeExecutionStateSurvivesStoreReconstruction()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-state-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var databasePath = Path.Combine(directory, "runtime.db");
+        try
+        {
+            static ServiceProvider Provider(string path)
+            {
+                var services = new ServiceCollection();
+                services.AddSingleton(TimeProvider.System);
+                services.AddSqliteRuntimeRuns($"Data Source={path}");
+                return services.BuildServiceProvider();
+            }
+
+            await using (var first = Provider(databasePath))
+            {
+                await first.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+                await first.GetRequiredService<IRuntimeExecutionStateStore>().StoreAsync(new(
+                    TestScope.WorkspaceId, "run-opaque", "maf", "checkpoint-2", JsonSerializer.SerializeToElement(new { opaque = "payload" }),
+                    new DateTimeOffset(2026, 8, 17, 8, 0, 0, TimeSpan.Zero), "checkpoint-1"), default);
+            }
+
+            await using (var second = Provider(databasePath))
+            {
+                await second.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+                var restored = await second.GetRequiredService<IRuntimeExecutionStateStore>()
+                    .GetAsync(TestScope.WorkspaceId, "run-opaque", "maf", "checkpoint-2", default);
+                Assert.IsNotNull(restored);
+                Assert.AreEqual("checkpoint-1", restored.ParentStateId);
+                Assert.AreEqual("payload", restored.Payload.GetProperty("opaque").GetString());
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+    [TestMethod]
+    public async Task CreatePreservesPayloadAndRequiresExactAgentVersion()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var input = Input("Optimize this query.", "{\"engine\":\"sqlserver\"}");
+
+        var created = await fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 3), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Console, "operator", default);
+
+        Assert.AreEqual(RuntimeRunState.Pending, created.Value.Status.State);
+        Assert.AreEqual(3L, created.Value.Properties.Agent.Version);
+        Assert.AreEqual("Optimize this query.", created.Value.Properties.Input.Messages[0].Content);
+        Assert.AreEqual(RuntimeRunOrigin.Console, created.Value.Properties.Origin);
+        Assert.AreEqual(TestScope, created.Value.Properties.Scope);
+        var missingVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 2), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_version_not_found", missingVersion.Code);
+        var invalidReference = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference("", 1), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_reference_invalid", invalidReference.Code);
+        var invalidVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 0), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_version_invalid", invalidVersion.Code);
+    }
+
+    [TestMethod]
+    public async Task RuntimeRunScopeIsImmutable()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var created = await fixture.CreateRunAsync();
+        var changedScope = TestScope with { WorkspaceId = new(Guid.NewGuid()) };
+
+        var mutation = await Assert.ThrowsAsync<RuntimeRunConcurrencyException>(() => fixture.Store.UpdateAsync(
+            created.Value with { Scope = changedScope, Properties = created.Value.Properties with { Scope = changedScope } },
+            created.ETag,
+            default));
+        StringAssert.Contains(mutation.Message, "scope is immutable");
+    }
+
+    [TestMethod]
+    public async Task UnsupportedRuntimeParameterIsRejectedBeforeRunCreation()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var options = new RuntimeExecutionOptions
+        {
+            Parameters = new Dictionary<string, JsonElement> { ["model"] = JsonSerializer.SerializeToElement("other-model") }
+        };
+
+        var exception = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope,
+            new RuntimeAgentReference(fixture.AgentId, 3), Input("test prompt"), options, RuntimeRunOrigin.Console, "operator", default));
+
+        Assert.AreEqual("runtime_parameter_unsupported", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task ConcurrentTerminalTransitionAcceptsTheWinningStateWithoutDuplicateEvents()
+    {
+        var run = new RuntimeRun
+        {
+            WorkspaceId = TestScope.WorkspaceId,
+            Scope = TestScope,
+            Id = "concurrent-terminal",
+            Name = "concurrent-terminal",
+            Properties = new RuntimeRunProperties
+            {
+                Agent = new RuntimeAgentReference("sql-expert", 3),
+                Input = Input("test"),
+                Execution = new RuntimeExecutionOptions()
+            },
+            Status = new RuntimeRunStatus { State = RuntimeRunState.Running, CreatedAt = DateTimeOffset.UtcNow }
+        };
+        var store = new ConcurrentTerminalRunStore(run);
+        var manager = new RuntimeRunStateManager(store, TimeProvider.System);
+
+        await manager.CompleteFailureAsync(run.WorkspaceId, run.Id, RuntimeRunState.TimedOut, "Run timed out.", default);
+
+        Assert.AreEqual(RuntimeRunState.Cancelled, store.Current.Value.Status.State);
+        Assert.AreEqual(1, store.UpdateAttempts);
+        Assert.HasCount(0, store.Events);
+    }
+
+    [TestMethod]
+    public async Task InitializationReenqueuesPendingAndRunningButNotTerminalRuns()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var pending = await fixture.CreateRunAsync();
+        var running = await fixture.CreateRunAsync();
+        var succeeded = await fixture.CreateRunAsync();
+        var failed = await fixture.CreateRunAsync();
+        var cancelled = await fixture.CreateRunAsync();
+        var timedOut = await fixture.CreateRunAsync();
+        var startedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        running = await fixture.Store.UpdateAsync(running.Value with { Status = running.Value.Status with { State = RuntimeRunState.Running, StartedAt = startedAt } }, running.ETag, default);
+        _ = await SetStateAsync(succeeded, RuntimeRunState.Succeeded);
+        _ = await SetStateAsync(failed, RuntimeRunState.Failed);
+        _ = await SetStateAsync(cancelled, RuntimeRunState.Cancelled);
+        _ = await SetStateAsync(timedOut, RuntimeRunState.TimedOut);
+        fixture.Queue.Enqueued.Clear();
+
+        await fixture.Service.InitializeAsync(default);
+
+        CollectionAssert.AreEquivalent(
+            new[] { new RuntimeRunQueueItem(TestScope, pending.Value.Id), new RuntimeRunQueueItem(TestScope, running.Value.Id) },
+            fixture.Queue.Enqueued.ToArray());
+
+        Task<StoredRuntimeRun> SetStateAsync(StoredRuntimeRun stored, RuntimeRunState state) =>
+            fixture.Store.UpdateAsync(stored.Value with { Status = stored.Value.Status with { State = state } }, stored.ETag, default);
+    }
+
+    [TestMethod]
+    public async Task RetryCreatesNewRunAndTerminalEventStreamCloses()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var original = await fixture.Service.CreateAsync(
+            TestScope,
+            new RuntimeAgentReference(fixture.AgentId, 3),
+            Input("test prompt"),
+            new RuntimeExecutionOptions { PersistToolArguments = true },
+            RuntimeRunOrigin.Console,
+            "operator",
+            default);
+        _ = await fixture.Service.CancelAsync(TestScope.WorkspaceId, original.Value.Id, default);
+
+        var retry = await fixture.Service.RetryAsync(TestScope, original.Value.Id, default);
+        var observed = new List<RuntimeRunEvent>();
+        await foreach (var runEvent in fixture.Service.ObserveAsync(TestScope.WorkspaceId, original.Value.Id, 0, default)) observed.Add(runEvent);
+
+        Assert.AreNotEqual(original.Value.Id, retry.Value.Id);
+        CollectionAssert.AreEqual(original.Value.Properties.Input.Messages.ToArray(), retry.Value.Properties.Input.Messages.ToArray());
+        Assert.AreEqual(original.Value.Properties.Input.Context, retry.Value.Properties.Input.Context);
+        Assert.AreEqual(true, retry.Value.Properties.Execution.PersistToolArguments);
+        Assert.AreEqual(RuntimeRunEventKind.RunCompleted, observed[^1].Kind);
+    }
+
+    [TestMethod]
+    public async Task DeleteRequiresTerminalStateAndRemovesRuntimeHistory()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var created = await fixture.CreateRunAsync();
+
+        await Assert.ThrowsExactlyAsync<RuntimeRunNotTerminalException>(() =>
+            fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, created.ETag, default));
+
+        var completed = await fixture.Service.CancelAsync(TestScope.WorkspaceId, created.Value.Id, default);
+        Assert.IsNotNull(completed);
+        await fixture.ExecutionStates.StoreAsync(new(
+            TestScope.WorkspaceId,
+            created.Value.Id,
+            "maf",
+            "checkpoint-1",
+            JsonSerializer.SerializeToElement(new { state = "completed" }),
+            DateTimeOffset.UtcNow), default);
+
+        await Assert.ThrowsExactlyAsync<RuntimeRunConcurrencyException>(() =>
+            fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, created.ETag, default));
+        await fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, completed.ETag, default);
+
+        Assert.IsNull(await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default));
+        Assert.HasCount(0, await fixture.Store.ListEventsAsync(TestScope.WorkspaceId, created.Value.Id, 0, default));
+        Assert.IsNull(await fixture.ExecutionStates.GetAsync(TestScope.WorkspaceId, created.Value.Id, "maf", "checkpoint-1", default));
+    }
+
+    [TestMethod]
+    public async Task FreshRuntimeSchemaAllowsTheSameRunIdInDifferentWorkspaces()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-scope-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var databasePath = Path.Combine(directory, "runtime.db");
+        try
+        {
+            var timestamp = new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero);
+            var services = new ServiceCollection();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSqliteRuntimeRuns($"Data Source={databasePath}");
+            await using var provider = services.BuildServiceProvider();
+            var store = provider.GetRequiredService<IRuntimeRunStore>();
+
+            await store.InitializeAsync(default);
+            await store.InitializeAsync(default);
+            var otherScope = TestScope with { WorkspaceId = new(Guid.Parse("44444444-4444-4444-4444-444444444444")) };
+            await store.CreateAsync(Run(TestScope, "first"), default);
+            await store.CreateAsync(Run(otherScope, "second"), default);
+            await store.AppendEventAsync(Event(TestScope.WorkspaceId), default);
+            await store.AppendEventAsync(Event(otherScope.WorkspaceId), default);
+
+            Assert.AreEqual("first", (await store.GetAsync(TestScope.WorkspaceId, "shared-run", default))!.Value.Name);
+            Assert.AreEqual("second", (await store.GetAsync(otherScope.WorkspaceId, "shared-run", default))!.Value.Name);
+            Assert.HasCount(1, await store.ListEventsAsync(TestScope.WorkspaceId, "shared-run", 0, default));
+            Assert.HasCount(1, await store.ListEventsAsync(otherScope.WorkspaceId, "shared-run", 0, default));
+
+            var first = await store.GetAsync(TestScope.WorkspaceId, "shared-run", default);
+            Assert.IsNotNull(first);
+            await store.DeleteAsync(TestScope.WorkspaceId, "shared-run", first.ETag, default);
+            Assert.IsNull(await store.GetAsync(TestScope.WorkspaceId, "shared-run", default));
+            Assert.IsNotNull(await store.GetAsync(otherScope.WorkspaceId, "shared-run", default));
+            Assert.HasCount(0, await store.ListEventsAsync(TestScope.WorkspaceId, "shared-run", 0, default));
+            Assert.HasCount(1, await store.ListEventsAsync(otherScope.WorkspaceId, "shared-run", 0, default));
+
+            RuntimeRun Run(RuntimeRunScope scope, string name) => new()
+            {
+                WorkspaceId = scope.WorkspaceId,
+                Scope = scope,
+                Id = "shared-run",
+                Name = name,
+                Properties = new RuntimeRunProperties
+                {
+                    Agent = new RuntimeAgentReference("sql-expert", 1),
+                    Input = Input(name),
+                    Execution = new RuntimeExecutionOptions()
+                },
+                Status = new RuntimeRunStatus { State = RuntimeRunState.Pending, CreatedAt = timestamp }
+            };
+            RuntimeRunEvent Event(Agentstration.Resources.WorkspaceId workspaceId) => new()
+            {
+                WorkspaceId = workspaceId,
+                EventId = Guid.NewGuid(),
+                RunId = "shared-run",
+                Kind = RuntimeRunEventKind.RunCreated,
+                Timestamp = timestamp,
+                State = RuntimeRunState.Pending
+            };
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void RuntimeCoreDoesNotReferenceWorkPlaneOrWeb()
+    {
+        var references = typeof(RuntimeRunService).Assembly.GetReferencedAssemblies().Select(item => item.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Work", StringComparison.Ordinal) || name.Contains("Agentstration.Web", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task RuntimeApiDispatchesRunWithoutExecutingItInWebOrCreatingWorkItem()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+        });
+        using var client = factory.CreateClient();
+        const string agentPath = "/api/agents/sql-expert";
+        var agent = await client.GetFromJsonAsync<AgentResource>(agentPath);
+        Assert.IsNotNull(agent);
+        var workBefore = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
+        var request = new CreateRuntimeRunRequest
+        {
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation),
+            Input = Input("integration prompt"),
+            Origin = RuntimeRunOrigin.Api
+        };
+
+        var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?generation={agent.Generation}");
+        using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", request);
+        Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
+        var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
+        Assert.IsNotNull(created);
+        var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        Assert.AreEqual(new RuntimeRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId), created.Properties.Scope);
+        Assert.AreEqual(current.PrincipalId.ToString("D"), created.Properties.Initiator);
+        Assert.IsNull(typeof(CreateRuntimeRunRequest).GetProperty("Initiator"));
+
+        var dispatched = await client.GetFromJsonAsync<RuntimeRun>($"/api/runtime/runs/{created.Id}");
+        var eventHistory = await client.GetFromJsonAsync<RuntimeRunEvent[]>($"/api/runtime/runs/{created.Id}/eventHistory?afterSequence=0");
+        var placement = await client.GetFromJsonAsync<RuntimeAssignmentPlacementResponse>(
+            $"/api/runtime/placements/runtimeRun/{created.Id}");
+        var instances = await client.GetFromJsonAsync<AgentInstanceResponse[]>("/api/runtime/agent-instances");
+        var workAfter = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
+        var assignment = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>()
+            .GetByTargetAsync(new(current.WorkspaceId), RuntimeAssignmentTargetKind.RuntimeRun, created.Id, default);
+
+        Assert.AreEqual(RuntimeRunState.Pending, dispatched!.Status.State);
+        Assert.IsNotNull(assignment);
+        Assert.AreEqual(RuntimeAssignmentState.Pending, assignment.Value.State);
+        Assert.IsTrue(readiness?.Ready);
+        Assert.IsNotNull(eventHistory);
+        Assert.IsNotNull(placement);
+        Assert.AreEqual(assignment.Value.Id.Value, placement.AssignmentId);
+        Assert.IsNotNull(instances);
+        Assert.IsEmpty(instances, "Pending assignments must not be presented as live Agent instances.");
+        var claim = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>().ClaimNextAsync(
+            new RuntimeWorkerId(Guid.NewGuid()), new RuntimeWorkerSessionId(Guid.NewGuid()),
+            "microsoft-agent-framework", new HashSet<string>(StringComparer.Ordinal) { "1.0" },
+            new HashSet<string>(StringComparer.Ordinal) { "1.0" }, 1, default);
+        Assert.IsNotNull(claim);
+        _ = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>()
+            .OpenTurnAsync(claim.Ownership, created.Id, null, "agent", default);
+        var activeInstances = await client.GetFromJsonAsync<AgentInstanceResponse[]>("/api/runtime/agent-instances");
+        Assert.IsNotNull(activeInstances);
+        Assert.HasCount(1, activeInstances);
+        Assert.AreEqual(agent.Metadata.Name, activeInstances[0].AgentName);
+        Assert.AreEqual(claim.Ownership.WorkerId.Value, activeInstances[0].WorkerId);
+        Assert.IsFalse(eventHistory.Any(item => item.Kind is RuntimeRunEventKind.ResponseDelta or RuntimeRunEventKind.RunCompleted));
+        Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
+    }
+
+    [TestMethod]
+    public async Task RoutingInvokeExecutesTheSelectedAgentThroughAwpWorker()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            AwpTestWorker.Configure(builder);
+        });
+        using var client = factory.CreateClient();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+
+        using var response = await client.PostAsJsonAsync("/api/routing/invoke", new RouteAndExecuteRequest("Explain dependency injection."));
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
+        var routed = await response.Content.ReadFromJsonAsync<RouteAndExecuteResponse>();
+        Assert.IsNotNull(routed);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(routed.AgentName));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(routed.Output));
+        var runs = await client.GetFromJsonAsync<RuntimeRunPageResponse>("/api/runtime/runs?top=100");
+        Assert.IsNotNull(runs);
+        Assert.IsTrue(runs.Value.Any(run => run.Status.State == RuntimeRunState.Succeeded));
+    }
+
+    [TestMethod]
+    public async Task RuntimeRunDeleteApiRequiresTerminalStateAndCurrentETag()
+    {
+        var queue = new TestRuntimeRunQueue();
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IRuntimeRunQueue>();
+                services.AddSingleton<IRuntimeRunQueue>(queue);
+            });
+        });
+        using var client = factory.CreateClient();
+        var agent = await client.GetFromJsonAsync<AgentResource>("/api/agents/sql-expert");
+        Assert.IsNotNull(agent);
+        using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
+        {
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation),
+            Input = Input("delete me"),
+            Origin = RuntimeRunOrigin.Api
+        });
+        var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
+        Assert.IsNotNull(created);
+        var createdETag = createdResponse.Headers.ETag?.Tag;
+        Assert.IsNotNull(createdETag);
+
+        Assert.AreEqual(HttpStatusCode.BadRequest, (await client.DeleteAsync($"/api/runtime/runs/{created.Id}")).StatusCode);
+        using var pendingDelete = new HttpRequestMessage(HttpMethod.Delete, $"/api/runtime/runs/{created.Id}");
+        pendingDelete.Headers.TryAddWithoutValidation("If-Match", createdETag);
+        Assert.AreEqual(HttpStatusCode.Conflict, (await client.SendAsync(pendingDelete)).StatusCode);
+
+        using var cancel = await client.PostAsync($"/api/runtime/runs/{created.Id}/cancel", null);
+        var currentETag = cancel.Headers.ETag?.Tag;
+        Assert.IsNotNull(currentETag);
+        using var staleDelete = new HttpRequestMessage(HttpMethod.Delete, $"/api/runtime/runs/{created.Id}");
+        staleDelete.Headers.TryAddWithoutValidation("If-Match", createdETag);
+        Assert.AreEqual(HttpStatusCode.PreconditionFailed, (await client.SendAsync(staleDelete)).StatusCode);
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, $"/api/runtime/runs/{created.Id}");
+        delete.Headers.TryAddWithoutValidation("If-Match", currentETag);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.SendAsync(delete)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync($"/api/runtime/runs/{created.Id}")).StatusCode);
+    }
+
+    [TestMethod]
+    public void HttpPayloadCaptureIsRejectedOutsideDevelopment()
+    {
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            builder.UseSetting("Observability:GenAI:HttpPayloadCapture:Enabled", "true");
+        });
+
+        var exception = Assert.ThrowsExactly<InvalidOperationException>(() => factory.CreateClient());
+
+        StringAssert.Contains(exception.Message, "Development environment");
+    }
+
+    private static RuntimeRunInput Input(string prompt, string? context = null) => new()
+    {
+        Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, prompt)],
+        Context = context
+    };
+
+    private sealed class TestAgentRuntimePreparationService : IAgentRuntimePreparationService
+    {
+        public Task<PreparedAgentRuntime> PrepareAsync(
+            ResourceNamespace resourceNamespace,
+            string agentName,
+            long generation,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new PreparedAgentRuntime(string.Empty, $"{agentName}--{generation:000000}", "Ready"));
+    }
+
+    private sealed class RuntimeFixture : IAsyncDisposable
+    {
+        private readonly string directory;
+        private readonly ServiceProvider provider;
+        public RuntimeRunService Service { get; }
+        public IRuntimeRunStore Store { get; }
+        public IRuntimeExecutionStateStore ExecutionStates => provider.GetRequiredService<IRuntimeExecutionStateStore>();
+        public TestRuntimeRunQueue Queue { get; }
+        public string AgentId { get; }
+
+        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, TestRuntimeRunQueue queue, string agentId)
+        {
+            this.directory = directory;
+            this.provider = provider;
+            Service = service;
+            Store = store;
+            Queue = queue;
+            AgentId = agentId;
+        }
+
+        public static async Task<RuntimeFixture> CreateAsync()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-tests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>();
+            services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
+            services.AddSingleton<IRuntimeAgentResolver, ResourceRuntimeAgentResolver>();
+            services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");
+            var queue = new TestRuntimeRunQueue();
+            services.AddSingleton(queue);
+            services.AddSingleton<IRuntimeRunQueue>(queue);
+            services.AddSingleton<IRuntimeRunExecutionScope, TestRuntimeRunExecutionScope>();
+            services.AddSingleton<IAgentRuntimePreparationService, TestAgentRuntimePreparationService>();
+            services.AddSingleton<RuntimeRunStateManager>();
+            services.AddSingleton<RuntimeRunService>();
+            var provider = services.BuildServiceProvider();
+            var management = provider.GetRequiredService<IResourceStore>();
+            var store = provider.GetRequiredService<IRuntimeRunStore>();
+            await management.InitializeAsync(default);
+            await store.InitializeAsync(default);
+
+            const string agentId = "sql-expert";
+            const string revisionId = "sql-expert--000001";
+            var agent = await management.PutAsync(Agent(agentId), null, true, default);
+            await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid), default);
+            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, queue, agentId);
+        }
+
+        public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(TestScope, new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
+
+        public async ValueTask DisposeAsync()
+        {
+            await provider.DisposeAsync();
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+
+        private static AgentResource Agent(string id) => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = "sql-expert" },
+            Generation = 3,
+            Definition = new AgentProperties
+            {
+                DisplayName = "SQL Expert",
+                Instructions = "Test",
+                ModelProfile = new ResourceReference("reasoning-default")
+            }
+        };
+
+        private static AgentRevision Revision(string id, string agentId, Guid agentUid) => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.AgentRevision,
+            Metadata = new ResourceMetadata { Name = "sql-expert--000001" },
+            AgentUid = agentUid,
+            AgentName = agentId,
+            AgentVersion = 3,
+            DefinitionHash = "hash",
+            CreatedAt = DateTimeOffset.UtcNow,
+            ProvisioningState = ProvisioningState.Succeeded,
+            Definition = new ResolvedAgentDefinition
+            {
+                AgentId = agentUid,
+                AgentKey = "sql-expert",
+                DisplayName = "SQL Expert",
+                Description = "Test",
+                AgentVersion = 3,
+                EffectiveInstructions = "Test",
+                ModelProfileName = "reasoning-default",
+                RuntimeProfileName = "maf-builtin",
+                EffectiveToolNames = [],
+                MiddlewareIds = [],
+                ContextProviderIds = [],
+                Capabilities = [],
+                Handler = "prompt-agent",
+                DefinitionHash = "hash"
+            }
+        };
+
+    }
+
+    private sealed class TestRuntimeRunExecutionScope : IRuntimeRunExecutionScope
+    {
+        public ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public IDisposable Enter(RuntimeRunScope scope) => new EmptyScope();
+
+        private sealed class EmptyScope : IDisposable
+        {
+            public void Dispose() { }
+        }
+    }
+
+    private sealed class TestRuntimeRunQueue : IRuntimeRunQueue
+    {
+        public List<RuntimeRunQueueItem> Enqueued { get; } = [];
+        public ValueTask EnqueueAsync(RuntimeRunQueueItem run, CancellationToken cancellationToken)
+        {
+            Enqueued.Add(run);
+            return ValueTask.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<RuntimeRunQueueItem> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
+    private sealed class ConcurrentTerminalRunStore(RuntimeRun run) : IRuntimeRunStore
+    {
+        public StoredRuntimeRun Current { get; private set; } = new(run, "etag-1", DateTimeOffset.UtcNow);
+        public int UpdateAttempts { get; private set; }
+        public List<RuntimeRunEvent> Events { get; } = [];
+
+        public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<StoredRuntimeRun> CreateAsync(RuntimeRun value, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredRuntimeRun?> GetAsync(Agentstration.Resources.WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeRun?>(Current);
+        public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(Agentstration.Resources.WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RuntimeRunKey>> ListRecoverableAsync(int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAsync(Agentstration.Resources.WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredRuntimeRun> UpdateAsync(RuntimeRun value, string expectedETag, CancellationToken cancellationToken)
+        {
+            UpdateAttempts++;
+            Current = new StoredRuntimeRun(
+                Current.Value with { Status = Current.Value.Status with { State = RuntimeRunState.Cancelled } },
+                "etag-2",
+                DateTimeOffset.UtcNow);
+            throw new RuntimeRunConcurrencyException("Concurrent terminal transition won.");
+        }
+
+        public Task<RuntimeRunEvent> AppendEventAsync(RuntimeRunEvent runEvent, CancellationToken cancellationToken)
+        {
+            Events.Add(runEvent);
+            return Task.FromResult(runEvent);
+        }
+
+        public Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(Agentstration.Resources.WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<RuntimeRunEvent>>(Events);
+    }
+
+    private static RuntimeRunScope TestScope { get; } = new(
+        Guid.Parse("11111111-1111-1111-1111-111111111111"),
+        new(Guid.Parse("22222222-2222-2222-2222-222222222222")),
+        Guid.Parse("33333333-3333-3333-3333-333333333333"));
+}

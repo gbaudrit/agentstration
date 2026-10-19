@@ -32,23 +32,46 @@ src/
   Agentstration.Flow.Storage.Abstractions/
   Agentstration.Flow.Storage.Sqlite/
   Agentstration.Infrastructure/  Composition adapters for current modules
-  Agentstration.Management.Abstractions/ Canonical Management resources, ports, events
-  Agentstration.Management.Core/ Management validation and use cases
-  Agentstration.Management.Contracts/
+  Agentstration.Bootstrap.Contracts/ Composed Bootstrap application and transport contracts
+  Agentstration.Api.Contracts/   Family-neutral HTTP collection contracts
+  Agentstration.*.Api/           Family-owned endpoint modules composed by Agentstration.Api
+  Agentstration.*.Contracts/     Public contracts owned by each resource family
+  Agentstration.ResourceManagement.Contracts/ Generic resource and Bootstrap handler contracts
+  Agentstration.Extensions/      Extension registration and inventory use cases
+  Agentstration.Extensions.Aep/  AEP enrollment use cases
+  Agentstration.Identity.Contracts/ Identity, authorization and PAT contracts
+  Agentstration.Identity/        Identity, authorization, scope and audit use cases
+  Agentstration.Security.Contracts/ Provider-neutral security audit contracts
+  Agentstration.Models.Application/ Model administration use cases
+  Agentstration.Packs.Contracts/   Pack installation, authoring and composition contracts
+  Agentstration.Packs/           Pack authoring, installation and composition
+  Agentstration.Sources.Contracts/ Source and Source Registry resources, policies and provider contracts
+  Agentstration.Sources/         Source and source-registry use cases
   Agentstration.Management.Storage.Sqlite/
   Agentstration.Runtime.Abstractions/
-  Agentstration.Runtime.AgentFramework/
+  Agentstration.Runtime.MicrosoftAgentFramework/
   Agentstration.Runtime.Local/
+  Agentstration.Runtime.Profiles/  Runtime-profile administration
   Agentstration.Work/             WorkItem aggregate and Runtime-facing port
   Agentstration.Work.Contracts/   Public Work Plane transport contracts
   Agentstration.Work.Storage.Abstractions/
   Agentstration.Work.Storage.Sqlite/
   Agentstration.Web/             REST, Razor Components, MCP, hosted workers
   Agentstration.AppHost/         Aspire orchestration and dashboard
+awp/
+  src/Agentstration.Awp.Abstractions/ Provider-neutral AWP wire contracts
 tests/
+  Agentstration.Awp.Tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
-  Agentstration.Management.Tests/
+  Agentstration.Tools.Tests/
+  Agentstration.Management.Storage.Tests/
+  Agentstration.Management.Sources.Tests/
+  Agentstration.Management.Api.Tests/
+  Agentstration.Management.Bootstrap.Tests/
+  Agentstration.Management.Security.Tests/
+  Agentstration.Management.Aep.Tests/
+  Agentstration.Performance.Tests/
 docs/
   architecture.md
   decisions/
@@ -67,8 +90,8 @@ Web -> Management / Flow / Runtime public boundaries
 - `Infrastructure` composes the current Management, Runtime, Flow, Work, identity, Pack, Trigger, Tool and provider adapters.
 - `Web` is the composition and transport layer. REST endpoints, Razor components, hosted workers, and MCP tools must delegate to the same application services.
 - Agentstration is the source of truth for agent definitions, immutable revisions, deployments, and desired state. Never persist a concrete `AIAgent`.
-- `Agentstration.Management.Abstractions` owns canonical Management resources and provider-neutral ports; `Agentstration.Management.Core` owns Management validation and use cases. Do not place Management types back in the general Domain or Application projects.
-- Concrete Microsoft Agent Framework types belong only in `Agentstration.Runtime.AgentFramework`.
+- Management abstractions are owned by their resource families. Identity, authorization and PAT contracts belong to `Agentstration.Identity.Contracts`; provider-neutral audit contracts belong to `Agentstration.Security.Contracts`; Extension and AEP contracts belong to `Agentstration.Extensions.Contracts`; Pack installation, Pack catalog schemas and authoring contracts belong to `Agentstration.Packs.Contracts`; Source and Source Registry contracts, policies, provenance and provider ports belong to `Agentstration.Sources.Contracts`. Packs may consume the narrow Source catalog/content contracts, but Sources must never reference Pack assemblies or own Pack lifecycle orchestration. Generic Bootstrap documents, planning and handler ports belong to `Agentstration.ResourceManagement.Contracts`; composed application/API contracts belong to the narrow `Agentstration.Bootstrap.Contracts` façade. Do not recreate a catch-all Management business module or kind catalogue.
+- Concrete Microsoft Agent Framework types belong only in `Agentstration.Runtime.MicrosoftAgentFramework`.
 - EF Core and SQLite control-plane implementation details belong only in `Agentstration.Management.Storage.Sqlite`.
 - Work Plane EF Core and SQLite details belong only in `Agentstration.Work.Storage.Sqlite`; Work data must not use management or runtime storage.
 - Flow domain types must remain provider-neutral. EF Core belongs only in `Agentstration.Flow.Storage.Sqlite`; Flow Core and Application must not reference Runtime, Web, MAF, or concrete storage.
@@ -173,6 +196,22 @@ At minimum, cover the relevant combination of:
 
 Prefer in-memory infrastructure for fast application tests. Use integration infrastructure only when behavior genuinely depends on HTTP, the ASP.NET Core host, SQLite, or another real boundary. Tests must not require internet access or a live LLM.
 
+### UX test scenario follow-up
+
+- For a feature or issue that adds or materially changes a Console or Workplace user journey, create a separate child issue using the Technical task form and the `test-scenario-task` label. Create it after the parent issue exists and before opening the UX implementation pull request, then attach it to the parent with GitHub's native Sub-issue relationship. Link the parent and child in both issue bodies for readability; those references do not replace the Sub-issue relationship. The child must name the routes, deterministic prerequisites, user actions, and observable success and expected-failure assertions. If an existing Playwright journey already covers the changed behavior, record the evidence and an explicit `Not applicable` decision in the parent issue and UX pull request instead.
+- Mark the child as blocked by UX validation and link the UX pull request when it exists. Do not start the new reusable Playwright journey until a maintainer has explicitly validated the UX in the pull request or parent issue and the UX pull request has merged. Record that validation and the merged pull request in the child before starting work.
+- The UX pull request must still add or update tests for behavior changes, repair any existing Playwright tests affected by the change, and run the required browser smoke checks. Deferral applies only to the new reusable UX scenario, not to existing regression checks or the required offline test suites.
+- Keep the parent issue open until the child scenario is merged and its catalog surface is covered, or a maintainer documents an explicit waiver with a reason. Before closing the parent, also verify that every Sub-issue is closed or a maintainer has documented an explicit exception. Do not use an auto-closing issue keyword for the parent in the UX-only pull request.
+
+### Architecture documentation reconciliation
+
+- Create a transverse reconciliation issue when a planned architecture review is due or when accumulated implementation changes make a broad DAT comparison necessary. Do not require every feature issue to perform repository-wide reconciliation.
+- Use the Technical task form and apply exactly one issue type, `technical-task`, plus both `documentation` and `documentation:architecture`. The latter is a specialization for architecture documentation; it is not an architecture-refactoring type. Use `test-scenario-task` only for the separate deferred UX workflow, not as an alternative documentation label.
+- Record the comparison baseline or change range under `Scope`. Inspect implementation and composition changes, the shared LikeC4 model and published L1–L3 views, DAT Markdown, Mermaid dynamic and deployment views, architecture tests, and relevant accepted ADRs.
+- Update documentation artifacts that describe already-decided and implemented behavior. Validate LikeC4 and the complete Docusaurus build, and run or cite focused architecture checks when implementation boundaries are involved.
+- When implementation, DAT, and an accepted ADR disagree, record the discrepancy and surface it for maintainer review. Never rewrite an accepted ADR or silently normalize one source to hide drift.
+- When a significant implemented choice lacks a decision record, report the missing ADR and link the owning feature or technical issue. The reconciliation task may identify or track the gap, but the change that owns the architectural decision must supply the ADR.
+
 ## Validation Commands
 
 Run from the repository root:
@@ -180,10 +219,18 @@ Run from the repository root:
 ```powershell
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
-dotnet test Agentstration.slnx --configuration Release --no-build
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 365 --max-parallel-test-modules 4
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 524 --max-parallel-test-modules 2
 ```
 
-For a focused iteration, run the affected test project first, then run the full build and test suite before handoff. Do not suppress warnings or disable analyzers to make a change pass.
+The two test solutions together form the required deterministic, offline functional suite. Performance and live-provider workloads are explicit opt-ins documented in `docs/contributing/testing.md`. For a focused iteration, run the affected test project first, then run both functional lanes before handoff. Do not suppress warnings or disable analyzers to make a change pass.
+
+When changing coverage collection or its CI workflow, restore the pinned repository tool and reproduce the consolidated report after the Release build:
+
+```powershell
+dotnet tool restore
+./scripts/ci/run-functional-coverage.ps1 -Configuration Release -NoBuild
+```
 
 To smoke-test the executable default with the Development bootstrap when startup behavior changes:
 
@@ -208,6 +255,8 @@ Use `--launch-profile http-NoBootstrap` instead when the test must preserve or e
 When creating or updating a GitHub issue, treat the forms under `.github/ISSUE_TEMPLATE/` as the canonical structure, including when using the GitHub API:
 
 - Use `bug.yml` for behavior that contradicts an existing expectation, `feature.yml` for a new user-facing or product capability, and `technical-task.yml` for architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer-experience work.
+- Use `technical-task.yml` plus `test-scenario-task` for a deferred UX test scenario child. Attach it to the parent as a native Sub-issue, record the parent issue under `Dependencies` for readability, and keep the child blocked until the UX validation and merge described above.
+- Use `technical-task.yml` plus `documentation` and `documentation:architecture` for transverse DAT/C4 reconciliation. Keep architectural redesign in the issue that owns the product change and its ADR; a reconciliation task documents evidence and surfaces drift.
 - Write issue titles and bodies in English. Keep titles outcome-focused and do not add type or priority prefixes such as `[Feature]`, `[Bug]`, or `[P1]`.
 - Preserve the form's section names and order. API-created issues must include the same required sections that the selected form would produce.
 - Apply the form's type label explicitly when creating an issue through the API: `bug` for bug reports, `enhancement` for feature requests, and `technical-task` for technical tasks. Use exactly one of these type labels. Add more specific area or technical labels only when they already exist and are supported by the issue content.
@@ -215,6 +264,13 @@ When creating or updating a GitHub issue, treat the forms under `.github/ISSUE_T
 - Search open and closed issues for duplicates before creating a new one. Link prerequisites and related issues with exact issue numbers.
 - Make acceptance criteria observable and testable. Include validation expectations for technical tasks and avoid inventing metrics, dependencies, code locations, or architectural constraints.
 - Keep implementation guidance proportional to the evidence. Separate required outcomes from optional suggestions and state exclusions under `Out of scope`.
+
+### Issue hierarchy and relationships
+
+- When an agent creates a `child issue`, `daughter FR`, `FR fille`, decomposition, or follow-up required to complete a parent issue, create the issue and then attach it to that parent using GitHub's native Sub-issue relationship. Verify that the relationship appears on the parent and child before treating the issue creation as complete.
+- A textual `Parent: #123` or `Child of #123` reference, a link in either issue body, or a checklist entry never replaces the native Sub-issue relationship. Keep textual references when they help readers navigate the work.
+- Use `Depends on` / `Blocked by` for execution dependencies and `Related to` for non-hierarchical relationships. An issue can be both a Sub-issue of one parent and dependent on another issue; record each relationship according to its purpose.
+- Before closing a parent issue, verify that every Sub-issue is closed or that an explicit maintainer-approved exception is documented on the parent issue.
 
 ### Priority triage
 
@@ -242,6 +298,19 @@ When an agent independently chooses any issue classification, area, or priority:
 - On confirmation, replace `triage:pending-review` with `triage:confirmed` and preserve `triage:agent` as provenance.
 - Omit the agent-triage labels when the maintainer supplied the complete classification and the agent only applied it.
 - If the labels are unavailable, report that `scripts/github/apply-issue-labels.ps1` must be applied instead of inventing alternatives.
+
+### AI defect remediation
+
+The `ai-defect` label identifies structural, architectural, behavioral, or code-quality drift introduced by an AI-generated or AI-assisted change. It is a provenance and learning label, not an issue type or priority.
+
+When an agent works on an issue labeled `ai-defect`:
+
+- Read `docs/ai-defects/index.md` before changing code.
+- Create or update exactly one AI Defect CAR under `docs/ai-defects/`, using the labeled issue number and the repository template.
+- Base the causal analysis on observable evidence. Record faulty assumptions, missed repository context, safeguard gaps, the correction, and a durable prevention measure. Do not include private chain-of-thought, full prompts, or speculation about a model.
+- Link the issue, the introducing change when it can be established, the corrective pull request, and any affected ADR. State `Unknown` rather than inventing provenance.
+- Apply `ai-defect` to the corrective pull request and link the CAR from its `Changes` section.
+- Do not mark the CAR `Resolved` or `Prevented` until the stated validation has actually completed. If no durable safeguard is added, explain why in the CAR.
 
 ## Pull Request Description
 

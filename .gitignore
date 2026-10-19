@@ -5,6 +5,11 @@ obj/
 .vscode/
 TestResults/
 artifacts/
+!src/Agentstration.Infrastructure/Artifacts/
+!src/Agentstration.Infrastructure/Artifacts/*.cs
+.models/
+deploy/compose/.env.postgresql
+deploy/compose/.env.foundry
 .agentstration*/
 *.user
 *.suo
@@ -14,5 +19,13 @@ artifacts/
 *.db-wal
 *.log
 docs/site/node_modules/
+tests/Agentstration.Console.Playwright/node_modules/
+tests/Agentstration.Console.Playwright/test-results/
+tests/Agentstration.Console.Playwright/playwright-report/
 docs/site/build/
 docs/site/.docusaurus/
+docs/site/static/generated/
+automation/playwright/node_modules/
+automation/playwright/test-results/
+automation/playwright/playwright-report/
+automation/playwright/.work/

@@ -1,0 +1,58 @@
+import { authenticateConsole } from './authenticate-console.journey.js';
+import { createAgent, type CreateAgentInput } from './create-agent.journey.js';
+import { createHandoffFlow, type CreateHandoffFlowInput } from './create-handoff-flow.journey.js';
+import { createEntry, type CreateEntryInput } from './create-entry.journey.js';
+import { createWorkspace, type CreateWorkspaceInput } from './create-workspace.journey.js';
+import { submitWorkplacePrompt, type SubmitWorkplacePromptInput } from './submit-workplace-prompt.journey.js';
+import { exposeEntryOnDashboard, type ExposeEntryOnDashboardInput } from './expose-entry-on-dashboard.journey.js';
+import { importSource, type ImportSourceInput } from './import-source.journey.js';
+import { createPackProject, type CreatePackProjectInput } from './create-pack-project.journey.js';
+import { inspectFlowObservability, type InspectFlowObservabilityInput } from './inspect-flow-observability.journey.js';
+import { inspectConsoleAdministration, type InspectConsoleAdministrationInput } from './inspect-console-administration.journey.js';
+import { inspectResourceAdministration, type InspectResourceAdministrationInput } from './inspect-resource-administration.journey.js';
+import { exerciseModelAdministration, type ExerciseModelAdministrationInput } from './exercise-model-administration.journey.js';
+import { exerciseDescendantSecrets, type ExerciseDescendantSecretsInput } from './exercise-descendant-secrets.journey.js';
+import { inspectPlatformHealth, type InspectPlatformHealthInput } from './inspect-platform-health.journey.js';
+import { exerciseResourceNaming, type ExerciseResourceNamingInput } from './exercise-resource-naming.journey.js';
+import { exerciseFoundrySecretBinding, type ExerciseFoundrySecretBindingInput } from './exercise-foundry-secret-binding.journey.js';
+import { inspectPlatformOverview, type InspectPlatformOverviewInput } from './inspect-platform-overview.journey.js';
+import { exerciseBootstrapProvenance, type ExerciseBootstrapProvenanceInput } from './exercise-bootstrap-provenance.journey.js';
+import { inspectArtifactContent, type InspectArtifactContentInput } from './inspect-artifact-content.journey.js';
+import { exerciseToolExecution, type ExerciseToolExecutionInput } from './exercise-tool-execution.journey.js';
+import { exerciseFlowTransitionEditing, type ExerciseFlowTransitionEditingInput } from './exercise-flow-transition-editing.journey.js';
+import { exerciseFlowNamedOutputs, type ExerciseFlowNamedOutputsInput } from './exercise-flow-named-outputs.journey.js';
+import { inspectRuntimeWorkerObservability, type InspectRuntimeWorkerObservabilityInput } from './inspect-runtime-worker-observability.journey.js';
+import { inspectAgentInstanceObservability, type InspectAgentInstanceObservabilityInput } from './inspect-agent-instance-observability.journey.js';
+import { exerciseSchemaDrivenSources, type ExerciseSchemaDrivenSourcesInput } from './exercise-schema-driven-sources.journey.js';
+import { exerciseSchemaAdministration, type ExerciseSchemaAdministrationInput } from './exercise-schema-administration.journey.js';
+import type { Journey } from './journey.js';
+
+export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
+  'authenticate-console': authenticateConsole as Journey<Record<string, unknown>>,
+  'create-agent': (context, input) => createAgent(context, input as unknown as CreateAgentInput),
+  'create-handoff-flow': (context, input) => createHandoffFlow(context, input as unknown as CreateHandoffFlowInput),
+  'create-entry': (context, input) => createEntry(context, input as unknown as CreateEntryInput),
+  'create-workspace': (context, input) => createWorkspace(context, input as unknown as CreateWorkspaceInput),
+  'submit-workplace-prompt': (context, input) => submitWorkplacePrompt(context, input as unknown as SubmitWorkplacePromptInput),
+  'expose-entry-on-dashboard': (context, input) => exposeEntryOnDashboard(context, input as unknown as ExposeEntryOnDashboardInput),
+  'import-source': (context, input) => importSource(context, input as unknown as ImportSourceInput),
+  'create-pack-project': (context, input) => createPackProject(context, input as unknown as CreatePackProjectInput),
+  'inspect-flow-observability': (context, input) => inspectFlowObservability(context, input as unknown as InspectFlowObservabilityInput),
+  'inspect-console-administration': (context, input) => inspectConsoleAdministration(context, input as unknown as InspectConsoleAdministrationInput),
+  'inspect-resource-administration': (context, input) => inspectResourceAdministration(context, input as unknown as InspectResourceAdministrationInput),
+  'exercise-model-administration': (context, input) => exerciseModelAdministration(context, input as unknown as ExerciseModelAdministrationInput),
+  'exercise-descendant-secrets': (context, input) => exerciseDescendantSecrets(context, input as unknown as ExerciseDescendantSecretsInput),
+  'inspect-platform-health': (context, input) => inspectPlatformHealth(context, input as unknown as InspectPlatformHealthInput),
+  'exercise-resource-naming': (context, input) => exerciseResourceNaming(context, input as unknown as ExerciseResourceNamingInput),
+  'exercise-foundry-secret-binding': (context, input) => exerciseFoundrySecretBinding(context, input as unknown as ExerciseFoundrySecretBindingInput),
+  'inspect-platform-overview': (context, input) => inspectPlatformOverview(context, input as unknown as InspectPlatformOverviewInput),
+  'exercise-bootstrap-provenance': (context, input) => exerciseBootstrapProvenance(context, input as unknown as ExerciseBootstrapProvenanceInput),
+  'inspect-artifact-content': (context, input) => inspectArtifactContent(context, input as unknown as InspectArtifactContentInput),
+  'exercise-tool-execution': async (context, input) => { await exerciseToolExecution(context, input as unknown as ExerciseToolExecutionInput); },
+  'exercise-flow-transition-editing': (context, input) => exerciseFlowTransitionEditing(context, input as unknown as ExerciseFlowTransitionEditingInput),
+  'exercise-flow-named-outputs': (context, input) => exerciseFlowNamedOutputs(context, input as unknown as ExerciseFlowNamedOutputsInput),
+  'inspect-runtime-worker-observability': (context, input) => inspectRuntimeWorkerObservability(context, input as unknown as InspectRuntimeWorkerObservabilityInput),
+  'inspect-agent-instance-observability': (context, input) => inspectAgentInstanceObservability(context, input as unknown as InspectAgentInstanceObservabilityInput),
+  'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),
+  'exercise-schema-administration': (context, input) => exerciseSchemaAdministration(context, input as unknown as ExerciseSchemaAdministrationInput),
+};

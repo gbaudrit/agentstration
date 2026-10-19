@@ -12,6 +12,7 @@
         "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles",
         "Agentstration__Bootstrap__InitialBootstrapEnabled": "true",
         "Agentstration__Bootstrap__InitialProfiles__0": "development",
+        "Agentstration__Aep__EnrollmentMode": "PairingCode",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057",
         "DOCKER_HOST": "tcp://localhost:2375"
@@ -28,6 +29,7 @@
         "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles",
         "Agentstration__Bootstrap__InitialBootstrapEnabled": "false",
         "Agentstration__Bootstrap__InitialProfiles__0": "development",
+        "Agentstration__Aep__EnrollmentMode": "PairingCode",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057",
         "DOCKER_HOST": "tcp://localhost:2375"

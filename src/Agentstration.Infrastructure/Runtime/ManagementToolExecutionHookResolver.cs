@@ -1,12 +1,12 @@
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Runtime;
 
 public sealed class ManagementToolExecutionHookResolver(
-    IControlPlaneStore store,
+    IResourceStore store,
     IResourceScopeResolver scopeResolver) : IToolExecutionHookResolver
 {
     public async ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveAsync(
@@ -24,7 +24,7 @@ public sealed class ManagementToolExecutionHookResolver(
             && workspaceScope.Ancestors.All(value => value.Ref != ResourceScopeRef.Tenant(tenantId)))
             return [];
 
-        var resources = await store.ListAllAsync<ToolExecutionHookResource>(ResourceKinds.ToolExecutionHook, cancellationToken);
+        var resources = await store.ListAllAsync<ToolExecutionHookResource>(ToolResourceKinds.ToolExecutionHook, cancellationToken);
         var hooks = new List<IToolExecutionHook>();
         foreach (var stored in resources)
         {

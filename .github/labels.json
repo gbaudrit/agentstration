@@ -20,6 +20,21 @@
     "description": "Architecture, refactoring, performance, testing, security, or technical-debt work."
   },
   {
+    "name": "documentation",
+    "color": "0075CA",
+    "description": "Improvements or additions to documentation."
+  },
+  {
+    "name": "documentation:architecture",
+    "color": "AAAAAA",
+    "description": "Architecture documentation, C4 models, DAT, diagrams, and related maintenance."
+  },
+  {
+    "name": "test-scenario-task",
+    "color": "C1EC61",
+    "description": "Work to add or improve an automated user scenario with explicit setup, actions, and assertions."
+  },
+  {
     "name": "triage:agent",
     "color": "5319E7",
     "description": "Issue triage was performed by an automated or coding agent."
@@ -33,5 +48,10 @@
     "name": "triage:confirmed",
     "color": "0E8A16",
     "description": "A maintainer confirmed the issue triage."
+  },
+  {
+    "name": "ai-defect",
+    "color": "A371F7",
+    "description": "Structural, architectural, or code-quality defect introduced by AI."
   }
 ]

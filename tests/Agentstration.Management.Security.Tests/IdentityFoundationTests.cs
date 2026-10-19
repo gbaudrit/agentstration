@@ -1,0 +1,440 @@
+using System.Net;
+using System.Net.Http.Json;
+using Agentstration.Flows.Application;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Agentstration.Management.Tests;
+
+[TestClass]
+public sealed class IdentityFoundationTests
+{
+    [TestMethod]
+    public async Task BootstrapReturnsOwnerContextWithoutPublishingItGlobally()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, fixture.Context.AccessMode);
+        Assert.ThrowsExactly<InvalidOperationException>(() => _ = fixture.Context.Current);
+
+        var context = await fixture.Bootstrap.EnsureInitializedAsync(default);
+
+        Assert.AreEqual(fixture.InitialContext, context);
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, fixture.Context.AccessMode);
+        Assert.ThrowsExactly<InvalidOperationException>(() => _ = fixture.Context.Current);
+    }
+
+    [TestMethod]
+    public async Task EmptyDatabaseBootstrapsOnceAndUsesStableIds()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var first = fixture.Context.Current;
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+
+        await fixture.Bootstrap.EnsureInitializedAsync(default);
+
+        Assert.AreEqual(first, fixture.Context.Current);
+        Assert.AreEqual(1, (await store.ListTenantsAsync(default)).Count);
+        Assert.AreEqual(1, (await store.ListWorkspacesAsync(first.TenantId, default)).Count);
+        Assert.IsNotNull(await store.FindMembershipAsync(first.TenantId, first.UserId, default));
+        Assert.IsNotNull(await store.FindWorkspaceMembershipAsync(first.WorkspaceId, first.PrincipalId, default));
+        Assert.AreEqual(1, (await store.ListRoleAssignmentsAsync(first.TenantId, first.UserId, default)).Count);
+    }
+
+    [TestMethod]
+    public async Task DevelopmentBootstrapCanGrantStablePlatformAdministration()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync(grantPlatformAdministrator: true);
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+
+        Assert.IsTrue(await store.IsPlatformAdministratorAsync(fixture.InitialContext.PrincipalId, default));
+
+        await fixture.Bootstrap.EnsureInitializedAsync(default);
+        Assert.AreEqual(1, (await store.ListPlatformAdministratorsAsync(default)).Count);
+    }
+
+    [TestMethod]
+    public async Task PrincipalPreferencesArePersistedPerPrincipal()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var firstPrincipalId = fixture.Context.Current.PrincipalId;
+        var secondPrincipal = new Principal(
+            Guid.NewGuid(),
+            PrincipalKind.Human,
+            "Second user",
+            null,
+            PrincipalStatus.Active,
+            DateTimeOffset.UtcNow);
+        await store.AddPrincipalAsync(secondPrincipal, default);
+
+        await store.UpsertPrincipalPreferencesAsync(
+            new PrincipalPreferences(firstPrincipalId, ThemePreference.Dark, DateTimeOffset.UtcNow, "fr-FR"),
+            default);
+        await store.UpsertPrincipalPreferencesAsync(
+            new PrincipalPreferences(secondPrincipal.Id, ThemePreference.Light, DateTimeOffset.UtcNow),
+            default);
+
+        Assert.AreEqual(ThemePreference.Dark, (await store.GetPrincipalPreferencesAsync(firstPrincipalId, default))?.Theme);
+        Assert.AreEqual("fr-FR", (await store.GetPrincipalPreferencesAsync(firstPrincipalId, default))?.Language);
+        Assert.AreEqual(ThemePreference.Light, (await store.GetPrincipalPreferencesAsync(secondPrincipal.Id, default))?.Theme);
+        Assert.IsNull((await store.GetPrincipalPreferencesAsync(secondPrincipal.Id, default))?.Language);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenStoresOnlyAHashAndRevocationIsDurable()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var store = fixture.Services.GetRequiredService<IPersonalAccessTokenStore>();
+
+        var created = await service.CreateAsync(
+            new(
+                "Test token",
+                fixture.Context.Current.WorkspaceId,
+                [AuthorizationPermissions.ResourcesRead],
+                DateTimeOffset.UtcNow.AddDays(30)),
+            default);
+        var secret = created.Token[(created.Metadata.TokenPrefix.Length + 1)..];
+        var credential = await store.GetCredentialAsync(created.Metadata.Id, default);
+
+        Assert.IsNotNull(credential);
+        CollectionAssert.AreEqual(PersonalAccessTokenService.HashSecret(secret), credential.SecretHash);
+        Assert.IsFalse(System.Text.Encoding.UTF8.GetString(credential.SecretHash).Contains(secret, StringComparison.Ordinal));
+        Assert.IsTrue(await service.RevokeCurrentAsync(created.Metadata.Id, default));
+        Assert.IsNotNull((await store.GetCredentialAsync(created.Metadata.Id, default))?.Token.RevokedAt);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenRestrictionIntersectsLiveWorkspacePermissions()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var authorization = fixture.Services.GetRequiredService<IAuthorizationService>();
+        var current = fixture.Context.Current;
+        var restricted = current with
+        {
+            Restriction = new AuthorizationRestriction(
+                Guid.NewGuid(),
+                current.WorkspaceId,
+                new HashSet<string>([AuthorizationPermissions.ResourcesRead], StringComparer.Ordinal))
+        };
+
+        var permissions = await authorization.GetPermissionsAsync(restricted, default);
+        Assert.IsTrue(permissions.Contains(AuthorizationPermissions.ResourcesRead));
+        Assert.IsFalse(permissions.Contains(AuthorizationPermissions.ResourcesWrite));
+
+        var wrongWorkspace = restricted with { WorkspaceId = Guid.NewGuid() };
+        Assert.AreEqual(0, (await authorization.GetPermissionsAsync(wrongWorkspace, default)).Count);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenCannotManagePersonalAccessTokens()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var current = fixture.Context.Current;
+        using var restrictedScope = fixture.Context.Push(current with
+        {
+            Restriction = new AuthorizationRestriction(
+                Guid.NewGuid(),
+                current.WorkspaceId,
+                new HashSet<string>([AuthorizationPermissions.ResourcesRead], StringComparer.Ordinal))
+        });
+
+        await Assert.ThrowsAsync<AuthorizationDeniedException>(() => service.ListCurrentAsync(default));
+    }
+
+    [TestMethod]
+    public async Task PlatformAdministratorCanRevokeAnotherPrincipalsPersonalAccessToken()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var store = fixture.Services.GetRequiredService<IPersonalAccessTokenStore>();
+        var identities = fixture.Services.GetRequiredService<IIdentityStore>();
+        var current = fixture.Context.Current;
+        var now = DateTimeOffset.UtcNow;
+        var principal = new Principal(
+            Guid.NewGuid(),
+            PrincipalKind.Human,
+            "Token owner",
+            null,
+            PrincipalStatus.Active,
+            now);
+        var token = new PersonalAccessToken(
+            Guid.NewGuid(),
+            principal.Id,
+            current.WorkspaceId,
+            "Automation",
+            $"{PersonalAccessTokenService.TokenPrefix}{Guid.NewGuid():N}",
+            [AuthorizationPermissions.ResourcesRead],
+            now,
+            now.AddDays(30),
+            null,
+            null);
+        await identities.AddPrincipalAsync(principal, default);
+        await identities.AddPlatformAdministratorAsync(new PlatformAdministrator(current.PrincipalId, now), default);
+        await store.AddAsync(
+            new PersonalAccessTokenCredential(token, PersonalAccessTokenService.HashSecret("secret")),
+            default);
+
+        Assert.IsTrue(await service.RevokeAsPlatformAdministratorAsync(principal.Id, token.Id, default));
+        Assert.IsNotNull((await store.GetCredentialAsync(token.Id, default))?.Token.RevokedAt);
+    }
+
+    [TestMethod]
+    public async Task BootstrapRepairsMissingWorkspaceMembershipAndOwnerAssignment()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var original = fixture.Context.Current;
+        await fixture.ExecuteSqlAsync("DELETE FROM RoleAssignments; DELETE FROM TenantMemberships; DELETE FROM Workspaces;");
+
+        var repaired = await fixture.Bootstrap.EnsureInitializedAsync(default);
+
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        Assert.AreEqual(original.TenantId, repaired.TenantId);
+        Assert.AreEqual(original.UserId, repaired.UserId);
+        Assert.AreNotEqual(original.WorkspaceId, repaired.WorkspaceId);
+        Assert.IsNotNull(await store.FindMembershipAsync(repaired.TenantId, repaired.UserId, default));
+        Assert.AreEqual(1, (await store.ListRoleAssignmentsAsync(repaired.TenantId, repaired.UserId, default)).Count);
+        Assert.AreEqual(original, fixture.Context.Current, "Bootstrap must not replace the ambient request scope.");
+    }
+
+    [TestMethod]
+    public async Task DuplicateTenantMembershipIsRejected()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var context = fixture.Context.Current;
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var duplicate = new TenantMembership(Guid.NewGuid(), context.TenantId, context.UserId, MembershipStatus.Active, DateTimeOffset.UtcNow);
+
+        await Assert.ThrowsAsync<ResourceConcurrencyException>(() => store.AddMembershipAsync(duplicate, default));
+    }
+
+    [TestMethod]
+    public async Task TenantOwnerInheritsWorkspaceAccessButReaderCannotWriteAndUnassignedUserCannotRead()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var context = fixture.Context.Current;
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var authorization = fixture.Services.GetRequiredService<IAuthorizationService>();
+        Assert.IsTrue(await authorization.HasPermissionAsync(context, AuthorizationPermissions.ResourcesWrite, default));
+
+        var now = DateTimeOffset.UtcNow;
+        var reader = new RoleDefinition(Guid.NewGuid(), "Reader-test", "Reader", [AuthorizationPermissions.ResourcesRead], false);
+        await store.AddRoleDefinitionAsync(reader, default);
+        var readerPrincipal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Reader", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(readerPrincipal, default);
+        await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, readerPrincipal.Id, MembershipStatus.Active, now), default);
+        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), context.WorkspaceId, readerPrincipal.Id, MembershipStatus.Active, now), default);
+        await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), context.TenantId, readerPrincipal.Id, PrincipalType.User, reader.Id, AuthorizationScopes.Workspace(context.WorkspaceId)), default);
+        var readerContext = context with { PrincipalId = readerPrincipal.Id };
+        Assert.IsTrue(await authorization.HasPermissionAsync(readerContext, AuthorizationPermissions.ResourcesRead, default));
+        Assert.IsFalse(await authorization.HasPermissionAsync(readerContext, AuthorizationPermissions.ResourcesWrite, default));
+
+        var unassigned = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Unassigned", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(unassigned, default);
+        await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, unassigned.Id, MembershipStatus.Active, now), default);
+        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), context.WorkspaceId, unassigned.Id, MembershipStatus.Active, now), default);
+        Assert.IsFalse(await authorization.HasPermissionAsync(context with { PrincipalId = unassigned.Id }, AuthorizationPermissions.ResourcesRead, default));
+    }
+
+    [TestMethod]
+    public async Task ResourceLookupIsExplicitlyWorkspaceAndTenantScoped()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var identity = fixture.Services.GetRequiredService<IIdentityStore>();
+        var resources = fixture.Services.GetRequiredService<IResourceStore>();
+        var first = fixture.Context.Current;
+        var now = DateTimeOffset.UtcNow;
+        var secondWorkspace = new Workspace(Guid.NewGuid(), first.TenantId, "finance", "Finance", WorkspaceStatus.Active, now);
+        await identity.AddWorkspaceAsync(secondWorkspace, default);
+
+        var key = new ResourceKey(RuntimeProfileResourceKinds.RuntimeProfile, "shared");
+        await resources.PutAsync(Profile("shared", first), null, true, default);
+        var second = first with { WorkspaceId = secondWorkspace.Id };
+        using (fixture.Context.Push(second))
+        {
+            await resources.PutAsync(Profile("shared", second), null, true, default);
+            Assert.IsNotNull(await resources.GetAsync<RuntimeProfileResource>(key, default));
+        }
+
+        var otherTenant = new Tenant(Guid.NewGuid(), "other", "Other", TenantStatus.Active, now);
+        await identity.AddTenantAsync(otherTenant, default);
+        var otherWorkspace = new Workspace(Guid.NewGuid(), otherTenant.Id, "default", "Default", WorkspaceStatus.Active, now);
+        await identity.AddWorkspaceAsync(otherWorkspace, default);
+        using (fixture.Context.Push(second with { TenantId = otherTenant.Id, WorkspaceId = otherWorkspace.Id }))
+            Assert.IsNull(await resources.GetAsync<RuntimeProfileResource>(key, default));
+    }
+
+    [TestMethod]
+    public void RequestContextScopeIsAmbientAndRestoresUnavailableState()
+    {
+        var accessor = new CurrentRequestContext();
+        var selected = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        using (accessor.Push(selected)) Assert.AreEqual(selected, accessor.Current);
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, accessor.AccessMode);
+        Assert.IsFalse(accessor.IsInitialized);
+        Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
+    }
+
+    [TestMethod]
+    public void ExplicitSystemScopeRestoresUnavailableState()
+    {
+        var accessor = new CurrentRequestContext();
+
+        using (accessor.PushSystem())
+        {
+            Assert.AreEqual(ControlPlaneAccessMode.System, accessor.AccessMode);
+            Assert.IsFalse(accessor.IsInitialized);
+            Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
+        }
+
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, accessor.AccessMode);
+        Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCreationDoesNotRequireAResourceGroup()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var administration = fixture.Services.GetRequiredService<IdentityAdministrationService>();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+
+        var workspace = await administration.CreateWorkspaceAsync("support", "Customer support", default);
+
+        Assert.AreEqual(fixture.Context.Current.TenantId, workspace.TenantId);
+        Assert.AreEqual("support", workspace.Name);
+    }
+
+    [TestMethod]
+    public async Task ContextApiSelectsAnAuthorizedWorkspaceAndRejectsAnUnknownOne()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var created = await client.PostAsJsonAsync("/api/identity/workspaces", new { name = "finance", displayName = "Finance" });
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+        var workspace = await created.Content.ReadFromJsonAsync<Workspace>();
+        Assert.IsNotNull(workspace);
+
+        var selected = await client.PostAsJsonAsync("/api/identity/context/workspace", new { workspaceId = workspace.Id });
+        Assert.AreEqual(HttpStatusCode.OK, selected.StatusCode);
+        var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.AreEqual(workspace.Id, context?.Context.WorkspaceId);
+
+        using var staleCookieClient = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        staleCookieClient.DefaultRequestHeaders.Add(
+            "Cookie",
+            $"{RequestContextMiddleware.WorkspaceCookie}={Guid.NewGuid():D}");
+        var recovered = await staleCookieClient.PostAsJsonAsync(
+            "/bff/identity/context/workspace",
+            new { workspaceId = workspace.Id });
+        Assert.AreEqual(HttpStatusCode.OK, recovered.StatusCode);
+
+        var denied = await client.PostAsJsonAsync("/api/identity/context/workspace", new { workspaceId = Guid.NewGuid() });
+        Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ExternalIdentityUsesIssuerAndSubjectAndIgnoresEmailChanges()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var resolver = fixture.Services.GetRequiredService<IPrincipalResolver>();
+        var now = DateTimeOffset.UtcNow;
+        var first = new Principal(Guid.NewGuid(), PrincipalKind.Human, "First", "before@example.test", PrincipalStatus.Active, now);
+        var second = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Second", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(first, default);
+        await store.AddPrincipalAsync(second, default);
+        await store.AddExternalIdentityAsync(new ExternalIdentity(Guid.NewGuid(), "https://issuer-a.test", "same-subject", first.Id, now), default);
+        await store.AddExternalIdentityAsync(new ExternalIdentity(Guid.NewGuid(), "https://issuer-b.test", "same-subject", second.Id, now), default);
+
+        Assert.AreEqual(first.Id, (await resolver.ResolveAsync("https://issuer-a.test", "same-subject", default))?.Id);
+        Assert.AreEqual(second.Id, (await resolver.ResolveAsync("https://issuer-b.test", "same-subject", default))?.Id);
+
+        await store.UpdatePrincipalAsync(first with { Email = "after@example.test" }, default);
+        Assert.AreEqual(first.Id, (await resolver.ResolveAsync("https://issuer-a.test", "same-subject", default))?.Id);
+    }
+
+    private static RuntimeProfileResource Profile(string id, RequestContext context) => new()
+    {
+        Metadata = new ResourceMetadata { Name = id },
+        Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        ScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId),
+        Definition = new RuntimeProfileProperties { DisplayName = "Shared", RuntimeType = "Local" }
+    };
+
+    private sealed class IdentityFixture : IAsyncDisposable
+    {
+        private readonly string directory;
+        private IdentityFixture(string directory, ServiceProvider services, RequestContext initialContext)
+        {
+            this.directory = directory;
+            Services = services;
+            InitialContext = initialContext;
+        }
+
+        public ServiceProvider Services { get; }
+        public RequestContext InitialContext { get; }
+        public CurrentRequestContext Context => Services.GetRequiredService<CurrentRequestContext>();
+        public ILocalEnvironmentBootstrapper Bootstrap => Services.GetRequiredService<ILocalEnvironmentBootstrapper>();
+        public IDisposable OpenScope() => Context.Push(InitialContext);
+
+        public static async Task<IdentityFixture> CreateAsync(bool grantPlatformAdministrator = false)
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"agentstration-identity-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(new LocalBootstrapOptions
+            {
+                GrantPlatformAdministrator = grantPlatformAdministrator
+            });
+            services.AddAgentstration(
+                directory,
+                controlPlaneConnectionString: $"Data Source={Path.Combine(directory, "control-plane.db")}");
+            var provider = services.BuildServiceProvider();
+            await provider.GetRequiredService<IResourceStore>().InitializeAsync(default);
+            await provider.GetRequiredService<FlowService>().InitializeAsync(default);
+            var initialContext = await provider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+            return new IdentityFixture(directory, provider, initialContext);
+        }
+
+        public async Task ExecuteSqlAsync(string sql)
+        {
+            await using var connection = new SqliteConnection($"Data Source={Path.Combine(directory, "control-plane.db")}");
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Services.DisposeAsync();
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+}

@@ -16,7 +16,7 @@ AEP is an autonomous, versioned protocol and .NET SDK for discovering, validatin
 ```powershell
 dotnet restore Aep.slnx
 dotnet build Aep.slnx --configuration Release --no-restore
-dotnet test Aep.slnx --configuration Release --no-build
+dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 1
 ```
 
 Run a generic sample and Inspector independently:
@@ -47,7 +47,42 @@ The Inspector provides:
 
 Extensions can publish immutable option-set versions and explicit directed migrations through `aep.configuration`. Consumers pin the option-set id, version, and schema digest; a newer preferred version does not silently reinterpret existing values. Migration requests validate every step before returning a new envelope. Secret annotations and schema-driven editing in the standalone Inspector remain future work.
 
+Extensions declare contribution-scoped logical values through `AepExtensionOptions.ValueRequirements`. Discovery publishes the versioned `aep.value-requirements` and `aep.bound-values` capabilities. Each declaration includes type, required/optional status and `standard` or `secured` protection. A standard requirement may additionally declare bounded, typed `allowedValues`; constrained values must travel inline so both the host and extension can validate them without reading Secret material. Invocations carry bounded inline values or one-use Secret grants, and the extension resolves both by logical identifier through `AepValueResolver`.
+
 The `SourceProviderExtension` sample demonstrates the native `aep.source-provider` Resolve/Materialize lifecycle entirely offline. Source Provider configuration uses the versioned `source-channel` option scope, and materialization is bounded by archive size, entry count, expanded size, timeout, exact revision, and SHA-256 integrity checks. AEP does not interpret Source catalogs or expose acquisition as an MCP tool.
+
+Extensions may also publish `schema-format` contributions through `aep.schema-formats`. A contribution declares format metadata and maps `validateDefinition` and `validateInstance` to MCP operations. These mappings are consumer service operations, not Agent Tool contributions; consumers validate their bounded structured results and decide how providers participate in format resolution.
+
+## Authenticate AEP traffic
+
+The client accepts a request-scoped credential provider. It applies the Bearer to each request without changing shared `HttpClient.DefaultRequestHeaders`:
+
+```csharp
+var client = new AepClient(httpClient, new StaticAepAccessTokenProvider(token));
+```
+
+An ASP.NET Core extension can opt into the matching fail-closed policy. All AEP protocol routes are protected; only the minimal platform `/health` route remains anonymous:
+
+```csharp
+builder.Services
+    .AddAep(options => options.Extension = new("sample", "Sample", "1.0.0"))
+    .AddAepStaticBearerAuthentication(options =>
+        options.AddToken(tokenId, clientId, token, AepAuthenticationDefaults.InvokePermission));
+```
+
+Tokens are opaque values with at least 256 bits of entropy. `AepStaticBearerCredentials.Generate` creates a suitable one-time issuance value. The server retains only SHA-256 digests and supports multiple active token IDs so callers can overlap credentials during rotation. Never place the clear token in configuration committed to source control, URLs, manifests, traces, or diagnostic output.
+
+An orchestrated extension can enable the same policy from a read-only shared-key file:
+
+```csharp
+builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
+```
+
+Set `Aep:EnrollmentMode=SharedKeyFile` and `Aep:SharedKeyFile:Path` to a file containing one bounded UTF-8 token line. Missing or malformed files fail during startup. `Disabled` leaves AEP authentication unconfigured; `PairingCode` is a separate enrollment mode and does not publish endpoints in SharedKeyFile mode.
+
+For a manual host, set `Aep:EnrollmentMode=PairingCode` and configure `Aep:PairingCode:AuthorityUrl`, `PublicEndpoint`, `TenantId`, `WorkspaceId`, and a durable writable `StateFile`. The SDK announces its stable instance ID, exposes the same-origin `/aep/enrollment/pair` form, and keeps all functional AEP endpoints authenticated while unpaired. After a successful claim it persists only the issued client ID and token digest; it does not revert to unpaired when the authority is unavailable.
+
+Credential rotation temporarily accepts both the old and new digests, verifies the replacement, then explicitly revokes the old digest. Revocation removes all digests, survives restart, returns `401` on the next functional request, and never reopens pairing. Disaster recovery is a local, explicit operation: restore the state file together with the Agentstration control plane and vault, or call `AepPairingLifecycle.ResetToUnpaired(stateFile)` and approve a new enrollment. Reset preserves the installation instance ID. Never use automatic reset after an authentication failure.
 
 ## CLI
 

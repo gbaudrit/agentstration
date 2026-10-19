@@ -1,0 +1,41 @@
+@page "/parameters"
+@implements IDisposable
+@inject IParametersClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ParameterStrings> Localizer
+
+<PageTitle>@T("Parameters") · Agentstration</PageTitle>
+<PageHeader Title="@T("Parameters")" Description="@T("Parameters.Description")" TestId="resource-parameters">
+    <Actions><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button><a class="button-primary" href="/parameters/new" data-testid="parameter-create">@T("CreateParameter")</a></Actions>
+</PageHeader>
+<div class="form-alert form-alert-info"><strong>@T("ReadableConfiguration")</strong><span>@T("SecretGuidance")</span></div>
+<div class="toolbar"><input @bind="search" @bind:event="oninput" placeholder="@T("SearchParameters")" aria-label="@T("SearchParameters")" /></div>
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
+else if (Filtered.Count == 0) { <EmptyState Title="@T("NoParameters")" Message="@T("NoParametersMessage")" /> }
+else
+{
+    <DataGrid TItem="ParameterResource" Items="Filtered">
+        <Header><tr><th>@T("Name")</th><th>@T("ValueType")</th><th>@T("Value")</th><th>@T("Scope")</th><th></th></tr></Header>
+        <Row Context="item"><tr data-testid="parameter-row"><td><strong>@item.Definition.DisplayName</strong><br /><code>@item.Name</code></td><td>@TypeLabel(item.Definition.ValueType)</td><td><code>@VisibleValue(item)</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /></td><td><a class="text-button" href="@ResourceUrl(item)">@T("ManageArrow")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ParameterResource> items = [];
+    private bool loading = true;
+    private Exception? error;
+    private string search = string.Empty;
+    private IReadOnlyList<ParameterResource> Filtered => items.Where(item => string.IsNullOrWhiteSpace(search)
+        || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || item.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string TypeLabel(ParameterValueType type) => T($"ValueType.{type}");
+    private static string VisibleValue(ParameterResource item) => item.Definition.Value.ValueKind == System.Text.Json.JsonValueKind.String
+        ? item.Definition.Value.GetString() ?? string.Empty
+        : item.Definition.Value.GetRawText();
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync() { loading = true; error = null; try { items = await Client.GetParametersAsync(cancellation.Token); } catch (Exception exception) { error = exception; } finally { loading = false; } }
+    private static string ResourceUrl(ParameterResource resource) => $"/parameters/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

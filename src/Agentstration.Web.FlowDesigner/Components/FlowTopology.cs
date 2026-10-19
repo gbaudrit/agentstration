@@ -1,4 +1,5 @@
-using Agentstration.Flow;
+using Agentstration.Flows;
+using Agentstration.Web.FlowDesigner.State;
 
 namespace Agentstration.Web.FlowDesigner.Components;
 
@@ -15,6 +16,7 @@ public enum FlowTopologyEdgeState
 {
     Declared,
     Observed,
+    Failed,
     Inactive
 }
 
@@ -62,6 +64,42 @@ public static class FlowTopologyProjector
 
     public static FlowTopologyGraph Project(FlowDefinition definition, FlowGraphDefinition? graph = null) =>
         ProjectCore(definition, graph, null, []);
+
+    public static FlowTopologyGraph ProjectPreview(FlowDefinition definition, FlowGraphDefinition? graph = null)
+    {
+        if (graph is null) return Project(definition);
+
+        var (arranged, vertical) = ArrangePreview(graph);
+        return ProjectWorkflowGraph(arranged, null) with { Layout = vertical ? "vertical" : "horizontal" };
+    }
+
+    public static FlowTopologyGraph ProjectPreview(FlowRun run, IReadOnlyList<FlowRunEvent>? events = null)
+    {
+        var graph = run.DefinitionSnapshot.Graph;
+        if (graph is null) return Project(run, events);
+
+        var arranged = graph with
+        {
+            Designer = graph.Designer with
+            {
+                NodePositions = FlowGraphAutoLayout.Arrange(graph, vertical: false)
+            }
+        };
+        return ProjectWorkflowGraph(arranged, run) with { Layout = "horizontal" };
+    }
+
+    private static (FlowGraphDefinition Graph, bool Vertical) ArrangePreview(FlowGraphDefinition graph)
+    {
+        var vertical = string.Equals(graph.Designer.PreferredLayout, "Vertical", StringComparison.OrdinalIgnoreCase);
+        var arranged = graph with
+        {
+            Designer = graph.Designer with
+            {
+                NodePositions = FlowGraphAutoLayout.Arrange(graph, vertical)
+            }
+        };
+        return (arranged, vertical);
+    }
 
     public static FlowTopologyGraph Project(FlowRun run, IReadOnlyList<FlowRunEvent>? events = null) =>
         ProjectCore(run.DefinitionSnapshot.Definition, run.DefinitionSnapshot.Graph, run, events ?? []);
@@ -145,6 +183,10 @@ public static class FlowTopologyProjector
             .Where(step => step.Status is not FlowStepRunStatus.NotStarted and not FlowStepRunStatus.Skipped)
             .Select(step => step.StepName)
             .ToHashSet(StringComparer.Ordinal) ?? [];
+        var failedSources = run?.Steps
+            .Where(step => step.Status == FlowStepRunStatus.Failed)
+            .Select(step => step.StepName)
+            .ToHashSet(StringComparer.Ordinal) ?? [];
         var edges = graph.Transitions.Select(transition => new FlowTopologyEdge(
             transition.Id,
             $"step:{transition.FromStep}",
@@ -152,11 +194,22 @@ public static class FlowTopologyProjector
             transition.Condition is null ? transition.Event : $"{transition.Event} · {transition.Condition}",
             transition.Event is "true" or "false" || transition.Condition is not null ? FlowTopologyEdgeKind.Conditional : FlowTopologyEdgeKind.Standard,
             run is null ? FlowTopologyEdgeState.Declared
-                : selectedTransitions.Contains(transition.Id) ? FlowTopologyEdgeState.Observed
+                : selectedTransitions.Contains(transition.Id)
+                    ? failedSources.Contains(transition.FromStep) || IsFailureTransition(graph, transition)
+                        ? FlowTopologyEdgeState.Failed
+                        : FlowTopologyEdgeState.Observed
                 : executedSources.Contains(transition.FromStep) ? FlowTopologyEdgeState.Inactive
                 : FlowTopologyEdgeState.Declared)).ToArray();
         return new(positions, edges, graph.Designer.PreferredLayout ?? "custom", "Workflow graph with declared transitions");
     }
+
+    private static bool IsFailureTransition(FlowGraphDefinition graph, FlowTransitionDefinition transition) =>
+        transition.Event is "error" or "failed" or "timedOut"
+        || graph.Steps.Single(step => step.Name == transition.ToStep) is FailureFlowStepDefinition
+        || graph.Steps.Single(step => step.Name == transition.ToStep) is OutputFlowStepDefinition
+        {
+            Outcome: FlowOutputOutcome.Error
+        };
 
     private static FlowTopologyGraph ProjectWorkflow(WorkflowFlowDefinition definition, FlowRun? run)
     {
@@ -443,6 +496,9 @@ public static class FlowTopologyProjector
         RouterFlowStepDefinition router => $"{router.Candidates.Count} routes",
         ConditionFlowStepDefinition condition => condition.Mode,
         TransformFlowStepDefinition transform => transform.Mode,
+        FlowCallStepDefinition flow => flow.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? $"{flow.Flow.ResourceId} · {flow.Flow.Version}" : $"{flow.Flow.ResourceId} · active",
+        RepeatFlowStepDefinition repeat => repeat.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? $"{repeat.Flow.ResourceId} · {repeat.Flow.Version} · ≤ {repeat.MaximumIterations}" : $"{repeat.Flow.ResourceId} · active · ≤ {repeat.MaximumIterations}",
+        ToolFlowStepDefinition tool => tool.Tool.ResourceId,
         FailureFlowStepDefinition failure => failure.Code,
         _ => null
     };

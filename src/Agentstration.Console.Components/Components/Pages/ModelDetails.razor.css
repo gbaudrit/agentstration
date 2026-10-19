@@ -1,0 +1,43 @@
+.model-detail-tabs { margin-bottom: 18px; }
+.model-detail-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
+.model-observation-warning { margin-bottom: 18px; }
+.model-identity-grid { grid-template-columns: max-content minmax(0, 1fr); }
+.model-capability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.model-capability-card, .model-limit-card { padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.model-capability-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.model-capability-actions { display: flex; align-items: center; gap: 8px; }
+.model-capability-card dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 7px 12px; margin: 0; font-size: .75rem; }
+.model-capability-card dt { color: var(--muted); }
+.model-capability-card dd { margin: 0; font-weight: 650; }
+.model-capability-card p { margin: 12px 0 0; color: var(--muted); font-size: .72rem; }
+.model-capability-card p span { margin-right: 6px; color: var(--text); font-weight: 650; }
+.model-limit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.model-limit-card { display: grid; gap: 6px; }
+.model-limit-card span, .model-limit-card small { color: var(--muted); }
+.model-limit-card strong { font-size: 1.3rem; }
+.model-yaml-actions { display: flex; align-items: center; gap: 8px; }
+.model-yaml-source { width: 100%; min-height: 36rem; resize: vertical; }
+.model-override-editor { display: grid; gap: 18px; }
+.model-override-section { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--border); }
+.model-override-section h3, .model-override-section h4, .model-override-section p { margin: 0; }
+.model-override-section > p, .model-feature-editor-grid small { color: var(--muted); }
+.model-override-columns, .model-feature-editor-grid, .model-limit-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.model-override-columns > div, .model-feature-editor-grid > article { display: grid; align-content: start; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.model-operation-grid-header, .model-operation-field { display: grid; grid-template-columns: minmax(7rem, .9fr) minmax(6.5rem, .7fr) minmax(9rem, 1fr); align-items: center; gap: 12px; }
+.model-operation-grid-header { padding: 0 0 7px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .68rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+.model-operation-field { min-height: 2.7rem; }
+.model-operation-field > label { display: block; min-width: 0; }
+.model-operation-field small { display: none; }
+.model-discovery-cell { min-width: 0; }
+.model-discovery-state { display: inline-flex; align-items: center; width: fit-content; max-width: 100%; padding: 4px 8px; border-radius: 999px; background: var(--surface); font-size: .72rem; font-weight: 650; }
+.model-discovery-state.is-positive { color: var(--success); background: color-mix(in srgb, var(--success) 11%, transparent); }
+.model-discovery-state.is-negative { color: var(--text); background: color-mix(in srgb, var(--muted) 13%, transparent); }
+.model-discovery-state.is-partial { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.model-discovery-state.is-unspecified { color: var(--muted); }
+.model-limit-editor-grid label { display: grid; align-items: center; gap: 12px; }
+.model-operation-field select, .model-limit-editor-grid input { width: 100%; }
+.model-limit-editor-grid label { grid-template-columns: 1fr; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.model-limit-editor-grid small { color: var(--muted); }
+.model-override-diagnostics ul { margin: 6px 0 0; padding-left: 20px; }
+@media (max-width: 960px) { .model-detail-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .model-detail-metrics, .model-capability-grid, .model-limit-grid, .model-override-columns, .model-feature-editor-grid, .model-limit-editor-grid, .model-operation-field { grid-template-columns: 1fr; } .model-yaml-actions, .model-capability-actions { align-items: stretch; flex-direction: column; } .model-operation-grid-header { display: none; } .model-operation-field { gap: 5px; padding: 8px 0; border-bottom: 1px solid var(--border); } .model-operation-field small { display: block; color: var(--muted); font-size: .68rem; } .model-operation-field > label, .model-discovery-cell { display: grid; grid-template-columns: 6rem minmax(0, 1fr); align-items: center; gap: 8px; } .model-strict-field > span:nth-child(2) { display: none; } }

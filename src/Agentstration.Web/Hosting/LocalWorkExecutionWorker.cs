@@ -1,8 +1,9 @@
 using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Infrastructure;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Local;
 using Agentstration.Work;
 
@@ -13,6 +14,7 @@ public sealed class LocalWorkExecutionWorker(
     WorkItemService workItems,
     AgentExecutionCoordinator agentExecution,
     FlowRunService flowRuns,
+    IRootFlowRunGateway rootFlowRuns,
     IFlowRunExecutionScope executionScopes,
     TimeProvider timeProvider,
     ILogger<LocalWorkExecutionWorker> logger) : BackgroundService
@@ -37,11 +39,22 @@ public sealed class LocalWorkExecutionWorker(
                     Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
                     timeProvider.GetUtcNow(), selected.Route.AgentId);
                 await workItems.ApplyExecutionEventAsync(started, stoppingToken);
-                var runtimeResult = await agentExecution.ExecuteSelectedAsync(selected, execution.Request.Instruction, stoppingToken);
+                var runtimeScope = new RuntimeRunScope(scope.TenantId, scope.WorkspaceId, scope.PrincipalId);
+                var routed = await agentExecution.ExecuteSelectedAsync(
+                    runtimeScope,
+                    selected,
+                    execution.Request.Instruction,
+                    scope.PrincipalId.ToString("D"),
+                    RuntimeRunOrigin.WorkItem,
+                    stoppingToken);
                 var result = new WorkResult(
-                    [new WorkResultContent(runtimeResult.Output)],
+                    [new WorkResultContent(routed.Execution.Output)],
                     [],
-                    new Dictionary<string, string> { ["agentId"] = selected.Route.AgentId },
+                    new Dictionary<string, string>
+                    {
+                        ["agentId"] = selected.Route.AgentId,
+                        ["runtimeRunId"] = routed.RuntimeRunId
+                    },
                     timeProvider.GetUtcNow());
                 await workItems.ApplyExecutionEventAsync(new WorkExecutionCompleted(
                     Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
@@ -76,24 +89,59 @@ public sealed class LocalWorkExecutionWorker(
         await workItems.ApplyExecutionEventAsync(new WorkExecutionStarted(
             Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
             timeProvider.GetUtcNow(), selectedAgent), cancellationToken);
-        var input = JsonSerializer.SerializeToElement(new
-        {
-            prompt = execution.Request.Instruction,
-            inputs = execution.Request.Inputs.Select(value => value.Structured ?? JsonSerializer.SerializeToElement(value.Text)).ToArray()
-        });
+        var input = execution.Request.Metadata.ContainsKey(RootFlowSubmissionService.RootRunIdMetadata)
+            && execution.Request.Inputs.FirstOrDefault()?.Structured is { } rootInput
+                ? rootInput
+                : JsonSerializer.SerializeToElement(new
+                {
+                    prompt = execution.Request.Instruction,
+                    inputs = execution.Request.Inputs.Select(value => value.Structured ?? JsonSerializer.SerializeToElement(value.Text)).ToArray()
+                });
         var scope = execution.Request.ExecutionScope!;
-        var created = await flowRuns.CreateAsync(
-            flow.FlowId, flow.UseActiveVersion ? null : flow.Version, "local", FlowRunTrigger.WorkItem,
-            "workplace",
-            execution.Request.CorrelationId.Value, input,
-            execution.Request.Metadata.GetValueOrDefault("workplace.parentFlowRunId"),
-            execution.Request.Metadata.GetValueOrDefault("workplace.interactionId"),
-            execution.Request.Metadata.GetValueOrDefault("workplace.taskId") ?? execution.Request.WorkItemId.Value.ToString("D"),
-            execution.Request.Metadata.GetValueOrDefault("workplace.triggerMessageId"),
-            scope,
-            cancellationToken);
-        FlowRun current = created.Value;
-        await foreach (var observed in flowRuns.ObserveAsync(created.Value.Id, scope, cancellationToken)) current = observed;
+        FlowRun created;
+        if (execution.Request.Metadata.TryGetValue(RootFlowSubmissionService.RootRunIdMetadata, out var rootRunId))
+        {
+            var origin = Enum.TryParse<FlowInvocationOrigin>(execution.Request.Metadata.GetValueOrDefault(RootFlowSubmissionService.OriginMetadata), out var parsedOrigin)
+                ? parsedOrigin
+                : FlowInvocationOrigin.Api;
+            var trigger = Enum.TryParse<FlowRunTrigger>(execution.Request.Metadata.GetValueOrDefault(RootFlowSubmissionService.TriggerMetadata), out var parsedTrigger)
+                ? parsedTrigger
+                : TriggerFor(origin);
+            var ensured = await rootFlowRuns.EnsureAsync(new RootFlowRunRequest(
+                rootRunId,
+                flow,
+                trigger,
+                origin,
+                execution.Request.Metadata.GetValueOrDefault(RootFlowSubmissionService.CallerMetadata) ?? execution.Request.RequestedAgentId ?? "local-user",
+                execution.Request.Metadata.GetValueOrDefault(RootFlowSubmissionService.CausationMetadata),
+                execution.Request.Metadata.GetValueOrDefault(RootFlowSubmissionService.IdempotencyMetadata),
+                execution.Request.CorrelationId.Value,
+                input,
+                execution.Request.WorkItemId,
+                bool.TryParse(execution.Request.Metadata.GetValueOrDefault(RootFlowSubmissionService.ActiveReferenceMetadata), out var resolvedFromActiveReference)
+                    && resolvedFromActiveReference,
+                execution.Request.Metadata.GetValueOrDefault("workplace.parentFlowRunId"),
+                execution.Request.Metadata.GetValueOrDefault("workplace.interactionId"),
+                execution.Request.Metadata.GetValueOrDefault("workplace.taskId") ?? execution.Request.WorkItemId.Value.ToString("D"),
+                execution.Request.Metadata.GetValueOrDefault("workplace.triggerMessageId"),
+                scope), cancellationToken);
+            created = ensured.Run;
+        }
+        else
+        {
+            created = (await flowRuns.CreateAsync(
+                flow.FlowId, flow.UseActiveVersion ? null : flow.Version, "local", FlowRunTrigger.WorkItem,
+                "workplace",
+                execution.Request.CorrelationId.Value, input,
+                execution.Request.Metadata.GetValueOrDefault("workplace.parentFlowRunId"),
+                execution.Request.Metadata.GetValueOrDefault("workplace.interactionId"),
+                execution.Request.Metadata.GetValueOrDefault("workplace.taskId") ?? execution.Request.WorkItemId.Value.ToString("D"),
+                execution.Request.Metadata.GetValueOrDefault("workplace.triggerMessageId"),
+                scope,
+                cancellationToken)).Value;
+        }
+        FlowRun current = created;
+        await foreach (var observed in flowRuns.ObserveAsync(created.Id, scope, cancellationToken)) current = observed;
         if (!await WaitUntilTaskCanCompleteAsync(execution.Request.WorkspaceId, execution.Request.WorkItemId, cancellationToken)) return;
         if (current.Status != FlowRunStatus.Succeeded)
         {
@@ -107,14 +155,47 @@ public sealed class LocalWorkExecutionWorker(
 
         var output = current.Output;
         var text = output is { ValueKind: JsonValueKind.String } ? output.Value.GetString() : null;
+        var artifacts = DurableArtifactReferences(output);
         var result = new WorkResult(
             [new WorkResultContent(text, output?.Clone(), output?.ValueKind == JsonValueKind.String ? "text/plain" : "application/json")],
-            [],
+            artifacts,
             new Dictionary<string, string> { ["flowRunId"] = current.Id, ["flowId"] = current.FlowId.Value },
             timeProvider.GetUtcNow());
         await workItems.ApplyExecutionEventAsync(new WorkExecutionCompleted(
             Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId, timeProvider.GetUtcNow(), result), cancellationToken);
     }
+
+    private static IReadOnlyList<WorkArtifact> DurableArtifactReferences(JsonElement? output)
+    {
+        if (output is not { ValueKind: JsonValueKind.Object } value
+            || !value.TryGetProperty("flowRunArtifactId", out var id)
+            || id.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(id.GetString())) return [];
+        var mediaType = value.TryGetProperty("receipt", out var receipt)
+            && receipt.ValueKind == JsonValueKind.Object
+            && receipt.TryGetProperty("mediaType", out var media)
+            && media.ValueKind == JsonValueKind.String
+                ? media.GetString()
+                : null;
+        var length = receipt.ValueKind == JsonValueKind.Object
+            && receipt.TryGetProperty("length", out var size)
+            && size.TryGetInt64(out var parsedLength)
+                ? parsedLength
+                : (long?)null;
+        var artifactId = id.GetString()!;
+        return [new WorkArtifact(
+            $"artifact-{artifactId[..Math.Min(12, artifactId.Length)]}",
+            new WorkContentReference($"artifact://flow-run/{artifactId}", mediaType),
+            new Dictionary<string, string> { ["flowRunArtifactId"] = artifactId },
+            length)];
+    }
+
+    private static FlowRunTrigger TriggerFor(FlowInvocationOrigin origin) => origin switch
+    {
+        FlowInvocationOrigin.Trigger => FlowRunTrigger.Schedule,
+        FlowInvocationOrigin.Api or FlowInvocationOrigin.Console or FlowInvocationOrigin.Mcp or FlowInvocationOrigin.Agent => FlowRunTrigger.Api,
+        _ => FlowRunTrigger.WorkItem
+    };
 
     private async Task<bool> WaitUntilTaskCanCompleteAsync(Agentstration.Resources.WorkspaceId workspaceId, WorkItemId workItemId, CancellationToken cancellationToken)
     {

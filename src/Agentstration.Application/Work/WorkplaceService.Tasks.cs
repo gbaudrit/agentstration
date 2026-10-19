@@ -14,7 +14,8 @@ public sealed partial class WorkplaceService
     {
         var anchor = (await workItems.GetAsync(workspaceId, taskId.ToWorkItemId(), cancellationToken))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
-        var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
+        RequireWorkplaceTask(anchor, taskId);
+        var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, context.PrincipalId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
         return ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId);
     }
 
@@ -25,9 +26,9 @@ public sealed partial class WorkplaceService
     {
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
         var query = new WorkItemQuery(
-            workspaceId, Skip: (page - 1) * pageSize, Take: pageSize, Status: status is null ? null : ToItemStatus(status.Value),
+            workspaceId, context.PrincipalId, Skip: (page - 1) * pageSize, Take: pageSize, Status: status is null ? null : ToItemStatus(status.Value),
             SortBy: sort, SortDirection: direction,
-            IsContinuation: false, Search: search, HasPendingAction: hasPendingAction, OperationalTasks: true,
+            IsContinuation: false, Search: search, HasPendingAction: hasPendingAction, OperationalTasks: true, WorkplaceTasksOnly: true,
             UpdatedFrom: updatedFrom, UpdatedTo: updatedTo);
         var anchors = await workItems.QueryAsync(query, cancellationToken);
         var continuations = await workItems.ListLatestContinuationsAsync(
@@ -69,13 +70,13 @@ public sealed partial class WorkplaceService
 
     public async Task<WorkTask> CancelTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.CancelAsync(workspaceId, current.Id, null, token); return await GetTaskAsync(workspaceId, taskId, token); }
 
-    public Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListActivitiesAsync(workspaceId, taskId, token);
+    public async Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { await GetTaskAsync(workspaceId, taskId, token); return await repository.ListActivitiesAsync(workspaceId, taskId, token); }
 
-    public Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListResultsAsync(workspaceId, taskId, token);
+    public async Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { await GetTaskAsync(workspaceId, taskId, token); return await repository.ListResultsAsync(workspaceId, taskId, token); }
 
-    public Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListArtifactsAsync(workspaceId, taskId, token);
+    public async Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { await GetTaskAsync(workspaceId, taskId, token); return await repository.ListArtifactsAsync(workspaceId, taskId, token); }
 
-    public async Task<WorkTaskArtifact> GetArtifactAsync(WorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken token) => await repository.GetArtifactAsync(workspaceId, taskId, artifactId, token) ?? throw new KeyNotFoundException($"Artifact '{artifactId}' was not found in Workspace '{workspaceId}'.");
+    public async Task<WorkTaskArtifact> GetArtifactAsync(WorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken token) { await GetTaskAsync(workspaceId, taskId, token); return await repository.GetArtifactAsync(workspaceId, taskId, artifactId, token) ?? throw new KeyNotFoundException($"Artifact '{artifactId}' was not found in Workspace '{workspaceId}'."); }
 
     public static WorkplaceAction CurrentAction(WorkTask task) => task.Status switch { WorkTaskStatus.ActionRequired => new RespondAction("A response is required."), WorkTaskStatus.Failed => new ShowErrorAction(task.Error?.Code ?? "Task failed", task.Error?.Message), WorkTaskStatus.Completed => new ShowResultAction("Result", task.Result?.Contents.FirstOrDefault()?.Text, task.Result?.Contents.FirstOrDefault()?.Structured), _ => new RespondAction("Agentstration is working on your request.") };
 
@@ -83,7 +84,8 @@ public sealed partial class WorkplaceService
     {
         var anchor = (await workItems.GetAsync(workspaceId, taskId.ToWorkItemId(), token))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
-        var page = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), token);
+        RequireWorkplaceTask(anchor, taskId);
+        var page = await workItems.QueryAsync(new WorkItemQuery(workspaceId, context.PrincipalId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), token);
         return LatestExecution(anchor, page.Items.Select(value => value.Value).ToArray());
     }
 
@@ -95,9 +97,11 @@ public sealed partial class WorkplaceService
         {
             var page = await workItems.QueryAsync(new WorkItemQuery(
                 workspaceId,
+                context.PrincipalId,
                 Skip: skip,
                 Take: WorkItemQueryPageSize,
                 IsContinuation: false,
+                WorkplaceTasksOnly: true,
                 SortBy: WorkItemSortField.CreatedAt), token);
             items.AddRange(page.Items.Select(value => value.Value));
             if (!page.HasMore || page.Items.Count == 0) break;
@@ -133,7 +137,12 @@ public sealed partial class WorkplaceService
 
     private static void RequireWorkspace(WorkItem item, WorkspaceId workspaceId) { if (item.WorkspaceId != workspaceId) throw new KeyNotFoundException($"Task '{item.Id}' was not found in Workspace '{workspaceId}'."); }
 
-    internal static WorkTask ToTask(WorkItem item, WorkTaskId? publicId = null) { var isTrigger = item.Metadata.GetValueOrDefault("origin") == "trigger"; item.Metadata.TryGetValue(EntryMetadata, out var entryId); item.Metadata.TryGetValue(InteractionMetadata, out var interactionId); if (!isTrigger && (entryId is null || !Guid.TryParse(interactionId, out _))) throw new InvalidOperationException($"Work item '{item.Id}' is not a Workplace Task."); item.Metadata.TryGetValue(FlowRunMetadata, out var flowRunId); if (flowRunId is null) item.Result?.Metadata.TryGetValue(FlowRunMetadata, out flowRunId); return new WorkTask(publicId ?? WorkTaskId.FromWorkItem(item.Id), item.WorkspaceId, entryId is null ? null : new(entryId), Guid.TryParse(interactionId, out var interactionGuid) ? new(interactionGuid) : null, item.Title ?? item.Instruction, item.Description, ToTaskStatus(item.Status), item.CreatedAt, item.UpdatedAt, flowRunId, item.Messages, item.Interactions, item.Result?.Artifacts ?? [], item.Result, item.Error, item.Version); }
+    private static void RequireWorkplaceTask(WorkItem item, WorkTaskId taskId)
+    {
+        if (!WorkplaceTaskIdentity.IsTask(item)) throw new KeyNotFoundException($"Task '{taskId}' was not found.");
+    }
+
+    internal static WorkTask ToTask(WorkItem item, WorkTaskId? publicId = null) { if (!WorkplaceTaskIdentity.IsTask(item)) throw new InvalidOperationException($"Work item '{item.Id}' is not a Workplace Task."); item.Metadata.TryGetValue(EntryMetadata, out var entryId); item.Metadata.TryGetValue(InteractionMetadata, out var interactionId); item.Metadata.TryGetValue(FlowRunMetadata, out var flowRunId); if (flowRunId is null) item.Result?.Metadata.TryGetValue(FlowRunMetadata, out flowRunId); return new WorkTask(publicId ?? WorkTaskId.FromWorkItem(item.Id), item.WorkspaceId, entryId is null ? null : new(entryId), Guid.TryParse(interactionId, out var interactionGuid) ? new(interactionGuid) : null, item.Title ?? item.Instruction, item.Description, ToTaskStatus(item.Status), item.CreatedAt, item.UpdatedAt, flowRunId, item.Messages, item.Interactions, item.Result?.Artifacts ?? [], item.Result, item.Error, item.Version); }
 
     internal static WorkTaskStatus ToTaskStatus(WorkItemStatus status) => status switch { WorkItemStatus.Pending or WorkItemStatus.Queued => WorkTaskStatus.Pending, WorkItemStatus.Running => WorkTaskStatus.Running, WorkItemStatus.WaitingForInput or WorkItemStatus.WaitingForApproval => WorkTaskStatus.ActionRequired, WorkItemStatus.Paused => WorkTaskStatus.Paused, WorkItemStatus.Completed => WorkTaskStatus.Completed, WorkItemStatus.Failed => WorkTaskStatus.Failed, WorkItemStatus.Cancelled => WorkTaskStatus.Cancelled, _ => throw new ArgumentOutOfRangeException(nameof(status), status, null) };
 }

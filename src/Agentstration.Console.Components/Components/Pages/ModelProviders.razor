@@ -1,0 +1,56 @@
+@page "/modelproviders"
+@implements IDisposable
+@inject IModelProvidersClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProvidersStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-model-providers">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button><a class="button-primary" href="/modelproviders/new">@T("CreateProvider")</a></Actions>
+</PageHeader>
+
+@if (loading && providers is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
+}
+else if (providers?.Count == 0)
+{
+    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" />
+}
+else
+{
+    <DataGrid TItem="ModelProviderResponse" Items="providers ?? []">
+        <Header><tr><th>@T("Provider")</th><th>@T("Namespace")</th><th>@T("Type")</th><th>@T("Management")</th><th>@T("Status")</th><th>@T("Models")</th><th></th></tr></Header>
+        <Row Context="provider"><tr>
+            <td><span class="resource-name-with-scope"><strong>@provider.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@provider.ScopeRef" Compact /></span><code>@provider.Name</code></td>
+            <td><code>@provider.Namespace</code></td>
+            <td>@provider.Properties.ContributionId</td><td>@provider.Properties.RegistrationSource</td>
+            <td><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>
+            <td>@ModelCount(provider.Properties.ModelCount)</td>
+            <td><a class="text-button" href="@DetailsUrl(provider)">@T("ViewDetails") →</a></td>
+        </tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ModelProviderResponse>? providers;
+    private AgentstrationApiException? error;
+    private bool loading;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string ModelCount(int count) => T(count == 1 ? "ModelCount.One" : "ModelCount.Many", count);
+    private string StatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "starting" => "Starting", "unavailable" => "Unavailable", "failed" => "Failed", _ => "Unknown" }}"];
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { providers = await Client.GetModelProvidersAsync(cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private static string DetailsUrl(ModelProviderResponse provider) => $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

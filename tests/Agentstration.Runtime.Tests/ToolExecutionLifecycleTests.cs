@@ -1,8 +1,8 @@
 using System.Text.Json;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Flow.Storage.Abstractions;
-using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -15,6 +15,29 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class ToolExecutionLifecycleTests
 {
+    [TestMethod]
+    public async Task SimulationInvokesDryRunPathAndReturnsOutputWithoutPublishingLifecycleEvents()
+    {
+        var events = new RecordingSink();
+        var invoker = new RecordingSimulationInvoker();
+        var calls = new List<string>();
+        var pipeline = new ToolExecutionPipeline(
+            invoker,
+            [SequenceHook("policy", 0, calls)],
+            [events],
+            new AdvancingTimeProvider());
+
+        var result = await pipeline.SimulateAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.Console }, default);
+
+        Assert.AreEqual(1, invoker.Validations);
+        Assert.AreEqual(1, invoker.Invocations);
+        Assert.AreEqual(true, result.Output?.GetProperty("dryRun").GetBoolean());
+        Assert.HasCount(1, result.GovernanceEvaluations);
+        Assert.AreEqual(ToolExecutionHookEvaluationKind.Allowed, result.GovernanceEvaluations[0].Decision);
+        CollectionAssert.AreEqual(new[] { "before:policy" }, calls);
+        Assert.IsEmpty(events.Events);
+    }
+
     [TestMethod]
     public async Task PipelinePublishesStartedAndCompletedWithoutPersistingProviderResult()
     {
@@ -528,11 +551,12 @@ public sealed class ToolExecutionLifecycleTests
                 [new FlowToolExecutionEventSink(repository, published)],
                 new AdvancingTimeProvider());
 
-            await pipeline.ExecuteAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.FlowRun }, default);
+            await pipeline.ExecuteAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.FlowRun, FlowStepId = "notify" }, default);
 
             var events = await repository.ListRunEventsAsync(Workspace, "run-1", 0, default);
             Assert.HasCount(3, events);
             Assert.AreEqual(FlowRunEventType.ToolCallStarted, events[0].Type);
+            Assert.AreEqual("notify", events[0].StepId);
             Assert.AreEqual(FlowRunEventType.ToolCallGovernanceEvaluated, events[1].Type);
             Assert.AreEqual(FlowRunEventType.ToolCallCompleted, events[2].Type);
             Assert.HasCount(3, published.Events);
@@ -688,6 +712,24 @@ public sealed class ToolExecutionLifecycleTests
     {
         public ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
             invoke(context, cancellationToken);
+    }
+
+    private sealed class RecordingSimulationInvoker : IToolInvoker
+    {
+        public int Validations { get; private set; }
+        public int Invocations { get; private set; }
+
+        public ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            Validations++;
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            Invocations++;
+            return ValueTask.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new { dryRun = true }));
+        }
     }
 
     private static IToolExecutionHook SequenceHook(string id, int order, List<string> calls) => new DelegateHook(

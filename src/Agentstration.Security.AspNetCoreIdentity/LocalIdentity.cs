@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Agentstration.Management.Abstractions;
+using Agentstration.Identity.Contracts;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -87,3 +87,8 @@ public sealed record LocalAccountView(
 public sealed record LocalAccountSecurityView(Guid AccountId, string UserName, string? Email);
 public sealed record LocalAccountSecurityResult(bool Succeeded, IReadOnlyList<string> Errors);
 public enum LocalLoginOutcome { Succeeded, Failed, LockedOut }
+public sealed record LocalCredentialValidation(
+    LocalLoginOutcome Outcome,
+    Guid? AccountId = null,
+    Guid? PrincipalId = null,
+    string? AuthenticationVersion = null);

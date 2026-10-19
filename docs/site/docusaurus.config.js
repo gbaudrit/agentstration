@@ -7,6 +7,12 @@ const config = {
   organizationName: 'gbaudrit',
   projectName: 'microsoft-agent-framework',
   onBrokenLinks: 'throw',
+  scripts: [
+    {
+      src: '/generated/agentstration-likec4.js',
+      type: 'module',
+    },
+  ],
   markdown: {
     mermaid: true,
     hooks: {

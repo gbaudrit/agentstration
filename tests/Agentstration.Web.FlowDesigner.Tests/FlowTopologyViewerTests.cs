@@ -21,8 +21,11 @@ public sealed class FlowTopologyViewerTests
             "graph",
             "Read-only topology");
         var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
-            .Add(component => component.Graph, graph));
+            .Add(component => component.Graph, graph)
+            .Add(component => component.Title, "Flow topology"));
 
+        Assert.AreEqual("Flow topology", rendered.Find(".topology-description").TextContent);
+        Assert.AreEqual("Flow topology", rendered.Find("svg").GetAttribute("aria-label"));
         Assert.AreEqual("100%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
         rendered.Find($"button[aria-label='{strings["ZoomIn"].Value}']").Click();
         Assert.AreEqual("115%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
@@ -63,6 +66,33 @@ public sealed class FlowTopologyViewerTests
     }
 
     [TestMethod]
+    public void ViewerUsesInvariantSvgCoordinatesInFrenchCulture()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var graph = new FlowTopologyGraph(
+            [
+                new("step:input", "input", "Input", "input", 0, 14.5),
+                new("step:output", "output", "Output", "output", 240.25, 80.75)
+            ],
+            [new("next", "step:input", "step:output", "completed")],
+            "graph",
+            "Localized workflow");
+
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph));
+
+        var canvas = rendered.Find("svg.topology-canvas");
+        Assert.DoesNotContain(",", canvas.GetAttribute("viewBox")!, StringComparison.Ordinal);
+        Assert.IsTrue(rendered.FindAll(".topology-node")
+            .All(node => !node.GetAttribute("transform")!.Contains(',', StringComparison.Ordinal)));
+        Assert.IsTrue(rendered.FindAll(".edge-label-wrap")
+            .SelectMany(label => new[] { label.GetAttribute("x"), label.GetAttribute("y"), label.GetAttribute("width") })
+            .All(value => value is not null && !value.Contains(',', StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void ObservedHandoffsRemainVisibleOnGraphWithoutAPathOverlay()
     {
         using var culture = new CultureScope("fr-FR");
@@ -91,6 +121,31 @@ public sealed class FlowTopologyViewerTests
         Assert.Contains("participant:welcome", badge.GetAttribute("aria-label")!, StringComparison.Ordinal);
         Assert.DoesNotContain(",", badge.GetAttribute("transform")!, StringComparison.Ordinal);
         Assert.AreNotEqual("translate(0 0)", badge.GetAttribute("transform"));
+    }
+
+    [TestMethod]
+    public void ViewerRendersFailedTransitionWithDedicatedMarkerAndLocalizedLegend()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var graph = new FlowTopologyGraph(
+            [
+                new("step:fetch", "fetch", "Fetch", "tool", 0, 0),
+                new("step:failure", "failure", "Failure", "failure", 220, 0)
+            ],
+            [new("fetch-failure", "step:fetch", "step:failure", "error", State: FlowTopologyEdgeState.Failed)],
+            "graph",
+            "Failed workflow");
+
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph));
+
+        var edge = rendered.Find(".topology-edge.failed");
+        StringAssert.Contains(edge.GetAttribute("marker-end")!, "-failed");
+        StringAssert.Contains(edge.QuerySelector("title")!.TextContent, "erreur observée");
+        StringAssert.Contains(rendered.Find(".topology-legend").TextContent, "Erreur");
+        Assert.HasCount(1, rendered.FindAll("marker.failed-marker"));
     }
 
     [TestMethod]

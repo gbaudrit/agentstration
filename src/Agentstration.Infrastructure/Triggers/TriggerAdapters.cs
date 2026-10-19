@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.Xml;
 using Agentstration.Application.Work;
-using Agentstration.Flow;
-using Agentstration.Flow.Application;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
+using Agentstration.Triggers;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Quartz;
@@ -105,17 +105,17 @@ public sealed class WorkspaceTriggerExecutionAuthorizer(
         scopes.Push(new RequestContext(executionScope.PrincipalId, executionScope.TenantId, executionScope.WorkspaceId));
 }
 
-public sealed class TriggerWorkSubmitter(FlowService flows, WorkItemService work, IWorkItemRepository repository) : ITriggerWorkSubmitter
+public sealed class TriggerWorkSubmitter(RootFlowSubmissionService rootFlows, IWorkItemRepository repository, IWorkExecutionScopeAccessor executionScopeAccessor) : ITriggerWorkSubmitter
 {
     public async Task<TriggerSubmission?> GetExistingAsync(Guid workspaceId, Guid occurrenceId, CancellationToken cancellationToken)
     {
-        var existing = await repository.GetAsync(new WorkspaceId(workspaceId), new WorkItemId(occurrenceId), cancellationToken);
+        var existing = await repository.GetAsync(new WorkspaceId(workspaceId), CurrentPrincipalId(), new WorkItemId(occurrenceId), cancellationToken);
         return existing is null ? null : new(existing.Value.Id.ToString());
     }
 
     public async Task<bool> HasActiveWorkAsync(Guid workspaceId, Guid triggerUid, CancellationToken cancellationToken)
     {
-        var page = await repository.QueryAsync(new WorkItemQuery(new WorkspaceId(workspaceId), Take: 200, Type: "trigger"), cancellationToken);
+        var page = await repository.QueryAsync(new WorkItemQuery(new WorkspaceId(workspaceId), CurrentPrincipalId(), Take: 200, Type: "trigger"), cancellationToken);
         return page.Items.Any(item => item.Value.Metadata.TryGetValue("triggerUid", out var value)
             && string.Equals(value, triggerUid.ToString("N"), StringComparison.Ordinal)
             && item.Value.Status is WorkItemStatus.Pending or WorkItemStatus.Queued or WorkItemStatus.Running or WorkItemStatus.WaitingForInput or WorkItemStatus.WaitingForApproval or WorkItemStatus.Paused);
@@ -127,8 +127,6 @@ public sealed class TriggerWorkSubmitter(FlowService flows, WorkItemService work
         var workspaceId = new WorkspaceId(occurrence.WorkspaceId);
         var ownerNamespace = trigger.Namespace;
         var reference = new FlowReference(new FlowId(target.Name, target.Namespace ?? ownerNamespace), target.Version, target.Version is null, target.Namespace);
-        var resolved = await flows.ResolveAsync(workspaceId, reference, ownerNamespace, cancellationToken);
-        var immutable = new FlowReference(resolved.FlowId, resolved.Version, false, resolved.FlowId.Namespace);
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["origin"] = "trigger",
@@ -142,18 +140,32 @@ public sealed class TriggerWorkSubmitter(FlowService flows, WorkItemService work
         IReadOnlyList<WorkInput> inputs = trigger.Definition.Input.ValueKind == System.Text.Json.JsonValueKind.Undefined
             ? []
             : [new WorkInput(Structured: trigger.Definition.Input)];
-        var stored = await work.SubmitAsync(new SubmitWorkItemCommand(
+        var instruction = $"Triggered execution of Flow '{reference.FlowId}'.";
+        var flowInput = System.Text.Json.JsonSerializer.SerializeToElement(new
+        {
+            prompt = instruction,
+            inputs = inputs.Select(value => value.Structured ?? System.Text.Json.JsonSerializer.SerializeToElement(value.Text)).ToArray()
+        });
+        var submission = await rootFlows.SubmitAsync(new SubmitRootFlowCommand(
             workspaceId,
+            reference,
+            flowInput,
+            FlowInvocationOrigin.Trigger,
+            trigger.Definition.ExecutionScope?.PrincipalId.ToString("D") ?? "trigger-system",
+            FlowRunTrigger.Schedule,
+            occurrence.Id.ToString("N"),
+            occurrence.Id.ToString("D"),
+            $"trigger:{trigger.Uid:N}:{occurrence.Id:N}",
             "trigger",
-            $"Triggered execution of Flow '{resolved.FlowId}'.",
+            instruction,
             trigger.Definition.DisplayName,
             trigger.Definition.Description,
-            trigger.Definition.ExecutionScope?.PrincipalId.ToString("D"),
-            new WorkCorrelationId($"trigger:{trigger.Uid:N}:{occurrence.Id:N}"),
             Metadata: metadata,
-            Inputs: inputs,
-            Flow: immutable,
-            Id: new WorkItemId(occurrence.Id)), cancellationToken);
-        return new(stored.Value.Id.ToString());
+            WorkInputs: inputs,
+            WorkItemId: new WorkItemId(occurrence.Id)), cancellationToken);
+        return new(submission.WorkItem.Value.Id.ToString());
     }
+
+    private Guid CurrentPrincipalId() => executionScopeAccessor.Current?.PrincipalId
+        ?? throw new TriggerExecutionException("trigger_execution_scope_required", "Trigger work access requires an authenticated execution scope.");
 }
