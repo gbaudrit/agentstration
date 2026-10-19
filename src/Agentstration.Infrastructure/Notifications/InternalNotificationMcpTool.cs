@@ -20,7 +20,8 @@ public sealed class WorkNotificationMcpToolDefinitionProvider : IInternalMcpTool
             {
                 title = new { type = "string", maxLength = 200, pattern = @"\S", description = "Short user-visible notification heading." },
                 message = new { type = "string", maxLength = 4000, pattern = @"\S", description = "User-visible notification body." },
-                actionUrl = new { type = "string", maxLength = 2048, pattern = @"^/(?!/)[^\\]*$", description = "Optional local absolute Agentstration path beginning with one slash. External URLs and backslashes are not supported." }
+                actionUrl = new { type = "string", maxLength = 2048, pattern = @"^/(?!/)[^\\]*$", description = "Optional local absolute Agentstration path beginning with one slash. External URLs and backslashes are not supported." },
+                dryRun = new { type = "boolean", description = "Returns a notification preview without creating it." }
             },
             required = new[] { "title", "message" },
             additionalProperties = false
@@ -31,9 +32,17 @@ public sealed class WorkNotificationMcpToolDefinitionProvider : IInternalMcpTool
             properties = new
             {
                 notificationId = new { type = "string" },
-                createdAt = new { type = "string" }
+                createdAt = new { type = "string" },
+                dryRun = new { type = "boolean" },
+                title = new { type = "string" },
+                message = new { type = "string" },
+                actionUrl = new { type = "string" }
             },
-            required = new[] { "notificationId", "createdAt" },
+            oneOf = new object[]
+            {
+                new { required = new[] { "notificationId", "createdAt", "dryRun" } },
+                new { required = new[] { "dryRun", "title", "message" } }
+            },
             additionalProperties = false
         }));
 }
@@ -48,18 +57,24 @@ public sealed class WorkNotificationMcpTool(
     {
         if (invocation.Arguments.ValueKind != JsonValueKind.Object)
             throw new ToolDefinitionInvocationException("notification_arguments_invalid", "Notification arguments must be a JSON object.");
-        var allowed = new HashSet<string>(["title", "message", "actionUrl"], StringComparer.Ordinal);
+        var allowed = new HashSet<string>(["title", "message", "actionUrl", ToolDryRunContract.ParameterName], StringComparer.Ordinal);
         var unknown = invocation.Arguments.EnumerateObject().Select(value => value.Name).FirstOrDefault(value => !allowed.Contains(value));
         if (unknown is not null)
             throw new ToolDefinitionInvocationException("notification_argument_unknown", $"Notification argument '{unknown}' is not declared by the Tool schema.");
+        var title = Required(invocation.Arguments, "title");
+        var message = Required(invocation.Arguments, "message");
+        var actionUrl = Optional(invocation.Arguments, "actionUrl");
+        if (ToolDryRunContract.IsEnabled(invocation.Arguments))
+            return JsonSerializer.SerializeToElement(new { dryRun = true, title, message, actionUrl });
+
         WorkplaceService.NotificationDelivery delivery;
         try
         {
             delivery = await workplace.DeliverNotificationAsync(new WorkplaceService.DeliverNotificationCommand(
                 invocation.WorkspaceId,
-                Required(invocation.Arguments, "title"),
-                Required(invocation.Arguments, "message"),
-                Optional(invocation.Arguments, "actionUrl"),
+                title,
+                message,
+                actionUrl,
                 invocation.CorrelationId,
                 invocation.RunId,
                 invocation.FlowStepId,
@@ -71,6 +86,7 @@ public sealed class WorkNotificationMcpTool(
         }
         return JsonSerializer.SerializeToElement(new
         {
+            dryRun = false,
             notificationId = delivery.Notification.Id.Value,
             createdAt = delivery.Notification.CreatedAt
         });

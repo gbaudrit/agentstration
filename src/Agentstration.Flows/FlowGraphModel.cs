@@ -24,7 +24,9 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(ConditionFlowStepDefinition), "condition")]
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
 [JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
+[JsonDerivedType(typeof(RepeatFlowStepDefinition), "repeat")]
 [JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
+[JsonDerivedType(typeof(ToolRouteFlowStepDefinition), "toolRoute")]
 [JsonDerivedType(typeof(OutputFlowStepDefinition), "output")]
 [JsonDerivedType(typeof(FailureFlowStepDefinition), "failure")]
 public abstract record FlowStepDefinition
@@ -32,6 +34,62 @@ public abstract record FlowStepDefinition
     public required string Name { get; init; }
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
+    public FlowStepArtifactOutputDefinition? ArtifactOutput { get; init; }
+}
+
+public sealed record FlowStepArtifactOutputDefinition
+{
+    public string? FileName { get; init; }
+    public string MediaType { get; init; } = "application/json";
+    public FlowStepArtifactContentEncoding ContentEncoding { get; init; }
+    public JsonElement? ContentMapping { get; init; }
+    public long? MaximumBytes { get; init; }
+    public ResourceReference? StagingBinding { get; init; }
+    public FlowCallReference? StorageFlow { get; init; }
+    public FlowStepArtifactCleanupMode Clean { get; init; }
+}
+
+[JsonConverter(typeof(FlowStepArtifactCleanupModeJsonConverter))]
+public enum FlowStepArtifactCleanupMode
+{
+    Auto,
+    Always,
+    Never
+}
+
+public sealed class FlowStepArtifactCleanupModeJsonConverter : JsonConverter<FlowStepArtifactCleanupMode>
+{
+    public override FlowStepArtifactCleanupMode Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options) => reader.TokenType switch
+        {
+            JsonTokenType.True => FlowStepArtifactCleanupMode.Always,
+            JsonTokenType.False => FlowStepArtifactCleanupMode.Never,
+            JsonTokenType.String when reader.GetString()?.Equals("auto", StringComparison.OrdinalIgnoreCase) == true =>
+                FlowStepArtifactCleanupMode.Auto,
+            JsonTokenType.String when bool.TryParse(reader.GetString(), out var clean) =>
+                clean ? FlowStepArtifactCleanupMode.Always : FlowStepArtifactCleanupMode.Never,
+            _ => throw new JsonException("Artifact output clean must be 'auto', true, or false.")
+        };
+
+    public override void Write(Utf8JsonWriter writer, FlowStepArtifactCleanupMode value,
+        JsonSerializerOptions options)
+    {
+        if (value == FlowStepArtifactCleanupMode.Auto) writer.WriteStringValue("auto");
+        else writer.WriteBooleanValue(value == FlowStepArtifactCleanupMode.Always);
+    }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<FlowStepArtifactContentEncoding>))]
+public enum FlowStepArtifactContentEncoding
+{
+    [JsonStringEnumMemberName("auto")]
+    Auto,
+    [JsonStringEnumMemberName("json")]
+    Json,
+    [JsonStringEnumMemberName("utf8")]
+    Utf8,
+    [JsonStringEnumMemberName("base64")]
+    Base64
 }
 
 public sealed record InputFlowStepDefinition : FlowStepDefinition
@@ -98,6 +156,15 @@ public sealed record FlowCallStepDefinition : FlowStepDefinition
     public JsonElement? InputMapping { get; init; }
 }
 
+public sealed record RepeatFlowStepDefinition : FlowStepDefinition
+{
+    public required FlowCallReference Flow { get; init; }
+    public JsonElement? InputMapping { get; init; }
+    public JsonElement? NextInputMapping { get; init; }
+    public required string Until { get; init; }
+    public int MaximumIterations { get; init; } = 100;
+}
+
 public sealed record FlowToolReference(
     string ResourceId,
     ResourceNamespace? Namespace = null)
@@ -111,17 +178,58 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
     public JsonElement? ArgumentsMapping { get; init; }
 }
 
-public sealed record OutputFlowStepDefinition : FlowStepDefinition
+public sealed record FlowToolSetReference(
+    string ResourceId,
+    string Version,
+    ResourceNamespace? Namespace = null)
 {
-    public JsonElement? OutputMapping { get; init; }
+    public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
 }
 
+public sealed record ToolRouteFlowStepDefinition : FlowStepDefinition
+{
+    public required FlowToolSetReference ToolSet { get; init; }
+    public required string Capability { get; init; }
+    public string? Route { get; init; }
+    public JsonElement? ArgumentsMapping { get; init; }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<FlowOutputOutcome>))]
+public enum FlowOutputOutcome
+{
+    [JsonStringEnumMemberName("success")]
+    Success,
+    [JsonStringEnumMemberName("error")]
+    Error
+}
+public sealed record OutputFlowStepDefinition : FlowStepDefinition
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public FlowOutputOutcome? Outcome { get; init; }
+    public JsonElement? OutputMapping { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? Schema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Code { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Message { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DetailsExpression { get; init; }
+}
+
+/// <summary>Compatibility shape for persisted Flow definitions authored before named outputs.</summary>
 public sealed record FailureFlowStepDefinition : FlowStepDefinition
 {
     public string Code { get; init; } = "FLOW_FAILED";
     public string Message { get; init; } = "Flow execution failed.";
     public string? DetailsExpression { get; init; }
 }
+
+public sealed record FlowOutputDefinition(
+    string Name,
+    string? DisplayName,
+    FlowOutputOutcome Outcome,
+    JsonElement? Schema);
 
 public sealed record FlowTransitionDefinition(
     string Id,
@@ -176,11 +284,76 @@ public static class FlowStepDefinitionExtensions
         ConditionFlowStepDefinition => "condition",
         TransformFlowStepDefinition => "transform",
         FlowCallStepDefinition => "flow",
+        RepeatFlowStepDefinition => "repeat",
         ToolFlowStepDefinition => "tool",
+        ToolRouteFlowStepDefinition => "toolRoute",
         OutputFlowStepDefinition => "output",
         FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))
     };
+
+    public static IReadOnlyList<string> OutputEvents(this FlowStepDefinition step) => step switch
+    {
+        InputFlowStepDefinition => ["completed"],
+        AgentFlowStepDefinition => ["success", "error"],
+        RouterFlowStepDefinition => ["selected", "failed"],
+        ConditionFlowStepDefinition => ["true", "false"],
+        TransformFlowStepDefinition => ["completed"],
+        ToolFlowStepDefinition => ["success", "error"],
+        ToolRouteFlowStepDefinition => ["success", "error"],
+        FlowCallStepDefinition => [],
+        OutputFlowStepDefinition or FailureFlowStepDefinition => [],
+        _ => throw new ArgumentOutOfRangeException(nameof(step))
+    };
+}
+
+public static class FlowGraphDefinitionExtensions
+{
+    public static IReadOnlyList<FlowOutputDefinition> GetOutputs(this FlowGraphDefinition definition) =>
+        definition.Steps
+            .Select(step => step switch
+            {
+                OutputFlowStepDefinition output => new FlowOutputDefinition(
+                    output.Name,
+                    output.DisplayName,
+                    output.Outcome ?? FlowOutputOutcome.Success,
+                    definition.ResolveOutputSchema(output, out _)?.Clone()),
+                FailureFlowStepDefinition failure => new FlowOutputDefinition(
+                    failure.Name,
+                    failure.DisplayName,
+                    FlowOutputOutcome.Error,
+                    null),
+                _ => null
+            })
+            .OfType<FlowOutputDefinition>()
+            .ToArray();
+
+    public static JsonElement? ResolveOutputSchema(
+        this FlowGraphDefinition definition,
+        OutputFlowStepDefinition output,
+        out bool ambiguous)
+    {
+        ambiguous = false;
+        if (output.Schema is { } declared) return declared;
+        if (output.Outcome is not FlowOutputOutcome.Error && definition.OutputSchema is { } legacy) return legacy;
+        if (output.OutputMapping is { } mapping
+            && (mapping.ValueKind != JsonValueKind.String
+                || !string.Equals(mapping.GetString(), "${transition.output}", StringComparison.Ordinal)))
+            return null;
+
+        var candidates = definition.Transitions
+            .Where(transition => transition.ToStep == output.Name)
+            .Select(transition => definition.Steps.FirstOrDefault(step => step.Name == transition.FromStep))
+            .Select(step => step is InputFlowStepDefinition input ? input.Schema ?? definition.InputSchema : null)
+            .Where(schema => schema is not null)
+            .Select(schema => schema!.Value)
+            .ToArray();
+        var distinct = new List<JsonElement>();
+        foreach (var candidate in candidates)
+            if (!distinct.Any(existing => JsonElement.DeepEquals(existing, candidate))) distinct.Add(candidate);
+        ambiguous = distinct.Count > 1;
+        return distinct.Count == 1 ? distinct[0] : null;
+    }
 }
 
 public static class FlowDefinitionHash

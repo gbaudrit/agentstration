@@ -27,6 +27,9 @@ public sealed class ResourceScopesLocalizationTests
             Assert.AreEqual("Périmètres des ressources", strings["Title"].Value);
             Assert.AreEqual("Périmètre sélectionné", strings["SelectedScopeResources"].Value);
             Assert.AreEqual("Ressources : 1", strings["ResourceCount", 1].Value);
+            Assert.AreEqual("Ressources de ce périmètre", strings["ResourcesInScope"].Value);
+            Assert.AreEqual("Affichage de 1 ressource(s) sur 3", strings["ShowingResources", 1, 3].Value);
+            Assert.AreEqual("Tous les types (3)", strings["AllKindsOption", 3].Value);
         }
         finally
         {

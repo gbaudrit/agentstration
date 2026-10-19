@@ -104,6 +104,20 @@ Use `--launch-profile http-NoBootstrap` or `--launch-profile https-NoBootstrap` 
 
 When `Agentstration.AppHost` is the Visual Studio startup project, select its `https` profile for the default bootstrap or `https-NoBootstrap` to disable it for the orchestrated Console resource.
 
+Aspire also starts one independent Microsoft Agent Framework Runtime Worker by default. Set
+`Agentstration:RuntimeWorkers:Count` on the AppHost to start between 1 and 16 independently
+identified Worker processes. For direct startup, keep the authoritative server running and launch
+the Worker from another terminal:
+
+```powershell
+./scripts/runtime/start-maf-worker.ps1 -AuthorityUrl http://localhost:5100
+```
+
+On first start the Worker announces its stable identity and waits for a pairing code entered through
+standard input. Issue that code from the AWP Worker administration API, then enter it in the Worker
+terminal. The resulting credential is stored in the ignored `.agentstration` state directory. The
+pairing code and credential value are never accepted as ordinary command-line arguments.
+
 After initialization, a Platform administrator can open **System > Bootstrap profiles** to compose profiles in a defined order, preview every create, skip, conflict, or validation error, select an explicit Tenant or Workspace target when required, and confirm the application. Manual applications are retained in durable history. A profile declares its scope in a reserved `profile.yaml`:
 
 ```yaml
@@ -216,7 +230,7 @@ Replace `ollama.yml` with `base.yml`, `llama-cpp.yml`, or `localai.yml` to selec
 
 For Aspire, set `Agentstration:Storage:Provider=PostgreSql`. Its generated password is persisted in user-secrets and relational data is kept in the worktree-isolated Docker volume `agentstration-<slot>-<instance-id>-postgresql`; file-backed state remains under the slot data directory. See [configuration](docs/getting-started/configuration.md#postgresql-storage-profile) for startup behavior, reset, troubleshooting, and backup guidance.
 
-Aspire starts Agentstration's local AEP extensions against existing inference servers. The Microsoft Foundry extension is opt-in through `Foundry:Enabled=true` or the optional Compose overlay; each Model Provider supplies its own endpoints and downstream identity through AEP Value Bindings. It supports deployment discovery, text chat, streaming and governed Tool calls. See [Foundry integration](docs/foundry-integration.md). Provider-specific Compose files isolate Ollama, llama.cpp, and LocalAI, with each topology owning its inference service and model storage. No topology downloads a model implicitly. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
+Aspire starts Agentstration's local AEP extensions against existing inference servers. The Microsoft Foundry extension is opt-in through `Foundry:Enabled=true` or the optional Compose overlay; each Model Provider supplies its own endpoints and downstream identity through AEP Value Bindings. It supports deployment discovery, text chat, streaming and governed Tool calls. The optional Crawl4AI acquisition extension uses `Crawl4AI:Enabled=true`; Aspire then starts its pinned, authenticated Crawl4AI container by default, while `Crawl4AI:Provisioning=External` preserves connection to an independently operated service. See [Crawl4AI web acquisition](docs/reference/crawl4ai-web-acquisition.md). Provider-specific Compose files isolate Ollama, llama.cpp, and LocalAI, with each topology owning its inference service and model storage. No topology downloads a model implicitly. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
 
 ## Build and test
 

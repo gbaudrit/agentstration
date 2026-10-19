@@ -1,6 +1,8 @@
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
+using Agentstration.Tools.Mcp;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Agentstration.Web.Api.Models;
@@ -16,9 +18,13 @@ internal static class ToolsApiHttp
         catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (ToolResourceValidationException exception) { return Problem("tool-resource-invalid", "Invalid tool resource", 422, exception.Message); }
         catch (ToolCategoryValidationException exception) { return Problem("tool-category-invalid", "Invalid ToolCategory", 422, exception.Message); }
+        catch (ToolSetValidationException exception) { return Problem(exception.Code, "Invalid ToolSet", 422, exception.Message); }
         catch (ToolDefinitionValidationException exception) { return Problem(exception.Code, "Invalid ToolDefinition", 422, exception.Message); }
         catch (ToolExecutionHookValidationException exception) { return Problem("tool-execution-hook-invalid", "Invalid Tool execution hook", 422, exception.Message); }
         catch (ToolProviderDiscoveryFailedException exception) { return Problem("tool-provider-unavailable", "Tool provider unavailable", 503, exception.Message); }
+        catch (ToolInputValidationException exception) { return Problem(exception.Code, "Invalid Tool input", 422, exception.Message); }
+        catch (ToolRunException exception) { return Problem(exception.Code, "Tool run failed", exception.StatusCode, exception.Message); }
+        catch (ToolExecutionHookException exception) { return Problem("tool-governance-failed", "Tool governance failed", 503, exception.Message); }
         catch (ArgumentException exception) { return Problem("validation-failed", "Invalid request", 400, exception.Message); }
     }
 

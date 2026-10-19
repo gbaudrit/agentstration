@@ -20,7 +20,7 @@ export class PlatformOverviewPage {
   }
 
   public async expectNavigationTargets(): Promise<void> {
-    const targets = ['/agents', '/flows', '/extensions', '/modelproviders', '/triggers', '/agent-runs', '/flow-runs', '/tasks', '/deployments'];
+    const targets = ['/agents', '/flows', '/extensions', '/modelproviders', '/triggers', '/agent-runs', '/flow-runs', '/tasks', '/agent-instances'];
     const links = this.root.locator('a.metric-card');
     await expect(links).toHaveCount(targets.length + 1);
     for (const target of targets) await expect(this.root.locator(`a.metric-card[href="${target}"]`)).toHaveCount(1);

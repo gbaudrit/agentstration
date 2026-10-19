@@ -200,13 +200,13 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         var secondAgent = await agents.PutAgentAsync(Agent(agentName), null, true, default);
         var secondRevision = await agents.CreateRevisionAsync(agentName, spec, default);
         var repeated = await agents.CreateRevisionAsync(agentName, spec, default);
-        var prepared = await agents.PrepareLocalRuntimeAsync(agentName, secondAgent.Value.Generation, default);
+        var prepared = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default, agentName, secondAgent.Value.Generation, default);
 
         Assert.AreNotEqual(firstAgent.Value.Uid, secondAgent.Value.Uid);
         Assert.AreNotEqual(firstRevision.Value.Metadata.Name, secondRevision.Value.Metadata.Name);
         Assert.AreEqual(secondAgent.Value.Uid, secondRevision.Value.AgentUid);
         Assert.AreEqual(secondRevision.Value.Metadata.Name, repeated.Value.Metadata.Name);
-        Assert.AreEqual(OperationalState.Ready, prepared.Value.OperationalState);
+        Assert.AreEqual(ProvisioningState.Succeeded, prepared.Value.ProvisioningState);
 
         static AgentResource Agent(string name) => new()
         {
