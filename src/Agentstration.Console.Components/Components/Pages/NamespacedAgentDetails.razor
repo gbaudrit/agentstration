@@ -106,7 +106,7 @@ else if (agent is not null)
                 }
                 <dl class="resource-details namespaced-deployment-details">
                     <dt>@T("DesiredGeneration")</dt><dd>@agent.Generation</dd>
-                    <dt>@T("Deployment")</dt><dd>@(readiness?.DeploymentId ?? T("NotPrepared"))</dd>
+                    <dt>@T("Deployment")</dt><dd>@(readiness?.DeploymentId ?? readiness?.RevisionId ?? T("NotPrepared"))</dd>
                     @if (!string.IsNullOrWhiteSpace(readiness?.RevisionId)) { <dt>@T("Revision")</dt><dd><code>@readiness.RevisionId</code></dd> }
                 </dl>
                 @if (!string.IsNullOrWhiteSpace(deploymentError)) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("DeploymentFailed")</strong><span>@deploymentError</span></div> }
@@ -162,7 +162,7 @@ else if (agent is not null)
     private string DeploymentStatus => readiness?.Ready == true ? T("Ready") : readiness?.State ?? T("NotDeployed");
     private UiStatus DeploymentTone => readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning;
     private string DeploymentOverviewStatus => readiness?.Ready == true ? T("Ready") : T("NotReady");
-    private string DeploymentOverviewDetail => readiness?.Ready == true ? readiness.DeploymentId ?? T("ActiveDeployment") : DeploymentStatus;
+    private string DeploymentOverviewDetail => readiness?.Ready == true ? readiness.DeploymentId ?? readiness.RevisionId ?? T("ActiveDeployment") : DeploymentStatus;
     private string DeploymentActionLabel => deploying ? T("Deploying") : readiness?.Ready == true ? T("ReconcileDeployment") : T("DeployGeneration", agent?.Generation ?? 0);
     private string AgentStatus => agent is null ? T("Unknown") : StatusPresentation.Label(agent.Status.ProvisioningState.ToString());
     private UiStatus AgentStatusTone => agent is null ? UiStatus.Neutral : StatusPresentation.Tone(agent.Status.ProvisioningState.ToString());
@@ -235,7 +235,8 @@ else if (agent is not null)
             var prepared = await RuntimeClient.PrepareAgentAsync(AgentResourceNamespace, agent.Metadata.Name, agent.Generation, cancellation.Token);
             await LoadReadinessAsync();
             if (string.Equals(prepared.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
-                deploymentMessage = T("GenerationActiveThroughDeployment", prepared.Generation, prepared.DeploymentId);
+                deploymentMessage = T("GenerationActiveThroughDeployment", prepared.Generation,
+                    string.IsNullOrWhiteSpace(prepared.DeploymentId) ? prepared.RevisionId : prepared.DeploymentId);
             else
                 deploymentError = T("RuntimePreparationCompleted", prepared.State);
         }

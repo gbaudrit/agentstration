@@ -20,18 +20,22 @@ public sealed class MainLayoutNavigationTests
 
         AssertNavigation(rendered,
             (string.Empty, [("Overview", "/")]),
-            ("Design", [("Agents", "/agents"), ("Flows", "/flows"), ("Entries", "/entries"), ("Resource plans", "/resource-plans"), ("Model profiles", "/modelprofiles")]),
+            ("Design", [("Agents", "/agents"), ("Flows", "/flows"), ("Schemas", "/schemas"), ("Entries", "/entries"), ("Resource plans", "/resource-plans"), ("Model profiles", "/modelprofiles"), ("Data Source Profiles", "/data-source-profiles")]),
             ("Automate", [("Triggers", "/triggers")]),
             ("Operate", [("Conversations", "/conversations"), ("Tasks", "/tasks")]),
-            ("Observe", [("Deployments", "/deployments"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
+            ("Observe", [("Agent instances", "/agent-instances"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
             ("Workplace", [("Configuration", "/workspaces")]),
-            ("Resources", [("Packs", "/packs"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
+            ("Resources", [("Packs", "/packs"), ("Data Sources", "/data-sources"), ("Knowledge Sources", "/knowledge-sources"), ("Artifacts", "/artifacts"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
             ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
             ("Configuration", [("Runtime profiles", "/runtimeprofiles"), ("Secrets", "/secrets"), ("Resource scopes", "/settings/resource-scopes")]),
-            ("System", [("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
+            ("System", [("Workers", "/settings/runtime-workers"), ("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
 
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/profile']").Count);
         Assert.AreEqual("Profile", rendered.Find(".topbar-actions a[href='/settings/profile']").GetAttribute("aria-label"));
+        Assert.AreEqual("Resource plans", rendered.Find(".side-nav a[href='/resource-plans']").GetAttribute("data-nav-tooltip"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/resource-plans']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-design"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/triggers']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-automate"));
+        Assert.IsTrue(rendered.Find(".side-nav a[href='/flow-runs']").Closest(".navigation-group")?.ClassList.Contains("navigation-group-observe"));
     }
 
     [TestMethod]
@@ -48,7 +52,56 @@ public sealed class MainLayoutNavigationTests
             groups.Select(GroupLabel).ToArray());
         Assert.AreEqual("Configuration", groups[5].QuerySelector("a")?.TextContent.Trim());
         Assert.AreEqual("MCP & Outils", groups[7].QuerySelector("a")?.TextContent.Trim());
+        Assert.AreEqual("Profils de source de données", groups[1].QuerySelector("a[href='/data-source-profiles']")?.TextContent.Trim());
+        Assert.AreEqual("Sources de données", groups[6].QuerySelector("a[href='/data-sources']")?.TextContent.Trim());
+        Assert.AreEqual("Schémas", groups[1].QuerySelector("a[href='/schemas']")?.TextContent.Trim());
         Assert.AreEqual("Profil", rendered.Find(".topbar-actions a[href='/settings/profile']").GetAttribute("aria-label"));
+    }
+
+    [TestMethod]
+    public void NavigationDistinguishesProfilesAndKnowledgeSourcesFromTheirRelatedResources()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(AllNavigationPermissions);
+
+        var rendered = RenderLayout(context);
+
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-adjustments",
+            rendered.Find(".side-nav a[href='/modelprofiles'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-database-cog",
+            rendered.Find(".side-nav a[href='/data-source-profiles'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-brain",
+            rendered.Find(".side-nav a[href='/knowledge-sources'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-plug-connected",
+            rendered.Find(".side-nav a[href='/sourceproviders'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-binary-tree",
+            rendered.Find(".side-nav a[href='/settings/resource-scopes'] use").GetAttribute("href"));
+        Assert.AreEqual(
+            "_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-database-search",
+            rendered.Find(".side-nav a[href='/settings/source-registries'] use").GetAttribute("href"));
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/resource-plans'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/modelprofiles'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/data-source-profiles'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/settings/sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/knowledge-sources'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/sourceproviders'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/resource-plans'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/settings/resource-scopes'] svg").InnerHtml);
+        Assert.AreNotEqual(
+            rendered.Find(".side-nav a[href='/data-sources'] svg").InnerHtml,
+            rendered.Find(".side-nav a[href='/settings/source-registries'] svg").InnerHtml);
     }
 
     [TestMethod]
@@ -60,10 +113,14 @@ public sealed class MainLayoutNavigationTests
         var rendered = RenderLayout(context);
 
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/resource-plans']").Count);
+        Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/knowledge-source-profiles']").Count);
+        Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/data-source-profiles']").Count);
+        Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/data-sources']").Count);
+        Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/schemas']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/conversations']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/resource-scopes']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/cleanup']").Count);
-        Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/deployments']").Count);
+        Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/agent-instances']").Count);
     }
 
     private static readonly IReadOnlySet<string> AllNavigationPermissions = new HashSet<string>(

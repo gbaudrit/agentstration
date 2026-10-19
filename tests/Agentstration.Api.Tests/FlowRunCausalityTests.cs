@@ -1,8 +1,12 @@
 using System.Globalization;
 using System.Text.Json;
+using Agentstration.Awp.Abstractions;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Infrastructure.Runtime;
+using Agentstration.Runtime.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Application.Tests;
 
@@ -42,9 +46,64 @@ public sealed partial class FlowTests
             null,
             null,
             TestScope), default);
-        await runs.ExecuteAsync(new(root.Value.Id, TestScope), default);
-        var waiting = (await runs.GetAsync(root.Value.Id, TestScope, default))!.Value;
-        var childId = waiting.Steps.Single(step => step.StepName == "analyze").ChildFlowRunId!;
+        var createdChild = await runs.CreateOrGetAssignedChildAsync(TestScope.WorkspaceId, root.Value.Id,
+            "analyze", input.RootElement, "flowCall", null, default);
+        var childId = createdChild.Value.Id;
+        var now = DateTimeOffset.Parse("2026-09-10T07:59:00Z", CultureInfo.InvariantCulture);
+        var stepExecutionId = Guid.NewGuid();
+        var assignment = new RuntimeWorkerAssignment
+        {
+            WorkspaceId = TestScope.WorkspaceId,
+            TenantId = TestScope.TenantId,
+            Id = new(Guid.NewGuid()),
+            TargetKind = RuntimeAssignmentTargetKind.FlowRun,
+            TargetRunId = root.Value.Id,
+            RuntimeCapability = AwpRuntimeKinds.MicrosoftAgentFramework,
+            RuntimeCapabilityVersion = "1.0",
+            ExecutionMaterialVersion = "1.0",
+            ExecutionMaterialId = "material-causality",
+            ExecutionMaterialDigest = "sha256:causality",
+            State = RuntimeAssignmentState.Assigned,
+            CreatedAt = now,
+            UpdatedAt = now,
+            StepExecutions =
+            [
+                new RuntimeAssignmentStepExecution
+                {
+                    CommandId = Guid.NewGuid(),
+                    Id = stepExecutionId,
+                    FlowRunId = root.Value.Id,
+                    FlowVersion = root.Value.FlowVersion,
+                    FlowDefinitionHash = root.Value.DefinitionHash!,
+                    StepDefinitionId = "analyze",
+                    StepName = "analyze",
+                    StepType = "flowCall",
+                    DefinitionPosition = 1,
+                    OpenedAt = now
+                }
+            ]
+        };
+        var projection = new AwpAssignmentProjection(null!, fixture.Repository,
+            new NullFlowRunEventSink(), TimeProvider.System, Options.Create(new FlowRunExecutionOptions()));
+        await projection.ProjectEventsAsync(assignment,
+        [
+            new RuntimeAssignmentExecutionEvent
+            {
+                EventId = Guid.NewGuid(),
+                AttemptEventSequence = 1,
+                OccurredAt = now,
+                Kind = "StepCompleted",
+                RunId = root.Value.Id,
+                StepExecutionId = stepExecutionId,
+                Payload = JsonSerializer.SerializeToElement(new
+                {
+                    status = "succeeded",
+                    output = new { summary = "new item" },
+                    selectedTransition = "analyze-output",
+                    childFlowRunIds = new[] { childId }
+                })
+            }
+        ], default);
         var startedAt = DateTimeOffset.Parse("2026-09-10T08:00:00Z", CultureInfo.InvariantCulture);
         var invocationId = $"flow:{childId}:step:notify:attempt:2";
         var toolCallId = $"flow:{childId}:step:notify";

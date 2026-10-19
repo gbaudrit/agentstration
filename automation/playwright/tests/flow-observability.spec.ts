@@ -9,15 +9,25 @@ test('Flow definitions, immutable views, designer, and direct runner render from
   const context = { ...product, pages, checkpoint: ignoreCheckpoints };
   await authenticateConsole(context, {});
 
+  await pages.flowObservability.openManualRunDialog(product.consoleUrl, true);
   await pages.flowObservability.open(product.consoleUrl, '/flows', 'flows');
   await pages.flowObservability.open(product.consoleUrl, '/flows/universal-router', 'flowDetails');
   await pages.flowObservability.open(product.consoleUrl, '/namespaces/default/flows/universal-router', 'flowDetails');
   await pages.flowObservability.open(product.consoleUrl, '/flows/universal-router/designer', 'designer');
   await pages.flowObservability.open(product.consoleUrl, '/namespaces/default/flows/universal-router/designer', 'designer');
+  await pages.flowDesigner.createDraftAndOpen(product.consoleUrl);
+  await pages.flowDesigner.expectExistingLinksVisible();
+  await pages.flowDesigner.expectCanvasFitsViewportAndWheelZoomContract();
+  await pages.flowDesigner.selectFirstInspectorTransition();
   await pages.flowObservability.open(product.consoleUrl, '/agents/dotnet-expert/run', 'agentRunner');
 });
 
 test('a completed Workplace task is traceable through Flow, Agent, task, and event observability @smoke', async ({ page, product }) => {
+  const pages = new ProductPages(page);
+  await inspectFlowObservability({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+});
+
+test('Flow Run token usage remains visible at mobile width @responsive @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await inspectFlowObservability({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });
@@ -31,5 +41,6 @@ test('Flow draft Definition and Split keep a usable YAML editor at desktop width
 test('Flow draft Definition and Split keep a usable YAML editor at mobile width @responsive @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+  await pages.flowObservability.openManualRunDialog(product.consoleUrl, false);
   await pages.flowObservability.exerciseDraftDefinitionAndSplit(product.consoleUrl, false);
 });

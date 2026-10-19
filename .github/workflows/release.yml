@@ -110,7 +110,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Compute container metadata
         id: container-metadata
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.DOCKER_IMAGE }}
           tags: |
@@ -121,7 +121,7 @@ jobs:
             org.opencontainers.image.licenses=Apache-2.0
       - name: Build and push multi-platform image
         id: container
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile

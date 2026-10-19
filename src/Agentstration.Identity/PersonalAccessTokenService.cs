@@ -30,7 +30,12 @@ public sealed class PersonalAccessTokenService(
             AuthorizationPermissions.ResourcesDelete,
             AuthorizationPermissions.RunsRead,
             AuthorizationPermissions.RunsExecute,
-            AuthorizationPermissions.RunsDelete
+            AuthorizationPermissions.RunsDelete,
+            AuthorizationPermissions.ArtifactsInspect,
+            AuthorizationPermissions.ArtifactsReadContent,
+            AuthorizationPermissions.ArtifactsWrite,
+            AuthorizationPermissions.ArtifactsManageRetention,
+            AuthorizationPermissions.ArtifactsPurge
         ],
         StringComparer.Ordinal);
 

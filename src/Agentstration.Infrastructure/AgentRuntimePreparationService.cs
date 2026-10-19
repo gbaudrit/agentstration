@@ -12,10 +12,40 @@ public sealed class AgentRuntimePreparationService(AgentManagementService agents
         long generation,
         CancellationToken cancellationToken)
     {
-        var deployment = await agents.PrepareLocalRuntimeAsync(resourceNamespace, agentName, generation, cancellationToken);
+        var revision = await agents.EnsureExecutionRevisionAsync(resourceNamespace, agentName, generation, cancellationToken);
         return new(
-            deployment.Value.Metadata.Name,
-            deployment.Value.RevisionName,
-            deployment.Value.OperationalState.ToString());
+            string.Empty,
+            revision.Value.Metadata.Name,
+            "Ready");
+    }
+}
+
+public sealed class ExternalWorkerAgentDeploymentReconciler : IAgentDeploymentReconciler
+{
+    public Task<AgentDeploymentReconciliationResult> ReconcileAsync(
+        AgentDeployment deployment,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (deployment.DesiredState == DesiredAgentState.Stopped)
+        {
+            var stopped = deployment with
+            {
+                ProvisioningState = ProvisioningState.Succeeded,
+                OperationalState = OperationalState.Stopped,
+                ObservedRevisionName = null,
+                LastError = null
+            };
+            return Task.FromResult(new AgentDeploymentReconciliationResult(stopped, stopped != deployment, "Deployment is stopped."));
+        }
+
+        var unsupported = deployment with
+        {
+            ProvisioningState = ProvisioningState.Failed,
+            OperationalState = OperationalState.Unavailable,
+            ObservedRevisionName = null,
+            LastError = "Agent deployments are not materialized by the authoritative server. Runtime execution is assigned to external AWP Workers."
+        };
+        return Task.FromResult(new AgentDeploymentReconciliationResult(unsupported, unsupported != deployment, unsupported.LastError));
     }
 }

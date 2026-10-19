@@ -92,7 +92,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -126,7 +126,7 @@ jobs:
           global-json-file: global.json
       - name: Cache NuGet packages
         if: needs.changes.outputs.dotnet == 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -183,7 +183,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -218,10 +218,10 @@ jobs:
             '| --- | ---: | ---: | ---: | ---: | ---: | --- |'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
-            @{ Name = 'Agentstration.Api.Tests'; Tests = 191; Warning = 1700; Failure = 2048 },
-            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 74; Warning = 1152; Failure = 1280 },
-            @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 23; Warning = 500; Failure = 700 },
-            @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 49; Warning = 900; Failure = 1152 },
+            @{ Name = 'Agentstration.Api.Tests'; Tests = 211; Warning = 2048; Failure = 2304 },
+            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 108; Warning = 1920; Failure = 2304 },
+            @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 31; Warning = 500; Failure = 700 },
+            @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 63; Warning = 1280; Failure = 1536 },
             @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 11; Warning = 450; Failure = 700 }
           )
           foreach ($module in $modules) {
@@ -258,7 +258,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -293,7 +293,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
@@ -389,7 +389,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile

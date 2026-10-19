@@ -33,7 +33,7 @@ public sealed record AgentExecutionResult(
     ModelExecutionOptions? EffectiveOptions = null,
     AgentExecutionUsage? Usage = null);
 
-public sealed record AgentExecutionUsage(int? InputTokens = null, int? OutputTokens = null);
+public sealed record AgentExecutionUsage(int? InputTokens = null, int? OutputTokens = null, int? TotalTokens = null);
 public sealed record AgentExecutionError(string Code, string Message, bool Retryable = false);
 
 public abstract record AgentExecutionEvent;
@@ -154,6 +154,7 @@ public sealed record ResolvedRuntimeAgent(
     string State,
     string? Error)
 {
+    public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
 }
@@ -178,11 +179,15 @@ public sealed class RuntimeAgentResolutionException(string code, string message)
 public sealed record AgentRouteRequest(string Input);
 public sealed record RoutableAgent(string AgentId, string Description, IReadOnlyCollection<string> Capabilities);
 public sealed record AgentRouteResult(string AgentId, double Confidence, string Reason);
-public sealed record RoutedAgentExecution(AgentRouteResult Route, AgentExecutionResult Execution);
+public sealed record RoutedAgentExecution(AgentRouteResult Route, AgentExecutionResult Execution, string RuntimeRunId);
 
 public interface IAgentExecutionCoordinator
 {
-    Task<RoutedAgentExecution> RouteAndExecuteAsync(string input, CancellationToken cancellationToken);
+    Task<RoutedAgentExecution> RouteAndExecuteAsync(
+        RuntimeRunScope scope,
+        string input,
+        string initiator,
+        CancellationToken cancellationToken);
 }
 
 public sealed record PreparedAgentRuntime(string DeploymentName, string RevisionName, string State);
@@ -267,7 +272,7 @@ public interface IToolCatalog
     ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
 }
 
-public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun }
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console }
 
 public sealed record ToolExecutionScope
 {
@@ -334,7 +339,25 @@ public sealed record ToolExecutionCaptureOptions
 public interface IToolExecutionPipeline
 {
     ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
+
+    async ValueTask<ToolInvocationResult> ExecuteDetailedAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        new(await ExecuteAsync(context, cancellationToken), null);
+
+    ValueTask<ToolExecutionSimulation> SimulateAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        ValueTask.FromException<ToolExecutionSimulation>(new InvalidOperationException("Tool execution simulation is not supported."));
 }
+
+public sealed record ToolInvocationResult(
+    JsonElement? Output,
+    IReadOnlyDictionary<string, string>? Receipt);
+
+public sealed record ToolExecutionSimulation(
+    IReadOnlyList<ToolExecutionHookEvaluation> GovernanceEvaluations,
+    JsonElement? Output = null);
 
 public abstract record ToolExecutionLifecycleEvent(
     ToolExecutionContext Context,
@@ -486,23 +509,21 @@ public sealed class UnavailableToolExecutionPipeline : IToolExecutionPipeline
 public interface IToolInvoker
 {
     ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
-}
 
-public interface IRuntimeRegistry
-{
-    void Set(string deploymentId, IAgentRuntime runtime);
-    bool TryGet(string deploymentId, out IAgentRuntime? runtime);
-    bool Remove(string deploymentId);
-    Task<AgentExecutionResult> ExecuteAsync(string deploymentId, AgentExecutionRequest request, CancellationToken cancellationToken);
-    async IAsyncEnumerable<AgentExecutionEvent> ExecuteEventsAsync(
-        string deploymentId,
-        AgentExecutionRequest request,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
+        ValueTask.CompletedTask;
+
+    async ValueTask<ToolInvocationResult> InvokeDetailedAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        new(await InvokeAsync(context, cancellationToken), null);
+
+    async ValueTask<ToolInvocationResult> SimulateDetailedAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default)
     {
-        yield return new ExecutionStarted(request.SessionId ?? Guid.NewGuid().ToString("N"));
-        var result = await ExecuteAsync(deploymentId, request, cancellationToken);
-        if (!string.IsNullOrEmpty(result.Output)) yield return new ContentDelta(result.Output);
-        yield return new ExecutionCompleted(result);
+        await ValidateAsync(context, cancellationToken);
+        return await InvokeDetailedAsync(context, cancellationToken);
     }
 }
 

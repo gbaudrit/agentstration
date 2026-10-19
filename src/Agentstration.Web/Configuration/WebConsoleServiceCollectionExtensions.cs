@@ -69,10 +69,16 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<TriggerApiClient, ITriggerApiClient>(services, configured.ManagementApi);
         AddClient<ResourcePlansApiClient, IResourcePlansApiClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
+        AddClient<ToolSetsApiClient, IToolSetsClient>(services, configured.ManagementApi);
+        AddClient<KnowledgeSourcesApiClient, IKnowledgeSourcesClient>(services, configured.ManagementApi);
+        AddClient<DataSourcesApiClient, IDataSourcesClient>(services, configured.ManagementApi);
+        AddClient<DataSourceProfilesApiClient, IDataSourceProfilesClient>(services, configured.ManagementApi);
+        AddClient<ArtifactsApiClient, IArtifactsClient>(services, configured.ManagementApi);
         AddClient<ToolCategoriesApiClient, IToolCategoriesClient>(services, configured.ManagementApi);
         AddClient<ToolDefinitionsApiClient, IToolDefinitionsClient>(services, configured.ManagementApi);
         AddSensitiveClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi);
         AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi);
+        AddClient<SchemasApiClient, ISchemasClient>(services, configured.ManagementApi);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);

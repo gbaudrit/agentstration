@@ -42,6 +42,12 @@ The official static Source registry is available as an optional instance-owned d
 
 The Console exposes these operations under **System > Source registries**. It supports registration CRUD, enablement, manual refresh, refresh history, Secret-reference selection, merged discovery filters, all observation evidence, and exact import confirmation. The official registration, local origin policy, publisher evidence, SourceVersion verification, and later Snapshot verification are presented separately on responsive desktop and mobile layouts.
 
+## Data Sources and Knowledge projection
+
+Data Sources govern acquisition from an origin independently of Knowledge. Instance-, tenant-, and Workspace-scoped Data Sources resolve a visible active Data Source Profile, then execute its exact `datasource.acquisition/v1` Flow in a consuming Workspace. The accepted acquisition retains source and profile generations, the immutable profile revision, resolved Flow and Tool/provider evidence, effective limits and policies, and a bounded durable Artifact manifest.
+
+Workspace-owned Knowledge Sources bind one to thirty-two visible Data Sources. Each binding may run an optional `artifact.transform/v1` Flow before one `knowledge.projection/v1` Flow receives every prepared input. Each successful projection creates and activates a distinct immutable Snapshot; failure retains the previous active Snapshot. The built-in projection preserves heterogeneous Artifacts unchanged, while the built-in `knowledge.retrieval/v1` Flow provides bounded local search, query, and read restricted to the selected Snapshot. See [Data Sources and Knowledge Sources](../concepts/data-sources-and-knowledge.md) and [Built-in Data Source Profiles](builtin-data-source-profiles.md).
+
 ## Schedule Triggers
 
 Agentstration can submit autonomous Work from a declarative Workspace-scoped `Trigger`. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.
@@ -150,9 +156,9 @@ Runtime
 Agents
 ```
 
-The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. The designer adds one generic `Flow` call card that selects a namespaced published Flow by active or exact version, maps its input schema, exposes its output schema, and blocks missing targets, incompatible mappings, and dependency cycles at publication. Durable child-Flow execution is not yet available. The local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
+The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. A generic `Flow` call selects a namespaced published Flow by active or exact version, maps its input schema, exposes its output schema, and blocks missing targets, incompatible mappings, and dependency cycles at publication. Flow calls execute as deterministic durable child FlowRuns with bounded nesting and descendant counts. The provider-neutral `repeat` step composes the same child boundary for a finite number of iterations, persists its current mapped input for recovery, and retains every child in causal diagnostics without enabling arbitrary graph cycles. The local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Flow`, `Repeat`, governed `Tool`, `ToolRoute`, `Output`, and `Failure` steps. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
 
-The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework.
+The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, routes requests to an exact generation, and assigns every Runtime Run to a separately launched AWP Worker. Microsoft Agent Framework is materialized only in that Worker process; the authoritative server has no in-process execution fallback.
 
 ## Prerequisites
 
@@ -265,7 +271,7 @@ $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.Models.Application` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
+`Agentstration.Models.Application` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.MicrosoftAgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
 
 Current limitations are deliberate: credentials are not stored on provider resources, llama.cpp reasoning output is not represented as a distinct AEP content kind, and image input is not yet effective through the AEP-to-`IChatClient` adapter. Separate Flow Runs are not dispatched in parallel and there is no conversation persistence. Other legacy OpenAI-compatible endpoints still use host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
@@ -376,6 +382,12 @@ Invoke-RestMethod -Method Post -ContentType application/json -Body (@{ version="
 Flow definitions are stored in `.agentstration/flow-plane.db`. Published versions are immutable; a `WorkItem` may carry a lightweight exact or active `FlowReference` without embedding the definition.
 
 The Flow console at `/flows` provides creation templates, a four-zone visual designer, Designer/Definition/Split modes, YAML source editing, validation, optimistic draft saving, publication, published versions and per-Flow Runs. The specialized UI lives in the `Agentstration.Web.FlowDesigner` Razor Class Library: Z.Blazor.Diagrams owns canvas interaction and BlazorMonaco provides the locally served Monaco editor, while `Agentstration.Web` supplies backend and resource adapters. A Draft Run validates its JSON input and retains its exact draft revision, hash, and immutable definition snapshot. Run details receive differential SignalR events with replay from persisted history; `/flow-runs` provides the global searchable Run history. Flow data remains in the independent `.agentstration/flow-plane.db` store.
+
+### Reusable Schemas
+
+The Schema library at `/schemas` owns scoped format-neutral drafts and immutable published versions. The built-in `json-schema` handler supports the 2020-12 dialect without AEP and exposes governed definition and instance validation through `/api/schemas/formats`. Provider selection uses explicit identities, capabilities, availability and default designation; ambiguous providers are rejected instead of being selected by registration order.
+
+The reusable editor offers visual authoring for the bounded common JSON Schema subset, Monaco source editing and instance preview. Definitions using unsupported composition or reference constructs remain source-only and are preserved without a lossy visual round trip. See [Schemas](../concepts/schemas.md) and [ADR-0170](../decisions/0170-schema-format-resolution-is-explicit.md).
 
 ## MCP
 

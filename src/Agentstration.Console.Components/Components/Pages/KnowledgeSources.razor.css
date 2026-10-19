@@ -1,0 +1,5 @@
+.knowledge-source-inputs {
+    display: grid;
+    justify-items: start;
+    gap: .25rem;
+}
