@@ -110,7 +110,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Compute container metadata
         id: container-metadata
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.DOCKER_IMAGE }}
           tags: |
