@@ -324,14 +324,14 @@ export class FlowDesignerPage {
     await expect(this.page.locator('.save-state.saved')).toBeVisible();
   }
 
-  public async publishAsReadOnlyFixture(consoleUrl: string, name: string): Promise<void> {
+  public async publishUserFixture(consoleUrl: string, name: string): Promise<void> {
     const draft = await this.getDraft(consoleUrl, name);
     const update = await this.page.request.put(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/draft`, {
       headers: { 'If-Match': draft.eTag },
       data: {
         displayName: draft.value.displayName,
         description: draft.value.description,
-        tags: { ...(draft.value.tags as Record<string, string>), 'agentstration.io/pack.name': 'flow-transition-ux-fixture' },
+        tags: draft.value.tags,
         definition: draft.value.definition,
       },
     });
@@ -341,6 +341,12 @@ export class FlowDesignerPage {
       data: { version: '1.0.0', activate: true },
     });
     expect(publish.status(), await publish.text()).toBe(201);
+  }
+
+  public async expectPublishedUserFlowEditable(consoleUrl: string, namespace: string, name: string): Promise<void> {
+    await this.open(consoleUrl, namespace, name);
+    await expect(this.page.locator('.read-only-badge')).toHaveCount(0);
+    await expect(this.page.locator('.flow-port-handle:not(.locked)').first()).toBeVisible();
   }
 
   public async expectReadOnlyPublished(consoleUrl: string, namespace: string, name: string): Promise<void> {
