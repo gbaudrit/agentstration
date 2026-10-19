@@ -190,6 +190,9 @@ public sealed class NamespacedAgentDetailsTests
                         : new Dictionary<string, string>()
                 },
                 Generation = 1,
+                Governance = packManaged
+                    ? ResourceGovernance.Pack("/instances/local/InstalledPack/daily-life-assistant", "agentstration/daily-life-assistant", "1.0.0")
+                    : ResourceGovernance.User,
                 Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
                 Definition = new AgentProperties
                 {

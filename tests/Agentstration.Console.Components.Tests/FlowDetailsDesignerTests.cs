@@ -484,8 +484,14 @@ public sealed class FlowDetailsDesignerTests
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
-            var metadata = managed ? new Dictionary<string, string> { ["agentstration.io/pack.name"] = "sample" } : new Dictionary<string, string>();
-            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, metadata, Now, Now, Graph) { Namespace = @namespace, ScopeRef = scopeRef });
+            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), Now, Now, Graph)
+            {
+                Namespace = @namespace,
+                ScopeRef = scopeRef,
+                Governance = managed
+                    ? ResourceGovernance.Pack("/instances/local/InstalledPack/sample", "publisher/sample", "1.0.0")
+                    : ResourceGovernance.User
+            });
         }
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace, ScopeRef = scopeRef }]);

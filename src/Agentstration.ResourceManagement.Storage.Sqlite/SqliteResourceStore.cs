@@ -104,7 +104,9 @@ internal sealed class ResourceScopeRow
 public sealed class SqliteResourceStore(
     IDbContextFactory<ResourceManagementDbContext> contextFactory,
     TimeProvider timeProvider,
-    ICurrentRequestContext requestContext) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver
+    ICurrentRequestContext requestContext,
+    IResourceGovernanceContext governanceContext,
+    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -261,6 +263,8 @@ public sealed class SqliteResourceStore(
         if (existing is not null && ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
 
+        resource = await ApplyGovernanceAsync(resource, existing is null ? null : DeserializeValue<T>(existing), cancellationToken);
+
         var etag = NewETag();
         var now = timeProvider.GetUtcNow();
         var uid = existing?.Uid ?? Guid.NewGuid();
@@ -295,11 +299,13 @@ public sealed class SqliteResourceStore(
             existing.UpdatedAt = now;
         }
         await SaveAsync(context, cancellationToken);
+        await AuditReconciliationAsync(versioned.Governance, cancellationToken);
         return new StoredResource<T>(versioned, etag, now);
     }
 
     public async Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource
     {
+        resource = await ApplyGovernanceAsync(resource, null, cancellationToken);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var etag = NewETag();
         var now = timeProvider.GetUtcNow();
@@ -323,6 +329,7 @@ public sealed class SqliteResourceStore(
         });
         try { await SaveAsync(context, cancellationToken); }
         catch (ResourceConcurrencyException exception) { throw new ResourceConcurrencyException($"Immutable resource '{resource.Kind}/{resource.Metadata.Name}' already exists: {exception.Message}"); }
+        await AuditReconciliationAsync(versioned.Governance, cancellationToken);
         return new StoredResource<T>(versioned, etag, now);
     }
 
@@ -343,11 +350,14 @@ public sealed class SqliteResourceStore(
         };
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
+        var governance = ReadGovernance(existing.Payload);
+        await EnsureManagedMutationAsync(governance, cancellationToken);
         var accessPolicy = await context.ResourceAccessPolicies
             .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
         if (accessPolicy is not null) context.ResourceAccessPolicies.Remove(accessPolicy);
         context.Documents.Remove(existing);
         await SaveAsync(context, cancellationToken);
+        await AuditReconciliationAsync(governance, cancellationToken);
     }
 
     public async Task DeleteExactAsync(ScopedResourceAddress address, string? ifMatch, CancellationToken cancellationToken)
@@ -359,20 +369,64 @@ public sealed class SqliteResourceStore(
             ?? throw new ResourceNotFoundException(new ResourceKey(address.Kind, address.Name, address.Namespace));
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
+        var governance = ReadGovernance(existing.Payload);
+        await EnsureManagedMutationAsync(governance, cancellationToken);
         var accessPolicy = await context.ResourceAccessPolicies
             .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
         if (accessPolicy is not null) context.ResourceAccessPolicies.Remove(accessPolicy);
         context.Documents.Remove(existing);
         await SaveAsync(context, cancellationToken);
+        await AuditReconciliationAsync(governance, cancellationToken);
     }
 
     private static StoredResource<T> Deserialize<T>(ControlPlaneDocument document) where T : Resource
     {
-        var value = JsonSerializer.Deserialize<T>(document.Payload, JsonOptions)
-            ?? throw new InvalidOperationException($"Stored resource '{document.Kind}/{document.Name}' is invalid.");
+        var value = DeserializeValue<T>(document);
         value = ApplySystemState(value, document.Uid, ResourceScopeRef.Parse(document.Scope.Ref), document.ETag);
         return new StoredResource<T>(value, document.ETag, document.UpdatedAt);
     }
+
+    private async Task<T> ApplyGovernanceAsync<T>(T resource, T? existing, CancellationToken cancellationToken) where T : Resource
+    {
+        try
+        {
+            var governance = existing is null
+                ? ResourceGovernanceEnforcement.PrepareCreate(resource.Governance, governanceContext.Current)
+                : ResourceGovernanceEnforcement.PrepareUpdate(existing.Governance, resource.Governance, governanceContext.Current);
+            return (T)resource.WithGovernance(governance);
+        }
+        catch (ResourceGovernanceViolationException exception)
+        {
+            await AuditDeniedAsync(exception.Code, cancellationToken);
+            throw new ResourceConcurrencyException($"{exception.Code}: {exception.Message}");
+        }
+    }
+
+    private async Task EnsureManagedMutationAsync(ResourceGovernance governance, CancellationToken cancellationToken)
+    {
+        try { ResourceGovernanceEnforcement.EnsureManager(governance, governanceContext.Current); }
+        catch (ResourceGovernanceViolationException exception)
+        {
+            await AuditDeniedAsync(exception.Code, cancellationToken);
+            throw new ResourceConcurrencyException($"{exception.Code}: {exception.Message}");
+        }
+    }
+
+    private Task AuditReconciliationAsync(ResourceGovernance governance, CancellationToken cancellationToken) =>
+        audit is null || !governance.IsManaged
+            ? Task.CompletedTask
+            : audit.WriteAsync(new(SecurityAuditActions.ManagedResourceReconciled), cancellationToken);
+
+    private Task AuditDeniedAsync(string reasonCode, CancellationToken cancellationToken) =>
+        audit?.WriteAsync(new(SecurityAuditActions.ManagedResourceMutationDenied, SecurityAuditOutcome.Failed, ReasonCode: reasonCode), cancellationToken)
+        ?? Task.CompletedTask;
+
+    private static T DeserializeValue<T>(ControlPlaneDocument document) where T : Resource =>
+        JsonSerializer.Deserialize<T>(document.Payload, JsonOptions)
+        ?? throw new InvalidOperationException($"Stored resource '{document.Kind}/{document.Name}' is invalid.");
+
+    private static ResourceGovernance ReadGovernance(string payload) =>
+        JsonSerializer.Deserialize<ResourceGovernanceEnvelope>(payload, JsonOptions)?.Governance ?? ResourceGovernance.User;
 
     public Task<IReadOnlyList<StoredResource<T>>> ListAllAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource =>
         LoadKindAsync<T>(kind, cancellationToken);
@@ -604,6 +658,11 @@ public sealed class SqliteResourceStore(
 
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
 
+    private sealed record ResourceGovernanceEnvelope
+    {
+        public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
+    }
+
 }
 
 public static class SqliteResourceManagementServiceCollectionExtensions
@@ -612,6 +671,7 @@ public static class SqliteResourceManagementServiceCollectionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         services.TryAddSingleton<ICurrentRequestContext, UnavailableRequestContext>();
+        services.TryAddSingleton<IResourceGovernanceContext, ResourceGovernanceContext>();
         services.TryAddSingleton<ITriggerExecutionContext, TriggerExecutionContextAdapter>();
         services.AddDbContextFactory<ResourceManagementDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IResourceStore, SqliteResourceStore>();

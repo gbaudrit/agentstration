@@ -577,6 +577,9 @@ public sealed class PackTests
         var packNamespace = new ResourceNamespace("agentstration.runtime-binding-pack");
         var agent = await agents.GetAgentAsync(packNamespace, "assistant", default);
         Assert.IsNotNull(agent);
+        Assert.AreEqual(ResourceOriginKind.Pack, agent.Value.Governance.Origin.Kind);
+        Assert.AreEqual(ResourceManagementAuthorityKind.PackInstallation, agent.Value.Governance.ManagedBy?.Kind);
+        Assert.AreEqual("1.0.0", agent.Value.Governance.Origin.Version);
         Assert.AreEqual("pack-runtime", agent.Value.Definition.RuntimeProfile.Name);
         Assert.AreEqual(runtimeNamespace, agent.Value.Definition.RuntimeProfile.Namespace);
         var revision = await agents.EnsureExecutionRevisionAsync(packNamespace, "assistant", agent.Value.Generation, default);
@@ -598,7 +601,10 @@ public sealed class PackTests
         Assert.AreEqual("Ready", prepared.State);
 
         var store = factory.Services.GetRequiredService<IResourceStore>();
-        await store.DeleteAsync(new(AgentResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() =>
+            store.DeleteAsync(new(AgentResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default));
+        using (factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(agent.Value.Governance))
+            await store.DeleteAsync(new(AgentResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
             await runtimeProfiles.DeleteAsync(runtimeNamespace, "pack-runtime", runtime.ETag, default);

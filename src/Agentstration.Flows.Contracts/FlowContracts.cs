@@ -20,17 +20,20 @@ public sealed record FlowResponse(string Id, string Name, string? Description, s
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }
 public sealed record FlowSummaryResponse(string Id, string Name, string? Description, FlowKind FlowKind, string Version, bool Enabled, string? ActiveVersion, DateTimeOffset UpdatedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }
 public sealed record FlowVersionResponse(string FlowId, string Version, string? Description, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset PublishedAt, FlowGraphDefinition? Graph = null, string? DefinitionHash = null, string? ReleaseNotes = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }
 public sealed record FlowPageResponse(IReadOnlyList<FlowSummaryResponse> Value, string? NextLink);
 public sealed record CreateFlowRunRequest(JsonElement Input, string? Version = null, string? DeploymentResourceId = "local", FlowRunTrigger Trigger = FlowRunTrigger.Manual, string? CorrelationId = null, IReadOnlyDictionary<string, JsonElement>? Options = null)

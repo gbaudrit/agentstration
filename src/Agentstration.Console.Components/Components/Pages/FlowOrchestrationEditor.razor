@@ -97,7 +97,7 @@ else
                 ? await Client.GetFlowSnapshotAsync(FlowId, cancellation.Token)
                 : await Client.GetFlowSnapshotAsync(FlowResourceNamespace, FlowId, requestedScope.Value, cancellation.Token);
             selectedScope = snapshot.Value.ScopeRef;
-            isReadOnly = snapshot.Value.Metadata.ContainsKey("agentstration.io/pack.name");
+            isReadOnly = snapshot.Value.Governance.IsManaged;
             if (IsReadOnly)
             {
                 var flow = snapshot.Value;

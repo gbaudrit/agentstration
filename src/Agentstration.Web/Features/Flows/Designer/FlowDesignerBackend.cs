@@ -9,12 +9,10 @@ namespace Agentstration.Web.Features.Flows.Designer;
 
 public sealed class FlowDesignerBackend(IFlowApiClient client) : IFlowDesignerBackend
 {
-    private const string PackNameMetadata = "agentstration.io/pack.name";
-
     public async Task<FlowDesignerLoadResult> LoadAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
     {
         var flow = await client.GetFlowAsync(target.Namespace, target.ResourceId, target.ScopeRef, cancellationToken);
-        if (flow.Metadata.ContainsKey(PackNameMetadata))
+        if (flow.Governance.IsManaged)
         {
             if (string.IsNullOrWhiteSpace(flow.ActiveVersion))
                 throw new InvalidOperationException($"Pack-managed Flow '{target.Namespace.Value}/{target.ResourceId}' has no active published version.");
@@ -119,8 +117,8 @@ public sealed class FlowDesignerBackend(IFlowApiClient client) : IFlowDesignerBa
     {
         if (target.Namespace.IsDefault) return target.ScopeRef;
         var flow = await client.GetFlowAsync(target.Namespace, target.ResourceId, target.ScopeRef, cancellationToken);
-        if (flow.Metadata.ContainsKey(PackNameMetadata))
-            throw new InvalidOperationException($"Pack-managed Flow '{target.Namespace.Value}/{target.ResourceId}' is read-only.");
+        if (flow.Governance.IsManaged)
+            throw new InvalidOperationException($"Managed Flow '{target.Namespace.Value}/{target.ResourceId}' is read-only.");
         return target.ScopeRef ?? flow.ScopeRef;
     }
 }

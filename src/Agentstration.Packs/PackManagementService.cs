@@ -22,6 +22,7 @@ public sealed partial class PackManagementService
     private readonly TimeProvider timeProvider;
     private readonly IPackArtifactStore? artifacts;
     private readonly ResourceScopeOperationService? scopeOperations;
+    private IResourceGovernanceContext governanceContext;
     private readonly IReadOnlyDictionary<string, IPackResourceHandler> handlers;
 
     public PackManagementService(IResourceStore store, IEnumerable<IPackResourceHandler> resourceHandlers, TimeProvider timeProvider)
@@ -32,6 +33,7 @@ public sealed partial class PackManagementService
         this.store = store;
         this.timeProvider = timeProvider;
         this.artifacts = artifacts;
+        governanceContext = new ResourceGovernanceContext();
         handlers = resourceHandlers.ToDictionary(value => value.Kind, StringComparer.Ordinal);
     }
 
@@ -44,6 +46,27 @@ public sealed partial class PackManagementService
         : this(store, resourceHandlers, timeProvider, artifacts)
     {
         this.scopeOperations = scopeOperations;
+    }
+
+    public PackManagementService(
+        IResourceStore store,
+        IEnumerable<IPackResourceHandler> resourceHandlers,
+        TimeProvider timeProvider,
+        IPackArtifactStore? artifacts,
+        ResourceScopeOperationService scopeOperations,
+        IResourceGovernanceContext governanceContext)
+        : this(store, resourceHandlers, timeProvider, artifacts, scopeOperations)
+    {
+        this.governanceContext = governanceContext;
+    }
+
+    private IDisposable BeginManagedResourceReconciliation(
+        PackIdentity identity,
+        ResourceScopeRef? scopeRef,
+        string version)
+    {
+        var installationReference = $"{scopeRef?.Value ?? "unscoped"}/{PackKinds.InstalledPack}/{identity.ResourceName}";
+        return governanceContext.Push(ResourceGovernance.Pack(installationReference, identity.ToString(), version));
     }
 
 

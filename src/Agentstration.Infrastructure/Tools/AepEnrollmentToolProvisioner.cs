@@ -6,7 +6,9 @@ using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Tools;
 
-public sealed class AepEnrollmentToolProvisioner(ToolManagementService tools) : IAepEnrollmentResourceProvisioner
+public sealed class AepEnrollmentToolProvisioner(
+    ToolManagementService tools,
+    IResourceGovernanceContext governance) : IAepEnrollmentResourceProvisioner
 {
     public async Task ProvisionAsync(
         ExtensionRegistrationResource registration,
@@ -15,6 +17,13 @@ public sealed class AepEnrollmentToolProvisioner(ToolManagementService tools) : 
     {
         var scopeRef = registration.ScopeRef
             ?? throw new ToolResourceValidationException("The Extension Registration has no ownership scope.");
+        var extensionId = authenticatedManifest?.Extension.Id
+            ?? registration.Definition.ExpectedExtensionId
+            ?? registration.Name;
+        using var governanceScope = governance.Push(ResourceGovernance.Extension(
+            $"{scopeRef.Value}/{registration.Kind}/{registration.Namespace}/{registration.Name}",
+            extensionId,
+            authenticatedManifest?.Extension.Version));
         var extensionReference = new ResourceReference(registration.Name, scopeRef, registration.Namespace);
         var provider = new ToolProviderResource
         {

@@ -374,6 +374,11 @@ public sealed class AepEnrollmentTests
         Assert.AreEqual(registrationName, firstProvider.Value.Definition.Aep.Extension.Name);
         Assert.AreEqual("lookup", firstTool.Value.Definition.ExternalId);
         Assert.IsFalse(firstTool.Value.Definition.Enabled);
+        Assert.AreEqual(ResourceOriginKind.Extension, firstProvider.Value.Governance.Origin.Kind);
+        Assert.AreEqual("extension.materialization-test", firstProvider.Value.Governance.Origin.Reference);
+        Assert.AreEqual("1.0.0", firstProvider.Value.Governance.Origin.Version);
+        Assert.AreEqual(ResourceManagementAuthorityKind.ExtensionInstallation, firstProvider.Value.Governance.ManagedBy?.Kind);
+        Assert.AreEqual(firstProvider.Value.Governance, firstTool.Value.Governance);
 
         var registration = await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>()
             .GetExactAsync(target, ResourceNamespace.Default, registrationName, default);

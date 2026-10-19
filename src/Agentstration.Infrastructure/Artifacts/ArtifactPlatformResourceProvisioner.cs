@@ -11,7 +11,11 @@ using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Artifacts;
 
-public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, FlowService flows, TimeProvider timeProvider)
+public sealed class ArtifactPlatformResourceProvisioner(
+    IResourceStore store,
+    FlowService flows,
+    TimeProvider timeProvider,
+    IResourceGovernanceContext governance)
 {
     public const string DefaultBindingName = "artifact-staging-filesystem-builtin";
     public const string DefaultToolSetName = "artifact-staging-filesystem-builtin";
@@ -26,6 +30,7 @@ public sealed class ArtifactPlatformResourceProvisioner(IResourceStore store, Fl
     {
         if (scope.Kind is not ResourceScopeKind.Instance and not ResourceScopeKind.Workspace)
             throw new InvalidOperationException("Built-in Artifact resources require an Instance or Workspace scope.");
+        using var governanceScope = governance.Push(ResourceGovernance.Core("artifacts.platform"));
         if (scope.Kind == ResourceScopeKind.Instance)
         {
             var toolSet = await EnsureToolSetAsync(scope, cancellationToken);

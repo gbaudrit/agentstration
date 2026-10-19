@@ -19,6 +19,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     IIdentityStore identities,
     IRequestContextScopeFactory scopes,
     IResourceStore resources,
+    IResourceGovernanceContext governance,
     InternalMcpToolProjectionService internalTools,
     ArtifactPlatformResourceProvisioner artifacts,
     KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
@@ -58,6 +59,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
 
     private async Task EnsureStandardRuntimeProfileAsync(CancellationToken cancellationToken)
     {
+        using var governanceScope = governance.Push(ResourceGovernance.Core("runtime.standard-profile"));
         var instanceScope = ResourceScopeRef.Instance;
         var address = ScopedResourceAddress.Create(
             instanceScope,

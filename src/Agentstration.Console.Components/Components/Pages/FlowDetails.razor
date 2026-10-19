@@ -116,8 +116,7 @@ else
     private string StatusLabel => T($"Status.{Status}");
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
     private ResourceScopeRef FlowScopeRef => flow?.ScopeRef ?? (string.IsNullOrWhiteSpace(ScopeRefValue) ? ResourceScopeRef.Workspace(Guid.Empty) : ResourceScopeRef.Parse(ScopeRefValue));
-    private bool IsPackManaged => flow?.Metadata.ContainsKey("agentstration.io/pack.name") is true;
-    private bool IsEditable => !IsPackManaged;
+    private bool IsEditable => flow?.Governance.IsManaged is false;
     private IReadOnlyList<string> AvailableTabs => Tabs;
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
     private bool IsOrchestration => Orchestration is not null;

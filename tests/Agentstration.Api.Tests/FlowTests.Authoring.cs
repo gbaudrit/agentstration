@@ -109,6 +109,41 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task ManagedFlowCanOnlyBeChangedByItsExactManager()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var manager = ResourceGovernance.Core("agentstration.core", "1.0.0");
+        StoredFlow created;
+        using (fixture.Governance.Push(manager))
+            created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+                "managed-flow", null, "1.0.0", true,
+                new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"))), default);
+
+        Assert.AreEqual(manager, created.Value.Governance);
+        var blocked = await Assert.ThrowsExactlyAsync<ResourceGovernanceViolationException>(() => fixture.Service.UpdateAsync(
+            TestScope.WorkspaceId,
+            created.Value.Id,
+            new UpdateFlowCommand("forbidden", "1.0.1", true, created.Value.Definition),
+            created.ETag,
+            default));
+        Assert.AreEqual("resource_managed", blocked.Code);
+
+        var nextManagerVersion = ResourceGovernance.Core("agentstration.core", "2.0.0");
+        StoredFlow updated;
+        using (fixture.Governance.Push(nextManagerVersion))
+            updated = await fixture.Service.UpdateAsync(
+                TestScope.WorkspaceId,
+                created.Value.Id,
+                new UpdateFlowCommand("reconciled", "2.0.0", true, created.Value.Definition),
+                created.ETag,
+                default);
+
+        Assert.AreEqual("2.0.0", updated.Value.Governance.Origin.Version);
+        using (fixture.Governance.Push(nextManagerVersion))
+            await fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, updated.ETag, default);
+    }
+
+    [TestMethod]
     public async Task DuplicateDraftPublicationDoesNotChangeTheFlowDefinition()
     {
         await using var fixture = await FlowFixture.CreateAsync();

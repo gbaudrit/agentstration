@@ -102,12 +102,25 @@ public sealed class WorkNotificationMcpTool(
 public sealed class InternalMcpToolProjectionService(
     IResourceStore store,
     IEnumerable<IInternalMcpToolDefinitionProvider> definitions,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IResourceGovernanceContext governance)
 {
     public async Task EnsureAsync(ResourceScopeRef scope, ResourceNamespace @namespace, CancellationToken cancellationToken)
     {
         if (scope.Kind is not ResourceScopeKind.Instance and not ResourceScopeKind.Workspace)
             throw new ToolResourceValidationException("Internal MCP Tools require an Instance or Workspace scope.");
+        var initialCategories = await EnsureManagedResourcesAsync(scope, @namespace, cancellationToken);
+        foreach (var (category, toolName) in initialCategories)
+            await EnsureInitialCategoryAsync(category, toolName, scope, @namespace, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<(InitialToolCategory Category, string ToolName)>> EnsureManagedResourcesAsync(
+        ResourceScopeRef scope,
+        ResourceNamespace @namespace,
+        CancellationToken cancellationToken)
+    {
+        using var governanceScope = governance.Push(ResourceGovernance.Core("tools.internal-mcp"));
+        var initialCategories = new List<(InitialToolCategory Category, string ToolName)>();
         var providerKey = new ResourceKey(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name, @namespace);
         var provider = await store.GetExactAsync<ToolProviderResource>(providerKey.AtScope(scope), cancellationToken)
             ?? await CreateOrReadAsync(Provider(scope, @namespace), scope, cancellationToken);
@@ -148,7 +161,7 @@ public sealed class InternalMcpToolProjectionService(
                 }, scope, cancellationToken);
 
                 if (definition.InitialCategory is { } category)
-                    await EnsureInitialCategoryAsync(category, name, scope, @namespace, cancellationToken);
+                    initialCategories.Add((category, name));
             }
 
             if (existing.Value.Definition.ExternalId != definition.Name
@@ -170,6 +183,8 @@ public sealed class InternalMcpToolProjectionService(
                 }, existing.ETag, false, cancellationToken);
             }
         }
+
+        return initialCategories;
     }
 
     private async Task EnsureInitialCategoryAsync(
