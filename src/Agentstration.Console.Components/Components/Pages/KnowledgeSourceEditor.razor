@@ -37,7 +37,8 @@ else
                 {
                     <div class="form-grid knowledge-binding-card" data-testid="knowledge-source-binding">
                         <label><span>@T("BindingName")</span><input @bind="binding.Name" maxlength="128" /></label>
-                        <label><span>@T("DataSource")</span><select @bind="binding.DataSourceKey" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
+                        <label><span>@T("DataSource")</span><select value="@binding.DataSourceKey" @onchange="args => ChangeDataSourceAsync(binding, args)" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
+                        @if (TargetOptions(binding).Count > 0) { <label><span>@T("AcquisitionTarget")</span><select @bind="binding.AcquisitionTargetName" required data-testid="knowledge-source-binding-acquisition-target"><option value="">@T("SelectAcquisitionTarget")</option>@foreach (var target in TargetOptions(binding).Where(value => value.Target.Enabled && !value.Stale)) { <option value="@target.Target.Name">@target.Target.DisplayName · @target.Target.ChoiceDisplayName</option> }</select></label> }
                         <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
                         <label class="knowledge-choice"><input type="checkbox" @bind="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
                         <label><span>@T("MaximumAge")</span><input type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /><small>@T("MaximumAgeHelp")</small></label>
@@ -58,6 +59,7 @@ else
     [Parameter] public EventCallback<KnowledgeSourceResource> Saved { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<DataSourceResource> dataSources = [];
+    private readonly Dictionary<string, IReadOnlyList<DataSourceAcquisitionTargetView>> acquisitionTargets = new(StringComparer.Ordinal);
     private IReadOnlyList<FlowOption> projectionFlows = [], retrievalFlows = [], transformationFlows = [];
     private readonly List<BindingModel> bindings = [];
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
@@ -92,6 +94,7 @@ else
                 bindings.Clear();
                 bindings.AddRange(snapshot.Value.Definition.DataSources.Select(value => BindingModel.From(
                     value, snapshot.Value.Namespace, TargetKey(value.TransformationFlow, snapshot.Value.Namespace))));
+                foreach (var binding in bindings) await LoadTargetsAsync(binding);
             }
             else
             {
@@ -165,7 +168,10 @@ else
     {
         if (!value.ConfigurationValid || value.Configuration.ValueKind != System.Text.Json.JsonValueKind.Object)
             throw new ArgumentException(T("JsonObjectRequired"));
-        return new() { Name = value.Name.Trim(), DataSource = DataSourceReference(value.DataSourceKey),
+        var dataSource = DataSourceReference(value.DataSourceKey);
+        return new() { Name = value.Name.Trim(), DataSource = dataSource,
+            AcquisitionTarget = string.IsNullOrWhiteSpace(value.AcquisitionTargetName) ? null
+                : new(value.AcquisitionTargetName, TargetOptions(value).Single(target => target.Target.Name == value.AcquisitionTargetName).Target.ScopeRef, dataSource.Namespace),
             TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = value.Configuration.Clone(), Required = value.Required,
             MaximumAge = ParseMaximumAge(value.MaximumAgeText) };
     }
@@ -202,6 +208,17 @@ else
         if (parts.Length != 3) throw new ArgumentException(T("DataSourceSelectionRequired"));
         return new(parts[2], ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]));
     }
+    private async Task ChangeDataSourceAsync(BindingModel binding, ChangeEventArgs args)
+    { binding.DataSourceKey = args.Value?.ToString() ?? string.Empty; binding.AcquisitionTargetName = string.Empty; await LoadTargetsAsync(binding); }
+    private async Task LoadTargetsAsync(BindingModel binding)
+    {
+        if (string.IsNullOrWhiteSpace(binding.DataSourceKey) || acquisitionTargets.ContainsKey(binding.DataSourceKey)) return;
+        var parts = binding.DataSourceKey.Split('|', 3);
+        acquisitionTargets[binding.DataSourceKey] = await DataSources.GetAcquisitionTargetsAsync(
+            ResourceNamespace.Parse(parts[1]), parts[2], ResourceScopeRef.Parse(parts[0]), cancellation.Token);
+    }
+    private IReadOnlyList<DataSourceAcquisitionTargetView> TargetOptions(BindingModel binding) =>
+        acquisitionTargets.GetValueOrDefault(binding.DataSourceKey, []);
     private static string FlowKey(FlowOption value) => value.Key;
     private static string FlowLabel(FlowOption value) => $"{value.DisplayName} · {value.ScopeRef} · {value.Namespace}/{value.Name}:{value.Version}";
     private static KnowledgeFlowTarget? FlowTarget(string key)
@@ -232,6 +249,7 @@ else
     {
         public string Name { get; set; } = string.Empty;
         public string DataSourceKey { get; set; } = string.Empty;
+        public string AcquisitionTargetName { get; set; } = string.Empty;
         public string TransformationFlowKey { get; set; } = string.Empty;
         public JsonElement Configuration { get; set; } = JsonSerializer.SerializeToElement(new { });
         public bool ConfigurationValid { get; set; } = true;
@@ -242,6 +260,7 @@ else
             Name = value.Name,
             DataSourceKey = value.DataSource.ScopeRef is null ? string.Empty
                 : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
+            AcquisitionTargetName = value.AcquisitionTarget?.Name ?? string.Empty,
             TransformationFlowKey = transformationFlowKey,
             Configuration = value.Configuration.Clone(),
             Required = value.Required,

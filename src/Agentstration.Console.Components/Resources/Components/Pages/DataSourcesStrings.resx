@@ -33,4 +33,22 @@
   <data name="DataSourceYamlHelp" xml:space="preserve"><value>Edit the complete Data Source resource as YAML.</value></data>
   <data name="ResourceManifest" xml:space="preserve"><value>Resource manifest</value></data>
   <data name="SaveYaml" xml:space="preserve"><value>Save YAML</value></data>
+  <data name="Discovery" xml:space="preserve"><value>Discovery</value></data>
+  <data name="DiscoveryTargets" xml:space="preserve"><value>Discovered acquisition targets</value></data>
+  <data name="DiscoveryHelp" xml:space="preserve"><value>Run the profile discovery Flow, review its bounded choices, and explicitly promote the choices that may be acquired.</value></data>
+  <data name="StartDiscovery" xml:space="preserve"><value>Start discovery</value></data>
+  <data name="NoDiscovery" xml:space="preserve"><value>No successful discovery is available yet.</value></data>
+  <data name="Choice" xml:space="preserve"><value>Choice</value></data>
+  <data name="Parent" xml:space="preserve"><value>Parent</value></data>
+  <data name="Eligible" xml:space="preserve"><value>Eligible</value></data>
+  <data name="Ineligible" xml:space="preserve"><value>Ineligible</value></data>
+  <data name="Promote" xml:space="preserve"><value>Promote</value></data>
+  <data name="AcquisitionTarget" xml:space="preserve"><value>Acquisition target</value></data>
+  <data name="AcquisitionTargets" xml:space="preserve"><value>Acquisition targets</value></data>
+  <data name="SelectTarget" xml:space="preserve"><value>Select a target</value></data>
+  <data name="Stale" xml:space="preserve"><value>Stale</value></data>
+  <data name="Current" xml:space="preserve"><value>Current</value></data>
+  <data name="TargetName" xml:space="preserve"><value>Target name</value></data>
+  <data name="DiscoveryFlow" xml:space="preserve"><value>Discovery Flow (optional)</value></data>
+  <data name="DiscoveryToolBindings" xml:space="preserve"><value>Discovery Tool bindings (JSON)</value></data>
 </root>

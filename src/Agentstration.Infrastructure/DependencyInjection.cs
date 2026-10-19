@@ -155,6 +155,8 @@ public static class DependencyInjection
         services.AddSingleton<DataSourceProfileService>();
         services.AddSingleton<DataSourceManagementService>();
         services.AddSingleton<DataSourceAcquisitionService>();
+        services.AddSingleton<DataSourceDiscoveryService>();
+        services.AddSingleton<DataSourceAcquisitionTargetService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
         services.AddSingleton<KnowledgeProjectionService>();
         services.AddSingleton<KnowledgeRetrievalService>();

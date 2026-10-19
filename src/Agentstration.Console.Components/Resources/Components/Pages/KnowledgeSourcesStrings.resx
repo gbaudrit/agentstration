@@ -64,4 +64,6 @@
   <data name="Completed" xml:space="preserve"><value>Completed</value></data>
   <data name="SynthesizedAnswer" xml:space="preserve"><value>Synthesized answer</value></data>
   <data name="UnknownMediaType" xml:space="preserve"><value>Unknown media type</value></data>
+  <data name="AcquisitionTarget" xml:space="preserve"><value>Acquisition target</value></data>
+  <data name="SelectAcquisitionTarget" xml:space="preserve"><value>Select an acquisition target</value></data>
 </root>

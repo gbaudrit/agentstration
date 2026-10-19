@@ -204,3 +204,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 176. [ADR-0176 — Data Source profiles pin owner-scoped dependencies](0176-data-source-profiles-pin-owner-scoped-dependencies.md)
 177. [ADR-0177 — Execution state uses the exact invocation scope](0177-execution-state-uses-exact-invocation-scope.md)
 178. [ADR-0178 — Managed resources record origin and management authority](0178-managed-resources-record-origin-and-management-authority.md)
+179. [ADR-0179 — Data Sources discover and promote acquisition targets](0179-data-sources-discover-and-promote-acquisition-targets.md)

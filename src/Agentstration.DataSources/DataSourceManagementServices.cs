@@ -126,6 +126,8 @@ public sealed class DataSourceProfileService(
         var dependencies = await compositions.ResolveDependenciesAsync(exact, profile.Value.Namespace,
             definition, cancellationToken);
         ValidateAcquisitionFlow(dependencies.AcquisitionFlow);
+        if (dependencies.DiscoveryFlow is { } discoveryFlow)
+            ValidateDiscoveryFlow(discoveryFlow);
         var dependencyHash = Hash(dependencies);
         var revision = new DataSourceProfileRevisionResource
         {
@@ -151,7 +153,9 @@ public sealed class DataSourceProfileService(
             PublishedBy = requestContext.IsInitialized ? requestContext.Current.PrincipalId : Guid.Empty,
             Definition = definition,
             AcquisitionFlow = dependencies.AcquisitionFlow,
-            ToolBindings = dependencies.ToolBindings
+            ToolBindings = dependencies.ToolBindings,
+            DiscoveryFlow = dependencies.DiscoveryFlow,
+            DiscoveryToolBindings = dependencies.DiscoveryToolBindings
         };
         var stored = await scopeOperations.WriteAsync(profile.Value, exact, AuthorizationPermissions.ResourcesWrite,
             async token =>
@@ -262,7 +266,9 @@ public sealed class DataSourceProfileService(
             DependencyHash = revision.Value.DependencyHash,
             Definition = revision.Value.Definition,
             AcquisitionFlow = revision.Value.AcquisitionFlow,
-            ToolBindings = revision.Value.ToolBindings
+            ToolBindings = revision.Value.ToolBindings,
+            DiscoveryFlow = revision.Value.DiscoveryFlow,
+            DiscoveryToolBindings = revision.Value.DiscoveryToolBindings
         };
     }
 
@@ -303,9 +309,15 @@ public sealed class DataSourceProfileService(
             throw Error("data_source_profile_description_too_long", "Profile descriptions cannot exceed 2000 characters.");
         ValidateVersion(resource.Definition.Version);
         ValidateSchema(resource.Definition.ConfigurationSchema);
-        ValidateFlow(resource.Definition.AcquisitionFlow);
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var binding in resource.Definition.ToolBindings)
+        ValidateFlow(resource.Definition.AcquisitionFlow, "acquisition");
+        if (resource.Definition.DiscoveryFlow is { } discoveryFlow) ValidateFlow(discoveryFlow, "discovery");
+        ValidateBindings(resource.Definition.ToolBindings, new(StringComparer.Ordinal));
+        ValidateBindings(resource.Definition.DiscoveryToolBindings, new(StringComparer.Ordinal));
+    }
+
+    private static void ValidateBindings(IReadOnlyList<DataSourceProfileToolBinding> bindings, HashSet<string> names)
+    {
+        foreach (var binding in bindings)
         {
             ValidateToken(binding.Name, "Tool binding name");
             ValidateToken(binding.Capability, "Tool binding capability");
@@ -349,11 +361,11 @@ public sealed class DataSourceProfileService(
             throw Error("data_source_profile_schema_invalid", "Configuration schemas must be bounded JSON objects.");
     }
 
-    private static void ValidateFlow(DataSourceFlowTarget target)
+    private static void ValidateFlow(DataSourceFlowTarget target, string purpose)
     {
-        ValidateToken(target.Name, "acquisition Flow name");
+        ValidateToken(target.Name, $"{purpose} Flow name");
         if (target.UseActiveVersion == (target.Version is not null))
-            throw Error("data_source_profile_flow_reference_invalid", "Acquisition Flow references must select either the active version or one exact version.");
+            throw Error("data_source_profile_flow_reference_invalid", $"{purpose} Flow references must select either the active version or one exact version.");
     }
 
     private static void ValidateToken(string value, string label)
@@ -384,6 +396,19 @@ public sealed class DataSourceProfileService(
             ["dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile", "sourceConfiguration",
                 "parameters", "caller", "correlationId", "acquisitionId"], "input");
         RequireProperties(flow.OutputSchema, ["artifacts"], "output");
+    }
+
+    private static void ValidateDiscoveryFlow(ResolvedDataSourceFlowBinding flow)
+    {
+        if (!string.Equals(flow.Contract, DataSourceFlowContracts.Discovery, StringComparison.Ordinal))
+            throw Error("data_source_discovery_contract_required",
+                $"Flow '{flow.Namespace}/{flow.Name}:{flow.Version}' must declare contract '{DataSourceFlowContracts.Discovery}'.");
+        DataSourceAcquisitionService.RequireContractProperties(flow.InputSchema,
+            ["dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile", "sourceConfiguration",
+                "parameters", "caller", "correlationId", "discoveryId"], "input",
+            DataSourceFlowContracts.Discovery, "data_source_discovery_contract_invalid");
+        DataSourceAcquisitionService.RequireContractProperties(flow.OutputSchema, ["choices"], "output",
+            DataSourceFlowContracts.Discovery, "data_source_discovery_contract_invalid");
     }
 
     private static void RequireProperties(JsonElement? schema, IReadOnlyList<string> names, string direction)
@@ -533,7 +558,7 @@ public sealed class DataSourceManagementService(
             if (issues.Count != 0) return new(false, true, profile, issues);
 
             await compositions.ValidatePinnedAsync(resource.ScopeRef.Value, profile, cancellationToken);
-            return new(true, true, profile, issues, profile.AcquisitionFlow);
+            return new(true, true, profile, issues, profile.AcquisitionFlow, profile.DiscoveryFlow);
         }
         catch (Exception exception) when (exception is DataSourceValidationException or DataSourceAcquisitionException
             or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)

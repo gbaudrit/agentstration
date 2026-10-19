@@ -52,7 +52,8 @@ internal static class DataSourceAcquisitionEndpoints
         var selectedScope = body.DataSourceScopeRef
             ?? (string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef));
         var stored = await service.StartAsync(ResourceNamespace.Parse(@namespace), name, selectedScope,
-            body.Parameters, body.CorrelationId, request.Headers["Idempotency-Key"].FirstOrDefault(), cancellationToken);
+            body.Parameters, body.CorrelationId, request.Headers["Idempotency-Key"].FirstOrDefault(), body.TargetName,
+            cancellationToken);
         response.Headers.Location = Location(stored.Value);
         response.Headers.ETag = stored.ETag;
         return Results.Json(stored.Value, statusCode: StatusCodes.Status202Accepted);

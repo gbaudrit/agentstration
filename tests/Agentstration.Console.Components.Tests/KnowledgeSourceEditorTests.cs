@@ -80,6 +80,25 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
+    public void CreationSelectsAnAcquisitionTargetForTheBinding()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new KnowledgeClientStub();
+        using var context = CreateContext(client, new DataSourcesClientStub(withTarget: true));
+        var rendered = context.Render<KnowledgeSourceEditor>();
+
+        rendered.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        rendered.WaitForElement("[data-testid='knowledge-source-binding-acquisition-target']")
+            .Change("documents");
+        rendered.Find("[data-testid='knowledge-source-display-name']").Change("Targeted documentation");
+        rendered.Find("button[type='submit']").Click();
+
+        rendered.WaitForAssertion(() =>
+            Assert.AreEqual("documents", client.CreatedRequest?.Properties.DataSources.Single().AcquisitionTarget?.Name));
+    }
+
+    [TestMethod]
     public void CreationRejectsATransformationConfigurationThatIsNotAJsonObject()
     {
         using var culture = new TestCultureScope("en-US");
@@ -450,12 +469,12 @@ public sealed class KnowledgeSourceEditorTests
         });
     }
 
-    private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge)
+    private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null)
     {
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(knowledge);
-        context.Services.AddSingleton<IDataSourcesClient>(new DataSourcesClientStub());
+        context.Services.AddSingleton(dataSourcesClient ?? new DataSourcesClientStub());
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
         return context;
     }
@@ -724,7 +743,7 @@ public sealed class KnowledgeSourceEditorTests
         public Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class DataSourcesClientStub : IDataSourcesClient
+    private sealed class DataSourcesClientStub(bool withTarget = false) : IDataSourcesClient
     {
         private static readonly DataSourceResource Source = new()
         {
@@ -747,6 +766,26 @@ public sealed class KnowledgeSourceEditorTests
         public Task<DataSourceReadiness> GetReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, StartDataSourceAcquisitionRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns,
+            string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>(withTarget
+                ? [new(new DataSourceAcquisitionTargetResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
+                    Metadata = new() { Name = "documents" }, ScopeRef = DataSourceScope, DisplayName = "Documents",
+                    DataSourceScopeRef = DataSourceScope, DataSourceUid = Source.Uid, DataSourceName = Source.Name,
+                    DataSourceNamespace = Source.Namespace, DataSourceGeneration = Source.Generation,
+                    DiscoveryId = "discovery-1", DiscoveryUid = Guid.NewGuid(), ChoiceId = "documents",
+                    ChoiceDisplayName = "Documents", Profile = new ResolvedDataSourceProfile
+                    {
+                        Name = "web-builtin", Namespace = ResourceNamespace.Default, ScopeRef = DataSourceScope,
+                        Uid = Guid.NewGuid(), Generation = 1, Version = "1.0.0", DefinitionHash = "hash",
+                        DependencyHash = "dependencies",
+                        Definition = new DataSourceProfileProperties { DisplayName = "Web", AcquisitionFlow = new() { Name = "acquire" } },
+                        AcquisitionFlow = new("acquire", ResourceNamespace.Default, "1.0.0", false,
+                            null, null, DataSourceFlowContracts.Acquisition, "sha256:acquire") { ScopeRef = DataSourceScope }
+                    }, PromotedAt = DateTimeOffset.UtcNow, PromotedBy = Guid.Empty
+                }, false, [])] : []);
     }
 
 }

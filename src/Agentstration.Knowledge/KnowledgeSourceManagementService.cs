@@ -223,6 +223,9 @@ public sealed class KnowledgeSourceManagementService(
             if (string.IsNullOrWhiteSpace(binding.DataSource.Name))
                 throw new KnowledgeSourceValidationException("knowledge_source_data_source_binding_invalid",
                     $"Binding '{binding.Name}' requires a Data Source reference.");
+            if (binding.AcquisitionTarget is { } target && string.IsNullOrWhiteSpace(target.Name))
+                throw new KnowledgeSourceValidationException("knowledge_source_acquisition_target_invalid",
+                    $"Binding '{binding.Name}' has an invalid acquisition target reference.");
             if (binding.Configuration.ValueKind != JsonValueKind.Object)
                 throw new KnowledgeSourceValidationException("knowledge_source_transformation_configuration_invalid",
                     $"Binding '{binding.Name}' transformation configuration must be a JSON object.");

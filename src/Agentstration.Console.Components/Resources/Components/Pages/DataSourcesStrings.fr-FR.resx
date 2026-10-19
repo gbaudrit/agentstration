@@ -33,4 +33,22 @@
   <data name="DataSourceYamlHelp" xml:space="preserve"><value>Modifiez la ressource Data Source complète au format YAML.</value></data>
   <data name="ResourceManifest" xml:space="preserve"><value>Manifeste de ressource</value></data>
   <data name="SaveYaml" xml:space="preserve"><value>Enregistrer le YAML</value></data>
+  <data name="Discovery" xml:space="preserve"><value>Découverte</value></data>
+  <data name="DiscoveryTargets" xml:space="preserve"><value>Cibles d’acquisition découvertes</value></data>
+  <data name="DiscoveryHelp" xml:space="preserve"><value>Exécutez le Flow de découverte du profil, examinez ses choix bornés et promouvez explicitement ceux qui peuvent être acquis.</value></data>
+  <data name="StartDiscovery" xml:space="preserve"><value>Lancer la découverte</value></data>
+  <data name="NoDiscovery" xml:space="preserve"><value>Aucune découverte réussie n’est encore disponible.</value></data>
+  <data name="Choice" xml:space="preserve"><value>Choix</value></data>
+  <data name="Parent" xml:space="preserve"><value>Parent</value></data>
+  <data name="Eligible" xml:space="preserve"><value>Éligible</value></data>
+  <data name="Ineligible" xml:space="preserve"><value>Non éligible</value></data>
+  <data name="Promote" xml:space="preserve"><value>Promouvoir</value></data>
+  <data name="AcquisitionTarget" xml:space="preserve"><value>Cible d’acquisition</value></data>
+  <data name="AcquisitionTargets" xml:space="preserve"><value>Cibles d’acquisition</value></data>
+  <data name="SelectTarget" xml:space="preserve"><value>Sélectionner une cible</value></data>
+  <data name="Stale" xml:space="preserve"><value>Obsolète</value></data>
+  <data name="Current" xml:space="preserve"><value>À jour</value></data>
+  <data name="TargetName" xml:space="preserve"><value>Nom de la cible</value></data>
+  <data name="DiscoveryFlow" xml:space="preserve"><value>Flow de découverte (facultatif)</value></data>
+  <data name="DiscoveryToolBindings" xml:space="preserve"><value>Associations d’outils de découverte (JSON)</value></data>
 </root>
