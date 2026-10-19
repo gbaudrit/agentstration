@@ -40,6 +40,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.EntryId).HasMaxLength(512);
         item.Property(value => value.AnchorTaskId).HasMaxLength(36);
         item.Property(value => value.FlowRunId).HasMaxLength(128);
+        item.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.IsWorkplaceTask, value.UpdatedAt });
         item.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.HasIndex(value => new { value.WorkspaceId, value.Status, value.UpdatedAt });
@@ -252,6 +253,7 @@ internal sealed class WorkItemDocument
     public string? EntryId { get; set; }
     public string? AnchorTaskId { get; set; }
     public string? FlowRunId { get; set; }
+    public bool IsWorkplaceTask { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public long Version { get; set; }

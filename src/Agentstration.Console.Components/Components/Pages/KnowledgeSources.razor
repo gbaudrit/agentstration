@@ -1,0 +1,54 @@
+@page "/knowledge-sources"
+@inject IKnowledgeSourcesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-knowledge-sources">
+    <Actions><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a><a class="button-secondary" href="/artifacts">@T("OpenArtifacts")</a><a class="button-secondary" href="/tools/sets">@T("OpenToolSets")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
+</PageHeader>
+
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (sources.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a></EmptyState> }
+else
+{
+    <DataGrid TItem="KnowledgeSourceResource" Items="sources">
+        <Header><tr><th>@T("KnowledgeSource")</th><th>@T("DataSources")</th><th>@T("ProjectionFlow")</th><th>@T("RetrievalFlow")</th><th>@T("State")</th><th></th></tr></Header>
+        <Row Context="source"><tr data-testid="knowledge-source-row"><td><span class="resource-name-with-scope"><strong><a class="resource-name-link" href="@DetailsUrl(source)" data-testid="knowledge-source-name-link">@source.Definition.DisplayName</a></strong><ResourceScopeBadge ScopeRef="source.ScopeRef" Compact /></span><code>@source.Namespace/@source.Name</code></td><td>@if (source.Definition.DataSources.Count > 0) { <span class="knowledge-source-inputs">@foreach (var binding in source.Definition.DataSources) { <a class="text-button" href="@DataSourceUrl(source, binding.DataSource)" data-testid="knowledge-source-data-source-link">@binding.DataSource.Name</a> }</span> } else { <span>—</span> }</td><td>@if (source.Definition.ProjectionFlow is { } projection) { <a class="text-button" href="@FlowUrl(source, projection)" data-testid="knowledge-source-projection-flow-link">@Flow(projection)</a> } else { <span>—</span> }</td><td>@if (source.Definition.RetrievalFlow is { } retrieval) { <a class="text-button" href="@FlowUrl(source, retrieval)">@Flow(retrieval)</a> } else { <span>—</span> }</td><td><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@DetailsUrl(source)">@T("Inspect")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private IReadOnlyList<KnowledgeSourceResource> sources = [];
+    private bool loading = true;
+    private string? error;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try { sources = await Client.GetAsync(); }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+    private static string Flow(KnowledgeFlowTarget? value) => value is null ? "—" : $"{value.Namespace ?? ResourceNamespace.Default}/{value.Name}:{value.Version ?? "active"}";
+    private static string DetailsUrl(KnowledgeSourceResource value) => value.Namespace.IsDefault
+        ? $"/knowledge-sources/{Uri.EscapeDataString(value.Name)}"
+        : $"/knowledge-sources/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+    private static string DataSourceUrl(KnowledgeSourceResource source, ResourceReference value)
+    {
+        var ns = value.Namespace ?? source.Namespace;
+        var scope = value.ScopeRef ?? source.ScopeRef;
+        var query = $"namespace={Uri.EscapeDataString(ns.Value)}";
+        if (scope is not null) query += $"&scopeRef={Uri.EscapeDataString(scope.Value.Value)}";
+        return $"/data-sources/{Uri.EscapeDataString(value.Name)}?{query}";
+    }
+    private static string FlowUrl(KnowledgeSourceResource source, KnowledgeFlowTarget value)
+    {
+        var ns = value.Namespace ?? source.Namespace;
+        return ns.IsDefault
+            ? $"/flows/{Uri.EscapeDataString(value.Name)}"
+            : $"/namespaces/{Uri.EscapeDataString(ns.Value)}/flows/{Uri.EscapeDataString(value.Name)}";
+    }
+}

@@ -13,7 +13,10 @@ public sealed class DateTimeMcpTool(TimeProvider timeProvider) : IInternalMcpToo
         JsonSerializer.SerializeToElement(new
         {
             type = "object",
-            properties = new { },
+            properties = new
+            {
+                dryRun = new { type = "boolean", description = "Runs the Tool without side effects." }
+            },
             additionalProperties = false
         }),
         JsonSerializer.SerializeToElement(new
@@ -37,8 +40,9 @@ public sealed class DateTimeMcpTool(TimeProvider timeProvider) : IInternalMcpToo
     public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (invocation.Arguments.ValueKind != JsonValueKind.Object || invocation.Arguments.EnumerateObject().Any())
-            throw new ToolDefinitionInvocationException("datetime_arguments_invalid", "The datetime Tool does not accept arguments.");
+        if (invocation.Arguments.ValueKind != JsonValueKind.Object
+            || invocation.Arguments.EnumerateObject().Any(value => value.Name != ToolDryRunContract.ParameterName))
+            throw new ToolDefinitionInvocationException("datetime_arguments_invalid", "The datetime Tool accepts only the dryRun argument.");
 
         var utc = timeProvider.GetUtcNow();
         var local = TimeZoneInfo.ConvertTime(utc, TimeZoneInfo.Local);

@@ -25,6 +25,7 @@ public static class ResourceManifestSerializer
     }
 
     private static readonly ISerializer YamlSerializer = new SerializerBuilder()
+        .WithQuotingNecessaryStrings(true)
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
         .Build();
 

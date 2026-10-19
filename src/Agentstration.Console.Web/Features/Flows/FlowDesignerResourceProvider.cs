@@ -1,3 +1,4 @@
+using Agentstration.Flows;
 using Agentstration.Web.Console;
 using Agentstration.Web.FlowDesigner.Backend;
 
@@ -20,7 +21,8 @@ public sealed class FlowDesignerResourceProvider(
         string name,
         CancellationToken cancellationToken) =>
         (await flowClient.GetFlowVersionsAsync(@namespace, name, cancellationToken))
-            .Select(version => new FlowDesignerFlowVersion(version.Version, version.Graph?.InputSchema, version.Graph?.OutputSchema)).ToArray();
+            .Select(version => new FlowDesignerFlowVersion(version.Version, version.Graph?.InputSchema, version.Graph?.OutputSchema,
+                version.Graph?.GetOutputs().Select(output => new FlowDesignerOutput(output.Name, output.DisplayName, output.Outcome, output.Schema)).ToArray() ?? [])).ToArray();
 
     public async Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken) =>
         (await toolsClient.GetToolsAsync(cancellationToken: cancellationToken))

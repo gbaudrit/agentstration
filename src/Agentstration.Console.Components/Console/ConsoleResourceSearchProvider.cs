@@ -55,24 +55,24 @@ public sealed class ConsoleResourceSearchProvider(
             var secretsTask = SafeLoadAsync("secrets", token => secrets.GetSecretsAsync(token), cancellationToken);
             var vaultsTask = SafeLoadAsync("vaults", token => secrets.GetVaultsAsync(token), cancellationToken);
             var flowsTask = SafeLoadAsync("flows", token => flows.GetFlowsAsync(token), cancellationToken);
-            var deploymentsTask = SafeLoadAsync("deployments", token => management.GetDeploymentsAsync(token), cancellationToken);
+            var instancesTask = SafeLoadAsync("Agent instances", token => runtime.GetAgentInstancesAsync(token), cancellationToken);
             var executionsTask = SafeLoadAsync("executions", token => runtime.GetExecutionsAsync(token), cancellationToken);
             var workTask = SafeLoadAsync("work items", token => work.GetWorkItemsAsync(token), cancellationToken);
 
-            await Task.WhenAll(agentsTask, profilesTask, providersTask, sourceProvidersTask, runtimeProfilesTask, parametersTask, secretsTask, vaultsTask, flowsTask, deploymentsTask, executionsTask, workTask);
+            await Task.WhenAll(agentsTask, profilesTask, providersTask, sourceProvidersTask, runtimeProfilesTask, parametersTask, secretsTask, vaultsTask, flowsTask, instancesTask, executionsTask, workTask);
 
             cache =
             [
                 .. agentsTask.Result.Select(ToResult),
-                .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, ResourceUrl("modelprofiles", item.Namespace, item.Name), item.Properties.Status, "layers", $"{item.Namespace} {item.Name} {item.Properties.Model.Name}")),
+                .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, ResourceUrl("modelprofiles", item.Namespace, item.Name), item.Properties.Status, "adjustments", $"{item.Namespace} {item.Name} {item.Properties.Model.Name}")),
                 .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, ResourceUrl("modelproviders", item.Namespace, item.Name), item.Properties.Status, "cpu", $"{item.Namespace} {item.Name} {item.Properties.ContributionId}")),
-                .. sourceProvidersTask.Result.Select(item => new ResourceSearchResult(item.DisplayName, "Source provider", item.Id, ResourceUrl("sourceproviders", item.Namespace, item.Name), item.Status, "database", $"{item.Namespace} {item.Name} {item.ContributionId} {item.ExtensionName}")),
+                .. sourceProvidersTask.Result.Select(item => new ResourceSearchResult(item.DisplayName, "Source provider", item.Id, ResourceUrl("sourceproviders", item.Namespace, item.Name), item.Status, "plug-connected", $"{item.Namespace} {item.Name} {item.ContributionId} {item.ExtensionName}")),
                 .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, ResourceUrl("runtimeprofiles", item.Namespace, item.Name), "Configured", "cube", $"{item.Namespace} {item.Name} {item.Properties.RuntimeType}")),
                 .. parametersTask.Result.Select(item => new ResourceSearchResult(item.Definition.DisplayName, "Parameter", item.Address.ToString(), $"/parameters/{Escape(item.Name)}?scopeRef={Escape(item.ScopeRef!.Value.Value)}", "Configured", "braces", $"{item.Namespace.Value} {item.Name} {item.Definition.ValueType}")),
                 .. secretsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Secret", item.Resource.Address.ToString(), $"/secrets/{Escape(item.Resource.Name)}", item.ValueStatus, "key", $"{item.Resource.Name} {item.Resource.Definition.Vault.Name}")),
                 .. vaultsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Vault", item.Resource.Address.ToString(), $"/vaults/{Escape(item.Resource.Name)}", item.Status, "vault", $"{item.Resource.Name} {item.Resource.Definition.ProviderType}")),
                 .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, item.DetailsUrl, item.Status, "workflow", $"{item.Namespace.Value} {item.Kind} {item.Version}")),
-                .. deploymentsTask.Result.Select(item => new ResourceSearchResult(item.Id, "Deployment", item.Id, "/deployments", item.Status, "server", $"{item.Agent} {item.Namespace} {item.HostingMode} {item.RuntimeProfile}")),
+                .. instancesTask.Result.Select(item => new ResourceSearchResult(item.AgentName, "Agent instance", item.InstanceId, $"/agent-instances#agent-instance-{Escape(item.InstanceId)}", "Running", "server", $"{item.AgentNamespace.Value} {item.RunId} {item.RuntimeProfile} {item.WorkerId}")),
                 .. executionsTask.Result.Select(item => new ResourceSearchResult(item.Id, "Execution", item.Id, $"/runs/{Escape(item.Id)}", item.Status, "play-circle", $"{item.Agent} {item.Flow}")),
                 .. workTask.Result.Select(item => new ResourceSearchResult(item.Title, "Task", item.Id.ToString(), $"/tasks/{item.Id}", item.Status, "tasks", $"{item.Type} {item.Owner}"))
             ];

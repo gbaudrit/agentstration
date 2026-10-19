@@ -49,7 +49,7 @@ export class FlowObservabilityPage {
     const split = this.page.locator('.flow-editor-shell.split');
     await expect(split).toBeVisible();
     await expect(split.locator('.flow-canvas-wrap')).toBeVisible();
-    await expect(split.locator('.flow-node')).toHaveCount(2);
+    await expect(split.locator('.flow-node')).toHaveCount(3);
     await expect(split.locator('.source-editor')).toBeVisible();
 
     if (!checkInvalidYaml) return;
@@ -60,7 +60,22 @@ export class FlowObservabilityPage {
     await split.getByRole('button', { name: 'Apply and save' }).click();
     await expect(split.locator('.source-editor .error-panel')).toBeVisible();
     await expect(split.locator('.view-lines')).toContainText('entryStep: [');
-    await expect(split.locator('.flow-node')).toHaveCount(2);
+    await expect(split.locator('.flow-node')).toHaveCount(3);
+  }
+
+  public async openManualRunDialog(consoleUrl: string, expectWide: boolean): Promise<void> {
+    await this.open(consoleUrl, '/flows/universal-router', 'flowDetails');
+    await this.page.getByRole('button', { name: 'Runs', exact: true }).click();
+    await this.page.getByTestId(TestIds.flowObservability.runOpen).click();
+    const dialog = this.page.getByTestId(TestIds.flowObservability.runDialog);
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('select')).toHaveCount(1);
+    await expect(this.page.getByTestId(TestIds.common.schemaInputEditor)).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.common.schemaRawMode)).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.flowObservability.runSubmit)).toBeEnabled();
+    const dialogWidth = (await dialog.boundingBox())?.width ?? 0;
+    if (expectWide) expect(dialogWidth).toBeGreaterThan(800);
+    else expect(dialogWidth).toBeLessThanOrEqual(390);
   }
 
   public async openTask(consoleUrl: string, taskId: string): Promise<void> {

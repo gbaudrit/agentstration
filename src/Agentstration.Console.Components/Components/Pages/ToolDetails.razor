@@ -16,58 +16,235 @@ else
         <Actions><button class="button-primary" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button></Actions>
     </ResourceHeader>
 
-    <section class="panel tool-capability" aria-labelledby="tool-capability-heading">
-        <div class="panel-header"><h2 id="tool-capability-heading">@T("Capability")</h2></div>
-        <p>@(string.IsNullOrWhiteSpace(tool.Definition.Description) ? T("NoDescription") : tool.Definition.Description)</p>
-    </section>
+    <nav class="section-tabs tool-detail-tabs" role="tablist" aria-label="@T("DetailViews")">
+        <button id="tool-overview-tab" type="button" role="tab" aria-selected="@(activeTab == ToolDetailTab.Overview ? "true" : "false")" aria-controls="tool-detail-panel" class="@(activeTab == ToolDetailTab.Overview ? "active" : null)" data-testid="tool-overview-tab" @onclick="() => activeTab = ToolDetailTab.Overview">@T("TabOverview")</button>
+        <button id="tool-execution-tab" type="button" role="tab" aria-selected="@(activeTab == ToolDetailTab.Execution ? "true" : "false")" aria-controls="tool-detail-panel" class="@(activeTab == ToolDetailTab.Execution ? "active" : null)" data-testid="tool-execution-tab" @onclick="() => activeTab = ToolDetailTab.Execution">@T("TabExecution")</button>
+    </nav>
 
-    <section class="panel tool-contract" aria-labelledby="tool-input-heading">
-        <div class="panel-header"><h2 id="tool-input-heading">@T("InputContract")</h2></div>
-        @SchemaSummary(tool.Definition.Schema?.Input)
-        @RawSchema(tool.Definition.Schema?.Input, "RawInputSchema")
-    </section>
+    <div id="tool-detail-panel" role="tabpanel" aria-labelledby="@(activeTab == ToolDetailTab.Overview ? "tool-overview-tab" : "tool-execution-tab")">
+        @if (activeTab == ToolDetailTab.Overview)
+        {
+            <section class="panel tool-capability" aria-labelledby="tool-capability-heading">
+                <div class="panel-header"><h2 id="tool-capability-heading">@T("Capability")</h2></div>
+                <p>@(string.IsNullOrWhiteSpace(tool.Definition.Description) ? T("NoDescription") : tool.Definition.Description)</p>
+            </section>
 
-    <section class="panel tool-contract" aria-labelledby="tool-output-heading">
-        <div class="panel-header"><h2 id="tool-output-heading">@T("OutputContract")</h2></div>
-        @SchemaSummary(tool.Definition.Schema?.Output)
-        @RawSchema(tool.Definition.Schema?.Output, "RawOutputSchema")
-    </section>
+            <section class="panel tool-contract" aria-labelledby="tool-input-heading">
+                <div class="panel-header"><h2 id="tool-input-heading">@T("InputContract")</h2></div>
+                @SchemaSummary(tool.Definition.Schema?.Input)
+                @RawSchema(tool.Definition.Schema?.Input, "RawInputSchema")
+            </section>
 
-    <section class="panel" aria-labelledby="tool-governance-heading">
-        <div class="panel-header"><h2 id="tool-governance-heading">@T("GovernanceAndSource")</h2></div>
-        <dl class="resource-details">
-            <dt>@T("Provider")</dt><dd><code>@tool.Definition.Provider?.ResourceId</code></dd>
-            <dt>@T("ExternalName")</dt><dd><code>@tool.Definition.ExternalId</code></dd>
-            <dt>@T("Enabled")</dt><dd>@BooleanLabel(tool.Definition.Enabled)</dd>
-            <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(tool.Definition.RequiresApproval)</dd>
-            <dt>@T("AvailableLabel")</dt><dd>@BooleanLabel(tool.Definition.Discovery?.Available == true)</dd>
-            <dt>@T("FirstSeen")</dt><dd>@tool.Definition.Discovery?.FirstSeenAt.ToString("g")</dd>
-            <dt>@T("LastSeen")</dt><dd>@tool.Definition.Discovery?.LastSeenAt.ToString("g")</dd>
-        </dl>
-    </section>
+            <section class="panel tool-contract" aria-labelledby="tool-output-heading">
+                <div class="panel-header"><h2 id="tool-output-heading">@T("OutputContract")</h2></div>
+                @SchemaSummary(tool.Definition.Schema?.Output)
+                @RawSchema(tool.Definition.Schema?.Output, "RawOutputSchema")
+            </section>
+
+            <section class="panel" aria-labelledby="tool-governance-heading">
+                <div class="panel-header"><h2 id="tool-governance-heading">@T("GovernanceAndSource")</h2></div>
+                <dl class="resource-details">
+                    <dt>@T("Provider")</dt><dd><code>@tool.Definition.Provider?.ResourceId</code></dd>
+                    <dt>@T("ExternalName")</dt><dd><code>@tool.Definition.ExternalId</code></dd>
+                    <dt>@T("Enabled")</dt><dd>@BooleanLabel(tool.Definition.Enabled)</dd>
+                    <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(tool.Definition.RequiresApproval)</dd>
+                    <dt>@T("AvailableLabel")</dt><dd>@BooleanLabel(tool.Definition.Discovery?.Available == true)</dd>
+                    <dt>@T("FirstSeen")</dt><dd>@tool.Definition.Discovery?.FirstSeenAt.ToString("g")</dd>
+                    <dt>@T("LastSeen")</dt><dd>@tool.Definition.Discovery?.LastSeenAt.ToString("g")</dd>
+                </dl>
+            </section>
+        }
+        else
+        {
+            <section class="panel tool-runner" aria-labelledby="tool-runner-heading" data-testid="tool-runner">
+                <div class="panel-header"><div><h2 id="tool-runner-heading">@T("RunTool")</h2><p class="muted">@T("RunToolHelp")</p></div></div>
+                <div class="tool-run-mode" role="group" aria-label="@T("RunMode")">
+                    <button type="button" class="tool-run-mode-option @(runMode == ToolRunMode.Simulate ? "selected" : null)" aria-pressed="@(runMode == ToolRunMode.Simulate)" disabled="@(!CanSimulate)" data-testid="tool-run-simulate-mode" @onclick="() => SelectMode(ToolRunMode.Simulate)">
+                        <span><strong>@T("Simulation")</strong><small>@T("SimulationOptionHelp")</small></span><span class="tool-run-mode-mark" aria-hidden="true">✓</span>
+                    </button>
+                    <button type="button" class="tool-run-mode-option execution @(runMode == ToolRunMode.Execute ? "selected" : null)" aria-pressed="@(runMode == ToolRunMode.Execute)" data-testid="tool-run-execute-mode" @onclick="() => SelectMode(ToolRunMode.Execute)">
+                        <span><strong>@T("RealExecution")</strong><small>@T("ExecutionOptionHelp")</small></span><span class="tool-run-mode-mark" aria-hidden="true">✓</span>
+                    </button>
+                </div>
+                @if (runMode == ToolRunMode.Execute)
+                {
+                    <p class="tool-run-mode-help execution">@T("RealExecutionHelp")</p>
+                }
+                else
+                {
+                    <p class="tool-run-mode-help">@T("SimulationHelp")</p>
+                }
+                @if (!CanSimulate)
+                {
+                    <p class="tool-run-mode-unavailable" role="status">@T("SimulationUnavailableHelp")</p>
+                }
+                @if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
+                {
+                    <p class="inline-warning" role="status">@T(!tool.Definition.Enabled ? "ToolDisabledHelp" : "ToolUnavailableHelp")</p>
+                }
+                @if (runMode == ToolRunMode.Execute && tool.Definition.RequiresApproval)
+                {
+                    <p class="inline-warning" role="status">@T("ApprovalRequiredHelp")</p>
+                }
+                <div class="tool-run-input">
+                    <div class="tool-run-input-heading">
+                        <h3>@T("RunInput")</h3>
+                        @if (runMode == ToolRunMode.Simulate)
+                        {
+                            <span class="tool-run-managed-input" data-testid="tool-run-dry-run-managed">✓ @T("DryRunManaged")</span>
+                        }
+                    </div>
+                    <JsonSchemaInputEditor Schema="tool.Definition.Schema?.Input" Value="runInput" ValueChanged="ChangeRunInput" ValidationChanged="UpdateRunValidation" LockedValues="ManagedRunValues" Disabled="submitting" />
+                </div>
+                @if (runError is not null)
+                {
+                    <p class="error-panel" role="alert">@runError</p>
+                }
+                <div class="tool-run-actions">
+                    <button class="button-primary" disabled="@(!CanSubmit)" data-testid="tool-run-submit" @onclick="SubmitRunAsync">@(submitting ? T("Running") : T(runMode == ToolRunMode.Simulate ? "Simulate" : "ExecuteNow"))</button>
+                </div>
+            </section>
+            @if (runResult is not null)
+            {
+                <section class="panel tool-run-result" aria-labelledby="tool-run-result-heading" data-testid="tool-run-result">
+                    <div class="panel-header"><h2 id="tool-run-result-heading">@T("RunResult")</h2><StatusBadge Text="@T($"RunStatus.{runResult.Status}")" Status="@(runResult.Status == "denied" ? UiStatus.Warning : UiStatus.Success)" /></div>
+                    @if (runResult.Status != "denied")
+                    {
+                        <div class="tool-output" data-testid="tool-run-output">
+                            <h3>@T("ToolOutput")</h3>
+                            @if (runResult.Output is { } output)
+                            {
+                                <pre>@JsonSerializer.Serialize(output, IndentedJson)</pre>
+                            }
+                            else
+                            {
+                                <p class="muted">@T("NoOutput")</p>
+                            }
+                        </div>
+                    }
+                    @if (runResult.Receipt?.FlowRunId is { Length: > 0 } flowRunId)
+                    {
+                        <a class="button-secondary" href="@($"/flow-runs/{Uri.EscapeDataString(flowRunId)}")">@T("OpenFlowRun")</a>
+                    }
+                    <div class="tool-run-facts">
+                        <span><small>@T("RunMode")</small><strong>@T(runResult.Mode == ToolRunMode.Simulate ? "Simulation" : "RealExecution")</strong></span>
+                        <span><small>@T("ProviderInvoked")</small><strong>@BooleanLabel(runResult.ProviderInvoked)</strong></span>
+                        <span><small>@T("Provider")</small><code>@runResult.ProviderName</code></span>
+                    </div>
+                    <details class="tool-run-diagnostics">
+                        <summary>@T("VerificationDetails")</summary>
+                        <ul class="tool-run-checks">@foreach (var check in runResult.Checks) { <li class="@check.Status"><strong>@RunCheckTitle(check)</strong><span>@RunCheckMessage(check)</span></li> }</ul>
+                    </details>
+                </section>
+            }
+        }
+    </div>
 }
 
 @code {
     [Parameter] public string Name { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+    private static readonly IReadOnlyDictionary<string, JsonElement> DryRunEnabled = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+    {
+        [ToolDryRunContract.ParameterName] = JsonSerializer.SerializeToElement(true)
+    };
+    private enum ToolDetailTab { Overview, Execution }
     private ToolResource? tool;
     private string? etag;
+    private ToolDetailTab activeTab;
+    private ToolRunMode runMode = ToolRunMode.Simulate;
+    private JsonElement runInput = JsonSerializer.SerializeToElement(new { });
+    private bool runInputValid = true;
+    private bool submitting;
+    private string? runError;
+    private RunToolResponse? runResult;
+    private ResourceNamespace ToolNamespace => ResourceNamespace.Parse(NamespaceValue);
+    private bool CanSimulate => ToolDryRunContract.IsSupported(tool?.Definition.Schema?.Input);
+    private IReadOnlyDictionary<string, JsonElement>? ManagedRunValues => runMode == ToolRunMode.Simulate ? DryRunEnabled : null;
+    private bool CanSubmit => tool is { Definition.Enabled: true }
+        && tool.Definition.Discovery?.Available == true
+        && runInputValid
+        && !submitting
+        && (runMode != ToolRunMode.Execute || !tool.Definition.RequiresApproval);
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
 
+    private string RunCheckTitle(ToolRunCheck check)
+    {
+        var localized = Localizer[$"RunCheckTitle.{check.Code}"];
+        return localized.ResourceNotFound ? check.Code : localized.Value;
+    }
+
+    private string RunCheckMessage(ToolRunCheck check)
+    {
+        var statusSpecific = Localizer[$"RunCheck.{check.Code}.{check.Status}"];
+        if (!statusSpecific.ResourceNotFound) return statusSpecific.Value;
+        var generic = Localizer[$"RunCheck.{check.Code}"];
+        return generic.ResourceNotFound ? check.Message : generic.Value;
+    }
+
     protected override async Task OnParametersSetAsync()
     {
-        var value = await Client.GetToolAsync(Name, default);
+        var value = await Client.GetToolAsync(ToolNamespace, Name, default);
         tool = value.Value;
         etag = value.ETag;
+        activeTab = ToolDetailTab.Overview;
+        runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
+        runInput = CanSimulate
+            ? ToolDryRunContract.Enable(JsonSerializer.SerializeToElement(new { }))
+            : JsonSerializer.SerializeToElement(new { });
+        runInputValid = true;
+        runError = null;
+        runResult = null;
     }
 
     private async Task ToggleAsync()
     {
-        var value = await Client.SetEnabledAsync(Name, !tool!.Definition.Enabled, etag, default);
+        var value = await Client.SetEnabledAsync(ToolNamespace, Name, !tool!.Definition.Enabled, etag, default);
         tool = value.Value;
         etag = value.ETag;
+    }
+
+    private void SelectMode(ToolRunMode mode)
+    {
+        if (mode == ToolRunMode.Simulate && !CanSimulate) return;
+        runMode = mode;
+        if (CanSimulate)
+            runInput = ToolDryRunContract.Set(runInput, mode == ToolRunMode.Simulate);
+        runError = null;
+        runResult = null;
+    }
+
+    private void ChangeRunInput(JsonElement value) =>
+        runInput = runMode == ToolRunMode.Simulate ? ToolDryRunContract.Enable(value) : value;
+
+    private Task UpdateRunValidation(JsonSchemaInputValidationState validation)
+    {
+        runInputValid = validation.IsValid;
+        return Task.CompletedTask;
+    }
+
+    private async Task SubmitRunAsync()
+    {
+        if (!CanSubmit) return;
+        try
+        {
+            submitting = true;
+            runError = null;
+            runResult = await Client.RunToolAsync(ToolNamespace, Name, new RunToolRequest(runInput.Clone(), runMode), default);
+        }
+        catch (Exception exception)
+        {
+            runResult = null;
+            runError = exception.Message;
+        }
+        finally
+        {
+            submitting = false;
+        }
     }
 
     private RenderFragment SchemaSummary(JsonElement? schema) => builder =>

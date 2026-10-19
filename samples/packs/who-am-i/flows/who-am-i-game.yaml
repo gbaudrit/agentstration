@@ -31,6 +31,13 @@ definition:
         name: output
         displayName: Judge response
         outputMapping: "${steps.judge.output}"
+      - type: output
+        name: error
+        displayName: Judge failure
+        outcome: error
+        code: WHO_AM_I_JUDGE_FAILED
+        message: The Judge Agent failed.
+        outputMapping: "${transition.output}"
     transitions:
       - id: input-to-judge
         fromStep: input
@@ -38,8 +45,12 @@ definition:
         toStep: judge
       - id: judge-to-output
         fromStep: judge
-        event: completed
+        event: success
         toStep: output
+      - id: judge-to-error
+        fromStep: judge
+        event: error
+        toStep: error
     designer:
       preferredLayout: Horizontal
       nodePositions:
@@ -52,5 +63,8 @@ definition:
         output:
           x: 640
           y: 160
+        error:
+          x: 640
+          y: 360
   publish: true
   activate: true

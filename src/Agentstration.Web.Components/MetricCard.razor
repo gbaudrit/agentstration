@@ -1,4 +1,13 @@
-@if (!string.IsNullOrWhiteSpace(Url))
+@if (OnClick.HasDelegate)
+{
+    <button type="button" class="metric-card metric-card-link metric-card-button @(!string.IsNullOrWhiteSpace(HelpText) ? "metric-card-help" : null)" @onclick="OnClick">
+        <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <HelpTooltip Text="@HelpText" /> }</span><strong>@Value</strong></div>
+        @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
+        <span class="metric-card-arrow" aria-hidden="true">→</span>
+        <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
+    </button>
+}
+else if (!string.IsNullOrWhiteSpace(Url))
 {
     <a class="metric-card metric-card-link @(!string.IsNullOrWhiteSpace(HelpText) ? "metric-card-help" : null)" href="@Url">
         <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <HelpTooltip Text="@HelpText" /> }</span><strong>@Value</strong></div>
@@ -23,5 +32,6 @@ else
     [Parameter] public string? HelpText { get; set; }
     [Parameter] public UiStatus Status { get; set; }
     [Parameter] public string? Url { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
 }
 

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Resources;
 using Agentstration.Tools;
 
@@ -8,6 +10,10 @@ public sealed record PutToolProviderRequest(ToolProviderProperties Properties);
 public sealed record SetToolEnabledRequest(bool Enabled);
 public sealed record CreateToolCategoryRequest(string Name, ToolCategoryProperties Properties, string? Namespace = null, ResourceScopeRef? ScopeRef = null);
 public sealed record PutToolCategoryRequest(ToolCategoryProperties Properties);
+public sealed record CreateToolSetRequest(string Name, ToolSetProperties Properties, string? Namespace = null);
+public sealed record PutToolSetRequest(ToolSetProperties Properties);
+public sealed record PublishToolSetVersionRequest(string Version);
+public sealed record ResolveToolSetRouteRequest(string Version, string Capability, string? Route = null);
 public sealed record ToolDiscoveryDiffResponse(int New, int Changed, int Unchanged, int Unavailable, int Total);
 public sealed record ToolConnectionTestResponse(string Status, int ToolCount, IReadOnlyDictionary<string, bool> Capabilities, IReadOnlyDictionary<string, string> ServerMetadata);
 public sealed record CreateToolDefinitionRequest(string Name, ToolDefinitionProperties Properties, string? Namespace = null);
@@ -15,3 +21,32 @@ public sealed record PutToolDefinitionRequest(ToolDefinitionProperties Propertie
 public sealed record SetToolDefinitionEnabledRequest(bool Enabled);
 public sealed record CreateToolExecutionHookRequest(string Name, ToolExecutionHookProperties Properties, string? Namespace = null);
 public sealed record PutToolExecutionHookRequest(ToolExecutionHookProperties Properties);
+
+[JsonConverter(typeof(JsonStringEnumConverter<ToolRunMode>))]
+public enum ToolRunMode { Simulate, Execute }
+
+public sealed record RunToolRequest(
+    JsonElement Arguments,
+    ToolRunMode Mode = ToolRunMode.Simulate);
+
+public sealed record ToolRunCheck(
+    string Code,
+    string Status,
+    string Message);
+
+public sealed record ToolRunReceipt(
+    string? WorkItemId = null,
+    string? FlowRunId = null,
+    string? CorrelationId = null);
+
+public sealed record RunToolResponse(
+    ToolRunMode Mode,
+    string Status,
+    string ToolName,
+    string ToolNamespace,
+    string ProviderName,
+    bool ProviderInvoked,
+    bool RequiresApproval,
+    IReadOnlyList<ToolRunCheck> Checks,
+    JsonElement? Output = null,
+    ToolRunReceipt? Receipt = null);

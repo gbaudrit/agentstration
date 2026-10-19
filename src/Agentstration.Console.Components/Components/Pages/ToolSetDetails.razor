@@ -1,0 +1,88 @@
+@page "/tools/sets/{Name}"
+@implements IDisposable
+@inject IToolSetsClient Client
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolSetsStrings> Localizer
+
+<PageTitle>@(toolSet?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+<PageHeader Title="@(toolSet?.Definition.DisplayName ?? Name)" Description="@(toolSet?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-toolset-details">
+    <Actions><a class="button-secondary" href="/tools/sets">@T("Back")</a>@if (toolSet is not null) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+</PageHeader>
+
+@if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else if (toolSet is not null)
+{
+    @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
+    <section class="metric-grid" aria-label="@T("Overview")">
+        <MetricCard Label="@T("DraftVersion")" Value="@toolSet.Definition.Version" Detail="@T(toolSet.Definition.Publish ? "PublishRequested" : "Draft")" Status="UiStatus.Info" />
+        <MetricCard Label="@T("Members")" Value="@toolSet.Definition.Members.Count.ToString()" Detail="@T("GovernedIndividually")" Status="UiStatus.Neutral" />
+        <MetricCard Label="@T("PublishedVersions")" Value="@versions.Count.ToString()" Detail="@T("Immutable")" Status="UiStatus.Success" />
+    </section>
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">@T("Metadata")</p><h2>@T("DescriptiveMetadata")</h2><p>@T("MetadataHelp")</p></div></div>
+        <dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@toolSet.Namespace/@toolSet.Name</code></dd><dt>@T("Category")</dt><dd>@(toolSet.Definition.Category?.Name ?? "—")</dd><dt>@T("Tags")</dt><dd>@Map(toolSet.Metadata.Tags)</dd><dt>@T("Annotations")</dt><dd>@Map(toolSet.Metadata.Annotations)</dd></dl>
+    </section>
+    <section class="panel form-section" data-testid="toolset-versions">
+        <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("PublishedVersions")</h2><p>@T("PinnedHelp")</p></div></div>
+        @if (versions.Count == 0) { <p class="muted">@T("NoVersions")</p> }
+        @foreach (var version in versions.OrderByDescending(value => value.PublishedAt))
+        {
+            <article class="panel" data-testid="toolset-version">
+                <div class="panel-header"><div><h3>@T("VersionLabel", version.Version)</h3><code>@version.DefinitionHash</code></div><StatusBadge Text="@T("Immutable")" Status="UiStatus.Success" /></div>
+                <DataGrid TItem="PublishedToolSetMember" Items="version.Members">
+                    <Header><tr><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Generation")</th><th>@T("Approval")</th></tr></Header>
+                    <Row Context="member"><tr><td><code>@member.Capability</code></td><td><code>@member.Route</code></td><td><a class="text-button" href="@ToolUrl(member)">@member.ToolNamespace/@member.ToolName</a></td><td>@member.ProviderNamespace/@member.ProviderName</td><td>@member.ToolGeneration</td><td>@T(member.RequiresApproval ? "Required" : "NotRequired")</td></tr></Row>
+                </DataGrid>
+            </article>
+        }
+    </section>
+}
+
+@if (confirmDelete)
+{
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-toolset-title"><h2 id="delete-toolset-title">@T("DeleteTitle")</h2><p>@T("DeleteHelp")</p><div class="form-actions"><button class="button-secondary" type="button" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" type="button" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></div></section>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ToolSetResource? toolSet;
+    private IReadOnlyList<ToolSetVersionResource> versions = [];
+    private string? etag, error, message;
+    private bool loading = true, busy, confirmDelete;
+    private ResourceNamespace ResourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            var snapshotTask = Client.GetToolSetAsync(ResourceNamespace, Name, cancellation.Token);
+            var versionsTask = Client.GetVersionsAsync(ResourceNamespace, Name, cancellation.Token);
+            await Task.WhenAll(snapshotTask, versionsTask);
+            var snapshot = await snapshotTask;
+            toolSet = snapshot.Value;
+            etag = snapshot.ETag;
+            versions = await versionsTask;
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+    private async Task DeleteAsync()
+    {
+        if (etag is null || busy) return;
+        busy = true;
+        message = null;
+        try { await Client.DeleteAsync(ResourceNamespace, Name, etag, cancellation.Token); Navigation.NavigateTo("/tools/sets"); }
+        catch (Exception exception) { message = exception.Message; confirmDelete = false; }
+        finally { busy = false; }
+    }
+    private static string ToolUrl(PublishedToolSetMember member) => member.ToolNamespace.IsDefault
+        ? $"/tools/{Uri.EscapeDataString(member.ToolName)}"
+        : $"/tools/{Uri.EscapeDataString(member.ToolName)}?namespace={Uri.EscapeDataString(member.ToolNamespace.Value)}";
+    private static string Map(IReadOnlyDictionary<string, string> values) => values.Count == 0 ? "—" : string.Join(" · ", values.Select(value => $"{value.Key}={value.Value}"));
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -103,6 +103,11 @@ public static class AuthorizationPermissions
     public const string RunsRead = "runs/read";
     public const string RunsExecute = "runs/execute";
     public const string RunsDelete = "runs/delete";
+    public const string ArtifactsInspect = "artifacts/inspect";
+    public const string ArtifactsReadContent = "artifacts/read-content";
+    public const string ArtifactsWrite = "artifacts/write";
+    public const string ArtifactsManageRetention = "artifacts/manage-retention";
+    public const string ArtifactsPurge = "artifacts/purge";
     public const string AuthorizationRead = "authorization/read";
     public const string AuthorizationWrite = "authorization/write";
 
@@ -110,6 +115,7 @@ public static class AuthorizationPermissions
     [
         TenantsRead, TenantsManage, WorkspacesRead, WorkspacesWrite, WorkspacesDelete,
         ResourcesRead, ResourcesWrite, ResourcesDelete, RunsRead, RunsExecute, RunsDelete,
+        ArtifactsInspect, ArtifactsReadContent, ArtifactsWrite, ArtifactsManageRetention, ArtifactsPurge,
         AuthorizationRead, AuthorizationWrite
     ];
 }
@@ -286,6 +292,7 @@ public interface IIdentityStore
     Task<RoleDefinition?> FindRoleDefinitionByNameAsync(string name, CancellationToken cancellationToken);
     Task<RoleDefinition?> GetRoleDefinitionAsync(Guid roleDefinitionId, CancellationToken cancellationToken);
     Task AddRoleDefinitionAsync(RoleDefinition roleDefinition, CancellationToken cancellationToken);
+    Task UpdateRoleDefinitionAsync(RoleDefinition roleDefinition, CancellationToken cancellationToken);
     Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
     Task AddRoleAssignmentAsync(RoleAssignment roleAssignment, CancellationToken cancellationToken);
     Task RemoveRoleAssignmentAsync(Guid roleAssignmentId, CancellationToken cancellationToken);

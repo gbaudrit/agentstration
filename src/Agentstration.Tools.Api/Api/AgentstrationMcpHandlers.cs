@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.ResourceManagement;
@@ -31,6 +32,7 @@ internal static class AgentstrationMcpHandlers
             .ToDictionary(value => value.Definition.ExternalId ?? string.Empty, StringComparer.Ordinal);
         var builtIns = services.GetServices<IInternalMcpToolDefinitionProvider>()
             .Select(value => value.Definition)
+            .Where(value => value.ExposeThroughMcp)
             .Where(value => projected.TryGetValue(value.Name, out var tool)
                 && tool.Definition.Enabled
                 && tool.Definition.Discovery?.Available == true)
@@ -62,12 +64,7 @@ internal static class AgentstrationMcpHandlers
                     Description = value.Definition.Description,
                     InputSchema = value.Definition.InputSchema.Clone(),
                     OutputSchema = value.Definition.OutputSchema?.Clone(),
-                    Meta = new JsonObject
-                    {
-                        ["agentstration/namespace"] = value.Namespace.Value,
-                        ["agentstration/requiresApproval"] = value.Definition.RequiresApproval,
-                        ["agentstration/implementation"] = "flow"
-                    }
+                    Meta = Metadata(value)
                 }))
                 .OrderBy(value => value.Name, StringComparer.Ordinal)
                 .ToList()
@@ -91,6 +88,8 @@ internal static class AgentstrationMcpHandlers
                 .SingleOrDefault(value => string.Equals(value.Definition.Name, parameters.Name, StringComparison.Ordinal));
             if (builtIn is not null)
             {
+                if (!builtIn.Definition.ExposeThroughMcp)
+                    throw new ToolDefinitionInvocationException("tool_not_exposed", $"Tool '{parameters.Name}' is an internal implementation Tool and is not exposed by the MCP broker.");
                 var callId = IdempotencyKey(parameters.Meta) ?? request.JsonRpcRequest.Id.ToString();
                 var resourceName = AgentstrationToolProvider.ToolResourceName(builtIn.Definition.Name);
                 var builtInOutput = await services.GetRequiredService<IToolExecutionPipeline>().ExecuteAsync(new ToolExecutionContext
@@ -152,18 +151,53 @@ internal static class AgentstrationMcpHandlers
         {
             return Error(exception.Code, exception.Message);
         }
+        catch (ArtifactValidationException exception)
+        {
+            return Error(exception.Code, exception.Message);
+        }
+        catch (AuthorizationDeniedException exception)
+        {
+            return Error("authorization_denied", exception.Message);
+        }
     }
 
     private static CallToolResult Error(string code, string message) => new()
     {
         IsError = true,
-        Content = [new TextContentBlock { Text = message }],
+        Content = [new TextContentBlock { Text = SafeMessage(code, message) }],
         Meta = new JsonObject { ["agentstration/errorCode"] = code }
     };
+
+    private static string SafeMessage(string code, string message)
+    {
+        var value = code is "knowledge_retrieval_execution_failed"
+            or "knowledge_retrieval_flow_rejected"
+            or "knowledge_retrieval_output_invalid"
+            or "knowledge_retrieval_output_missing"
+            ? "Knowledge retrieval could not be completed. Inspect the correlated Flow Run for authorized diagnostics."
+            : message;
+        const int maximumCharacters = 2_000;
+        return value.Length <= maximumCharacters ? value : value[..maximumCharacters];
+    }
 
     private static string PublicName(ToolDefinitionResource definition) => definition.Namespace.IsDefault
         ? definition.Name
         : $"{definition.Namespace.Value}.{definition.Name}";
+
+    private static JsonObject Metadata(ToolDefinitionResource definition)
+    {
+        var metadata = new JsonObject
+        {
+            ["agentstration/namespace"] = definition.Namespace.Value,
+            ["agentstration/requiresApproval"] = definition.Definition.RequiresApproval,
+            ["agentstration/implementation"] = "flow"
+        };
+        if (definition.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source", out var source))
+            metadata["agentstration/knowledgeSource"] = source;
+        if (definition.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-operation", out var operation))
+            metadata["agentstration/knowledgeOperation"] = operation;
+        return metadata;
+    }
 
     private static string? Correlation(JsonObject? metadata) =>
         metadata?["agentstration/correlationId"]?.GetValue<string>();

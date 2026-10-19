@@ -45,8 +45,16 @@ definition:
         name: output
         displayName: Delivery receipt
         outputMapping: "${steps.create-notification.output}"
+      - type: output
+        name: error
+        displayName: Delivery failure
+        outcome: error
+        code: NOTIFICATION_DELIVERY_FAILED
+        message: The notification could not be delivered.
+        outputMapping: "${transition.output}"
     transitions:
       - { id: input-to-tool, fromStep: input, event: completed, toStep: create-notification }
-      - { id: tool-to-output, fromStep: create-notification, event: completed, toStep: output }
+      - { id: tool-to-output, fromStep: create-notification, event: success, toStep: output }
+      - { id: tool-to-error, fromStep: create-notification, event: error, toStep: error }
   publish: true
   activate: true

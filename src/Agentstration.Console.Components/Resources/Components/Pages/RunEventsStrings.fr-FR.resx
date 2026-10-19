@@ -15,4 +15,6 @@
   <data name="Level.Error" xml:space="preserve"><value>Erreur</value></data>
   <data name="PersistedJournals" xml:space="preserve"><value>Journaux persistants</value></data>
   <data name="Loading" xml:space="preserve"><value>Chargement des événements d’exécution…</value></data>
+  <data name="NoRunEvents" xml:space="preserve"><value>Aucun événement d’exécution</value></data>
+  <data name="NoRunEventsMessage" xml:space="preserve"><value>Les événements persistants du cycle de vie du Runtime et des Flows apparaîtront ici.</value></data>
 </root>
