@@ -1,0 +1,32 @@
+.runtime-workers-grid ::deep .data-grid {
+    table-layout: fixed;
+    white-space: normal;
+}
+
+.runtime-workers-grid ::deep th:nth-child(1) { width: 24%; }
+.runtime-workers-grid ::deep th:nth-child(2) { width: 11%; }
+.runtime-workers-grid ::deep th:nth-child(3) { width: 14%; }
+.runtime-workers-grid ::deep th:nth-child(4) { width: 14%; }
+.runtime-workers-grid ::deep th:nth-child(5) { width: 10%; }
+.runtime-workers-grid ::deep th:nth-child(6) { width: 17%; }
+.runtime-workers-grid ::deep th:nth-child(7) { width: 10%; }
+.runtime-workers-grid ::deep td { min-width: 0; overflow-wrap: anywhere; vertical-align: top; }
+.runtime-workers-grid ::deep td small { display: block; margin-top: .3rem; color: var(--muted); }
+.runtime-workers-grid ::deep .runtime-primary { display: block; min-width: 0; font-weight: 700; }
+.runtime-workers-grid ::deep .runtime-token { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runtime-workers-grid ::deep .runtime-capabilities { font-size: .78rem; }
+
+@media (max-width: 860px) {
+    .runtime-workers-grid ::deep .data-grid-wrap { overflow: visible; border: 0; background: transparent; box-shadow: none; }
+    .runtime-workers-grid ::deep .data-grid,
+    .runtime-workers-grid ::deep .data-grid tbody { display: grid; gap: .75rem; }
+    .runtime-workers-grid ::deep .data-grid thead { display: none; }
+    .runtime-workers-grid ::deep .data-grid tr { display: grid; padding: .35rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+    .runtime-workers-grid ::deep .data-grid td { display: grid; grid-template-columns: minmax(7.5rem, 35%) minmax(0, 1fr); gap: .75rem; padding: .65rem 0; border-bottom: 1px solid var(--border); }
+    .runtime-workers-grid ::deep .data-grid td:last-child { border-bottom: 0; }
+    .runtime-workers-grid ::deep .data-grid td::before { content: attr(data-label); color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+}
+
+@media (max-width: 520px) {
+    .runtime-workers-grid ::deep .data-grid td { grid-template-columns: 1fr; gap: .35rem; }
+}

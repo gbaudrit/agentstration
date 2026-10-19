@@ -1,4 +1,5 @@
 using Agentstration.Agents.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Web.Api.Runtime;
 using Agentstration.Web.Security;
@@ -14,11 +15,13 @@ internal sealed class RouteAndExecuteEndpoint
         RouteAndExecuteRequest body,
         HttpRequest request,
         IAgentExecutionCoordinator service,
+        ICurrentRequestContext requestContext,
         CancellationToken cancellationToken) =>
         RuntimeHttp.ExecuteAsync(async () =>
         {
             RuntimeHttp.RequireApiVersion(request);
-            var result = await service.RouteAndExecuteAsync(body.Input, cancellationToken);
+            var scope = RuntimeHttp.CurrentScope(requestContext);
+            var result = await service.RouteAndExecuteAsync(scope, body.Input, scope.PrincipalId.ToString("D"), cancellationToken);
             return Results.Ok(new RouteAndExecuteResponse(result.Route.AgentId, result.Route.Confidence, result.Route.Reason, result.Execution.Output));
         });
 }

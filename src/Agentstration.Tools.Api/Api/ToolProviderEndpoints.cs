@@ -1,8 +1,10 @@
 using Agentstration.Api.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Tools.Mcp;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
@@ -24,6 +26,10 @@ internal static class ToolProviderEndpoints
         tools.MapGet("/", ListToolsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         tools.MapGet("/{toolName}", GetToolAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         tools.MapPut("/{toolName}/enabled", SetEnabledAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        tools.MapPost("/{toolName}/run", RunToolAsync)
+            .Produces<RunToolResponse>()
+            .WithSummary("Simulate or execute a governed Tool")
+            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
     }
 
     private static Task<IResult> ListProvidersAsync(ToolManagementService service, CancellationToken cancellationToken) =>
@@ -94,17 +100,32 @@ internal static class ToolProviderEndpoints
             return Results.Ok(new ValueResponse<ToolResource>(values.ToArray()));
         });
 
-    private static Task<IResult> GetToolAsync(string toolName, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetToolAsync(string toolName, string? @namespace, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var id = ToolManagementService.ToolId(toolName);
-            var stored = await service.GetToolAsync(id, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, toolName));
+            var ns = ResourceNamespace.Parse(@namespace);
+            var stored = await service.GetToolAsync(id, ns, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, toolName, ns));
             return ToolsApiHttp.ResourceResult(stored, response, 200);
         });
 
-    private static Task<IResult> SetEnabledAsync(string toolName, SetToolEnabledRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> SetEnabledAsync(string toolName, string? @namespace, SetToolEnabledRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () => ToolsApiHttp.ResourceResult(
-            await service.SetToolEnabledAsync(ToolManagementService.ToolId(toolName), body.Enabled, ToolsApiHttp.IfMatch(request), cancellationToken), response, 200));
+            await service.SetToolEnabledAsync(ToolManagementService.ToolId(toolName), ResourceNamespace.Parse(@namespace), body.Enabled, ToolsApiHttp.IfMatch(request), cancellationToken), response, 200));
+
+    private static Task<IResult> RunToolAsync(
+        string toolName,
+        string? @namespace,
+        RunToolRequest body,
+        ToolRunnerService runner,
+        ICurrentRequestContext context,
+        CancellationToken cancellationToken) =>
+        ToolsApiHttp.ExecuteAsync(async () => Results.Ok(await runner.RunAsync(
+            ResourceNamespace.Parse(@namespace),
+            toolName,
+            body,
+            context.Current,
+            cancellationToken)));
 
     private static ToolProviderResource Resource(string name, ToolProviderProperties properties) => new()
     {

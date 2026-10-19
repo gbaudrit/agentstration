@@ -262,6 +262,7 @@ public sealed partial class FlowRunService
     {
         var stored = await RequiredAsync(runId, scope, cancellationToken);
         if (stored.Value.Status.IsTerminal()) return stored;
+        await queue.RequestCancellationAsync(new(stored.Value.Id, stored.Value.Scope), cancellationToken);
         var cancelled = await CancelSingleAsync(stored, cancellationToken);
         foreach (var descendant in await ListActiveDescendantsAsync(cancelled.Value, cancellationToken))
             await CancelSingleAsync(descendant, cancellationToken);
@@ -285,6 +286,7 @@ public sealed partial class FlowRunService
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null
         }, stored.ETag, cancellationToken);
+        await TryCleanupStepArtifactsAsync(cancelled.Value, cancellationToken);
         foreach (var input in await repository.ListInputRequestsAsync(stored.Value.WorkspaceId, stored.Value.Id, InputRequestStatus.Pending, cancellationToken))
             await repository.UpdateInputRequestAsync(input.Value with { Status = InputRequestStatus.Cancelled }, input.ETag, cancellationToken);
         await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.FlowRunCancelled, null, null, cancellationToken);

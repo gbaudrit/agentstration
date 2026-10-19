@@ -6,6 +6,7 @@
 .topology-legend{display:flex;align-items:center;gap:6px;white-space:nowrap}
 .topology-legend i{width:18px;border-top:2px solid var(--primary)}
 .topology-legend i.observed{border-top-width:4px;border-color:#2bb673}
+.topology-legend i.failed{border-top-width:4px;border-color:#e45562}
 .topology-legend i.inactive{border-color:var(--muted);opacity:.45}
 .topology-zoom-controls{display:flex;align-items:center;gap:4px}
 .topology-zoom-controls button{min-width:30px;height:28px;padding:0 7px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);cursor:pointer}
@@ -26,9 +27,11 @@
 .topology-edge.collaboration{stroke-width:2.5}
 .topology-edge.dynamic{stroke-dasharray:2 5}
 .topology-edge.observed{stroke:#2bb673;stroke-width:4}
+.topology-edge.failed{stroke:#e45562;stroke-width:4}
 .topology-edge.inactive{stroke:var(--muted);opacity:.38}
 marker path{fill:var(--primary)}
 marker.observed-marker path{fill:#2bb673}
+marker.failed-marker path{fill:#e45562}
 marker.inactive-marker path{fill:var(--muted);opacity:.55}
 .edge-label-wrap{pointer-events:none;overflow:visible}.edge-label{display:grid;box-sizing:border-box;height:22px;padding:0 6px;place-items:center;border:1px solid color-mix(in srgb,var(--border) 72%,transparent);border-radius:9px;background:color-mix(in srgb,var(--surface-2) 92%,transparent);box-shadow:0 1px 3px rgba(11,24,45,.14);color:var(--muted);font-size:10px;text-align:center;white-space:nowrap}
 .transfer-badge{cursor:help}.transfer-badge rect{fill:#2bb673;stroke:var(--surface-2);stroke-width:2;filter:drop-shadow(0 1px 2px rgba(11,24,45,.24))}.transfer-badge text{fill:#fff;font-family:var(--font-sans);font-size:9px;font-weight:800;pointer-events:none}
@@ -40,7 +43,7 @@ marker.inactive-marker path{fill:var(--muted);opacity:.55}
 .topology-node.status-running rect{stroke:#3981e8;stroke-width:4}
 .topology-node.status-failed rect{stroke:#e45562}
 .topology-node.status-skipped{opacity:.52}
-@media(prefers-reduced-motion:no-preference){.topology-edge.observed{animation:topology-edge-observed .45s ease-out}.topology-node.status-running rect{animation:topology-node-running .8s ease-in-out infinite alternate}@keyframes topology-edge-observed{from{opacity:.15;stroke-dasharray:3 8;stroke-dashoffset:22}to{opacity:1;stroke-dashoffset:0}}@keyframes topology-node-running{to{filter:drop-shadow(0 0 7px rgba(57,129,232,.52))}}@keyframes topology-replay-spin{to{transform:rotate(360deg)}}}
+@media(prefers-reduced-motion:no-preference){.topology-edge.observed,.topology-edge.failed{animation:topology-edge-observed .45s ease-out}.topology-node.status-running rect{animation:topology-node-running .8s ease-in-out infinite alternate}@keyframes topology-edge-observed{from{opacity:.15;stroke-dasharray:3 8;stroke-dashoffset:22}to{opacity:1;stroke-dashoffset:0}}@keyframes topology-node-running{to{filter:drop-shadow(0 0 7px rgba(57,129,232,.52))}}@keyframes topology-replay-spin{to{transform:rotate(360deg)}}}
 .node-content{display:grid;grid-template-columns:30px minmax(0,1fr) auto;grid-template-rows:38px 16px;align-items:center;width:156px;height:62px;color:var(--text);font-family:var(--font-sans)}
 .node-icon{display:grid;width:28px;height:28px;place-items:center;border-radius:50%;background:var(--primary-soft);color:var(--primary);font-size:13px;font-weight:800}
 .node-copy{display:grid;min-width:0}.node-copy strong{overflow:hidden;font-size:12px;text-overflow:ellipsis;white-space:nowrap}.node-copy small,.node-subtitle{color:var(--muted);font-size:9px}.node-subtitle{grid-column:1/4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.turn-badge{align-self:start;padding-top:3px;color:var(--primary);font-size:8px;font-weight:700;white-space:nowrap}

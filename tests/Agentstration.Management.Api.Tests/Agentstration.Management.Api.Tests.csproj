@@ -6,9 +6,16 @@
     <ProjectReference Include="../../src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Knowledge.Contracts/Agentstration.Knowledge.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Knowledge/Agentstration.Knowledge.csproj" />
+    <ProjectReference Include="../../src/Agentstration.DataSources.Contracts/Agentstration.DataSources.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.DataSources/Agentstration.DataSources.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Models.Contracts/Agentstration.Models.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Parameters.Contracts/Agentstration.Parameters.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Parameters/Agentstration.Parameters.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Schemas.Contracts/Agentstration.Schemas.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Schemas/Agentstration.Schemas.csproj" />
     <ProjectReference Include="../../src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Secrets.Contracts/Agentstration.Secrets.Contracts.csproj" />
@@ -26,6 +33,7 @@
     <ProjectReference Include="../../src/Agentstration.Secrets.Local/Agentstration.Secrets.Local.csproj" />
     <ProjectReference Include="../../src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

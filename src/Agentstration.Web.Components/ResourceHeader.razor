@@ -1,6 +1,6 @@
 <header class="resource-header resource-domain-@Domain" data-testid="@TestId">
     <div class="resource-header-identity">
-        <div class="resource-icon" aria-hidden="true">@Icon</div>
+        <div class="resource-icon" aria-hidden="true">@if (!string.IsNullOrWhiteSpace(IconName)) { <UiIcon Name="@IconName" /> } else { @Icon }</div>
         <div>
             <p class="eyebrow">@ResourceType</p>
             <div class="resource-title-row">
@@ -19,6 +19,7 @@
     [Parameter, EditorRequired] public string ResourceType { get; set; } = string.Empty;
     [Parameter] public string Domain { get; set; } = "neutral";
     [Parameter] public string Icon { get; set; } = "◇";
+    [Parameter] public string? IconName { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string? StatusText { get; set; }
     [Parameter] public UiStatus Status { get; set; }

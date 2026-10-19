@@ -28,7 +28,8 @@ public sealed class AssistantDiagnosticsMcpTool(
             properties = new
             {
                 area = new { type = "string", @enum = Areas.OrderBy(value => value).ToArray(), description = "Diagnostic area to inspect." },
-                flowRunId = new { type = "string", minLength = 1, maxLength = 200, description = "Required only for the flow-run area." }
+                flowRunId = new { type = "string", minLength = 1, maxLength = 200, description = "Required only for the flow-run area." },
+                dryRun = new { type = "boolean", description = "Runs the Tool without side effects." }
             },
             required = new[] { "area" },
             additionalProperties = false
@@ -186,7 +187,7 @@ public sealed class AssistantDiagnosticsMcpTool(
     {
         if (arguments.ValueKind != JsonValueKind.Object)
             throw new ToolDefinitionInvocationException("assistant_diagnostics_arguments_invalid", "Diagnostic Tool arguments must be a JSON object.");
-        var allowed = new HashSet<string>(["area", "flowRunId"], StringComparer.Ordinal);
+        var allowed = new HashSet<string>(["area", "flowRunId", ToolDryRunContract.ParameterName], StringComparer.Ordinal);
         if (arguments.EnumerateObject().Select(value => value.Name).FirstOrDefault(value => !allowed.Contains(value)) is { } unknown)
             throw new ToolDefinitionInvocationException("assistant_diagnostics_argument_unknown", $"Argument '{unknown}' is not declared by the Tool schema.");
     }

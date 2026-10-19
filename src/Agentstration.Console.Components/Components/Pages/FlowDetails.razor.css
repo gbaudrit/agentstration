@@ -156,6 +156,13 @@
     font-weight: 650;
 }
 
+.run-dialog {
+    width: min(1000px, calc(100vw - 2rem)) !important;
+    max-width: 1000px !important;
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+}
+
 @media (max-width: 720px) {
     .flow-overview-preview {
         padding: 18px;

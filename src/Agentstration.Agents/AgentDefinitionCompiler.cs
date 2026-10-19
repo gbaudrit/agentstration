@@ -2,13 +2,18 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Models;
+using Agentstration.Resources;
 using Agentstration.Tools;
 
 namespace Agentstration.Agents;
 
 public interface IAgentDefinitionCompiler
 {
-    ResolvedAgentDefinition Compile(AgentResource agent, AgentDeploymentSpec deployment);
+    ResolvedAgentDefinition Compile(
+        AgentResource agent,
+        AgentDeploymentSpec deployment,
+        IReadOnlyCollection<ResourceReference>? toolSetTools = null,
+        IReadOnlyCollection<ResolvedAgentToolSetAssignment>? toolSetAssignments = null);
 }
 
 public sealed class AgentDefinitionValidationException(string code, string message) : Exception(message)
@@ -23,7 +28,11 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
         "prompt-agent", "router-agent", "remote-agent", "custom-agent"
     };
 
-    public ResolvedAgentDefinition Compile(AgentResource resource, AgentDeploymentSpec deployment)
+    public ResolvedAgentDefinition Compile(
+        AgentResource resource,
+        AgentDeploymentSpec deployment,
+        IReadOnlyCollection<ResourceReference>? toolSetTools = null,
+        IReadOnlyCollection<ResolvedAgentToolSetAssignment>? toolSetAssignments = null)
     {
         ArgumentNullException.ThrowIfNull(resource);
         ArgumentNullException.ThrowIfNull(deployment);
@@ -32,7 +41,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             throw new AgentDefinitionValidationException("handler_not_supported", $"Handler '{agent.Handler}' is not supported.");
 
         var instructions = NormalizeInstructions(agent.Instructions);
-        var tools = agent.Tools
+        var tools = agent.Tools.Concat(toolSetTools ?? [])
             .Select(reference => reference.Resolve(resource.Namespace, ToolResourceKinds.Tool))
             .Select(address => ToolResourceIdentity.CatalogId(address.Namespace, address.Name))
             .Distinct(StringComparer.Ordinal)
@@ -56,6 +65,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             deployment.RuntimeProfileNamespace,
             deployment.HostingMode,
             Tools = tools,
+            ToolSetAssignments = toolSetAssignments ?? [],
             Middleware = middleware,
             ContextProviders = contextProviders,
             Capabilities = capabilities,
@@ -76,6 +86,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             RuntimeProfileName = deployment.RuntimeProfileName,
             RuntimeProfileNamespace = deployment.RuntimeProfileNamespace,
             EffectiveToolNames = tools,
+            ToolSetAssignments = toolSetAssignments ?? [],
             MiddlewareIds = middleware,
             ContextProviderIds = contextProviders,
             Capabilities = capabilities,

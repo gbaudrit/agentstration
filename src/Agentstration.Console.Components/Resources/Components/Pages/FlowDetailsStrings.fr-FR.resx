@@ -66,6 +66,8 @@
   <data name="Active"><value>Active</value></data>
   <data name="PublishedVersion"><value>Version publiée</value></data>
   <data name="InputJson"><value>Entrée JSON</value></data>
+  <data name="FlowInput"><value>Entrée du Flow</value></data>
+  <data name="FlowInputHelp"><value>Renseignez les informations nécessaires pour exécuter le Flow.</value></data>
   <data name="Cancel"><value>Annuler</value></data>
   <data name="Starting"><value>Démarrage…</value></data>
   <data name="Status.Published"><value>Publié</value></data>

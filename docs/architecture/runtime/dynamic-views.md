@@ -28,37 +28,44 @@ Structural anchors: **API transport**, **Work and Workplace application**, and *
 
 ## Execute Flow
 
-A Flow Run owns graph progress and durable Flow events. Work owns the functional lifecycle; Runtime owns technical Agent invocation; the Tool pipeline owns governed Tool invocation.
+A Flow Run owns graph progress and durable Flow events. Work owns the functional lifecycle; the independent Runtime Worker owns transient MAF execution; Agentstration retains durable authority and every governed side effect.
 
 ```mermaid
 sequenceDiagram
-    participant Worker as Flow worker
-    participant Flow as Flow engine
+    participant Worker as Independent Runtime Worker
+    participant Flow as Authoritative Flow/AWP services
     participant FlowData as Flow data
-    participant Runtime as Runtime execution
+    participant Runtime as Model invocation
     participant Tools as Tool execution pipeline
     participant Work as Work application
-    Worker->>Flow: Claim pending Flow Run
-    Flow->>FlowData: Load exact validated snapshot and replay state
+    Worker->>Flow: Claim root Flow assignment
+    Flow->>FlowData: Load exact immutable material
+    Flow-->>Worker: Pinned AWP v1 material
     loop Typed graph steps
         alt Flow step
-            Flow->>FlowData: Create deterministic child Flow Run
-            Flow->>FlowData: Suspend parent until child completes
+            Worker->>Flow: Create deterministic child Flow Run
+            Flow->>FlowData: Persist child identity and causality
+            Flow-->>Worker: Pinned child material
+            Worker->>Worker: Execute child under root assignment
         else Agent step
-            Flow->>Runtime: Create technical Runtime Run
-            Runtime-->>Flow: Normalized result and events
+            Worker->>Flow: Invoke governed model/Agent operations
+            Flow->>Runtime: Resolve credentials and invoke model
+            Runtime-->>Worker: Normalized result
         else Tool step
-            Flow->>Tools: Execute governed Tool attempt
-            Tools-->>Flow: Result and governance events
+            Worker->>Flow: Invoke direct Tool or ToolRoute
+            Flow->>Tools: Resolve, authorize and execute attempt
+            Tools-->>Worker: Result and effective identities
         else Deterministic step
-            Flow->>Flow: Evaluate mapping, routing, or transform
+            Worker->>Worker: Evaluate mapping, routing, or transform
         end
-        Flow->>FlowData: Persist transition and differential events
+        Worker->>Flow: Append fenced idempotent events
+        Flow->>FlowData: Project step, transition and Artifact facts
     end
+    Worker->>Flow: Complete root assignment
     Flow->>Work: Project functional progress or terminal result
 ```
 
-Structural anchors: **Flow engine**, **Runtime execution**, **Tool execution pipeline**, and **Work and Workplace application**. Decisions: [ADR-0010](../../decisions/0010-independent-flow-module.md), [ADR-0019](../../decisions/0019-flow-run-resource-and-console.md), [ADR-0048](../../decisions/0048-flow-runs-carry-a-durable-execution-scope.md), [ADR-0054](../../decisions/0054-durable-interactive-flow-execution.md), and [ADR-0105](../../decisions/0105-flows-compose-flows-and-governed-tools.md).
+Structural anchors: **Flow engine**, **Runtime execution**, **Tool execution pipeline**, and **Work and Workplace application**. Decisions: [ADR-0010](../../decisions/0010-independent-flow-module.md), [ADR-0019](../../decisions/0019-flow-run-resource-and-console.md), [ADR-0048](../../decisions/0048-flow-runs-carry-a-durable-execution-scope.md), [ADR-0054](../../decisions/0054-durable-interactive-flow-execution.md), [ADR-0105](../../decisions/0105-flows-compose-flows-and-governed-tools.md), and [ADR-0168](../../decisions/0168-runtime-execution-is-placed-on-independent-awp-workers.md).
 
 ## Execute Agent
 
@@ -110,6 +117,43 @@ sequenceDiagram
 ```
 
 Structural anchors: **Tool execution pipeline**, **Resource-family services**, **Flow engine**, and **Runtime execution**. Decisions: [ADR-0055](../../decisions/0055-agentstration-owns-tool-execution-boundary.md), [ADR-0056](../../decisions/0056-tool-execution-hooks-are-ordered-runtime-guards.md), [ADR-0058](../../decisions/0058-tool-governance-decisions-are-traced-per-physical-attempt.md), and [ADR-0059](../../decisions/0059-tool-arguments-require-explicit-bounded-retention.md).
+
+## Acquire, project, and retrieve Knowledge
+
+Data Sources own governed acquisition. Knowledge Sources consume the resulting durable Artifacts through a separate projection and expose only immutable Snapshot content to retrieval.
+
+```mermaid
+sequenceDiagram
+    participant Caller as Console or API caller
+    participant Data as Data Source services
+    participant Flow as Flow engine
+    participant Tools as Tool execution pipeline
+    participant Artifacts as Artifact services
+    participant Knowledge as Knowledge services
+    Caller->>Data: Start acquisition in a Workspace
+    Data->>Data: Resolve visible active profile revision
+    Data->>Data: Pin Flow, Tool, provider, limits, and policies
+    Data->>Flow: Run datasource.acquisition/v1
+    Flow->>Tools: Acquire and stage bounded content
+    Flow->>Artifacts: Persist through artifact.storage.write/v1
+    Flow-->>Data: Durable publishable Artifact manifest
+    Caller->>Knowledge: Start projection
+    Knowledge->>Data: Resolve selected or latest successful acquisitions
+    opt Binding declares artifact.transform/v1
+        Knowledge->>Flow: Transform one binding
+        Flow-->>Knowledge: Prepared Artifact manifest
+    end
+    Knowledge->>Flow: Run knowledge.projection/v1 once with all prepared inputs
+    Flow-->>Knowledge: Snapshot Artifact manifest
+    Knowledge->>Artifacts: Validate receipts, lineage, and integrity
+    Knowledge->>Knowledge: Publish and activate a new immutable Snapshot
+    Caller->>Knowledge: Search, query, or bounded read
+    Knowledge->>Flow: Run knowledge.retrieval/v1 against selected Snapshot
+    Flow-->>Knowledge: Bounded items, citations, content, or answer
+    Knowledge-->>Caller: Snapshot-bound result and Flow Run evidence
+```
+
+A projection failure leaves the previous active Snapshot unchanged. The built-in projection performs identity aggregation and preserves heterogeneous media; normalization requires an explicit transformation or specialized projection. The built-in retrieval implementation is deterministic and local-first rather than model-backed. Structural anchors: **Resource-family services**, **Flow engine**, **Tool execution pipeline**, and **Control-plane data**. Decisions: [ADR-0151](../../decisions/0151-artifacts-use-toolset-backed-staging-and-storage-flows.md), [ADR-0153](../../decisions/0153-knowledge-snapshots-are-immutable-publications.md), [ADR-0154](../../decisions/0154-knowledge-retrieval-is-a-snapshot-bound-flow-invocation.md), [ADR-0164](../../decisions/0164-data-sources-own-governed-acquisition.md), [ADR-0166](../../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0167](../../decisions/0167-knowledge-sources-project-data-source-artifacts.md).
 
 ## Invoke AEP or MCP
 

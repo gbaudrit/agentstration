@@ -1,0 +1,324 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace Agentstration.Awp.Abstractions;
+
+public sealed record AwpExecutionToolMaterial(
+    string Id,
+    string Namespace,
+    string Name,
+    string? Description,
+    JsonElement InputSchema,
+    JsonElement? OutputSchema,
+    bool RequiresApproval);
+
+public sealed record AwpExecutionAgentMaterial(
+    string MaterialId,
+    string ParticipantId,
+    Guid AgentId,
+    string AgentName,
+    long Generation,
+    string RevisionId,
+    string DefinitionHash,
+    string Handler,
+    string DisplayName,
+    string Description,
+    string Instructions,
+    string ModelProfileName,
+    string ModelProfileNamespace,
+    IReadOnlyList<AwpExecutionToolMaterial> Tools)
+{
+    public string AgentNamespace { get; init; } = "default";
+    public string RuntimeProfileName { get; init; } = string.Empty;
+    public string RuntimeProfileNamespace { get; init; } = "default";
+}
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(AwpDirectAgentExecutionMaterial), "directAgent")]
+[JsonDerivedType(typeof(AwpRootFlowExecutionMaterial), "rootFlow")]
+public abstract record AwpExecutionMaterial(
+    string MaterialId,
+    string SchemaVersion,
+    string Digest,
+    string RunId);
+
+public sealed record AwpDirectAgentExecutionMaterial(
+    string MaterialId,
+    string SchemaVersion,
+    string Digest,
+    string RunId,
+    IReadOnlyList<AwpExecutionMessage> Messages,
+    string? Context,
+    AwpExecutionOptions Execution,
+    AwpExecutionAgentMaterial Agent)
+    : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId);
+
+public sealed record AwpRootFlowExecutionMaterial(
+    string MaterialId,
+    string SchemaVersion,
+    string Digest,
+    string RunId,
+    string FlowId,
+    string FlowNamespace,
+    string FlowVersion,
+    string FlowDefinitionHash,
+    JsonElement Input,
+    JsonElement Definition,
+    IReadOnlyList<AwpExecutionAgentMaterial> Agents,
+    Guid PrincipalId,
+    AwpFlowResumeMaterial? Resume = null,
+    string? RootFlowRunId = null,
+    string? ParentFlowRunId = null,
+    string? CorrelationId = null,
+    int OrchestrationTimeoutMilliseconds = 0)
+    : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId);
+
+public sealed record AwpFlowResumeMaterial(
+    string RuntimeType,
+    string StateId,
+    string InputRequestId,
+    string RuntimeRequestId,
+    string Prompt,
+    string InputType,
+    IReadOnlyList<string> Options,
+    string? Source,
+    JsonElement Response,
+    DateTimeOffset RespondedAt,
+    string PrincipalId);
+
+public sealed record AwpExecutionMessage(string Role, string Content);
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(AwpModelTextContent), "text")]
+[JsonDerivedType(typeof(AwpModelToolCallContent), "toolCall")]
+[JsonDerivedType(typeof(AwpModelToolResultContent), "toolResult")]
+public abstract record AwpModelContent;
+
+public sealed record AwpModelTextContent(string Text) : AwpModelContent;
+public sealed record AwpModelToolCallContent(string CallId, string Name, JsonElement Arguments) : AwpModelContent;
+public sealed record AwpModelToolResultContent(string CallId, JsonElement Result) : AwpModelContent;
+public sealed record AwpModelMessage(string Role, IReadOnlyList<AwpModelContent> Contents);
+public sealed record AwpModelTool(string Name, string? Description, JsonElement Parameters);
+
+public sealed record AwpExecutionOptions(
+    int TimeoutSeconds,
+    string Streaming,
+    bool? PersistToolArguments,
+    IReadOnlyDictionary<string, JsonElement> Parameters);
+
+public sealed record AwpGetExecutionMaterialRequest(AwpAssignmentCommandContext Context);
+
+public sealed record AwpGetExecutionMaterialResponse(DateTimeOffset ServerTime, AwpExecutionMaterial Material);
+
+public sealed record AwpStoreCheckpointRequest(
+    AwpAssignmentCommandContext Context,
+    string CheckpointId,
+    string SchemaVersion,
+    string CompatibilityKey,
+    JsonElement Payload);
+
+public sealed record AwpCheckpointResponse(
+    DateTimeOffset ServerTime,
+    string CheckpointId,
+    string SchemaVersion,
+    string CompatibilityKey,
+    JsonElement Payload,
+    DateTimeOffset PersistedAt);
+
+public sealed record AwpGetCheckpointRequest(AwpAssignmentCommandContext Context, string CheckpointId);
+
+public sealed record AwpInvokeModelRequest(
+    AwpAssignmentCommandContext Context,
+    string ParticipantId,
+    AwpTurnId TurnId,
+    AwpTurnAttemptId TurnAttemptId,
+    IReadOnlyList<AwpModelMessage> Messages,
+    IReadOnlyList<AwpModelTool>? Tools = null);
+
+public sealed record AwpInvokeModelResponse(
+    DateTimeOffset ServerTime,
+    IReadOnlyList<AwpModelContent> Contents,
+    string? ModelId,
+    string? FinishReason,
+    int? InputTokens,
+    int? OutputTokens,
+    string? ProviderType = null);
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonDerivedType(typeof(AwpModelStreamStarted), "model.response.started")]
+[JsonDerivedType(typeof(AwpModelTextDelta), "model.output_text.delta")]
+[JsonDerivedType(typeof(AwpModelToolCallStarted), "model.tool_call.started")]
+[JsonDerivedType(typeof(AwpModelToolCallArgumentsDelta), "model.tool_call.arguments.delta")]
+[JsonDerivedType(typeof(AwpModelToolCallDone), "model.tool_call.done")]
+[JsonDerivedType(typeof(AwpModelToolResult), "model.tool_result")]
+[JsonDerivedType(typeof(AwpModelUsage), "model.usage")]
+[JsonDerivedType(typeof(AwpModelStreamCompleted), "model.response.completed")]
+[JsonDerivedType(typeof(AwpModelStreamFailed), "model.response.failed")]
+public abstract record AwpModelStreamEvent(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt);
+
+public sealed record AwpModelStreamStarted(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelTextDelta(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string Text,
+    string? ModelId = null,
+    string? ProviderType = null)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelToolCallStarted(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string CallId,
+    string Name)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelToolCallArgumentsDelta(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string CallId,
+    string Delta)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelToolCallDone(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string CallId)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelToolResult(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string CallId,
+    JsonElement Result)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelUsage(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    int? InputTokens,
+    int? OutputTokens)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelStreamCompleted(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string? ModelId,
+    string? ProviderType,
+    string? FinishReason)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpModelStreamFailed(
+    Guid StreamId,
+    long SequenceNumber,
+    DateTimeOffset SentAt,
+    string Code,
+    string Message)
+    : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
+
+public sealed record AwpInvokeToolRequest(
+    AwpAssignmentCommandContext Context,
+    string ParticipantId,
+    AwpTurnId TurnId,
+    AwpTurnAttemptId TurnAttemptId,
+    AwpToolCallId ToolCallId,
+    string ToolId,
+    JsonElement? Arguments);
+
+public sealed record AwpInvokeToolResponse(DateTimeOffset ServerTime, JsonElement? Result);
+
+public sealed record AwpInvokeFlowToolRequest(
+    AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId,
+    JsonElement Arguments);
+
+public sealed record AwpFlowToolRoute(
+    string ToolSetName,
+    string ToolSetNamespace,
+    string ToolSetVersion,
+    string Capability,
+    string Route);
+
+public sealed record AwpInvokeFlowToolResponse(
+    DateTimeOffset ServerTime,
+    JsonElement? Result,
+    string ToolName,
+    string ToolNamespace,
+    Guid ToolUid,
+    long ToolGeneration,
+    string ProviderName,
+    string ProviderNamespace,
+    string ProviderType,
+    string ExternalToolId,
+    AwpFlowToolRoute? Route);
+
+public sealed record AwpCaptureFlowArtifactRequest(
+    AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId,
+    string? FileName,
+    string MediaType,
+    JsonElement Content,
+    IReadOnlyDictionary<string, string> Provenance);
+
+public sealed record AwpFlowArtifact(
+    string ArtifactId,
+    string FileName,
+    string MediaType,
+    string Kind = "staged",
+    string? StorageFlowRunId = null,
+    string? LocalArtifactId = null);
+
+public sealed record AwpCaptureFlowArtifactResponse(
+    DateTimeOffset ServerTime,
+    AwpFlowArtifact Artifact);
+
+public sealed record AwpCleanupFlowArtifactRequest(
+    AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId,
+    AwpFlowArtifact Artifact);
+
+public sealed record AwpCleanupFlowArtifactResponse(DateTimeOffset ServerTime);
+
+public sealed record AwpStoreArtifactRequest(
+    AwpAssignmentCommandContext Context,
+    string Name,
+    string ContentType,
+    byte[] Content);
+
+public sealed record AwpGetArtifactRequest(AwpAssignmentCommandContext Context, Guid ArtifactId);
+
+public sealed record AwpArtifactResponse(
+    DateTimeOffset ServerTime,
+    Guid ArtifactId,
+    string Name,
+    string ContentType,
+    long Length,
+    byte[] Content);
+
+public sealed record AwpCreateChildFlowRequest(
+    AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId,
+    JsonElement Input,
+    string Purpose = "flowCall",
+    int? Iteration = null);
+
+public sealed record AwpChildFlowResponse(
+    DateTimeOffset ServerTime,
+    string RunId,
+    string Status,
+    JsonElement? Output,
+    AwpRootFlowExecutionMaterial? Material = null);

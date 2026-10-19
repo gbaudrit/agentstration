@@ -1,7 +1,10 @@
 using System.Globalization;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Models.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Triggers;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.State;
@@ -15,6 +18,7 @@ public sealed class PlatformDashboardService(
     IWorkApiClient work,
     IFlowApiClient flow,
     IModelProvidersClient modelProviders,
+    IExtensionsClient extensions,
     ILogger<PlatformDashboardService> logger) : IPlatformStatusProvider, IDisposable
 {
     private readonly CancellationTokenSource lifetime = new();
@@ -34,24 +38,21 @@ public sealed class PlatformDashboardService(
     public PlatformDashboardLoad Start(CancellationToken cancellationToken)
     {
         var agentsTask = LoadAsync("Agents", management.GetAgentsAsync, Array.Empty<AgentSummary>(), cancellationToken);
-        var deploymentsTask = LoadAsync("Deployments", management.GetDeploymentsAsync, Array.Empty<DeploymentSummary>(), cancellationToken);
+        var instancesTask = LoadAsync("Agent instances", runtime.GetAgentInstancesAsync, Array.Empty<AgentInstanceResponse>(), cancellationToken);
         var runtimeRunsTask = LoadAsync("Agents Run", token => runtime.GetRunsAsync(null, token), Array.Empty<RuntimeRun>(), cancellationToken);
         var workTask = LoadAsync("Work Tasks", token => work.GetTaskSummaryAsync(null, token), new WorkTaskOperationsCountersResponse(0, 0, 0, 0, 0), cancellationToken);
         var flowsTask = LoadAsync("Flows", flow.GetFlowsAsync, Array.Empty<FlowSummary>(), cancellationToken);
         var flowRunsTask = LoadAsync("Flow Runs", token => flow.GetFlowRunsAsync(null, token), Array.Empty<FlowRun>(), cancellationToken);
         var triggersTask = LoadAsync("Triggers", management.GetTriggersAsync, Array.Empty<TriggerResource>(), cancellationToken);
         var providersTask = LoadAsync("Model providers", modelProviders.GetModelProvidersAsync, Array.Empty<ModelProviderResponse>(), cancellationToken);
-        var snapshotTask = BuildSnapshotAsync(agentsTask, deploymentsTask, runtimeRunsTask, workTask, flowsTask, flowRunsTask, triggersTask, providersTask);
+        var extensionsTask = LoadAsync("Extensions", extensions.GetExtensionsAsync, Array.Empty<ExtensionResponse>(), cancellationToken);
+        var snapshotTask = BuildSnapshotAsync(agentsTask, instancesTask, runtimeRunsTask, workTask, flowsTask, flowRunsTask, triggersTask, providersTask, extensionsTask);
 
         return new(
             ToMetricAsync(agentsTask, agents => new(FormatCount(agents.Count), null, UiStatus.Info)),
-            ToMetricAsync(deploymentsTask, deployments =>
-            {
-                var desired = deployments.Where(IsDesiredRunning).ToArray();
-                var ready = desired.Count(IsReady);
-                return new($"{FormatCount(ready)}/{FormatCount(desired.Length)}", "Ready / desired",
-                    ready == desired.Length && desired.Length > 0 ? UiStatus.Success : UiStatus.Warning);
-            }),
+            ToMetricAsync(flowsTask, flows => new(FormatCount(flows.Count), null, UiStatus.Info)),
+            ToMetricAsync(extensionsTask, configured => new(FormatCount(configured.Count), null, UiStatus.Info)),
+            ToMetricAsync(instancesTask, instances => new(FormatCount(instances.Count), null, UiStatus.Info)),
             ToMetricAsync(runtimeRunsTask, runs => new(
                 FormatCount(runs.Count(run => run.Status.State == RuntimeRunState.Running)), null, UiStatus.Info)),
             ToMetricAsync(workTask, tasks => new(FormatCount(tasks.Running), null, UiStatus.Info)),
@@ -61,20 +62,26 @@ public sealed class PlatformDashboardService(
             {
                 var running = runs.Count(run => run.Status == FlowRunStatus.Running);
                 var waiting = runs.Count(run => run.Status == FlowRunStatus.WaitingForInput);
-                return new(FormatCount(running), $"{FormatCount(waiting)} awaiting input",
-                    waiting > 0 ? UiStatus.Warning : UiStatus.Info);
+                return new(FormatCount(running), null,
+                    waiting > 0 ? UiStatus.Warning : UiStatus.Info,
+                    "Metric.AwaitingInput",
+                    [waiting]);
             }),
             ToMetricAsync(triggersTask, triggers =>
             {
                 var failed = triggers.Count(trigger => trigger.Observed.LastOutcome == TriggerLastOutcome.Failed);
-                return new(FormatCount(triggers.Count(trigger => trigger.Definition.Enabled)), $"{FormatCount(failed)} failed last firing",
-                    failed == 0 ? UiStatus.Success : UiStatus.Danger);
+                return new(FormatCount(triggers.Count(trigger => trigger.Definition.Enabled)), null,
+                    failed == 0 ? UiStatus.Success : UiStatus.Danger,
+                    "Metric.FailedLastFiring",
+                    [failed]);
             }),
             ToMetricAsync(providersTask, providers =>
             {
                 var unavailable = providers.Count(provider => ModelManagementUi.Status(provider.Properties.Status) is UiStatus.Warning or UiStatus.Danger);
                 return new(FormatCount(providers.Count(provider => ModelManagementUi.Status(provider.Properties.Status) == UiStatus.Success)),
-                    $"{FormatCount(unavailable)} unavailable", unavailable == 0 ? UiStatus.Success : UiStatus.Warning);
+                    null, unavailable == 0 ? UiStatus.Success : UiStatus.Warning,
+                    "Metric.UnavailableCount",
+                    [unavailable]);
             }),
             snapshotTask);
     }
@@ -98,7 +105,7 @@ public sealed class PlatformDashboardService(
     private static async Task<DashboardMetric> ToMetricAsync<T>(Task<SourceLoad<T>> sourceTask, Func<T, DashboardMetric> project)
     {
         var source = await sourceTask;
-        return source.Available ? project(source.Value) : new("—", "Unavailable", UiStatus.Danger);
+        return source.Available ? project(source.Value) : new("—", null, UiStatus.Danger, "Unavailable");
     }
 
     private static async Task<DashboardMetric> ToMetricAsync(Task<PlatformSnapshot> snapshotTask, Func<PlatformSnapshot, DashboardMetric> project) =>
@@ -108,78 +115,83 @@ public sealed class PlatformDashboardService(
 
     private static async Task<PlatformSnapshot> BuildSnapshotAsync(
         Task<SourceLoad<IReadOnlyList<AgentSummary>>> agentsTask,
-        Task<SourceLoad<IReadOnlyList<DeploymentSummary>>> deploymentsTask,
+        Task<SourceLoad<IReadOnlyList<AgentInstanceResponse>>> instancesTask,
         Task<SourceLoad<IReadOnlyList<RuntimeRun>>> runtimeRunsTask,
         Task<SourceLoad<WorkTaskOperationsCountersResponse>> workTask,
         Task<SourceLoad<IReadOnlyList<FlowSummary>>> flowsTask,
         Task<SourceLoad<IReadOnlyList<FlowRun>>> flowRunsTask,
         Task<SourceLoad<IReadOnlyList<TriggerResource>>> triggersTask,
-        Task<SourceLoad<IReadOnlyList<ModelProviderResponse>>> providersTask)
+        Task<SourceLoad<IReadOnlyList<ModelProviderResponse>>> providersTask,
+        Task<SourceLoad<IReadOnlyList<ExtensionResponse>>> extensionsTask)
     {
 
-        await Task.WhenAll(agentsTask, deploymentsTask, runtimeRunsTask, workTask, flowsTask, flowRunsTask, triggersTask, providersTask);
+        await Task.WhenAll(agentsTask, instancesTask, runtimeRunsTask, workTask, flowsTask, flowRunsTask, triggersTask, providersTask, extensionsTask);
 
         var agents = await agentsTask;
-        var deployments = await deploymentsTask;
+        var instances = await instancesTask;
         var runtimeRuns = await runtimeRunsTask;
         var tasks = await workTask;
         var flows = await flowsTask;
         var flowRuns = await flowRunsTask;
         var triggers = await triggersTask;
         var providers = await providersTask;
+        var extensions = await extensionsTask;
 
-        var desiredDeployments = deployments.Value.Where(IsDesiredRunning).ToArray();
-        var readyDeployments = desiredDeployments.Count(IsReady);
-        var deploymentAttention = desiredDeployments.Where(NeedsAttention).Select(ToAttentionItem).ToArray();
-        var failedTriggers = triggers.Value.Count(trigger => trigger.Observed.LastOutcome == TriggerLastOutcome.Failed);
+        var failedTriggerItems = triggers.Value.Where(trigger => trigger.Observed.LastOutcome == TriggerLastOutcome.Failed).ToArray();
+        var failedTriggers = failedTriggerItems.Length;
         var runningFlowRuns = flowRuns.Value.Count(run => run.Status == FlowRunStatus.Running);
         var waitingFlowRuns = flowRuns.Value.Where(run => run.Status == FlowRunStatus.WaitingForInput).ToArray();
         var unavailableProviders = providers.Value.Where(provider => ModelManagementUi.Status(provider.Properties.Status) is UiStatus.Warning or UiStatus.Danger).ToArray();
 
         var attention = new List<ComponentHealth>();
-        attention.AddRange(deploymentAttention);
         if (tasks.Value.ActionRequired > 0)
-            attention.Add(new("tasks-action-required", "Action required", $"{tasks.Value.ActionRequired} awaiting input", UiStatus.Warning));
+            attention.Add(new("tasks-action-required", "Action required", $"{tasks.Value.ActionRequired} awaiting input", UiStatus.Warning, "/tasks?hasPendingAction=true"));
         if (tasks.Value.Failed > 0)
-            attention.Add(new("tasks-failed", "Failed", $"{tasks.Value.Failed} failed tasks", UiStatus.Danger));
-        if (failedTriggers > 0)
-            attention.Add(new("triggers-failed", "Failed", $"{failedTriggers} failed triggers", UiStatus.Danger));
+            attention.Add(new("tasks-failed", "Failed", $"{tasks.Value.Failed} failed tasks", UiStatus.Danger, "/tasks?status=Failed"));
+        attention.AddRange(failedTriggerItems.Select(trigger => new ComponentHealth(
+            trigger.Definition.DisplayName,
+            "Failed",
+            $"{trigger.Namespace.Value}/{trigger.Name}",
+            UiStatus.Danger,
+            $"/triggers/{Uri.EscapeDataString(trigger.Name)}")));
         attention.AddRange(waitingFlowRuns.Select(ToFlowRunAttention));
         attention.AddRange(unavailableProviders.Select(provider => new ComponentHealth(
-            $"provider-{provider.Name}",
+            provider.Properties.DisplayName,
             ModelManagementUi.Label(provider.Properties.Status),
             provider.Properties.LastCheckedAt is { } checkedAt ? $"Last checked {checkedAt.LocalDateTime:g}" : "Status unavailable",
-            ModelManagementUi.Status(provider.Properties.Status))));
+            ModelManagementUi.Status(provider.Properties.Status),
+            $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}")));
 
         var sources = new[]
         {
             agents.ToSource($"{agents.Value.Count} agents", "/agents"),
-            deployments.ToSource($"{deployments.Value.Count} deployments", "/deployments"),
+            instances.ToSource($"{instances.Value.Count} active Agent instances", "/agent-instances"),
             runtimeRuns.ToSource($"{runtimeRuns.Value.Count} runs", "/agent-runs"),
             tasks.ToSource("Available", "/tasks"),
             flows.ToSource($"{flows.Value.Count} flows", "/flows"),
             flowRuns.ToSource($"{flowRuns.Value.Count} runs", "/flow-runs"),
             triggers.ToSource($"{triggers.Value.Count} triggers", "/triggers"),
-            providers.ToSource($"{providers.Value.Count} providers", "/modelproviders")
+            providers.ToSource($"{providers.Value.Count} providers", "/modelproviders"),
+            extensions.ToSource($"{extensions.Value.Count} extensions", "/extensions")
         };
         attention.AddRange(sources.Where(source => source.Severity == UiStatus.Danger));
 
         var unavailableSources = sources.Count(source => source.Severity == UiStatus.Danger);
-        var attentionCount = deploymentAttention.Length + tasks.Value.ActionRequired + tasks.Value.Failed + waitingFlowRuns.Length + failedTriggers + unavailableProviders.Length + unavailableSources;
+        var attentionCount = tasks.Value.ActionRequired + tasks.Value.Failed + waitingFlowRuns.Length + failedTriggers + unavailableProviders.Length + unavailableSources;
         var status = unavailableSources > 0
             ? "Partially unavailable"
-            : attentionCount > 0
+                : attentionCount > 0
                 ? "Attention required"
-                : desiredDeployments.Length == 0
-                    ? "No active deployments"
-                    : "Operational";
+                : "Operational";
 
         return new PlatformSnapshot
         {
             Status = status,
             DefinedAgents = agents.Value.Count,
-            ReadyDeployments = readyDeployments,
-            DesiredDeployments = desiredDeployments.Length,
+            DefinedFlows = flows.Value.Count,
+            ConfiguredExtensions = extensions.Value.Count,
+            ReadyDeployments = instances.Value.Count,
+            DesiredDeployments = instances.Value.Count,
             RunningRuntimeRuns = runtimeRuns.Value.Count(run => run.Status.State == RuntimeRunState.Running),
             RunningTasks = tasks.Value.Running,
             ActionRequiredTasks = tasks.Value.ActionRequired,
@@ -200,9 +212,9 @@ public sealed class PlatformDashboardService(
 
     public static UiStatus ToStatus(string status) => status.ToLowerInvariant() switch
     {
-        "operational" or "healthy" or "ready" or "active" or "running" or "completed" => UiStatus.Success,
-        "attention required" or "degraded" or "waiting" or "waitingforinput" or "waitingforchild" or "needsinput" or "actionrequired" or "paused" or "queued" or "draft" => UiStatus.Warning,
-        "partially unavailable" or "failed" or "error" or "unavailable" or "cancelled" or "canceled" => UiStatus.Danger,
+        "operational" or "healthy" or "ready" or "active" or "online" or "running" or "completed" or "succeeded" => UiStatus.Success,
+        "attention required" or "degraded" or "stale" or "waiting" or "waitingforinput" or "waitingforchild" or "needsinput" or "actionrequired" or "paused" or "queued" or "draft" => UiStatus.Warning,
+        "partially unavailable" or "offline" or "failed" or "error" or "unavailable" or "cancelled" or "canceled" => UiStatus.Danger,
         "no active deployments" => UiStatus.Success,
         _ => UiStatus.Neutral
     };
@@ -251,7 +263,12 @@ public sealed class PlatformDashboardService(
             ?? (deployment.ObservedRevision is not null && !string.Equals(deployment.ObservedRevision, deployment.Revision, StringComparison.Ordinal)
                 ? $"Observed {deployment.ObservedRevision}; desired {deployment.Revision}"
                 : $"Desired Running; observed {deployment.Status}");
-        return new(deployment.Id, deployment.Status, detail, severity);
+        return new(
+            deployment.Id,
+            deployment.Status,
+            detail,
+            severity,
+            ConsoleResourceUrls.Deployment(ResourceNamespace.Parse(deployment.Namespace), deployment.Id));
     }
 
     private static ComponentHealth ToFlowRunAttention(FlowRun run) => new(
