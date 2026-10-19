@@ -48,6 +48,8 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             Assert.AreEqual(item.Value, stored.Value.Definition.AcquisitionFlow.Name);
             Assert.AreEqual(scope, stored.Value.Definition.AcquisitionFlow.ScopeRef);
             Assert.AreEqual("true", stored.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+            Assert.AreEqual(ResourceOriginKind.BuiltIn, stored.Value.Governance.Origin.Kind);
+            Assert.AreEqual(ResourceManagementAuthorityKind.Core, stored.Value.Governance.ManagedBy?.Kind);
             var revisions = await profiles.ListRevisionsAsync(ResourceNamespace.Default, item.Key, scope, default);
             Assert.HasCount(1, revisions);
             Assert.AreEqual(scope, revisions[0].Value.ScopeRef);

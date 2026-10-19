@@ -234,7 +234,7 @@ else
                 var snapshot = requestedScope is null
                     ? await Client.GetAgentAsync(AgentResourceNamespace, Name!, cancellation.Token)
                     : await Client.GetAgentAsync(AgentResourceNamespace, Name!, requestedScope.Value, cancellation.Token);
-                if (!AgentResourceNamespace.IsDefault && IsPackManaged(snapshot.Value))
+                if (snapshot.Value.Governance.IsManaged)
                 {
                     Navigation.NavigateTo(ConsoleResourceUrls.Agent(AgentResourceNamespace, Name!, snapshot.Value.ScopeRef), replace: true);
                     return;
@@ -400,9 +400,6 @@ else
     private Task DiscardAsync() => OnParametersSetAsync();
 
     private static string ResourceName(string name) => name;
-    private static bool IsPackManaged(AgentResource value) =>
-        value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Publisher)
-        && value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name);
     private static string ProfileUrl(AgentModelResponse value)
     {
         return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId), value.Declared.ModelProfile.ScopeRef);

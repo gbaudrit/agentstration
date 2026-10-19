@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Security.Contracts;
 
 namespace Agentstration.Flows.Application;
 
@@ -29,9 +30,12 @@ public sealed class FlowService(
     IEnumerable<IFlowDeletionGuard> deletionGuards,
     IEnumerable<IFlowVersionActivationGuard>? activationGuards = null,
     IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null,
-    IFlowAgentReferenceResolver? agentReferences = null)
+    IFlowAgentReferenceResolver? agentReferences = null,
+    IResourceGovernanceContext? governanceContext = null,
+    ISecurityAuditWriter? audit = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly IResourceGovernanceContext effectiveGovernanceContext = governanceContext ?? new ResourceGovernanceContext();
 
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 
@@ -47,9 +51,14 @@ public sealed class FlowService(
         _ = scopeRef.Value;
         var now = timeProvider.GetUtcNow();
         var resource = new FlowResource(scopeRef, new FlowId(command.Name, @namespace), command.Name, command.Description, command.Version, command.Enabled, null,
-            command.Definition, Copy(command.Metadata), now, now, command.DisplayName, command.Graph);
+            command.Definition, Copy(command.Metadata), now, now, command.DisplayName, command.Graph)
+        {
+            Governance = ResourceGovernanceEnforcement.PrepareCreate(ResourceGovernance.User, effectiveGovernanceContext.Current)
+        };
         FlowValidator.Validate(resource);
-        return await repository.CreateAsync(resource, cancellationToken);
+        var created = await repository.CreateAsync(resource, cancellationToken);
+        await AuditReconciliationAsync(resource.Governance, cancellationToken);
+        return created;
     }
 
     public Task<StoredFlow?> GetAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) => repository.GetAsync(workspaceId, id, cancellationToken);
@@ -133,6 +142,7 @@ public sealed class FlowService(
     {
         ArgumentNullException.ThrowIfNull(command);
         var current = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        await EnsureManagerAsync(current.Value.Governance, cancellationToken);
         if (!string.Equals(current.ETag, expectedETag, StringComparison.Ordinal)) throw new FlowConcurrencyException("The supplied ETag does not match the current Flow version.");
         var published = await repository.GetVersionExactAsync(scopeRef, id, command.Version, cancellationToken);
         if (published is not null
@@ -148,10 +158,16 @@ public sealed class FlowService(
             Metadata = Copy(command.Metadata),
             Graph = command.Graph,
             DisplayName = command.DisplayName ?? current.Value.DisplayName,
-            UpdatedAt = timeProvider.GetUtcNow()
+            UpdatedAt = timeProvider.GetUtcNow(),
+            Governance = ResourceGovernanceEnforcement.PrepareUpdate(
+                current.Value.Governance,
+                ResourceGovernance.User,
+                effectiveGovernanceContext.Current)
         };
         FlowValidator.Validate(updated);
-        return await repository.UpdateAsync(updated, expectedETag, cancellationToken);
+        var stored = await repository.UpdateAsync(updated, expectedETag, cancellationToken);
+        await AuditReconciliationAsync(updated.Governance, cancellationToken);
+        return stored;
     }
 
     public Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, CancellationToken cancellationToken) =>
@@ -163,6 +179,7 @@ public sealed class FlowService(
     public async Task DeleteExactAsync(ResourceScopeRef scopeRef, FlowId id, string? expectedETag, bool allowSystemManaged, CancellationToken cancellationToken)
     {
         var stored = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        await EnsureManagerAsync(stored.Value.Governance, cancellationToken);
         if (IsSystemManaged(stored.Value.Metadata)
             && (!allowSystemManaged || !IsDirectAgentFlow(stored.Value.Metadata)))
             throw new FlowValidationException("system_flow_managed", $"Flow '{id}' is managed by Agentstration and cannot be deleted independently.");
@@ -172,6 +189,7 @@ public sealed class FlowService(
             foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(workspaceId, id, cancellationToken);
         }
         await repository.DeleteExactAsync(scopeRef, id, expectedETag, cancellationToken);
+        await AuditReconciliationAsync(stored.Value.Governance, cancellationToken);
     }
 
     public async Task<StoredFlowVersion> PublishVersionAsync(WorkspaceId workspaceId, FlowId id, string version, bool activate, CancellationToken cancellationToken, string? releaseNotes = null)
@@ -180,6 +198,7 @@ public sealed class FlowService(
     public async Task<StoredFlowVersion> PublishVersionExactAsync(ResourceScopeRef scopeRef, FlowId id, string version, bool activate, CancellationToken cancellationToken, string? releaseNotes = null)
     {
         var stored = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        await EnsureManagerAsync(stored.Value.Governance, cancellationToken);
         if (!string.Equals(stored.Value.Version, version, StringComparison.Ordinal))
             throw new FlowValidationException("flow_version_mismatch", "The requested version must match the current Flow definition version.");
         if (await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken) is not null)
@@ -187,7 +206,10 @@ public sealed class FlowService(
         var definition = await PinAgentsAsync(scopeRef, id.Namespace, stored.Value.Definition, cancellationToken);
         var graph = stored.Value.Graph is null ? null : await PinAgentsAsync(scopeRef, id.Namespace, stored.Value.Graph, cancellationToken);
         var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, definition, stored.Value.Metadata, timeProvider.GetUtcNow(), graph,
-            graph is null ? FlowDefinitionHash.Compute(definition) : FlowDefinitionHash.Compute(graph), releaseNotes);
+            graph is null ? FlowDefinitionHash.Compute(definition) : FlowDefinitionHash.Compute(graph), releaseNotes)
+        {
+            Governance = stored.Value.Governance
+        };
         FlowValidator.ValidateVersion(published);
         if (activate)
             if (scopeRef.Kind == ResourceScopeKind.Workspace)
@@ -205,6 +227,7 @@ public sealed class FlowService(
             var activated = stored.Value with { ActiveVersion = version, Enabled = true, UpdatedAt = timeProvider.GetUtcNow() };
             await repository.UpdateAsync(activated, stored.ETag, cancellationToken);
         }
+        await AuditReconciliationAsync(stored.Value.Governance, cancellationToken);
         return created;
     }
 
@@ -283,12 +306,15 @@ public sealed class FlowService(
     public async Task<StoredFlow> ActivateVersionExactAsync(ResourceScopeRef scopeRef, FlowId id, string version, CancellationToken cancellationToken)
     {
         var stored = await repository.GetExactAsync(scopeRef, id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        await EnsureManagerAsync(stored.Value.Governance, cancellationToken);
         var published = await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken)
             ?? throw new FlowValidationException("flow_version_not_published", "The Flow version must be published before activation.");
         if (stored.Value.ActiveVersion == version) return stored;
         if (scopeRef.Kind == ResourceScopeKind.Workspace)
             foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(new(scopeRef.TargetId!.Value), published.Value, cancellationToken);
-        return await repository.UpdateAsync(stored.Value with { ActiveVersion = version, Enabled = true, UpdatedAt = timeProvider.GetUtcNow() }, stored.ETag, cancellationToken);
+        var activated = await repository.UpdateAsync(stored.Value with { ActiveVersion = version, Enabled = true, UpdatedAt = timeProvider.GetUtcNow() }, stored.ETag, cancellationToken);
+        await AuditReconciliationAsync(stored.Value.Governance, cancellationToken);
+        return activated;
     }
     public Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) => repository.ListVersionsAsync(workspaceId, id, cancellationToken);
     public Task<IReadOnlyList<StoredFlowVersion>> ListVersionsExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken) => repository.ListVersionsExactAsync(scopeRef, id, cancellationToken);
@@ -346,6 +372,23 @@ public sealed class FlowService(
 
     private static IReadOnlyDictionary<string, string> Copy(IReadOnlyDictionary<string, string>? source) =>
         source is null ? new Dictionary<string, string>() : new Dictionary<string, string>(source, StringComparer.Ordinal);
+
+    private async Task EnsureManagerAsync(ResourceGovernance governance, CancellationToken cancellationToken)
+    {
+        try { ResourceGovernanceEnforcement.EnsureManager(governance, effectiveGovernanceContext.Current); }
+        catch (ResourceGovernanceViolationException exception)
+        {
+            if (audit is not null)
+                await audit.WriteAsync(new(SecurityAuditActions.ManagedResourceMutationDenied,
+                    SecurityAuditOutcome.Failed, ReasonCode: exception.Code), cancellationToken);
+            throw;
+        }
+    }
+
+    private Task AuditReconciliationAsync(ResourceGovernance governance, CancellationToken cancellationToken) =>
+        audit is null || !governance.IsManaged
+            ? Task.CompletedTask
+            : audit.WriteAsync(new(SecurityAuditActions.ManagedResourceReconciled), cancellationToken);
 
     private static bool IsSystemManaged(IReadOnlyDictionary<string, string> metadata) =>
         metadata.TryGetValue("systemManaged", out var value) && bool.TryParse(value, out var parsed) && parsed;

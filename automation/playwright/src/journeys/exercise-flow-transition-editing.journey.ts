@@ -33,7 +33,8 @@ export const exerciseFlowTransitionEditing: Journey<ExerciseFlowTransitionEditin
   await designer.selectTransition('transform —completed→ error');
   await designer.expectSelectedTransition('transform', 'completed', 'error', 'transform-completed-completed');
 
-  await designer.publishAsReadOnlyFixture(context.consoleUrl, name);
-  await designer.expectReadOnlyPublished(context.consoleUrl, 'default', name);
+  await designer.publishUserFixture(context.consoleUrl, name);
+  await designer.expectPublishedUserFlowEditable(context.consoleUrl, 'default', name);
+  await designer.expectReadOnlyPublished(context.consoleUrl, 'default', 'artifact-storage-filesystem-read-builtin');
   await expect(context.pages.flowDesigner.designer).toBeVisible();
 };

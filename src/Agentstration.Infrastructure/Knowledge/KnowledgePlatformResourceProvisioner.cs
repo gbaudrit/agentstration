@@ -22,7 +22,8 @@ public sealed class KnowledgePlatformResourceProvisioner(
     FlowService flows,
     DataSourceProfileService dataSourceProfiles,
     IResourceAccessPolicyService accessPolicies,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IResourceGovernanceContext governance)
 {
     public const string RetrievalToolSetName = "knowledge-retrieval-builtin";
     public const string ProjectionFlowName = "knowledge-projection-builtin";
@@ -43,6 +44,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
             throw new InvalidOperationException("Built-in Knowledge resources require a Tenant scope.");
         if (workspaceScope.Kind != ResourceScopeKind.Workspace)
             throw new InvalidOperationException("Built-in Knowledge resources require a Workspace scope.");
+        using var governanceScope = governance.Push(ResourceGovernance.Core("knowledge.platform"));
         await EnsureToolSetAsync(workspaceScope, RetrievalToolSetName,
             "Knowledge retrieval · Built-in", "Local-first deterministic search, query, and read over Snapshot Artifacts.",
             [

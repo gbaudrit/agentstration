@@ -176,6 +176,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         var address = key.AtScope(scope);
         await projection.EnsureAsync(scope, ResourceNamespace.Default, default);
         var original = (await store.GetExactAsync<ToolResource>(address, default))!;
+        using var governanceScope = factory.Services.GetRequiredService<IResourceGovernanceContext>()
+            .Push(ResourceGovernance.Core("tools.internal-mcp"));
         var stale = await store.PutExactAsync(scope, original.Value with
         {
             Generation = original.Value.Generation + 1,

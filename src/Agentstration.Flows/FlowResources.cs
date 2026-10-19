@@ -22,7 +22,10 @@ public sealed record FlowResource(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string? DisplayName = null,
-    FlowGraphDefinition? Graph = null);
+    FlowGraphDefinition? Graph = null)
+{
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
+}
 
 public sealed record FlowVersion(
     ResourceScopeRef ScopeRef,
@@ -34,4 +37,7 @@ public sealed record FlowVersion(
     DateTimeOffset PublishedAt,
     FlowGraphDefinition? Graph = null,
     string? DefinitionHash = null,
-    string? ReleaseNotes = null);
+    string? ReleaseNotes = null)
+{
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
+}

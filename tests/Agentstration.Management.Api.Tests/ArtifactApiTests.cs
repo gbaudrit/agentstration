@@ -341,6 +341,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
             ArtifactResourceKinds.ArtifactStagingBinding, ArtifactPlatformResourceProvisioner.DefaultBindingName);
         var current = await store.GetExactAsync<ArtifactStagingBindingResource>(currentAddress, default);
         Assert.IsNotNull(current);
+        using var governanceScope = factory.Services.GetRequiredService<IResourceGovernanceContext>()
+            .Push(ResourceGovernance.Core("artifacts.platform"));
         _ = await store.PutExactAsync(scope, current.Value with
         {
             Generation = checked(current.Value.Generation + 1),
@@ -526,6 +528,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         var binding = await service.GetBindingAsync(ResourceNamespace.Default, ArtifactPlatformResourceProvisioner.DefaultBindingName, default);
         Assert.IsNotNull(binding);
         var store = factory.Services.GetRequiredService<IResourceStore>();
+        using var governanceScope = factory.Services.GetRequiredService<IResourceGovernanceContext>()
+            .Push(ResourceGovernance.Core("artifacts.platform"));
         _ = await store.PutExactAsync(binding.Value.ScopeRef!.Value, binding.Value with
         {
             Definition = binding.Value.Definition with { ToolSetVersion = "2.0.0" }

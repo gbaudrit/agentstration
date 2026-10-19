@@ -6,7 +6,8 @@ namespace Agentstration.Runtime.Profiles;
 
 public sealed class StandardRuntimeProfileSeeder(
     RuntimeProfileManagementService runtimes,
-    ICurrentRequestContext requestContext)
+    ICurrentRequestContext requestContext,
+    IResourceGovernanceContext governance)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool initialized;
@@ -26,6 +27,7 @@ public sealed class StandardRuntimeProfileSeeder(
         try
         {
             if (initialized) return;
+            using var governanceScope = governance.Push(ResourceGovernance.Core("runtime.standard-profile"));
 
             if (await runtimes.GetExactAsync(instanceScope, ResourceNamespace.Default, "maf-builtin", cancellationToken) is null)
             {
