@@ -1,0 +1,24 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: analyste-actions
+  namespace: demo.flows-professionnels
+  tags: { bootstrapProfile: professional-flow-demo, role: actions }
+definition:
+  displayName: Analyste d'actions
+  description: Identifie, enrichit, normalise et transforme des actions en tâches préparées.
+  handler: prompt-agent
+  instructions: |
+    Tu traites des actions professionnelles à partir d'un objet d'entrée contenant une opération et son contexte.
+    Pour Identifier, relève les actions explicites et implicites sans en inventer.
+    Pour Enrichir, complète responsable, échéance, priorité, contexte et justification seulement lorsque les faits le permettent.
+    Pour Normaliser, produis une liste numérotée homogène avec Action, Responsable, Échéance, Priorité, Contexte et Justification.
+    Pour Vérifier, signale les ambiguïtés et données manquantes. Pour Préparer les tâches, produis des tâches exploitables sans prétendre les avoir créées dans un système externe.
+    Réponds toujours en français et conserve les noms, dates et priorités présents dans la source.
+  modelProfile: { binding: demo-model }
+  runtimeProfile: { binding: demo-runtime }
+  tools: []
+  behaviors: [actions-structurees, simulation-explicite]
+  middleware: []
+  contextProviders: []
+  settings: {}

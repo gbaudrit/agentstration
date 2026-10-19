@@ -1,0 +1,69 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: extraire-actions
+  namespace: demo.flows-professionnels
+definition:
+  displayName: Extraire les actions
+  description: Compose identification, enrichissement et normalisation pour produire une liste d'actions réutilisable.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: direct
+    target: { kind: agent, id: analyste-actions, namespace: demo.flows-professionnels }
+  graph:
+    entryStep: entree
+    inputSchema:
+      type: object
+      properties:
+        contexte: { type: string }
+        contenu: { type: string }
+        analyse: { type: string }
+      required: [contexte, contenu, analyse]
+      additionalProperties: false
+    steps:
+      - { type: input, name: entree, displayName: Contexte à traiter }
+      - type: flow
+        name: identifier
+        displayName: Identifier les actions
+        flow: { resourceId: identifier-actions, namespace: demo.flows-professionnels, versionStrategy: active }
+        inputMapping:
+          contexte: "${input.contexte}"
+          contenu: "${input.contenu}"
+          analyse: "${input.analyse}"
+      - type: agent
+        name: enrichir
+        displayName: Enrichir les actions
+        agent: { resourceId: analyste-actions, namespace: demo.flows-professionnels }
+        inputMapping:
+          operation: Enrichir
+          contexte: "${input.contexte}"
+          actionsIdentifiees: "${steps.identifier.output.identification}"
+          contenuSource: "${input.contenu}"
+      - type: agent
+        name: normaliser
+        displayName: Normaliser les actions
+        agent: { resourceId: analyste-actions, namespace: demo.flows-professionnels }
+        inputMapping:
+          operation: Normaliser
+          contexte: "${input.contexte}"
+          actionsEnrichies: "${steps.enrichir.output}"
+      - type: output
+        name: resultat
+        displayName: Actions structurées
+        outputMapping:
+          actions: "${steps.normaliser.output}"
+    transitions:
+      - { id: entree-vers-identification, fromStep: entree, event: completed, toStep: identifier }
+      - { id: identification-vers-enrichissement, fromStep: identifier, event: completed, toStep: enrichir }
+      - { id: enrichissement-vers-normalisation, fromStep: enrichir, event: completed, toStep: normaliser }
+      - { id: normalisation-vers-resultat, fromStep: normaliser, event: completed, toStep: resultat }
+    outputSchema:
+      type: object
+      properties:
+        actions: { type: string }
+      required: [actions]
+      additionalProperties: false
+  metadata: { bootstrapProfile: professional-flow-demo, capability: actions-extraction }
+  publish: true
+  activate: true

@@ -1,0 +1,50 @@
+apiVersion: agentstration.io/v1
+kind: Entry
+metadata:
+  name: analyser-reunion
+  namespace: demo.flows-professionnels
+definition:
+  displayName: Analyser une réunion
+  description: Transforme des notes brutes en compte-rendu, actions, tâches préparées et communication aux participants.
+  exposure:
+    version: 1
+    surfaces: [console]
+    workplacePlacements: []
+  presentation:
+    kind: prompt
+    placeholder: Collez les notes de la réunion à traiter…
+    icon: briefcase
+    allowAttachments: false
+    allowVoiceInput: false
+    participants: { visibility: hidden }
+    progress: { visibility: compact }
+    task: { display: auto }
+    results: { display: auto }
+    suggestions:
+      - label: Réunion projet du 25 septembre
+        value: |
+          Réunion projet Horizon — 25 septembre 2026, 9 h 30 à 10 h 20.
+          Participants : Claire Martin (responsable produit), Karim Benali (tech lead), Sophie Dubois (UX), Thomas Leroy (support) et Inès Petit (data).
+
+          Claire confirme que la version pilote sera ouverte à vingt clients le 15 octobre. Décision : conserver le périmètre actuel et reporter l'export PDF à novembre. Karim doit finaliser la revue de sécurité avant le 2 octobre. Sophie prépare les écrans mobiles validés pour le 30 septembre. Thomas contactera les cinq clients pilotes avant le 4 octobre et consolidera leurs contraintes d'accès.
+
+          Le suivi analytics reste bloqué : Inès attend la validation juridique sur la durée de conservation des événements. Claire prend le point avec le juridique demain et partagera la décision au plus tard le 29 septembre. L'environnement de recette est instable depuis la mise à jour de mardi ; Karim ouvre une analyse avec l'équipe plateforme aujourd'hui.
+
+          Décisions : lancement pilote maintenu au 15 octobre ; export PDF hors périmètre du pilote ; revue go/no-go fixée au 8 octobre à 14 h. Point d'attention : sans validation juridique avant le 29 septembre, le tableau de bord analytics sera désactivé pour le pilote.
+    fields:
+      - name: notes
+        type: prompt
+        label: Notes de réunion
+        description: Notes brutes contenant les participants, décisions, échéances et points bloquants.
+        placeholder: Collez les notes de la réunion…
+        required: true
+        order: 0
+        role: primaryInput
+        validation: { minimumLength: 20, maximumLength: 16000 }
+  binding: { kind: flow, resourceId: traiter-reunion, namespace: demo.flows-professionnels }
+  behavior:
+    taskCreationMode: automatic
+    allowConversation: true
+    streamResponse: true
+    conversation: { enabled: true }
+  publish: true
