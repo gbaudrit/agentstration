@@ -38,9 +38,9 @@ public sealed class FlowRunTokenUsageConsolidator(IFlowRepository repository)
                 && step.Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed or FlowStepRunStatus.Cancelled)
             .ToArray();
         var reported = invocations.Count(step => step.Usage is
-            { InputTokens: not null } or { OutputTokens: not null } or { TotalTokens: not null });
+        { InputTokens: not null } or { OutputTokens: not null } or { TotalTokens: not null });
         var complete = invocations.Count(step => step.Usage is
-            { InputTokens: not null, OutputTokens: not null, TotalTokens: not null });
+        { InputTokens: not null, OutputTokens: not null, TotalTokens: not null });
         return new(
             Sum(invocations.Select(step => (long?)step.Usage?.InputTokens)),
             Sum(invocations.Select(step => (long?)step.Usage?.OutputTokens)),
