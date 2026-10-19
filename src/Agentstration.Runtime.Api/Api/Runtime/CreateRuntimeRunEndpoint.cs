@@ -12,7 +12,7 @@ internal sealed class CreateRuntimeRunEndpoint : IRuntimeEndpoint
     private static Task<IResult> HandleAsync(CreateRuntimeRunRequest body, HttpResponse response, RuntimeRunService service, ICurrentRequestContext requestContext, CancellationToken cancellationToken) =>
         RuntimeHttp.ExecuteAsync(async () =>
         {
-            var scope = RuntimeHttp.CurrentScope(requestContext);
+            var scope = RuntimeHttp.CurrentScope(requestContext, body.ExecutionScopeRef);
             var stored = await service.CreateAsync(scope, body.Agent, body.Input, body.Execution, body.Origin, scope.PrincipalId.ToString("D"), cancellationToken);
             response.Headers.ETag = stored.ETag;
             response.Headers.Location = $"/api/runtime/runs/{stored.Value.Id}";

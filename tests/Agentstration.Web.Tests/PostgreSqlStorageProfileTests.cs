@@ -147,8 +147,10 @@ public sealed class PostgreSqlStorageProfileTests
             Profile = new()
             {
                 Name = "profile", Namespace = ResourceNamespace.Default, ScopeRef = scope, Uid = Guid.NewGuid(),
-                Generation = 1, Version = "1.0.0", DefinitionHash = "hash",
-                Definition = new() { DisplayName = "Profile", AcquisitionFlow = new() { Name = "acquire" } }
+                Generation = 1, Version = "1.0.0", DefinitionHash = "hash", DependencyHash = "dependencies",
+                Definition = new() { DisplayName = "Profile", AcquisitionFlow = new() { Name = "acquire" } },
+                AcquisitionFlow = new("acquire", ResourceNamespace.Default, "1.0.0", false,
+                    null, null, DataSourceFlowContracts.Acquisition, "sha256:acquire") { ScopeRef = scope }
             },
             PromotedAt = DateTimeOffset.UtcNow, PromotedBy = Guid.Empty
         };

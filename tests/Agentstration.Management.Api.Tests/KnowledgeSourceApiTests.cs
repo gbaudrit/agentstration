@@ -23,12 +23,13 @@ namespace Agentstration.Management.Tests;
 public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
-    public async Task WorkspacesReceiveProtectedPublishedBuiltInDataSourceProfilesIdempotently()
+    public async Task InstanceReceivesProtectedPublishedBuiltInDataSourceProfilesIdempotently()
     {
         await using var factory = Factory();
         var context = await GetBootstrapContextAsync(factory);
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
-        var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var scope = ResourceScopeRef.Instance;
+        var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
         var profiles = factory.Services.GetRequiredService<DataSourceProfileService>();
         var expected = new Dictionary<string, string>
         {
@@ -43,10 +44,19 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             var stored = await profiles.GetAsync(ResourceNamespace.Default, item.Key, scope, default);
             Assert.IsNotNull(stored);
             Assert.AreEqual(KnowledgePlatformResourceProvisioner.ProfileVersion, stored.Value.ActiveVersion);
+            Assert.AreEqual(scope, stored.Value.ScopeRef);
             Assert.AreEqual(item.Value, stored.Value.Definition.AcquisitionFlow.Name);
+            Assert.AreEqual(scope, stored.Value.Definition.AcquisitionFlow.ScopeRef);
             Assert.AreEqual("true", stored.Value.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+            Assert.AreEqual(ResourceOriginKind.BuiltIn, stored.Value.Governance.Origin.Kind);
+            Assert.AreEqual(ResourceManagementAuthorityKind.Core, stored.Value.Governance.ManagedBy?.Kind);
             var revisions = await profiles.ListRevisionsAsync(ResourceNamespace.Default, item.Key, scope, default);
             Assert.HasCount(1, revisions);
+            Assert.AreEqual(scope, revisions[0].Value.ScopeRef);
+            Assert.AreEqual(scope, revisions[0].Value.AcquisitionFlow.ScopeRef);
+            Assert.IsTrue(revisions[0].Value.ToolBindings.All(binding =>
+                binding.ToolScopeRef == scope && binding.ProviderScopeRef == scope));
+            Assert.IsNull(await profiles.GetAsync(ResourceNamespace.Default, item.Key, workspaceScope, default));
             before[item.Key] = (stored.Value.Uid, stored.Value.Generation, stored.ETag);
         }
 
@@ -106,7 +116,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 Definition = new()
                 {
                     DisplayName = name,
-                    Profile = new("web-builtin", scope),
+                    Profile = new("web-builtin", ResourceScopeRef.Instance),
                     Configuration = JsonSerializer.SerializeToElement(new { url })
                 }
             }, default);
@@ -221,7 +231,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 Definition = new()
                 {
                     DisplayName = "Artifact origin",
-                    Profile = new("artifact-import-builtin", scope),
+                    Profile = new("artifact-import-builtin", ResourceScopeRef.Instance),
                     Configuration = JsonSerializer.SerializeToElement(new { artifactIds = new[] { "artifact-1" } })
                 }
             }, default);

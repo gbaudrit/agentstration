@@ -36,8 +36,9 @@ public sealed class DataSourceDiscoveryService(
         DataSourceAcquisitionService.ValidateBoundedRequest(parameters, idempotencyKey, "Discovery");
         if (sourceScope is { } requestedScope)
             DataSourceAcquisitionService.EnsureVisible(requestedScope, context);
-        var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
-            ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
+        var executionScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var source = await sources.ResolveForUseAsync(sourceNamespace, sourceName, sourceScope,
+            executionScope, cancellationToken);
         var ownerScope = source.Value.ScopeRef ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
         DataSourceAcquisitionService.EnsureVisible(ownerScope, context);
         var gate = startGates.GetOrAdd((context.WorkspaceId, source.Value.Uid), _ => new SemaphoreSlim(1, 1));
@@ -46,12 +47,14 @@ public sealed class DataSourceDiscoveryService(
         {
             if (!source.Value.Definition.Enabled)
                 throw Error("data_source_disabled", $"Data Source '{source.Value.Address}' is disabled.");
+            var profileUid = source.Value.ProfileUid
+                ?? throw Error("data_source_profile_pin_missing",
+                    $"Data Source '{source.Value.Address}' does not pin an exact Data Source Profile identity.");
             var profile = await profiles.ResolveActiveAsync(ownerScope, source.Value.Namespace,
-                source.Value.Definition.Profile, cancellationToken);
+                source.Value.Definition.Profile, profileUid, cancellationToken);
             if (profile.Definition.DiscoveryFlow is null)
                 throw Error("data_source_discovery_not_supported", $"Profile '{profile.Name}' does not define discovery.");
-            var executionScope = ResourceScopeRef.Workspace(context.WorkspaceId);
-            var composition = await compositions.ResolveDiscoveryAsync(executionScope, source.Value.Namespace, profile, cancellationToken);
+            var composition = await compositions.ResolveDiscoveryAsync(ownerScope, source.Value.Namespace, profile, cancellationToken);
             ValidateContract(composition.Flow);
             var requestHash = Hash(JsonSerializer.SerializeToElement(new
             {

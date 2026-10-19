@@ -26,7 +26,7 @@ else if (run is null)
 else
 {
     <PageHeader Title="@T("FlowRun")" Description="@run.Id">
-        <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId)">@T("FlowDefinition")</a></Actions>
+        <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@T("FlowDefinition")</a></Actions>
     </PageHeader>
     <nav class="section-tabs flow-run-page-tabs" role="tablist" aria-label="@T("RunViewsAriaLabel")">
         @foreach (var tab in AvailableTabs)
@@ -76,7 +76,8 @@ else
             <article class="panel flow-run-overview">
                 <section class="run-summary flow-run-overview-identity">
                     <div><span class="field-label">@T("Status")</span><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>
-                    <div><span class="field-label">@T("FlowAndVersion")</span><strong><a class="text-button" href="@ConsoleResourceUrls.Flow(run.FlowId)">@run.FlowId.Value · @run.FlowVersion</a></strong></div>
+                    <div><span class="field-label">@T("FlowAndVersion")</span><strong><a class="text-button" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@run.FlowId.Value · @run.FlowVersion</a></strong></div>
+                    <div><span class="field-label">@T("ExecutionScope")</span><code>@run.ExecutionScopeRef.Value</code></div>
                     <div><span class="field-label">@T("Deployment")</span><strong>@(run.DeploymentResourceId ?? "—")</strong></div>
                     <div><span class="field-label">@T("TriggerAndStartedBy")</span><strong>@TriggerLabel(run.Trigger) · @(run.StartedBy ?? "—")</strong></div>
                     @if (run.InvocationOrigin is { } origin) { <div><span class="field-label">@T("OriginAndCaller")</span><strong>@OriginLabel(origin) · @(run.CallerId ?? "—")</strong></div> }
@@ -100,7 +101,7 @@ else
                         }
                         else
                         {
-                            <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("ChildFlowRun")</dt><dd>@if (selected.ChildFlowRunId is { } childRunId) { <a href="@($"/flow-runs/{Uri.EscapeDataString(childRunId)}")"><code>@childRunId</code></a> } else { <span>—</span> }</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
+                            <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("ChildFlowRun")</dt><dd>@if (selected.ChildFlowRunId is { } childRunId) { <a href="@($"/flow-runs/{Uri.EscapeDataString(childRunId)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")"><code>@childRunId</code></a> } else { <span>—</span> }</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
                             <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
                             @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@selected.Error.Message</p></div> }
                         }
@@ -162,7 +163,7 @@ else
         }
         else if (activeTab == RunTab.Worker)
         {
-            <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@run.Id" />
+            <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@run.Id" ScopeRef="@run.ExecutionScopeRef" />
         }
         else
         {
@@ -175,6 +176,7 @@ else
 </div>
 @code {
     [Parameter] public string RunId { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string StatusLabel(FlowRunStatus value) => Localizer[$"Status.{value}"];
     private string TriggerLabel(FlowRunTrigger value) => Localizer[$"Trigger.{value}"];
@@ -262,7 +264,9 @@ else
         realtimeError = null;
         try
         {
-            run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
+            run = string.IsNullOrWhiteSpace(ScopeRef)
+                ? await Client.GetFlowRunAsync(RunId, cancellation.Token)
+                : await Client.GetFlowRunAsync(RunId, ResourceScopeRef.Parse(ScopeRef), cancellation.Token);
         }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -314,13 +318,13 @@ else
 
     private async Task SubscribeAndReplayAsync()
     {
-        await hub!.InvokeAsync("SubscribeAsync", RunId, cancellation.Token);
+        await hub!.InvokeAsync("SubscribeAsync", RunId, run!.ExecutionScopeRef.Value, cancellation.Token);
         await ReplayAsync();
     }
 
     private async Task ReplayAsync()
     {
-        var replay = await Client.GetFlowRunEventsAsync(RunId, eventBuffer.LastSequence, cancellation.Token);
+        var replay = await Client.GetFlowRunEventsAsync(RunId, run!.ExecutionScopeRef, eventBuffer.LastSequence, cancellation.Token);
         foreach (var runEvent in replay) AddEvent(runEvent);
         if (replay.Count > 0) await RefreshRunAsync();
         await InvokeAsync(StateHasChanged);
@@ -345,7 +349,7 @@ else
 
     private async Task RefreshRunAsync()
     {
-        run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
+        run = await Client.GetFlowRunAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
         await RefreshInputAsync();
         if (selected is not null) selected = run.Steps.FirstOrDefault(value => value.StepName == selected.StepName);
         await RefreshCausalityAsync();
@@ -355,7 +359,7 @@ else
     {
         try
         {
-            causality = await Client.GetFlowRunCausalityAsync(RunId, cancellation.Token);
+            causality = await Client.GetFlowRunCausalityAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
             causalityError = null;
         }
         catch (NotSupportedException) { causality = null; }
@@ -374,14 +378,14 @@ else
         if (tab == RunTab.Causality && causality is null) await RefreshCausalityAsync();
     }
 
-    private static string GovernanceUrl(string flowRunId, string toolCallId, string? invocationId = null) =>
-        $"/tool-governance/flow/{Uri.EscapeDataString(flowRunId)}?toolCallId={Uri.EscapeDataString(toolCallId)}"
+    private string GovernanceUrl(string flowRunId, string toolCallId, string? invocationId = null) =>
+        $"/tool-governance/flow/{Uri.EscapeDataString(flowRunId)}?scopeRef={Uri.EscapeDataString(run!.ExecutionScopeRef.Value)}&toolCallId={Uri.EscapeDataString(toolCallId)}"
         + (invocationId is null ? string.Empty : $"&invocationId={Uri.EscapeDataString(invocationId)}");
 
     private async Task RefreshInputAsync()
     {
         pendingInput = run?.Status == FlowRunStatus.WaitingForInput
-            ? (await Client.GetFlowRunInputsAsync(RunId, cancellation.Token)).FirstOrDefault()
+            ? (await Client.GetFlowRunInputsAsync(RunId, run.ExecutionScopeRef, cancellation.Token)).FirstOrDefault()
             : null;
     }
 
@@ -396,7 +400,7 @@ else
         {
             submittingInput = true;
             inputError = null;
-            await Client.RespondToFlowRunInputAsync(RunId, pendingInput.Id, value, cancellation.Token);
+            await Client.RespondToFlowRunInputAsync(RunId, pendingInput.Id, run!.ExecutionScopeRef, value, cancellation.Token);
             pendingInput = null;
             await RefreshRunAsync();
         }
@@ -540,7 +544,7 @@ else
         };
     }
 
-    private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, cancellation.Token);
+    private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);
     private static string Duration(DateTimeOffset? start, DateTimeOffset? end) { if (start is null) return "—"; var value = (end ?? DateTimeOffset.UtcNow) - start.Value; return value.TotalSeconds >= 1 ? $"{value.TotalSeconds:0.##} s" : $"{value.TotalMilliseconds:0} ms"; }

@@ -42,6 +42,7 @@ public sealed partial class FlowTests
         private readonly ServiceProvider _provider;
         public FlowService Service => _provider.GetRequiredService<FlowService>();
         public IFlowRepository Repository => _provider.GetRequiredService<IFlowRepository>();
+        public IResourceGovernanceContext Governance => _provider.GetRequiredService<IResourceGovernanceContext>();
         public IDbContextFactory<FlowDbContext> ContextFactory => _provider.GetRequiredService<IDbContextFactory<FlowDbContext>>();
         private FlowFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
         public static async Task<FlowFixture> CreateAsync(
@@ -53,6 +54,7 @@ public sealed partial class FlowTests
             Directory.CreateDirectory(directory);
             var services = new ServiceCollection();
             services.AddSingleton(timeProvider ?? TimeProvider.System);
+            services.AddSingleton<IResourceGovernanceContext, ResourceGovernanceContext>();
             var connectionString = $"Data Source={Path.Combine(directory, "flow.db")};Pooling=False";
             if (commandInterceptor is null)
             {

@@ -24,4 +24,6 @@ test('an administrator can create and deploy an agent @smoke', async ({ page, pr
     url.pathname === `/agents/${agent.name}` && url.searchParams.has('scopeRef'));
   await expect(page.getByTestId(TestIds.agentEditor.name)).toHaveValue(agent.name);
   await expect(page.getByTestId(TestIds.agentEditor.name)).toBeDisabled();
+  await new ProductPages(page).agentEditor.openTools();
+  await expect(page.getByTestId(TestIds.agentEditor.toolConfiguration)).toBeVisible();
 });

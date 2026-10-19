@@ -780,7 +780,10 @@ public sealed class KnowledgeSourceEditorTests
                     {
                         Name = "web-builtin", Namespace = ResourceNamespace.Default, ScopeRef = DataSourceScope,
                         Uid = Guid.NewGuid(), Generation = 1, Version = "1.0.0", DefinitionHash = "hash",
-                        Definition = new DataSourceProfileProperties { DisplayName = "Web", AcquisitionFlow = new() { Name = "acquire" } }
+                        DependencyHash = "dependencies",
+                        Definition = new DataSourceProfileProperties { DisplayName = "Web", AcquisitionFlow = new() { Name = "acquire" } },
+                        AcquisitionFlow = new("acquire", ResourceNamespace.Default, "1.0.0", false,
+                            null, null, DataSourceFlowContracts.Acquisition, "sha256:acquire") { ScopeRef = DataSourceScope }
                     }, PromotedAt = DateTimeOffset.UtcNow, PromotedBy = Guid.Empty
                 }, false, [])] : []);
     }

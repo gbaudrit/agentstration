@@ -18,30 +18,33 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
         modelBuilder.HasDefaultSchema("runtime");
         var run = modelBuilder.Entity<RuntimeRunDocument>();
         run.ToTable("RuntimeRuns");
-        run.HasKey(value => new { value.WorkspaceId, value.RunId });
+        run.HasKey(value => new { value.ScopeRef, value.RunId });
+        run.Property(value => value.ScopeRef).HasMaxLength(64);
         run.Property(value => value.WorkspaceId);
         run.Property(value => value.RunId).HasMaxLength(64);
         run.Property(value => value.AgentResourceId).HasMaxLength(1024);
         run.Property(value => value.State).HasMaxLength(32);
         run.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
-        run.HasIndex(value => new { value.WorkspaceId, value.AgentResourceId, value.CreatedAt });
+        run.HasIndex(value => new { value.ScopeRef, value.AgentResourceId, value.CreatedAt });
 
         var runEvent = modelBuilder.Entity<RuntimeRunEventDocument>();
         runEvent.ToTable("RuntimeRunEvents");
-        runEvent.HasKey(value => new { value.WorkspaceId, value.RunId, value.Sequence });
+        runEvent.HasKey(value => new { value.ScopeRef, value.RunId, value.Sequence });
+        runEvent.Property(value => value.ScopeRef).HasMaxLength(64);
         runEvent.Property(value => value.WorkspaceId);
         runEvent.Property(value => value.RunId).HasMaxLength(64);
-        runEvent.HasIndex(value => new { value.WorkspaceId, value.RunId, value.Sequence });
+        runEvent.HasIndex(value => new { value.ScopeRef, value.RunId, value.Sequence });
 
         var executionState = modelBuilder.Entity<RuntimeExecutionStateDocument>();
         executionState.ToTable("RuntimeExecutionStates");
-        executionState.HasKey(value => new { value.WorkspaceId, value.RunId, value.RuntimeType, value.StateId });
+        executionState.HasKey(value => new { value.ScopeRef, value.RunId, value.RuntimeType, value.StateId });
+        executionState.Property(value => value.ScopeRef).HasMaxLength(64);
         executionState.Property(value => value.WorkspaceId);
         executionState.Property(value => value.RunId).HasMaxLength(160);
         executionState.Property(value => value.RuntimeType).HasMaxLength(64);
         executionState.Property(value => value.StateId).HasMaxLength(256);
         executionState.Property(value => value.ParentStateId).HasMaxLength(256);
-        executionState.HasIndex(value => new { value.WorkspaceId, value.RunId, value.RuntimeType, value.CreatedAt });
+        executionState.HasIndex(value => new { value.ScopeRef, value.RunId, value.RuntimeType, value.CreatedAt });
 
         RuntimeWorkerAssignmentModel.Configure(modelBuilder);
     }
@@ -49,6 +52,7 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
 
 internal sealed class RuntimeExecutionStateDocument
 {
+    public required string ScopeRef { get; set; }
     public required Guid WorkspaceId { get; set; }
     public required string RunId { get; set; }
     public required string RuntimeType { get; set; }
@@ -60,6 +64,7 @@ internal sealed class RuntimeExecutionStateDocument
 
 internal sealed class RuntimeRunDocument
 {
+    public required string ScopeRef { get; set; }
     public Guid WorkspaceId { get; set; }
     public required string RunId { get; set; }
     public required string AgentResourceId { get; set; }
@@ -72,6 +77,7 @@ internal sealed class RuntimeRunDocument
 
 internal sealed class RuntimeRunEventDocument
 {
+    public required string ScopeRef { get; set; }
     public Guid WorkspaceId { get; set; }
     public required string RunId { get; set; }
     public long Sequence { get; set; }
@@ -102,18 +108,24 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
     }
 
     public async Task<StoredRuntimeRun?> GetAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken)
+        => await GetExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, cancellationToken);
+
+    public async Task<StoredRuntimeRun?> GetExactAsync(ResourceScopeRef scopeRef, string runId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Runs.AsNoTracking().SingleOrDefaultAsync(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId, cancellationToken);
+        var document = await context.Runs.AsNoTracking().SingleOrDefaultAsync(value => value.ScopeRef == scopeRef.Value && value.RunId == runId, cancellationToken);
         return document is null ? null : Deserialize(document);
     }
 
     public async Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken)
+        => await ListExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), agentResourceId, skip, take, cancellationToken);
+
+    public async Task<IReadOnlyList<StoredRuntimeRun>> ListExactAsync(ResourceScopeRef scopeRef, string? agentResourceId, int skip, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var query = context.Runs.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value);
+        var query = context.Runs.AsNoTracking().Where(value => value.ScopeRef == scopeRef.Value);
         if (!string.IsNullOrWhiteSpace(agentResourceId)) query = query.Where(value => value.AgentResourceId == agentResourceId);
         var documents = await query.OrderByDescending(value => value.CreatedAt).Skip(skip).Take(Math.Min(take, 1000)).ToArrayAsync(cancellationToken);
         return documents.Select(Deserialize).ToArray();
@@ -124,20 +136,26 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        return await context.Runs.AsNoTracking()
+        var values = await context.Runs.AsNoTracking()
             .Where(value => value.State == nameof(RuntimeRunState.Pending) || value.State == nameof(RuntimeRunState.Running))
             .OrderBy(value => value.CreatedAt)
             .Skip(skip)
             .Take(Math.Min(take, 1000))
-            .Select(value => new RuntimeRunKey(new WorkspaceId(value.WorkspaceId), value.RunId))
+            .Select(value => new { value.ScopeRef, value.RunId })
             .ToArrayAsync(cancellationToken);
+        return values.Select(value => new RuntimeRunKey(ResourceScopeRef.Parse(value.ScopeRef), value.RunId)).ToArray();
     }
 
     public async Task<StoredRuntimeRun> UpdateAsync(RuntimeRun run, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Runs.SingleOrDefaultAsync(value => value.WorkspaceId == run.WorkspaceId.Value && value.RunId == run.Id, cancellationToken)
-            ?? throw new RuntimeRunNotFoundException(run.Id);
+        var document = await context.Runs.SingleOrDefaultAsync(value => value.ScopeRef == run.ExecutionScopeRef.Value && value.RunId == run.Id, cancellationToken);
+        if (document is null)
+        {
+            if (await context.Runs.AnyAsync(value => value.RunId == run.Id && value.ETag == expectedETag, cancellationToken))
+                throw new RuntimeRunConcurrencyException("The Runtime Run execution scope is immutable.");
+            throw new RuntimeRunNotFoundException(run.Id);
+        }
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal))
             throw new RuntimeRunConcurrencyException("The supplied ETag does not match the current runtime run version.");
         var current = Deserialize(document).Value;
@@ -156,15 +174,19 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
     }
 
     public async Task DeleteAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken)
+        => await DeleteExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, expectedETag, cancellationToken);
+
+    public async Task DeleteExactAsync(ResourceScopeRef scopeRef, string runId, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var run = await context.Runs.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId, cancellationToken)
+        var run = await context.Runs.SingleOrDefaultAsync(value => value.ScopeRef == scopeRef.Value && value.RunId == runId, cancellationToken)
             ?? throw new RuntimeRunNotFoundException(runId);
         if (!string.Equals(run.ETag, expectedETag, StringComparison.Ordinal))
             throw new RuntimeRunConcurrencyException("The supplied ETag does not match the current Runtime Run version.");
-        context.Events.RemoveRange(await context.Events.Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
-        context.ExecutionStates.RemoveRange(await context.ExecutionStates.Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
-        context.WorkerAssignments.RemoveRange(await context.WorkerAssignments.Where(value => value.WorkspaceId == workspaceId.Value && value.TargetRunId == runId).ToArrayAsync(cancellationToken));
+        context.Events.RemoveRange(await context.Events.Where(value => value.ScopeRef == scopeRef.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
+        context.ExecutionStates.RemoveRange(await context.ExecutionStates.Where(value => value.ScopeRef == scopeRef.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
+        if (scopeRef.Kind == ResourceScopeKind.Workspace && scopeRef.TargetId is { } workspaceId)
+            context.WorkerAssignments.RemoveRange(await context.WorkerAssignments.Where(value => value.WorkspaceId == workspaceId && value.TargetRunId == runId).ToArrayAsync(cancellationToken));
         context.Runs.Remove(run);
         try { await context.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateConcurrencyException exception) { throw new RuntimeRunConcurrencyException(exception.Message); }
@@ -173,11 +195,12 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
     public async Task<RuntimeRunEvent> AppendEventAsync(RuntimeRunEvent runEvent, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        if (!await context.Runs.AnyAsync(value => value.WorkspaceId == runEvent.WorkspaceId.Value && value.RunId == runEvent.RunId, cancellationToken)) throw new RuntimeRunNotFoundException(runEvent.RunId);
-        var sequence = (await context.Events.Where(value => value.WorkspaceId == runEvent.WorkspaceId.Value && value.RunId == runEvent.RunId).MaxAsync(value => (long?)value.Sequence, cancellationToken) ?? 0) + 1;
+        if (!await context.Runs.AnyAsync(value => value.ScopeRef == runEvent.ScopeRef.Value && value.RunId == runEvent.RunId, cancellationToken)) throw new RuntimeRunNotFoundException(runEvent.RunId);
+        var sequence = (await context.Events.Where(value => value.ScopeRef == runEvent.ScopeRef.Value && value.RunId == runEvent.RunId).MaxAsync(value => (long?)value.Sequence, cancellationToken) ?? 0) + 1;
         var sequenced = runEvent with { Sequence = sequence };
         context.Events.Add(new RuntimeRunEventDocument
         {
+            ScopeRef = runEvent.ScopeRef.Value,
             WorkspaceId = runEvent.WorkspaceId.Value,
             RunId = runEvent.RunId,
             Sequence = sequence,
@@ -190,10 +213,13 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
     }
 
     public async Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken)
+        => await ListEventsExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, afterSequence, cancellationToken);
+
+    public async Task<IReadOnlyList<RuntimeRunEvent>> ListEventsExactAsync(ResourceScopeRef scopeRef, string runId, long afterSequence, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.Events.AsNoTracking()
-            .Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId && value.Sequence > afterSequence)
+            .Where(value => value.ScopeRef == scopeRef.Value && value.RunId == runId && value.Sequence > afterSequence)
             .OrderBy(value => value.Sequence)
             .Take(1000)
             .ToArrayAsync(cancellationToken);
@@ -203,6 +229,7 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
 
     private static RuntimeRunDocument ToDocument(RuntimeRun run, string etag, DateTimeOffset now) => new()
     {
+        ScopeRef = run.ExecutionScopeRef.Value,
         WorkspaceId = run.WorkspaceId.Value,
         RunId = run.Id,
         AgentResourceId = run.Properties.Agent.ResourceId,
@@ -231,12 +258,13 @@ public sealed class PostgreSqlRuntimeExecutionStateStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var existing = await context.ExecutionStates.SingleOrDefaultAsync(value =>
-            value.WorkspaceId == state.WorkspaceId.Value && value.RunId == state.RunId && value.RuntimeType == state.RuntimeType && value.StateId == state.StateId,
+            value.ScopeRef == state.ScopeRef.Value && value.RunId == state.RunId && value.RuntimeType == state.RuntimeType && value.StateId == state.StateId,
             cancellationToken);
         if (existing is null)
         {
             context.ExecutionStates.Add(new RuntimeExecutionStateDocument
             {
+                ScopeRef = state.ScopeRef.Value,
                 WorkspaceId = state.WorkspaceId.Value,
                 RunId = state.RunId,
                 RuntimeType = state.RuntimeType,
@@ -255,34 +283,43 @@ public sealed class PostgreSqlRuntimeExecutionStateStore(
     }
 
     public async Task<RuntimeExecutionState?> GetAsync(WorkspaceId workspaceId, string runId, string runtimeType, string stateId, CancellationToken cancellationToken)
+        => await GetExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, runtimeType, stateId, cancellationToken);
+
+    public async Task<RuntimeExecutionState?> GetExactAsync(ResourceScopeRef scopeRef, string runId, string runtimeType, string stateId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var value = await context.ExecutionStates.AsNoTracking().SingleOrDefaultAsync(state =>
-            state.WorkspaceId == workspaceId.Value && state.RunId == runId && state.RuntimeType == runtimeType && state.StateId == stateId,
+            state.ScopeRef == scopeRef.Value && state.RunId == runId && state.RuntimeType == runtimeType && state.StateId == stateId,
             cancellationToken);
         return value is null ? null : ToState(value);
     }
 
     public async Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(WorkspaceId workspaceId, string runId, string runtimeType, string? parentStateId, CancellationToken cancellationToken)
+        => await ListExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, runtimeType, parentStateId, cancellationToken);
+
+    public async Task<IReadOnlyList<RuntimeExecutionState>> ListExactAsync(ResourceScopeRef scopeRef, string runId, string runtimeType, string? parentStateId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var query = context.ExecutionStates.AsNoTracking().Where(state => state.WorkspaceId == workspaceId.Value && state.RunId == runId && state.RuntimeType == runtimeType);
+        var query = context.ExecutionStates.AsNoTracking().Where(state => state.ScopeRef == scopeRef.Value && state.RunId == runId && state.RuntimeType == runtimeType);
         if (parentStateId is not null) query = query.Where(state => state.ParentStateId == parentStateId);
         var values = await query.OrderBy(state => state.CreatedAt).ToArrayAsync(cancellationToken);
         return values.Select(ToState).ToArray();
     }
 
     public async Task DeleteAsync(WorkspaceId workspaceId, string runId, string? runtimeType, CancellationToken cancellationToken)
+        => await DeleteExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, runtimeType, cancellationToken);
+
+    public async Task DeleteExactAsync(ResourceScopeRef scopeRef, string runId, string? runtimeType, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var query = context.ExecutionStates.Where(state => state.WorkspaceId == workspaceId.Value && state.RunId == runId);
+        var query = context.ExecutionStates.Where(state => state.ScopeRef == scopeRef.Value && state.RunId == runId);
         if (runtimeType is not null) query = query.Where(state => state.RuntimeType == runtimeType);
         context.ExecutionStates.RemoveRange(await query.ToArrayAsync(cancellationToken));
         await context.SaveChangesAsync(cancellationToken);
     }
 
     private static RuntimeExecutionState ToState(RuntimeExecutionStateDocument value) => new(
-        new WorkspaceId(value.WorkspaceId),
+        ResourceScopeRef.Parse(value.ScopeRef),
         value.RunId,
         value.RuntimeType,
         value.StateId,

@@ -73,7 +73,9 @@ Agent, Tool, Tool-route, child-Flow, repeat, and Flow-output steps may capture a
     storageFlow:
       resourceId: artifact-storage-filesystem-write-builtin
       namespace: default
-      versionStrategy: active
+      scopeRef: /instance
+      versionStrategy: exact
+      version: 1.0.0
 ```
 
 `contentMapping` may select the current raw result through `${step.output...}` or an earlier result through `${steps.<name>.output...}`. `${step.name}` and `${step.displayName}` are available for file metadata. When `fileName` is omitted, Agentstration uses the technical step name and infers an extension from `mediaType`; an explicit name such as `toto` remains extensionless.

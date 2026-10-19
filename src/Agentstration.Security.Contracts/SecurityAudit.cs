@@ -92,6 +92,8 @@ public static class SecurityAuditActions
     public const string ResourceAccessPolicySet = "resource-access.policy-set";
     public const string ResourceAccessPolicyDeleted = "resource-access.policy-deleted";
     public const string ResourceAccessEvaluated = "resource-access.evaluated";
+    public const string ManagedResourceReconciled = "managed-resource.reconciled";
+    public const string ManagedResourceMutationDenied = "managed-resource.mutation-denied";
 }
 
 public sealed record SecurityAuditEvent(

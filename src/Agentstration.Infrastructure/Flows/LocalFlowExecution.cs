@@ -20,31 +20,78 @@ namespace Agentstration.Infrastructure.Flows;
 public sealed class WorkspaceFlowRunExecutionScope(
     IIdentityStore identities,
     Agentstration.Identity.Contracts.IAuthorizationService authorization,
-    IRequestContextScopeFactory scopeFactory) : IFlowRunExecutionScope
+    IPlatformAuthorizationService platformAuthorization,
+    IRequestContextScopeFactory scopeFactory) : IFlowRunExecutionScope, IWorkExecutionScopeAccessor
 {
+    private readonly AsyncLocal<FlowRunScope?> current = new();
+
+    public FlowRunScope? Current => current.Value;
+
     public async ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken)
     {
         var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
+        if (principal?.Status != PrincipalStatus.Active) throw Denied();
+        if (scope.ScopeRef.Kind == ResourceScopeKind.Instance)
+        {
+            if (!await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) throw Denied();
+            return;
+        }
+        var tenant = scope.TenantId == Guid.Empty ? null : await identities.GetTenantAsync(scope.TenantId, cancellationToken);
+        if (tenant?.Status != TenantStatus.Active || scope.ScopeRef.TargetId != scope.TenantId && scope.ScopeRef.Kind == ResourceScopeKind.Tenant)
+            throw Denied();
+        if (scope.ScopeRef.Kind == ResourceScopeKind.Tenant)
+        {
+            if (await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) return;
+            var membership = await identities.FindMembershipAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
+            if (membership?.Status != MembershipStatus.Active || !await HasTenantPermissionAsync(scope, cancellationToken)) throw Denied();
+            return;
+        }
         var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId.Value, cancellationToken);
-        if (principal?.Status != PrincipalStatus.Active || workspace?.Status != WorkspaceStatus.Active)
-            throw Denied();
-
-        var requestContext = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
-        try
-        {
-            await authorization.EnsurePermissionAsync(requestContext, AuthorizationPermissions.RunsExecute, cancellationToken);
-        }
-        catch (AuthorizationDeniedException)
-        {
-            throw Denied();
-        }
+        if (workspace?.Status != WorkspaceStatus.Active || scope.ScopeRef != ResourceScopeRef.Workspace(scope.WorkspaceId.Value)) throw Denied();
+        try { await authorization.EnsurePermissionAsync(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value), AuthorizationPermissions.RunsExecute, cancellationToken); }
+        catch (AuthorizationDeniedException) { throw Denied(); }
     }
 
-    public IDisposable Enter(FlowRunScope scope) =>
-        scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value));
+    public IDisposable Enter(FlowRunScope scope)
+    {
+        var previous = current.Value;
+        current.Value = scope;
+        var requestScope = scope.ScopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => scopeFactory.PushSystem(),
+            ResourceScopeKind.Tenant => scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId),
+            ResourceScopeKind.Workspace => scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value)),
+            _ => throw Denied()
+        };
+        return new ExecutionScopeLease(requestScope, () => current.Value = previous);
+    }
+
+    private async Task<bool> HasTenantPermissionAsync(FlowRunScope scope, CancellationToken cancellationToken)
+    {
+        var assignments = await identities.ListRoleAssignmentsAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
+        foreach (var assignment in assignments.Where(value => string.Equals(value.Scope, AuthorizationScopes.Tenant(scope.TenantId), StringComparison.Ordinal)))
+        {
+            var role = await identities.GetRoleDefinitionAsync(assignment.RoleDefinitionId, cancellationToken);
+            if (role?.Permissions.Contains(AuthorizationPermissions.RunsExecute) == true) return true;
+        }
+        return false;
+    }
 
     private static FlowValidationException Denied() =>
-        new("flow_run_authorization_denied", "The Principal is no longer authorized to execute this Flow Run in its Workspace.");
+        new("flow_run_authorization_denied", "The Principal is no longer authorized to execute this Flow Run in its exact scope.");
+
+    private sealed class ExecutionScopeLease(IDisposable requestScope, Action restore) : IDisposable
+    {
+        private IDisposable? activeRequestScope = requestScope;
+
+        public void Dispose()
+        {
+            var active = Interlocked.Exchange(ref activeRequestScope, null);
+            if (active is null) return;
+            active.Dispose();
+            restore();
+        }
+    }
 }
 
 public sealed class CurrentWorkExecutionScopeAccessor(ICurrentRequestContext requestContext) : IWorkExecutionScopeAccessor
@@ -193,8 +240,11 @@ public sealed class ManagementFlowResourceReferenceResolver(
         try
         {
             var toolSetNamespace = step.ToolSet.ResolveNamespace(ownerNamespace);
-            var selected = await toolSets.ResolveRouteAsync(toolSetNamespace, step.ToolSet.ResourceId,
-                step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
+            var selected = step.ToolSet.ScopeRef is { } scopeRef
+                ? await toolSets.ResolveRouteExactAsync(scopeRef, toolSetNamespace, step.ToolSet.ResourceId,
+                    step.ToolSet.Version, step.Capability, step.Route, cancellationToken)
+                : await toolSets.ResolveRouteAsync(toolSetNamespace, step.ToolSet.ResourceId,
+                    step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
             var member = selected.Member;
             return new ResolvedFlowToolRoute(
                 new FlowToolReference(member.ToolName, member.ToolNamespace),
@@ -261,6 +311,7 @@ public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFl
 {
     public async Task<ResolvedFlowToolRoute> ResolveAsync(
         WorkspaceId workspaceId,
+        ResourceScopeRef ownerScopeRef,
         ResourceNamespace ownerNamespace,
         ToolRouteFlowStepDefinition step,
         CancellationToken cancellationToken)
@@ -269,7 +320,8 @@ public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFl
         try
         {
             var toolSetNamespace = step.ToolSet.ResolveNamespace(ownerNamespace);
-            var selected = await toolSets.ResolveRouteAsync(toolSetNamespace, step.ToolSet.ResourceId,
+            var selected = await toolSets.ResolveRouteExactAsync(step.ToolSet.ScopeRef ?? ownerScopeRef,
+                toolSetNamespace, step.ToolSet.ResourceId,
                 step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
             var member = selected.Member;
             return new ResolvedFlowToolRoute(
@@ -367,11 +419,9 @@ public sealed class ManagedFlowToolExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var toolNamespace = request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace);
-        var stored = request.Route is { } route
-            ? await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
-                route.ToolScopeRef, toolNamespace, ToolResourceKinds.Tool, request.Tool.ResourceId), cancellationToken)
-            : await store.GetAsync<ToolResource>(
-                new ResourceKey(ToolResourceKinds.Tool, request.Tool.ResourceId, toolNamespace), cancellationToken);
+        var toolScope = request.Route?.ToolScopeRef ?? request.DefinitionScopeRef;
+        var stored = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+            toolScope, toolNamespace, ToolResourceKinds.Tool, request.Tool.ResourceId), cancellationToken);
         if (stored is null)
             throw Error("tool_not_found", $"Tool resource '{toolNamespace}/{request.Tool.ResourceId}' was not found.");
 
@@ -388,11 +438,9 @@ public sealed class ManagedFlowToolExecutor(
         var providerId = tool.Definition.Provider?.Name
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no ToolProvider mapping.");
         var providerNamespace = tool.Definition.Provider!.Namespace ?? tool.Metadata.Namespace;
-        var provider = request.Route is { } pinnedProvider
-            ? await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
-                pinnedProvider.ProviderScopeRef, providerNamespace, ToolResourceKinds.ToolProvider, providerId), cancellationToken)
-            : await store.GetAsync<ToolProviderResource>(
-                new ResourceKey(ToolResourceKinds.ToolProvider, providerId, providerNamespace), cancellationToken);
+        var providerScope = request.Route?.ProviderScopeRef ?? tool.Definition.Provider.ScopeRef ?? toolScope;
+        var provider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+            providerScope, providerNamespace, ToolResourceKinds.ToolProvider, providerId), cancellationToken);
         if (provider is null)
             throw Error("tool_provider_not_found",
                 $"ToolProvider resource '{providerNamespace}/{providerId}' was not found.");

@@ -201,4 +201,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 173. [ADR-0173 — Model infrastructure is Instance-owned and Model Profiles are hierarchical](0173-model-infrastructure-is-instance-owned.md)
 174. [ADR-0174 — Agent definitions use hierarchical resource ownership](0174-agent-definitions-use-hierarchical-resource-ownership.md)
 175. [ADR-0175 — AEP Schema formats use governed MCP operations](0175-aep-schema-formats-use-governed-mcp-operations.md)
-176. [ADR-0176 — Data Sources discover and promote acquisition targets](0176-data-sources-discover-and-promote-acquisition-targets.md)
+176. [ADR-0176 — Data Source profiles pin owner-scoped dependencies](0176-data-source-profiles-pin-owner-scoped-dependencies.md)
+177. [ADR-0177 — Execution state uses the exact invocation scope](0177-execution-state-uses-exact-invocation-scope.md)
+178. [ADR-0178 — Managed resources record origin and management authority](0178-managed-resources-record-origin-and-management-authority.md)
+179. [ADR-0179 — Data Sources discover and promote acquisition targets](0179-data-sources-discover-and-promote-acquisition-targets.md)

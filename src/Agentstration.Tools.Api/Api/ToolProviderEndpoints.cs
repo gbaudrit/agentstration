@@ -100,12 +100,15 @@ internal static class ToolProviderEndpoints
             return Results.Ok(new ValueResponse<ToolResource>(values.ToArray()));
         });
 
-    private static Task<IResult> GetToolAsync(string toolName, string? @namespace, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetToolAsync(string toolName, string? @namespace, string? scopeRef, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var id = ToolManagementService.ToolId(toolName);
             var ns = ResourceNamespace.Parse(@namespace);
-            var stored = await service.GetToolAsync(id, ns, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, toolName, ns));
+            var stored = string.IsNullOrWhiteSpace(scopeRef)
+                ? await service.GetToolAsync(id, ns, cancellationToken)
+                : await service.GetToolExactAsync(ResourceScopeRef.Parse(scopeRef), id, ns, cancellationToken);
+            if (stored is null) throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, toolName, ns));
             return ToolsApiHttp.ResourceResult(stored, response, 200);
         });
 

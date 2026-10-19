@@ -119,7 +119,7 @@ public sealed class StorageConcurrencyBenchmarkTests
                     }, default);
                     await runtimeRuns.AppendEventAsync(new RuntimeRunEvent
                     {
-                        WorkspaceId = workspaceId,
+                        ScopeRef = ResourceScopeRef.Workspace(workspaceId.Value),
                         EventId = Guid.NewGuid(),
                         RunId = runtimeRunId,
                         Kind = RuntimeRunEventKind.RunCompleted,

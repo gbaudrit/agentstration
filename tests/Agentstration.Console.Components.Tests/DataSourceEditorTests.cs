@@ -164,7 +164,12 @@ public sealed class DataSourceEditorTests
         Generation = 1,
         Version = "1.0.1",
         DefinitionHash = "sha256:test",
-        Definition = ProfileProperties
+        DependencyHash = "sha256:dependencies",
+        Definition = ProfileProperties,
+        AcquisitionFlow = new("data-source-web-acquisition-builtin", ResourceNamespace.Default,
+            "1.0.1", false, AcquisitionInputSchema, null, DataSourceFlowContracts.Acquisition,
+            "sha256:flow") { ScopeRef = Scope },
+        ToolBindings = []
     };
 
     private static DataSourceAcquisitionResource Acquisition => new()
@@ -181,7 +186,8 @@ public sealed class DataSourceEditorTests
         Composition = new()
         {
             Profile = ResolvedProfile,
-            Flow = new("data-source-web-acquisition-builtin", ResourceNamespace.Default, "1.0.1", false, null, null, DataSourceFlowContracts.Acquisition)
+            Flow = new("data-source-web-acquisition-builtin", ResourceNamespace.Default, "1.0.1", false,
+                null, null, DataSourceFlowContracts.Acquisition, "sha256:flow") { ScopeRef = Scope }
         },
         FlowRunId = "flowrun-data-source",
         State = DataSourceAcquisitionState.Succeeded,
@@ -202,8 +208,10 @@ public sealed class DataSourceEditorTests
         public Task<ResourceSnapshot<DataSourceResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new ResourceSnapshot<DataSourceResource>(Source, "\"etag\""));
         public Task<DataSourceReadiness> GetReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new DataSourceReadiness(true, true, ResolvedProfile, [],
             new ResolvedDataSourceFlowBinding("data-source-web-acquisition-builtin", ResourceNamespace.Default,
-                "1.0.1", false, AcquisitionInputSchema, null, DataSourceFlowContracts.Acquisition),
-            targeted ? new("discover", ResourceNamespace.Default, "1.0.0", false, null, null, DataSourceFlowContracts.Discovery) : null));
+                "1.0.1", false, AcquisitionInputSchema, null, DataSourceFlowContracts.Acquisition,
+                 "sha256:flow") { ScopeRef = Scope },
+            targeted ? new("discover", ResourceNamespace.Default, "1.0.0", false, null, null,
+                DataSourceFlowContracts.Discovery, "sha256:discovery") { ScopeRef = Scope } : null));
         public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceAcquisitionResource>>([Acquisition]);
         public Task<ResourceSnapshot<DataSourceResource>> CreateAsync(CreateDataSourceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -223,7 +231,8 @@ public sealed class DataSourceEditorTests
         Metadata = new() { Name = "discovery-1" }, ScopeRef = Scope, DataSourceScopeRef = Scope,
         DataSourceUid = Source.Uid, DataSourceName = Source.Name, DataSourceNamespace = Source.Namespace,
         DataSourceGeneration = Source.Generation, Composition = new() { Profile = ResolvedProfile,
-            Flow = new("discover", ResourceNamespace.Default, "1.0.0", false, null, null, DataSourceFlowContracts.Discovery) },
+            Flow = new("discover", ResourceNamespace.Default, "1.0.0", false, null, null,
+                DataSourceFlowContracts.Discovery, "sha256:discovery") { ScopeRef = Scope } },
         FlowRunId = "flowrun-discovery", State = DataSourceDiscoveryState.Succeeded, CorrelationId = "discovery-1",
         RequestHash = "hash", CreatedBy = Guid.Empty, TenantId = Guid.Empty, WorkspaceId = Scope.TargetId!.Value,
         CreatedAt = DateTimeOffset.UtcNow, CompletedAt = DateTimeOffset.UtcNow,
@@ -255,9 +264,12 @@ public sealed class DataSourceEditorTests
             ProfileGeneration = 1,
             Version = "1.0.1",
             DefinitionHash = "sha256:test",
+            DependencyHash = "sha256:dependencies",
             PublishedAt = DateTimeOffset.UtcNow,
             PublishedBy = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-            Definition = ProfileProperties
+            Definition = ProfileProperties,
+            AcquisitionFlow = ResolvedProfile.AcquisitionFlow,
+            ToolBindings = []
         }]);
         public Task<ResourceSnapshot<DataSourceProfileResource>> CreateAsync(CreateDataSourceProfileRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceProfileResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceProfileRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();

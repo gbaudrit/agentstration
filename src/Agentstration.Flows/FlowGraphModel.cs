@@ -190,7 +190,8 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
 public sealed record FlowToolSetReference(
     string ResourceId,
     string Version,
-    ResourceNamespace? Namespace = null)
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
 }
@@ -261,6 +262,7 @@ public sealed record FlowGraphDefinition
 public sealed record FlowDraft
 {
     public required Agentstration.Resources.WorkspaceId WorkspaceId { get; init; }
+    public Agentstration.Resources.ResourceScopeRef? ScopeRef { get; init; }
     public required string Id { get; init; }
     public required FlowId FlowId { get; init; }
     public required string DisplayName { get; init; }

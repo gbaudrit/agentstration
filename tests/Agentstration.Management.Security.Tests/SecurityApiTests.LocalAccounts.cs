@@ -247,6 +247,8 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(RuntimeToolInvocationMode.Automatic, standardRuntime.Definition.Execution.ToolInvocation);
         Assert.AreEqual(StreamingMode.Automatic, standardRuntime.Definition.Execution.Streaming);
         Assert.AreEqual("true", standardRuntime.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.AreEqual(ResourceOriginKind.BuiltIn, standardRuntime.Governance.Origin.Kind);
+        Assert.AreEqual(ResourceManagementAuthorityKind.Core, standardRuntime.Governance.ManagedBy?.Kind);
         Assert.AreEqual(HttpStatusCode.OK, platform.StatusCode);
 
         await using var scope = factory.Services.CreateAsyncScope();

@@ -51,6 +51,7 @@ public sealed partial class PackManagementService
                 {
                     if (!string.Equals(currentToken, resource.VersionToken, StringComparison.Ordinal))
                         throw new PackResourceModifiedException(resource.Kind, resource.Name);
+                    using var reconciliation = BeginManagedResourceReconciliation(identity, installed.Value.ScopeRef, installed.Value.Definition.Version);
                     await handler.DeleteAsync(resource, removalOptions, cancellationToken);
                 }
                 remaining.Remove(resource);

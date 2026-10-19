@@ -39,6 +39,8 @@ public interface IManagementApiClient
 public interface IAgentRunnerManagementClient
 {
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetAgentAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support exact scoped Agent lookup.");
 }
 
 public interface IRuntimeApiClient
@@ -46,11 +48,17 @@ public interface IRuntimeApiClient
     Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken);
     Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken);
     Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken);
+    Task<RuntimeRun> GetRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetRunAsync(runId, cancellationToken);
     Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetRunsAsync(agentResourceId, cancellationToken);
     Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) => GetRunEventsAsync(runId, afterSequence, cancellationToken);
     IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, CancellationToken cancellationToken);
+    IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) => ObserveRunAsync(runId, afterSequence, cancellationToken);
     Task<RuntimeRun> CancelRunAsync(string runId, CancellationToken cancellationToken);
+    Task<RuntimeRun> CancelRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => CancelRunAsync(runId, cancellationToken);
     Task<RuntimeRun> RetryRunAsync(string runId, CancellationToken cancellationToken);
+    Task<RuntimeRun> RetryRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => RetryRunAsync(runId, cancellationToken);
     Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Agent instance observability.");
     Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
@@ -59,6 +67,8 @@ public interface IRuntimeApiClient
         throw new NotSupportedException("This client does not support Runtime Worker details.");
     Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Runtime placement.");
+    Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        GetPlacementAsync(targetKind, runId, cancellationToken);
 }
 
 public interface IAgentRunnerRuntimeClient : IRuntimeApiClient
@@ -90,6 +100,7 @@ public interface IToolGovernanceAuditClient
     Task<ToolGovernanceAuditPage> GetAsync(
         ToolExecutionOwnerKind ownerKind,
         string runId,
+        ResourceScopeRef? scopeRef,
         long afterSequence,
         int limit,
         ToolGovernanceAuditFilters filters,
@@ -152,9 +163,12 @@ public interface IFlowApiClient
     Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
         GetFlowAsync(@namespace, flowId, cancellationToken);
     Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken);
+    Task<FlowResourceSnapshot> GetFlowSnapshotAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowSnapshotAsync(flowId, cancellationToken);
     Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken);
     Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken);
+    Task<FlowResourceSnapshot> UpdateFlowAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, UpdateFlowRequest request, string etag, CancellationToken cancellationToken) => UpdateFlowAsync(flowId, request, etag, cancellationToken);
     Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken);
+    Task<FlowVersionResponse> CreateFlowVersionAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CreateFlowVersionRequest request, CancellationToken cancellationToken) => CreateFlowVersionAsync(flowId, request, cancellationToken);
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetFlowVersionsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
@@ -170,41 +184,56 @@ public interface IFlowApiClient
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? definitionScopeRef, CancellationToken cancellationToken) =>
         GetFlowRunsAsync(@namespace, flowId, cancellationToken);
     Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken);
+    Task<FlowRun> GetFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowRunAsync(runId, cancellationToken);
     Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Flow Run causality diagnostics.");
+    Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowRunCausalityAsync(runId, cancellationToken);
     Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) => GetFlowRunEventsAsync(runId, afterSequence, cancellationToken);
     Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowRunInputsAsync(runId, cancellationToken);
     Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken);
+    Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, ResourceScopeRef scopeRef, JsonElement value, CancellationToken cancellationToken) => RespondToFlowRunInputAsync(runId, inputId, value, cancellationToken);
     Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken);
     Task<FlowRun> CreateFlowRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? CreateFlowRunAsync(flowId, request, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken);
+    Task<FlowRun> CancelFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => CancelFlowRunAsync(runId, cancellationToken);
     IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, CancellationToken cancellationToken);
+    IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => ObserveFlowRunAsync(runId, cancellationToken);
     Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken);
     Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken);
     Task<FlowDraftResponse> GetDraftAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetDraftAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
+    Task<FlowDraftResponse> GetDraftAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetDraftAsync(@namespace, flowId, cancellationToken);
     Task<FlowDraftResponse> SaveDraftAsync(string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken);
     Task<FlowDraftResponse> SaveDraftAsync(ResourceNamespace @namespace, string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? SaveDraftAsync(flowId, request, etag, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
+    Task<FlowDraftResponse> SaveDraftAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) => SaveDraftAsync(@namespace, flowId, request, etag, cancellationToken);
     Task<FlowValidationResponse> ValidateDraftAsync(string flowId, CancellationToken cancellationToken);
     Task<FlowValidationResponse> ValidateDraftAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? ValidateDraftAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
+    Task<FlowValidationResponse> ValidateDraftAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => ValidateDraftAsync(@namespace, flowId, cancellationToken);
     Task<FlowSourceResponse> GetDraftSourceAsync(string flowId, string format, CancellationToken cancellationToken);
     Task<FlowSourceResponse> GetDraftSourceAsync(ResourceNamespace @namespace, string flowId, string format, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetDraftSourceAsync(flowId, format, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
+    Task<FlowSourceResponse> GetDraftSourceAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, string format, CancellationToken cancellationToken) => GetDraftSourceAsync(@namespace, flowId, format, cancellationToken);
     Task<FlowDraftResponse> ReplaceDraftSourceAsync(string flowId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken);
     Task<FlowDraftResponse> ReplaceDraftSourceAsync(ResourceNamespace @namespace, string flowId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? ReplaceDraftSourceAsync(flowId, request, etag, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
+    Task<FlowDraftResponse> ReplaceDraftSourceAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken) => ReplaceDraftSourceAsync(@namespace, flowId, request, etag, cancellationToken);
     Task<FlowVersionResponse> PublishDraftAsync(string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken);
     Task<FlowVersionResponse> PublishDraftAsync(ResourceNamespace @namespace, string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? PublishDraftAsync(flowId, request, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
+    Task<FlowVersionResponse> PublishDraftAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, PublishFlowDraftRequest request, CancellationToken cancellationToken) => PublishDraftAsync(@namespace, flowId, request, cancellationToken);
     Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken);
     Task<FlowRun> CreateDraftRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? CreateDraftRunAsync(flowId, request, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
+    Task<FlowRun> CreateDraftRunAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CreateFlowRunRequest request, CancellationToken cancellationToken) => CreateDraftRunAsync(@namespace, flowId, request, cancellationToken);
     Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken);
     Task<FlowDraftResponse> CreateDraftFromVersionAsync(ResourceNamespace @namespace, string flowId, string version, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? CreateDraftFromVersionAsync(flowId, version, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flow drafts.");
+    Task<FlowDraftResponse> CreateDraftFromVersionAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, string version, CancellationToken cancellationToken) => CreateDraftFromVersionAsync(@namespace, flowId, version, cancellationToken);
 }
 
 public sealed record FlowResourceSnapshot(FlowResponse Value, string ETag);

@@ -100,6 +100,7 @@ public sealed class FlowToolExecutorTests
         Scope,
         "run-42",
         new FlowId("parent"),
+        WorkspaceScope,
         "notify",
         attempt,
         "correlation-42",

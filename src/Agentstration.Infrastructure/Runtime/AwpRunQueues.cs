@@ -17,16 +17,17 @@ public sealed class AwpRuntimeRunQueue(
     private const string MicrosoftAgentFramework = "microsoft-agent-framework";
     public async ValueTask EnqueueAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken)
     {
-        var run = await runs.GetAsync(item.Scope.WorkspaceId, item.RunId, cancellationToken)
+        var run = await runs.GetExactAsync(item.Scope.ScopeRef, item.RunId, cancellationToken)
             ?? throw new RuntimeRunNotFoundException(item.RunId);
         if (run.Value.Scope != item.Scope || run.Value.Status.State.IsTerminal()) return;
-        if (await assignments.GetByTargetAsync(item.Scope.WorkspaceId, RuntimeAssignmentTargetKind.RuntimeRun,
+        if (await assignments.GetByTargetExactAsync(item.Scope.ScopeRef, RuntimeAssignmentTargetKind.RuntimeRun,
                 item.RunId, cancellationToken) is not null) return;
 
-        await assignments.CreateAsync(item.Scope.WorkspaceId, item.Scope.TenantId,
+        await assignments.CreateExactAsync(item.Scope.ScopeRef,
+            item.Scope.TenantId == Guid.Empty ? null : item.Scope.TenantId,
             RuntimeAssignmentTargetKind.RuntimeRun, item.RunId,
             MicrosoftAgentFramework, "1.0", RuntimeExecutionMaterialVersions.V1,
-            $"runtime-run:{item.RunId}", Digest($"{item.Scope.WorkspaceId}:{item.RunId}:{run.Value.Properties.Agent.Namespace}:{run.Value.Properties.Agent.ResourceId}:{run.Value.Properties.Agent.Version}"),
+            $"runtime-run:{item.RunId}", Digest($"{item.Scope.ScopeRef}:{item.RunId}:{run.Value.Properties.Agent.Namespace}:{run.Value.Properties.Agent.ResourceId}:{run.Value.Properties.Agent.Version}"),
             cancellationToken);
     }
 
@@ -40,10 +41,10 @@ public sealed class AwpRuntimeRunQueue(
 
     public async ValueTask RequestCancellationAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken)
     {
-        var assignment = await assignments.GetByTargetAsync(item.Scope.WorkspaceId,
+        var assignment = await assignments.GetByTargetExactAsync(item.Scope.ScopeRef,
             RuntimeAssignmentTargetKind.RuntimeRun, item.RunId, cancellationToken);
         if (assignment is not null)
-            await assignments.RequestCancellationAsync(item.Scope.WorkspaceId, assignment.Value.Id, cancellationToken);
+            await assignments.RequestCancellationExactAsync(item.Scope.ScopeRef, assignment.Value.Id, cancellationToken);
     }
 
     private static string Digest(string value) => $"sha256:{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)))}";
@@ -56,36 +57,37 @@ public sealed class AwpFlowRunQueue(
     private const string MicrosoftAgentFramework = "microsoft-agent-framework";
     public async ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken)
     {
-        var run = await runs.GetRunAsync(item.Scope.WorkspaceId, item.RunId, cancellationToken)
+        var run = await runs.GetRunExactAsync(item.Scope.ScopeRef, item.RunId, cancellationToken)
             ?? throw new FlowRunNotFoundException(item.RunId);
         if (run.Value.Scope != item.Scope || run.Value.Status.IsTerminal() || run.Value.RootFlowRunId is not null) return;
-        var existing = await assignments.GetByTargetAsync(item.Scope.WorkspaceId, RuntimeAssignmentTargetKind.FlowRun,
+        var existing = await assignments.GetByTargetExactAsync(item.Scope.ScopeRef, RuntimeAssignmentTargetKind.FlowRun,
             item.RunId, cancellationToken);
         if (existing is not null)
         {
             if (run.Value.Status == FlowRunStatus.WaitingForInput
                 && existing.Value.State == RuntimeAssignmentState.Succeeded)
-                await assignments.RequeueAsync(item.Scope.WorkspaceId, existing.Value.Id, cancellationToken);
+                await assignments.RequeueExactAsync(item.Scope.ScopeRef, existing.Value.Id, cancellationToken);
             return;
         }
 
         var hash = run.Value.DefinitionHash ?? Digest(JsonSerializer.Serialize(run.Value.DefinitionSnapshot));
-        await assignments.CreateAsync(item.Scope.WorkspaceId, item.Scope.TenantId,
+        await assignments.CreateExactAsync(item.Scope.ScopeRef,
+            item.Scope.TenantId == Guid.Empty ? null : item.Scope.TenantId,
             RuntimeAssignmentTargetKind.FlowRun, item.RunId,
             MicrosoftAgentFramework, "1.0", RuntimeExecutionMaterialVersions.V1,
-            $"flow-run:{item.RunId}", Digest($"{item.Scope.WorkspaceId}:{item.RunId}:{run.Value.FlowId}:{run.Value.FlowVersion}:{hash}"),
+            $"flow-run:{item.RunId}", Digest($"{item.Scope.ScopeRef}:{item.RunId}:{run.Value.FlowId}:{run.Value.FlowVersion}:{hash}"),
             cancellationToken);
     }
 
     public async ValueTask RequestCancellationAsync(FlowRunQueueItem item, CancellationToken cancellationToken)
     {
-        var run = await runs.GetRunAsync(item.Scope.WorkspaceId, item.RunId, cancellationToken);
+        var run = await runs.GetRunExactAsync(item.Scope.ScopeRef, item.RunId, cancellationToken);
         if (run is null) return;
         var rootRunId = run.Value.RootFlowRunId ?? run.Value.Id;
-        var assignment = await assignments.GetByTargetAsync(item.Scope.WorkspaceId,
+        var assignment = await assignments.GetByTargetExactAsync(item.Scope.ScopeRef,
             RuntimeAssignmentTargetKind.FlowRun, rootRunId, cancellationToken);
         if (assignment is not null)
-            await assignments.RequestCancellationAsync(item.Scope.WorkspaceId, assignment.Value.Id, cancellationToken);
+            await assignments.RequestCancellationExactAsync(item.Scope.ScopeRef, assignment.Value.Id, cancellationToken);
     }
 
     private static string Digest(string value) => $"sha256:{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)))}";

@@ -112,7 +112,7 @@ export class RuntimeWorkerObservabilityPage {
     await expect(row).toBeVisible();
     const assignmentId = await row.getAttribute('data-assignment-id');
     if (!assignmentId) throw new Error(`Worker assignment '${runId}' does not expose its assignment identifier.`);
-    await row.locator(`a[href$="/${runId}"]`).click();
+    await row.locator(`a[href^="/runs/${runId}"], a[href^="/flow-runs/${runId}"]`).click();
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.placement)).toHaveAttribute('data-assignment-id', assignmentId);
   }
 
@@ -322,7 +322,7 @@ export class RuntimeWorkerObservabilityPage {
 
   private assignmentRow(runId: string): Locator {
     return this.page.getByTestId(TestIds.runtimeWorkerObservability.assignmentRow)
-      .filter({ has: this.page.locator(`a[href$="/${runId}"]`) });
+      .filter({ has: this.page.locator(`a[href^="/runs/${runId}"], a[href^="/flow-runs/${runId}"]`) });
   }
 
   private async getFlowRun(consoleUrl: string, runId: string): Promise<FlowRunWire> {

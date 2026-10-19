@@ -5,6 +5,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
 using Agentstration.Work;
@@ -32,7 +33,7 @@ public sealed class RuntimeWorkerOperationGateway(
         RuntimeGovernedModelRequest request,
         CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.TenantId, request.WorkspaceId, request.PrincipalId);
+        using var requestScope = EnterScope(request.ExecutionScopeRef, request.TenantId, request.WorkspaceId, request.PrincipalId);
         var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
             request.Agent.ModelProfileName, cancellationToken);
         var messages = ToMessages(request.Messages);
@@ -53,7 +54,7 @@ public sealed class RuntimeWorkerOperationGateway(
         RuntimeGovernedModelRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.TenantId, request.WorkspaceId, request.PrincipalId);
+        using var requestScope = EnterScope(request.ExecutionScopeRef, request.TenantId, request.WorkspaceId, request.PrincipalId);
         var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
             request.Agent.ModelProfileName, cancellationToken);
         var metadata = client.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
@@ -74,7 +75,7 @@ public sealed class RuntimeWorkerOperationGateway(
 
     public async Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.TenantId, request.WorkspaceId, request.PrincipalId);
+        using var requestScope = EnterScope(request.ExecutionScopeRef, request.TenantId, request.WorkspaceId, request.PrincipalId);
         return await toolExecution.ExecuteAsync(new ToolExecutionContext
         {
             OwnerKind = request.StepExecutionId is null ? ToolExecutionOwnerKind.RuntimeRun : ToolExecutionOwnerKind.FlowRun,
@@ -126,16 +127,17 @@ public sealed class RuntimeWorkerOperationGateway(
     }
 
     public async Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(
+        ResourceScopeRef executionScopeRef,
         Agentstration.Resources.WorkspaceId workspaceId,
         string flowRunId,
         string stepDefinitionId,
         JsonElement arguments,
         CancellationToken cancellationToken)
     {
-        var stored = await flowRunRepository.GetRunAsync(workspaceId, flowRunId, cancellationToken)
+        var stored = await flowRunRepository.GetRunExactAsync(executionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
-        using var requestScope = EnterScope(run.Scope.TenantId, run.Scope.WorkspaceId, run.Scope.PrincipalId);
+        using var requestScope = EnterScope(run.Scope);
         var step = run.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
             string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid",
@@ -150,7 +152,8 @@ public sealed class RuntimeWorkerOperationGateway(
                 tool = direct.Tool;
                 break;
             case ToolRouteFlowStepDefinition routed:
-                resolvedRoute = await flowToolSetResolver.ResolveAsync(workspaceId, run.FlowId.Namespace,
+                resolvedRoute = await flowToolSetResolver.ResolveAsync(workspaceId,
+                    run.DefinitionScopeRef ?? run.ExecutionScopeRef, run.FlowId.Namespace,
                     routed, cancellationToken);
                 tool = resolvedRoute.Tool;
                 route = new(resolvedRoute.ToolSetName, resolvedRoute.ToolSetNamespace, resolvedRoute.ToolSetVersion,
@@ -168,6 +171,7 @@ public sealed class RuntimeWorkerOperationGateway(
                 run.Scope,
                 run.Id,
                 run.FlowId,
+                run.DefinitionScopeRef ?? run.ExecutionScopeRef,
                 step.Name,
                 attempt,
                 run.CorrelationId ?? run.Id,
@@ -193,6 +197,7 @@ public sealed class RuntimeWorkerOperationGateway(
     }
 
     public async Task<RuntimeGovernedFlowArtifact> CaptureFlowArtifactAsync(
+        ResourceScopeRef executionScopeRef,
         Agentstration.Resources.WorkspaceId workspaceId,
         string flowRunId,
         string stepDefinitionId,
@@ -202,11 +207,11 @@ public sealed class RuntimeWorkerOperationGateway(
         IReadOnlyDictionary<string, string> provenance,
         CancellationToken cancellationToken)
     {
-        var (run, step) = await GetFlowStepAsync(workspaceId, flowRunId, stepDefinitionId, cancellationToken);
+        var (run, step) = await GetFlowStepAsync(executionScopeRef, flowRunId, stepDefinitionId, cancellationToken);
         var declaration = step.ArtifactOutput
             ?? throw new RuntimeExecutionMaterialException("flow_step_artifact_not_declared",
                 "The assigned Flow step does not declare an Artifact output.");
-        using var requestScope = EnterScope(run.Scope.TenantId, run.Scope.WorkspaceId, run.Scope.PrincipalId);
+        using var requestScope = EnterScope(run.Scope);
         var trustedProvenance = new Dictionary<string, string>(provenance, StringComparer.Ordinal)
         {
             ["flowName"] = run.FlowId.Value,
@@ -233,17 +238,18 @@ public sealed class RuntimeWorkerOperationGateway(
     }
 
     public async Task CleanupFlowArtifactAsync(
+        ResourceScopeRef executionScopeRef,
         Agentstration.Resources.WorkspaceId workspaceId,
         string flowRunId,
         string stepDefinitionId,
         RuntimeGovernedFlowArtifact artifact,
         CancellationToken cancellationToken)
     {
-        var (run, step) = await GetFlowStepAsync(workspaceId, flowRunId, stepDefinitionId, cancellationToken);
+        var (run, step) = await GetFlowStepAsync(executionScopeRef, flowRunId, stepDefinitionId, cancellationToken);
         if (step.ArtifactOutput is null)
             throw new RuntimeExecutionMaterialException("flow_step_artifact_not_declared",
                 "The assigned Flow step does not declare an Artifact output.");
-        using var requestScope = EnterScope(run.Scope.TenantId, run.Scope.WorkspaceId, run.Scope.PrincipalId);
+        using var requestScope = EnterScope(run.Scope);
         await flowArtifactCapture.CleanupAsync(run.Scope, run.Id, step.Name,
             new(artifact.ArtifactId, artifact.FileName, artifact.MediaType, artifact.Kind,
                 artifact.StorageFlowRunId, artifact.LocalArtifactId), cancellationToken);
@@ -270,6 +276,7 @@ public sealed class RuntimeWorkerOperationGateway(
     }
 
     public async Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(
+        ResourceScopeRef executionScopeRef,
         Agentstration.Resources.WorkspaceId workspaceId,
         string parentRunId,
         string stepDefinitionId,
@@ -278,7 +285,7 @@ public sealed class RuntimeWorkerOperationGateway(
         int? iteration,
         CancellationToken cancellationToken)
     {
-        var child = await flowRuns.CreateOrGetAssignedChildAsync(workspaceId, parentRunId,
+        var child = await flowRuns.CreateOrGetAssignedChildExactAsync(executionScopeRef, parentRunId,
             stepDefinitionId, input, purpose, iteration, cancellationToken);
         return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone());
     }
@@ -337,12 +344,12 @@ public sealed class RuntimeWorkerOperationGateway(
     private static string AssignmentRunId(RuntimeAssignmentId assignmentId) => $"awp-assignment:{assignmentId.Value:N}";
 
     private async Task<(FlowRun Run, FlowStepDefinition Step)> GetFlowStepAsync(
-        Agentstration.Resources.WorkspaceId workspaceId,
+        ResourceScopeRef executionScopeRef,
         string flowRunId,
         string stepDefinitionId,
         CancellationToken cancellationToken)
     {
-        var stored = await flowRunRepository.GetRunAsync(workspaceId, flowRunId, cancellationToken)
+        var stored = await flowRunRepository.GetRunExactAsync(executionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var step = stored.Value.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
             string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
@@ -350,8 +357,17 @@ public sealed class RuntimeWorkerOperationGateway(
                 "The StepDefinition is not present in the assigned Flow snapshot.");
         return (stored.Value, step);
     }
-    private IDisposable EnterScope(Guid tenantId, Agentstration.Resources.WorkspaceId workspaceId, Guid principalId) =>
-        requestScopes.Push(new RequestContext(principalId, tenantId, workspaceId.Value));
+    private IDisposable EnterScope(ResourceScopeRef scopeRef, Guid tenantId, Agentstration.Resources.WorkspaceId workspaceId, Guid principalId) =>
+        scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => requestScopes.PushSystem(),
+            ResourceScopeKind.Tenant => requestScopes.PushTenant(principalId, tenantId),
+            ResourceScopeKind.Workspace => requestScopes.Push(new RequestContext(principalId, tenantId, workspaceId.Value)),
+            _ => throw new RuntimeExecutionMaterialException("execution_scope_invalid", "The execution scope is invalid.")
+        };
+
+    private IDisposable EnterScope(FlowRunScope scope) =>
+        EnterScope(scope.ScopeRef, scope.TenantId, scope.WorkspaceId, scope.PrincipalId);
 
     private sealed record ArtifactState(Guid ArtifactId, string Name, ArtifactReference Reference);
 }
