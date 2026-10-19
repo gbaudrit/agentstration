@@ -14,9 +14,6 @@ namespace Agentstration.Web;
 
 public static partial class FlowEndpoints
 {
-    private static async Task<StoredFlow> RequiredAsync(WorkspaceId workspaceId, string id, FlowService service, CancellationToken token) =>
-        await service.GetAsync(workspaceId, new FlowId(id), token) ?? throw new FlowNotFoundException(new FlowId(id));
-
     private static async Task<StoredFlow> RequiredVisibleAsync(
         FlowId id,
         string? scopeRef,
@@ -33,12 +30,8 @@ public static partial class FlowEndpoints
     private static ResourceScopeRef RequestedOwnerScope(string? value, ICurrentRequestContext requestContext) => ParseScopeRef(value) ?? CurrentConsumerScope(requestContext);
     private static Task<T> WriteFlowAsync<T>(IResourceScopeOperations scopes, ResourceScopeRef scopeRef, Func<CancellationToken, Task<T>> operation, CancellationToken token) =>
         scopes.WriteAsync(FlowResourceKinds.Flow, scopeRef, AuthorizationPermissions.ResourcesWrite, operation, token);
-    private static void EnsureWorkspaceMutationScope(string? value, ICurrentRequestContext requestContext)
-    {
-        var requestedScope = ParseScopeRef(value);
-        if (requestedScope is not null && requestedScope != CurrentConsumerScope(requestContext))
-            throw new FlowValidationException("flow_scope_read_only", $"Flow scope '{requestedScope}' is read-only from the current Workspace.");
-    }
+    private static Task<T> DeleteFlowAsync<T>(IResourceScopeOperations scopes, ResourceScopeRef scopeRef, Func<CancellationToken, Task<T>> operation, CancellationToken token) =>
+        scopes.WriteAsync(FlowResourceKinds.Flow, scopeRef, AuthorizationPermissions.ResourcesDelete, operation, token);
 
     private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt, value.Graph) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName };
 

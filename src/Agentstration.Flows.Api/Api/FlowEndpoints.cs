@@ -42,6 +42,7 @@ public static partial class FlowEndpoints
         namespaced.MapDelete("/{id}", DeleteNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         namespaced.MapGet("/{id}/versions", ListNamespacedVersionsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         namespaced.MapGet("/{id}/versions/{version}", GetNamespacedVersionAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        namespaced.MapPost("/{id}/versions", CreateNamespacedVersionAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         namespaced.MapGet("/{id}/draft", GetNamespacedDraftAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         namespaced.MapPut("/{id}/draft", SaveNamespacedDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         namespaced.MapPost("/{id}/validate", ValidateNamespacedDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);

@@ -38,6 +38,12 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         return await ReadFlowAsync(response, cancellationToken);
     }
 
+    public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(FlowPath(@namespace, flowId, scopeRef), cancellationToken);
+        return await ReadFlowAsync(response, cancellationToken);
+    }
+
     public async Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsJsonAsync("api/flows", request, JsonOptions, cancellationToken);
@@ -55,9 +61,28 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         return await ReadFlowAsync(response, cancellationToken);
     }
 
+    public async Task<FlowResourceSnapshot> UpdateFlowAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, UpdateFlowRequest request, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Put, FlowPath(@namespace, flowId, scopeRef))
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        message.Headers.TryAddWithoutValidation("If-Match", etag);
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        return await ReadFlowAsync(response, cancellationToken);
+    }
+
     public async Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsJsonAsync($"api/flows/{Uri.EscapeDataString(flowId)}/versions", request, JsonOptions, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions, cancellationToken)
+            ?? throw new AgentstrationApiException("Flow API returned an empty published version.", Guid.NewGuid().ToString("N"));
+    }
+
+    public async Task<FlowVersionResponse> CreateFlowVersionAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CreateFlowVersionRequest request, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync($"{FlowPath(@namespace, flowId)}/versions{ScopeQuery(scopeRef)}", request, JsonOptions, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty published version.", Guid.NewGuid().ToString("N"));

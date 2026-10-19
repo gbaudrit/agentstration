@@ -40,21 +40,27 @@ public static partial class FlowEndpoints
         return Results.Ok(ToResponse(stored.Value));
     });
 
-    private static Task<IResult> UpdateNamespacedAsync(string @namespace, string id, string? scopeRef, UpdateFlowRequest body, HttpRequest request, HttpResponse response, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> UpdateNamespacedAsync(string @namespace, string id, string? scopeRef, UpdateFlowRequest body, HttpRequest request, HttpResponse response, FlowService service, IResourceScopeOperations scopes, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        EnsureWorkspaceMutationScope(scopeRef, requestContext);
         var flowId = new FlowId(id, ResourceNamespace.Parse(@namespace));
-        var workspaceId = CurrentWorkspace(requestContext);
-        var current = await service.GetAsync(workspaceId, flowId, token) ?? throw new FlowNotFoundException(flowId);
-        var stored = await service.UpdateAsync(workspaceId, flowId, new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), request.Headers.IfMatch.FirstOrDefault() ?? current.ETag, token);
+        var ownerScope = RequestedOwnerScope(scopeRef, requestContext);
+        var stored = await WriteFlowAsync(scopes, ownerScope, async operationToken =>
+        {
+            var current = await service.GetExactAsync(ownerScope, flowId, operationToken) ?? throw new FlowNotFoundException(flowId);
+            return await service.UpdateExactAsync(ownerScope, flowId, new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), request.Headers.IfMatch.FirstOrDefault() ?? current.ETag, operationToken);
+        }, token);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(ToResponse(stored.Value));
     });
 
-    private static Task<IResult> DeleteNamespacedAsync(string @namespace, string id, string? scopeRef, bool? deleteSystemManaged, HttpRequest request, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> DeleteNamespacedAsync(string @namespace, string id, string? scopeRef, bool? deleteSystemManaged, HttpRequest request, FlowService service, IResourceScopeOperations scopes, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        EnsureWorkspaceMutationScope(scopeRef, requestContext);
-        await service.DeleteAsync(CurrentWorkspace(requestContext), new FlowId(id, ResourceNamespace.Parse(@namespace)), request.Headers.IfMatch.FirstOrDefault(), deleteSystemManaged is true, token);
+        var ownerScope = RequestedOwnerScope(scopeRef, requestContext);
+        await DeleteFlowAsync(scopes, ownerScope, async operationToken =>
+        {
+            await service.DeleteExactAsync(ownerScope, new FlowId(id, ResourceNamespace.Parse(@namespace)), request.Headers.IfMatch.FirstOrDefault(), deleteSystemManaged is true, operationToken);
+            return true;
+        }, token);
         return Results.NoContent();
     });
 
@@ -65,6 +71,16 @@ public static partial class FlowEndpoints
         var stored = await service.GetVersionExactAsync(flow.Value.ScopeRef, flowId, version, token) ?? throw new FlowNotFoundException(flowId);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(ToVersion(stored.Value));
+    });
+
+    private static Task<IResult> CreateNamespacedVersionAsync(string @namespace, string id, string? scopeRef, CreateFlowVersionRequest body, HttpResponse response, FlowService service, IResourceScopeOperations scopes, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var flowId = new FlowId(id, ResourceNamespace.Parse(@namespace));
+        var ownerScope = RequestedOwnerScope(scopeRef, requestContext);
+        var stored = await WriteFlowAsync(scopes, ownerScope, operationToken => service.PublishVersionExactAsync(ownerScope, flowId, body.Version, body.Activate, operationToken), token);
+        response.Headers.ETag = stored.ETag;
+        response.Headers.Location = $"/api/namespaces/{flowId.Namespace.Value}/flows/{id}/versions/{body.Version}";
+        return Results.Json(ToVersion(stored.Value), statusCode: StatusCodes.Status201Created);
     });
 
     private static Task<IResult> ListAsync(bool? allNamespaces, int? skip, int? top, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) =>
@@ -96,28 +112,34 @@ public static partial class FlowEndpoints
         return Results.Ok(ToResponse(stored.Value));
     });
 
-    private static Task<IResult> UpdateAsync(string id, string? scopeRef, UpdateFlowRequest body, HttpRequest request, HttpResponse response, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> UpdateAsync(string id, string? scopeRef, UpdateFlowRequest body, HttpRequest request, HttpResponse response, FlowService service, IResourceScopeOperations scopes, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        EnsureWorkspaceMutationScope(scopeRef, requestContext);
-        var workspaceId = CurrentWorkspace(requestContext);
-        var current = await RequiredAsync(workspaceId, id, service, token);
-        var etag = request.Headers.IfMatch.FirstOrDefault() ?? current.ETag;
-        var stored = await service.UpdateAsync(workspaceId, new FlowId(id), new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), etag, token);
+        var flowId = new FlowId(id);
+        var ownerScope = RequestedOwnerScope(scopeRef, requestContext);
+        var stored = await WriteFlowAsync(scopes, ownerScope, async operationToken =>
+        {
+            var current = await service.GetExactAsync(ownerScope, flowId, operationToken) ?? throw new FlowNotFoundException(flowId);
+            return await service.UpdateExactAsync(ownerScope, flowId, new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), request.Headers.IfMatch.FirstOrDefault() ?? current.ETag, operationToken);
+        }, token);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(ToResponse(stored.Value));
     });
 
-    private static Task<IResult> DeleteAsync(string id, string? scopeRef, bool? deleteSystemManaged, HttpRequest request, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> DeleteAsync(string id, string? scopeRef, bool? deleteSystemManaged, HttpRequest request, FlowService service, IResourceScopeOperations scopes, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        EnsureWorkspaceMutationScope(scopeRef, requestContext);
-        await service.DeleteAsync(CurrentWorkspace(requestContext), new FlowId(id), request.Headers.IfMatch.FirstOrDefault(), deleteSystemManaged is true, token);
+        var ownerScope = RequestedOwnerScope(scopeRef, requestContext);
+        await DeleteFlowAsync(scopes, ownerScope, async operationToken =>
+        {
+            await service.DeleteExactAsync(ownerScope, new FlowId(id), request.Headers.IfMatch.FirstOrDefault(), deleteSystemManaged is true, operationToken);
+            return true;
+        }, token);
         return Results.NoContent();
     });
 
-    private static Task<IResult> CreateVersionAsync(string id, string? scopeRef, CreateFlowVersionRequest body, HttpResponse response, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> CreateVersionAsync(string id, string? scopeRef, CreateFlowVersionRequest body, HttpResponse response, FlowService service, IResourceScopeOperations scopes, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        EnsureWorkspaceMutationScope(scopeRef, requestContext);
-        var stored = await service.PublishVersionAsync(CurrentWorkspace(requestContext), new FlowId(id), body.Version, body.Activate, token);
+        var ownerScope = RequestedOwnerScope(scopeRef, requestContext);
+        var stored = await WriteFlowAsync(scopes, ownerScope, operationToken => service.PublishVersionExactAsync(ownerScope, new FlowId(id), body.Version, body.Activate, operationToken), token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/flows/{id}/versions/{body.Version}";
         return Results.Json(ToVersion(stored.Value), statusCode: StatusCodes.Status201Created);

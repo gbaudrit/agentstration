@@ -120,7 +120,7 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public async Task FlowApiListsVisibleOwnersRequiresExactScopeOnCollisionAndRejectsInheritedMutation()
+    public async Task FlowApiListsVisibleOwnersRequiresExactScopeOnCollisionAndAllowsAuthorizedExactMutation()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
@@ -148,16 +148,19 @@ public sealed partial class FlowTests
         Assert.AreEqual(HttpStatusCode.BadRequest, (await client.GetAsync("/api/flows/scoped-collision")).StatusCode);
 
         var exactPath = $"/api/flows/scoped-collision?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}";
-        var inherited = await client.GetFromJsonAsync<FlowResponse>(exactPath, JsonOptions);
+        using var inheritedResponse = await client.GetAsync(exactPath);
+        var inherited = await inheritedResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
         Assert.AreEqual(ResourceScopeRef.Instance, inherited?.ScopeRef);
         using var mutation = new HttpRequestMessage(HttpMethod.Put, exactPath)
         {
             Content = JsonContent.Create(new UpdateFlowRequest("Changed", "1.0.0", true, definition), options: JsonOptions)
         };
-        mutation.Headers.TryAddWithoutValidation("If-Match", workspaceResponse.Headers.ETag?.Tag);
-        using var rejected = await client.SendAsync(mutation);
-        Assert.AreEqual(HttpStatusCode.BadRequest, rejected.StatusCode);
-        StringAssert.Contains(await rejected.Content.ReadAsStringAsync(), "flow_scope_read_only");
+        mutation.Headers.TryAddWithoutValidation("If-Match", inheritedResponse.Headers.ETag?.Tag);
+        using var updatedResponse = await client.SendAsync(mutation);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode, await updatedResponse.Content.ReadAsStringAsync());
+        var updated = await updatedResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
+        Assert.AreEqual("Changed", updated?.Description);
+        Assert.AreEqual(ResourceScopeRef.Instance, updated?.ScopeRef);
     }
 
     [TestMethod]

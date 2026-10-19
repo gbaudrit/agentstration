@@ -12,7 +12,7 @@ else
 {
     <PageHeader Title="@flow.Name" Description="@(flow.Description ?? T("DefaultDescription"))">
         <Status><StatusBadge Text="@StatusLabel" Status="@PlatformDashboardService.ToStatus(Status)" /></Status>
-        <Actions>@if (!IsOrchestration && IsWorkspaceOwned) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@EditorLabel</a> }</Actions>
+        <Actions>@if (!IsOrchestration && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@EditorLabel</a> }</Actions>
     </PageHeader>
     <nav class="section-tabs" aria-label="@T("DetailsAriaLabel")">
         @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button> }
@@ -24,19 +24,12 @@ else
             <div class="panel-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</div>
             <FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" />
         </section>
-        @if (!IsWorkspaceOwned)
-        {
-            <p class="muted">
-                @T("InheritedScope", FlowScopeRef.Value)
-                @T("InheritedReadOnlyHelp")
-            </p>
-        }
     }
     else if (activeTab == "Definition")
     {
-        @if (IsOrchestration && IsWorkspaceOwned)
+        @if (IsOrchestration && IsEditable)
         {
-            <FlowOrchestrationEditor FlowId="@FlowId" FlowNamespace="@FlowNamespace" Embedded="true" />
+            <FlowOrchestrationEditor FlowId="@FlowId" FlowNamespace="@FlowNamespace" ScopeRef="@FlowScopeRef" Embedded="true" />
         }
         else
         {
@@ -56,8 +49,8 @@ else
                 {
                     <form class="panel flow-definition-form" @onsubmit="SaveDefinitionAsync" @onsubmit:preventDefault="true" data-testid="flow-definition-form">
                         <div class="panel-header">
-                            <div><h3>@T("DefinitionIdentitySection")</h3><p>@T(IsWorkspaceOwned ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p></div>
-                            <StatusBadge Text="@T(IsWorkspaceOwned ? "Status.Draft" : "ReadOnly")" Status="UiStatus.Neutral" />
+                            <div><h3>@T("DefinitionIdentitySection")</h3><p>@T(IsEditable ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p></div>
+                            <StatusBadge Text="@T(IsEditable ? "Status.Draft" : "ReadOnly")" Status="UiStatus.Neutral" />
                         </div>
                         <div class="flow-definition-fields">
                             <label><span>@T("DisplayName")</span><input value="@definitionDisplayName" @oninput="args => definitionDisplayName = args.Value?.ToString() ?? string.Empty" disabled="@(!CanEditDefinition)" maxlength="200" data-testid="flow-definition-display-name" /></label>
@@ -68,7 +61,7 @@ else
                         </div>
                         @if (definitionError is not null) { <p class="error-panel" role="alert">@definitionError</p> }
                         @if (definitionSaved && !DefinitionDirty) { <p class="flow-definition-success" role="status">@T("DefinitionSaved")</p> }
-                        @if (IsWorkspaceOwned)
+                        @if (IsEditable)
                         {
                             <div class="form-actions"><button class="button-primary" type="submit" disabled="@(!CanEditDefinition || definitionSaving || !DefinitionDirty)">@(definitionSaving ? T("Saving") : T("SaveDefinition"))</button></div>
                         }
@@ -89,9 +82,9 @@ else
     else
     {
         <section class="panel form-section" data-testid="flow-yaml-viewer">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("FlowYaml")</h2><p>@T(IsWorkspaceOwned ? "FlowYamlEditableHelp" : "FlowYamlReadOnlyHelp")</p></div><StatusBadge Text="@T(IsWorkspaceOwned ? "Source" : "ReadOnly")" Status="UiStatus.Neutral" /></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("FlowYaml")</h2><p>@T(IsEditable ? "FlowYamlEditableHelp" : "FlowYamlReadOnlyHelp")</p></div><StatusBadge Text="@T(IsEditable ? "Source" : "ReadOnly")" Status="UiStatus.Neutral" /></div>
             <textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("FlowYamlDefinition")">@FlowYaml</textarea>
-            @if (IsWorkspaceOwned) { <div class="form-actions"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenYamlEditor")</a></div> }
+            @if (IsEditable) { <div class="form-actions"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenYamlEditor")</a></div> }
         </section>
     }
     @if (showRun)
@@ -123,7 +116,8 @@ else
     private string StatusLabel => T($"Status.{Status}");
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
     private ResourceScopeRef FlowScopeRef => flow?.ScopeRef ?? (string.IsNullOrWhiteSpace(ScopeRefValue) ? ResourceScopeRef.Workspace(Guid.Empty) : ResourceScopeRef.Parse(ScopeRefValue));
-    private bool IsWorkspaceOwned => FlowScopeRef.Kind == ResourceScopeKind.Workspace;
+    private bool IsPackManaged => flow?.Metadata.ContainsKey("agentstration.io/pack.name") is true;
+    private bool IsEditable => !IsPackManaged;
     private IReadOnlyList<string> AvailableTabs => Tabs;
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
     private bool IsOrchestration => Orchestration is not null;
@@ -143,7 +137,7 @@ else
     private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
     private FlowTopologyGraph PreviewTopology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(flow.Definition, flow.Graph);
     private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
-    private bool CanEditDefinition => IsWorkspaceOwned && definitionDraft is not null;
+    private bool CanEditDefinition => IsEditable && definitionDraft is not null;
     private FlowVersionResponse? SelectedRunVersion => versions.SingleOrDefault(version => string.Equals(version.Version, runVersion, StringComparison.Ordinal));
     private bool DefinitionDirty => definitionDraft is not null &&
         (!string.Equals(definitionDisplayName.Trim(), definitionDraft.Value.DisplayName, StringComparison.Ordinal) ||
@@ -180,9 +174,9 @@ else
         definitionError = null;
         try
         {
-            if (IsWorkspaceOwned)
+            if (IsEditable)
             {
-                definitionDraft = await Client.GetDraftAsync(FlowResourceNamespace, FlowId, cancellation.Token);
+                definitionDraft = await Client.GetDraftAsync(FlowResourceNamespace, FlowId, FlowScopeRef, cancellation.Token);
                 definitionDisplayName = definitionDraft.Value.DisplayName;
                 definitionDescription = definitionDraft.Value.Description ?? string.Empty;
             }
@@ -226,7 +220,7 @@ else
         try
         {
             var current = definitionDraft!;
-            var saved = await Client.SaveDraftAsync(FlowId,
+            var saved = await Client.SaveDraftAsync(FlowResourceNamespace, FlowId, FlowScopeRef,
                 new UpdateFlowDraftRequest(displayName, NormalizedDescription, current.Value.Tags, current.Value.Definition),
                 current.ETag, cancellation.Token);
             definitionDraft = saved;

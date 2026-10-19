@@ -163,9 +163,12 @@ public interface IFlowApiClient
     Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
         GetFlowAsync(@namespace, flowId, cancellationToken);
     Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken);
+    Task<FlowResourceSnapshot> GetFlowSnapshotAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowSnapshotAsync(flowId, cancellationToken);
     Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken);
     Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken);
+    Task<FlowResourceSnapshot> UpdateFlowAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, UpdateFlowRequest request, string etag, CancellationToken cancellationToken) => UpdateFlowAsync(flowId, request, etag, cancellationToken);
     Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken);
+    Task<FlowVersionResponse> CreateFlowVersionAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef scopeRef, CreateFlowVersionRequest request, CancellationToken cancellationToken) => CreateFlowVersionAsync(flowId, request, cancellationToken);
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetFlowVersionsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
