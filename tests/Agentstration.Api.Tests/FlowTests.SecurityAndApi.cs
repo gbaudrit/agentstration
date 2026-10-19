@@ -288,6 +288,11 @@ public sealed partial class FlowTests
         Assert.IsNull(run.ParentFlowRunId);
         Assert.AreEqual(0, run.NestingDepth);
         Assert.IsNull(typeof(CreateFlowRunRequest).GetProperty("StartedBy"));
+        var detail = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{run.Id}", JsonOptions);
+        Assert.IsNotNull(detail?.TokenUsage);
+        Assert.AreEqual(FlowRunTokenUsageState.Collecting, detail.TokenUsage.State);
+        Assert.AreEqual(FlowRunTokenUsageCoverage.Unavailable, detail.TokenUsage.Direct.Coverage);
+        Assert.AreEqual(0, detail.TokenUsage.Direct.InvocationCount);
         var global = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flowRuns", JsonOptions);
         Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
         var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);

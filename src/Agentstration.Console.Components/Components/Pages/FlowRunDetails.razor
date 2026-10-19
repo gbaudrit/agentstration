@@ -83,6 +83,39 @@ else
                     <div><span class="field-label">@T("CorrelationId")</span><code>@run.CorrelationId</code></div>
                     @if (!string.IsNullOrWhiteSpace(run.CausationId)) { <div><span class="field-label">@T("CausationId")</span><code>@run.CausationId</code></div> }
                 </section>
+                <section class="token-usage-summary" data-testid="flow-run-token-usage" aria-label="@T("TokenUsageSummary")">
+                    <div class="panel-header"><h2>@T("TokenUsageSummary")</h2><span>@T("TokenUsageHelp")</span></div>
+                    @if (run.TokenUsage.State == FlowRunTokenUsageState.Collecting)
+                    {
+                        <p class="muted">@T("TokenUsageCollecting")</p>
+                    }
+                    else
+                    {
+                        var tokenUsage = run.TokenUsage;
+                        <div class="token-usage-grid">
+                            <article>
+                                <h3>@T("DirectUsage")</h3>
+                                <p>@T("DirectUsageHelp")</p>
+                                <dl class="details-list token-usage-values">
+                                    <dt>@T("InputTokens")</dt><dd>@TokenCount(tokenUsage.Direct.InputTokens)</dd>
+                                    <dt>@T("OutputTokens")</dt><dd>@TokenCount(tokenUsage.Direct.OutputTokens)</dd>
+                                    <dt>@T("CombinedTokens")</dt><dd>@TokenCount(tokenUsage.Direct.TotalTokens)</dd>
+                                    <dt>@T("UsageCoverage")</dt><dd>@CoverageLabel(tokenUsage.Direct.Coverage) · @T("ReportedInvocations", tokenUsage.Direct.ReportedInvocationCount, tokenUsage.Direct.InvocationCount)</dd>
+                                </dl>
+                            </article>
+                            <article>
+                                <h3>@T("InclusiveUsage")</h3>
+                                <p>@T("InclusiveUsageHelp")</p>
+                                <dl class="details-list token-usage-values">
+                                    <dt>@T("InputTokens")</dt><dd>@TokenCount(tokenUsage.Inclusive.InputTokens)</dd>
+                                    <dt>@T("OutputTokens")</dt><dd>@TokenCount(tokenUsage.Inclusive.OutputTokens)</dd>
+                                    <dt>@T("CombinedTokens")</dt><dd>@TokenCount(tokenUsage.Inclusive.TotalTokens)</dd>
+                                    <dt>@T("UsageCoverage")</dt><dd>@CoverageLabel(tokenUsage.Inclusive.Coverage) · @T("ReportedInvocations", tokenUsage.Inclusive.ReportedInvocationCount, tokenUsage.Inclusive.InvocationCount)</dd>
+                                </dl>
+                            </article>
+                        </div>
+                    }
+                </section>
                 <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
                                  View="@FlowRunTimeline.TimelineView.Summary" ShowHeader="false" ShowNavigation="false" Embedded="true" ParticipantUrls="@ParticipantUrls" />
                 <section class="designer-layout run-layout flow-run-overview-topology @(inspectorVisible ? null : "inspector-collapsed")">
@@ -180,7 +213,11 @@ else
     private string TriggerLabel(FlowRunTrigger value) => Localizer[$"Trigger.{value}"];
     private string OriginLabel(FlowInvocationOrigin value) => Localizer[$"Origin.{value}"];
     private string StepStatusLabel(FlowStepRunStatus value) => Localizer[$"StepStatus.{value}"];
-    private string TokenUsage(FlowStepRunUsage? usage) => usage is null ? "—" : T("TokenUsage", usage.InputTokens ?? 0, usage.OutputTokens ?? 0);
+    private string TokenUsage(FlowStepRunUsage? usage) => usage is null
+        ? T("UnavailableValue")
+        : T("TokenUsage", TokenCount(usage.InputTokens), TokenCount(usage.OutputTokens));
+    private string TokenCount(long? value) => value?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? T("UnavailableValue");
+    private string CoverageLabel(FlowRunTokenUsageCoverage coverage) => T($"UsageCoverage.{coverage}");
     private readonly CancellationTokenSource cancellation = new();
     private readonly FlowRunEventBuffer eventBuffer = new();
     private FlowRun? run;

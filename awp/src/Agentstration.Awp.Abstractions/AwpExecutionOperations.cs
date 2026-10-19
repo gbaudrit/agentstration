@@ -142,7 +142,8 @@ public sealed record AwpInvokeModelResponse(
     string? FinishReason,
     int? InputTokens,
     int? OutputTokens,
-    string? ProviderType = null);
+    string? ProviderType = null,
+    int? TotalTokens = null);
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(AwpModelStreamStarted), "model.response.started")]
@@ -210,7 +211,8 @@ public sealed record AwpModelUsage(
     long SequenceNumber,
     DateTimeOffset SentAt,
     int? InputTokens,
-    int? OutputTokens)
+    int? OutputTokens,
+    int? TotalTokens = null)
     : AwpModelStreamEvent(StreamId, SequenceNumber, SentAt);
 
 public sealed record AwpModelStreamCompleted(

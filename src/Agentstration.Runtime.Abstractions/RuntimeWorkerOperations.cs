@@ -25,7 +25,8 @@ public sealed record RuntimeGovernedModelResponse(
     string? FinishReason,
     int? InputTokens,
     int? OutputTokens,
-    string? ProviderType = null);
+    string? ProviderType = null,
+    int? TotalTokens = null);
 
 public sealed record RuntimeGovernedModelUpdate(
     IReadOnlyList<RuntimeGovernedModelContent> Contents,
@@ -33,7 +34,8 @@ public sealed record RuntimeGovernedModelUpdate(
     string? FinishReason,
     int? InputTokens,
     int? OutputTokens,
-    string? ProviderType = null);
+    string? ProviderType = null,
+    int? TotalTokens = null);
 
 public sealed record RuntimeGovernedToolRequest(
     RuntimeExecutionAgentMaterial Agent,
