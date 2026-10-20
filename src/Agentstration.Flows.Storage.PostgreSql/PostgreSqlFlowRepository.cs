@@ -79,6 +79,21 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         return new StoredFlow(definition, document.ETag, now);
     }
 
+    public async Task<StoredFlow?> GetByUidAsync(Guid uid, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Documents.AsNoTracking()
+            .Where(value => value.Kind == DefinitionKind)
+            .ToArrayAsync(cancellationToken);
+        var matches = documents.Select(ToFlow).Where(value => value.Value.Uid == uid).Take(2).ToArray();
+        return matches.Length switch
+        {
+            0 => null,
+            1 => matches[0],
+            _ => throw new InvalidOperationException($"Flow UID '{uid:D}' is not unique.")
+        };
+    }
+
     public async Task<StoredFlow?> GetExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);

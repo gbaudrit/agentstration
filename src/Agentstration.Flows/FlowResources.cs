@@ -24,6 +24,7 @@ public sealed record FlowResource(
     string? DisplayName = null,
     FlowGraphDefinition? Graph = null)
 {
+    public Guid Uid { get; init; } = Guid.NewGuid();
     public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }
 

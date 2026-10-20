@@ -27,7 +27,7 @@ public sealed class ResourceAccessPolicyException(string code, string message) :
 }
 
 public sealed class ResourceAccessPolicyService(
-    IResourceStore resources,
+    IResourceIdentityCatalog resources,
     IResourceAccessPolicyStore policies,
     IResourceScopeResolver scopes,
     IResourceScopeOperations scopeOperations,

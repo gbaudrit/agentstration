@@ -6,6 +6,7 @@ using Agentstration.Agents;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Parameters;
@@ -377,6 +378,47 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.IsTrue(tenantNode.Resources.Any(value =>
             value.Kind == SecretResourceKinds.Vault && value.Name == "inventory-vault"));
         Assert.IsFalse(workspaceNode.Resources.Any(value => value.Name == "inventory-vault"));
+    }
+
+    [TestMethod]
+    public async Task InstanceFlowIdentityIsAvailableForDescendantAccessAdministration()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        StoredFlow created;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context))
+        {
+            created = await factory.Services.GetRequiredService<FlowService>().CreateExactAsync(
+                ResourceScopeRef.Instance,
+                new CreateFlowCommand(
+                    "instance-access-flow",
+                    null,
+                    "1.0.0",
+                    true,
+                    new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], [])),
+                ResourceNamespace.Default,
+                default);
+        }
+
+        using var client = factory.CreateClient();
+        var inventory = await client.GetFromJsonAsync<ResourceScopeInventoryResponse>("/api/resource-scopes");
+        var item = inventory!.Scopes.Single(value => value.ScopeRef == ResourceScopeRef.Instance).Resources
+            .Single(value => value.Kind == FlowResourceKinds.Flow && value.Name == created.Value.Name);
+        Assert.AreEqual(created.Value.Uid, item.Uid);
+
+        var tenant = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
+            $"/api/resource-scopes/targets?kind={FlowResourceKinds.Flow}"))!
+            .Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        var identity = new ResourceAccessIdentity(
+            created.Value.Uid,
+            ResourceScopeRef.Instance,
+            created.Value.Id.Namespace,
+            FlowResourceKinds.Flow,
+            Version: created.Value.Version);
+        using var saved = await client.PutAsJsonAsync(
+            $"/api/resource-access-policies/{created.Value.Uid:D}",
+            new ResourceAccessPolicy(identity, [new(tenant, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]));
+        Assert.AreEqual(HttpStatusCode.OK, saved.StatusCode);
     }
 
     [TestMethod]

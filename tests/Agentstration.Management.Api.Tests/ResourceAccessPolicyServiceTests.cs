@@ -95,7 +95,8 @@ public sealed class ResourceAccessPolicyServiceTests
         var policies = new PolicyStore();
         var scopes = new Scopes();
         var audit = new Audit();
-        var service = new ResourceAccessPolicyService(resources, policies, scopes, new ScopeOperations(), audit);
+        var identities = new ResourceIdentityCatalog(resources, []);
+        var service = new ResourceAccessPolicyService(identities, policies, scopes, new ScopeOperations(), audit);
         return new(service, resources, audit, uid, owner);
     }
 

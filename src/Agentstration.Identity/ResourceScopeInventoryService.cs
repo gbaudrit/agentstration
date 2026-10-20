@@ -14,7 +14,7 @@ public sealed record ResourceScopeInventoryNode(
 
 public sealed class ResourceScopeInventoryService(
     IdentityExperienceService identityExperience,
-    IResourceStore store,
+    IResourceIdentityCatalog identities,
     IRequestContextScopeFactory scopeFactory)
 {
     public async Task<IReadOnlyList<ResourceScopeInventoryNode>> GetAsync(CancellationToken cancellationToken)
@@ -80,13 +80,6 @@ public sealed class ResourceScopeInventoryService(
         ResourceScopeRef scopeRef,
         CancellationToken cancellationToken)
     {
-        const int pageSize = 500;
-        var resources = new List<ResourceInventoryEntry>();
-        while (true)
-        {
-            var page = await store.ListExactInventoryAsync(scopeRef, resources.Count, pageSize, cancellationToken);
-            resources.AddRange(page);
-            if (page.Count < pageSize) return resources;
-        }
+        return await identities.ListExactInventoryAsync(scopeRef, cancellationToken);
     }
 }
