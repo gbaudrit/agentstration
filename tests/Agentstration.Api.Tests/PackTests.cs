@@ -867,18 +867,22 @@ public sealed class PackTests
         using var installedResponse = await client.PostAsync("/api/packs", installContent);
         Assert.AreEqual(HttpStatusCode.Created, installedResponse.StatusCode, await installedResponse.Content.ReadAsStringAsync());
         var ns = new ResourceNamespace("agentstration.test-pack");
-        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
-            .GetAsync(new("pack-knowledge", ns), default);
+        var knowledgeSources = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
+        var source = await knowledgeSources.GetAsync(new("pack-knowledge", ns), default);
         Assert.IsNotNull(source);
         var ready = source.Value.Status.Conditions.Single(value => value.Type == "Ready");
-        Assert.AreEqual("False", ready.Status);
-        StringAssert.Contains(ready.Message, "has no successful acquisition with artifacts");
+        Assert.AreEqual("True", ready.Status);
+        var operationalReadiness = await knowledgeSources.GetReadinessForUseAsync(
+            new("pack-knowledge", ns, source.Value.ScopeRef),
+            ResourceScopeRef.Workspace(requestContext.WorkspaceId), default);
+        Assert.IsFalse(operationalReadiness.Ready);
+        Assert.IsTrue(operationalReadiness.Issues.Any(issue =>
+            issue.Contains("has no successful acquisition with artifacts", StringComparison.Ordinal)));
         Assert.AreEqual("test-pack", source.Value.Metadata.Annotations[PackProvenanceAnnotations.Name]);
 
         using var removed = await client.DeleteAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode, await removed.Content.ReadAsStringAsync());
-        Assert.IsNull(await factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
-            .GetAsync(new("pack-knowledge", ns), default));
+        Assert.IsNull(await knowledgeSources.GetAsync(new("pack-knowledge", ns), default));
         Assert.IsNull(await factory.Services.GetRequiredService<DataSourceManagementService>()
             .GetAsync(ns, "pack-source", ResourceScopeRef.Workspace(requestContext.WorkspaceId), default));
         Assert.IsNull(await factory.Services.GetRequiredService<FlowService>()

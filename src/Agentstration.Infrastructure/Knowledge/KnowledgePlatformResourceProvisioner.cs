@@ -45,16 +45,20 @@ public sealed class KnowledgePlatformResourceProvisioner(
         if (workspaceScope.Kind != ResourceScopeKind.Workspace)
             throw new InvalidOperationException("Built-in Knowledge resources require a Workspace scope.");
         using var governanceScope = governance.Push(ResourceGovernance.Core("knowledge.platform"));
-        await EnsureToolSetAsync(workspaceScope, RetrievalToolSetName,
+        var instanceScope = ResourceScopeRef.Instance;
+        await EnsureToolSetAsync(instanceScope, RetrievalToolSetName,
             "Knowledge retrieval · Built-in", "Local-first deterministic search, query, and read over Snapshot Artifacts.",
             [
                 (KnowledgeFlowContracts.Search, KnowledgeBuiltinToolNames.RetrievalSearch),
                 (KnowledgeFlowContracts.Query, KnowledgeBuiltinToolNames.RetrievalQuery),
                 (KnowledgeFlowContracts.Read, KnowledgeBuiltinToolNames.RetrievalRead)
             ], cancellationToken);
-        await EnsureProjectionFlowAsync(workspaceScope, cancellationToken);
-        await EnsureRetrievalFlowAsync(workspaceScope, cancellationToken);
-        var instanceScope = ResourceScopeRef.Instance;
+        var retrievalToolSet = await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(
+            instanceScope, ResourceNamespace.Default, ToolResourceKinds.ToolSet, RetrievalToolSetName), cancellationToken)
+            ?? throw new InvalidOperationException("The built-in Knowledge retrieval ToolSet was not reconciled.");
+        await EnsureTenantAccessAsync(retrievalToolSet.Value, tenantScope, cancellationToken);
+        await EnsureProjectionFlowAsync(instanceScope, cancellationToken);
+        await EnsureRetrievalFlowAsync(instanceScope, cancellationToken);
         await EnsureHttpAcquisitionFlowAsync(instanceScope, WebAcquisitionFlowName,
             "Web resource acquisition · Built-in", WebFetchMcpTool.ToolName, cancellationToken);
         await EnsureHttpAcquisitionFlowAsync(instanceScope, RestAcquisitionFlowName,
@@ -165,12 +169,12 @@ public sealed class KnowledgePlatformResourceProvisioner(
         await EnsureTenantAccessAsync(current.Value, tenantScope, cancellationToken);
     }
 
-    private async Task EnsureTenantAccessAsync(DataSourceProfileResource profile, ResourceScopeRef tenantScope,
+    private async Task EnsureTenantAccessAsync(Resource resource, ResourceScopeRef tenantScope,
         CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            var current = await accessPolicies.GetAsync(profile.Uid, cancellationToken);
+            var current = await accessPolicies.GetAsync(resource.Uid, cancellationToken);
             var grants = current?.Policy.Grants.ToList() ?? [];
             var existing = grants.FindIndex(value => value.TargetScopeRef == tenantScope);
             var desired = new ResourceAccessGrant(tenantScope,
@@ -183,8 +187,8 @@ public sealed class KnowledgePlatformResourceProvisioner(
             else grants.Add(desired);
             try
             {
-                _ = await accessPolicies.PutAsync(new(new(profile.Uid, profile.ScopeRef!.Value,
-                    profile.Namespace, profile.Kind, profile.Generation), grants), current?.ETag, cancellationToken);
+                _ = await accessPolicies.PutAsync(new(new(resource.Uid, resource.ScopeRef!.Value,
+                    resource.Namespace, resource.Kind, resource.Generation), grants), current?.ETag, cancellationToken);
                 return;
             }
             catch (ResourceConcurrencyException) when (attempt < 2) { }

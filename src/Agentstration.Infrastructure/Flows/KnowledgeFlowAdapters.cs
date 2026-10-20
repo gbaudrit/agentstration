@@ -19,13 +19,11 @@ public sealed class KnowledgeFlowResolver(FlowService flows) : IKnowledgeFlowRes
         KnowledgeFlowTarget target,
         CancellationToken cancellationToken)
     {
-        if (scopeRef.Kind != ResourceScopeKind.Workspace || scopeRef.TargetId is not { } workspaceId)
-            throw new KnowledgeSourceValidationException("knowledge_source_scope_invalid", "A KnowledgeSource must belong to a Workspace scope.");
         var flowNamespace = target.Namespace ?? ownerNamespace;
         var reference = new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace, target.ScopeRef);
         try
         {
-            var resolved = await flows.ResolveAsync(new WorkspaceId(workspaceId), reference, ownerNamespace, cancellationToken);
+            var resolved = await flows.ResolveAsync(scopeRef, reference, ownerNamespace, cancellationToken);
             return new(
                 resolved.FlowId.Value,
                 resolved.FlowId.Namespace,
@@ -34,7 +32,10 @@ public sealed class KnowledgeFlowResolver(FlowService flows) : IKnowledgeFlowRes
                 resolved.Graph?.InputSchema?.Clone(),
                 resolved.Graph?.OutputSchema?.Clone(),
                 resolved.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract),
-                Capabilities(resolved.Metadata.GetValueOrDefault(KnowledgeFlowContracts.CapabilitiesMetadataKey)))
+                Capabilities(resolved.Metadata.GetValueOrDefault(KnowledgeFlowContracts.CapabilitiesMetadataKey)),
+                resolved.DefinitionHash ?? (resolved.Graph is null
+                    ? FlowDefinitionHash.Compute(resolved.Definition)
+                    : FlowDefinitionHash.Compute(resolved.Graph)))
             {
                 ScopeRef = resolved.ScopeRef
             };
@@ -44,6 +45,26 @@ public sealed class KnowledgeFlowResolver(FlowService flows) : IKnowledgeFlowRes
             throw new KnowledgeSourceValidationException("knowledge_source_flow_unavailable",
                 $"Flow binding '{flowNamespace}/{target.Name}' is not available as a published version: {exception.Message}");
         }
+    }
+
+    public async Task ValidatePinnedAsync(
+        ResolvedKnowledgeFlowBinding binding,
+        CancellationToken cancellationToken)
+    {
+        var scopeRef = binding.ScopeRef
+            ?? throw new KnowledgeSourceValidationException("knowledge_source_flow_scope_missing",
+                $"Pinned Flow '{binding.Namespace}/{binding.Name}:{binding.Version}' has no ownership scope.");
+        var stored = await flows.GetVersionExactAsync(scopeRef,
+            new FlowId(binding.Name, binding.Namespace), binding.Version, cancellationToken)
+            ?? throw new KnowledgeSourceValidationException("knowledge_source_flow_stale",
+                $"Pinned Flow '{scopeRef}/{binding.Namespace}/{binding.Name}:{binding.Version}' no longer exists.");
+        var hash = stored.Value.DefinitionHash ?? (stored.Value.Graph is null
+            ? FlowDefinitionHash.Compute(stored.Value.Definition)
+            : FlowDefinitionHash.Compute(stored.Value.Graph));
+        if (string.IsNullOrWhiteSpace(binding.DefinitionHash)
+            || !string.Equals(hash, binding.DefinitionHash, StringComparison.Ordinal))
+            throw new KnowledgeSourceValidationException("knowledge_source_flow_stale",
+                $"Pinned Flow '{scopeRef}/{binding.Namespace}/{binding.Name}:{binding.Version}' no longer matches its integrity evidence.");
     }
 
     private static IReadOnlyList<string>? Capabilities(string? value) => string.IsNullOrWhiteSpace(value)

@@ -223,7 +223,11 @@ public sealed class ToolDefinitionExecutor(
                 ToolDefinitionCallerKind.Flow => KnowledgeRetrievalInvocationOrigin.Flow,
                 _ => KnowledgeRetrievalInvocationOrigin.Mcp
             };
-            var sourceId = new KnowledgeSourceId(sourceName, definition.Namespace);
+            var sourceScope = definition.Metadata.Annotations.TryGetValue(
+                "agentstration.io/knowledge-source-scope", out var serializedScope)
+                ? ResourceScopeRef.Parse(serializedScope)
+                : (ResourceScopeRef?)null;
+            var sourceId = new KnowledgeSourceId(sourceName, definition.Namespace, sourceScope);
             var executionContext = new KnowledgeRetrievalExecutionContext(
                 invocation.ExecutionContext?.AgentId,
                 invocation.ExecutionContext?.AgentRevisionId,

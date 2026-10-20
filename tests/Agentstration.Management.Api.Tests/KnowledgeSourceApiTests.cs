@@ -13,6 +13,7 @@ using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -22,6 +23,162 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task KnowledgeSourcesPinThreeScopeDependenciesAndRequireDescendantUseGrants()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var instanceScope = ResourceScopeRef.Instance;
+        var tenantScope = ResourceScopeRef.Tenant(context.TenantId);
+        var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var dataSources = factory.Services.GetRequiredService<DataSourceManagementService>();
+        var source = await dataSources.CreateAsync(new DataSourceResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSource,
+            Metadata = new() { Name = "shared-artifact-origin" },
+            ScopeRef = instanceScope,
+            Definition = new()
+            {
+                DisplayName = "Shared artifact origin",
+                Profile = new("artifact-import-builtin", instanceScope),
+                Configuration = JsonSerializer.SerializeToElement(new { artifactIds = Array.Empty<string>() })
+            }
+        }, default);
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        _ = await policies.PutAsync(new(new(source.Value.Uid, instanceScope, source.Value.Namespace,
+            source.Value.Kind, source.Value.Generation),
+            [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
+
+        var knowledge = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
+        async Task<StoredResource<KnowledgeSourceResource>> CreateAsync(ResourceScopeRef scope, string name) =>
+            await knowledge.CreateAsync(new KnowledgeSourceResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = name },
+                ScopeRef = scope,
+                Definition = new()
+                {
+                    DisplayName = $"Knowledge {scope}",
+                    DataSources =
+                    [
+                        new KnowledgeDataSourceBinding
+                        {
+                            Name = "origin",
+                            DataSource = new(source.Value.Name, instanceScope)
+                        }
+                    ],
+                    ProjectionFlow = new()
+                    {
+                        Name = KnowledgePlatformResourceProvisioner.ProjectionFlowName,
+                        ScopeRef = instanceScope
+                    },
+                    RetrievalFlow = new()
+                    {
+                        Name = KnowledgePlatformResourceProvisioner.RetrievalFlowName,
+                        ScopeRef = instanceScope
+                    }
+                }
+            }, default);
+
+        var instance = await CreateAsync(instanceScope, "instance-knowledge");
+        var tenant = await CreateAsync(tenantScope, "tenant-knowledge");
+        var workspace = await CreateAsync(workspaceScope, "workspace-knowledge");
+
+        using (var client = factory.CreateClient())
+        using (var response = await client.PostAsJsonAsync("/api/knowledgesources",
+                   new CreateKnowledgeSourceRequest("api-instance-knowledge", instance.Value.Definition,
+                       ScopeRef: instanceScope)))
+        {
+            Assert.AreEqual(HttpStatusCode.Created, response.StatusCode,
+                await response.Content.ReadAsStringAsync());
+            var apiCreated = await response.Content.ReadFromJsonAsync<KnowledgeSourceResource>();
+            Assert.AreEqual(instanceScope, apiCreated?.ScopeRef);
+            StringAssert.Contains(response.Headers.Location?.OriginalString ?? string.Empty,
+                Uri.EscapeDataString(instanceScope.Value));
+        }
+
+        foreach (var stored in new[] { instance, tenant, workspace })
+        {
+            Assert.IsNotNull(stored.Value.Composition);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(stored.Value.Composition.DependencyHash));
+            Assert.AreEqual(instanceScope, stored.Value.Composition.ProjectionFlow.ScopeRef);
+            Assert.AreEqual(instanceScope, stored.Value.Composition.RetrievalFlow.ScopeRef);
+            var dependency = stored.Value.Composition.DataSources.Single();
+            Assert.AreEqual(instanceScope, dependency.DataSourceScopeRef);
+            Assert.AreEqual(source.Value.Uid, dependency.DataSourceUid);
+            Assert.AreEqual(source.Value.Generation, dependency.DataSourceGeneration);
+            Assert.AreEqual(instanceScope, dependency.ProfileScopeRef);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(dependency.ProfileDefinitionHash));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(dependency.ProfileDependencyHash));
+        }
+
+        var denied = await Assert.ThrowsAsync<KnowledgeSourceValidationException>(() =>
+            knowledge.ResolveForUseAsync(new(instance.Value.Name, instance.Value.Namespace, instanceScope),
+                workspaceScope, default));
+        Assert.AreEqual("knowledge_source_access_denied", denied.Code);
+
+        _ = await policies.PutAsync(new(new(instance.Value.Uid, instanceScope, instance.Value.Namespace,
+            instance.Value.Kind, instance.Value.Generation),
+            [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
+        var inherited = await knowledge.ResolveForUseAsync(
+            new(instance.Value.Name, instance.Value.Namespace, instanceScope), workspaceScope, default);
+        Assert.AreEqual(instance.Value.Uid, inherited.Value.Uid);
+
+        var otherWorkspaceId = Guid.NewGuid();
+        var otherWorkspace = new Workspace(otherWorkspaceId, context.TenantId,
+            $"knowledge-{otherWorkspaceId:N}", "Knowledge isolation", WorkspaceStatus.Initializing,
+            DateTimeOffset.UtcNow);
+        await factory.Services.GetRequiredService<IIdentityStore>().AddWorkspaceAsync(otherWorkspace, default);
+        await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(otherWorkspace, default);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        KnowledgeProjectionResource Projection(string name, Guid workspaceId) => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeProjection,
+            Metadata = new() { Name = name },
+            ScopeRef = ResourceScopeRef.Workspace(workspaceId),
+            Generation = 1,
+            KnowledgeSourceUid = instance.Value.Uid,
+            KnowledgeSourceScopeRef = instanceScope,
+            KnowledgeSourceName = instance.Value.Name,
+            KnowledgeSourceNamespace = instance.Value.Namespace,
+            KnowledgeSourceGeneration = instance.Value.Generation,
+            ProjectionFlow = instance.Value.Composition!.ProjectionFlow,
+            RetrievalFlow = instance.Value.Composition.RetrievalFlow,
+            ProjectionFlowRunId = $"run-{name}",
+            State = KnowledgeProjectionState.Succeeded,
+            CorrelationId = name,
+            CreatedBy = context.PrincipalId,
+            TenantId = context.TenantId,
+            WorkspaceId = workspaceId,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _ = await store.PutExactAsync(workspaceScope, Projection("projection-a", context.WorkspaceId),
+            null, true, default);
+        var otherScope = ResourceScopeRef.Workspace(otherWorkspaceId);
+        var contextScopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        using (contextScopes.Push(context with { WorkspaceId = otherWorkspaceId }))
+            _ = await store.PutExactAsync(otherScope, Projection("projection-b", otherWorkspaceId),
+                null, true, default);
+        var projections = factory.Services.GetRequiredService<KnowledgeProjectionService>();
+        var sourceId = new KnowledgeSourceId(instance.Value.Name, instance.Value.Namespace, instanceScope);
+        Assert.AreEqual("projection-a", (await projections.ListAsync(sourceId, default)).Single().Name);
+        using (contextScopes.Push(context with { WorkspaceId = otherWorkspaceId }))
+        {
+            Assert.AreEqual("projection-b", (await projections.ListAsync(sourceId, default)).Single().Name);
+        }
+
+        _ = await dataSources.PutAsync(source.Value.Namespace, source.Value.Name, instanceScope,
+            source.Value.Definition with { Description = "Changed dependency" }, source.ETag, default);
+        var stale = await knowledge.GetReadinessAsync(
+            new(instance.Value.Name, instance.Value.Namespace, instanceScope), default);
+        Assert.IsFalse(stale.Ready);
+        StringAssert.Contains(string.Join(' ', stale.Issues), "stale");
+    }
+
     [TestMethod]
     public async Task InstanceReceivesProtectedPublishedBuiltInDataSourceProfilesIdempotently()
     {

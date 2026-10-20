@@ -435,7 +435,8 @@ public sealed class KnowledgeSourceBootstrapResourceHandler(
     IKnowledgeFlowResolver flows) : IBootstrapResourceHandler
 {
     public string Kind => KnowledgeResourceKinds.KnowledgeSource;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+    public bool SupportsProfileScope(BootstrapProfileScope profileScope) => true;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -444,7 +445,7 @@ public sealed class KnowledgeSourceBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<KnowledgeSourceResource>(resource);
-        var scopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value);
+        var scopeRef = value.ScopeRef ?? DataSourceProfileBootstrapResourceHandler.TargetScope(operation);
         value = value with { ScopeRef = scopeRef };
         var id = new KnowledgeSourceId(value.Name, value.Namespace);
         if (await service.GetExactAsync(scopeRef, id, cancellationToken) is not null)
@@ -471,7 +472,7 @@ public sealed class KnowledgeSourceBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<KnowledgeSourceResource>(resource);
-        var scopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value);
+        var scopeRef = value.ScopeRef ?? DataSourceProfileBootstrapResourceHandler.TargetScope(operation);
         value = value with { ScopeRef = scopeRef };
         if (await service.GetExactAsync(scopeRef, new(value.Name, value.Namespace), cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
@@ -500,6 +501,7 @@ internal sealed record DeclarativeKnowledgeSourceToolExposureDefinition
 {
     public string Version { get; init; } = "1.0.0";
     public bool RequiresApproval { get; init; }
+    public ResourceScopeRef? SourceScopeRef { get; init; }
 }
 
 public sealed class KnowledgeSourceToolExposureBootstrapResourceHandler(
@@ -516,7 +518,8 @@ public sealed class KnowledgeSourceToolExposureBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeKnowledgeSourceToolExposureDefinition>>(resource);
-        var id = new KnowledgeSourceId(value.Metadata.Name, value.Metadata.Namespace);
+        var id = new KnowledgeSourceId(value.Metadata.Name, value.Metadata.Namespace,
+            value.Definition.SourceScopeRef);
         if (await exposures.GetAsync(id, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
 
@@ -536,7 +539,8 @@ public sealed class KnowledgeSourceToolExposureBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeKnowledgeSourceToolExposureDefinition>>(resource);
-        var id = new KnowledgeSourceId(value.Metadata.Name, value.Metadata.Namespace);
+        var id = new KnowledgeSourceId(value.Metadata.Name, value.Metadata.Namespace,
+            value.Definition.SourceScopeRef);
         if (await exposures.GetAsync(id, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
         _ = await exposures.PublishAsync(id, value.Definition.Version, value.Definition.RequiresApproval, cancellationToken);
