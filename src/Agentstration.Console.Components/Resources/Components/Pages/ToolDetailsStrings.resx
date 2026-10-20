@@ -41,6 +41,7 @@
   <data name="DetailViews"><value>Tool views</value></data>
   <data name="TabOverview"><value>Overview</value></data>
   <data name="TabExecution"><value>Execution</value></data>
+  <data name="TabAccess"><value>Access</value></data>
   <data name="RunTool"><value>Run this tool</value></data>
   <data name="RunToolHelp"><value>Validate the input safely or explicitly invoke the governed tool.</value></data>
   <data name="RunMode"><value>Mode</value></data>

@@ -122,4 +122,5 @@
   <data name="Status.Failed"><value>Failed</value></data>
   <data name="Status.Unknown"><value>Unknown</value></data>
   <data name="Range"><value>Range: {0} to {1}.</value></data>
+  <data name="Access"><value>Access</value></data>
 </root>

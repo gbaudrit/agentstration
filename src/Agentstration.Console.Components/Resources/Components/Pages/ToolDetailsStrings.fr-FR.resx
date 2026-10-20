@@ -41,6 +41,7 @@
   <data name="DetailViews"><value>Vues de l’outil</value></data>
   <data name="TabOverview"><value>Vue d’ensemble</value></data>
   <data name="TabExecution"><value>Exécution</value></data>
+  <data name="TabAccess"><value>Accès</value></data>
   <data name="RunTool"><value>Exécuter cet outil</value></data>
   <data name="RunToolHelp"><value>Validez les entrées en toute sécurité ou lancez explicitement l’outil gouverné.</value></data>
   <data name="RunMode"><value>Mode</value></data>

@@ -51,4 +51,5 @@
   <data name="TargetName" xml:space="preserve"><value>Target name</value></data>
   <data name="DiscoveryFlow" xml:space="preserve"><value>Discovery Flow (optional)</value></data>
   <data name="DiscoveryToolBindings" xml:space="preserve"><value>Discovery Tool bindings (JSON)</value></data>
+  <data name="Access"><value>Access</value></data>
 </root>

@@ -50,6 +50,10 @@ else
         <section class="panel form-section"><div class="form-grid"><label><span>@T("Version")</span><input @bind="publishVersion" /></label></div><div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="PublishAsync">@T("Publish")</button></div>
         @if (revisions.Count == 0) { <p class="muted">@T("NoRevisions")</p> } else { <DataGrid TItem="DataSourceProfileRevisionResource" Items="revisions"><Header><tr><th>@T("Version")</th><th>@T("Created")</th><th>@T("State")</th><th></th></tr></Header><Row Context="revision"><tr><td><code>@revision.Version</code></td><td>@revision.PublishedAt.ToLocalTime().ToString("g")</td><td>@(revision.Version == profile!.ActiveVersion ? T("Activate") : "—")</td><td>@if (revision.Version != profile.ActiveVersion) { <button class="text-button" type="button" @onclick="() => ActivateAsync(revision.Version)">@T("Activate")</button> }</td></tr></Row></DataGrid> }</section>
     }
+    else if (tab == Tab.Access)
+    {
+        <ResourceAccessPanel OwnerScopeRef="selectedScope!.Value" Namespace="profile!.Namespace" Kind="@DataSourceResourceKinds.DataSourceProfile" Name="@profile.Name" Generation="profile.Generation" Version="@(profile.ActiveVersion ?? profile.Definition.Version)" Governance="profile.Governance" />
+    }
     else if (tab == Tab.Yaml)
     {
         <section class="panel form-section"><label class="profile-yaml-field"><span>@T("Manifest")</span><textarea class="form-code-editor runner-json" rows="30" @bind="rawYaml"></textarea></label><div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@T("ApplyYaml")</button></div></section>
@@ -93,6 +97,6 @@ else
     }
     private static string Url(DataSourceProfileResource item) => $"/data-source-profiles/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}";
     private sealed record RawProfile { public required string ApiVersion { get; init; } public required string Kind { get; init; } public required ResourceMetadata Metadata { get; init; } public ResourceScopeRef? ScopeRef { get; init; } public required DataSourceProfileProperties Definition { get; init; } }
-    private enum Tab { Overview, Definition, Revisions, Yaml }
+    private enum Tab { Overview, Definition, Revisions, Access, Yaml }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

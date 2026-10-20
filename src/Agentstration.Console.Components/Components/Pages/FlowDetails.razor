@@ -79,6 +79,10 @@ else
     {
         <DataGrid TItem="FlowVersionResponse" Items="versions"><Header><tr><th>@T("Deployment")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Published")</th></tr></Header><Row Context="version"><tr><td><code>local</code></td><td>@version.Version</td><td><StatusBadge Text="@(version.Version == flow.ActiveVersion ? T("Active") : T("Published"))" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></td><td>@version.PublishedAt.LocalDateTime.ToString("g")</td></tr></Row></DataGrid>
     }
+    else if (activeTab == "Access")
+    {
+        <ResourceAccessPanel OwnerScopeRef="FlowScopeRef" Namespace="FlowResourceNamespace" Kind="@FlowResourceKinds.Flow" Name="@flow.Id" Version="@(flow.ActiveVersion ?? flow.Version)" Governance="flow.Governance" />
+    }
     else
     {
         <section class="panel form-section" data-testid="flow-yaml-viewer">
@@ -102,7 +106,7 @@ else
     private string StrategyLabel(FlowOrchestrationStrategy strategy) => Localizer[$"Strategy.{strategy}"];
     private string SucceededRunCount(int count) => T(count == 1 ? "SucceededRunCount.One" : "SucceededRunCount.Many", count);
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
-    private static readonly string[] Tabs = ["Overview", "Definition", "Runs", "Deployments", "YAML"];
+    private static readonly string[] Tabs = ["Overview", "Definition", "Runs", "Deployments", "Access", "YAML"];
     private readonly CancellationTokenSource cancellation = new();
     private FlowResponse? flow; private IReadOnlyList<FlowVersionResponse> versions=[]; private IReadOnlyList<FlowRun> runs=[];
     private string activeTab="Overview", runVersion=""; private string? error; private bool showRun,submitting,runInputValid=true;
@@ -156,6 +160,7 @@ else
         runs = await Client.GetFlowRunsAsync(FlowResourceNamespace, FlowId, flow.ScopeRef, cancellation.Token);
         runVersion = flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";
         if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = "Definition";
+        else if (string.Equals(View, "access", StringComparison.OrdinalIgnoreCase)) activeTab = "Access";
         else if (string.Equals(View, "yaml", StringComparison.OrdinalIgnoreCase)) activeTab = "YAML";
         if (activeTab == "Definition" && !IsOrchestration) await LoadDefinitionAsync();
     }

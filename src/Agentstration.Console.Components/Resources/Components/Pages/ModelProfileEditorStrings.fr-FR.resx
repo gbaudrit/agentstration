@@ -122,4 +122,5 @@
   <data name="Status.Failed"><value>Échec</value></data>
   <data name="Status.Unknown"><value>Inconnu</value></data>
   <data name="Range"><value>Plage : de {0} à {1}.</value></data>
+  <data name="Access"><value>Accès</value></data>
 </root>

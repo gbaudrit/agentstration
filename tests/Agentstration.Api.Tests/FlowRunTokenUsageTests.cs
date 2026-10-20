@@ -106,7 +106,7 @@ public sealed partial class FlowTests
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = Now,
             CompletedAt = Now,
-            DefinitionSnapshot = new FlowVersion(TestScope.WorkspaceId, new FlowId("usage-flow"), "1.0.0", null,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value), new FlowId("usage-flow"), "1.0.0", null,
                 definition, new Dictionary<string, string>(), Now),
             Steps = steps
         };
