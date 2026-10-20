@@ -131,8 +131,14 @@
         try
         {
             inventory = await Scopes.GetAsync(cancellation.Token);
-            targets = await Scopes.GetTargetsAsync(Kind, cancellation.Token);
-            canManage = targets.Any(value => value.ScopeRef == OwnerScopeRef && value.CanWrite);
+            var ownershipTargets = await Scopes.GetTargetsAsync(Kind, cancellation.Token);
+            canManage = ownershipTargets.Any(value => value.ScopeRef == OwnerScopeRef && value.CanWrite);
+            targets = inventory.Scopes.Select(scope => new ResourceScopeTargetResponse(
+                scope.ScopeRef,
+                scope.Kind,
+                scope.DisplayName,
+                ownershipTargets.SingleOrDefault(value => value.ScopeRef == scope.ScopeRef)?.CanWrite ?? false))
+                .ToArray();
             var resource = inventory.Scopes.SingleOrDefault(value => value.ScopeRef == OwnerScopeRef)?.Resources
                 .SingleOrDefault(value => value.Namespace == Namespace
                     && string.Equals(value.Kind, Kind, StringComparison.Ordinal)

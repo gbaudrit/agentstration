@@ -25,7 +25,8 @@ public sealed class RuntimeProfileEditorTests
         context.Services.AddSingleton(new NotificationState());
         context.Services.AddSingleton<IRuntimeProfilesClient>(new RuntimeProfilesClientStub());
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new ScopeInventoryClientStub());
-        context.Services.AddSingleton<IResourceAccessPolicyClient>(new AccessPolicyClientStub());
+        var policies = new AccessPolicyClientStub();
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
 
         var rendered = context.Render<RuntimeProfileEditor>(parameters => parameters
             .Add(component => component.Name, "maf-builtin"));
@@ -37,6 +38,17 @@ public sealed class RuntimeProfileEditorTests
             Assert.AreEqual("Accès", rendered.Find("[data-testid='runtime-profile-access-tab']").TextContent.Trim());
             StringAssert.Contains(rendered.Find(".access-identity").TextContent, ResourceUid.ToString());
             Assert.AreEqual(0, rendered.FindAll("[data-testid='runtime-profile-form']").Count);
+        });
+
+        rendered.Find("[data-testid='resource-access-target']").Change(TenantScope.Value);
+        rendered.Find("[data-testid='resource-access-add']").Click();
+        rendered.Find("[data-testid='resource-access-save']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var grant = policies.Saved?.Grants.Single();
+            Assert.IsNotNull(grant);
+            Assert.AreEqual(TenantScope, grant.TargetScopeRef);
         });
     }
 
@@ -81,17 +93,18 @@ public sealed class RuntimeProfileEditorTests
 
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string kind, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([
-                new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true),
-                new(TenantScope, ResourceScopeKind.Tenant, "Development", true)
+                new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true)
             ]);
     }
 
     private sealed class AccessPolicyClientStub : IResourceAccessPolicyClient
     {
+        public ResourceAccessPolicy? Saved { get; private set; }
+
         public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) =>
             Task.FromResult<ResourceAccessPolicySnapshot?>(null);
 
         public Task<ResourceAccessPolicySnapshot> PutAsync(ResourceAccessPolicy policy, string? etag, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult(new ResourceAccessPolicySnapshot(Saved = policy, "\"policy\""));
     }
 }
