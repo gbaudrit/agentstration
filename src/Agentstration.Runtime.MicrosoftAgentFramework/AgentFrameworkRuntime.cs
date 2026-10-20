@@ -246,7 +246,10 @@ public sealed class AgentFrameworkRuntimeFactory(
             if (usage is null) return null;
             var inputTokens = ToTokenCount(usage.InputTokenCount);
             var outputTokens = ToTokenCount(usage.OutputTokenCount);
-            return inputTokens is null && outputTokens is null ? null : new(inputTokens, outputTokens);
+            var totalTokens = ToTokenCount(usage.TotalTokenCount);
+            return inputTokens is null && outputTokens is null && totalTokens is null
+                ? null
+                : new(inputTokens, outputTokens, totalTokens);
         }
 
         private static int? ToTokenCount(long? count)

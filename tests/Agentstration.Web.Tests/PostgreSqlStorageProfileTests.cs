@@ -4,6 +4,8 @@ using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Core;
 using Agentstration.Secrets;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -51,6 +53,7 @@ public sealed class PostgreSqlStorageProfileTests
         using var client = host.CreateClient();
         using var response = await client.GetAsync("/health/ready");
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        await AssertRuntimeWorkerRegistrationAsync(host.Services);
         if (exerciseWorkplace)
         {
             await AssertWorkplaceDefaultReplacementAsync(host.Services);
@@ -58,6 +61,24 @@ public sealed class PostgreSqlStorageProfileTests
             await WriteScopedSecretsAsync(host.Services, tenantId, workspaceId);
         }
         else await AssertScopedSecretsAfterRestartAsync(host.Services, tenantId, workspaceId);
+    }
+
+    private static async Task AssertRuntimeWorkerRegistrationAsync(IServiceProvider services)
+    {
+        var dispatch = services.GetRequiredService<RuntimeWorkerDispatchService>();
+        var workerId = new RuntimeWorkerId(Guid.NewGuid());
+        var sessionId = new RuntimeWorkerSessionId(Guid.NewGuid());
+
+        var registration = await dispatch.RegisterAsync(
+            workerId,
+            sessionId,
+            "test-worker",
+            1,
+            [new("microsoft-agent-framework", "1.0", new HashSet<string>(StringComparer.Ordinal) { "1.0" }, "test")],
+            default);
+
+        Assert.AreEqual(workerId, registration.WorkerId);
+        Assert.AreEqual(sessionId, registration.WorkerSessionId);
     }
 
     private static async Task WriteScopedSecretsAsync(IServiceProvider services, Guid tenantId, Guid workspaceId)

@@ -13,7 +13,7 @@ public sealed class ToolInputValidationException(string code, string path, strin
 public static partial class ToolInputSchemaValidator
 {
     private const int MaximumDepth = 12;
-    private const int MaximumPayloadLength = 65_536;
+    private const int MaximumPayloadLength = 2 * 1024 * 1024;
 
     public static void Validate(JsonElement? schema, JsonElement arguments)
     {

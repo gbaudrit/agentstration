@@ -482,6 +482,49 @@ public sealed class RuntimeWorkerAssignmentTests
     }
 
     [TestMethod]
+    public async Task EventPayloadAllowsBase64ReadChunksAndRejectsPayloadsAboveTwoMebibytes()
+    {
+        await using var fixture = await AssignmentFixture.CreateAsync();
+        await fixture.CreateAssignmentAsync();
+        var claim = await fixture.ClaimRequiredAsync();
+        var chunkPayload = System.Text.Json.JsonSerializer.SerializeToElement(new
+        {
+            output = new
+            {
+                structuredContent = new
+                {
+                    contentBase64 = Convert.ToBase64String(new byte[64 * 1024])
+                }
+            }
+        });
+        var executionEvent = new RuntimeAssignmentExecutionEvent
+        {
+            EventId = Guid.NewGuid(),
+            AttemptEventSequence = 1,
+            OccurredAt = fixture.Clock.GetUtcNow(),
+            Kind = "StepCompleted",
+            RunId = fixture.RunId,
+            Payload = chunkPayload
+        };
+
+        var accepted = await fixture.Service.AppendEventsAsync(claim.Ownership, [executionEvent], default);
+
+        Assert.AreEqual(1, accepted.AcceptedThroughSequence);
+        var oversized = executionEvent with
+        {
+            EventId = Guid.NewGuid(),
+            AttemptEventSequence = 2,
+            Payload = System.Text.Json.JsonSerializer.SerializeToElement(new
+            {
+                output = new string('x', 2 * 1024 * 1024)
+            })
+        };
+        var exception = await Assert.ThrowsExactlyAsync<RuntimeAssignmentException>(() =>
+            fixture.Service.AppendEventsAsync(claim.Ownership, [oversized], default));
+        Assert.AreEqual(RuntimeAssignmentErrorCodes.LimitExceeded, exception.Code);
+    }
+
+    [TestMethod]
     public async Task CheckpointRequiresCurrentOwnershipAndSurvivesStoreRestart()
     {
         var path = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-checkpoint-{Guid.NewGuid():N}.db");

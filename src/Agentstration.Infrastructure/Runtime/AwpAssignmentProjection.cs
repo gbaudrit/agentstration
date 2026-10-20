@@ -14,8 +14,12 @@ public sealed class AwpAssignmentProjection(
     IFlowRunEventSink flowEvents,
     TimeProvider timeProvider,
     IOptions<FlowRunExecutionOptions> flowOptions,
-    IFlowInputRequestSink? inputRequestSink = null) : IRuntimeAssignmentProjection
+    IFlowInputRequestSink? inputRequestSink = null,
+    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null) : IRuntimeAssignmentProjection
 {
+    private readonly FlowRunTokenUsageConsolidator tokenUsageConsolidator =
+        configuredTokenUsageConsolidator ?? new(flowRuns);
+
     public async Task ProjectEventsAsync(RuntimeWorkerAssignment assignment,
         IReadOnlyList<RuntimeAssignmentExecutionEvent> events, CancellationToken cancellationToken)
     {
@@ -32,7 +36,7 @@ public sealed class AwpAssignmentProjection(
         CancellationToken cancellationToken)
     {
         if (result.Assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun) return;
-        await ProjectFlowTerminalAsync(result.Assignment, result.Assignment.TargetRunId, result, cancellationToken);
+        var runs = new List<FlowRun>();
         const int pageSize = 200;
         for (var skip = 0; ; skip += pageSize)
         {
@@ -41,10 +45,13 @@ public sealed class AwpAssignmentProjection(
             {
                 var candidate = await flowRuns.GetRunExactAsync(key.ScopeRef, key.RunId, cancellationToken);
                 if (candidate?.Value.RootFlowRunId == result.Assignment.TargetRunId)
-                    await ProjectFlowTerminalAsync(result.Assignment, candidate.Value.Id, result, cancellationToken);
+                    runs.Add(candidate.Value);
             }
             if (keys.Count < pageSize) break;
         }
+        foreach (var run in runs.OrderByDescending(value => value.NestingDepth))
+            await ProjectFlowTerminalAsync(result.Assignment, run.Id, result, cancellationToken);
+        await ProjectFlowTerminalAsync(result.Assignment, result.Assignment.TargetRunId, result, cancellationToken);
     }
 
     private async Task ProjectFlowTerminalAsync(RuntimeWorkerAssignment assignment, string runId,
@@ -96,6 +103,10 @@ public sealed class AwpAssignmentProjection(
                 },
                 _ => step
             }).ToArray()
+        };
+        updated = updated with
+        {
+            TokenUsage = await tokenUsageConsolidator.FinalizeAsync(updated, cancellationToken)
         };
         await flowRuns.UpdateRunAsync(updated, stored.ETag, cancellationToken);
         await AppendFlowEventAsync(updated, status switch
@@ -309,6 +320,11 @@ public sealed class AwpAssignmentProjection(
     private async Task UpdateFlowAsync(StoredFlowRun stored, FlowRun updated, FlowRunEventType eventType,
         string? stepId, JsonElement? payload, DateTimeOffset occurredAt, CancellationToken cancellationToken)
     {
+        if (updated.Status.IsTerminal())
+            updated = updated with
+            {
+                TokenUsage = await tokenUsageConsolidator.FinalizeAsync(updated, cancellationToken)
+            };
         await flowRuns.UpdateRunAsync(updated, stored.ETag, cancellationToken);
         await AppendFlowEventAsync(updated, eventType, stepId, payload, occurredAt, cancellationToken);
     }
@@ -347,9 +363,11 @@ public sealed class AwpAssignmentProjection(
         if (usage is not { ValueKind: JsonValueKind.Object }) return null;
         var input = LongProperty(usage, "inputTokens");
         var output = LongProperty(usage, "outputTokens");
-        return input is null && output is null ? null : new(
+        var total = LongProperty(usage, "totalTokens");
+        return input is null && output is null && total is null ? null : new(
             input is null ? null : checked((int)input.Value),
-            output is null ? null : checked((int)output.Value));
+            output is null ? null : checked((int)output.Value),
+            total is null ? null : checked((int)total.Value));
     }
 
     private static int? IntProperty(JsonElement? payload, string name) =>

@@ -141,59 +141,64 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         DateTimeOffset leaseExpiresAt,
         CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var activeCount = await context.WorkerAssignments.AsNoTracking()
-            .Where(value => value.State == nameof(RuntimeAssignmentState.Assigned)
-                && value.LeaseExpiresAt != null && value.LeaseExpiresAt > acquiredAt.UtcTicks
-                && value.ActiveWorkerId == request.WorkerId.Value
-                && value.ActiveWorkerSessionId == request.WorkerSessionId.Value)
-            .CountAsync(cancellationToken);
-        if (activeCount >= request.MaximumConcurrentAssignments) return null;
-        var versions = request.RuntimeCapabilityVersions.ToArray();
-        var materials = request.ExecutionMaterialVersions.ToArray();
-        var document = await context.WorkerAssignments
-            .Where(value => value.State == nameof(RuntimeAssignmentState.Pending)
-                && value.RuntimeCapability == request.RuntimeCapability
-                && versions.Contains(value.RuntimeCapabilityVersion)
-                && materials.Contains(value.ExecutionMaterialVersion))
-            .OrderBy(value => value.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (document is null) return null;
-        var assignment = Deserialize(document).Value;
-        var generation = checked(assignment.FencingGeneration + 1);
-        var attempt = new RuntimeAssignmentAttempt
+        await using var strategyContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var strategy = strategyContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            Id = request.AttemptId,
-            WorkerId = request.WorkerId,
-            WorkerSessionId = request.WorkerSessionId,
-            FencingGeneration = generation,
-            AcquiredAt = acquiredAt,
-            LastHeartbeatAt = acquiredAt,
-            LeaseExpiresAt = leaseExpiresAt,
-            State = RuntimeAssignmentAttemptState.Active
-        };
-        assignment = assignment with
-        {
-            State = RuntimeAssignmentState.Assigned,
-            FencingGeneration = generation,
-            UpdatedAt = acquiredAt,
-            Attempts = assignment.Attempts.Append(attempt).ToArray()
-        };
-        Apply(document, assignment, Convert.ToHexString(ownershipTokenDigest), leaseExpiresAt);
-        if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
-            await SetRunStateAsync(context, assignment, RuntimeRunState.Running, acquiredAt, null, null, cancellationToken);
-        try
-        {
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (DbUpdateException) { return null; }
-        catch (PostgresException exception) when (exception.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected)
-        {
-            return null;
-        }
-        return Deserialize(document);
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            var activeCount = await context.WorkerAssignments.AsNoTracking()
+                .Where(value => value.State == nameof(RuntimeAssignmentState.Assigned)
+                    && value.LeaseExpiresAt != null && value.LeaseExpiresAt > acquiredAt.UtcTicks
+                    && value.ActiveWorkerId == request.WorkerId.Value
+                    && value.ActiveWorkerSessionId == request.WorkerSessionId.Value)
+                .CountAsync(cancellationToken);
+            if (activeCount >= request.MaximumConcurrentAssignments) return null;
+            var versions = request.RuntimeCapabilityVersions.ToArray();
+            var materials = request.ExecutionMaterialVersions.ToArray();
+            var document = await context.WorkerAssignments
+                .Where(value => value.State == nameof(RuntimeAssignmentState.Pending)
+                    && value.RuntimeCapability == request.RuntimeCapability
+                    && versions.Contains(value.RuntimeCapabilityVersion)
+                    && materials.Contains(value.ExecutionMaterialVersion))
+                .OrderBy(value => value.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (document is null) return null;
+            var assignment = Deserialize(document).Value;
+            var generation = checked(assignment.FencingGeneration + 1);
+            var attempt = new RuntimeAssignmentAttempt
+            {
+                Id = request.AttemptId,
+                WorkerId = request.WorkerId,
+                WorkerSessionId = request.WorkerSessionId,
+                FencingGeneration = generation,
+                AcquiredAt = acquiredAt,
+                LastHeartbeatAt = acquiredAt,
+                LeaseExpiresAt = leaseExpiresAt,
+                State = RuntimeAssignmentAttemptState.Active
+            };
+            assignment = assignment with
+            {
+                State = RuntimeAssignmentState.Assigned,
+                FencingGeneration = generation,
+                UpdatedAt = acquiredAt,
+                Attempts = assignment.Attempts.Append(attempt).ToArray()
+            };
+            Apply(document, assignment, Convert.ToHexString(ownershipTokenDigest), leaseExpiresAt);
+            if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+                await SetRunStateAsync(context, assignment, RuntimeRunState.Running, acquiredAt, null, null, cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateException) { return null; }
+            catch (PostgresException exception) when (exception.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected)
+            {
+                return null;
+            }
+            return Deserialize(document);
+        });
     }
 
     public async Task<StoredRuntimeWorkerAssignment> RenewAsync(
@@ -392,21 +397,21 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         DateTimeOffset requestedAt,
         CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var document = await RequiredAsync(context, scopeRef, assignmentId, cancellationToken);
-        var assignment = Deserialize(document).Value;
-        if (assignment.State is RuntimeAssignmentState.Succeeded or RuntimeAssignmentState.Failed or RuntimeAssignmentState.Cancelled)
+        return await ExecuteSerializableAsync(async context =>
+        {
+            var document = await RequiredAsync(context, scopeRef, assignmentId, cancellationToken);
+            var assignment = Deserialize(document).Value;
+            if (assignment.State is RuntimeAssignmentState.Succeeded or RuntimeAssignmentState.Failed or RuntimeAssignmentState.Cancelled)
+                return Deserialize(document);
+            assignment = assignment with { CancellationRequestedAt = assignment.CancellationRequestedAt ?? requestedAt, UpdatedAt = requestedAt };
+            if (assignment.State == RuntimeAssignmentState.Pending)
+                assignment = assignment with { State = RuntimeAssignmentState.Cancelled };
+            Apply(document, assignment, document.OwnershipTokenDigest, assignment.CurrentAttempt?.LeaseExpiresAt);
+            if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+                await SetRunStateAsync(context, assignment, RuntimeRunState.Cancelled, requestedAt, null, "Cancelled by the caller.", cancellationToken);
+            await SaveAsync(context, cancellationToken);
             return Deserialize(document);
-        assignment = assignment with { CancellationRequestedAt = assignment.CancellationRequestedAt ?? requestedAt, UpdatedAt = requestedAt };
-        if (assignment.State == RuntimeAssignmentState.Pending)
-            assignment = assignment with { State = RuntimeAssignmentState.Cancelled };
-        Apply(document, assignment, document.OwnershipTokenDigest, assignment.CurrentAttempt?.LeaseExpiresAt);
-        if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
-            await SetRunStateAsync(context, assignment, RuntimeRunState.Cancelled, requestedAt, null, "Cancelled by the caller.", cancellationToken);
-        await SaveAsync(context, cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return Deserialize(document);
+        }, cancellationToken);
     }
 
     public async Task<StoredRuntimeWorkerAssignment> RequeueAsync(
@@ -447,54 +452,54 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         DateTimeOffset completedAt,
         CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
-        var existing = Deserialize(document).Value;
-        if (existing.CurrentAttempt?.TerminalEventId == command.EventId)
+        return await ExecuteSerializableAsync(async context =>
         {
-            ValidateTerminalReplay(document, proof, ownershipTokenDigest);
-            return new RuntimeAssignmentTerminalResult(existing, ToRunState(existing.State), true);
-        }
-        if (existing.State is RuntimeAssignmentState.Succeeded or RuntimeAssignmentState.Failed or RuntimeAssignmentState.Cancelled)
-            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.TerminalConflict, "The assignment already has a different terminal outcome.");
-        var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, completedAt);
-        var run = assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun
-            ? await RequiredRunAsync(context, assignment, cancellationToken)
-            : null;
-        var cancelled = assignment.CancellationRequestedAt is not null || run?.State == nameof(RuntimeRunState.Cancelled);
-        var assignmentState = cancelled ? RuntimeAssignmentState.Cancelled : command.Outcome == RuntimeAssignmentTerminalOutcome.Succeeded
-            ? RuntimeAssignmentState.Succeeded : RuntimeAssignmentState.Failed;
-        var attemptState = cancelled ? RuntimeAssignmentAttemptState.Interrupted : command.Outcome == RuntimeAssignmentTerminalOutcome.Succeeded
-            ? RuntimeAssignmentAttemptState.Succeeded : RuntimeAssignmentAttemptState.Failed;
-        var current = assignment.CurrentAttempt! with
-        {
-            State = attemptState,
-            CompletedAt = completedAt,
-            TerminalEventId = command.EventId,
-            ErrorCode = cancelled ? null : command.ErrorCode
-        };
-        assignment = assignment with
-        {
-            State = assignmentState,
-            UpdatedAt = completedAt,
-            Attempts = assignment.Attempts.Take(assignment.Attempts.Count - 1).Append(current).ToArray()
-        };
-        Apply(document, assignment, document.OwnershipTokenDigest, null);
-        var runState = ToRunState(assignmentState);
-        if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
-        {
-            await SetRunStateAsync(context, assignment, runState, completedAt,
-                cancelled ? null : command.Response,
-                cancelled ? "Cancelled by the caller." : command.Error,
-                cancellationToken,
-                cancelled ? null : command.ErrorCode);
-            await AppendTerminalEventAsync(context, assignment, command.EventId, runState, completedAt,
-                cancelled ? "Run cancelled" : command.Error ?? "Run completed", cancellationToken);
-        }
-        await SaveAsync(context, cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return new RuntimeAssignmentTerminalResult(assignment, runState, false);
+            var document = await RequiredAsync(context, proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken);
+            var existing = Deserialize(document).Value;
+            if (existing.CurrentAttempt?.TerminalEventId == command.EventId)
+            {
+                ValidateTerminalReplay(document, proof, ownershipTokenDigest);
+                return new RuntimeAssignmentTerminalResult(existing, ToRunState(existing.State), true);
+            }
+            if (existing.State is RuntimeAssignmentState.Succeeded or RuntimeAssignmentState.Failed or RuntimeAssignmentState.Cancelled)
+                throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.TerminalConflict, "The assignment already has a different terminal outcome.");
+            var assignment = ValidateOwnership(document, proof, ownershipTokenDigest, completedAt);
+            var run = assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun
+                ? await RequiredRunAsync(context, assignment, cancellationToken)
+                : null;
+            var cancelled = assignment.CancellationRequestedAt is not null || run?.State == nameof(RuntimeRunState.Cancelled);
+            var assignmentState = cancelled ? RuntimeAssignmentState.Cancelled : command.Outcome == RuntimeAssignmentTerminalOutcome.Succeeded
+                ? RuntimeAssignmentState.Succeeded : RuntimeAssignmentState.Failed;
+            var attemptState = cancelled ? RuntimeAssignmentAttemptState.Interrupted : command.Outcome == RuntimeAssignmentTerminalOutcome.Succeeded
+                ? RuntimeAssignmentAttemptState.Succeeded : RuntimeAssignmentAttemptState.Failed;
+            var current = assignment.CurrentAttempt! with
+            {
+                State = attemptState,
+                CompletedAt = completedAt,
+                TerminalEventId = command.EventId,
+                ErrorCode = cancelled ? null : command.ErrorCode
+            };
+            assignment = assignment with
+            {
+                State = assignmentState,
+                UpdatedAt = completedAt,
+                Attempts = assignment.Attempts.Take(assignment.Attempts.Count - 1).Append(current).ToArray()
+            };
+            Apply(document, assignment, document.OwnershipTokenDigest, null);
+            var runState = ToRunState(assignmentState);
+            if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+            {
+                await SetRunStateAsync(context, assignment, runState, completedAt,
+                    cancelled ? null : command.Response,
+                    cancelled ? "Cancelled by the caller." : command.Error,
+                    cancellationToken,
+                    cancelled ? null : command.ErrorCode);
+                await AppendTerminalEventAsync(context, assignment, command.EventId, runState, completedAt,
+                    cancelled ? "Run cancelled" : command.Error ?? "Run completed", cancellationToken);
+            }
+            await SaveAsync(context, cancellationToken);
+            return new RuntimeAssignmentTerminalResult(assignment, runState, false);
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> ExpireLeasesAsync(
@@ -502,44 +507,44 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         int take,
         CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var documents = await context.WorkerAssignments
-            .Where(value => value.State == nameof(RuntimeAssignmentState.Assigned)
-                && value.LeaseExpiresAt != null && value.LeaseExpiresAt <= observedAt.UtcTicks)
-            .OrderBy(value => value.LeaseExpiresAt).Take(take).ToArrayAsync(cancellationToken);
-        var results = new List<RuntimeAssignmentTerminalResult>(documents.Length);
-        foreach (var document in documents)
+        return await ExecuteSerializableAsync(async context =>
         {
-            var assignment = Deserialize(document).Value;
-            var cancelled = assignment.CancellationRequestedAt is not null;
-            var current = assignment.CurrentAttempt! with
+            var documents = await context.WorkerAssignments
+                .Where(value => value.State == nameof(RuntimeAssignmentState.Assigned)
+                    && value.LeaseExpiresAt != null && value.LeaseExpiresAt <= observedAt.UtcTicks)
+                .OrderBy(value => value.LeaseExpiresAt).Take(take).ToArrayAsync(cancellationToken);
+            var results = new List<RuntimeAssignmentTerminalResult>(documents.Length);
+            foreach (var document in documents)
             {
-                State = RuntimeAssignmentAttemptState.Interrupted,
-                CompletedAt = observedAt,
-                ErrorCode = cancelled ? null : "worker_lost"
-            };
-            assignment = assignment with
-            {
-                State = cancelled ? RuntimeAssignmentState.Cancelled : RuntimeAssignmentState.Failed,
-                UpdatedAt = observedAt,
-                Attempts = assignment.Attempts.Take(assignment.Attempts.Count - 1).Append(current).ToArray()
-            };
-            Apply(document, assignment, null, null);
-            var runState = cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed;
-            if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
-            {
-                await SetRunStateAsync(context, assignment, runState, observedAt, null,
-                    cancelled ? "Cancelled by the caller." : "The Runtime Worker lease expired.", cancellationToken,
-                    cancelled ? null : "worker_lost");
-                await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
-                    cancelled ? "Run cancelled after Worker loss" : "Runtime Worker lost", cancellationToken);
+                var assignment = Deserialize(document).Value;
+                var cancelled = assignment.CancellationRequestedAt is not null;
+                var current = assignment.CurrentAttempt! with
+                {
+                    State = RuntimeAssignmentAttemptState.Interrupted,
+                    CompletedAt = observedAt,
+                    ErrorCode = cancelled ? null : "worker_lost"
+                };
+                assignment = assignment with
+                {
+                    State = cancelled ? RuntimeAssignmentState.Cancelled : RuntimeAssignmentState.Failed,
+                    UpdatedAt = observedAt,
+                    Attempts = assignment.Attempts.Take(assignment.Attempts.Count - 1).Append(current).ToArray()
+                };
+                Apply(document, assignment, null, null);
+                var runState = cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed;
+                if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+                {
+                    await SetRunStateAsync(context, assignment, runState, observedAt, null,
+                        cancelled ? "Cancelled by the caller." : "The Runtime Worker lease expired.", cancellationToken,
+                        cancelled ? null : "worker_lost");
+                    await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
+                        cancelled ? "Run cancelled after Worker loss" : "Runtime Worker lost", cancellationToken);
+                }
+                results.Add(new RuntimeAssignmentTerminalResult(assignment, runState, false));
             }
-            results.Add(new RuntimeAssignmentTerminalResult(assignment, runState, false));
-        }
-        await SaveAsync(context, cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return results;
+            await SaveAsync(context, cancellationToken);
+            return results;
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> InterruptSupersededSessionsAsync(
@@ -548,47 +553,64 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
         DateTimeOffset observedAt,
         CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var documents = await context.WorkerAssignments
-            .Where(value => value.State == nameof(RuntimeAssignmentState.Assigned)
-                && value.ActiveWorkerId == workerId.Value
-                && value.ActiveWorkerSessionId != activeSessionId.Value)
-            .ToArrayAsync(cancellationToken);
-        var results = new List<RuntimeAssignmentTerminalResult>();
-        foreach (var document in documents)
+        return await ExecuteSerializableAsync(async context =>
         {
-            var assignment = Deserialize(document).Value;
-            var attempt = assignment.CurrentAttempt;
-            if (attempt?.WorkerId != workerId || attempt.WorkerSessionId == activeSessionId) continue;
-            var cancelled = assignment.CancellationRequestedAt is not null;
-            var interrupted = attempt with
+            var documents = await context.WorkerAssignments
+                .Where(value => value.State == nameof(RuntimeAssignmentState.Assigned)
+                    && value.ActiveWorkerId == workerId.Value
+                    && value.ActiveWorkerSessionId != activeSessionId.Value)
+                .ToArrayAsync(cancellationToken);
+            var results = new List<RuntimeAssignmentTerminalResult>();
+            foreach (var document in documents)
             {
-                State = RuntimeAssignmentAttemptState.Interrupted,
-                CompletedAt = observedAt,
-                ErrorCode = cancelled ? null : "worker_lost"
-            };
-            assignment = assignment with
-            {
-                State = cancelled ? RuntimeAssignmentState.Cancelled : RuntimeAssignmentState.Failed,
-                UpdatedAt = observedAt,
-                Attempts = assignment.Attempts.Take(assignment.Attempts.Count - 1).Append(interrupted).ToArray()
-            };
-            Apply(document, assignment, null, null);
-            var runState = cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed;
-            if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
-            {
-                await SetRunStateAsync(context, assignment, runState, observedAt, null,
-                    cancelled ? "Cancelled by the caller." : "The Runtime Worker session was superseded.", cancellationToken,
-                    cancelled ? null : "worker_lost");
-                await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
-                    cancelled ? "Run cancelled after Worker session replacement" : "Runtime Worker session superseded", cancellationToken);
+                var assignment = Deserialize(document).Value;
+                var attempt = assignment.CurrentAttempt;
+                if (attempt?.WorkerId != workerId || attempt.WorkerSessionId == activeSessionId) continue;
+                var cancelled = assignment.CancellationRequestedAt is not null;
+                var interrupted = attempt with
+                {
+                    State = RuntimeAssignmentAttemptState.Interrupted,
+                    CompletedAt = observedAt,
+                    ErrorCode = cancelled ? null : "worker_lost"
+                };
+                assignment = assignment with
+                {
+                    State = cancelled ? RuntimeAssignmentState.Cancelled : RuntimeAssignmentState.Failed,
+                    UpdatedAt = observedAt,
+                    Attempts = assignment.Attempts.Take(assignment.Attempts.Count - 1).Append(interrupted).ToArray()
+                };
+                Apply(document, assignment, null, null);
+                var runState = cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed;
+                if (assignment.TargetKind == RuntimeAssignmentTargetKind.RuntimeRun)
+                {
+                    await SetRunStateAsync(context, assignment, runState, observedAt, null,
+                        cancelled ? "Cancelled by the caller." : "The Runtime Worker session was superseded.", cancellationToken,
+                        cancelled ? null : "worker_lost");
+                    await AppendTerminalEventAsync(context, assignment, Guid.NewGuid(), runState, observedAt,
+                        cancelled ? "Run cancelled after Worker session replacement" : "Runtime Worker session superseded", cancellationToken);
+                }
+                results.Add(new RuntimeAssignmentTerminalResult(assignment, runState, false));
             }
-            results.Add(new RuntimeAssignmentTerminalResult(assignment, runState, false));
-        }
-        await SaveAsync(context, cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return results;
+            await SaveAsync(context, cancellationToken);
+            return results;
+        }, cancellationToken);
+    }
+
+    private async Task<T> ExecuteSerializableAsync<T>(
+        Func<RuntimeRunDbContext, Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        await using var strategyContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var strategy = strategyContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var result = await operation(context);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        });
     }
 
     private static RuntimeWorkerAssignment ValidateOwnership(

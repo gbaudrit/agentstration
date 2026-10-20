@@ -34,6 +34,8 @@ public sealed class RuntimeWorkerAssignmentService(
     RuntimeAssignmentLeaseGuardRegistry leaseGuards,
     IRuntimeAssignmentProjection? configuredProjection = null)
 {
+    private const int MaximumEventPayloadLength = 2 * 1024 * 1024;
+
     private readonly IRuntimeAssignmentProjection projection = configuredProjection ?? new NullRuntimeAssignmentProjection();
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -280,9 +282,9 @@ public sealed class RuntimeWorkerAssignmentService(
         CancellationToken cancellationToken)
     {
         if (events.Any(value => string.IsNullOrWhiteSpace(value.Kind) || value.Kind.Length > 128
-            || value.Payload?.GetRawText().Length > 65_536))
+            || value.Payload?.GetRawText().Length > MaximumEventPayloadLength))
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded,
-                "Event kinds are limited to 128 characters and individual payloads to 64 KiB.");
+                "Event kinds are limited to 128 characters and individual payloads to 2 MiB.");
         var result = await assignments.AppendEventsAsync(proof, Digest(proof.OwnershipToken), events,
             timeProvider.GetUtcNow(), cancellationToken);
         var assignment = (await assignments.GetExactAsync(proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken))!.Value;

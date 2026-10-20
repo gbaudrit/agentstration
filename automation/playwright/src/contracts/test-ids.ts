@@ -326,6 +326,7 @@ export const TestIds = {
     flowCallExactVersion: 'flow-call-exact-version',
     runs: 'flow-observability-runs',
     runDetails: 'flow-observability-run-details',
+    runTokenUsage: 'flow-run-token-usage',
     agentRunner: 'flow-observability-agent-runner',
     agentRunPrompt: 'agent-run-prompt',
     agentRunSubmit: 'agent-run-submit',

@@ -11,6 +11,8 @@ public sealed class RuntimeWorkerExecutionService(
     RuntimeWorkerLeaseOptions leaseOptions,
     RuntimeAssignmentLeaseGuardRegistry leaseGuards)
 {
+    private const int MaximumToolArgumentsLength = 2 * 1024 * 1024;
+
     public async Task<RuntimeExecutionMaterial> GetMaterialAsync(
         RuntimeAssignmentOwnershipProof proof,
         CancellationToken cancellationToken)
@@ -108,11 +110,10 @@ public sealed class RuntimeWorkerExecutionService(
         Guid turnId,
         Guid turnAttemptId,
         IReadOnlyList<RuntimeGovernedModelMessage> messages,
+        IReadOnlyList<RuntimeGovernedModelTool> tools,
         CancellationToken cancellationToken)
     {
-        if (messages.Count is < 1 or > 256 || ModelPayloadLength(messages) > 1_048_576)
-            throw new RuntimeExecutionMaterialException("model_request_too_large",
-                "A model request must contain between 1 and 256 messages and cannot exceed 1 MiB.");
+        ValidateModelRequest(messages, tools);
         var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(proof, participantId, turnId, cancellationToken);
         _ = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId
             && value.AttemptId == turnAttemptId && string.Equals(value.ParticipantId, participantId, StringComparison.Ordinal))
@@ -122,7 +123,7 @@ public sealed class RuntimeWorkerExecutionService(
             ? direct.Execution
             : new RuntimeExecutionOptions();
         return await operations.InvokeModelAsync(new RuntimeGovernedModelRequest(
-            agent, messages, options, material.TenantId, material.WorkspaceId, material.PrincipalId)
+            agent, messages, tools, options, material.TenantId, material.WorkspaceId, material.PrincipalId)
         {
             ExecutionScopeRef = material.ScopeRef
         }, lease.Token);
@@ -134,11 +135,10 @@ public sealed class RuntimeWorkerExecutionService(
         Guid turnId,
         Guid turnAttemptId,
         IReadOnlyList<RuntimeGovernedModelMessage> messages,
+        IReadOnlyList<RuntimeGovernedModelTool> tools,
         CancellationToken cancellationToken)
     {
-        if (messages.Count is < 1 or > 256 || ModelPayloadLength(messages) > 1_048_576)
-            throw new RuntimeExecutionMaterialException("model_request_too_large",
-                "A model request must contain between 1 and 256 messages and cannot exceed 1 MiB.");
+        ValidateModelRequest(messages, tools);
         var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(
             proof, participantId, turnId, cancellationToken);
         _ = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId
@@ -152,7 +152,7 @@ public sealed class RuntimeWorkerExecutionService(
                 ? direct.Execution
                 : new RuntimeExecutionOptions();
             var stream = operations.StreamModelAsync(new RuntimeGovernedModelRequest(
-                agent, messages, options, material.TenantId, material.WorkspaceId, material.PrincipalId)
+                agent, messages, tools, options, material.TenantId, material.WorkspaceId, material.PrincipalId)
             {
                 ExecutionScopeRef = material.ScopeRef
             }, lease.Token);
@@ -175,8 +175,8 @@ public sealed class RuntimeWorkerExecutionService(
         JsonElement? arguments,
         CancellationToken cancellationToken)
     {
-        if (arguments?.GetRawText().Length > 1_048_576)
-            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 1 MiB.");
+        if (arguments?.GetRawText().Length > MaximumToolArgumentsLength)
+            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 2 MiB.");
         var (authorization, material, agent) = await AuthorizeParticipantSideEffectAsync(proof, participantId, turnId, cancellationToken);
         var turn = authorization.Assignment.Turns.SingleOrDefault(value => value.Id == turnId
             && value.AttemptId == turnAttemptId && string.Equals(value.ParticipantId, participantId, StringComparison.Ordinal))
@@ -211,8 +211,8 @@ public sealed class RuntimeWorkerExecutionService(
         JsonElement arguments,
         CancellationToken cancellationToken)
     {
-        if (arguments.GetRawText().Length > 1_048_576)
-            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 1 MiB.");
+        if (arguments.GetRawText().Length > MaximumToolArgumentsLength)
+            throw new RuntimeExecutionMaterialException("tool_arguments_too_large", "Tool arguments cannot exceed 2 MiB.");
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
         if (authorization.Assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
             throw new RuntimeExecutionMaterialException("flow_tool_not_allowed", "Only a Flow assignment can invoke a Flow Tool.");
@@ -369,6 +369,24 @@ public sealed class RuntimeWorkerExecutionService(
             RuntimeGovernedModelToolResult result => (long)result.CallId.Length + result.Result.GetRawText().Length,
             _ => 0L
         });
+
+    private static void ValidateModelRequest(
+        IReadOnlyList<RuntimeGovernedModelMessage> messages,
+        IReadOnlyList<RuntimeGovernedModelTool> tools)
+    {
+        if (messages.Count is < 1 or > 256 || tools.Count > 128
+            || ModelPayloadLength(messages) + tools.Sum(tool =>
+                (long)tool.Name.Length + (tool.Description?.Length ?? 0) + tool.Parameters.GetRawText().Length) > 1_048_576)
+            throw new RuntimeExecutionMaterialException("model_request_too_large",
+                "A model request must contain between 1 and 256 messages, at most 128 Tools, and cannot exceed 1 MiB.");
+        if (tools.Any(tool => string.IsNullOrWhiteSpace(tool.Name) || tool.Name.Length > 128
+            || tool.Description?.Length > 4096 || tool.Parameters.ValueKind != JsonValueKind.Object))
+            throw new RuntimeExecutionMaterialException("model_tool_invalid",
+                "Model Tool declarations require a bounded name, description, and object parameters schema.");
+        if (tools.Select(tool => tool.Name).Distinct(StringComparer.Ordinal).Count() != tools.Count)
+            throw new RuntimeExecutionMaterialException("model_tool_duplicate",
+                "Model Tool declaration names must be unique.");
+    }
 
     private static async IAsyncEnumerable<RuntimeGovernedModelUpdate> GuardStream(
         IAsyncEnumerable<RuntimeGovernedModelUpdate> stream,

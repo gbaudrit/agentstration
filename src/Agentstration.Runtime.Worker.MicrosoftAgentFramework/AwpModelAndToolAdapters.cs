@@ -34,7 +34,7 @@ internal sealed class AwpModelChatClient(
     {
         await session.EnsureCanStartMutationAsync(cancellationToken);
         var request = new AwpInvokeModelRequest(session.Context, agent.ParticipantId, turn.TurnId,
-            turn.Attempt.TurnAttemptId, messages.Select(ToContract).ToArray());
+            turn.Attempt.TurnAttemptId, messages.Select(ToContract).ToArray(), ToContract(options));
         var response = await session.Client.InvokeModelAsync(request, cancellationToken);
         responseModelId = response.ModelId;
         responseProviderType = response.ProviderType;
@@ -42,10 +42,11 @@ internal sealed class AwpModelChatClient(
         return new ChatResponse(new ChatMessage(ChatRole.Assistant, contents))
         {
             ModelId = response.ModelId,
-            Usage = response.InputTokens is null && response.OutputTokens is null ? null : new UsageDetails
+            Usage = response.InputTokens is null && response.OutputTokens is null && response.TotalTokens is null ? null : new UsageDetails
             {
                 InputTokenCount = response.InputTokens,
-                OutputTokenCount = response.OutputTokens
+                OutputTokenCount = response.OutputTokens,
+                TotalTokenCount = response.TotalTokens
             }
         };
     }
@@ -55,7 +56,7 @@ internal sealed class AwpModelChatClient(
     {
         await session.EnsureCanStartMutationAsync(cancellationToken);
         var request = new AwpInvokeModelRequest(session.Context, agent.ParticipantId, turn.TurnId,
-            turn.Attempt.TurnAttemptId, messages.Select(ToContract).ToArray());
+            turn.Attempt.TurnAttemptId, messages.Select(ToContract).ToArray(), ToContract(options));
         var calls = new Dictionary<string, ToolCallBuffer>(StringComparer.Ordinal);
         await foreach (var streamEvent in session.Client.StreamModelAsync(request, cancellationToken))
         {
@@ -93,7 +94,8 @@ internal sealed class AwpModelChatClient(
                         [new UsageContent(new UsageDetails
                         {
                             InputTokenCount = usage.InputTokens,
-                            OutputTokenCount = usage.OutputTokens
+                            OutputTokenCount = usage.OutputTokens,
+                            TotalTokenCount = usage.TotalTokens
                         })]);
                     break;
                 case AwpModelStreamCompleted completed:
@@ -124,6 +126,11 @@ internal sealed class AwpModelChatClient(
             : message.Role == ChatRole.Assistant ? "assistant"
             : message.Role == ChatRole.Tool ? "tool" : "user",
         message.Contents.Select(ToContract).Where(content => content is not null).Cast<AwpModelContent>().ToArray());
+
+    private static AwpModelTool[] ToContract(ChatOptions? options) => options?.Tools?
+        .OfType<AIFunctionDeclaration>()
+        .Select(tool => new AwpModelTool(tool.Name, tool.Description, tool.JsonSchema.Clone()))
+        .ToArray() ?? [];
 
     private static AwpModelContent? ToContract(AIContent content) => content switch
     {

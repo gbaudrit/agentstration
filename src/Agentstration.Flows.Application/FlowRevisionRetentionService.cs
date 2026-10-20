@@ -7,8 +7,12 @@ public sealed class FlowRevisionRetentionService(
     IFlowRepository repository,
     IFlowRunCancellationRegistry cancellations,
     IFlowRunEventSink eventSink,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null)
 {
+    private readonly FlowRunTokenUsageConsolidator tokenUsageConsolidator =
+        configuredTokenUsageConsolidator ?? new(repository);
+
     public async Task<FlowRevisionUsage> GetUsageAsync(string revisionId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(revisionId);
@@ -45,8 +49,15 @@ public sealed class FlowRevisionRetentionService(
     public async Task<FlowRevisionUsage> ForceTerminateAsync(string revisionId, CancellationToken cancellationToken)
     {
         var usage = await GetUsageAsync(revisionId, cancellationToken);
+        var activeRuns = new List<(StoredFlowRun Run, FlowRevisionRunImpact Impact)>();
         foreach (var impact in usage.ActiveRuns)
         {
+            var active = await repository.GetRunExactAsync(impact.ScopeRef, impact.RunId, cancellationToken);
+            if (active is not null && !active.Value.Status.IsTerminal()) activeRuns.Add((active, impact));
+        }
+        foreach (var candidate in activeRuns.OrderByDescending(value => value.Run.Value.NestingDepth))
+        {
+            var impact = candidate.Impact;
             cancellations.Cancel(new FlowRunKey(impact.ScopeRef, impact.RunId));
             try
             {
@@ -60,7 +71,7 @@ public sealed class FlowRevisionRetentionService(
                 var steps = stored.Value.Steps.Select(step => step.Status is FlowStepRunStatus.NotStarted or FlowStepRunStatus.Running
                     ? step with { Status = FlowStepRunStatus.Cancelled, CompletedAt = now, Error = error }
                     : step).ToArray();
-                await repository.UpdateRunAsync(stored.Value with
+                var terminal = stored.Value with
                 {
                     Status = FlowRunStatus.Cancelled,
                     CompletedAt = now,
@@ -68,7 +79,12 @@ public sealed class FlowRevisionRetentionService(
                     Steps = steps,
                     ExecutionLeaseId = null,
                     ExecutionLeaseExpiresAt = null
-                }, stored.ETag, cancellationToken);
+                };
+                terminal = terminal with
+                {
+                    TokenUsage = await tokenUsageConsolidator.FinalizeAsync(terminal, cancellationToken)
+                };
+                await repository.UpdateRunAsync(terminal, stored.ETag, cancellationToken);
                 foreach (var input in await repository.ListInputRequestsExactAsync(impact.ScopeRef, impact.RunId, InputRequestStatus.Pending, cancellationToken))
                     await repository.UpdateInputRequestAsync(input.Value with { Status = InputRequestStatus.Cancelled }, input.ETag, cancellationToken);
                 var runEvent = await repository.AppendRunEventAsync(new FlowRunEvent(

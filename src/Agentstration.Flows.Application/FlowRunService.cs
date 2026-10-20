@@ -190,7 +190,8 @@ public sealed partial class FlowRunService(
     IFlowInputRequestSink? inputRequestSink = null,
     IEnumerable<IFlowRunDeletionGuard>? configuredRunDeletionGuards = null,
     IFlowStepArtifactCapture? configuredArtifactCapture = null,
-    FlowService? flowDefinitions = null)
+    FlowService? flowDefinitions = null,
+    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
@@ -207,6 +208,8 @@ public sealed partial class FlowRunService(
     private readonly IFlowStepArtifactCapture artifactCapture =
         configuredArtifactCapture ?? UnsupportedFlowStepArtifactCapture.Instance;
     private readonly FlowService? flowDefinitions = flowDefinitions;
+    private readonly FlowRunTokenUsageConsolidator tokenUsageConsolidator =
+        configuredTokenUsageConsolidator ?? new(repository);
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flows");
     public static readonly Meter Meter = new("Agentstration.Flows");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");

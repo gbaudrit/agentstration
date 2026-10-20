@@ -519,7 +519,12 @@ public sealed class AwpAssignmentExecutorTests
             ],
             Transitions = [new("answer-output", "answer", "success", "output")]
         };
-        var agent = AgentMaterial() with { AgentName = "assistant", Generation = 3 };
+        var agent = AgentMaterial() with
+        {
+            AgentName = "assistant",
+            Generation = 3,
+            Tools = [ToolMaterial("lookup")]
+        };
 
         var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }),
             agentMaterial: agent);
@@ -528,6 +533,7 @@ public sealed class AwpAssignmentExecutorTests
         Assert.AreEqual("agent", handler.CaptureRequest?.Provenance["invocationKind"]);
         Assert.AreEqual("assistant", handler.CaptureRequest?.Provenance["agentResourceId"]);
         Assert.AreEqual("3", handler.CaptureRequest?.Provenance["agentVersion"]);
+        Assert.AreEqual("lookup", handler.ModelRequests.Single().Tools?.Single().Name);
         Assert.IsEmpty(handler.CleanupRequests);
     }
 
@@ -586,7 +592,8 @@ public sealed class AwpAssignmentExecutorTests
         var researcher = AgentMaterial() with
         {
             ParticipantId = "researcher",
-            AgentName = "researcher"
+            AgentName = "researcher",
+            Tools = [ToolMaterial("research")]
         };
         var reviewer = AgentMaterial() with
         {
@@ -620,6 +627,7 @@ public sealed class AwpAssignmentExecutorTests
         CollectionAssert.AreEqual(new[] { "researcher", "reviewer" },
             handler.ModelRequests.Select(value => value.ParticipantId).ToArray());
         Assert.IsTrue(material.Agents.All(value => value.ModelProfileName == "default-reasoning"));
+        Assert.AreEqual("research", handler.ModelRequests[0].Tools?.Single().Name);
         CollectionAssert.AreEquivalent(new[] { "Input", "researcher", "reviewer", "Output" },
             handler.Events.Where(value => value.Kind == AwpExecutionEventKind.StepCompleted)
                 .Select(value => value.Location.FlowStep?.StepDefinitionId).ToArray());
@@ -768,6 +776,7 @@ public sealed class AwpAssignmentExecutorTests
         Assert.AreEqual("Deterministic", completed.Payload?.GetProperty("provider").GetString());
         Assert.AreEqual(12, completed.Payload?.GetProperty("usage").GetProperty("inputTokens").GetInt32());
         Assert.AreEqual(4, completed.Payload?.GetProperty("usage").GetProperty("outputTokens").GetInt32());
+        Assert.AreEqual(16, completed.Payload?.GetProperty("usage").GetProperty("totalTokens").GetInt32());
         var diagnostic = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.Diagnostic
             && value.Location.FlowStep?.StepDefinitionId == "Agent");
         Assert.AreEqual("deterministic", diagnostic.Payload?.GetProperty("model").GetString());
@@ -1261,6 +1270,10 @@ public sealed class AwpAssignmentExecutorTests
         "agent-material", "agent", Guid.NewGuid(), "echo-agent", 1, "revision", "sha256:agent",
         "prompt-agent", "Echo agent", "Echo agent", "Return an answer.", "default-reasoning", "default", []);
 
+    private static AwpExecutionToolMaterial ToolMaterial(string name) => new(
+        $"tool-{name}", "default", name, $"Invoke {name}.",
+        JsonSerializer.SerializeToElement(new { type = "object" }), null, false);
+
     private sealed class GraphHandler(DateTimeOffset now) : HttpMessageHandler
     {
         public List<AwpExecutionEvent> Events { get; } = [];
@@ -1374,7 +1387,7 @@ public sealed class AwpAssignmentExecutorTests
             var request = Payload<AwpInvokeModelRequest>(bytes);
             ModelRequests.Add(request);
             return new(now, [new AwpModelTextContent(ModelOutput)], "deterministic", "stop", 12, 4,
-                "Deterministic");
+                "Deterministic", 16);
         }
 
         private HttpResponseMessage StreamModel(byte[] bytes, Guid messageId)
@@ -1398,7 +1411,7 @@ public sealed class AwpAssignmentExecutorTests
                 if (midpoint < ModelOutput.Length)
                     events.Add(new AwpModelTextDelta(streamId, events.Count, now, ModelOutput[midpoint..],
                         "deterministic", "Deterministic"));
-                events.Add(new AwpModelUsage(streamId, events.Count, now, 12, 4));
+                events.Add(new AwpModelUsage(streamId, events.Count, now, 12, 4, 16));
                 events.Add(new AwpModelStreamCompleted(streamId, events.Count, now,
                     "deterministic", "Deterministic", "stop"));
             }

@@ -53,7 +53,26 @@ public sealed record FlowRunEvent(ResourceScopeRef ScopeRef, string RunId, long 
         ? new WorkspaceId(ScopeRef.TargetId!.Value)
         : default;
 }
-public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null);
+public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null, int? TotalTokens = null);
+public enum FlowRunTokenUsageState { Collecting, Final }
+public enum FlowRunTokenUsageCoverage { Complete, Partial, Unavailable }
+public sealed record FlowRunTokenUsageTotal(
+    long? InputTokens,
+    long? OutputTokens,
+    long? TotalTokens,
+    FlowRunTokenUsageCoverage Coverage,
+    int ReportedInvocationCount,
+    int InvocationCount);
+public sealed record FlowRunTokenUsage(
+    FlowRunTokenUsageState State,
+    FlowRunTokenUsageTotal Direct,
+    FlowRunTokenUsageTotal Inclusive)
+{
+    private static readonly FlowRunTokenUsageTotal Empty = new(null, null, null,
+        FlowRunTokenUsageCoverage.Unavailable, 0, 0);
+
+    public static FlowRunTokenUsage Initial { get; } = new(FlowRunTokenUsageState.Collecting, Empty, Empty);
+}
 public sealed record FlowStepArtifactReference(
     string ArtifactId,
     string FileName,
@@ -159,6 +178,7 @@ public sealed record FlowRun
     public FlowRunError? Error { get; init; }
     public required FlowVersion DefinitionSnapshot { get; init; }
     public IReadOnlyList<FlowStepRun> Steps { get; init; } = [];
+    public FlowRunTokenUsage TokenUsage { get; init; } = FlowRunTokenUsage.Initial;
     public IReadOnlyList<RuntimeExecutionBinding> RuntimeBindings { get; init; } = [];
     public DurableRuntimeStateReference? RuntimeState { get; init; }
     public string? ExecutionLeaseId { get; init; }
