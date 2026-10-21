@@ -126,7 +126,7 @@ public sealed class FlowDetailsDesignerTests
 
         Assert.HasCount(0, rendered.FindAll(".page-header .flow-header-designer"));
         CollectionAssert.AreEqual(
-            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Runs"].Value, strings["Tab.Deployments"].Value, strings["Tab.YAML"].Value },
+            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Runs"].Value, strings["Tab.Deployments"].Value, strings["Tab.Access"].Value, strings["Tab.YAML"].Value },
             rendered.FindAll("nav.section-tabs button").Select(button => button.TextContent.Trim()).ToArray());
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
 
@@ -425,7 +425,7 @@ public sealed class FlowDetailsDesignerTests
             Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition,
                 new Dictionary<string, string>(), FlowClientStub.Now),
             TokenUsage = new(
                 FlowRunTokenUsageState.Final,

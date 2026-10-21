@@ -227,9 +227,9 @@ public sealed class KnowledgeSourceEditorTests
         rendered.WaitForAssertion(() =>
         {
             var tabs = rendered.FindAll("[role='tab']");
-            Assert.HasCount(7, tabs);
+            Assert.HasCount(8, tabs);
             CollectionAssert.AreEqual(
-                new[] { "Overview", "Definition", "Projections", "Snapshots", "Retrieval", "Tools", "YAML" },
+                new[] { "Overview", "Definition", "Projections", "Snapshots", "Retrieval", "Tools", "Access", "YAML" },
                 tabs.Select(tab => tab.TextContent).ToArray());
             Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-source-overview-tab']").GetAttribute("aria-selected"));
             Assert.HasCount(1, rendered.FindAll(".metric-grid"));
@@ -388,7 +388,7 @@ public sealed class KnowledgeSourceEditorTests
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
 
-        rendered.WaitForAssertion(() => Assert.HasCount(7, rendered.FindAll("[role='tab']")));
+        rendered.WaitForAssertion(() => Assert.HasCount(8, rendered.FindAll("[role='tab']")));
         rendered.Find("[data-testid='knowledge-source-definition-tab']").Click();
         rendered.WaitForAssertion(() =>
         {

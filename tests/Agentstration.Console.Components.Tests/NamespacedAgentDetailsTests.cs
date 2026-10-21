@@ -52,7 +52,7 @@ public sealed class NamespacedAgentDetailsTests
             .Add(component => component.Name, "concierge"));
 
         Assert.AreEqual(FakeManagementClient.PackNamespace, agents.RequestedNamespace);
-        CollectionAssert.AreEqual(new[] { "Overview", "Definition", "Model", "Runtime", "YAML" }, rendered.FindAll("[role='tab']").Select(tab => tab.TextContent.Trim()).ToArray());
+        CollectionAssert.AreEqual(new[] { "Overview", "Definition", "Model", "Runtime", "Access", "YAML" }, rendered.FindAll("[role='tab']").Select(tab => tab.TextContent.Trim()).ToArray());
         Assert.AreEqual("true", rendered.Find("#agent-overview-tab").GetAttribute("aria-selected"));
         Assert.AreEqual(4, rendered.FindAll(".namespaced-agent-metrics .metric-card").Count);
         Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("Model profile", StringComparison.Ordinal));

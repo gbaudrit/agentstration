@@ -10,6 +10,7 @@
   <data name="Tab.Designer"><value>Designer</value></data>
   <data name="Tab.Runs"><value>Runs</value></data>
   <data name="Tab.Deployments"><value>Deployments</value></data>
+  <data name="Tab.Access"><value>Access</value></data>
   <data name="CurrentVersion"><value>Current version</value></data>
   <data name="NotPublished"><value>Not published</value></data>
   <data name="ActiveVersion"><value>Active {0}</value></data>

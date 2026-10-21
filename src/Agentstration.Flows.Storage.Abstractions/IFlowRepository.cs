@@ -15,6 +15,7 @@ public interface IFlowRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredFlow> CreateAsync(FlowResource resource, CancellationToken cancellationToken);
+    Task<StoredFlow?> GetByUidAsync(Guid uid, CancellationToken cancellationToken);
     Task<StoredFlow?> GetExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken);
     Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, int skip, int take, CancellationToken cancellationToken);
     Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken);

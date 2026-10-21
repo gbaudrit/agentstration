@@ -136,7 +136,7 @@ public sealed partial class FlowRunService
         var targetId = call.Flow.Resolve(parent.FlowId.Namespace);
         var requestedVersion = call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? call.Flow.Version : null;
         var resolved = await ResolveVersionAsync(parent.Scope.ScopeRef, targetId, requestedVersion,
-            call.Flow.ScopeRef ?? parent.DefinitionScopeRef, cancellationToken);
+            call.Flow.ScopeRef, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, input);
         var now = timeProvider.GetUtcNow();
         var child = new FlowRun

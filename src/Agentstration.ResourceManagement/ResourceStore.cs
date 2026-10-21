@@ -27,6 +27,68 @@ public sealed record ResourceIdentitySnapshot(
     string? Version,
     string ETag);
 
+public interface IResourceIdentityContributor
+{
+    Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(Guid uid, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ResourceInventoryEntry>> ListExactInventoryAsync(
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken);
+}
+
+public interface IResourceIdentityCatalog
+{
+    Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(Guid uid, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ResourceInventoryEntry>> ListExactInventoryAsync(
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken);
+}
+
+public sealed class ResourceIdentityCatalog(
+    IResourceStore resources,
+    IEnumerable<IResourceIdentityContributor> contributors) : IResourceIdentityCatalog
+{
+    public async Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(
+        Guid uid,
+        CancellationToken cancellationToken)
+    {
+        var matches = new List<ResourceIdentitySnapshot>();
+        var managed = await resources.GetIdentityByUidAsync(uid, cancellationToken);
+        if (managed is not null) matches.Add(managed);
+        foreach (var contributor in contributors)
+        {
+            var candidate = await contributor.GetIdentityByUidAsync(uid, cancellationToken);
+            if (candidate is not null) matches.Add(candidate);
+        }
+        return matches.Count switch
+        {
+            0 => null,
+            1 => matches[0],
+            _ => throw new InvalidOperationException($"Resource UID '{uid:D}' is not unique across resource families.")
+        };
+    }
+
+    public async Task<IReadOnlyList<ResourceInventoryEntry>> ListExactInventoryAsync(
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken)
+    {
+        const int pageSize = 500;
+        var result = new List<ResourceInventoryEntry>();
+        while (true)
+        {
+            var page = await resources.ListExactInventoryAsync(scopeRef, result.Count, pageSize, cancellationToken);
+            result.AddRange(page);
+            if (page.Count < pageSize) break;
+        }
+        foreach (var contributor in contributors)
+            result.AddRange(await contributor.ListExactInventoryAsync(scopeRef, cancellationToken));
+        return result
+            .OrderBy(value => value.Namespace.Value, StringComparer.Ordinal)
+            .ThenBy(value => value.Kind, StringComparer.Ordinal)
+            .ThenBy(value => value.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+}
+
 public interface IResourceStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);

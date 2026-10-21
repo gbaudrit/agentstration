@@ -149,6 +149,8 @@ public static class DependencyInjection
             provider.GetRequiredService<IMasterKeyProvider>()));
         services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<DescendantResourceUseAuthorizer>();
+        services.AddSingleton<IResourceIdentityContributor, FlowResourceIdentityContributor>();
+        services.AddSingleton<IResourceIdentityCatalog, ResourceIdentityCatalog>();
         services.AddSingleton<ResourceAccessPolicyService>();
         services.AddSingleton<IResourceAccessPolicyService>(provider => provider.GetRequiredService<ResourceAccessPolicyService>());
         services.AddSingleton<ParameterManagementService>();

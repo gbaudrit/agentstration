@@ -66,4 +66,5 @@
   <data name="UnknownMediaType" xml:space="preserve"><value>Type de média inconnu</value></data>
   <data name="AcquisitionTarget" xml:space="preserve"><value>Cible d’acquisition</value></data>
   <data name="SelectAcquisitionTarget" xml:space="preserve"><value>Sélectionner une cible d’acquisition</value></data>
+  <data name="Tab.Access" xml:space="preserve"><value>Accès</value></data>
 </root>

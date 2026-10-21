@@ -49,4 +49,6 @@
   <data name="CreatedNotification"><value>Profil d’exécution créé</value></data>
   <data name="UpdatedNotification"><value>Profil d’exécution mis à jour</value></data>
   <data name="ProfileUsedError"><value>Ce profil est utilisé par {0}.</value></data>
+  <data name="Definition"><value>Définition</value></data>
+  <data name="Access"><value>Accès</value></data>
 </root>

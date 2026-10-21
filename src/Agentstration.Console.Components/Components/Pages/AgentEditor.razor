@@ -33,7 +33,7 @@ else
             <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
             <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button></Actions>
         </ResourceHeader>
-        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode && !accessMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(accessMode ? "active" : null)" data-testid="agent-access-tab" @onclick="ShowAccess">@T("Access")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
                 <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
@@ -65,7 +65,11 @@ else
         <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
     }
 
-    @if (sourceMode)
+    @if (accessMode && selectedScope is { } ownerScope)
+    {
+        <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="AgentResourceNamespace" Kind="@AgentResourceKinds.Agent" Name="@model.Name" Generation="generation" Governance="governance" />
+    }
+    else if (sourceMode)
     {
         <section class="panel form-section" data-testid="agent-yaml-editor">
             <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("AgentYaml")</h2><p>@T("AgentYamlHelp")</p></div></div>
@@ -174,8 +178,10 @@ else
     private bool applyRuntimeOnSubmit = true;
     private bool sourceMode;
     private bool toolsMode;
+    private bool accessMode;
     private bool interactive;
     private ResourceScopeRef? selectedScope;
+    private ResourceGovernance governance = ResourceGovernance.User;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace AgentResourceNamespace => string.IsNullOrWhiteSpace(AgentNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(AgentNamespace);
     private string OverviewUrl => AgentResourceNamespace.IsDefault
@@ -244,6 +250,7 @@ else
                 etag = snapshot.ETag;
                 resourceId = snapshot.Value.Uid.ToString("D");
                 generation = snapshot.Value.Generation;
+                governance = snapshot.Value.Governance;
                 provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
                 await LoadAgentModelAsync(Name!);
                 await LoadReadinessAsync(Name!, generation);
@@ -279,15 +286,16 @@ else
     }
 
     private void MarkDirty(EventArgs _) => isDirty = true;
-    private void ShowDefinition() => (sourceMode, toolsMode) = (false, false);
-    private void ShowTools() => (sourceMode, toolsMode) = (false, true);
+    private void ShowDefinition() => (sourceMode, toolsMode, accessMode) = (false, false, false);
+    private void ShowTools() => (sourceMode, toolsMode, accessMode) = (false, true, false);
+    private void ShowAccess() => (sourceMode, toolsMode, accessMode) = (false, false, true);
     private void ShowSource()
     {
         if (model is null) return;
         rawError = null;
         try { rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest()); }
         catch (Exception exception) { rawError = exception.Message; }
-        (sourceMode, toolsMode) = (true, false);
+        (sourceMode, toolsMode, accessMode) = (true, false, false);
     }
 
     private bool ApplyRawYaml()
@@ -466,6 +474,7 @@ else
             etag = snapshot.ETag;
             resourceId = snapshot.Value.Uid.ToString("D");
             generation = snapshot.Value.Generation;
+            governance = snapshot.Value.Governance;
             provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
             model = AgentEditorModel.FromResource(snapshot.Value);
             isDirty = false;

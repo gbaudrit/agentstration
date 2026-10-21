@@ -160,6 +160,10 @@ else if (source is not null && readiness is not null)
         }
         </section>
     }
+    else if (activeTab == DetailsTab.Access)
+    {
+        <ResourceAccessPanel OwnerScopeRef="@(source.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="source.Namespace" Kind="@KnowledgeResourceKinds.KnowledgeSource" Name="@source.Name" Generation="source.Generation" Governance="source.Governance" />
+    }
     else
     {
         <section class="panel form-section" data-testid="knowledge-source-yaml">
@@ -194,7 +198,7 @@ else if (source is not null && readiness is not null)
     private JsonElement projectionParameters = JsonSerializer.SerializeToElement(new { });
     private string? etag, error, message, rawError;
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
-    private static readonly IReadOnlyList<DetailsTab> VisibleTabs = [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, DetailsTab.Yaml];
+    private static readonly IReadOnlyList<DetailsTab> VisibleTabs = [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, DetailsTab.Access, DetailsTab.Yaml];
     private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
         ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
         : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
@@ -240,6 +244,7 @@ else if (source is not null && readiness is not null)
                 "snapshots" => DetailsTab.Snapshots,
                 "retrieval" => DetailsTab.Retrieval,
                 "tools" => DetailsTab.Tools,
+                "access" => DetailsTab.Access,
                 "yaml" => DetailsTab.Yaml,
                 _ => activeTab
             };
@@ -428,6 +433,6 @@ else if (source is not null && readiness is not null)
         public required ResourceMetadata Metadata { get; init; }
         public required KnowledgeSourceProperties Definition { get; init; }
     }
-    private enum DetailsTab { Overview, Definition, Projections, Snapshots, Retrieval, Tools, Yaml }
+    private enum DetailsTab { Overview, Definition, Projections, Snapshots, Retrieval, Tools, Access, Yaml }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
