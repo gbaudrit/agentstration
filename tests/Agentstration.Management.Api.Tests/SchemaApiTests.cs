@@ -84,36 +84,36 @@ public sealed class SchemaApiTests : ModelManagementApiTestBase
 
         var missing = await Assert.ThrowsAsync<SchemaBindingResolutionException>(async () =>
             await bindings.ResolveAsync("$.inputSchema", new SchemaBinding
+            {
+                Reference = new()
                 {
-                    Reference = new()
-                    {
-                        Name = "flow-input",
-                        Version = "9.9.9",
-                        ScopeRef = workspaceScope
-                    }
-                }, new(workspaceScope, ResourceNamespace.Default, SchemaFormatIds.JsonSchema), default));
+                    Name = "flow-input",
+                    Version = "9.9.9",
+                    ScopeRef = workspaceScope
+                }
+            }, new(workspaceScope, ResourceNamespace.Default, SchemaFormatIds.JsonSchema), default));
         Assert.AreEqual("schema_version_not_found", missing.Code);
 
         var incompatible = await Assert.ThrowsAsync<SchemaBindingResolutionException>(async () =>
             await bindings.ResolveAsync("$.inputSchema", new SchemaBinding
+            {
+                Inline = new()
                 {
-                    Inline = new()
-                    {
-                        Format = "xml-schema",
-                        Content = JsonDocument.Parse("{}").RootElement.Clone()
-                    }
-                }, new(workspaceScope, ResourceNamespace.Default, SchemaFormatIds.JsonSchema), default));
+                    Format = "xml-schema",
+                    Content = JsonDocument.Parse("{}").RootElement.Clone()
+                }
+            }, new(workspaceScope, ResourceNamespace.Default, SchemaFormatIds.JsonSchema), default));
         Assert.AreEqual("schema_format_incompatible", incompatible.Code);
 
         var unavailable = await Assert.ThrowsAsync<SchemaBindingResolutionException>(async () =>
             await bindings.ResolveAsync("$.inputSchema", new SchemaBinding
+            {
+                Inline = new()
                 {
-                    Inline = new()
-                    {
-                        Format = "unavailable-format",
-                        Content = JsonDocument.Parse("{}").RootElement.Clone()
-                    }
-                }, new(workspaceScope, ResourceNamespace.Default, "unavailable-format"), default));
+                    Format = "unavailable-format",
+                    Content = JsonDocument.Parse("{}").RootElement.Clone()
+                }
+            }, new(workspaceScope, ResourceNamespace.Default, "unavailable-format"), default));
         Assert.AreEqual("schema_format_unavailable", unavailable.Code);
     }
 
