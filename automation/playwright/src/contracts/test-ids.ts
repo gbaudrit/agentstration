@@ -203,6 +203,7 @@ export const TestIds = {
     add: 'resource-access-add',
     remove: 'resource-access-remove',
     save: 'resource-access-save',
+    saved: 'resource-access-saved',
     invalidTarget: 'resource-access-invalid-target',
   },
   secretGrants: {

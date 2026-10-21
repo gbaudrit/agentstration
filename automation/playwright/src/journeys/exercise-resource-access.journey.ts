@@ -22,8 +22,8 @@ export const exerciseResourceAccess: Journey<ExerciseResourceAccessInput> = asyn
 
   await context.pages.login.signIn(context.consoleUrl, input.username, input.password);
   const toolName = input.managedToolName ?? await access.ensureManagedUtilitiesTool(context.consoleUrl);
-  await workspaces.selectByName(input.authorizedWorkspaceName);
-  const authorizedScope = await currentWorkspaceScope(context.pages.page);
+  const authorizedWorkspaceId = await workspaces.selectByName(input.authorizedWorkspaceName);
+  const authorizedScope = `/workspaces/${authorizedWorkspaceId}`;
 
   await secrets.openNewVault(context.consoleUrl);
   const tenantScope = await secrets.selectScope('tenant');
@@ -31,8 +31,8 @@ export const exerciseResourceAccess: Journey<ExerciseResourceAccessInput> = asyn
 
   await secrets.openNewSecret(context.consoleUrl);
   await assertVaultOffer(secrets, input.vaultName, tenantScope, false, 'authorized Workspace before grant');
-  await workspaces.selectByName(input.siblingWorkspaceName);
-  const siblingScope = await currentWorkspaceScope(context.pages.page);
+  const siblingWorkspaceId = await workspaces.selectByName(input.siblingWorkspaceName);
+  const siblingScope = `/workspaces/${siblingWorkspaceId}`;
   await secrets.openNewSecret(context.consoleUrl);
   await assertVaultOffer(secrets, input.vaultName, tenantScope, false, 'sibling Workspace');
   await context.checkpoint({ name: Checkpoints.resourceAccess.defaultDenied, page: context.pages.page, target: secrets.secretEditor });
@@ -80,12 +80,6 @@ export const exerciseResourceAccess: Journey<ExerciseResourceAccessInput> = asyn
   await assertVaultOffer(secrets, input.vaultName, tenantScope, false, 'authorized Workspace after revocation');
   await context.checkpoint({ name: Checkpoints.resourceAccess.revoked, page: context.pages.page, target: secrets.secretEditor });
 };
-
-async function currentWorkspaceScope(page: import('@playwright/test').Page): Promise<string> {
-  const id = await page.getByTestId('console-shell').getAttribute('data-workspace-id');
-  if (!id) throw new Error('The selected Workspace does not expose its identifier.');
-  return `/workspaces/${id}`;
-}
 
 async function assertVaultOffer(
   secrets: import('../pages/descendant-secrets.page.js').DescendantSecretsPage,

@@ -88,7 +88,7 @@
             @if (invalidTarget) { <p class="error-panel" role="alert" data-testid="resource-access-invalid-target">@T("InvalidTarget")</p> }
             @if (invalidGrant) { <p class="error-panel" role="alert">@T("GrantActionsRequired")</p> }
             @if (saveError) { <p class="error-panel" role="alert">@T("SaveFailed")</p> }
-            @if (saved) { <p class="access-success" role="status">@T("Saved")</p> }
+            @if (saved) { <p class="access-success" role="status" data-testid="resource-access-saved">@T("Saved")</p> }
             @if (canManage)
             {
                 <div class="form-actions"><button class="button-primary" type="button" data-testid="resource-access-save" disabled="@(saving || invalidGrant || !dirty)" @onclick="SaveAsync">@(saving ? T("Saving") : T("Save"))</button></div>
