@@ -3,7 +3,10 @@
 @inject IResourceScopeInventoryClient Scopes
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceAccessPanelStrings> Localizer
 
-<section class="resource-access-panel" data-testid="resource-access-panel">
+<section class="resource-access-panel" data-testid="resource-access-panel"
+         data-resource-uid="@identity?.Uid" data-resource-generation="@Generation"
+         data-resource-version="@Version" data-resource-managed="@Governance.IsManaged.ToString().ToLowerInvariant()"
+         data-resource-origin="@Governance.Origin.Kind" data-resource-origin-version="@Governance.Origin.Version">
     @if (loading)
     {
         <LoadingState Message="@T("Loading")" />
@@ -57,7 +60,7 @@
                 <div class="access-grant-list">
                     @foreach (var grant in grants)
                     {
-                        <div class="access-grant" data-testid="resource-access-grant">
+                        <div class="access-grant" data-testid="resource-access-grant" data-scope-ref="@grant.TargetScopeRef.Value">
                             <div class="access-target"><ResourceScopeBadge ScopeRef="grant.TargetScopeRef" /><strong>@TargetName(grant.TargetScopeRef)</strong><code>@grant.TargetScopeRef.Value</code></div>
                             <div class="access-actions" aria-label="@T("AllowedActions")">
                                 <label><input type="checkbox" checked="@grant.Discover" disabled="@(!canManage)" @onchange="args => SetAction(grant, ResourceAccessAction.Discover, (bool)(args.Value ?? false))" />@T("Discover")</label>
@@ -82,6 +85,7 @@
                 <p class="access-readonly" role="note">@T("ReadOnlyPolicy")</p>
             }
 
+            @if (invalidTarget) { <p class="error-panel" role="alert" data-testid="resource-access-invalid-target">@T("InvalidTarget")</p> }
             @if (invalidGrant) { <p class="error-panel" role="alert">@T("GrantActionsRequired")</p> }
             @if (saveError) { <p class="error-panel" role="alert">@T("SaveFailed")</p> }
             @if (saved) { <p class="access-success" role="status">@T("Saved")</p> }
@@ -110,7 +114,7 @@
     private string? etag;
     private string? loadedKey;
     private string selectedTarget = string.Empty;
-    private bool loading = true, loadError, canManage, dirty, saving, saveError, saved;
+    private bool loading = true, loadError, canManage, dirty, saving, saveError, saved, invalidTarget;
     private bool invalidGrant => grants.Any(value => !value.Discover && !value.Use);
     private IReadOnlyList<ResourceScopeTargetResponse> AvailableTargets => targets
         .Where(value => IsDescendant(value.ScopeRef, OwnerScopeRef)
@@ -127,7 +131,7 @@
 
     private async Task LoadAsync()
     {
-        loading = true; loadError = saveError = saved = false; dirty = false; grants.Clear();
+        loading = true; loadError = saveError = saved = invalidTarget = false; dirty = false; grants.Clear();
         try
         {
             inventory = await Scopes.GetAsync(cancellation.Token);
@@ -155,7 +159,13 @@
 
     private void Add()
     {
-        if (!ResourceScopeRef.TryParse(selectedTarget, out var scopeRef) || !IsDescendant(scopeRef, OwnerScopeRef)) return;
+        if (!ResourceScopeRef.TryParse(selectedTarget, out var scopeRef) || !IsDescendant(scopeRef, OwnerScopeRef))
+        {
+            invalidTarget = true;
+            saved = false;
+            return;
+        }
+        invalidTarget = false;
         grants.Add(new(scopeRef, true, true, false)); selectedTarget = string.Empty; MarkDirty();
     }
     private void Remove(GrantModel grant) { grants.Remove(grant); MarkDirty(); }
@@ -165,7 +175,7 @@
         MarkDirty();
     }
     private void SetPropagation(GrantModel grant, bool enabled) { grant.IncludeDescendants = enabled; MarkDirty(); }
-    private void MarkDirty() { dirty = true; saved = saveError = false; }
+    private void MarkDirty() { dirty = true; saved = saveError = invalidTarget = false; }
 
     private async Task SaveAsync()
     {

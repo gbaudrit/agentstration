@@ -194,6 +194,16 @@ export const TestIds = {
     submit: 'tool-run-submit',
     result: 'tool-run-result',
     output: 'tool-run-output',
+    enabledToggle: 'tool-enabled-toggle',
+  },
+  resourceAccess: {
+    panel: 'resource-access-panel',
+    grant: 'resource-access-grant',
+    target: 'resource-access-target',
+    add: 'resource-access-add',
+    remove: 'resource-access-remove',
+    save: 'resource-access-save',
+    invalidTarget: 'resource-access-invalid-target',
   },
   secretGrants: {
     scopePicker: 'resource-scope-picker',

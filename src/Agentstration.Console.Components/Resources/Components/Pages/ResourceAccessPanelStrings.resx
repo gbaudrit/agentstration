@@ -46,6 +46,7 @@
   <data name="Add"><value>Add grant</value></data>
   <data name="ReadOnlyPolicy"><value>You can inspect this policy, but you are not authorized to change grants in the owner scope.</value></data>
   <data name="GrantActionsRequired"><value>Every grant must allow Discover, Use, or both.</value></data>
+  <data name="InvalidTarget"><value>Select a valid descendant scope. Owner, parent, sibling, and unrelated scopes cannot receive this grant.</value></data>
   <data name="SaveFailed"><value>The access policy could not be saved. Refresh it and verify your authorization before trying again.</value></data>
   <data name="Saved"><value>Access policy saved.</value></data>
   <data name="Saving"><value>Saving…</value></data>

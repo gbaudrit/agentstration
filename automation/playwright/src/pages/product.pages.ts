@@ -26,6 +26,7 @@ import { RuntimeWorkerObservabilityPage } from './runtime-worker-observability.p
 import { AgentInstanceObservabilityPage } from './agent-instance-observability.page.js';
 import { SchemaDrivenSourcesPage } from './schema-driven-sources.page.js';
 import { SchemaAdministrationPage } from './schema-administration.page.js';
+import { ResourceAccessPage } from './resource-access.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -54,6 +55,7 @@ export class ProductPages {
   public readonly agentInstanceObservability: AgentInstanceObservabilityPage;
   public readonly schemaDrivenSources: SchemaDrivenSourcesPage;
   public readonly schemaAdministration: SchemaAdministrationPage;
+  public readonly resourceAccess: ResourceAccessPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -82,6 +84,7 @@ export class ProductPages {
     this.agentInstanceObservability = new AgentInstanceObservabilityPage(page);
     this.schemaDrivenSources = new SchemaDrivenSourcesPage(page);
     this.schemaAdministration = new SchemaAdministrationPage(page);
+    this.resourceAccess = new ResourceAccessPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {
