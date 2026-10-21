@@ -183,8 +183,8 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'flow-designer', host: 'console', source: `${consolePages}/FlowDesigner.razor`,
     routes: ['/flows/{FlowId}/designer', '/namespaces/{FlowNamespace}/flows/{FlowId}/designer'], fixtureKeys: ['flowId', 'flowNamespace'],
-    pageObject: 'src/pages/flow-designer.page.ts', journey: 'exercise-flow-named-outputs',
-    specification: 'tests/flow-named-outputs.spec.ts', coverage: 'covered',
+    pageObject: 'src/pages/flow-designer.page.ts', journey: 'exercise-flow-designer-responsive',
+    specification: 'tests/flow-designer-responsive.spec.ts', coverage: 'covered',
   },
   coveredFlow('flow-runs', `${consolePages}/FlowRuns.razor`, ['/flow-runs'], [], 'inspect-flow-observability'),
   coveredFlow('flow-run-details', `${consolePages}/FlowRunDetails.razor`, ['/flow-runs/{RunId}'], ['runId'], 'inspect-flow-observability'),
