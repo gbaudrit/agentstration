@@ -204,6 +204,7 @@ public static class DependencyInjection
         services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
         services.AddSingleton<IRuntimeAgentResolver, ResourceRuntimeAgentResolver>();
+        services.AddSingleton<IRuntimeAgentAccessValidator, RuntimeAgentAccessValidator>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
         if (!useManagedProfileResolver)
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();

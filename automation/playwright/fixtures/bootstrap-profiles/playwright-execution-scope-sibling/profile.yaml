@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: playwright-execution-scope-sibling
+definition:
+  displayName: Playwright execution scope sibling
+  description: Creates a sibling Tenant and Workspace for exact execution-scope isolation checks.
+  targetScope: instance

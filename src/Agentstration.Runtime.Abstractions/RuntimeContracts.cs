@@ -175,6 +175,14 @@ public interface IRuntimeAgentResolver
             : throw new RuntimeAgentResolutionException("latest_agent_resolution_unsupported", $"Latest-version resolution is not supported for agent '{@namespace}/{resourceId}'.");
 }
 
+public interface IRuntimeAgentAccessValidator
+{
+    Task ValidateUseAsync(
+        ResolvedRuntimeAgent agent,
+        ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken);
+}
+
 public sealed class RuntimeAgentResolutionException(string code, string message) : Exception(message)
 {
     public string Code { get; } = code;

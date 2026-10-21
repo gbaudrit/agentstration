@@ -11,6 +11,7 @@ public sealed class RuntimeRunService(
     IRuntimeRunExecutionScope executionScopes,
     IAgentRuntimePreparationService preparation,
     IRuntimeAgentResolver agents,
+    IRuntimeAgentAccessValidator agentAccess,
     RuntimeRunStateManager stateManager,
     TimeProvider timeProvider)
 {
@@ -58,6 +59,7 @@ public sealed class RuntimeRunService(
             using var requestScope = executionScopes.Enter(scope);
             _ = await preparation.PrepareAsync(agentReference.Namespace, agentReference.ResourceId, agentReference.Version, cancellationToken);
             resolved = await agents.ResolveAsync(agentReference, cancellationToken);
+            await agentAccess.ValidateUseAsync(resolved, scope.ScopeRef, cancellationToken);
         }
         catch (RuntimeAgentResolutionException exception) { throw new RuntimeRunValidationException(exception.Code, exception.Message); }
 

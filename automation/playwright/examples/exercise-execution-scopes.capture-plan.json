@@ -1,0 +1,11 @@
+{
+  "journey": "exercise-execution-scopes",
+  "theme": "dark",
+  "input": {},
+  "captures": [
+    { "checkpoint": "execution-scopes-instance-run", "name": "01-instance-run" },
+    { "checkpoint": "execution-scopes-tenant-run", "name": "02-tenant-run" },
+    { "checkpoint": "execution-scopes-workspace-run", "name": "03-workspace-run" },
+    { "checkpoint": "execution-scopes-isolation", "name": "04-exact-isolation" }
+  ]
+}

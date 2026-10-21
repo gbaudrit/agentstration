@@ -15,7 +15,7 @@ else
         <Actions>@if (!IsOrchestration && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@EditorLabel</a> }</Actions>
     </PageHeader>
     <nav class="section-tabs" aria-label="@T("DetailsAriaLabel")">
-        @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button> }
+        @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" data-testid="@(tab == "Access" ? "flow-access-tab" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button> }
     </nav>
     @if (activeTab == "Overview")
     {

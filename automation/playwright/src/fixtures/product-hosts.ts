@@ -78,7 +78,9 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
   const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort}`;
   const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort}`;
   const utilitiesExtensionUrl = `http://127.0.0.1:${utilitiesExtensionPort}`;
-  const bootstrapPath = path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles');
+  const bootstrapPath = path.join(workDirectory, 'bootstrap-profiles');
+  await fs.cp(path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles'), bootstrapPath, { recursive: true });
+  await fs.cp(path.join(automationRoot, 'fixtures', 'bootstrap-profiles'), bootstrapPath, { recursive: true });
   const runtimeProxy = await startControlledRuntimeProxy(consoleUrl);
   const workerAuthorityProxy = await startControlledWorkerAuthorityProxy(consoleUrl);
   const workerId = randomUUID();

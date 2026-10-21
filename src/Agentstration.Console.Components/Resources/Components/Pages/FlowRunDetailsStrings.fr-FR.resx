@@ -14,6 +14,7 @@
   <data name="Status"><value>État</value></data>
   <data name="FlowAndVersion"><value>Flow / version</value></data>
   <data name="ExecutionScope"><value>Périmètre d’exécution</value></data>
+  <data name="DefinitionScope"><value>Périmètre de définition</value></data>
   <data name="Deployment"><value>Déploiement</value></data>
   <data name="TriggerAndStartedBy"><value>Déclencheur / démarrée par</value></data>
   <data name="CorrelationId"><value>Identifiant de corrélation</value></data>

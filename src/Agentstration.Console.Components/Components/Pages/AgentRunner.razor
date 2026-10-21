@@ -43,7 +43,8 @@ else
         <div><span>@T("Deployment")</span><strong><StatusBadge Text="@(readiness?.State ?? T("Unknown"))" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /></strong></div>
         <div><span>@T("RuntimeProfile")</span><strong>@(readiness?.RuntimeProfileId is null ? T("NotResolved") : ResourceName(readiness.RuntimeProfileId))</strong></div>
         <div><span>@T("ExecutionMode")</span><strong>@T("Interactive")</strong></div>
-        <div><span>@T("ExecutionScope")</span><strong>@ScopeLabel(SelectedExecutionScope)</strong></div>
+        <div data-testid="agent-definition-scope"><span>@T("DefinitionScope")</span><strong><code>@AgentDefinitionScope.Value</code></strong></div>
+        <div data-testid="agent-execution-scope"><span>@T("ExecutionScope")</span><strong><code>@SelectedExecutionScope.Value</code></strong></div>
     </section>
 
     @if (readiness is { Ready: false })
@@ -98,7 +99,8 @@ else
                 {
                     <dl class="runner-details">
                         <dt>@I("RunId")</dt><dd><code>@state.Run.Id</code></dd>
-                        <dt>@I("ExecutionScope")</dt><dd><code>@state.Run.ExecutionScopeRef.Value</code></dd>
+                        <dt>@I("DefinitionScope")</dt><dd data-testid="agent-run-definition-scope"><code>@AgentDefinitionScope.Value</code></dd>
+                        <dt>@I("ExecutionScope")</dt><dd data-testid="agent-run-execution-scope"><code>@state.Run.ExecutionScopeRef.Value</code></dd>
                         <dt>@I("Status")</dt><dd><StatusBadge Text="@I($"RunState.{state.State}")" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
                         <dt>@I("Duration")</dt><dd>@Duration(state.Run)</dd>
                         <dt>@I("AgentVersion")</dt><dd>@state.Run.Properties.Agent.Version</dd>
@@ -187,6 +189,7 @@ else
         && modelResolution?.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
     private bool CanCancel => state.Run is not null && state.State is RuntimeRunState.Pending or RuntimeRunState.Running;
     private ResourceScopeRef SelectedExecutionScope => state.Run?.ExecutionScopeRef ?? agent?.ScopeRef ?? ResourceScopeRef.Instance;
+    private ResourceScopeRef AgentDefinitionScope => state.Run?.Properties.Agent.ScopeRef ?? agent?.ScopeRef ?? ResourceScopeRef.Instance;
     private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.Name)}";
     private string RawResponse => JsonSerializer.Serialize(new { run = state.Run, events = state.Events }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
 

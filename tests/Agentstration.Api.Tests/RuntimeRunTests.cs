@@ -89,6 +89,19 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task CreateRequiresAgentUseAccessAtTheExactExecutionScope()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        fixture.AgentAccess.Allow = false;
+
+        var exception = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.CreateRunAsync());
+
+        Assert.AreEqual("agent_not_found", exception.Code);
+        Assert.AreEqual(TestScope.ScopeRef, fixture.AgentAccess.ConsumerScopeRef);
+        Assert.IsEmpty(fixture.Queue.Enqueued);
+    }
+
+    [TestMethod]
     public async Task RuntimeRunScopeIsImmutable()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
@@ -525,15 +538,18 @@ public sealed class RuntimeRunTests
         public IRuntimeRunStore Store { get; }
         public IRuntimeExecutionStateStore ExecutionStates => provider.GetRequiredService<IRuntimeExecutionStateStore>();
         public TestRuntimeRunQueue Queue { get; }
+        public TestRuntimeAgentAccess AgentAccess { get; }
         public string AgentId { get; }
 
-        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, TestRuntimeRunQueue queue, string agentId)
+        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store,
+            TestRuntimeRunQueue queue, TestRuntimeAgentAccess agentAccess, string agentId)
         {
             this.directory = directory;
             this.provider = provider;
             Service = service;
             Store = store;
             Queue = queue;
+            AgentAccess = agentAccess;
             AgentId = agentId;
         }
 
@@ -553,6 +569,8 @@ public sealed class RuntimeRunTests
             services.AddSingleton<IRuntimeRunQueue>(queue);
             services.AddSingleton<IRuntimeRunExecutionScope, TestRuntimeRunExecutionScope>();
             services.AddSingleton<IAgentRuntimePreparationService, TestAgentRuntimePreparationService>();
+            var agentAccess = new TestRuntimeAgentAccess();
+            services.AddSingleton<IRuntimeAgentAccessValidator>(agentAccess);
             services.AddSingleton<RuntimeRunStateManager>();
             services.AddSingleton<RuntimeRunService>();
             var provider = services.BuildServiceProvider();
@@ -565,7 +583,8 @@ public sealed class RuntimeRunTests
             const string revisionId = "sql-expert--000001";
             var agent = await management.PutAsync(Agent(agentId), null, true, default);
             await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid), default);
-            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, queue, agentId);
+            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store,
+                queue, agentAccess, agentId);
         }
 
         public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(TestScope, new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
@@ -631,6 +650,20 @@ public sealed class RuntimeRunTests
         private sealed class EmptyScope : IDisposable
         {
             public void Dispose() { }
+        }
+    }
+
+    private sealed class TestRuntimeAgentAccess : IRuntimeAgentAccessValidator
+    {
+        public bool Allow { get; set; } = true;
+        public ResourceScopeRef? ConsumerScopeRef { get; private set; }
+
+        public Task ValidateUseAsync(ResolvedRuntimeAgent agent, ResourceScopeRef consumerScopeRef,
+            CancellationToken cancellationToken)
+        {
+            ConsumerScopeRef = consumerScopeRef;
+            if (!Allow) throw new RuntimeAgentResolutionException("agent_not_found", "Agent was not found.");
+            return Task.CompletedTask;
         }
     }
 

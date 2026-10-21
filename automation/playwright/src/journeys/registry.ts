@@ -26,6 +26,7 @@ import { inspectAgentInstanceObservability, type InspectAgentInstanceObservabili
 import { exerciseSchemaDrivenSources, type ExerciseSchemaDrivenSourcesInput } from './exercise-schema-driven-sources.journey.js';
 import { exerciseSchemaAdministration, type ExerciseSchemaAdministrationInput } from './exercise-schema-administration.journey.js';
 import { exerciseResourceAccess, type ExerciseResourceAccessInput } from './exercise-resource-access.journey.js';
+import { exerciseExecutionScopes, type ExerciseExecutionScopesInput } from './exercise-execution-scopes.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -57,4 +58,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),
   'exercise-schema-administration': (context, input) => exerciseSchemaAdministration(context, input as unknown as ExerciseSchemaAdministrationInput),
   'exercise-resource-access': (context, input) => exerciseResourceAccess(context, input as unknown as ExerciseResourceAccessInput),
+  'exercise-execution-scopes': (context, input) => exerciseExecutionScopes(context, input as unknown as ExerciseExecutionScopesInput),
 };
