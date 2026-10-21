@@ -70,19 +70,21 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
   const dataDirectory = path.join(workDirectory, 'data');
   await fs.mkdir(dataDirectory, { recursive: true });
 
-  const [consolePort, workplacePort, workerPort, extensionPort, gitExtensionPort, foundryExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort(), freePort()]);
+  const [consolePort, workplacePort, workerPort, extensionPort, gitExtensionPort, foundryExtensionPort, utilitiesExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), freePort()]);
   const consoleUrl = `http://127.0.0.1:${consolePort}`;
   const workplaceUrl = `http://127.0.0.1:${workplacePort}`;
   const workerUrl = `http://127.0.0.1:${workerPort}`;
   const extensionUrl = `http://127.0.0.1:${extensionPort}`;
   const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort}`;
   const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort}`;
+  const utilitiesExtensionUrl = `http://127.0.0.1:${utilitiesExtensionPort}`;
   const bootstrapPath = path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles');
   const runtimeProxy = await startControlledRuntimeProxy(consoleUrl);
   const workerAuthorityProxy = await startControlledWorkerAuthorityProxy(consoleUrl);
   const workerId = randomUUID();
   const credentialId = randomUUID();
   const workerKeyFile = path.join(workDirectory, 'runtime-worker.key');
+  const utilitiesEnrollmentStateFile = path.join(workDirectory, 'utilities-extension.instance');
   await fs.writeFile(workerKeyFile, `${randomBytes(48).toString('base64')}\n`, { mode: 0o600 });
 
   const fakeOllama = await startFakeOllama();
@@ -103,17 +105,29 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     ASPNETCORE_URLS: foundryExtensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',
   });
+  const utilitiesExtension = runDotnet('src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj', path.join(workDirectory, 'utilities-extension.log'), {
+    ASPNETCORE_ENVIRONMENT: 'Development',
+    ASPNETCORE_URLS: utilitiesExtensionUrl,
+    Logging__EventLog__LogLevel__Default: 'None',
+    Aep__EnrollmentMode: 'PairingCode',
+    Aep__PairingCode__AuthorityUrl: consoleUrl,
+    Aep__PairingCode__PublicEndpoint: utilitiesExtensionUrl,
+    Aep__PairingCode__StateFile: utilitiesEnrollmentStateFile,
+    Aep__PairingCode__AllowInsecureHttp: 'true',
+  });
 
   try {
     await Promise.all([
       waitUntilHealthy(`${extensionUrl}/health`, modelExtension),
       waitUntilHealthy(`${gitExtensionUrl}/health`, gitExtension),
       waitUntilHealthy(`${foundryExtensionUrl}/health`, foundryExtension),
+      waitUntilHealthy(`${utilitiesExtensionUrl}/health`, utilitiesExtension),
     ]);
   } catch (error) {
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
     await stopProcess(foundryExtension);
+    await stopProcess(utilitiesExtension);
     await fakeOllama.stop();
     await runtimeProxy.stop();
     throw error;
@@ -195,6 +209,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
     await stopProcess(foundryExtension);
+    await stopProcess(utilitiesExtension);
     await fakeOllama.stop();
     await runtimeProxy.stop();
     await workerAuthorityProxy.stop();
@@ -229,6 +244,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
       await stopProcess(modelExtension);
       await stopProcess(gitExtension);
       await stopProcess(foundryExtension);
+      await stopProcess(utilitiesExtension);
       await fakeOllama.stop();
       await runtimeProxy.stop();
       await workerAuthorityProxy.stop();

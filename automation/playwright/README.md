@@ -102,6 +102,12 @@ The descendant Secret and Vault journey checks that a Tenant Vault is unavailabl
 npm run capture -- --plan examples/exercise-descendant-secrets.capture-plan.json --output .work/descendant-secrets --console-url https://agentstration.example.com
 ```
 
+The hierarchical Resource Access journey covers `/vaults/{name}`, `/secrets/new`, `/tools/{name}`, and the shared Access tab. It requires two prepared sibling Workspaces and Platform-administrator access. Its deterministic local fixture enrolls `Agentstration.Extensions.Utilities` at Instance scope through the Pairing Code protocol. It verifies default denial, exact descendant grant and use, sibling denial, localized invalid-target feedback, governed definition immutability, independent policy revocation, and stable governed identity:
+
+```powershell
+npm run capture -- --plan examples/exercise-resource-access.capture-plan.json --output .work/resource-access --console-url https://agentstration.example.com
+```
+
 The local Ollama extension backs a fully offline create/update/delete journey for a model provider, model profile, and runtime profile:
 
 ```powershell

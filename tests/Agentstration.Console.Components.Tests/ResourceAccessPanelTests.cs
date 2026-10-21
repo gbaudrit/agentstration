@@ -81,6 +81,30 @@ public sealed class ResourceAccessPanelTests
         });
     }
 
+    [TestMethod]
+    public void InvalidOwnerTargetShowsLocalizedFeedbackWithoutAddingGrant()
+    {
+        var uid = Guid.NewGuid();
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeScopes(uid, tenant));
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(new FakePolicies());
+
+        var rendered = context.Render<ResourceAccessPanel>(parameters => parameters
+            .Add(component => component.OwnerScopeRef, ResourceScopeRef.Instance)
+            .Add(component => component.Namespace, ResourceNamespace.Default)
+            .Add(component => component.Kind, "Agent")
+            .Add(component => component.Name, "managed-agent"));
+
+        rendered.WaitForElement("[data-testid='resource-access-target']");
+        rendered.Find("[data-testid='resource-access-target']").Change(ResourceScopeRef.Instance.Value);
+        rendered.Find("[data-testid='resource-access-add']").Click();
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(rendered.Find("[data-testid='resource-access-invalid-target']").TextContent));
+        Assert.AreEqual(0, rendered.FindAll("[data-testid='resource-access-grant']").Count);
+    }
+
     private sealed class FakePolicies : IResourceAccessPolicyClient
     {
         public ResourceAccessPolicySnapshot? Existing { get; init; }

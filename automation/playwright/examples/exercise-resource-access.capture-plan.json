@@ -1,0 +1,19 @@
+{
+  "journey": "exercise-resource-access",
+  "theme": "dark",
+  "input": {
+    "authorizedWorkspaceName": "resource-access-authorized",
+    "siblingWorkspaceName": "resource-access-sibling",
+    "vaultName": "hierarchical-access-vault",
+    "vaultDisplayName": "Hierarchical access Vault",
+    "workspaceSecretName": "authorized-vault-reference"
+  },
+  "captures": [
+    { "checkpoint": "resource-access-default-denied", "name": "01-default-denied" },
+    { "checkpoint": "resource-access-invalid-target", "name": "02-invalid-target" },
+    { "checkpoint": "resource-access-editable-granted", "name": "03-editable-granted" },
+    { "checkpoint": "resource-access-managed-granted", "name": "04-managed-granted" },
+    { "checkpoint": "resource-access-sibling-denied", "name": "05-sibling-denied" },
+    { "checkpoint": "resource-access-revoked", "name": "06-revoked" }
+  ]
+}

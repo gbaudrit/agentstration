@@ -120,6 +120,14 @@ export const Checkpoints = {
     secretGranted: 'descendant-secrets-secret-granted',
     secretRevoked: 'descendant-secrets-secret-revoked',
   },
+  resourceAccess: {
+    defaultDenied: 'resource-access-default-denied',
+    invalidTarget: 'resource-access-invalid-target',
+    editableGranted: 'resource-access-editable-granted',
+    managedGranted: 'resource-access-managed-granted',
+    siblingDenied: 'resource-access-sibling-denied',
+    revoked: 'resource-access-revoked',
+  },
   modelAdministration: {
     provider: 'model-administration-provider',
     runtime: 'model-administration-runtime',

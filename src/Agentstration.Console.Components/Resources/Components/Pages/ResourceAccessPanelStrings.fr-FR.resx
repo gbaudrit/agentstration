@@ -46,6 +46,7 @@
   <data name="Add"><value>Ajouter une autorisation</value></data>
   <data name="ReadOnlyPolicy"><value>Vous pouvez consulter cette politique, mais vous n’êtes pas autorisé à modifier les accès dans le périmètre propriétaire.</value></data>
   <data name="GrantActionsRequired"><value>Chaque autorisation doit permettre Découvrir, Utiliser ou les deux.</value></data>
+  <data name="InvalidTarget"><value>Sélectionnez un périmètre descendant valide. Les périmètres propriétaire, parent, frère et sans lien ne peuvent pas recevoir cette autorisation.</value></data>
   <data name="SaveFailed"><value>La politique d’accès n’a pas pu être enregistrée. Actualisez-la et vérifiez vos autorisations avant de réessayer.</value></data>
   <data name="Saved"><value>Politique d’accès enregistrée.</value></data>
   <data name="Saving"><value>Enregistrement…</value></data>

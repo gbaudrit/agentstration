@@ -39,12 +39,16 @@ export class OrganizationWorkspacesPage {
     await this.page.locator(`[data-testid="${TestIds.console.shell}"][data-workspace-id="${workspaceId}"]`).waitFor({ state: 'visible' });
   }
 
-  public async selectByName(name: string): Promise<void> {
+  public async selectByName(name: string): Promise<string> {
     const shell = this.page.getByTestId(TestIds.console.shell);
     await shell.waitFor({ state: 'visible' });
-    if (await shell.getAttribute('data-workspace-name') === name) return;
-
     const selector = this.page.getByTestId(TestIds.console.workspaceSelector);
+    if (await shell.getAttribute('data-workspace-name') === name) {
+      const workspaceId = await shell.getAttribute('data-workspace-id')
+        ?? (await selector.count() > 0 ? await selector.inputValue() : null);
+      if (workspaceId) return workspaceId;
+    }
+
     if (await selector.count() === 0) {
       throw new Error(`Campaign workspace '${name}' is not available in the workspace selector.`);
     }
@@ -61,6 +65,7 @@ export class OrganizationWorkspacesPage {
 
     await this.select(workspaceId);
     await expect(shell).toHaveAttribute('data-workspace-name', name);
+    return workspaceId;
   }
 
   public row(name: string): Locator {

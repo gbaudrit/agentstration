@@ -13,7 +13,7 @@ else
                     StatusText="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)"
                     Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)"
                     TestId="resource-tool-details">
-        <Actions><button class="button-primary" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button></Actions>
+        <Actions><button class="button-primary" data-testid="tool-enabled-toggle" disabled="@tool.Governance.IsManaged" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button></Actions>
     </ResourceHeader>
 
     <nav class="section-tabs tool-detail-tabs" role="tablist" aria-label="@T("DetailViews")">
