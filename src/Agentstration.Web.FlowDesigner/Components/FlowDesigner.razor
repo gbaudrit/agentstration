@@ -156,22 +156,40 @@ else
                                 </div>
                                 <button type="button" class="step-settings-close" aria-label="@T("CloseStepSettings")" @onclick="CloseStepSettings"><UiIcon Name="x" /></button>
                             </header>
+                            <nav class="step-settings-tabs" role="tablist" aria-label="@T("StepSettingsSections")">
+                                @foreach (var tab in Enum.GetValues<StepSettingsTab>())
+                                {
+                                    <button type="button" role="tab" aria-selected="@(activeStepSettingsTab == tab)" class="@(activeStepSettingsTab == tab ? "active" : null)"
+                                            data-testid="@($"step-settings-tab-{tab.ToString().ToLowerInvariant()}")" @onclick="() => activeStepSettingsTab = tab">@T($"StepSettingsTab.{tab}")</button>
+                                }
+                            </nav>
                             <div class="step-settings-body">
                                 <div class="flow-inspector step-settings-form">
+                    @if (activeStepSettingsTab == StepSettingsTab.General)
+                    {
                     <div class="inspector-details-group">
                         <div class="inspector-details-heading"><h3>@T("StepDetails")</h3><span class="inspector-step-type">@T($"Step.{SelectedStep.Type()}")</span></div>
                         <label>@T("StepDisplayName")<input data-testid="step-display-name" disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
                         <label>@T("StepId")<input data-testid="step-name" disabled="@(ReadOnly || SelectedStep is not OutputFlowStepDefinition)" value="@SelectedStep.Name" @onchange="UpdateOutputNameAsync" /></label>
                     </div>
+                    }
                     @if (SelectedStep is InputFlowStepDefinition input)
                     {
-                        <SchemaBindingEditor Title="@T("InputSchema")" TestId="flow-input-schema"
-                            Binding="@input.SchemaBinding" LegacySchema="@(input.Schema ?? Editor.State.Resource.Definition.InputSchema)"
-                            SchemaVersions="schemaVersions" ValueChanged="UpdateInputSchemaAsync" ReadOnly="ReadOnly"
-                            DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
+                        @if (activeStepSettingsTab == StepSettingsTab.Input)
+                        {
+                            <section class="step-contract-section">
+                                <ContractHeading Direction="Input" Source="@T("ContractSource.Flow")" />
+                                <SchemaBindingEditor Title="@T("InputSchema")" TestId="flow-input-schema"
+                                    Binding="@input.SchemaBinding" LegacySchema="@(input.Schema ?? Editor.State.Resource.Definition.InputSchema)"
+                                    SchemaVersions="schemaVersions" ValueChanged="UpdateInputSchemaAsync" ReadOnly="ReadOnly"
+                                    DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
+                            </section>
+                        }
                     }
                     else if (SelectedStep is AgentFlowStepDefinition agent)
                     {
+                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
+                        {
                         <div class="inspector-details-group inspector-resource-details">
                             <h3>@T("CalledResource")</h3>
                         <div class="inspector-resource-field">
@@ -192,9 +210,12 @@ else
                             <p class="inspector-resource-id">@T("AgentId") <code>@referencedAgent.Name</code></p>
                         }
                         </div>
+                        }
                     }
                     else if (SelectedStep is FlowCallStepDefinition flowCall)
                     {
+                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
+                        {
                         <div class="inspector-details-group inspector-resource-details">
                             <h3>@T("CalledResource")</h3>
                         <div class="inspector-resource-field">
@@ -228,6 +249,11 @@ else
                                 @foreach (var version in flowVersions) { <option value="@version.Version">@version.Version</option> }
                             </select></label>
                         }
+                        }
+                        @if (activeStepSettingsTab == StepSettingsTab.Input)
+                        {
+                            <section class="step-contract-section">
+                            <ContractHeading Direction="Input" Source="@T("ContractSource.CalledFlow")" />
                         @if (SelectedFlowVersion is not null)
                         {
                             <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
@@ -245,16 +271,40 @@ else
                                     }
                                 }
                             </fieldset>
+                            @if (SelectedFlowVersion.InputSchema is { } calledFlowInputSchema)
+                            {
+                                <SchemaDocumentEditor Value="calledFlowInputSchema" ReadOnly="true" />
+                            }
+                            else
+                            {
+                                <p class="step-contract-empty muted">@T("NoInputContract")</p>
+                            }
                         }
-                        @if (SelectedFlowVersion?.OutputSchema is { ValueKind: JsonValueKind.Object } outputSchema
-                            && outputSchema.TryGetProperty("properties", out var outputProperties)
-                            && outputProperties.ValueKind == JsonValueKind.Object)
+                        else
                         {
-                            <p class="muted">@T("AvailableOutput"): @string.Join(", ", outputProperties.EnumerateObject().Select(property => property.Name))</p>
+                            <p class="step-contract-empty muted">@T("SelectFlowVersionForContract")</p>
+                        }
+                            </section>
+                        }
+                        @if (activeStepSettingsTab == StepSettingsTab.Output)
+                        {
+                            <section class="step-contract-section">
+                                <ContractHeading Direction="Output" Source="@T("ContractSource.CalledFlow")" />
+                                @if (SelectedFlowVersion?.OutputSchema is { } calledFlowOutputSchema)
+                                {
+                                    <SchemaDocumentEditor Value="calledFlowOutputSchema" ReadOnly="true" />
+                                }
+                                else
+                                {
+                                    <p class="step-contract-empty muted">@T("NoOutputContract")</p>
+                                }
+                            </section>
                         }
                     }
                     else if (SelectedStep is ToolFlowStepDefinition toolStep)
                     {
+                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
+                        {
                         <div class="inspector-details-group inspector-resource-details">
                             <h3>@T("CalledResource")</h3>
                             <div class="inspector-resource-field">
@@ -292,6 +342,14 @@ else
                             {
                                 <p class="muted">@ToolState(selectedTool)</p>
                             }
+                            }
+                        }
+                        @if (activeStepSettingsTab == StepSettingsTab.Input)
+                        {
+                            <section class="step-contract-section">
+                                <ContractHeading Direction="Input" Source="@T("ContractSource.CalledTool")" />
+                            @if (SelectedTool is { } selectedTool)
+                            {
                             @if (selectedTool.InputSchema.ValueKind == JsonValueKind.Object
                                 && selectedTool.InputSchema.TryGetProperty("properties", out var toolProperties)
                                 && toolProperties.ValueKind == JsonValueKind.Object)
@@ -304,16 +362,33 @@ else
                                     }
                                 </fieldset>
                             }
-                            @if (selectedTool.OutputSchema is { ValueKind: JsonValueKind.Object } toolOutput
-                                && toolOutput.TryGetProperty("properties", out var toolOutputProperties)
-                                && toolOutputProperties.ValueKind == JsonValueKind.Object)
-                            {
-                                <p class="muted">@T("AvailableOutput"): @string.Join(", ", toolOutputProperties.EnumerateObject().Select(property => property.Name))</p>
+                                <SchemaDocumentEditor Value="selectedTool.InputSchema" ReadOnly="true" />
                             }
+                            else
+                            {
+                                <p class="step-contract-empty muted">@T("SelectToolForContract")</p>
+                            }
+                            </section>
+                        }
+                        @if (activeStepSettingsTab == StepSettingsTab.Output)
+                        {
+                            <section class="step-contract-section">
+                                <ContractHeading Direction="Output" Source="@T("ContractSource.CalledTool")" />
+                                @if (SelectedTool?.OutputSchema is { } toolOutputSchema)
+                                {
+                                    <SchemaDocumentEditor Value="toolOutputSchema" ReadOnly="true" />
+                                }
+                                else
+                                {
+                                    <p class="step-contract-empty muted">@T("NoOutputContract")</p>
+                                }
+                            </section>
                         }
                     }
                     else if (SelectedStep is RouterFlowStepDefinition router)
                     {
+                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
+                        {
                         <section class="router-editor">
                             <div class="router-group-picker">
                                 <button class="button-secondary" @onclick="LoadAgentsAsync">@T("LoadAgents")</button>
@@ -339,34 +414,65 @@ else
                             </div>
                             <button class="button-secondary" disabled="@ReadOnly" @onclick="AddRouterCandidateAsync">＋ @T("AddRoute")</button>
                         </section>
+                        }
                     }
                     else if (SelectedStep is ConditionFlowStepDefinition condition)
                     {
+                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
+                        {
                         <label>@T("LeftValue")<input disabled="@ReadOnly" value="@condition.Left" @onchange="e => UpdateSelectedAsync(condition with { Left = Text(e) })" /></label>
                         <label>@T("Operator")<input disabled="@ReadOnly" value="@condition.Operator" @onchange="e => UpdateSelectedAsync(condition with { Operator = Text(e) })" /></label>
                         <label>@T("RightValue")<input disabled="@ReadOnly" value="@condition.Right" @onchange="e => UpdateSelectedAsync(condition with { Right = Text(e) })" /></label>
+                        }
                     }
                     else if (SelectedStep is OutputFlowStepDefinition output)
                     {
+                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
+                        {
                         <label>@T("OutputOutcome")<select data-testid="output-outcome" disabled="@ReadOnly" value="@(output.Outcome ?? FlowOutputOutcome.Success)" @onchange="UpdateOutputOutcomeAsync"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></select></label>
-                        <label>@T("OutputMapping")<textarea data-testid="output-mapping" disabled="@ReadOnly" value="@JsonText(output.OutputMapping)" @onchange="UpdateOutputMappingAsync"></textarea></label>
-                        <SchemaBindingEditor Title="@T("OutputSchema")" TestId="flow-output-schema"
-                            Binding="@output.SchemaBinding" LegacySchema="@output.Schema" SchemaVersions="schemaVersions"
-                            ValueChanged="UpdateOutputSchemaBindingAsync" ReadOnly="ReadOnly"
-                            DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
                         @if ((output.Outcome ?? FlowOutputOutcome.Success) == FlowOutputOutcome.Error)
                         {
                             <label>@T("ErrorCode")<input data-testid="output-error-code" disabled="@ReadOnly" value="@output.Code" @onchange="e => UpdateSelectedAsync(output with { Code = EmptyToNull(Text(e)) })" /></label>
                             <label>@T("Message")<textarea data-testid="output-error-message" disabled="@ReadOnly" value="@output.Message" @onchange="e => UpdateSelectedAsync(output with { Message = EmptyToNull(Text(e)) })"></textarea></label>
                             <label>@T("ErrorDetailsExpression")<input data-testid="output-error-details" disabled="@ReadOnly" value="@output.DetailsExpression" @onchange="e => UpdateSelectedAsync(output with { DetailsExpression = EmptyToNull(Text(e)) })" /></label>
                         }
+                        }
+                        @if (activeStepSettingsTab == StepSettingsTab.Output)
+                        {
+                            <section class="step-contract-section">
+                                <ContractHeading Direction="Output" Source="@T("ContractSource.Step")" />
+                                <label>@T("OutputMapping")<textarea data-testid="output-mapping" disabled="@ReadOnly" value="@JsonText(output.OutputMapping)" @onchange="UpdateOutputMappingAsync"></textarea></label>
+                                <SchemaBindingEditor Title="@T("OutputSchema")" TestId="flow-output-schema"
+                                    Binding="@output.SchemaBinding" LegacySchema="@output.Schema" SchemaVersions="schemaVersions"
+                                    ValueChanged="UpdateOutputSchemaBindingAsync" ReadOnly="ReadOnly"
+                                    DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
+                            </section>
+                        }
                     }
                     else if (SelectedStep is FailureFlowStepDefinition failure)
                     {
+                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
+                        {
                         <label>@T("ErrorCode")<input disabled="@ReadOnly" value="@failure.Code" @onchange="e => UpdateSelectedAsync(failure with { Code = Text(e) })" /></label>
                         <label>@T("Message")<textarea disabled="@ReadOnly" value="@failure.Message" @onchange="e => UpdateSelectedAsync(failure with { Message = Text(e) })"></textarea></label>
+                        }
                     }
-                    <button class="button-danger" disabled="@(ReadOnly || SelectedStep.Name == Editor.State.Resource.Definition.EntryStep)" @onclick="RemoveSelectedAsync">@T("DeleteStep")</button>
+                    @if (activeStepSettingsTab == StepSettingsTab.Configuration && SelectedStep is InputFlowStepDefinition)
+                    {
+                        <div class="step-settings-empty"><UiIcon Name="adjustments" /><h3>@T("NoStepConfiguration")</h3><p class="muted">@T("NoStepConfigurationHelp")</p></div>
+                    }
+                    @if (activeStepSettingsTab == StepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition)
+                    {
+                        <div class="step-settings-empty"><UiIcon Name="arrow-bar-to-right" /><h3>@T("NoInputContract")</h3><p class="muted">@T("NoInputContractHelp")</p></div>
+                    }
+                    @if (activeStepSettingsTab == StepSettingsTab.Output && SelectedStep is not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition)
+                    {
+                        <div class="step-settings-empty"><UiIcon Name="arrow-bar-left" /><h3>@T("NoOutputContract")</h3><p class="muted">@T("NoOutputContractHelp")</p></div>
+                    }
+                    @if (activeStepSettingsTab == StepSettingsTab.General)
+                    {
+                        <button class="button-danger" disabled="@(ReadOnly || SelectedStep.Name == Editor.State.Resource.Definition.EntryStep)" @onclick="RemoveSelectedAsync">@T("DeleteStep")</button>
+                    }
                                 </div>
                             </div>
                             <footer class="step-settings-footer">
@@ -467,6 +573,7 @@ else
     private bool? paletteVisibility;
     private bool? inspectorVisibility;
     private bool showStepSettings;
+    private StepSettingsTab activeStepSettingsTab = StepSettingsTab.General;
     private long layoutRevision;
     private long flowCallRenderRevision;
     private int toolPickerRevision;
@@ -603,9 +710,14 @@ else
     private async Task OpenStepSettingsAsync(string name)
     {
         await SelectStepAsync(name);
+        activeStepSettingsTab = StepSettingsTab.General;
         showStepSettings = SelectedStep is not null;
     }
-    private void OpenSelectedStepSettings() => showStepSettings = SelectedStep is not null;
+    private void OpenSelectedStepSettings()
+    {
+        activeStepSettingsTab = StepSettingsTab.General;
+        showStepSettings = SelectedStep is not null;
+    }
     private void CloseStepSettings() => showStepSettings = false;
     private async Task LayoutAsync(bool vertical)
     {
@@ -1045,6 +1157,14 @@ else
         && string.Equals(value.GetString(), "${transition.output}", StringComparison.Ordinal);
     private static string Text(ChangeEventArgs e) => e.Value?.ToString()?.Trim() ?? string.Empty;
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private enum StepSettingsTab
+    {
+        General,
+        Configuration,
+        Input,
+        Output
+    }
     private static string JsonText(JsonElement? value) => value?.GetRawText() ?? string.Empty;
     private static bool IsValidStepName(string value) => value.All(character => char.IsLetterOrDigit(character) || character is '-' or '_');
     private static string SuggestedPublishVersion(IReadOnlyList<FlowDesignerFlowVersion> versions)

@@ -542,6 +542,7 @@ public sealed class FlowDesignerReadOnlyTests
         });
         cards[0].Click();
         rendered.Find("[data-testid='configure-selected-step']").Click();
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Markup, "Called Flow");
@@ -556,6 +557,7 @@ public sealed class FlowDesignerReadOnlyTests
             .State.Resource!.Definition.Steps.Single(step => step.Type() == "flow"));
         Assert.AreEqual(JsonValueKind.String, call.InputMapping?.ValueKind);
         Assert.AreEqual("${transition.output}", call.InputMapping?.GetString());
+        rendered.Find("[data-testid='step-settings-tab-input']").Click();
         Assert.IsTrue(rendered.Find("[data-testid='flow-pass-transition-output']").HasAttribute("checked"));
         StringAssert.Contains(rendered.Markup, "Pass incoming transition output");
         var errorTransition = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Transitions
@@ -659,10 +661,11 @@ public sealed class FlowDesignerReadOnlyTests
         rendered.WaitForAssertion(() => Assert.AreEqual("Welcome Agent", store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single().DisplayName));
         var step = store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single();
         Assert.AreEqual("welcome-agent", step.Agent.ResourceId);
+        StringAssert.Contains(rendered.Find(".inspector-details-group").TextContent, "Step ID");
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         Assert.AreEqual("/agents/welcome-agent", rendered.Find(".inspector-resource-link").GetAttribute("href"));
         Assert.AreEqual("_blank", rendered.Find(".inspector-resource-link").GetAttribute("target"));
         Assert.HasCount(1, rendered.FindAll(".inspector-resource-heading .inspector-resource-link"));
-        StringAssert.Contains(rendered.Find(".inspector-details-group").TextContent, "Step ID");
         StringAssert.Contains(rendered.Find(".inspector-resource-id").TextContent, "Agent ID");
 
         rendered.Find(".flow-inspector select").Change("pack.demo|packed-agent");
@@ -732,20 +735,24 @@ public sealed class FlowDesignerReadOnlyTests
         });
         cards[0].Click();
         rendered.Find("[data-testid='configure-selected-step']").Click();
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Markup, "Called Tool");
-            StringAssert.Contains(rendered.Markup, "message");
-            StringAssert.Contains(rendered.Markup, "deliveryId");
         });
         Assert.AreEqual("Send notification", rendered.Find(".tool-picker-trigger span").TextContent);
         Assert.HasCount(2, rendered.FindAll(".tool-picker-option"));
         Assert.AreEqual("notification.send", rendered.Find(".inspector-resource-id code").TextContent);
 
+        rendered.Find("[data-testid='step-settings-tab-input']").Click();
+        StringAssert.Contains(rendered.Markup, "message");
         rendered.Find(".flow-mapping-editor input").Change("hello");
         var store = context.Services.GetRequiredService<FlowEditorStore>();
         var toolStep = store.State.Resource!.Definition.Steps.OfType<ToolFlowStepDefinition>().Single();
         Assert.AreEqual("hello", toolStep.ArgumentsMapping?.GetProperty("message").GetString());
+        rendered.Find("[data-testid='step-settings-tab-output']").Click();
+        StringAssert.Contains(rendered.Markup, "deliveryId");
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         rendered.FindAll(".tool-picker-option").Single(option =>
             string.Equals(option.GetAttribute("aria-pressed"), "true", StringComparison.OrdinalIgnoreCase)).Click();
         toolStep = store.State.Resource!.Definition.Steps.OfType<ToolFlowStepDefinition>().Single();
@@ -754,10 +761,12 @@ public sealed class FlowDesignerReadOnlyTests
         rendered.Find(".tool-picker-search input").Input("warehouse");
         Assert.HasCount(1, rendered.FindAll(".tool-picker-option"));
         rendered.Find(".tool-picker-option").Click();
+        rendered.Find("[data-testid='step-settings-tab-input']").Click();
         rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "requestId"));
         toolStep = store.State.Resource!.Definition.Steps.OfType<ToolFlowStepDefinition>().Single();
         Assert.AreEqual("warehouse.lookup", toolStep.Tool.ResourceId);
         Assert.AreEqual(new ResourceNamespace("pack.tools"), toolStep.Tool.Namespace);
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         Assert.AreEqual("warehouse.lookup", rendered.Find(".inspector-resource-id code").TextContent);
     }
 
@@ -793,6 +802,7 @@ public sealed class FlowDesignerReadOnlyTests
             .Add(component => component.ResourceId, "sample")
             .Add(component => component.Namespace, new ResourceNamespace("pack.sample")));
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("tool"));
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
 
         Assert.AreEqual("Send notification", rendered.Find(".tool-picker-trigger.is-readonly span").TextContent);
         Assert.HasCount(0, rendered.FindAll(".tool-picker-option"));
@@ -835,6 +845,7 @@ public sealed class FlowDesignerReadOnlyTests
             .Add(component => component.ResourceId, "parent"));
         var canvas = rendered.FindComponent<FlowCanvas>();
         await rendered.InvokeAsync(() => canvas.Instance.StepSettingsRequested.InvokeAsync("deliver"));
+        rendered.Find("[data-testid='step-settings-tab-input']").Click();
 
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='flow-pass-transition-output']")));
         rendered.Find("[data-testid='flow-pass-transition-output']").Change(true);
@@ -932,6 +943,7 @@ public sealed class FlowDesignerReadOnlyTests
         var store = context.Services.GetRequiredService<FlowEditorStore>();
         rendered.WaitForAssertion(() => CollectionAssert.AreEqual(new[] { "accepted" }, store.State.Diagram.Nodes.Single(node => node.Name == "child").OutputEvents.ToArray()));
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
 
         rendered.FindAll(".flow-inspector label").Single(element => element.TextContent.StartsWith("Exact version", StringComparison.Ordinal)).QuerySelector("select")!.Change("2.0.0");
 
@@ -961,10 +973,12 @@ public sealed class FlowDesignerReadOnlyTests
         context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("result"));
+        rendered.Find("[data-testid='step-settings-tab-output']").Click();
 
         rendered.Find("[data-testid='output-mapping']").Change("\"${transition.output}\"");
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });
         await rendered.InvokeAsync(() => rendered.FindComponent<SchemaDocumentEditor>().Instance.ValueChanged.InvokeAsync(schema));
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         rendered.FindAll(".flow-inspector input").Single(element => element.ParentElement!.TextContent.Contains("Error details expression", StringComparison.Ordinal)).Change("${transition.output.details}");
 
         var output = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps.OfType<OutputFlowStepDefinition>().Single();
@@ -1003,6 +1017,7 @@ public sealed class FlowDesignerReadOnlyTests
         context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("result"));
+        rendered.Find("[data-testid='step-settings-tab-output']").Click();
 
         rendered.FindAll("[data-testid='flow-output-schema'] button")
             .Single(button => button.TextContent.Trim() == "Shared Schema").Click();

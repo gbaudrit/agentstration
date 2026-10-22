@@ -85,4 +85,25 @@
   <data name="ConfigureStepTitle"><value>Configure {0}</value></data>
   <data name="CloseStepSettings"><value>Close step settings</value></data>
   <data name="Done"><value>Done</value></data>
+  <data name="StepSettingsSections"><value>Step settings sections</value></data>
+  <data name="StepSettingsTab.General"><value>General</value></data>
+  <data name="StepSettingsTab.Configuration"><value>Configuration</value></data>
+  <data name="StepSettingsTab.Input"><value>Input</value></data>
+  <data name="StepSettingsTab.Output"><value>Output</value></data>
+  <data name="ContractDirection.Input"><value>Input</value></data>
+  <data name="ContractDirection.Output"><value>Output</value></data>
+  <data name="InputContract"><value>Input contract</value></data>
+  <data name="OutputContract"><value>Output contract</value></data>
+  <data name="ContractSource.Flow"><value>Defined by the Flow</value></data>
+  <data name="ContractSource.Step"><value>Defined by this step</value></data>
+  <data name="ContractSource.CalledFlow"><value>Provided by the called Flow</value></data>
+  <data name="ContractSource.CalledTool"><value>Provided by the called Tool</value></data>
+  <data name="NoStepConfiguration"><value>No specific configuration</value></data>
+  <data name="NoStepConfigurationHelp"><value>This step is configured through its input and output contracts.</value></data>
+  <data name="NoInputContract"><value>No input contract</value></data>
+  <data name="NoInputContractHelp"><value>This step does not currently expose a configurable input contract.</value></data>
+  <data name="NoOutputContract"><value>No output contract</value></data>
+  <data name="NoOutputContractHelp"><value>This step does not currently expose a configurable output contract.</value></data>
+  <data name="SelectFlowVersionForContract"><value>Select an available Flow version to inspect its contract.</value></data>
+  <data name="SelectToolForContract"><value>Select an available Tool to inspect its contract.</value></data>
 </root>

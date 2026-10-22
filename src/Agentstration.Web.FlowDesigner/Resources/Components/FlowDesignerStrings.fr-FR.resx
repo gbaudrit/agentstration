@@ -79,4 +79,25 @@
   <data name="ConfigureStepTitle"><value>Configurer {0}</value></data>
   <data name="CloseStepSettings"><value>Fermer la configuration de l’étape</value></data>
   <data name="Done"><value>Terminé</value></data>
+  <data name="StepSettingsSections"><value>Sections de configuration de l’étape</value></data>
+  <data name="StepSettingsTab.General"><value>Général</value></data>
+  <data name="StepSettingsTab.Configuration"><value>Configuration</value></data>
+  <data name="StepSettingsTab.Input"><value>Entrée</value></data>
+  <data name="StepSettingsTab.Output"><value>Sortie</value></data>
+  <data name="ContractDirection.Input"><value>Entrée</value></data>
+  <data name="ContractDirection.Output"><value>Sortie</value></data>
+  <data name="InputContract"><value>Contrat d’entrée</value></data>
+  <data name="OutputContract"><value>Contrat de sortie</value></data>
+  <data name="ContractSource.Flow"><value>Défini par le Flow</value></data>
+  <data name="ContractSource.Step"><value>Défini par cette étape</value></data>
+  <data name="ContractSource.CalledFlow"><value>Fourni par le Flow appelé</value></data>
+  <data name="ContractSource.CalledTool"><value>Fourni par le Tool appelé</value></data>
+  <data name="NoStepConfiguration"><value>Aucune configuration spécifique</value></data>
+  <data name="NoStepConfigurationHelp"><value>Cette étape se configure au travers de ses contrats d’entrée et de sortie.</value></data>
+  <data name="NoInputContract"><value>Aucun contrat d’entrée</value></data>
+  <data name="NoInputContractHelp"><value>Cette étape n’expose actuellement aucun contrat d’entrée configurable.</value></data>
+  <data name="NoOutputContract"><value>Aucun contrat de sortie</value></data>
+  <data name="NoOutputContractHelp"><value>Cette étape n’expose actuellement aucun contrat de sortie configurable.</value></data>
+  <data name="SelectFlowVersionForContract"><value>Sélectionnez une version de Flow disponible pour consulter son contrat.</value></data>
+  <data name="SelectToolForContract"><value>Sélectionnez un Tool disponible pour consulter son contrat.</value></data>
 </root>

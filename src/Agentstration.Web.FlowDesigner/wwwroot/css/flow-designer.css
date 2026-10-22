@@ -209,13 +209,29 @@
 .step-settings-header h2{margin:3px 0 4px;font-size:1.25rem}
 .step-settings-header .eyebrow{color:var(--primary);font-size:.7rem;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
 .step-settings-close{display:grid;width:38px;height:38px;padding:0;place-items:center;border:1px solid var(--border);border-radius:9px;background:var(--surface-2);color:var(--text);cursor:pointer}
+.step-settings-tabs{display:flex;gap:4px;padding:0 22px;border-bottom:1px solid var(--border);background:var(--surface)}
+.step-settings-tabs button{position:relative;padding:14px 16px;border:0;background:transparent;color:var(--muted);font-weight:650;cursor:pointer}
+.step-settings-tabs button::after{position:absolute;right:10px;bottom:-1px;left:10px;height:2px;border-radius:2px;background:transparent;content:""}
+.step-settings-tabs button:hover,.step-settings-tabs button:focus-visible,.step-settings-tabs button.active{color:var(--text)}
+.step-settings-tabs button.active::after{background:var(--primary)}
 .step-settings-body{min-height:0;overflow:auto;padding:22px}
 .step-settings-form.flow-inspector{width:100%;padding:0;border:0;background:transparent;overflow:visible}
 .step-settings-form .schema-binding-editor{max-width:none}
 .step-settings-footer{justify-content:flex-end;border-top:1px solid var(--border);border-bottom:0}
+.step-contract-section{display:grid;gap:18px}
+.step-contract-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.step-contract-heading h3{margin:3px 0 0;font-size:1.05rem}
+.step-contract-heading .eyebrow{color:var(--primary);font-size:.68rem;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+.step-contract-source{padding:5px 9px;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-size:.72rem;font-weight:650}
+.step-contract-empty{margin:0;padding:18px;border:1px dashed var(--border);border-radius:9px;background:var(--surface-2)}
+.step-settings-empty{display:grid;max-width:520px;margin:32px auto;padding:28px;place-items:center;text-align:center;border:1px dashed var(--border);border-radius:12px;background:var(--surface-2)}
+.step-settings-empty .ui-icon{width:28px;height:28px;margin-bottom:8px;color:var(--muted)}
+.step-settings-empty h3,.step-settings-empty p{margin:4px 0}
 
 @media(max-width:800px){
     .step-settings-backdrop{padding:0}
     .step-settings-dialog{width:100vw;height:100dvh;border:0;border-radius:0}
     .step-settings-header,.step-settings-body,.step-settings-footer{padding:16px}
+    .step-settings-tabs{padding:0 10px;overflow-x:auto}
+    .step-settings-tabs button{padding-inline:12px;white-space:nowrap}
 }
