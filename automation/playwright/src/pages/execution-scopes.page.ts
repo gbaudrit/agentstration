@@ -101,17 +101,49 @@ export class ExecutionScopesPage {
     };
   }
 
-  public async executeAtScopes(consoleUrl: string, fixture: ExecutionScopeFixture): Promise<ScopedExecutionEvidence[]> {
-    const evidence: ScopedExecutionEvidence[] = [];
-    for (const scopeRef of Object.values(fixture.scopes)) {
-      evidence.push(await this.executeAtScope(consoleUrl, fixture, scopeRef));
-    }
-    return evidence;
-  }
+  public async executeFromWorkspaceConsole(consoleUrl: string, fixture: ExecutionScopeFixture): Promise<ScopedExecutionEvidence> {
+    const scopeRef = fixture.scopes.workspace;
+    await this.selectWorkspace(consoleUrl, fixture.workspaceId);
 
-  public async executeAtScope(consoleUrl: string, fixture: ExecutionScopeFixture, scopeRef: string): Promise<ScopedExecutionEvidence> {
-    const runtime = await this.createRuntimeRun(consoleUrl, fixture, scopeRef);
-    const flow = await this.createFlowRun(consoleUrl, fixture, scopeRef);
+    await this.open(
+      `${consoleUrl}/agents/${encodeURIComponent(fixture.agentName)}/run?scopeRef=${encodeURIComponent('/instance')}`,
+      TestIds.flowObservability.agentRunner,
+    );
+    await expect(this.agentDefinitionScope).toContainText('/instance');
+    await expect(this.agentExecutionScope).toContainText(scopeRef);
+    const prompt = this.page.getByTestId(TestIds.flowObservability.agentRunPrompt);
+    await prompt.fill('Run the Instance Agent from the selected Workspace.');
+    await prompt.dispatchEvent('change');
+    await expect(prompt).toHaveValue('Run the Instance Agent from the selected Workspace.');
+    await this.page.getByTestId(TestIds.flowObservability.agentRunSubmit).click();
+    const agentRun = this.page.getByTestId(TestIds.flowObservability.agentRunDetails);
+    await agentRun.waitFor({ state: 'visible' });
+    await expect.poll(async () => await agentRun.getAttribute('data-run-state'), { timeout: 90_000 }).toBe('Succeeded');
+    const runtimeRunId = await agentRun.getAttribute('data-run-id');
+    if (!runtimeRunId) throw new Error('The Agent runner did not expose the created Runtime Run identifier.');
+    const runtime = await this.read<RuntimeRunWire>(`${consoleUrl}/api/runtime/runs/${encodeURIComponent(runtimeRunId)}`);
+
+    await this.open(
+      `${consoleUrl}/flows/${encodeURIComponent(fixture.flowName)}?scopeRef=${encodeURIComponent('/instance')}`,
+      TestIds.flowObservability.flowDetails,
+    );
+    await expect(async () => {
+      await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
+      await expect(this.page.getByTestId(TestIds.flowObservability.flowRunOpen)).toBeVisible();
+    }).toPass({ timeout: 30_000 });
+    await this.page.getByTestId(TestIds.flowObservability.flowRunOpen).click();
+    const flowInput = this.page.getByRole('textbox', { name: 'JSON input' });
+    await flowInput.fill('{}');
+    await flowInput.dispatchEvent('change');
+    await this.page.getByTestId(TestIds.flowObservability.flowRunSubmit).click();
+    await this.page.waitForURL(/\/flow-runs\/[^?]+\?scopeRef=/, { timeout: 30_000 });
+    await this.page.getByTestId(TestIds.flowObservability.runDetails).waitFor({ state: 'visible' });
+    const flowRunId = decodeURIComponent(new URL(this.page.url()).pathname.split('/').at(-1) ?? '');
+    if (!flowRunId) throw new Error('The Flow runner did not navigate to the created Flow Run.');
+    await expect.poll(async () => flowStatus(await this.read<FlowRunWire>(
+      `${consoleUrl}/api/flowRuns/${encodeURIComponent(flowRunId)}`)),
+    { timeout: 90_000 }).toBe('Succeeded');
+    const flow = await this.read<FlowRunWire>(`${consoleUrl}/api/flowRuns/${encodeURIComponent(flowRunId)}`);
     if (!flow.workItemResourceId) throw new Error(`Flow Run '${flow.id}' did not expose its WorkItem.`);
     const work = await this.waitForWorkItem(consoleUrl, flow.workItemResourceId, scopeRef);
     expect(runtime.executionScopeRef).toBe(scopeRef);
@@ -140,23 +172,27 @@ export class ExecutionScopesPage {
     await expect(this.flowRunExecutionScope).toContainText(evidence.scopeRef);
   }
 
-  public async expectExactIsolation(consoleUrl: string, fixture: ExecutionScopeFixture, evidence: ScopedExecutionEvidence[]): Promise<void> {
-    for (const item of evidence) {
-      for (const otherScope of Object.values(fixture.scopes).filter(scope => scope !== item.scopeRef)) {
-        await this.expectNotFound(`${consoleUrl}/api/runtime/runs/${encodeURIComponent(item.runtimeRunId)}?scopeRef=${encodeURIComponent(otherScope)}`);
-        await this.expectNotFound(`${consoleUrl}/api/flowRuns/${encodeURIComponent(item.flowRunId)}?scopeRef=${encodeURIComponent(otherScope)}`);
-        await this.expectNotFound(`${consoleUrl}/api/work/workitems/${encodeURIComponent(item.workItemId)}?scopeRef=${encodeURIComponent(otherScope)}`);
-      }
-    }
+  public async recoverFlowRunThroughWorkspaceList(consoleUrl: string, evidence: ScopedExecutionEvidence): Promise<void> {
+    await this.open(`${consoleUrl}/flow-runs`, TestIds.flowObservability.runs);
+    const link = this.page.locator(`a[href^="/flow-runs/${evidence.flowRunId}?"]`);
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute(
+      'href',
+      `/flow-runs/${evidence.flowRunId}?scopeRef=${encodeURIComponent(evidence.scopeRef)}`,
+    );
+    await link.click();
+    await this.page.getByTestId(TestIds.flowObservability.runDetails).waitFor({ state: 'visible' });
+    await expect(this.flowRunDefinitionScope).toContainText('/instance');
+    await expect(this.flowRunExecutionScope).toContainText(evidence.scopeRef);
+  }
 
+  public async expectWorkspaceIsolation(consoleUrl: string, fixture: ExecutionScopeFixture, evidence: ScopedExecutionEvidence): Promise<void> {
     await this.selectWorkspace(consoleUrl, fixture.siblingWorkspaceId);
-    for (const item of evidence) {
-      await this.expectNotFound(`${consoleUrl}/api/runtime/runs/${encodeURIComponent(item.runtimeRunId)}`);
-      await this.expectNotFound(`${consoleUrl}/api/flowRuns/${encodeURIComponent(item.flowRunId)}`);
-      await this.expectNotFound(`${consoleUrl}/api/work/workitems/${encodeURIComponent(item.workItemId)}`);
-    }
+    await this.expectNotFound(`${consoleUrl}/api/runtime/runs/${encodeURIComponent(evidence.runtimeRunId)}`);
+    await this.expectNotFound(`${consoleUrl}/api/flowRuns/${encodeURIComponent(evidence.flowRunId)}`);
+    await this.expectNotFound(`${consoleUrl}/api/work/workitems/${encodeURIComponent(evidence.workItemId)}`);
 
-    await this.expectUnrelatedTenantDenied(consoleUrl, fixture, evidence);
+    await this.expectUnrelatedTenantDenied(consoleUrl, fixture, [evidence]);
 
     await this.selectWorkspace(consoleUrl, fixture.workspaceId);
   }
@@ -361,20 +397,6 @@ export class ExecutionScopesPage {
     expect(saved.status(), await saved.text()).toBe(200);
   }
 
-  private async createRuntimeRun(consoleUrl: string, fixture: ExecutionScopeFixture, scopeRef: string): Promise<RuntimeRunWire> {
-    const created = await this.page.request.post(`${consoleUrl}/api/runtime/runs`, {
-      data: this.runtimeRunRequest(fixture, scopeRef),
-    });
-    const body = await created.text();
-    expect(created.status(), body).toBe(202);
-    const run = JSON.parse(body) as RuntimeRunWire;
-    await expect.poll(async () => (await this.read<RuntimeRunWire>(
-      `${consoleUrl}/api/runtime/runs/${encodeURIComponent(run.id)}?scopeRef=${encodeURIComponent(scopeRef)}`)).status.state,
-    { timeout: 90_000 }).toBe('Succeeded');
-    return await this.read<RuntimeRunWire>(
-      `${consoleUrl}/api/runtime/runs/${encodeURIComponent(run.id)}?scopeRef=${encodeURIComponent(scopeRef)}`);
-  }
-
   private runtimeRunRequest(fixture: ExecutionScopeFixture, scopeRef: string): object {
     return {
       executionScopeRef: scopeRef,
@@ -385,23 +407,6 @@ export class ExecutionScopesPage {
       input: { messages: [{ role: 'User', content: `Execute deterministically at ${scopeRef}.` }] },
       origin: 'Api',
     };
-  }
-
-  private async createFlowRun(consoleUrl: string, fixture: ExecutionScopeFixture, scopeRef: string): Promise<FlowRunWire> {
-    const created = await this.page.request.post(`${consoleUrl}/api/flows/${fixture.flowName}/runs`, {
-      data: {
-        input: { request: `Execute deterministically at ${scopeRef}.` },
-        version: '1.0.0', definitionScopeRef: '/instance', executionScopeRef: scopeRef,
-      },
-    });
-    const body = await created.text();
-    expect(created.status(), body).toBe(202);
-    const run = JSON.parse(body) as FlowRunWire;
-    await expect.poll(async () => flowStatus(await this.read<FlowRunWire>(
-      `${consoleUrl}/api/flowRuns/${encodeURIComponent(run.id)}?scopeRef=${encodeURIComponent(scopeRef)}`)),
-    { timeout: 90_000 }).toBe('Succeeded');
-    return await this.read<FlowRunWire>(
-      `${consoleUrl}/api/flowRuns/${encodeURIComponent(run.id)}?scopeRef=${encodeURIComponent(scopeRef)}`);
   }
 
   private async waitForWorkItem(consoleUrl: string, workItemId: string, scopeRef: string): Promise<WorkItemWire> {

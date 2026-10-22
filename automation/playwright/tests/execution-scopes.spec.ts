@@ -6,7 +6,7 @@ import { test } from '../src/fixtures/test.js';
 test.use({ authenticationMode: 'Local' });
 test.setTimeout(360_000);
 
-test('ancestor definitions execute at exact Instance, Tenant, and Workspace scopes without leaking state @smoke', async ({ page, product }) => {
+test('ancestor definitions execute in the selected Workspace and remain discoverable after navigation @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await exerciseExecutionScopes({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });
@@ -15,7 +15,7 @@ test('definition ownership and invocation scope remain distinct at mobile width 
   const pages = new ProductPages(page);
   await pages.login.signIn(product.consoleUrl);
   const fixture = await pages.executionScopes.ensureFixture(product.consoleUrl);
-  const evidence = await pages.executionScopes.executeAtScope(product.consoleUrl, fixture, fixture.scopes.workspace);
+  const evidence = await pages.executionScopes.executeFromWorkspaceConsole(product.consoleUrl, fixture);
   await pages.executionScopes.openRuntimeRun(product.consoleUrl, evidence);
   await pages.executionScopes.openFlowRun(product.consoleUrl, evidence);
 });
@@ -24,6 +24,6 @@ test('execution scope labels are localized in English and French @locale @smoke'
   const pages = new ProductPages(page);
   await pages.login.signIn(product.consoleUrl);
   const fixture = await pages.executionScopes.ensureFixture(product.consoleUrl);
-  const evidence = await pages.executionScopes.executeAtScope(product.consoleUrl, fixture, fixture.scopes.instance);
+  const evidence = await pages.executionScopes.executeFromWorkspaceConsole(product.consoleUrl, fixture);
   await pages.executionScopes.assertLocalizedLabels(product.consoleUrl, evidence);
 });

@@ -4,6 +4,7 @@
 @inject IAgentRunnerManagementClient ManagementClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
 @inject IAgentsModelClient ModelsClient
+@inject ConsoleContextState ContextState
 @inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerInspectorStrings> InspectorLocalizer
@@ -188,7 +189,8 @@ else
     private bool CanRun => readiness is { Ready: true }
         && modelResolution?.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
     private bool CanCancel => state.Run is not null && state.State is RuntimeRunState.Pending or RuntimeRunState.Running;
-    private ResourceScopeRef SelectedExecutionScope => state.Run?.ExecutionScopeRef ?? agent?.ScopeRef ?? ResourceScopeRef.Instance;
+    private ResourceScopeRef SelectedExecutionScope => state.Run?.ExecutionScopeRef
+        ?? ResourceScopeRef.Workspace(ContextState.Current?.WorkspaceId ?? Guid.Empty);
     private ResourceScopeRef AgentDefinitionScope => state.Run?.Properties.Agent.ScopeRef ?? agent?.ScopeRef ?? ResourceScopeRef.Instance;
     private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.Name)}";
     private string RawResponse => JsonSerializer.Serialize(new { run = state.Run, events = state.Events }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
@@ -313,7 +315,10 @@ else
 
     private async Task LoadHistoryAsync()
     {
-        if (agent is not null) history = await RuntimeClient.GetRunsAsync(agent.Metadata.Name, SelectedExecutionScope, cancellation.Token);
+        if (agent is null) return;
+        history = state.Run is null
+            ? await RuntimeClient.GetRunsAsync(agent.Metadata.Name, cancellation.Token)
+            : await RuntimeClient.GetRunsAsync(agent.Metadata.Name, state.Run.ExecutionScopeRef, cancellation.Token);
     }
 
     private Task LoadExecutionContextAsync() => LoadExecutionContextAsync(agent?.Generation);

@@ -11,29 +11,35 @@ export const exerciseExecutionScopes: Journey<ExerciseExecutionScopesInput> = as
   await prepareConsoleJourney(context, input);
   const scopes = context.pages.executionScopes;
   const fixture = await scopes.ensureFixture(context.consoleUrl);
-  const evidence = await scopes.executeAtScopes(context.consoleUrl, fixture);
+  const evidence = await scopes.executeFromWorkspaceConsole(context.consoleUrl, fixture);
 
-  for (const [index, item] of evidence.entries()) {
-    await scopes.openRuntimeRun(context.consoleUrl, item);
-    await scopes.openFlowRun(context.consoleUrl, item);
-    const checkpoint = [
-      Checkpoints.executionScopes.instanceRun,
-      Checkpoints.executionScopes.tenantRun,
-      Checkpoints.executionScopes.workspaceRun,
-    ][index];
-    await context.checkpoint({
-      name: checkpoint,
-      page: context.pages.page,
-      target: scopes.flowRunExecutionScope,
-    });
-  }
+  await scopes.openRuntimeRun(context.consoleUrl, evidence);
+  await context.checkpoint({
+    name: Checkpoints.executionScopes.workspaceAgentRun,
+    page: context.pages.page,
+    target: scopes.agentRunExecutionScope,
+  });
 
-  await scopes.expectExactIsolation(context.consoleUrl, fixture, evidence);
-  await scopes.openFlowRun(context.consoleUrl, evidence.at(-1)!);
+  await scopes.openFlowRun(context.consoleUrl, evidence);
+  await context.checkpoint({
+    name: Checkpoints.executionScopes.workspaceFlowRun,
+    page: context.pages.page,
+    target: scopes.flowRunExecutionScope,
+  });
+
+  await scopes.recoverFlowRunThroughWorkspaceList(context.consoleUrl, evidence);
+  await context.checkpoint({
+    name: Checkpoints.executionScopes.workspaceRecovery,
+    page: context.pages.page,
+    target: scopes.flowRunExecutionScope,
+  });
+
+  await scopes.expectWorkspaceIsolation(context.consoleUrl, fixture, evidence);
+  await scopes.openFlowRun(context.consoleUrl, evidence);
   await context.checkpoint({
     name: Checkpoints.executionScopes.isolation,
     page: context.pages.page,
     target: scopes.flowRunExecutionScope,
   });
-  await scopes.assertLocalizedLabels(context.consoleUrl, evidence.at(-1)!);
+  await scopes.assertLocalizedLabels(context.consoleUrl, evidence);
 };

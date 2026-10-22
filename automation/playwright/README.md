@@ -108,7 +108,7 @@ The hierarchical Resource Access journey covers `/vaults/{name}`, `/secrets/new`
 npm run capture -- --plan examples/exercise-resource-access.capture-plan.json --output .work/resource-access --console-url https://agentstration.example.com
 ```
 
-The exact execution-scope journey creates an Instance-owned Agent and Flow, grants their use to one Tenant and its descendants, then invokes the same definitions at Instance, Tenant, and Workspace scope. It verifies the persisted Runtime Run, Flow Run, and root WorkItem scopes, sibling isolation, stable denial from an unrelated Tenant, and distinct localized definition/invocation scope labels:
+The exact execution-scope journey creates an Instance-owned Agent and Flow, grants their use to one Tenant and its descendants, then invokes both definitions from the Console in the selected Workspace. It verifies Workspace-owned Runtime Run, Flow Run, and root WorkItem state, recovery through the Workspace run list after navigation, sibling isolation, stable denial from an unrelated Tenant, and distinct localized definition/invocation scope labels:
 
 ```powershell
 npm run capture -- --plan examples/exercise-execution-scopes.capture-plan.json --output .work/execution-scopes

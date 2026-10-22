@@ -129,9 +129,9 @@ export const Checkpoints = {
     revoked: 'resource-access-revoked',
   },
   executionScopes: {
-    instanceRun: 'execution-scopes-instance-run',
-    tenantRun: 'execution-scopes-tenant-run',
-    workspaceRun: 'execution-scopes-workspace-run',
+    workspaceAgentRun: 'execution-scopes-workspace-agent-run',
+    workspaceFlowRun: 'execution-scopes-workspace-flow-run',
+    workspaceRecovery: 'execution-scopes-workspace-recovery',
     isolation: 'execution-scopes-isolation',
   },
   modelAdministration: {

@@ -140,6 +140,7 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual("1.0.0", client.LastRunRequest.Version);
         Assert.AreEqual("local", client.LastRunRequest.DeploymentResourceId);
         Assert.AreEqual(client.ScopeRef, client.LastRunRequest.DefinitionScopeRef);
+        Assert.IsNull(client.LastRunRequest.ExecutionScopeRef);
     }
 
     [TestMethod]
