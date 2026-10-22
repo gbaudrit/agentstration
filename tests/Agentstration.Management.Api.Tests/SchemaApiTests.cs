@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -85,6 +86,12 @@ public sealed class SchemaApiTests : ModelManagementApiTestBase
         Assert.AreEqual("1.0.0", snapshot.Source!.Version);
         Assert.AreEqual(schemaVersion.Value.DefinitionHash,
             published.Value.SchemaBindings["$.steps[normalize].schema"].DefinitionHash);
+
+        using var client = factory.CreateClient();
+        var publishedResponse = await client.GetFromJsonAsync<FlowVersionResponse>(
+            "/api/flows/schema-bound-flow/versions/1.0.0");
+        Assert.IsNotNull(publishedResponse);
+        Assert.AreEqual("1.0.0", publishedResponse.SchemaBindings!["$.inputSchema"].Source!.Version);
 
         _ = await schemaService.PutAsync(workspaceScope, ResourceNamespace.Default, "flow-input",
             original with { Content = JsonDocument.Parse("{\"type\":\"array\"}").RootElement.Clone() },

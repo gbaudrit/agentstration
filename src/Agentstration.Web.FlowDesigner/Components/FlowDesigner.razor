@@ -256,6 +256,30 @@ else
                             <ContractHeading Direction="Input" Source="@T("ContractSource.CalledFlow")" />
                         @if (SelectedFlowVersion is not null)
                         {
+                            @if (FlowCallReceivesParentInput(flowCall) && SelectedFlowVersion.InputSchemaReference is { } sharedInputReference)
+                            {
+                                <aside class="shared-contract-reuse" data-testid="flow-call-shared-input-contract">
+                                    <div>
+                                        <strong>@T("CalledFlowSharedInputTitle")</strong>
+                                        <p>@T("CalledFlowSharedInputHelp")</p>
+                                        <code>@SchemaReferenceLabel(sharedInputReference)</code>
+                                    </div>
+                                    @if (ParentInputHasExplicitContract)
+                                    {
+                                        <span class="inspector-step-type">@T("ParentInputContractAlreadyDefined")</span>
+                                    }
+                                    else if (!ReadOnly)
+                                    {
+                                        <button type="button" class="secondary" data-testid="use-called-flow-shared-input" @onclick="UseCalledFlowSharedInputAsync">@T("UseCalledFlowSharedInput")</button>
+                                    }
+                                </aside>
+                            }
+                            else if (FlowCallReceivesParentInput(flowCall)
+                                && SelectedFlowVersion.InputSchema is not null
+                                && SelectedFlowVersion.InputSchemaReference is null)
+                            {
+                                <p class="step-contract-empty muted" data-testid="flow-call-inline-input-contract">@T("CalledFlowInlineInputHelp")</p>
+                            }
                             <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
                                 <label class="flow-checkbox-field"><input data-testid="flow-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(flowCall.InputMapping)" @onchange="UpdateFlowTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
                                 <small>@T("PassIncomingTransitionOutputHelp")</small>
@@ -685,6 +709,9 @@ else
     private FlowDesignerTool? SelectedTool => SelectedStep is ToolFlowStepDefinition tool
         ? tools.FirstOrDefault(item => ToolKey(item.Namespace, item.Name) == ToolKey(tool.Tool))
         : null;
+    private InputFlowStepDefinition? ParentInputStep => Editor.State.Resource?.Definition.Steps.OfType<InputFlowStepDefinition>().SingleOrDefault();
+    private bool ParentInputHasExplicitContract => ParentInputStep is { Schema: not null } or { SchemaBinding: not null }
+        || Editor.State.Resource?.Definition is { InputSchema: not null } or { InputSchemaBinding: not null };
     private JsonElement? EffectiveInputSchema
     {
         get
@@ -1074,6 +1101,21 @@ else
             : JsonSerializer.SerializeToElement(new { });
         return UpdateSelectedAsync(call with { InputMapping = mapping });
     }
+    private Task UseCalledFlowSharedInputAsync()
+    {
+        if (ReadOnly
+            || SelectedStep is not FlowCallStepDefinition call
+            || !FlowCallReceivesParentInput(call)
+            || ParentInputHasExplicitContract
+            || ParentInputStep is not { } input
+            || SelectedFlowVersion?.InputSchemaReference is not { } reference)
+            return Task.CompletedTask;
+        return DispatchAsync(new UpdateStepCommand(input with
+        {
+            Schema = null,
+            SchemaBinding = new SchemaBinding { Reference = reference }
+        }));
+    }
     private Task SelectToolAsync(FlowDesignerTool selected)
     {
         toolSearch = string.Empty;
@@ -1282,6 +1324,13 @@ else
     private static bool PassesIncomingTransitionOutput(JsonElement? mapping) =>
         mapping is { ValueKind: JsonValueKind.String } value
         && string.Equals(value.GetString(), "${transition.output}", StringComparison.Ordinal);
+    private bool FlowCallReceivesParentInput(FlowCallStepDefinition call) =>
+        ParentInputStep is { } input
+        && PassesIncomingTransitionOutput(call.InputMapping)
+        && Editor.State.Resource?.Definition.Transitions.Any(transition =>
+            transition.FromStep == input.Name && transition.ToStep == call.Name) == true;
+    private static string SchemaReferenceLabel(SchemaVersionReference reference) =>
+        $"{reference.Namespace?.Value ?? ResourceNamespace.Default.Value}/{reference.Name} · {reference.Version}";
     private static string Text(ChangeEventArgs e) => e.Value?.ToString()?.Trim() ?? string.Empty;
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 

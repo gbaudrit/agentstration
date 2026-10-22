@@ -1003,6 +1003,103 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
+    public async Task FlowCallCanReuseItsSharedInputContractForAnUnconfiguredParentInput()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { request = new { type = "string" } } });
+        var reference = new SchemaVersionReference
+        {
+            Name = "analysis-request",
+            Version = "1.2.0",
+            Namespace = new("pack.news"),
+            ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"))
+        };
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new FlowCallStepDefinition
+                {
+                    Name = "child",
+                    Flow = new("analysis", FlowCallVersionStrategy.Exact, "1.0.0", new("pack.news")),
+                    InputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+                }
+            ],
+            Transitions = [new("input-child", "input", "completed", "child")]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            FlowVersions = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal)
+            {
+                ["pack.news|analysis"] = [new("1.0.0", schema, null, InputSchemaReference: reference)]
+            }
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
+        rendered.Find("[data-testid='step-settings-tab-input']").Click();
+        StringAssert.Contains(rendered.Find("[data-testid='flow-call-shared-input-contract']").TextContent, "pack.news/analysis-request · 1.2.0");
+        rendered.Find("[data-testid='use-called-flow-shared-input']").Click();
+
+        var input = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<InputFlowStepDefinition>().Single();
+        Assert.AreEqual(reference, input.SchemaBinding?.Reference);
+        Assert.IsNull(input.Schema);
+        Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='use-called-flow-shared-input']"));
+        StringAssert.Contains(rendered.Find("[data-testid='flow-call-shared-input-contract']").TextContent, "Parent input already configured");
+    }
+
+    [TestMethod]
+    public async Task FlowCallDoesNotOfferToCopyAnInlineInputContract()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var schema = JsonSerializer.SerializeToElement(new { type = "object" });
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new FlowCallStepDefinition
+                {
+                    Name = "child",
+                    Flow = new("analysis", FlowCallVersionStrategy.Exact, "1.0.0"),
+                    InputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+                }
+            ],
+            Transitions = [new("input-child", "input", "completed", "child")]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            FlowVersions = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal)
+            {
+                ["default|analysis"] = [new("1.0.0", schema, null)]
+            }
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
+        rendered.Find("[data-testid='step-settings-tab-input']").Click();
+
+        StringAssert.Contains(rendered.Find("[data-testid='flow-call-inline-input-contract']").TextContent, "Make it shared in the called Flow");
+        Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='use-called-flow-shared-input']"));
+    }
+
+    [TestMethod]
     public async Task OutputInspectorShowsCanonicalMappingAndInheritedSchemaAndEditsErrorDetails()
     {
         using var culture = new CultureScope("en-US");

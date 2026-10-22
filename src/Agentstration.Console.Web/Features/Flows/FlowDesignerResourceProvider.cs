@@ -24,10 +24,18 @@ public sealed class FlowDesignerResourceProvider(
         string name,
         CancellationToken cancellationToken) =>
         (await flowClient.GetFlowVersionsAsync(@namespace, name, cancellationToken))
-            .Select(version => new FlowDesignerFlowVersion(version.Version,
-                version.Graph?.Steps.OfType<InputFlowStepDefinition>().SingleOrDefault()?.Schema ?? version.Graph?.InputSchema,
+            .Select(version =>
+            {
+                var input = version.Graph?.Steps.OfType<InputFlowStepDefinition>().SingleOrDefault();
+                var inputReference = input?.Schema is not null
+                    ? version.SchemaBindings?.GetValueOrDefault($"$.steps[{input.Name}].schema")?.Source
+                    : version.SchemaBindings?.GetValueOrDefault("$.inputSchema")?.Source;
+                return new FlowDesignerFlowVersion(version.Version,
+                input?.Schema ?? version.Graph?.InputSchema,
                 version.Graph?.OutputSchema,
-                version.Graph?.GetOutputs().Select(output => new FlowDesignerOutput(output.Name, output.DisplayName, output.Outcome, output.Schema)).ToArray() ?? [])).ToArray();
+                version.Graph?.GetOutputs().Select(output => new FlowDesignerOutput(output.Name, output.DisplayName, output.Outcome, output.Schema)).ToArray() ?? [],
+                inputReference);
+            }).ToArray();
 
     public async Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken) =>
         (await toolsClient.GetToolsAsync(cancellationToken: cancellationToken))

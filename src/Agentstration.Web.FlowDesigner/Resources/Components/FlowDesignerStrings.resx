@@ -97,6 +97,11 @@
   <data name="ContractSource.Flow"><value>Defined by the Flow</value></data>
   <data name="ContractSource.Step"><value>Defined by this step</value></data>
   <data name="ContractSource.CalledFlow"><value>Provided by the called Flow</value></data>
+  <data name="CalledFlowSharedInputTitle"><value>Reusable shared contract</value></data>
+  <data name="CalledFlowSharedInputHelp"><value>The called Flow pins its input to this published Schema version. The parent Flow can use the same contract without copying it.</value></data>
+  <data name="UseCalledFlowSharedInput"><value>Use for the parent Flow input</value></data>
+  <data name="ParentInputContractAlreadyDefined"><value>Parent input already configured</value></data>
+  <data name="CalledFlowInlineInputHelp"><value>The called Flow uses an inline input contract. Make it shared in the called Flow before reusing it in the parent Flow.</value></data>
   <data name="ContractSource.CalledTool"><value>Provided by the called Tool</value></data>
   <data name="ContractSource.IncomingTransition"><value>Inherited from the incoming transition</value></data>
   <data name="ContractSource.LegacyOutput"><value>Declared by this legacy output</value></data>

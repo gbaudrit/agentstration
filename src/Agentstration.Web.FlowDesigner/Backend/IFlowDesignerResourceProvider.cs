@@ -12,7 +12,7 @@ public sealed record FlowDesignerAgent(string Name, string DisplayName)
 }
 public sealed record FlowDesignerFlow(string Name, string DisplayName, ResourceNamespace Namespace, string? ActiveVersion);
 public sealed record FlowDesignerOutput(string Name, string? DisplayName, FlowOutputOutcome Outcome, JsonElement? Schema);
-public sealed record FlowDesignerFlowVersion(string Version, JsonElement? InputSchema, JsonElement? OutputSchema, IReadOnlyList<FlowDesignerOutput>? Outputs = null)
+public sealed record FlowDesignerFlowVersion(string Version, JsonElement? InputSchema, JsonElement? OutputSchema, IReadOnlyList<FlowDesignerOutput>? Outputs = null, SchemaVersionReference? InputSchemaReference = null)
 {
     public IReadOnlyList<FlowDesignerOutput> NamedOutputs { get; init; } = Outputs ?? [];
 }

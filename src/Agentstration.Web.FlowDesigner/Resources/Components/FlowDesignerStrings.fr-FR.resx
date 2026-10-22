@@ -91,6 +91,11 @@
   <data name="ContractSource.Flow"><value>Défini par le Flow</value></data>
   <data name="ContractSource.Step"><value>Défini par cette étape</value></data>
   <data name="ContractSource.CalledFlow"><value>Fourni par le Flow appelé</value></data>
+  <data name="CalledFlowSharedInputTitle"><value>Contrat partagé réutilisable</value></data>
+  <data name="CalledFlowSharedInputHelp"><value>Le Flow appelé épingle son entrée sur cette version publiée d’un schéma. Le Flow parent peut utiliser le même contrat sans le recopier.</value></data>
+  <data name="UseCalledFlowSharedInput"><value>Utiliser pour l’entrée du Flow parent</value></data>
+  <data name="ParentInputContractAlreadyDefined"><value>Entrée du Flow parent déjà configurée</value></data>
+  <data name="CalledFlowInlineInputHelp"><value>Le Flow appelé utilise un contrat d’entrée intégré. Rendez-le partagé dans le Flow appelé avant de le réutiliser dans le Flow parent.</value></data>
   <data name="ContractSource.CalledTool"><value>Fourni par le Tool appelé</value></data>
   <data name="ContractSource.IncomingTransition"><value>Hérité de la transition entrante</value></data>
   <data name="ContractSource.LegacyOutput"><value>Déclaré par cette ancienne sortie</value></data>
