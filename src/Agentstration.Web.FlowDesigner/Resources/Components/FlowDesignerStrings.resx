@@ -71,4 +71,13 @@
   <data name="EdgeDescription"><value>{0} to {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>declared</value></data><data name="EdgeState.Observed"><value>observed</value></data><data name="EdgeState.Failed"><value>observed error</value></data><data name="EdgeState.Inactive"><value>not selected</value></data>
   <data name="ExpandTopology"><value>Expand</value></data><data name="ReduceTopology"><value>Reduce</value></data><data name="ShowInfo"><value>Details</value></data><data name="HideInfo"><value>Hide details</value></data>
   <data name="Replay"><value>Replay</value></data><data name="Replaying"><value>Replaying…</value></data><data name="ReplaySequence"><value>Replay the execution sequence</value></data><data name="ReplayInProgress"><value>Execution sequence replay in progress</value></data><data name="ReplayElapsedCounter"><value>Original execution elapsed time</value></data>
+  <data name="SchemaContractHelp"><value>Author this contract inline or pin it to an exact published Schema version.</value></data>
+  <data name="SchemaSource"><value>Schema source</value></data>
+  <data name="SchemaInline"><value>Inline</value></data>
+  <data name="SchemaShared"><value>Shared Schema</value></data>
+  <data name="SharedSchema"><value>Schema</value></data>
+  <data name="ExactSchemaVersion"><value>Published version</value></data>
+  <data name="NoCompatibleSchemas"><value>No published JSON Schema is available. Publish a compatible Schema first or use an inline contract.</value></data>
+  <data name="SchemaReferenceUnavailable"><value>The referenced Schema {0}/{1} version {2} is no longer available.</value></data>
+  <data name="InputSchema"><value>Input schema</value></data>
 </root>

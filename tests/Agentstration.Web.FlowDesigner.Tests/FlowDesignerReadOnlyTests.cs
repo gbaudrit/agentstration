@@ -4,7 +4,9 @@ using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Components.JsonSchema;
+using Agentstration.Web.Components.Schemas;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.Components;
@@ -958,14 +960,56 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.SelectedStepChanged.InvokeAsync("result"));
 
         rendered.Find("[data-testid='output-mapping']").Change("\"${transition.output}\"");
-        rendered.Find("[data-testid='output-schema']").Change("{\"type\":\"object\"}");
+        var schema = JsonSerializer.SerializeToElement(new { type = "object" });
+        await rendered.InvokeAsync(() => rendered.FindComponent<SchemaDocumentEditor>().Instance.ValueChanged.InvokeAsync(schema));
         rendered.FindAll(".flow-inspector input").Single(element => element.ParentElement!.TextContent.Contains("Error details expression", StringComparison.Ordinal)).Change("${transition.output.details}");
 
         var output = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps.OfType<OutputFlowStepDefinition>().Single();
         Assert.AreEqual(JsonValueKind.String, output.OutputMapping?.ValueKind);
         Assert.AreEqual("${transition.output}", output.OutputMapping?.GetString());
-        Assert.AreEqual("object", output.Schema?.GetProperty("type").GetString());
+        Assert.IsNull(output.Schema);
+        Assert.AreEqual("object", output.SchemaBinding?.Inline?.Content.GetProperty("type").GetString());
         Assert.AreEqual("${transition.output.details}", output.DetailsExpression);
+    }
+
+    [TestMethod]
+    public async Task OutputInspectorPinsAnExactPublishedSharedSchemaVersion()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "result" }],
+            Transitions = [new("input-result", "input", "completed", "result")]
+        };
+        var scope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            SchemaVersions =
+            [
+                new("task-result", "Task result", ResourceNamespace.Default, scope, "1.2.0", "json-schema",
+                    "https://json-schema.org/draft/2020-12/schema",
+                    JsonSerializer.SerializeToElement(new { type = "object", properties = new { answer = new { type = "string" } } }))
+            ]
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.SelectedStepChanged.InvokeAsync("result"));
+
+        rendered.FindAll("[data-testid='flow-output-schema'] button")
+            .Single(button => button.TextContent.Trim() == "Shared Schema").Click();
+
+        var output = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<OutputFlowStepDefinition>().Single();
+        Assert.IsNull(output.Schema);
+        Assert.AreEqual("task-result", output.SchemaBinding?.Reference?.Name);
+        Assert.AreEqual("1.2.0", output.SchemaBinding?.Reference?.Version);
+        Assert.AreEqual(scope, output.SchemaBinding?.Reference?.ScopeRef);
     }
 
     [TestMethod]
@@ -1092,6 +1136,7 @@ public sealed class FlowDesignerReadOnlyTests
         private readonly IReadOnlyList<string> publishedVersions;
         public IReadOnlyList<FlowDesignerAgent> Agents { get; init; } = [];
         public IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerFlowVersion>> FlowVersions { get; init; } = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal);
+        public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; init; } = [];
 
         public ResourceProviderStub(params string[] publishedVersions) => this.publishedVersions = publishedVersions;
 
@@ -1127,6 +1172,8 @@ public sealed class FlowDesignerReadOnlyTests
                     Enabled: true,
                     Available: true,
                     RequiresApproval: false)]);
+        public Task<IReadOnlyList<FlowDesignerSchemaVersion>> GetSchemaVersionsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(SchemaVersions);
     }
 
     private sealed class BackendStub : IFlowDesignerBackend

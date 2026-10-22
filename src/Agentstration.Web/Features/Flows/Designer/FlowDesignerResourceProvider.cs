@@ -1,10 +1,12 @@
 using Agentstration.Flows;
+using Agentstration.Schemas;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Console;
 using Agentstration.Web.FlowDesigner.Backend;
 
 namespace Agentstration.Web.Features.Flows.Designer;
 
-public sealed class FlowDesignerResourceProvider(IManagementApiClient client, IFlowApiClient flowClient, IToolsClient toolsClient) : IFlowDesignerResourceProvider
+public sealed class FlowDesignerResourceProvider(IManagementApiClient client, IFlowApiClient flowClient, IToolsClient toolsClient, ISchemasClient schemasClient) : IFlowDesignerResourceProvider
 {
     public async Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken)
     {
@@ -41,4 +43,27 @@ public sealed class FlowDesignerResourceProvider(IManagementApiClient client, IF
             tool.Definition.Discovery?.Available == true,
             tool.Definition.RequiresApproval)).ToArray();
     }
+
+    public async Task<IReadOnlyList<FlowDesignerSchemaVersion>> GetSchemaVersionsAsync(CancellationToken cancellationToken)
+    {
+        var schemas = (await schemasClient.GetSchemasAsync(cancellationToken))
+            .Where(schema => string.Equals(schema.Definition.Format, SchemaFormatIds.JsonSchema, StringComparison.Ordinal))
+            .ToArray();
+        var result = new List<FlowDesignerSchemaVersion>();
+        foreach (var schema in schemas)
+        {
+            if (schema.ScopeRef is not { } scopeRef) continue;
+            var versions = await schemasClient.GetVersionsAsync(scopeRef, schema.Namespace, schema.Name, cancellationToken);
+            result.AddRange(versions.Select(version => new FlowDesignerSchemaVersion(
+                schema.Name, schema.Definition.DisplayName, schema.Namespace, scopeRef, version.Version,
+                version.Format, version.Dialect, version.Content.Clone())));
+        }
+        return result;
+    }
+
+    public Task<SchemaFormatValidationResult> ValidateSchemaDefinitionAsync(ValidateSchemaDefinitionRequest request,
+        CancellationToken cancellationToken) => schemasClient.ValidateDefinitionAsync(request, cancellationToken);
+
+    public Task<SchemaFormatValidationResult> ValidateSchemaInstanceAsync(ValidateSchemaInstanceRequest request,
+        CancellationToken cancellationToken) => schemasClient.ValidateInstanceAsync(request, cancellationToken);
 }

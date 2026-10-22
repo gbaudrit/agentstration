@@ -65,4 +65,13 @@
   <data name="EdgeDescription"><value>{0} vers {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>déclaré</value></data><data name="EdgeState.Observed"><value>observé</value></data><data name="EdgeState.Failed"><value>erreur observée</value></data><data name="EdgeState.Inactive"><value>non sélectionné</value></data>
   <data name="ExpandTopology"><value>Agrandir</value></data><data name="ReduceTopology"><value>Réduire</value></data><data name="ShowInfo"><value>Infos</value></data><data name="HideInfo"><value>Masquer les infos</value></data>
   <data name="Replay"><value>Revoir</value></data><data name="Replaying"><value>Lecture…</value></data><data name="ReplaySequence"><value>Revoir la séquence d’exécution</value></data><data name="ReplayInProgress"><value>Relecture de la séquence d’exécution en cours</value></data><data name="ReplayElapsedCounter"><value>Temps écoulé de l’exécution originale</value></data>
+  <data name="SchemaContractHelp"><value>Définissez ce contrat localement ou épinglez-le sur une version publiée exacte d’un schéma.</value></data>
+  <data name="SchemaSource"><value>Source du schéma</value></data>
+  <data name="SchemaInline"><value>Intégré</value></data>
+  <data name="SchemaShared"><value>Schéma partagé</value></data>
+  <data name="SharedSchema"><value>Schéma</value></data>
+  <data name="ExactSchemaVersion"><value>Version publiée</value></data>
+  <data name="NoCompatibleSchemas"><value>Aucun JSON Schema publié n’est disponible. Publiez d’abord un schéma compatible ou utilisez un contrat intégré.</value></data>
+  <data name="SchemaReferenceUnavailable"><value>Le schéma référencé {0}/{1}, version {2}, n’est plus disponible.</value></data>
+  <data name="InputSchema"><value>Schéma d’entrée</value></data>
 </root>

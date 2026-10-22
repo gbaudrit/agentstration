@@ -136,7 +136,14 @@ else
                         <label>@T("StepDisplayName")<input data-testid="step-display-name" disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
                         <label>@T("StepId")<input data-testid="step-name" disabled="@(ReadOnly || SelectedStep is not OutputFlowStepDefinition)" value="@SelectedStep.Name" @onchange="UpdateOutputNameAsync" /></label>
                     </div>
-                    @if (SelectedStep is AgentFlowStepDefinition agent)
+                    @if (SelectedStep is InputFlowStepDefinition input)
+                    {
+                        <SchemaBindingEditor Title="@T("InputSchema")" TestId="flow-input-schema"
+                            Binding="@input.SchemaBinding" LegacySchema="@(input.Schema ?? Editor.State.Resource.Definition.InputSchema)"
+                            SchemaVersions="schemaVersions" ValueChanged="UpdateInputSchemaAsync" ReadOnly="ReadOnly"
+                            DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
+                    }
+                    else if (SelectedStep is AgentFlowStepDefinition agent)
                     {
                         <div class="inspector-details-group inspector-resource-details">
                             <h3>@T("CalledResource")</h3>
@@ -316,7 +323,10 @@ else
                     {
                         <label>@T("OutputOutcome")<select data-testid="output-outcome" disabled="@ReadOnly" value="@(output.Outcome ?? FlowOutputOutcome.Success)" @onchange="UpdateOutputOutcomeAsync"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></select></label>
                         <label>@T("OutputMapping")<textarea data-testid="output-mapping" disabled="@ReadOnly" value="@JsonText(output.OutputMapping)" @onchange="UpdateOutputMappingAsync"></textarea></label>
-                        <label>@T("OutputSchema")<textarea data-testid="output-schema" disabled="@ReadOnly" value="@JsonText(output.Schema)" @onchange="UpdateOutputSchemaAsync"></textarea></label>
+                        <SchemaBindingEditor Title="@T("OutputSchema")" TestId="flow-output-schema"
+                            Binding="@output.SchemaBinding" LegacySchema="@output.Schema" SchemaVersions="schemaVersions"
+                            ValueChanged="UpdateOutputSchemaBindingAsync" ReadOnly="ReadOnly"
+                            DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
                         @if ((output.Outcome ?? FlowOutputOutcome.Success) == FlowOutputOutcome.Error)
                         {
                             <label>@T("ErrorCode")<input data-testid="output-error-code" disabled="@ReadOnly" value="@output.Code" @onchange="e => UpdateSelectedAsync(output with { Code = EmptyToNull(Text(e)) })" /></label>
@@ -382,7 +392,7 @@ else
 
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="Editor.State.Resource.Definition.InputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<div class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></div></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="EffectiveInputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<div class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></div></section></div>
     }
 }
 
@@ -399,6 +409,7 @@ else
     private IReadOnlyList<FlowDesignerFlow> flows = [];
     private IReadOnlyList<FlowDesignerFlowVersion> flowVersions = [];
     private IReadOnlyList<FlowDesignerTool> tools = [];
+    private IReadOnlyList<FlowDesignerSchemaVersion> schemaVersions = [];
     private string? loadedResource;
     private string sourceText = string.Empty;
     private string transitionFrom = string.Empty;
@@ -455,6 +466,16 @@ else
     private FlowDesignerTool? SelectedTool => SelectedStep is ToolFlowStepDefinition tool
         ? tools.FirstOrDefault(item => ToolKey(item.Namespace, item.Name) == ToolKey(tool.Tool))
         : null;
+    private JsonElement? EffectiveInputSchema
+    {
+        get
+        {
+            if (Editor.State.Resource is not { } resource) return null;
+            var input = resource.Definition.Steps.OfType<InputFlowStepDefinition>().FirstOrDefault();
+            return ResolveSchema(input?.SchemaBinding, input?.Schema)
+                ?? ResolveSchema(resource.Definition.InputSchemaBinding, resource.Definition.InputSchema);
+        }
+    }
     private IEnumerable<FlowDesignerTool> VisibleTools => string.IsNullOrWhiteSpace(toolSearch)
         ? tools
         : tools.Where(item => item.DisplayName.Contains(toolSearch, StringComparison.CurrentCultureIgnoreCase)
@@ -480,6 +501,7 @@ else
             agents = routerAgents = await Resources.GetAgentsAsync(cancellation.Token);
             flows = await Resources.GetFlowsAsync(cancellation.Token);
             tools = await Resources.GetToolsAsync(cancellation.Token);
+            schemaVersions = await Resources.GetSchemaVersionsAsync(cancellation.Token);
             await RefreshFlowCallOutputsAsync(loaded.Resource.Definition);
             if (!ReadOnly)
                 publishVersion = SuggestedPublishVersion(await Resources.GetFlowVersionsAsync(Namespace, ResourceId, cancellation.Token));
@@ -910,6 +932,28 @@ else
         ? UpdateSelectedAsync(output with { Outcome = outcome }) : Task.CompletedTask;
     private Task UpdateOutputMappingAsync(ChangeEventArgs e) => UpdateOutputJsonAsync(e, schema: false);
     private Task UpdateOutputSchemaAsync(ChangeEventArgs e) => UpdateOutputJsonAsync(e, schema: true);
+    private Task UpdateInputSchemaAsync(SchemaBindingEditorValue value) =>
+        SelectedStep is InputFlowStepDefinition input
+            ? UpdateSelectedAsync(input with { Schema = null, SchemaBinding = value.Binding })
+            : Task.CompletedTask;
+    private Task UpdateOutputSchemaBindingAsync(SchemaBindingEditorValue value) =>
+        SelectedStep is OutputFlowStepDefinition output
+            ? UpdateSelectedAsync(output with { Schema = null, SchemaBinding = value.Binding })
+            : Task.CompletedTask;
+    private Task<SchemaFormatValidationResult> ValidateSchemaDefinitionAsync(ValidateSchemaDefinitionRequest request) =>
+        Resources.ValidateSchemaDefinitionAsync(request, cancellation.Token);
+    private Task<SchemaFormatValidationResult> ValidateSchemaInstanceAsync(ValidateSchemaInstanceRequest request) =>
+        Resources.ValidateSchemaInstanceAsync(request, cancellation.Token);
+    private JsonElement? ResolveSchema(SchemaBinding? binding, JsonElement? legacy)
+    {
+        if (binding?.Inline is { } inline) return inline.Content;
+        if (binding?.Reference is { } reference)
+            return schemaVersions.FirstOrDefault(candidate => candidate.Name == reference.Name
+                && candidate.Version == reference.Version
+                && candidate.Namespace == (reference.Namespace ?? ResourceNamespace.Default)
+                && (reference.ScopeRef is null || candidate.ScopeRef == reference.ScopeRef))?.Content;
+        return legacy;
+    }
     private Task UpdateOutputJsonAsync(ChangeEventArgs e, bool schema)
     {
         if (ReadOnly || SelectedStep is not OutputFlowStepDefinition output) return Task.CompletedTask;

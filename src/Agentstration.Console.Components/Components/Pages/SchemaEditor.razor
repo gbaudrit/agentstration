@@ -114,7 +114,7 @@ else
                                 <div><h4>@T("ImmutableContent")</h4><p class="muted">@T("ImmutableContentHelp")</p></div>
                                 <SchemaDocumentEditor Format="@selectedVersion.Format" Dialect="@selectedVersion.Dialect"
                                     Descriptor="@VersionFormatDescriptor(selectedVersion)" Value="@selectedVersion.Content"
-                                    ReadOnly="true" />
+                                    ReadOnly="true" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
                             </div>
                         </section>
                     }
@@ -132,7 +132,7 @@ else
                     <p>@T("DesignerHelp")</p>
                 </div>
                 <section class="panel schema-designer-panel" data-testid="schema-designer">
-                    <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" />
+                    <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
                     <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
                 </section>
             </section>
@@ -175,7 +175,7 @@ else
                 {
                     <section class="panel schema-designer-panel" data-testid="schema-designer">
                         <div class="panel-header"><div><p class="eyebrow">@T("DesignerEyebrow")</p><h3>@T("DesignerTitle")</h3><p>@T("DesignerHelp")</p></div></div>
-                        <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" />
+                        <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
                         <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
                     </section>
                 }
@@ -214,6 +214,10 @@ else
         ?? formats.FirstOrDefault(value => value.IsAvailable && string.Equals(value.Format, format, StringComparison.Ordinal));
     private bool FormatAvailable => SelectedFormatDescriptor is not null;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request) =>
+        Client.ValidateDefinitionAsync(request, cancellation.Token);
+    private Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request) =>
+        Client.ValidateInstanceAsync(request, cancellation.Token);
     private static string TabId(SchemaTab tab) => $"schema-tab-{tab.ToString().ToLowerInvariant()}";
 
     protected override async Task OnParametersSetAsync()
