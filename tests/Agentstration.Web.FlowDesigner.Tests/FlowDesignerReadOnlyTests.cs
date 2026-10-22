@@ -4,6 +4,7 @@ using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Components.JsonSchema;
 using Agentstration.Web.Components.Schemas;
@@ -1033,6 +1034,11 @@ public sealed class FlowDesignerReadOnlyTests
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
         {
+            SchemaVersions =
+            [
+                new("analysis-request", "Analysis request", new("pack.news"), reference.ScopeRef!.Value,
+                    reference.Version, "json-schema", "https://json-schema.org/draft/2020-12/schema", schema)
+            ],
             FlowVersions = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal)
             {
                 ["pack.news|analysis"] = [new("1.0.0", schema, null, InputSchemaReference: reference)]
@@ -1047,6 +1053,7 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
         rendered.Find("[data-testid='step-settings-tab-input']").Click();
         StringAssert.Contains(rendered.Find("[data-testid='flow-call-shared-input-contract']").TextContent, "pack.news/analysis-request · 1.2.0");
+        CollectionAssert.Contains(rendered.Find("[data-testid='use-called-flow-shared-input']").ClassList.ToArray(), "button-secondary");
         rendered.Find("[data-testid='use-called-flow-shared-input']").Click();
 
         var input = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
@@ -1055,10 +1062,16 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.IsNull(input.Schema);
         Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='use-called-flow-shared-input']"));
         StringAssert.Contains(rendered.Find("[data-testid='flow-call-shared-input-contract']").TextContent, "Parent input already configured");
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("input"));
+        rendered.Find("[data-testid='step-settings-tab-output']").Click();
+        StringAssert.Contains(rendered.Find("[data-testid='input-output-contract']").TextContent, "Same as input contract");
+        Assert.AreEqual("string", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
+            .GetProperty("properties").GetProperty("request").GetProperty("type").GetString());
     }
 
     [TestMethod]
-    public async Task FlowCallDoesNotOfferToCopyAnInlineInputContract()
+    public async Task FlowCallCanCopyAnInlineInputContractIndependently()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
@@ -1095,8 +1108,22 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
         rendered.Find("[data-testid='step-settings-tab-input']").Click();
 
-        StringAssert.Contains(rendered.Find("[data-testid='flow-call-inline-input-contract']").TextContent, "Make it shared in the called Flow");
+        var inlineContract = rendered.Find("[data-testid='flow-call-inline-input-contract']");
+        StringAssert.Contains(inlineContract.TextContent, "later changes will not be synchronized");
+        StringAssert.Contains(inlineContract.TextContent, "make it shared manually in the called Flow");
+        CollectionAssert.Contains(rendered.Find("[data-testid='copy-called-flow-inline-input']").ClassList.ToArray(), "button-secondary");
         Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='use-called-flow-shared-input']"));
+
+        rendered.Find("[data-testid='copy-called-flow-inline-input']").Click();
+
+        var input = (InputFlowStepDefinition)context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .Single(step => step.Name == "input");
+        Assert.IsNotNull(input.SchemaBinding?.Inline);
+        Assert.IsNull(input.SchemaBinding.Reference);
+        Assert.AreEqual(SchemaFormatIds.JsonSchema, input.SchemaBinding.Inline.Format);
+        Assert.AreEqual("object", input.SchemaBinding.Inline.Content.GetProperty("type").GetString());
+        StringAssert.Contains(rendered.Find("[data-testid='flow-call-inline-input-contract']").TextContent, "Parent input already configured");
+        Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='copy-called-flow-inline-input']"));
     }
 
     [TestMethod]
@@ -1125,6 +1152,7 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("result"));
         rendered.Find("[data-testid='step-settings-tab-output']").Click();
 
+        StringAssert.Contains(rendered.Find("[data-testid='terminal-output-contract']").TextContent, "Same as input contract");
         var mapping = rendered.Find("[data-testid='output-mapping']");
         Assert.IsEmpty(mapping.QuerySelectorAll("input, textarea"));
         Assert.AreEqual("${transition.output}", mapping.QuerySelector("code")!.TextContent);

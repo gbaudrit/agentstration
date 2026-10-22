@@ -185,6 +185,20 @@ else
                                     DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
                             </section>
                         }
+                        @if (activeStepSettingsTab == StepSettingsTab.Output)
+                        {
+                            <section class="step-contract-section" data-testid="input-output-contract">
+                                <ContractHeading Direction="Output" Source="@T("ContractSource.SameAsInput")" />
+                                @if (EffectiveInputSchema is { } inputOutputSchema)
+                                {
+                                    <SchemaDocumentEditor Value="inputOutputSchema" ReadOnly="true" />
+                                }
+                                else
+                                {
+                                    <p class="step-contract-empty muted">@T("NoInputContract")</p>
+                                }
+                            </section>
+                        }
                     }
                     else if (SelectedStep is AgentFlowStepDefinition agent)
                     {
@@ -270,7 +284,7 @@ else
                                     }
                                     else if (!ReadOnly)
                                     {
-                                        <button type="button" class="secondary" data-testid="use-called-flow-shared-input" @onclick="UseCalledFlowSharedInputAsync">@T("UseCalledFlowSharedInput")</button>
+                                        <button type="button" class="button-secondary" data-testid="use-called-flow-shared-input" @onclick="UseCalledFlowSharedInputAsync">@T("UseCalledFlowSharedInput")</button>
                                     }
                                 </aside>
                             }
@@ -278,7 +292,20 @@ else
                                 && SelectedFlowVersion.InputSchema is not null
                                 && SelectedFlowVersion.InputSchemaReference is null)
                             {
-                                <p class="step-contract-empty muted" data-testid="flow-call-inline-input-contract">@T("CalledFlowInlineInputHelp")</p>
+                                <aside class="shared-contract-reuse" data-testid="flow-call-inline-input-contract">
+                                    <div>
+                                        <strong>@T("CalledFlowInlineInputTitle")</strong>
+                                        <p>@T("CalledFlowInlineInputHelp")</p>
+                                    </div>
+                                    @if (ParentInputHasExplicitContract)
+                                    {
+                                        <span class="inspector-step-type">@T("ParentInputContractAlreadyDefined")</span>
+                                    }
+                                    else if (!ReadOnly)
+                                    {
+                                        <button type="button" class="button-secondary" data-testid="copy-called-flow-inline-input" @onclick="CopyCalledFlowInlineInputAsync">@T("CopyCalledFlowInlineInput")</button>
+                                    }
+                                </aside>
                             }
                             <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
                                 <label class="flow-checkbox-field"><input data-testid="flow-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(flowCall.InputMapping)" @onchange="UpdateFlowTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
@@ -527,8 +554,8 @@ else
                         }
                         @if (activeStepSettingsTab == StepSettingsTab.Output)
                         {
-                            <section class="step-contract-section">
-                                <ContractHeading Direction="Output" Source="@(EffectiveIncomingSchema is null && ResolveSchema(output.SchemaBinding, output.Schema) is not null ? T("ContractSource.LegacyOutput") : T("ContractSource.IncomingTransition"))" />
+                            <section class="step-contract-section" data-testid="terminal-output-contract">
+                                <ContractHeading Direction="Output" Source="@(EffectiveIncomingSchema is null && ResolveSchema(output.SchemaBinding, output.Schema) is not null ? T("ContractSource.LegacyOutput") : T("ContractSource.SameAsInput"))" />
                                 <div class="output-passthrough" data-testid="output-mapping">
                                     <span class="output-passthrough-icon" aria-hidden="true"><UiIcon Name="arrow-right" /></span>
                                     <span class="output-passthrough-copy"><strong>@T("IncomingTransitionOutput")</strong><small>@T("OutputMappingHelp")</small></span>
@@ -565,7 +592,7 @@ else
                     {
                         <div class="step-settings-empty"><UiIcon Name="arrow-bar-to-right" /><h3>@T("NoInputContract")</h3><p class="muted">@T("NoInputContractHelp")</p></div>
                     }
-                    @if (activeStepSettingsTab == StepSettingsTab.Output && SelectedStep is not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition)
+                    @if (activeStepSettingsTab == StepSettingsTab.Output && SelectedStep is not InputFlowStepDefinition and not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition)
                     {
                         <div class="step-settings-empty"><UiIcon Name="arrow-bar-left" /><h3>@T("NoOutputContract")</h3><p class="muted">@T("NoOutputContractHelp")</p></div>
                     }
@@ -1114,6 +1141,29 @@ else
         {
             Schema = null,
             SchemaBinding = new SchemaBinding { Reference = reference }
+        }));
+    }
+    private Task CopyCalledFlowInlineInputAsync()
+    {
+        if (ReadOnly
+            || SelectedStep is not FlowCallStepDefinition call
+            || !FlowCallReceivesParentInput(call)
+            || ParentInputHasExplicitContract
+            || ParentInputStep is not { } input
+            || SelectedFlowVersion is not { InputSchema: { } schema, InputSchemaReference: null })
+            return Task.CompletedTask;
+        return DispatchAsync(new UpdateStepCommand(input with
+        {
+            Schema = null,
+            SchemaBinding = new SchemaBinding
+            {
+                Inline = new InlineSchemaBinding
+                {
+                    Format = SchemaFormatIds.JsonSchema,
+                    Dialect = "https://json-schema.org/draft/2020-12/schema",
+                    Content = schema.Clone()
+                }
+            }
         }));
     }
     private Task SelectToolAsync(FlowDesignerTool selected)
