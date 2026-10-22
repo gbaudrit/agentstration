@@ -24,6 +24,53 @@ public sealed class AepConformanceTests
     private static readonly string WorkloadToken = AepStaticBearerCredentials.Generate("aep-conformance-tests").AccessToken;
 
     [TestMethod]
+    public void SchemaFormatContributionsRoundTripAlongsideUnrelatedContributions()
+    {
+        var manifest = new AepManifest(
+            AepProtocol.Version,
+            new("sample", "Sample", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.SchemaFormats] = new("1.0"),
+                [AepCapabilityNames.Tools] = new("1.0")
+            },
+            new AepContributions(
+                [],
+                [new("text.upper", "Uppercase", new("operations", "text_upper"))],
+                SchemaFormats:
+                [
+                    new(
+                        "json-schema.validation",
+                        "json-schema",
+                        "JSON Schema",
+                        "1.0",
+                        ["https://json-schema.org/draft/2020-12/schema"],
+                        new(new("operations", "schema_validate_definition"),
+                            new("operations", "schema_validate_instance"))),
+                    new(
+                        "record.validation",
+                        "record",
+                        "Record contract",
+                        "2.0",
+                        [],
+                        new(new("operations", "record_validate_definition"),
+                            new("operations", "record_validate_instance")))
+                ]),
+            new([new("operations", "/mcp")]));
+
+        var json = JsonSerializer.Serialize(manifest, AepProtocol.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<AepManifest>(json, AepProtocol.JsonOptions)!;
+        var schemaFormats = roundTripped.Contributions.SchemaFormats!;
+
+        Assert.IsEmpty(AepDescriptorValidator.Validate(roundTripped));
+        Assert.HasCount(1, roundTripped.Contributions.Tools!);
+        Assert.HasCount(2, schemaFormats);
+        Assert.AreEqual("schema_validate_definition",
+            schemaFormats[0].Operations.ValidateDefinition.Tool);
+        Assert.AreEqual("record", schemaFormats[1].Format);
+    }
+
+    [TestMethod]
     public void TypedPartialModelObservationsRoundTripWithoutInventingSupport()
     {
         var expected = new AepModelDescriptor("deployment", "Deployment", new AepModelSpecification

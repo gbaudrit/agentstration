@@ -6,7 +6,10 @@ using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Triggers;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
@@ -17,8 +20,70 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class FlowDetailsDesignerTests
 {
+    [TestMethod]
+    public void FlowRunGridUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "reviewer"));
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-review-1",
+            FlowId = new FlowId("multi-agent-review"),
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Succeeded,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            StartedAt = FlowClientStub.Now,
+            CompletedAt = FlowClientStub.Now.AddSeconds(2),
+            DefinitionSnapshot = new FlowVersion(workspaceId, new FlowId("multi-agent-review"), "1.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+
+        var rendered = context.Render<RunGrid>(parameters => parameters.Add(component => component.Runs, [run]));
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunsStrings>>();
+
+        var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
+        Assert.AreEqual(strings["Status"].Value, headers[2]);
+        var link = rendered.Find("tbody .resource-name-link");
+        Assert.AreEqual("multi-agent-review", link.TextContent.Trim());
+        Assert.AreEqual("/flow-runs/flowrun-review-1", link.GetAttribute("href"));
+        Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
+    }
+
+    [TestMethod]
+    public void FlowListUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub
+        {
+            FlowSummaries =
+            [
+                new FlowSummary("review", "Multi-agent review", "Direct", "1.0.0", "Active", 1, 0, FlowClientStub.Now)
+                {
+                    Namespace = new ResourceNamespace("samples")
+                }
+            ]
+        };
+        context.Services.AddSingleton<IFlowApiClient>(client);
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Flows>();
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings>>();
+
+        var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
+        Assert.AreEqual(strings["Status"].Value, headers[2]);
+        var link = rendered.Find("tbody .resource-name-link");
+        Assert.AreEqual("Multi-agent review", link.TextContent.Trim());
+        Assert.AreEqual("/namespaces/samples/flows/review", link.GetAttribute("href"));
+        Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
+    }
+
     [TestMethod]
     public void ManualRunUsesPublishedSchemaAndSubmitsValidatedInput()
     {
@@ -259,6 +324,151 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual("/flow-runs", rendered.Find("a.button-secondary").GetAttribute("href"));
     }
 
+    [TestMethod]
+    public void FlowRunTopologyInitiallyFitsTheExecutedWorkflowSnapshot()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("manual-workflow");
+        var definition = new WorkflowFlowDefinition(
+            "input",
+            [new FlowNode("input", FlowNodeKind.Input), new FlowNode("agent", FlowNodeKind.Agent), new FlowNode("output", FlowNodeKind.Output)],
+            [new FlowEdge("input", "agent"), new FlowEdge("agent", "output")]);
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("welcome-agent") },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-output", "agent", "success", "output")
+            ],
+            Designer = new FlowDesignerMetadata
+            {
+                NodePositions = new Dictionary<string, FlowNodePosition>
+                {
+                    ["input"] = new(0, 0),
+                    ["agent"] = new(900, 0),
+                    ["output"] = new(1800, 0)
+                }
+            }
+        };
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-manual-workflow",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Succeeded,
+            Trigger = FlowRunTrigger.Manual,
+            CorrelationId = "manual-workflow-fit",
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now, graph)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        Assert.IsTrue(rendered.Find(".flow-run-overview-topology .topology-canvas").ClassList.Contains("fit"));
+    }
+
+    [TestMethod]
+    public void FlowRunSummaryShowsDirectAndInclusiveTokenUsageWithoutSelectingAStep()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("token-summary");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-token-summary",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Succeeded,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now),
+            TokenUsage = new(
+                FlowRunTokenUsageState.Final,
+                new(20, 5, 25, FlowRunTokenUsageCoverage.Complete, 1, 1),
+                new(27, 8, 35, FlowRunTokenUsageCoverage.Partial, 2, 3))
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        var summary = rendered.Find("[data-testid=flow-run-token-usage]");
+        StringAssert.Contains(summary.TextContent, strings["DirectUsage"].Value);
+        StringAssert.Contains(summary.TextContent, strings["InclusiveUsage"].Value);
+        StringAssert.Contains(summary.TextContent, "25");
+        StringAssert.Contains(summary.TextContent, "35");
+        StringAssert.Contains(summary.TextContent, strings["UsageCoverage.Partial"].Value);
+        Assert.IsTrue(rendered.Find("#flow-run-tab-summary").ClassList.Contains("active"));
+    }
+
+    [TestMethod]
+    public void FlowRunShowsWorkerPlacementInsideTheWorkerTab()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("support");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-runtime",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Succeeded,
+            Trigger = FlowRunTrigger.Manual,
+            CorrelationId = "runtime-tab",
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        var workerId = Guid.NewGuid();
+        var now = FlowClientStub.Now;
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IRuntimeApiClient>(new RuntimeClientStub(new(Guid.NewGuid(), "FlowRun", run.Id,
+            "Succeeded", "microsoft-agent-framework", "1.0", "1.0", now, now,
+            [new(Guid.NewGuid(), workerId, Guid.NewGuid(), 1, "Succeeded", now, now, now.AddSeconds(30), now, null)])));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        Assert.IsEmpty(rendered.FindAll("[data-testid=runtime-placement]"));
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "Worker").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[data-testid=runtime-placement]").TextContent, "Worker assignment");
+            StringAssert.Contains(rendered.Markup, $"/settings/runtime-workers/{workerId:D}");
+        });
+    }
+
     private sealed class FlowClientStub : IFlowApiClient
     {
         public static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-08-15T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
@@ -283,6 +493,7 @@ public sealed class FlowDetailsDesignerTests
         public int DraftLoadCount { get; private set; }
         public bool SimulateDraftConflict { get; init; }
         public CreateFlowRunRequest? LastRunRequest { get; private set; }
+        public IReadOnlyList<FlowSummary> FlowSummaries { get; init; } = [];
 
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
@@ -292,7 +503,7 @@ public sealed class FlowDetailsDesignerTests
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace }]);
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowRun>>([]);
-        public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowSummary>>([]);
+        public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult(FlowSummaries);
         public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
             GetFlowAsync(ResourceNamespace.Default, flowId, cancellationToken);
         public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) =>
@@ -384,6 +595,19 @@ public sealed class FlowDetailsDesignerTests
         public Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class RuntimeClientStub(RuntimeAssignmentPlacementResponse placement) : IRuntimeApiClient
+    {
+        public Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) => Task.FromResult<RuntimeAssignmentPlacementResponse?>(placement);
+        public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> CancelRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> RetryRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class NoOpRealtimeConfigurator : IConsoleRealtimeConnectionConfigurator

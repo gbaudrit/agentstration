@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: agentstration-documentation
+definition:
+  displayName: Agentstration documentation Knowledge Source
+  description: Projects the governed documentation Data Source into a retrievable Knowledge Snapshot.
+  targetScope: workspace

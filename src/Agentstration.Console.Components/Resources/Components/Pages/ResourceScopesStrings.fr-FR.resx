@@ -24,13 +24,15 @@
   <data name="SearchPlaceholder" xml:space="preserve"><value>Nom, type ou espace de noms</value></data>
   <data name="Kind" xml:space="preserve"><value>Type</value></data>
   <data name="AllKinds" xml:space="preserve"><value>Tous les types</value></data>
+  <data name="Inventory" xml:space="preserve"><value>Inventaire</value></data>
+  <data name="ResourcesInScope" xml:space="preserve"><value>Ressources de ce périmètre</value></data>
+  <data name="InventoryFilters" xml:space="preserve"><value>Filtres de l’inventaire des ressources</value></data>
+  <data name="ShowingResources" xml:space="preserve"><value>Affichage de {0} ressource(s) sur {1}</value></data>
+  <data name="AllKindsOption" xml:space="preserve"><value>Tous les types ({0})</value></data>
+  <data name="KindOption" xml:space="preserve"><value>{0} ({1})</value></data>
   <data name="Resource" xml:space="preserve"><value>Ressource</value></data>
   <data name="Namespace" xml:space="preserve"><value>Espace de noms</value></data>
   <data name="Updated" xml:space="preserve"><value>Mise à jour</value></data>
-  <data name="Actions" xml:space="preserve"><value>Actions</value></data>
-  <data name="Open" xml:space="preserve"><value>Ouvrir</value></data>
-  <data name="OpenNamedResource" xml:space="preserve"><value>Ouvrir {0}</value></data>
-  <data name="NoDirectPage" xml:space="preserve"><value>Cette ressource ne possède pas de page dédiée dans la console.</value></data>
   <data name="ResourceTypes" xml:space="preserve"><value>Types de ressources dans ce périmètre</value></data>
   <data name="LinksRequireCurrentWorkspace" xml:space="preserve"><value>Basculez vers ce workspace pour ouvrir ses ressources.</value></data>
   <data name="NoResources" xml:space="preserve"><value>Aucune ressource correspondante</value></data>

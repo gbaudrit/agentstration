@@ -218,6 +218,7 @@ public abstract class ModelManagementApiTestBase
         {
             base.ConfigureWebHost(builder);
             builder.UseSetting("ConnectionStrings:ollama-extension", "Endpoint=http://127.0.0.1:1");
+            AwpTestWorker.Configure(builder);
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IModelProviderDiscovery>();
@@ -229,6 +230,7 @@ public abstract class ModelManagementApiTestBase
                 services.AddSingleton<IExtensionInspector>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
             });
         }
+
     }
 }
 

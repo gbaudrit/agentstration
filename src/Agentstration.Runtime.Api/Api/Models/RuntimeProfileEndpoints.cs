@@ -84,7 +84,7 @@ internal static class RuntimeProfileEndpoints
             _ = await service.GetAsync(@namespace, profileName, cancellationToken)
                 ?? throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, profileName, @namespace));
             var usages = await service.GetUsagesAsync(@namespace, profileName, cancellationToken);
-            var values = usages.Select(value => new RuntimeProfileUsageResponse(value.DeploymentUid.ToString("D"), value.Name, value.Environment, value.AgentName)).ToArray();
+            var values = usages.Select(value => new RuntimeProfileUsageResponse(value.ResourceUid.ToString("D"), value.Name, value.Environment, value.AgentName)).ToArray();
             return Results.Ok(new RuntimeProfileUsagesResponse(values, values.Length));
         });
 }

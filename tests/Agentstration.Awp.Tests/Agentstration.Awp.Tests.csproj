@@ -1,0 +1,5 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

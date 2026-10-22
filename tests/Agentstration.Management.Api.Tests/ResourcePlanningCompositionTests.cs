@@ -32,7 +32,14 @@ public sealed class ResourcePlanningCompositionTests
         Assert.IsFalse(tools.Any(value => value.EndsWith(".apply", StringComparison.Ordinal)));
         Assert.IsFalse(tools.Any(value => value.EndsWith("change-set.create", StringComparison.Ordinal)));
         Assert.IsFalse(tools.Any(value => value.EndsWith("change-set.validate", StringComparison.Ordinal)));
-        Assert.IsTrue(parent.Definition.Graph.Transitions.Any(value => value.FromStep == "materialize-plan" && value.ToStep == "output"));
+        Assert.IsTrue(parent.Definition.Graph.Transitions.Any(value => value.FromStep == "materialize-plan" && value.Event == "success" && value.ToStep == "completed"));
+        Assert.IsTrue(parent.Definition.Graph.Transitions.Any(value => value.FromStep == "materialize-plan" && value.Event == "error" && value.ToStep == "error"));
+        Assert.IsTrue(calls.All(call => parent.Definition.Graph.Transitions.Any(value => value.FromStep == call.Name && value.Event == "completed")));
+        Assert.IsTrue(calls.All(call => parent.Definition.Graph.Transitions.Any(value => value.FromStep == call.Name && value.Event == "error" && value.ToStep == "error")));
+        CollectionAssert.AreEquivalent(
+            new[] { "clarification", "completed", "error" },
+            parent.Definition.Graph.GetOutputs().Select(value => value.Name).ToArray());
+        Assert.IsTrue(parent.Definition.Graph.Steps.OfType<OutputFlowStepDefinition>().All(value => value.Outcome is not null));
         Assert.IsTrue(parent.Definition.Graph.Steps.OfType<ConditionFlowStepDefinition>().Any(value => value.Name == "ready"));
     }
 

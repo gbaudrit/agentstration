@@ -1,0 +1,32 @@
+.metric-grid ::deep .metric-card,
+.metric-grid ::deep .metric-card > div,
+.metric-grid ::deep .metric-card small {
+    min-width: 0;
+}
+
+.metric-grid ::deep .metric-card strong,
+.metric-grid ::deep .metric-card small {
+    overflow-wrap: anywhere;
+}
+
+.durable-artifact-details-grid dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.durable-artifact-details-grid code {
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.durable-content-notice .button-secondary {
+    width: max-content;
+}
+
+.artifact-content-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3, .75rem);
+    align-items: center;
+}
