@@ -97,6 +97,7 @@
   <data name="InheritedContractUnavailable"><value>Aucun contrat non ambigu n’est disponible depuis la transition entrante.</value></data>
   <data name="NoIncomingTransitionContract"><value>Connectez une transition entrante pour hériter de son contrat de sortie.</value></data>
   <data name="UpstreamContractUnavailable"><value>L’étape amont « {0} » ne déclare aucun contrat de sortie.</value></data>
+  <data name="NamedOutputContractUnavailable"><value>La sortie nommée « {0} » ne déclare aucun contrat.</value></data>
   <data name="NoStepConfiguration"><value>Aucune configuration spécifique</value></data>
   <data name="NoStepConfigurationHelp"><value>Cette étape se configure au travers de ses contrats d’entrée et de sortie.</value></data>
   <data name="NoInputContract"><value>Aucun contrat d’entrée</value></data>

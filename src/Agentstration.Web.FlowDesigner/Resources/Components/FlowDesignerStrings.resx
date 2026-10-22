@@ -103,6 +103,7 @@
   <data name="InheritedContractUnavailable"><value>No unambiguous contract is available from the incoming transition.</value></data>
   <data name="NoIncomingTransitionContract"><value>Connect an incoming transition to inherit its output contract.</value></data>
   <data name="UpstreamContractUnavailable"><value>The upstream step '{0}' does not declare an output contract.</value></data>
+  <data name="NamedOutputContractUnavailable"><value>The named output '{0}' does not declare a contract.</value></data>
   <data name="NoStepConfiguration"><value>No specific configuration</value></data>
   <data name="NoStepConfigurationHelp"><value>This step is configured through its input and output contracts.</value></data>
   <data name="NoInputContract"><value>No input contract</value></data>

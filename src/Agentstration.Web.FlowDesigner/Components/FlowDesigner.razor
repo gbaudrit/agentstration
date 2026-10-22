@@ -290,7 +290,26 @@ else
                         {
                             <section class="step-contract-section">
                                 <ContractHeading Direction="Output" Source="@T("ContractSource.CalledFlow")" />
-                                @if (SelectedFlowVersion?.OutputSchema is { } calledFlowOutputSchema)
+                                @if (SelectedFlowVersion is { NamedOutputs.Count: > 0 } calledFlowVersion)
+                                {
+                                    <div class="called-flow-outputs">
+                                    @foreach (var namedOutput in calledFlowVersion.NamedOutputs)
+                                    {
+                                        <article class="called-flow-output" data-testid="called-flow-output-contract">
+                                            <header><strong>@(namedOutput.DisplayName ?? namedOutput.Name)</strong><code>@namedOutput.Name</code><span class="inspector-step-type">@T($"OutputOutcome.{namedOutput.Outcome}")</span></header>
+                                            @if (namedOutput.Schema is { } namedOutputSchema)
+                                            {
+                                                <SchemaDocumentEditor Value="namedOutputSchema" ReadOnly="true" />
+                                            }
+                                            else
+                                            {
+                                                <p class="step-contract-empty muted">@T("NamedOutputContractUnavailable", namedOutput.Name)</p>
+                                            }
+                                        </article>
+                                    }
+                                    </div>
+                                }
+                                else if (SelectedFlowVersion?.OutputSchema is { } calledFlowOutputSchema)
                                 {
                                     <SchemaDocumentEditor Value="calledFlowOutputSchema" ReadOnly="true" />
                                 }
@@ -683,8 +702,7 @@ else
             if (Editor.State.Resource is not { } resource || SelectedStep is null) return null;
             var candidates = resource.Definition.Transitions
                 .Where(transition => transition.ToStep == SelectedStep.Name)
-                .Select(transition => resource.Definition.Steps.FirstOrDefault(step => step.Name == transition.FromStep))
-                .Select(ResolveStepOutputSchema)
+                .Select(ResolveTransitionOutputSchema)
                 .Where(schema => schema is not null)
                 .Select(schema => schema!.Value)
                 .ToArray();
@@ -1218,6 +1236,15 @@ else
             FlowCallStepDefinition call => FlowVersion(call)?.OutputSchema,
             _ => null
         };
+    }
+    private JsonElement? ResolveTransitionOutputSchema(FlowTransitionDefinition transition)
+    {
+        if (Editor.State.Resource is not { } resource) return null;
+        var source = resource.Definition.Steps.FirstOrDefault(step => step.Name == transition.FromStep);
+        if (source is FlowCallStepDefinition call && FlowVersion(call) is { } version)
+            return version.NamedOutputs.FirstOrDefault(output => output.Name == transition.Event)?.Schema
+                ?? version.OutputSchema;
+        return ResolveStepOutputSchema(source);
     }
     private string IncomingContractUnavailableText()
     {

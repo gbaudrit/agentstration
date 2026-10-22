@@ -239,6 +239,7 @@
 .output-passthrough-icon{display:grid;width:36px;height:36px;place-items:center;border-radius:50%;background:var(--primary-soft);color:var(--primary)}
 .output-passthrough-copy{display:grid;gap:3px}.output-passthrough-copy strong{color:var(--text);font-size:.86rem}.output-passthrough-copy small{color:var(--muted);font-size:.75rem;font-weight:400}
 .output-passthrough-technical{position:relative}.output-passthrough-technical summary{cursor:pointer;color:var(--primary);font-size:.75rem;font-weight:650;list-style:none}.output-passthrough-technical summary::-webkit-details-marker{display:none}.output-passthrough-technical code{display:block;margin-top:7px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);white-space:nowrap}
+.called-flow-outputs{display:grid;gap:14px}.called-flow-output{display:grid;gap:14px;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}.called-flow-output>header{display:flex;align-items:center;gap:10px}.called-flow-output>header code{color:var(--muted);font-size:.72rem}.called-flow-output>header .inspector-step-type{margin-left:auto}
 .step-contract-empty{margin:0;padding:18px;border:1px dashed var(--border);border-radius:9px;background:var(--surface-2)}
 .step-settings-empty{display:grid;max-width:520px;margin:32px auto;padding:28px;place-items:center;text-align:center;border:1px dashed var(--border);border-radius:12px;background:var(--surface-2)}
 .step-settings-empty .ui-icon{width:28px;height:28px;margin-bottom:8px;color:var(--muted)}

@@ -26,7 +26,9 @@ public sealed class FlowDesignerResourceProvider(IManagementApiClient client, IF
         CancellationToken cancellationToken)
     {
         var versions = await flowClient.GetFlowVersionsAsync(@namespace, name, cancellationToken);
-        return versions.Select(version => new FlowDesignerFlowVersion(version.Version, version.Graph?.InputSchema, version.Graph?.OutputSchema,
+        return versions.Select(version => new FlowDesignerFlowVersion(version.Version,
+            version.Graph?.Steps.OfType<InputFlowStepDefinition>().SingleOrDefault()?.Schema ?? version.Graph?.InputSchema,
+            version.Graph?.OutputSchema,
             version.Graph?.GetOutputs().Select(output => new FlowDesignerOutput(output.Name, output.DisplayName, output.Outcome, output.Schema)).ToArray() ?? [])).ToArray();
     }
 

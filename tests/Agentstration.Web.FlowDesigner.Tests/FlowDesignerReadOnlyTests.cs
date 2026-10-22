@@ -951,6 +951,58 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
+    public async Task FlowCallInspectorShowsPublishedInputAndNamedOutputContracts()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var inputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { request = new { type = "string" } } });
+        var outputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { answer = new { type = "string" } } });
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps =
+            [
+                new FlowCallStepDefinition { Name = "child", Flow = new("analysis", FlowCallVersionStrategy.Exact, "1.0.0", new("pack.news")) },
+                new OutputFlowStepDefinition { Name = "result" }
+            ],
+            Transitions = [new("child-completed", "child", "completed", "result")]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            FlowVersions = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal)
+            {
+                ["pack.news|analysis"] =
+                [
+                    new("1.0.0", inputSchema, null,
+                        [new("completed", "Completed", FlowOutputOutcome.Success, outputSchema)])
+                ]
+            }
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
+        rendered.Find("[data-testid='step-settings-tab-input']").Click();
+        Assert.AreEqual("string", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
+            .GetProperty("properties").GetProperty("request").GetProperty("type").GetString());
+
+        rendered.Find("[data-testid='step-settings-tab-output']").Click();
+        var namedOutput = rendered.Find("[data-testid='called-flow-output-contract']");
+        StringAssert.Contains(namedOutput.TextContent, "Completed");
+        Assert.AreEqual("string", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
+            .GetProperty("properties").GetProperty("answer").GetProperty("type").GetString());
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("result"));
+        rendered.Find("[data-testid='step-settings-tab-output']").Click();
+        Assert.AreEqual("string", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
+            .GetProperty("properties").GetProperty("answer").GetProperty("type").GetString());
+    }
+
+    [TestMethod]
     public async Task OutputInspectorShowsCanonicalMappingAndInheritedSchemaAndEditsErrorDetails()
     {
         using var culture = new CultureScope("en-US");
