@@ -24,6 +24,40 @@ namespace Agentstration.Web.Tests;
 public sealed class FlowDetailsDesignerTests
 {
     [TestMethod]
+    public void FlowRunSummaryDistinguishesDefinitionAndExecutionScopes()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("inherited-flow");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var executionScope = ResourceScopeRef.Workspace(workspaceId.Value);
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-inherited",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            DefinitionScopeRef = ResourceScopeRef.Instance,
+            Status = FlowRunStatus.Succeeded,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        Assert.AreEqual("/instance", rendered.Find("[data-testid=flow-run-definition-scope] code").TextContent);
+        Assert.AreEqual(executionScope.Value, rendered.Find("[data-testid=flow-run-execution-scope] code").TextContent);
+    }
+
+    [TestMethod]
     public void FlowRunGridUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
     {
         using var context = new BunitContext();
@@ -106,6 +140,7 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual("1.0.0", client.LastRunRequest.Version);
         Assert.AreEqual("local", client.LastRunRequest.DeploymentResourceId);
         Assert.AreEqual(client.ScopeRef, client.LastRunRequest.DefinitionScopeRef);
+        Assert.IsNull(client.LastRunRequest.ExecutionScopeRef);
     }
 
     [TestMethod]

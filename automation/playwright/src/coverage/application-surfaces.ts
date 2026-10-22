@@ -164,7 +164,11 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredConsoleAdministration('logout', `${razorPages}/Logout.cshtml`, ['/logout']),
 
   partialResourceAdministration('agents', `${consolePages}/Agents.razor`, ['/agents'], 412),
-  coveredFlow('agent-runner', `${consolePages}/AgentRunner.razor`, ['/agents/{Name}/run', '/runs/{RunId}'], ['name', 'runId'], 'inspect-flow-observability'),
+  {
+    id: 'agent-runner', host: 'console', source: `${consolePages}/AgentRunner.razor`, routes: ['/agents/{Name}/run', '/runs/{RunId}'], fixtureKeys: ['name', 'runId'],
+    pageObject: 'src/pages/execution-scopes.page.ts', journey: 'exercise-execution-scopes',
+    specification: 'tests/execution-scopes.spec.ts', coverage: 'covered',
+  },
   coveredFlow('agent-runs', `${consolePages}/AgentRuns.razor`, ['/agent-runs'], [], 'inspect-flow-observability'),
   {
     id: 'namespaced-agent-details', host: 'console', source: `${consolePages}/NamespacedAgentDetails.razor`,
@@ -187,7 +191,11 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     specification: 'tests/flow-named-outputs.spec.ts', coverage: 'covered',
   },
   coveredFlow('flow-runs', `${consolePages}/FlowRuns.razor`, ['/flow-runs'], [], 'inspect-flow-observability'),
-  coveredFlow('flow-run-details', `${consolePages}/FlowRunDetails.razor`, ['/flow-runs/{RunId}'], ['runId'], 'inspect-flow-observability'),
+  {
+    id: 'flow-run-details', host: 'console', source: `${consolePages}/FlowRunDetails.razor`, routes: ['/flow-runs/{RunId}'], fixtureKeys: ['runId'],
+    pageObject: 'src/pages/execution-scopes.page.ts', journey: 'exercise-execution-scopes',
+    specification: 'tests/execution-scopes.spec.ts', coverage: 'covered',
+  },
   coveredFlow('run-events', `${consolePages}/RunEvents.razor`, ['/run-events'], [], 'inspect-flow-observability'),
   coveredFlow('tasks', `${consolePages}/Tasks.razor`, ['/tasks', '/work'], [], 'inspect-flow-observability'),
   coveredFlow('task-details', `${consolePages}/TaskDetails.razor`, ['/tasks/{TaskId:guid}'], ['taskId'], 'inspect-flow-observability'),

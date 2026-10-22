@@ -27,6 +27,7 @@ import { AgentInstanceObservabilityPage } from './agent-instance-observability.p
 import { SchemaDrivenSourcesPage } from './schema-driven-sources.page.js';
 import { SchemaAdministrationPage } from './schema-administration.page.js';
 import { ResourceAccessPage } from './resource-access.page.js';
+import { ExecutionScopesPage } from './execution-scopes.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -56,6 +57,7 @@ export class ProductPages {
   public readonly schemaDrivenSources: SchemaDrivenSourcesPage;
   public readonly schemaAdministration: SchemaAdministrationPage;
   public readonly resourceAccess: ResourceAccessPage;
+  public readonly executionScopes: ExecutionScopesPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -85,6 +87,7 @@ export class ProductPages {
     this.schemaDrivenSources = new SchemaDrivenSourcesPage(page);
     this.schemaAdministration = new SchemaAdministrationPage(page);
     this.resourceAccess = new ResourceAccessPage(page);
+    this.executionScopes = new ExecutionScopesPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

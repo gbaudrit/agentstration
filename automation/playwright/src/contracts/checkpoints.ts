@@ -128,6 +128,12 @@ export const Checkpoints = {
     siblingDenied: 'resource-access-sibling-denied',
     revoked: 'resource-access-revoked',
   },
+  executionScopes: {
+    workspaceAgentRun: 'execution-scopes-workspace-agent-run',
+    workspaceFlowRun: 'execution-scopes-workspace-flow-run',
+    workspaceRecovery: 'execution-scopes-workspace-recovery',
+    isolation: 'execution-scopes-isolation',
+  },
   modelAdministration: {
     provider: 'model-administration-provider',
     runtime: 'model-administration-runtime',

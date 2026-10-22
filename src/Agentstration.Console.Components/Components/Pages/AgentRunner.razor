@@ -4,6 +4,7 @@
 @inject IAgentRunnerManagementClient ManagementClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
 @inject IAgentsModelClient ModelsClient
+@inject ConsoleContextState ContextState
 @inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerInspectorStrings> InspectorLocalizer
@@ -43,7 +44,14 @@ else
         <div><span>@T("Deployment")</span><strong><StatusBadge Text="@(readiness?.State ?? T("Unknown"))" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /></strong></div>
         <div><span>@T("RuntimeProfile")</span><strong>@(readiness?.RuntimeProfileId is null ? T("NotResolved") : ResourceName(readiness.RuntimeProfileId))</strong></div>
         <div><span>@T("ExecutionMode")</span><strong>@T("Interactive")</strong></div>
-        <div><span>@T("ExecutionScope")</span><strong>@ScopeLabel(SelectedExecutionScope)</strong></div>
+        <div data-testid="agent-definition-scope">
+            <span>@T("DefinitionScope")</span>
+            <strong><ResourceScopeBadge ScopeRef="@AgentDefinitionScope" /></strong>
+        </div>
+        <div data-testid="agent-execution-scope">
+            <span>@T("ExecutionScope")</span>
+            <strong><ResourceScopeBadge ScopeRef="@SelectedExecutionScope" /></strong>
+        </div>
     </section>
 
     @if (readiness is { Ready: false })
@@ -98,7 +106,8 @@ else
                 {
                     <dl class="runner-details">
                         <dt>@I("RunId")</dt><dd><code>@state.Run.Id</code></dd>
-                        <dt>@I("ExecutionScope")</dt><dd><code>@state.Run.ExecutionScopeRef.Value</code></dd>
+                        <dt>@I("DefinitionScope")</dt><dd data-testid="agent-run-definition-scope"><ResourceScopeBadge ScopeRef="@AgentDefinitionScope" /></dd>
+                        <dt>@I("ExecutionScope")</dt><dd data-testid="agent-run-execution-scope"><ResourceScopeBadge ScopeRef="@state.Run.ExecutionScopeRef" /></dd>
                         <dt>@I("Status")</dt><dd><StatusBadge Text="@I($"RunState.{state.State}")" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
                         <dt>@I("Duration")</dt><dd>@Duration(state.Run)</dd>
                         <dt>@I("AgentVersion")</dt><dd>@state.Run.Properties.Agent.Version</dd>
@@ -183,10 +192,12 @@ else
     private bool preparing;
     private bool interactive;
     private bool IsBusy => state.Run is not null && !state.State.IsTerminal();
-    private bool CanRun => readiness is { Ready: true }
-        && modelResolution?.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
+    private bool CanRun => modelResolution is not null
+        && modelResolution.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
     private bool CanCancel => state.Run is not null && state.State is RuntimeRunState.Pending or RuntimeRunState.Running;
-    private ResourceScopeRef SelectedExecutionScope => state.Run?.ExecutionScopeRef ?? agent?.ScopeRef ?? ResourceScopeRef.Instance;
+    private ResourceScopeRef SelectedExecutionScope => state.Run?.ExecutionScopeRef
+        ?? ResourceScopeRef.Workspace(ContextState.Current?.WorkspaceId ?? Guid.Empty);
+    private ResourceScopeRef AgentDefinitionScope => state.Run?.Properties.Agent.ScopeRef ?? agent?.ScopeRef ?? ResourceScopeRef.Instance;
     private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.Name)}";
     private string RawResponse => JsonSerializer.Serialize(new { run = state.Run, events = state.Events }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
 
@@ -310,7 +321,10 @@ else
 
     private async Task LoadHistoryAsync()
     {
-        if (agent is not null) history = await RuntimeClient.GetRunsAsync(agent.Metadata.Name, SelectedExecutionScope, cancellation.Token);
+        if (agent is null) return;
+        history = state.Run is null
+            ? await RuntimeClient.GetRunsAsync(agent.Metadata.Name, cancellation.Token)
+            : await RuntimeClient.GetRunsAsync(agent.Metadata.Name, state.Run.ExecutionScopeRef, cancellation.Token);
     }
 
     private Task LoadExecutionContextAsync() => LoadExecutionContextAsync(agent?.Generation);
@@ -326,7 +340,7 @@ else
                 modelWarning = string.Join(" ", modelResolution.Warnings.DefaultIfEmpty($"Model resolution state is {ModelManagementUi.Label(modelResolution.Status)}."));
         }
         catch (AgentstrationApiException exception) { modelWarning = $"Model resolution is unavailable: {exception.Message}"; }
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.Name, generation.Value, cancellation.Token); }
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.Namespace, agent.Name, AgentDefinitionScope, generation.Value, cancellation.Token); }
         catch (AgentstrationApiException exception) { readiness = null; modelWarning = $"Runtime readiness is unavailable: {exception.Message}"; }
     }
 
@@ -337,7 +351,7 @@ else
         errorMessage = null;
         try
         {
-            var activation = await RuntimeClient.PrepareAgentAsync(agent.Name, agent.Generation, cancellation.Token);
+            var activation = await RuntimeClient.PrepareAgentAsync(agent.Namespace, agent.Name, AgentDefinitionScope, agent.Generation, cancellation.Token);
             await LoadExecutionContextAsync();
             if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 errorMessage = $"Generation {agent.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";

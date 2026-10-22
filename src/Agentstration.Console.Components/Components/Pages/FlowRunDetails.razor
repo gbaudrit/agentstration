@@ -77,7 +77,8 @@ else
                 <section class="run-summary flow-run-overview-identity">
                     <div><span class="field-label">@T("Status")</span><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>
                     <div><span class="field-label">@T("FlowAndVersion")</span><strong><a class="text-button" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@run.FlowId.Value · @run.FlowVersion</a></strong></div>
-                    <div><span class="field-label">@T("ExecutionScope")</span><code>@run.ExecutionScopeRef.Value</code></div>
+                    <div data-testid="flow-run-definition-scope"><span class="field-label">@T("DefinitionScope")</span><code>@(run.DefinitionScopeRef?.Value ?? "—")</code></div>
+                    <div data-testid="flow-run-execution-scope"><span class="field-label">@T("ExecutionScope")</span><code>@run.ExecutionScopeRef.Value</code></div>
                     <div><span class="field-label">@T("Deployment")</span><strong>@(run.DeploymentResourceId ?? "—")</strong></div>
                     <div><span class="field-label">@T("TriggerAndStartedBy")</span><strong>@TriggerLabel(run.Trigger) · @(run.StartedBy ?? "—")</strong></div>
                     @if (run.InvocationOrigin is { } origin) { <div><span class="field-label">@T("OriginAndCaller")</span><strong>@OriginLabel(origin) · @(run.CallerId ?? "—")</strong></div> }

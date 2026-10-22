@@ -58,4 +58,5 @@
   <data name="RunState.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
   <data name="RunState.TimedOut" xml:space="preserve"><value>Timed out</value></data>
   <data name="ExecutionScope" xml:space="preserve"><value>Execution scope</value></data>
+  <data name="DefinitionScope" xml:space="preserve"><value>Definition scope</value></data>
 </root>

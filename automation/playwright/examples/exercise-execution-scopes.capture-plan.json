@@ -1,0 +1,11 @@
+{
+  "journey": "exercise-execution-scopes",
+  "theme": "dark",
+  "input": {},
+  "captures": [
+    { "checkpoint": "execution-scopes-workspace-agent-run", "name": "01-workspace-agent-run" },
+    { "checkpoint": "execution-scopes-workspace-flow-run", "name": "02-workspace-flow-run" },
+    { "checkpoint": "execution-scopes-workspace-recovery", "name": "03-workspace-recovery" },
+    { "checkpoint": "execution-scopes-isolation", "name": "04-workspace-isolation" }
+  ]
+}
