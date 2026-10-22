@@ -96,10 +96,8 @@ public static class InteractiveFlowDemoData
         }
 
         var agents = services.GetRequiredService<AgentManagementService>();
-        var store = services.GetRequiredService<IResourceStore>();
         await ManagementDemoData.EnsureAgentAsync(
             agents,
-            store,
             AgentName,
             "Computes a real SHA-256 digest through the Utilities AEP extension after explicit user approval.",
             Instructions,
@@ -121,7 +119,7 @@ public static class InteractiveFlowDemoData
                 }
             }, agent.ETag, false, cancellationToken);
         }
-        await agents.PrepareLocalRuntimeAsync(AgentName, agent.Value.Generation, cancellationToken);
+        await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default, AgentName, agent.Value.Generation, cancellationToken);
 
         var flows = services.GetRequiredService<FlowService>();
         var definition = new OrchestrationFlowDefinition(

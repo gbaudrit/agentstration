@@ -6,9 +6,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -16,6 +18,7 @@ using Agentstration.Work.Storage.Sqlite;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -467,6 +470,81 @@ public sealed class WorkPlaneTests
         Assert.AreEqual(WorkTaskStatus.Pending, tasks.Single(value => value.Id == secondTaskId).Status);
         Assert.HasCount(1, commands.CommandTexts.Where(value => value.Contains("ROW_NUMBER()", StringComparison.OrdinalIgnoreCase)));
         Assert.IsFalse(commands.CommandTexts.Any(value => value.Contains("\"AnchorTaskId\" = @", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task WorkplaceQueriesExcludeTechnicalRootWorkItemsAndRetainInteractiveAndTriggerTasks()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var interactionId = Guid.NewGuid();
+        var interactive = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry", "Interactive task", Now,
+            metadata: new Dictionary<string, string>
+            {
+                [WorkplaceTaskIdentity.EntryMetadata] = "assistant",
+                [WorkplaceTaskIdentity.InteractionMetadata] = interactionId.ToString("D")
+            });
+        var trigger = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry", "Trigger task", Now.AddSeconds(1),
+            metadata: new Dictionary<string, string>
+            {
+                [WorkplaceTaskIdentity.OriginMetadata] = WorkplaceTaskIdentity.TriggerOrigin
+            });
+        var technical = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "flow-api", "Technical flow", Now.AddSeconds(2));
+        var malformed = WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "entry", "Malformed task", Now.AddSeconds(3),
+            metadata: new Dictionary<string, string>
+            {
+                [WorkplaceTaskIdentity.EntryMetadata] = "assistant",
+                [WorkplaceTaskIdentity.InteractionMetadata] = "not-a-guid"
+            });
+        var otherWorkspace = new WorkspaceId(Guid.NewGuid());
+        var foreign = WorkItem.Create(WorkItemId.New(), otherWorkspace, OwnerPrincipalId, "entry", "Foreign task", Now.AddSeconds(4),
+            metadata: new Dictionary<string, string>
+            {
+                [WorkplaceTaskIdentity.OriginMetadata] = WorkplaceTaskIdentity.TriggerOrigin
+            });
+        await fixture.Repository.CreateAsync(interactive, default);
+        await fixture.Repository.CreateAsync(trigger, default);
+        await fixture.Repository.CreateAsync(technical, default);
+        await fixture.Repository.CreateAsync(malformed, default);
+        await fixture.Repository.CreateAsync(foreign, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
+
+        var listed = await workplace.ListTasksAsync(WorkplaceId, null, default);
+        var firstPage = await workplace.QueryOperationalTasksAsync(
+            WorkplaceId, WorkTaskStatus.Draft, null, null, 1, 1,
+            WorkItemSortField.CreatedAt, WorkItemSortDirection.Ascending, default);
+        var secondPage = await workplace.QueryOperationalTasksAsync(
+            WorkplaceId, WorkTaskStatus.Draft, null, null, 2, 1,
+            WorkItemSortField.CreatedAt, WorkItemSortDirection.Ascending, default);
+
+        Assert.HasCount(2, listed);
+        CollectionAssert.AreEquivalent(
+            new[] { WorkTaskId.FromWorkItem(interactive.Id), WorkTaskId.FromWorkItem(trigger.Id) },
+            listed.Select(value => value.Id).ToArray());
+        Assert.AreEqual(2, firstPage.TotalCount);
+        Assert.HasCount(1, firstPage.Items);
+        Assert.HasCount(1, secondPage.Items);
+        Assert.AreNotEqual(firstPage.Items.Single().Id, secondPage.Items.Single().Id);
+        await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() =>
+            workplace.GetTaskAsync(WorkplaceId, WorkTaskId.FromWorkItem(technical.Id), default));
+    }
+
+    [TestMethod]
+    public async Task WorkplaceQueriesReturnEmptyWhenWorkspaceContainsOnlyTechnicalWorkItems()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        await fixture.Repository.CreateAsync(
+            WorkItem.Create(WorkItemId.New(), WorkplaceId, OwnerPrincipalId, "flow-api", "Technical flow", Now),
+            default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub(), new EntryExecutionResolverStub());
+
+        var listed = await workplace.ListTasksAsync(WorkplaceId, null, default);
+        var operational = await workplace.QueryOperationalTasksAsync(
+            WorkplaceId, null, null, null, 1, 20,
+            WorkItemSortField.UpdatedAt, WorkItemSortDirection.Descending, default);
+
+        Assert.IsEmpty(listed);
+        Assert.IsEmpty(operational.Items);
+        Assert.AreEqual(0, operational.TotalCount);
     }
 
     [TestMethod]
@@ -971,31 +1049,37 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
-    public async Task LocalRuntimeCompletesWorkAndExposesResultThroughCanonicalApi()
+    public async Task ExternalWorkerCompletesDirectAgentWorkAndExposesRuntimeRunResult()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            AwpTestWorker.Configure(builder);
         });
         using var client = factory.CreateClient();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         using var response = await client.PostAsJsonAsync("/api/work/workitems", new CreateWorkItemRequest("question", "How can I optimize a SQL query?"));
         response.EnsureSuccessStatusCode();
         var created = await response.Content.ReadFromJsonAsync<WorkItemResponse>();
         Assert.IsNotNull(created);
 
         WorkItemResponse? current = null;
-        for (var attempt = 0; attempt < 50; attempt++)
+        for (var attempt = 0; attempt < 200; attempt++)
         {
             current = await client.GetFromJsonAsync<WorkItemResponse>($"/api/work/workitems/{created.Id}");
             if (current?.Status is WorkItemStatus.Completed or WorkItemStatus.Failed) break;
-            await Task.Delay(20);
+            await Task.Delay(25);
         }
 
         Assert.AreEqual(WorkItemStatus.Completed, current!.Status);
         var result = await client.GetFromJsonAsync<WorkResultResponse>($"/api/work/workitems/{created.Id}/result");
         Assert.IsNotNull(result);
         Assert.IsFalse(string.IsNullOrWhiteSpace(result.Contents.Single().Text));
+        Assert.IsTrue(result.Metadata.TryGetValue("runtimeRunId", out var runtimeRunId));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(runtimeRunId));
+        var run = await client.GetFromJsonAsync<RuntimeRun>($"/api/runtime/runs/{runtimeRunId}");
+        Assert.AreEqual(RuntimeRunState.Succeeded, run?.Status.State);
         var events = await client.GetFromJsonAsync<WorkEventResponse[]>($"/api/work/workitems/{created.Id}/events");
         CollectionAssert.IsSubsetOf(new[] { "WorkItemSubmitted", "WorkItemQueued", "WorkItemStarted", "WorkItemCompleted" }, events!.Select(value => value.Type).ToArray());
     }
@@ -1007,8 +1091,10 @@ public sealed class WorkPlaneTests
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            AwpTestWorker.Configure(builder);
         });
         using var client = factory.CreateClient();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
         var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
         var workspace = workspaces!.Single(value => value.Name == "default");
         Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.OrganizationName));

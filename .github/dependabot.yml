@@ -5,6 +5,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    commit-message:
+      prefix: "chore(deps)"
     open-pull-requests-limit: 5
     exclude-paths:
       - aep/**
@@ -18,6 +20,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    commit-message:
+      prefix: "chore(deps)"
     open-pull-requests-limit: 3
     groups:
       aep-nuget-minor-and-patch:
@@ -29,6 +33,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    commit-message:
+      prefix: "chore(deps)"
     open-pull-requests-limit: 3
     groups:
       github-actions-minor-and-patch:

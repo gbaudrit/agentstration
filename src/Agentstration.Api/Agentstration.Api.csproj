@@ -1,10 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.DataSources.Api/Agentstration.DataSources.Api.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Agentstration.Artifacts.Api/Agentstration.Artifacts.Api.csproj" />
     <ProjectReference Include="../Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <ProjectReference Include="../Agentstration.Flows.Api/Agentstration.Flows.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Knowledge.Api/Agentstration.Knowledge.Api.csproj" />
     <ProjectReference Include="../Agentstration.Models.Api/Agentstration.Models.Api.csproj" />
     <ProjectReference Include="../Agentstration.Parameters.Api/Agentstration.Parameters.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Schemas.Api/Agentstration.Schemas.Api.csproj" />
     <ProjectReference Include="../Agentstration.ResourcePlanning.Api/Agentstration.ResourcePlanning.Api.csproj" />
     <ProjectReference Include="../Agentstration.Secrets.Api/Agentstration.Secrets.Api.csproj" />
     <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
@@ -28,6 +32,8 @@
     <ProjectReference Include="../Agentstration.Models.Contracts/Agentstration.Models.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Parameters.Contracts/Agentstration.Parameters.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Parameters/Agentstration.Parameters.csproj" />
+    <ProjectReference Include="../Agentstration.Schemas.Contracts/Agentstration.Schemas.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Schemas/Agentstration.Schemas.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Secrets.Contracts/Agentstration.Secrets.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Sources.Contracts/Agentstration.Sources.Contracts.csproj" />

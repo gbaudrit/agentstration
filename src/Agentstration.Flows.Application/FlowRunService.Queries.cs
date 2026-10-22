@@ -27,6 +27,8 @@ public sealed partial class FlowRunService
     {
         var stored = await RequiredAsync(runId, scope, cancellationToken);
         if (!stored.Value.Status.IsTerminal()) throw new FlowRunNotTerminalException(runId, stored.Value.Status);
+        foreach (var guard in runDeletionGuards)
+            await guard.ValidateDeleteAsync(scope.WorkspaceId, runId, cancellationToken);
         await repository.DeleteRunAsync(scope.WorkspaceId, runId, expectedETag, cancellationToken);
     }
 

@@ -32,6 +32,15 @@ public static class SecurityAuditActions
     public const string BffWorkloadCredentialRevoked = "bff-workload.credential-revoked";
     public const string BffWorkloadAuthenticated = "bff-workload.authenticated";
     public const string BffWorkloadAuthenticationFailed = "bff-workload.authentication-failed";
+    public const string AwpWorkerEnrollmentAnnounced = "awp-worker.enrollment-announced";
+    public const string AwpWorkerPairingCodeIssued = "awp-worker.pairing-code-issued";
+    public const string AwpWorkerCredentialIssued = "awp-worker.credential-issued";
+    public const string AwpWorkerCredentialRotated = "awp-worker.credential-rotated";
+    public const string AwpWorkerCredentialRevoked = "awp-worker.credential-revoked";
+    public const string AwpWorkerSessionStarted = "awp-worker.session-started";
+    public const string AwpWorkerEnrollmentFailed = "awp-worker.enrollment-failed";
+    public const string AwpWorkerAuthenticated = "awp-worker.authenticated";
+    public const string AwpWorkerAuthenticationFailed = "awp-worker.authentication-failed";
     public const string BootstrapProfileApplied = "bootstrap-profile.applied";
     public const string AepEnrollmentAnnounced = "aep-enrollment.announced";
     public const string AepPairingCodeIssued = "aep-enrollment.code-issued";
@@ -48,6 +57,34 @@ public static class SecurityAuditActions
     public const string SourceRegistryDeleted = "source-registry.deleted";
     public const string SourceRegistryRefreshed = "source-registry.refreshed";
     public const string SourceRegistrySourceImported = "source-registry.source-imported";
+    public const string DataSourceCreated = "data-source.created";
+    public const string DataSourceUpdated = "data-source.updated";
+    public const string DataSourceDeleted = "data-source.deleted";
+    public const string DataSourceProfileCreated = "data-source-profile.created";
+    public const string DataSourceProfileUpdated = "data-source-profile.updated";
+    public const string DataSourceProfileDeleted = "data-source-profile.deleted";
+    public const string DataSourceProfileRevisionPublished = "data-source-profile.revision-published";
+    public const string DataSourceProfileRevisionActivated = "data-source-profile.revision-activated";
+    public const string DataSourceAcquisitionStarted = "data-source-acquisition.started";
+    public const string DataSourceAcquisitionCancelled = "data-source-acquisition.cancelled";
+    public const string DataSourceAcquisitionRetried = "data-source-acquisition.retried";
+    public const string KnowledgeSourceCreated = "knowledge-source.created";
+    public const string KnowledgeSourceToolExposurePublished = "knowledge-source.tool-exposure-published";
+    public const string KnowledgeSourceUpdated = "knowledge-source.updated";
+    public const string KnowledgeSourceEnabled = "knowledge-source.enabled";
+    public const string KnowledgeSourceDisabled = "knowledge-source.disabled";
+    public const string KnowledgeSourceDeleted = "knowledge-source.deleted";
+    public const string KnowledgeSnapshotPublished = "knowledge-snapshot.published";
+    public const string KnowledgeSnapshotActivated = "knowledge-snapshot.activated";
+    public const string KnowledgeRetrievalCompleted = "knowledge-retrieval.completed";
+    public const string KnowledgeRetrievalFailed = "knowledge-retrieval.failed";
+    public const string ToolSetCreated = "tool-set.created";
+    public const string ToolSetUpdated = "tool-set.updated";
+    public const string ToolSetDeleted = "tool-set.deleted";
+    public const string ToolSetVersionPublished = "tool-set.version-published";
+    public const string SchemaCreated = "schema.created";
+    public const string SchemaUpdated = "schema.updated";
+    public const string SchemaVersionPublished = "schema.version-published";
 }
 
 public sealed record SecurityAuditEvent(

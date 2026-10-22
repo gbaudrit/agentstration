@@ -1,34 +1,10 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
 
 namespace Agentstration.Flows.Application;
-
-public sealed record FlowAgentExecutionResult(
-    JsonElement Output,
-    string AgentResourceId,
-    long AgentVersion,
-    string? ModelProfileResourceId,
-    string? Provider,
-    FlowStepRunUsage? Usage,
-    IReadOnlyList<string> Tools,
-    IReadOnlyList<string> Logs);
-
-public sealed record FlowAgentExecutionRequest(
-    FlowRunScope Scope,
-    string RunId,
-    string StepName,
-    FlowTargetReference Target,
-    JsonElement Input,
-    string CorrelationId);
-
-public interface IFlowAgentExecutor
-{
-    Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken);
-}
 
 public sealed record FlowToolExecutionRequest(
     FlowRunScope Scope,
@@ -40,9 +16,80 @@ public sealed record FlowToolExecutionRequest(
     FlowToolReference Tool,
     JsonElement Arguments);
 
+public sealed record FlowToolExecutionResult(
+    JsonElement? Output,
+    string ToolName,
+    ResourceNamespace ToolNamespace,
+    Guid ToolUid,
+    long ToolGeneration,
+    string ProviderName,
+    ResourceNamespace ProviderNamespace,
+    string ProviderType,
+    string ExternalToolId);
+
 public interface IFlowToolExecutor
 {
-    Task<JsonElement?> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken);
+    Task<FlowToolExecutionResult> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken);
+}
+
+public interface IFlowToolSetResolver
+{
+    Task<ResolvedFlowToolRoute> ResolveAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step,
+        CancellationToken cancellationToken);
+}
+
+public sealed record FlowStepArtifactCaptureRequest(
+    FlowRunScope Scope,
+    string FlowRunId,
+    string RootFlowRunId,
+    string? ParentFlowRunId,
+    string StepName,
+    int Attempt,
+    string? CorrelationId,
+    FlowStepArtifactOutputDefinition Definition,
+    JsonElement Content,
+    IReadOnlyDictionary<string, string> Provenance);
+
+public interface IFlowStepArtifactCapture
+{
+    Task<FlowStepArtifactReference> CaptureAsync(
+        FlowStepArtifactCaptureRequest request,
+        CancellationToken cancellationToken);
+
+    Task CleanupAsync(
+        FlowRunScope scope,
+        string flowRunId,
+        string stepName,
+        FlowStepArtifactReference artifact,
+        CancellationToken cancellationToken) =>
+        Task.FromException(new FlowValidationException(
+            "flow_step_artifact_cleanup_unavailable",
+            "No governed Artifact cleanup service is configured for Flow Runs."));
+}
+
+public sealed class UnsupportedFlowStepArtifactCapture : IFlowStepArtifactCapture
+{
+    public static UnsupportedFlowStepArtifactCapture Instance { get; } = new();
+    private UnsupportedFlowStepArtifactCapture() { }
+
+    public Task<FlowStepArtifactReference> CaptureAsync(
+        FlowStepArtifactCaptureRequest request,
+        CancellationToken cancellationToken) =>
+        Task.FromException<FlowStepArtifactReference>(new FlowValidationException(
+            "flow_step_artifact_capture_unavailable",
+            "No governed Artifact capture service is configured for Flow Runs."));
+}
+
+public sealed class UnsupportedFlowToolSetResolver : IFlowToolSetResolver
+{
+    public static UnsupportedFlowToolSetResolver Instance { get; } = new();
+    private UnsupportedFlowToolSetResolver() { }
+    public Task<ResolvedFlowToolRoute> ResolveAsync(WorkspaceId workspaceId, ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step, CancellationToken cancellationToken) =>
+        Task.FromException<ResolvedFlowToolRoute>(new FlowValidationException("flow_tool_set_resolver_unavailable", "No ToolSet resolver is configured for Flow Runs."));
 }
 
 public sealed class UnsupportedFlowToolExecutor : IFlowToolExecutor
@@ -50,13 +97,13 @@ public sealed class UnsupportedFlowToolExecutor : IFlowToolExecutor
     public static UnsupportedFlowToolExecutor Instance { get; } = new();
     private UnsupportedFlowToolExecutor() { }
 
-    public Task<JsonElement?> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken) =>
-        Task.FromException<JsonElement?>(new FlowValidationException("flow_tool_executor_unavailable", "No governed Tool executor is configured for Flow Runs."));
+    public Task<FlowToolExecutionResult> ExecuteAsync(FlowToolExecutionRequest request, CancellationToken cancellationToken) =>
+        Task.FromException<FlowToolExecutionResult>(new FlowValidationException("flow_tool_executor_unavailable", "No governed Tool executor is configured for Flow Runs."));
 }
 public interface IFlowRunQueue
 {
     ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken);
-    IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask RequestCancellationAsync(FlowRunQueueItem item, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 public sealed record FlowRunQueueItem(string RunId, FlowRunScope Scope);
@@ -72,6 +119,11 @@ public interface IFlowRunCancellationRegistry
     CancellationToken Register(FlowRunKey key, CancellationToken stoppingToken);
     bool Cancel(FlowRunKey key);
     void Complete(FlowRunKey key);
+}
+
+public interface IFlowRunDeletionGuard
+{
+    Task ValidateDeleteAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken);
 }
 
 public interface IFlowRunEventSink
@@ -128,16 +180,13 @@ public sealed partial class FlowRunService(
     IFlowRepository repository,
     IFlowRunQueue queue,
     IFlowRunCancellationRegistry cancellations,
-    IFlowAgentExecutor agents,
-    IFlowOrchestrationEngine orchestrations,
-    IExpressionParser expressionParser,
-    IExpressionEvaluator expressions,
     IFlowRunEventSink eventSink,
-    IFlowRunExecutionScope executionScope,
     TimeProvider timeProvider,
     FlowRunExecutionOptions? executionOptions = null,
     IFlowInputRequestSink? inputRequestSink = null,
-    IFlowToolExecutor? configuredToolExecutor = null)
+    IEnumerable<IFlowRunDeletionGuard>? configuredRunDeletionGuards = null,
+    IFlowStepArtifactCapture? configuredArtifactCapture = null,
+    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
@@ -149,13 +198,15 @@ public sealed partial class FlowRunService(
           && executionOptions.MaximumDescendantRuns is >= 1 and <= 4096
             ? executionOptions
             : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution and input timeouts must be positive, and the execution lease must exceed the orchestration timeout.");
-    private readonly IFlowToolExecutor toolExecutor = configuredToolExecutor ?? UnsupportedFlowToolExecutor.Instance;
+    private readonly IReadOnlyList<IFlowRunDeletionGuard> runDeletionGuards =
+        configuredRunDeletionGuards?.ToArray() ?? [];
+    private readonly IFlowStepArtifactCapture artifactCapture =
+        configuredArtifactCapture ?? UnsupportedFlowStepArtifactCapture.Instance;
+    private readonly FlowRunTokenUsageConsolidator tokenUsageConsolidator =
+        configuredTokenUsageConsolidator ?? new(repository);
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flows");
     public static readonly Meter Meter = new("Agentstration.Flows");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");
-    private static readonly Counter<long> RunsCompleted = Meter.CreateCounter<long>("agentstration.flow.runs.completed");
-    private static readonly Counter<long> RunsFailed = Meter.CreateCounter<long>("agentstration.flow.runs.failed");
-    private static readonly Histogram<double> RunDuration = Meter.CreateHistogram<double>("agentstration.flow.run.duration", "s");
 
 
 
@@ -222,14 +273,6 @@ public sealed partial class FlowRunService(
 
 
 
-
-    private static (string Route, FlowResourceReference Agent, double Confidence, string Reason)? SelectRoute(RouterFlowStepDefinition router, JsonElement input)
-    {
-        var text = input.GetRawText();
-        foreach (var candidate in router.Candidates)
-            if (text.Contains(candidate.Route, StringComparison.OrdinalIgnoreCase) || (candidate.Examples?.Any(example => text.Contains(example, StringComparison.OrdinalIgnoreCase)) ?? false)) return (candidate.Route, candidate.Agent, 1, $"Input matched route '{candidate.Route}'.");
-        return router.Fallback is null ? null : ("fallback", router.Fallback, .5, "No rule matched; explicit fallback selected.");
-    }
 
 
 

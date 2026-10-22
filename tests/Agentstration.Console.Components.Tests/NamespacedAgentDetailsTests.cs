@@ -36,7 +36,7 @@ public sealed class NamespacedAgentDetailsTests
     }
 
     [TestMethod]
-    public async Task PageShowsPackBindingsAndDeploysTheExactNamespacedAgent()
+    public async Task PageShowsPackBindingsAndPreparesTheExactNamespacedAgentRevision()
     {
         using var culture = new CultureScope("en-US");
         using var context = new BunitContext();
@@ -101,12 +101,12 @@ public sealed class NamespacedAgentDetailsTests
         Assert.IsFalse(rendered.FindAll(".form-actions").Any());
         Assert.IsTrue(rendered.FindAll(".namespaced-agent-actions").Any());
 
-        await rendered.FindAll("button").First(button => button.TextContent.Contains("Deploy generation 1", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.FindAll("button").First(button => button.TextContent.Contains("Prepare generation 1", StringComparison.Ordinal)).ClickAsync(new());
 
         Assert.AreEqual(FakeManagementClient.PackNamespace, runtime.PreparedNamespace);
         Assert.AreEqual("concierge", runtime.PreparedAgentName);
         Assert.AreEqual(1, runtime.PreparedGeneration);
-        Assert.IsTrue(rendered.Markup.Contains("Deployment ready", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Revision ready", StringComparison.Ordinal));
 
         await rendered.Find("#agent-definition-tab").ClickAsync(new());
 
@@ -128,7 +128,7 @@ public sealed class NamespacedAgentDetailsTests
 
         Assert.AreEqual("Vue d’ensemble", localizer["Tab.Overview"].Value);
         Assert.AreEqual("Liaison d’installation", localizer["InstallationBinding"].Value);
-        Assert.AreEqual("Déployer la génération 4", localizer["DeployGeneration", 4].Value);
+        Assert.AreEqual("Préparer la génération 4", localizer["DeployGeneration", 4].Value);
     }
 
     private sealed class FakeRuntimeClient : IAgentRunnerRuntimeClient

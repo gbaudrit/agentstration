@@ -8,6 +8,7 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets;
 using Agentstration.Security.Contracts;
+using Agentstration.Tools;
 
 namespace Agentstration.Web.Hosting;
 
@@ -104,6 +105,9 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.ExtensionRegistration => Options(
                 await store.ListAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.Tool => Options(
+                await store.ListAsync<ToolResource>(ToolResourceKinds.Tool, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.Parameter => Options(
                 await store.ListAsync<ParameterResource>(ParameterResourceKinds.Parameter, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
@@ -118,6 +122,7 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.ModelProvider => ModelResourceKinds.ModelProvider,
             BootstrapBindingTargetKind.RuntimeProfile => RuntimeProfileResourceKinds.RuntimeProfile,
             BootstrapBindingTargetKind.ExtensionRegistration => ExtensionKinds.ExtensionRegistration,
+            BootstrapBindingTargetKind.Tool => ToolResourceKinds.Tool,
             BootstrapBindingTargetKind.Parameter => ParameterResourceKinds.Parameter,
             BootstrapBindingTargetKind.Secret => SecretResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")

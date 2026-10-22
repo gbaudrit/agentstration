@@ -16,7 +16,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkApiProgram = global::Program;
 
 namespace Agentstration.Api.Tests;
@@ -241,8 +243,10 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+                AddAwpFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
+            await using var worker = await AwpTestWorker.StartAsync(factory);
 
             var apiFlowName = "specialized-agent-routing";
             using (var createdFlow = await client.PostAsJsonAsync("/api/flows/", new CreateFlowRequest(
@@ -606,8 +610,10 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+                AddAwpFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
+            await using var worker = await AwpTestWorker.StartAsync(factory);
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/default/entries/prepare-report/interactions",
                 new CreateInteractionRequest(new Dictionary<string, JsonElement>
@@ -709,8 +715,10 @@ public sealed class WorkplaceApiTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+                AddAwpFlowTestHarness(builder);
             });
             using var client = factory.CreateClient();
+            await using var worker = await AwpTestWorker.StartAsync(factory);
             var taskCreated = new TaskCompletionSource<TaskCreatedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             var taskStatusChanged = new TaskCompletionSource<TaskStatusChangedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             var resultAdded = new TaskCompletionSource<TaskResultAddedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -830,6 +838,9 @@ public sealed class WorkplaceApiTests
     {
         ["style"] = JsonSerializer.SerializeToElement(value)
     };
+
+    private static void AddAwpFlowTestHarness(IWebHostBuilder builder)
+        => AwpTestWorker.Configure(builder);
 
     private static async Task<(WorkTaskResult[] Results, WorkTaskArtifact[] Artifacts)> WaitForOutputsAsync(HttpClient client, Guid taskId, int count)
     {

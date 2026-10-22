@@ -24,6 +24,7 @@ public sealed record ToolDefinitionProperties
     public bool Enabled { get; init; } = true;
     public bool RequiresApproval { get; init; }
     public required JsonElement InputSchema { get; init; }
+    public JsonElement? FixedArguments { get; init; }
     public JsonElement? OutputSchema { get; init; }
     public required ToolDefinitionFlowTarget Flow { get; init; }
     public int InvocationTimeoutSeconds { get; init; } = 90;
@@ -52,6 +53,14 @@ public interface IToolDefinitionFlowResolver
 
 public enum ToolDefinitionCallerKind { Mcp, Agent, Flow, Console }
 
+public sealed record ToolDefinitionInvocationContext(
+    string? AgentId = null,
+    string? AgentRevisionId = null,
+    string? RuntimeRunId = null,
+    string? FlowRunId = null,
+    string? FlowStepId = null,
+    string? InvocationId = null);
+
 public sealed record ToolDefinitionInvocation(
     Guid TenantId,
     WorkspaceId WorkspaceId,
@@ -62,7 +71,16 @@ public sealed record ToolDefinitionInvocation(
     string? CorrelationId,
     JsonElement Arguments,
     ToolDefinitionCallerKind CallerKind,
-    string? CallerId = null);
+    string? CallerId = null,
+    ToolDefinitionInvocationContext? ExecutionContext = null);
+
+public sealed record ToolDefinitionKnowledgeReceipt(
+    string KnowledgeSourceId,
+    Guid KnowledgeSourceUid,
+    long KnowledgeSourceGeneration,
+    string SnapshotName,
+    Guid SnapshotUid,
+    IReadOnlyList<string> ArtifactIds);
 
 public sealed record ToolDefinitionOperationReceipt(
     string WorkItemId,
@@ -71,7 +89,8 @@ public sealed record ToolDefinitionOperationReceipt(
     ResourceNamespace FlowNamespace,
     string FlowVersion,
     string CorrelationId,
-    bool Recovered);
+    bool Recovered,
+    ToolDefinitionKnowledgeReceipt? Knowledge = null);
 
 public sealed record ToolDefinitionInvocationResult(JsonElement? Output, ToolDefinitionOperationReceipt Receipt);
 
@@ -94,7 +113,8 @@ public sealed record InternalMcpToolDefinition(
     JsonElement InputSchema,
     JsonElement? OutputSchema = null,
     bool RequiresApproval = false,
-    InitialToolCategory? InitialCategory = null);
+    InitialToolCategory? InitialCategory = null,
+    bool ExposeThroughMcp = true);
 
 public sealed record InitialToolCategory(
     string Name,

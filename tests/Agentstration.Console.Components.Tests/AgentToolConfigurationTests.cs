@@ -98,6 +98,60 @@ public sealed class AgentToolConfigurationTests
         Assert.HasCount(0, selected!);
     }
 
+    [TestMethod]
+    public void ToolSetGrantedToolIsCheckedReadOnlyAndKeepsItsProvenance()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+        var rendered = context.Render<AgentToolConfiguration>(parameters => parameters
+            .Add(component => component.Providers, [Provider("documentation", "Documentation")])
+            .Add(component => component.Tools,
+            [
+                Tool("documentation.search", "Documentation search", "documentation"),
+                Tool("documentation.read", "Documentation read", "documentation")
+            ])
+            .Add(component => component.SelectedToolIds, ["documentation.read"])
+            .Add(component => component.ToolSetGrantedTools, new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["documentation.search"] = ["agentstration-documentation@1.0.0"]
+            }));
+
+        var inherited = rendered.Find("input[aria-label='Documentation search']");
+        Assert.IsTrue(inherited.HasAttribute("checked"));
+        Assert.IsTrue(inherited.HasAttribute("disabled"));
+        StringAssert.Contains(rendered.Find(".tool-status.inherited").TextContent, "agentstration-documentation@1.0.0");
+        StringAssert.Contains(rendered.Find("[data-testid='agent-tool-access-summary']").TextContent, "2");
+    }
+
+    [TestMethod]
+    public async Task CategoryBulkActionDoesNotPersistToolSetGrantedToolsAsIndividualReferences()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        IReadOnlyList<string>? selected = null;
+        var tools = new[]
+        {
+            Tool("documentation.search", "Documentation search", "documentation"),
+            Tool("documentation.read", "Documentation read", "documentation")
+        };
+
+        var rendered = context.Render<AgentToolConfiguration>(parameters => parameters
+            .Add(component => component.Providers, [Provider("documentation", "Documentation")])
+            .Add(component => component.Tools, tools)
+            .Add(component => component.Categories, [Category("knowledge", "Knowledge", tools.Select(tool => tool.Name).ToArray())])
+            .Add(component => component.ToolSetGrantedTools, new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["documentation.search"] = ["agentstration-documentation@1.0.0"]
+            })
+            .Add(component => component.SelectedToolIdsChanged, values => selected = values));
+
+        Assert.AreEqual("mixed", rendered.Find("[data-category='knowledge']").GetAttribute("aria-checked"));
+        await rendered.Find("[data-category='knowledge']").ClickAsync(new());
+
+        CollectionAssert.AreEqual(new[] { "documentation.read" }, selected?.ToArray());
+    }
+
     private static ToolProviderResource Provider(string name, string displayName) => new()
     {
         ApiVersion = "agentstration.io/v1",

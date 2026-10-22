@@ -18,6 +18,7 @@ internal static class ToolsApiHttp
         catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (ToolResourceValidationException exception) { return Problem("tool-resource-invalid", "Invalid tool resource", 422, exception.Message); }
         catch (ToolCategoryValidationException exception) { return Problem("tool-category-invalid", "Invalid ToolCategory", 422, exception.Message); }
+        catch (ToolSetValidationException exception) { return Problem(exception.Code, "Invalid ToolSet", 422, exception.Message); }
         catch (ToolDefinitionValidationException exception) { return Problem(exception.Code, "Invalid ToolDefinition", 422, exception.Message); }
         catch (ToolExecutionHookValidationException exception) { return Problem("tool-execution-hook-invalid", "Invalid Tool execution hook", 422, exception.Message); }
         catch (ToolProviderDiscoveryFailedException exception) { return Problem("tool-provider-unavailable", "Tool provider unavailable", 503, exception.Message); }
