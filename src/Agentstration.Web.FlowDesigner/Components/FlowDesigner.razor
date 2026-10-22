@@ -664,11 +664,15 @@ else
     }
     @if (connectionContractPrompt is { } contractPrompt)
     {
-        <div class="dialog-backdrop" role="presentation" @onclick="DismissConnectionContractPrompt">
+        <div class="dialog-backdrop connection-contract-backdrop" role="presentation" @onclick="DismissConnectionContractPrompt">
             <section class="dialog connection-contract-dialog" role="dialog" aria-modal="true" aria-labelledby="connection-contract-title" data-testid="connection-contract-dialog" @onclick:stopPropagation="true">
                 <span class="eyebrow">@T("InputContract")</span>
                 <h2 id="connection-contract-title">@T("ConnectionContractTitle")</h2>
                 <p>@T("ConnectionContractHelp", contractPrompt.FlowDisplayName)</p>
+                @if (contractPrompt.ReplacesExistingContract)
+                {
+                    <p class="connection-contract-warning" role="alert">@T("ConnectionContractOverwriteWarning")</p>
+                }
                 @if (contractPrompt.Version.InputSchemaReference is { } promptReference)
                 {
                     <article class="connection-contract-choice">
@@ -1208,7 +1212,7 @@ else
         }));
     private async Task OfferCalledFlowInputContractAsync(FlowTransitionDefinition transition)
     {
-        if (ReadOnly || ParentInputHasExplicitContract || ParentInputStep is not { } input
+        if (ReadOnly || ParentInputStep is not { } input
             || transition.FromStep != input.Name
             || Editor.State.Resource?.Definition.Steps.FirstOrDefault(step => step.Name == transition.ToStep) is not FlowCallStepDefinition call
             || !PassesIncomingTransitionOutput(call.InputMapping))
@@ -1217,11 +1221,11 @@ else
         var versions = await Resources.GetFlowVersionsAsync(call.Flow.Namespace ?? Namespace, call.Flow.ResourceId, cancellation.Token);
         var version = ResolveFlowVersion(call, versions);
         if (version?.InputSchemaReference is null && version?.InputSchema is null) return;
-        connectionContractPrompt = new(call.DisplayName ?? call.Name, version);
+        connectionContractPrompt = new(call.DisplayName ?? call.Name, version, ParentInputHasExplicitContract);
     }
     private async Task ApplyConnectionContractAsync()
     {
-        if (connectionContractPrompt is not { } prompt || ParentInputHasExplicitContract || ParentInputStep is not { } input)
+        if (connectionContractPrompt is not { } prompt || ParentInputStep is not { } input)
         {
             connectionContractPrompt = null;
             return;
@@ -1458,7 +1462,10 @@ else
         Input,
         Output
     }
-    private sealed record ConnectionContractPrompt(string FlowDisplayName, FlowDesignerFlowVersion Version);
+    private sealed record ConnectionContractPrompt(
+        string FlowDisplayName,
+        FlowDesignerFlowVersion Version,
+        bool ReplacesExistingContract);
     private static string JsonText(JsonElement? value) => value?.GetRawText() ?? string.Empty;
     private static bool IsValidStepName(string value) => value.All(character => char.IsLetterOrDigit(character) || character is '-' or '_');
     private static string SuggestedPublishVersion(IReadOnlyList<FlowDesignerFlowVersion> versions)

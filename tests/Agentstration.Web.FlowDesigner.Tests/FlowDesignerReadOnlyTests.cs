@@ -1004,7 +1004,7 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
-    public async Task FlowCallCanReuseItsSharedInputContractForAnUnconfiguredParentInput()
+    public async Task FlowCallCanReplaceAnExistingParentInputContractWithItsSharedContract()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
@@ -1021,7 +1021,19 @@ public sealed class FlowDesignerReadOnlyTests
             EntryStep = "input",
             Steps =
             [
-                new InputFlowStepDefinition { Name = "input" },
+                new InputFlowStepDefinition
+                {
+                    Name = "input",
+                    SchemaBinding = new SchemaBinding
+                    {
+                        Inline = new InlineSchemaBinding
+                        {
+                            Format = SchemaFormatIds.JsonSchema,
+                            Dialect = "https://json-schema.org/draft/2020-12/schema",
+                            Content = JsonSerializer.SerializeToElement(new { type = "string" })
+                        }
+                    }
+                },
                 new FlowCallStepDefinition
                 {
                     Name = "child",
@@ -1053,9 +1065,11 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.TransitionCreated.InvokeAsync(
             new FlowTransitionDefinition("input-child", "input", "completed", "child")));
         var connectionDialog = rendered.Find("[data-testid='connection-contract-dialog']");
-        StringAssert.Contains(connectionDialog.TextContent, "Configure the parent Flow input contract?");
+        StringAssert.Contains(connectionDialog.TextContent, "Use the child Flow input contract?");
+        StringAssert.Contains(connectionDialog.TextContent, "The current input contract will be replaced.");
         StringAssert.Contains(connectionDialog.TextContent, "Reusable shared contract");
         StringAssert.Contains(connectionDialog.TextContent, "pack.news/analysis-request · 1.2.0");
+        CollectionAssert.Contains(connectionDialog.ParentElement!.ClassList.ToArray(), "connection-contract-backdrop");
         CollectionAssert.Contains(rendered.Find("[data-testid='connection-contract-apply']").ClassList.ToArray(), "button-primary");
         rendered.Find("[data-testid='connection-contract-apply']").Click();
 
@@ -1117,7 +1131,7 @@ public sealed class FlowDesignerReadOnlyTests
             new FlowTransitionDefinition("input-child", "input", "completed", "child")));
         var connectionDialog = rendered.Find("[data-testid='connection-contract-dialog']");
         StringAssert.Contains(connectionDialog.TextContent, "Independent inline copy");
-        StringAssert.Contains(connectionDialog.TextContent, "make it shared manually in the called Flow");
+        StringAssert.Contains(connectionDialog.TextContent, "make it shared manually in the child Flow");
         rendered.Find("[data-testid='connection-contract-later']").Click();
         Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='connection-contract-dialog']"));
 
@@ -1126,7 +1140,7 @@ public sealed class FlowDesignerReadOnlyTests
 
         var inlineContract = rendered.Find("[data-testid='flow-call-inline-input-contract']");
         StringAssert.Contains(inlineContract.TextContent, "later changes will not be synchronized");
-        StringAssert.Contains(inlineContract.TextContent, "make it shared manually in the called Flow");
+        StringAssert.Contains(inlineContract.TextContent, "make it shared manually in the child Flow");
         CollectionAssert.Contains(rendered.Find("[data-testid='copy-called-flow-inline-input']").ClassList.ToArray(), "button-secondary");
         Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='use-called-flow-shared-input']"));
 
