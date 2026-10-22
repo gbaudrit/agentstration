@@ -204,7 +204,7 @@
 .inspector-step-summary-copy small{color:var(--muted)}
 .inspector-configure-step{display:flex;width:100%;align-items:center;justify-content:center;gap:7px}
 .step-settings-backdrop{position:fixed;z-index:120;inset:0;display:grid;padding:24px;place-items:center;background:rgba(8,19,35,.58);backdrop-filter:blur(2px)}
-.step-settings-dialog{display:grid;width:min(1180px,calc(100vw - 48px));height:min(900px,calc(100dvh - 48px));grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:0 28px 80px rgba(8,19,35,.35)}
+.step-settings-dialog{display:grid;width:min(1180px,calc(100vw - 48px));height:min(900px,calc(100dvh - 48px));grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:0 28px 80px rgba(8,19,35,.35)}
 .step-settings-header,.step-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;border-bottom:1px solid var(--border)}
 .step-settings-header h2{margin:3px 0 4px;font-size:1.25rem}
 .step-settings-header .eyebrow{color:var(--primary);font-size:.7rem;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
@@ -215,7 +215,19 @@
 .step-settings-tabs button:hover,.step-settings-tabs button:focus-visible,.step-settings-tabs button.active{color:var(--text)}
 .step-settings-tabs button.active::after{background:var(--primary)}
 .step-settings-body{min-height:0;overflow:auto;padding:22px}
-.step-settings-form.flow-inspector{width:100%;padding:0;border:0;background:transparent;overflow:visible}
+.step-settings-form{width:100%;padding:0;background:transparent}
+.step-settings-form>label,.step-settings-form .inspector-details-group label,.step-settings-form .flow-mapping-editor label,.step-settings-form .router-editor label,.step-settings-form .step-contract-section>label{display:grid;gap:5px;margin-bottom:12px;color:var(--muted);font-size:.75rem;font-weight:650}
+.step-settings-form>label :is(input,select,textarea),.step-settings-form .inspector-details-group label :is(input,select,textarea),.step-settings-form .flow-mapping-editor label :is(input,select,textarea),.step-settings-form .router-editor label :is(input,select,textarea),.step-settings-form .step-contract-section>label :is(input,select,textarea),.step-settings-form .inspector-resource-field> :is(input,select){width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)}
+.step-settings-form .inspector-details-heading h3,.step-settings-form .inspector-resource-details>h3{margin:0;color:var(--muted);font-size:.7rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase}
+.step-settings-form .inspector-resource-details>h3{margin-bottom:12px}
+.step-settings-form .inspector-resource-heading label{display:block;margin:0;color:var(--muted);font-size:.75rem;font-weight:650}
+.step-settings-form .inspector-resource-heading>span{color:var(--muted);font-size:.75rem;font-weight:650}
+.step-settings-form>.button-danger{display:block;max-width:100%;margin-top:8px;white-space:normal}
+.step-settings-form .flow-checkbox-field{display:flex;align-items:center;gap:8px}
+.step-settings-form .flow-checkbox-field input[type="checkbox"]{flex:0 0 17px;width:17px;height:17px;min-height:17px;margin:0;padding:0;border:0;background:initial;box-shadow:none;accent-color:var(--primary)}
+.step-settings-form .tool-picker-search input{min-width:0;width:100%;padding:0;border:0;outline:0;background:transparent;color:var(--text);font-size:.75rem}
+.step-settings-form .flow-mapping-editor{margin:0;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}
+.step-settings-form .flow-mapping-editor legend{padding:0 6px;color:var(--text);font-size:.78rem;font-weight:700}
 .step-settings-form .schema-binding-editor{max-width:none}
 .step-settings-footer{justify-content:flex-end;border-top:1px solid var(--border);border-bottom:0}
 .step-contract-section{display:grid;gap:18px}
