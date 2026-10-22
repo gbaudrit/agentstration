@@ -57,7 +57,12 @@ public sealed class RuntimeRunService(
         {
             await executionScopes.ValidateAsync(scope, cancellationToken);
             using var requestScope = executionScopes.Enter(scope);
-            _ = await preparation.PrepareAsync(agentReference.Namespace, agentReference.ResourceId, agentReference.Version, cancellationToken);
+            _ = await preparation.PrepareAsync(
+                agentReference.Namespace,
+                agentReference.ResourceId,
+                agentReference.ScopeRef,
+                agentReference.Version,
+                cancellationToken);
             resolved = await agents.ResolveAsync(agentReference, cancellationToken);
             await agentAccess.ValidateUseAsync(resolved, scope.ScopeRef, cancellationToken);
         }

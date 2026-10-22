@@ -89,6 +89,20 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task CreatePreparesTheAgentAtItsDefinitionScope()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var reference = new RuntimeAgentReference(fixture.AgentId, 3)
+        {
+            ScopeRef = fixture.AgentScopeRef,
+        };
+
+        _ = await fixture.Service.CreateAsync(TestScope, reference, Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Console, "operator", default);
+
+        Assert.AreEqual(fixture.AgentScopeRef, fixture.Preparation.PreparedScopeRef);
+    }
+
+    [TestMethod]
     public async Task CreateRequiresAgentUseAccessAtTheExactExecutionScope()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
@@ -522,12 +536,25 @@ public sealed class RuntimeRunTests
 
     private sealed class TestAgentRuntimePreparationService : IAgentRuntimePreparationService
     {
+        public ResourceScopeRef? PreparedScopeRef { get; private set; }
+
         public Task<PreparedAgentRuntime> PrepareAsync(
             ResourceNamespace resourceNamespace,
             string agentName,
             long generation,
             CancellationToken cancellationToken) =>
             Task.FromResult(new PreparedAgentRuntime(string.Empty, $"{agentName}--{generation:000000}", "Ready"));
+
+        public Task<PreparedAgentRuntime> PrepareAsync(
+            ResourceNamespace resourceNamespace,
+            string agentName,
+            ResourceScopeRef? scopeRef,
+            long generation,
+            CancellationToken cancellationToken)
+        {
+            PreparedScopeRef = scopeRef;
+            return PrepareAsync(resourceNamespace, agentName, generation, cancellationToken);
+        }
     }
 
     private sealed class RuntimeFixture : IAsyncDisposable
@@ -539,10 +566,13 @@ public sealed class RuntimeRunTests
         public IRuntimeExecutionStateStore ExecutionStates => provider.GetRequiredService<IRuntimeExecutionStateStore>();
         public TestRuntimeRunQueue Queue { get; }
         public TestRuntimeAgentAccess AgentAccess { get; }
+        public TestAgentRuntimePreparationService Preparation { get; }
         public string AgentId { get; }
+        public ResourceScopeRef AgentScopeRef { get; }
 
         private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store,
-            TestRuntimeRunQueue queue, TestRuntimeAgentAccess agentAccess, string agentId)
+            TestRuntimeRunQueue queue, TestRuntimeAgentAccess agentAccess, TestAgentRuntimePreparationService preparation,
+            string agentId, ResourceScopeRef agentScopeRef)
         {
             this.directory = directory;
             this.provider = provider;
@@ -550,7 +580,9 @@ public sealed class RuntimeRunTests
             Store = store;
             Queue = queue;
             AgentAccess = agentAccess;
+            Preparation = preparation;
             AgentId = agentId;
+            AgentScopeRef = agentScopeRef;
         }
 
         public static async Task<RuntimeFixture> CreateAsync()
@@ -568,7 +600,8 @@ public sealed class RuntimeRunTests
             services.AddSingleton(queue);
             services.AddSingleton<IRuntimeRunQueue>(queue);
             services.AddSingleton<IRuntimeRunExecutionScope, TestRuntimeRunExecutionScope>();
-            services.AddSingleton<IAgentRuntimePreparationService, TestAgentRuntimePreparationService>();
+            var preparation = new TestAgentRuntimePreparationService();
+            services.AddSingleton<IAgentRuntimePreparationService>(preparation);
             var agentAccess = new TestRuntimeAgentAccess();
             services.AddSingleton<IRuntimeAgentAccessValidator>(agentAccess);
             services.AddSingleton<RuntimeRunStateManager>();
@@ -584,7 +617,8 @@ public sealed class RuntimeRunTests
             var agent = await management.PutAsync(Agent(agentId), null, true, default);
             await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid), default);
             return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store,
-                queue, agentAccess, agentId);
+                queue, agentAccess, preparation, agentId,
+                agent.Value.ScopeRef ?? throw new InvalidOperationException("The test Agent must have an owner scope."));
         }
 
         public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(TestScope, new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);

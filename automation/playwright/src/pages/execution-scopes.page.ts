@@ -85,7 +85,6 @@ export class ExecutionScopesPage {
     };
     await this.ensureInstanceModelProfile(consoleUrl, scopes.tenant);
     const agent = await this.ensureInstanceAgent(consoleUrl, scopes.tenant);
-    await this.ensureInstanceFlow(consoleUrl, agent, scopes.tenant);
 
     return {
       agentName,
@@ -112,16 +111,23 @@ export class ExecutionScopesPage {
     await expect(this.agentDefinitionScope).toContainText('/instance');
     await expect(this.agentExecutionScope).toContainText(scopeRef);
     const prompt = this.page.getByTestId(TestIds.flowObservability.agentRunPrompt);
-    await prompt.fill('Run the Instance Agent from the selected Workspace.');
-    await prompt.dispatchEvent('change');
-    await expect(prompt).toHaveValue('Run the Instance Agent from the selected Workspace.');
-    await this.page.getByTestId(TestIds.flowObservability.agentRunSubmit).click();
+    const submit = this.page.getByTestId(TestIds.flowObservability.agentRunSubmit);
+    const promptValue = 'Run the Instance Agent from the selected Workspace.';
+    await expect(async () => {
+      await prompt.fill(promptValue);
+      await prompt.blur();
+      await expect(prompt).toHaveValue(promptValue);
+      await expect(submit).toBeEnabled();
+    }).toPass({ timeout: 30_000 });
+    await submit.click();
     const agentRun = this.page.getByTestId(TestIds.flowObservability.agentRunDetails);
     await agentRun.waitFor({ state: 'visible' });
     await expect.poll(async () => await agentRun.getAttribute('data-run-state'), { timeout: 90_000 }).toBe('Succeeded');
     const runtimeRunId = await agentRun.getAttribute('data-run-id');
     if (!runtimeRunId) throw new Error('The Agent runner did not expose the created Runtime Run identifier.');
     const runtime = await this.read<RuntimeRunWire>(`${consoleUrl}/api/runtime/runs/${encodeURIComponent(runtimeRunId)}`);
+
+    await this.ensureInstanceFlow(consoleUrl, fixture.agentUid, fixture.scopes.tenant);
 
     await this.open(
       `${consoleUrl}/flows/${encodeURIComponent(fixture.flowName)}?scopeRef=${encodeURIComponent('/instance')}`,
@@ -336,7 +342,7 @@ export class ExecutionScopesPage {
     await this.grantDescendantUse(consoleUrl, profile, tenantScope);
   }
 
-  private async ensureInstanceFlow(consoleUrl: string, agent: AgentWire, tenantScope: string): Promise<void> {
+  private async ensureInstanceFlow(consoleUrl: string, agentUid: string, tenantScope: string): Promise<void> {
     const current = await this.page.request.get(`${consoleUrl}/api/flows/${flowName}?scopeRef=${encodeURIComponent('/instance')}`);
     if (current.status() === 404) {
       const created = await this.page.request.post(`${consoleUrl}/api/flows`, {
@@ -346,7 +352,7 @@ export class ExecutionScopesPage {
           version: '1.0.0', enabled: true, scopeRef: '/instance',
           definition: {
             flowKind: 'direct',
-            target: { kind: 0, id: agentName, namespace: 'default', scopeRef: '/instance', resourceUid: agent.uid },
+            target: { kind: 0, id: agentName, namespace: 'default', scopeRef: '/instance', resourceUid: agentUid },
           },
         },
       });

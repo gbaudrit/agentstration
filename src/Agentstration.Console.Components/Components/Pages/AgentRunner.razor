@@ -44,8 +44,14 @@ else
         <div><span>@T("Deployment")</span><strong><StatusBadge Text="@(readiness?.State ?? T("Unknown"))" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /></strong></div>
         <div><span>@T("RuntimeProfile")</span><strong>@(readiness?.RuntimeProfileId is null ? T("NotResolved") : ResourceName(readiness.RuntimeProfileId))</strong></div>
         <div><span>@T("ExecutionMode")</span><strong>@T("Interactive")</strong></div>
-        <div data-testid="agent-definition-scope"><span>@T("DefinitionScope")</span><strong><code>@AgentDefinitionScope.Value</code></strong></div>
-        <div data-testid="agent-execution-scope"><span>@T("ExecutionScope")</span><strong><code>@SelectedExecutionScope.Value</code></strong></div>
+        <div class="runner-scope-item" data-testid="agent-definition-scope">
+            <span>@T("DefinitionScope")</span>
+            <strong><ResourceScopeBadge ScopeRef="@AgentDefinitionScope" /><code title="@AgentDefinitionScope.Value">@AgentDefinitionScope.Value</code></strong>
+        </div>
+        <div class="runner-scope-item" data-testid="agent-execution-scope">
+            <span>@T("ExecutionScope")</span>
+            <strong><ResourceScopeBadge ScopeRef="@SelectedExecutionScope" /><code title="@SelectedExecutionScope.Value">@SelectedExecutionScope.Value</code></strong>
+        </div>
     </section>
 
     @if (readiness is { Ready: false })
@@ -334,7 +340,7 @@ else
                 modelWarning = string.Join(" ", modelResolution.Warnings.DefaultIfEmpty($"Model resolution state is {ModelManagementUi.Label(modelResolution.Status)}."));
         }
         catch (AgentstrationApiException exception) { modelWarning = $"Model resolution is unavailable: {exception.Message}"; }
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.Name, generation.Value, cancellation.Token); }
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.Namespace, agent.Name, AgentDefinitionScope, generation.Value, cancellation.Token); }
         catch (AgentstrationApiException exception) { readiness = null; modelWarning = $"Runtime readiness is unavailable: {exception.Message}"; }
     }
 
@@ -345,7 +351,7 @@ else
         errorMessage = null;
         try
         {
-            var activation = await RuntimeClient.PrepareAgentAsync(agent.Name, agent.Generation, cancellation.Token);
+            var activation = await RuntimeClient.PrepareAgentAsync(agent.Namespace, agent.Name, AgentDefinitionScope, agent.Generation, cancellation.Token);
             await LoadExecutionContextAsync();
             if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 errorMessage = $"Generation {agent.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";

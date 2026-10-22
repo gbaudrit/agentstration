@@ -56,6 +56,7 @@ public sealed class AgentRunnerModel
             {
                 Namespace = agent.Namespace,
                 ScopeRef = agent.ScopeRef,
+                ResourceUid = agent.Uid,
             },
             Input = new RuntimeRunInput
             {

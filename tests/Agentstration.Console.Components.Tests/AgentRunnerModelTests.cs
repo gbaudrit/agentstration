@@ -12,6 +12,7 @@ public sealed class AgentRunnerModelTests
     {
         var agent = new AgentResource
         {
+            Uid = Guid.Parse("97a3927c-1554-4200-9583-7d93cdb24614"),
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = AgentResourceKinds.Agent,
             Metadata = new ResourceMetadata { Name = "instance-agent" },
@@ -30,5 +31,6 @@ public sealed class AgentRunnerModelTests
 
         Assert.IsNull(request.ExecutionScopeRef);
         Assert.AreEqual(ResourceScopeRef.Instance, request.Agent.ScopeRef);
+        Assert.AreEqual(agent.Uid, request.Agent.ResourceUid);
     }
 }
