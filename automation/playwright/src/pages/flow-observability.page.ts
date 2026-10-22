@@ -16,6 +16,7 @@ export class FlowObservabilityPage {
   }
 
   public async exerciseDraftDefinitionAndSplit(consoleUrl: string, checkInvalidYaml: boolean): Promise<void> {
+    if (checkInvalidYaml) await this.page.setViewportSize({ width: 1920, height: 1080 });
     const flowName = `definition-editor-smoke-${Date.now()}`;
     const created = await this.page.request.post(`${consoleUrl}/api/flows/drafts`, {
       data: { name: flowName, displayName: 'Definition editor smoke', template: 'Empty' },
@@ -65,8 +66,12 @@ export class FlowObservabilityPage {
 
   public async openManualRunDialog(consoleUrl: string, expectWide: boolean): Promise<void> {
     await this.open(consoleUrl, '/flows/universal-router', 'flowDetails');
-    await this.page.getByRole('button', { name: 'Runs', exact: true }).click();
-    await this.page.getByTestId(TestIds.flowObservability.runOpen).click();
+    const runOpen = this.page.getByTestId(TestIds.flowObservability.runOpen);
+    await expect(async () => {
+      await this.page.getByRole('button', { name: 'Runs', exact: true }).click();
+      await expect(runOpen).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+    await runOpen.click();
     const dialog = this.page.getByTestId(TestIds.flowObservability.runDialog);
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('select')).toHaveCount(1);
