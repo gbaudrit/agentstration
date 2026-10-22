@@ -80,4 +80,9 @@
   <data name="NoCompatibleSchemas"><value>No published JSON Schema is available. Publish a compatible Schema first or use an inline contract.</value></data>
   <data name="SchemaReferenceUnavailable"><value>The referenced Schema {0}/{1} version {2} is no longer available.</value></data>
   <data name="InputSchema"><value>Input schema</value></data>
+  <data name="ConfigureStep"><value>Configure step</value></data>
+  <data name="ConfigureStepNamed"><value>Configure step {0}</value></data>
+  <data name="ConfigureStepTitle"><value>Configure {0}</value></data>
+  <data name="CloseStepSettings"><value>Close step settings</value></data>
+  <data name="Done"><value>Done</value></data>
 </root>

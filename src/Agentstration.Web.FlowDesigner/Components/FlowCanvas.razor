@@ -10,7 +10,9 @@
         <button type="button" @onclick="Center">@Localizer["Fit"]</button>
     </div>
     <CascadingValue Value="diagram" IsFixed="true">
-        <DiagramCanvas />
+        <CascadingValue Value="nodeInteractions" IsFixed="true">
+            <DiagramCanvas />
+        </CascadingValue>
     </CascadingValue>
 </div>
 
@@ -35,6 +37,7 @@
     private DotNetObjectReference<FlowCanvas>? dotNetReference;
     private IJSObjectReference? canvasModule;
     private IJSObjectReference? wheelRegistration;
+    private FlowNodeInteractionContext nodeInteractions = default!;
     private int ZoomPercent => (int)Math.Round(diagram.Zoom * 100);
 
     [Parameter, EditorRequired] public FlowDesignerDocument Document { get; set; } = new([], []);
@@ -47,6 +50,7 @@
     [Parameter] public string? SelectedTransitionId { get; set; }
     [Parameter] public bool ShowAllErrorTransitions { get; set; }
     [Parameter] public EventCallback<string?> SelectedStepChanged { get; set; }
+    [Parameter] public EventCallback<string> StepSettingsRequested { get; set; }
     [Parameter] public EventCallback<string?> SelectedTransitionChanged { get; set; }
     [Parameter] public EventCallback<MoveStepCommand> StepMoved { get; set; }
     [Parameter] public EventCallback<string> StepRemoved { get; set; }
@@ -56,6 +60,7 @@
 
     protected override void OnInitialized()
     {
+        nodeInteractions = new(RequestStepSettingsAsync);
         diagram.RegisterComponent<FlowDiagramNode, FlowNodeWidget>();
         diagram.ContainerChanged += OnContainerChanged;
         diagram.ZoomChanged += OnZoomChanged;
@@ -67,6 +72,8 @@
         diagram.Links.Added += OnLinkAdded;
         diagram.Links.Removed += OnLinkRemoved;
     }
+
+    private Task RequestStepSettingsAsync(string stepName) => StepSettingsRequested.InvokeAsync(stepName);
 
     protected override void OnParametersSet()
     {

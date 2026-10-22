@@ -116,6 +116,7 @@ else
                 <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" ResolvedOutputsRevision="flowCallRenderRevision" FitRevision="layoutRevision"
                             IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedStepName="@Editor.State.Selection.StepName"
                             SelectedTransitionId="@Editor.State.Selection.TransitionId" ShowAllErrorTransitions="showAllErrorTransitions" SelectedStepChanged="SelectStepAsync"
+                            StepSettingsRequested="OpenStepSettingsAsync"
                             SelectedTransitionChanged="SelectTransitionAsync"
                             StepMoved="MoveStepAsync" StepRemoved="RemoveStepAsync" TransitionCreated="CreateTransitionAsync"
                             TransitionReconnected="ReconnectTransitionAsync"
@@ -131,6 +132,32 @@ else
                 }
                 else
                 {
+                    <article class="inspector-step-summary">
+                        <span class="inspector-step-summary-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(SelectedStep.Type())" /></span>
+                        <span class="inspector-step-summary-copy">
+                            <strong>@(SelectedStep.DisplayName ?? SelectedStep.Name)</strong>
+                            <small>@T($"Step.{SelectedStep.Type()}")</small>
+                            <code>@SelectedStep.Name</code>
+                        </span>
+                    </article>
+                    <button type="button" class="button-primary inspector-configure-step" data-testid="configure-selected-step" @onclick="OpenSelectedStepSettings">
+                        <UiIcon Name="settings" />
+                        <span>@T("ConfigureStep")</span>
+                    </button>
+                    @if (showStepSettings)
+                    {
+                    <div class="step-settings-backdrop" @onclick="CloseStepSettings">
+                        <section class="step-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="step-settings-title" data-testid="step-settings-dialog" @onclick:stopPropagation="true">
+                            <header class="step-settings-header">
+                                <div>
+                                    <span class="eyebrow">@T($"Step.{SelectedStep.Type()}")</span>
+                                    <h2 id="step-settings-title">@T("ConfigureStepTitle", SelectedStep.DisplayName ?? SelectedStep.Name)</h2>
+                                    <code>@SelectedStep.Name</code>
+                                </div>
+                                <button type="button" class="step-settings-close" aria-label="@T("CloseStepSettings")" @onclick="CloseStepSettings"><UiIcon Name="x" /></button>
+                            </header>
+                            <div class="step-settings-body">
+                                <div class="flow-inspector step-settings-form">
                     <div class="inspector-details-group">
                         <div class="inspector-details-heading"><h3>@T("StepDetails")</h3><span class="inspector-step-type">@T($"Step.{SelectedStep.Type()}")</span></div>
                         <label>@T("StepDisplayName")<input data-testid="step-display-name" disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
@@ -340,6 +367,14 @@ else
                         <label>@T("Message")<textarea disabled="@ReadOnly" value="@failure.Message" @onchange="e => UpdateSelectedAsync(failure with { Message = Text(e) })"></textarea></label>
                     }
                     <button class="button-danger" disabled="@(ReadOnly || SelectedStep.Name == Editor.State.Resource.Definition.EntryStep)" @onclick="RemoveSelectedAsync">@T("DeleteStep")</button>
+                                </div>
+                            </div>
+                            <footer class="step-settings-footer">
+                                <button type="button" class="button-primary" @onclick="CloseStepSettings">@T("Done")</button>
+                            </footer>
+                        </section>
+                    </div>
+                    }
                 }
 
                 <hr /><h3>@T("Transitions")</h3>
@@ -431,6 +466,7 @@ else
     private bool moreActionsOpen;
     private bool? paletteVisibility;
     private bool? inspectorVisibility;
+    private bool showStepSettings;
     private long layoutRevision;
     private long flowCallRenderRevision;
     private int toolPickerRevision;
@@ -564,6 +600,13 @@ else
             await UpdateSelectedAsync(agent with { DisplayName = selectedAgent.DisplayName });
         if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call);
     }
+    private async Task OpenStepSettingsAsync(string name)
+    {
+        await SelectStepAsync(name);
+        showStepSettings = SelectedStep is not null;
+    }
+    private void OpenSelectedStepSettings() => showStepSettings = SelectedStep is not null;
+    private void CloseStepSettings() => showStepSettings = false;
     private async Task LayoutAsync(bool vertical)
     {
         await DispatchAsync(new ApplyAutoLayoutCommand(vertical));
@@ -590,6 +633,11 @@ else
     [JSInvokable]
     public Task ExitFullScreenAsync()
     {
+        if (showStepSettings)
+        {
+            showStepSettings = false;
+            return InvokeAsync(StateHasChanged);
+        }
         if (!focusMode || showRun) return Task.CompletedTask;
         focusMode = false;
         return InvokeAsync(StateHasChanged);
@@ -751,7 +799,13 @@ else
         ReadOnly || SelectedTransition is not { } transition
             ? Task.CompletedTask
             : DispatchAsync(new UpdateTransitionCommand(update(transition)));
-    private Task RemoveSelectedAsync() => SelectedStep is { } step ? RemoveStepAsync(step.Name) : Task.CompletedTask;
+    private async Task RemoveSelectedAsync()
+    {
+        if (SelectedStep is not { } step) return;
+        await RemoveStepAsync(step.Name);
+        if (Editor.State.Resource?.Definition.Steps.All(candidate => candidate.Name != step.Name) == true)
+            showStepSettings = false;
+    }
     private async Task RemoveStepAsync(string name)
     {
         if (ReadOnly || Editor.State.Resource is not { } resource || name == resource.Definition.EntryStep

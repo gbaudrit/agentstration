@@ -74,4 +74,9 @@
   <data name="NoCompatibleSchemas"><value>Aucun JSON Schema publié n’est disponible. Publiez d’abord un schéma compatible ou utilisez un contrat intégré.</value></data>
   <data name="SchemaReferenceUnavailable"><value>Le schéma référencé {0}/{1}, version {2}, n’est plus disponible.</value></data>
   <data name="InputSchema"><value>Schéma d’entrée</value></data>
+  <data name="ConfigureStep"><value>Configurer l’étape</value></data>
+  <data name="ConfigureStepNamed"><value>Configurer l’étape {0}</value></data>
+  <data name="ConfigureStepTitle"><value>Configurer {0}</value></data>
+  <data name="CloseStepSettings"><value>Fermer la configuration de l’étape</value></data>
+  <data name="Done"><value>Terminé</value></data>
 </root>
