@@ -951,16 +951,17 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
-    public async Task OutputInspectorPreservesStringMappingAndEditsSchemaAndErrorDetails()
+    public async Task OutputInspectorShowsCanonicalMappingAndInheritedSchemaAndEditsErrorDetails()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { result = new { type = "string" } } });
         var definition = new FlowGraphDefinition
         {
             EntryStep = "input",
             Steps =
             [
-                new InputFlowStepDefinition { Name = "input" },
+                new InputFlowStepDefinition { Name = "input", Schema = schema },
                 new OutputFlowStepDefinition { Name = "result", Outcome = FlowOutputOutcome.Error, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }
             ],
             Transitions = [new("input-result", "input", "completed", "result")]
@@ -975,9 +976,10 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("result"));
         rendered.Find("[data-testid='step-settings-tab-output']").Click();
 
-        rendered.Find("[data-testid='output-mapping']").Change("\"${transition.output}\"");
-        var schema = JsonSerializer.SerializeToElement(new { type = "object" });
-        await rendered.InvokeAsync(() => rendered.FindComponent<SchemaDocumentEditor>().Instance.ValueChanged.InvokeAsync(schema));
+        var mapping = rendered.Find("[data-testid='output-mapping']");
+        Assert.IsTrue(mapping.HasAttribute("readonly"));
+        Assert.AreEqual("\"${transition.output}\"", mapping.GetAttribute("value"));
+        Assert.AreEqual("object", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value.GetProperty("type").GetString());
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         rendered.FindAll(".flow-inspector input").Single(element => element.ParentElement!.TextContent.Contains("Error details expression", StringComparison.Ordinal)).Change("${transition.output.details}");
 
@@ -985,20 +987,29 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.AreEqual(JsonValueKind.String, output.OutputMapping?.ValueKind);
         Assert.AreEqual("${transition.output}", output.OutputMapping?.GetString());
         Assert.IsNull(output.Schema);
-        Assert.AreEqual("object", output.SchemaBinding?.Inline?.Content.GetProperty("type").GetString());
+        Assert.IsNull(output.SchemaBinding);
         Assert.AreEqual("${transition.output.details}", output.DetailsExpression);
     }
 
     [TestMethod]
-    public async Task OutputInspectorPinsAnExactPublishedSharedSchemaVersion()
+    public async Task TransformInspectorPinsAnExactPublishedSharedOutputSchemaVersion()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
         var definition = new FlowGraphDefinition
         {
             EntryStep = "input",
-            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "result" }],
-            Transitions = [new("input-result", "input", "completed", "result")]
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new TransformFlowStepDefinition { Name = "transform", Mapping = JsonSerializer.SerializeToElement("${transition.output}") },
+                new OutputFlowStepDefinition { Name = "result" }
+            ],
+            Transitions =
+            [
+                new("input-transform", "input", "completed", "transform"),
+                new("transform-result", "transform", "completed", "result")
+            ]
         };
         var scope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
@@ -1016,18 +1027,18 @@ public sealed class FlowDesignerReadOnlyTests
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
-        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("result"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("transform"));
         rendered.Find("[data-testid='step-settings-tab-output']").Click();
 
-        rendered.FindAll("[data-testid='flow-output-schema'] button")
+        rendered.FindAll("[data-testid='transform-output-schema'] button")
             .Single(button => button.TextContent.Trim() == "Shared Schema").Click();
 
-        var output = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
-            .OfType<OutputFlowStepDefinition>().Single();
-        Assert.IsNull(output.Schema);
-        Assert.AreEqual("task-result", output.SchemaBinding?.Reference?.Name);
-        Assert.AreEqual("1.2.0", output.SchemaBinding?.Reference?.Version);
-        Assert.AreEqual(scope, output.SchemaBinding?.Reference?.ScopeRef);
+        var transform = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<TransformFlowStepDefinition>().Single();
+        Assert.IsNull(transform.Schema);
+        Assert.AreEqual("task-result", transform.SchemaBinding?.Reference?.Name);
+        Assert.AreEqual("1.2.0", transform.SchemaBinding?.Reference?.Version);
+        Assert.AreEqual(scope, transform.SchemaBinding?.Reference?.ScopeRef);
     }
 
     [TestMethod]

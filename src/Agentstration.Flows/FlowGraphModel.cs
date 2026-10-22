@@ -132,6 +132,10 @@ public sealed record TransformFlowStepDefinition : FlowStepDefinition
     public string Mode { get; init; } = "Mapping";
     public JsonElement? Mapping { get; init; }
     public string? Expression { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? Schema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBinding? SchemaBinding { get; init; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<FlowCallVersionStrategy>))]
@@ -350,7 +354,12 @@ public static class FlowGraphDefinitionExtensions
         var candidates = definition.Transitions
             .Where(transition => transition.ToStep == output.Name)
             .Select(transition => definition.Steps.FirstOrDefault(step => step.Name == transition.FromStep))
-            .Select(step => step is InputFlowStepDefinition input ? input.Schema ?? definition.InputSchema : null)
+            .Select(step => step switch
+            {
+                InputFlowStepDefinition input => input.Schema ?? definition.InputSchema,
+                TransformFlowStepDefinition transform => transform.Schema,
+                _ => null
+            })
             .Where(schema => schema is not null)
             .Select(schema => schema!.Value)
             .ToArray();

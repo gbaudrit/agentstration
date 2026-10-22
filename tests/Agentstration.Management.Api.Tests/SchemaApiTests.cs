@@ -49,9 +49,19 @@ public sealed class SchemaApiTests : ModelManagementApiTestBase
             Steps =
             [
                 new InputFlowStepDefinition { Name = "input" },
+                new TransformFlowStepDefinition
+                {
+                    Name = "normalize",
+                    Mapping = JsonSerializer.SerializeToElement("${transition.output}"),
+                    SchemaBinding = reference
+                },
                 new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }
             ],
-            Transitions = [new("completed", "input", "completed", "completed")]
+            Transitions =
+            [
+                new("normalize", "input", "completed", "normalize"),
+                new("completed", "normalize", "completed", "completed")
+            ]
         };
         var createdFlow = await flows.CreateAsync(workspaceId, new CreateFlowCommand(
             "schema-bound-flow", null, "1.0.0", true,
@@ -63,10 +73,18 @@ public sealed class SchemaApiTests : ModelManagementApiTestBase
         Assert.IsNull(published.Value.Graph!.InputSchemaBinding);
         Assert.AreEqual("string", published.Value.Graph.InputSchema!.Value.GetProperty("properties")
             .GetProperty("name").GetProperty("type").GetString());
+        var publishedTransform = published.Value.Graph.Steps.OfType<TransformFlowStepDefinition>().Single();
+        Assert.IsNull(publishedTransform.SchemaBinding);
+        Assert.AreEqual("string", publishedTransform.Schema!.Value.GetProperty("properties")
+            .GetProperty("name").GetProperty("type").GetString());
+        Assert.AreEqual("string", published.Value.Graph.GetOutputs().Single().Schema!.Value
+            .GetProperty("properties").GetProperty("name").GetProperty("type").GetString());
         var snapshot = published.Value.SchemaBindings!["$.inputSchema"];
         Assert.AreEqual(schemaVersion.Value.DefinitionHash, snapshot.DefinitionHash);
         Assert.AreEqual(schemaVersion.Value.SchemaUid, snapshot.SchemaUid);
         Assert.AreEqual("1.0.0", snapshot.Source!.Version);
+        Assert.AreEqual(schemaVersion.Value.DefinitionHash,
+            published.Value.SchemaBindings["$.steps[normalize].schema"].DefinitionHash);
 
         _ = await schemaService.PutAsync(workspaceScope, ResourceNamespace.Default, "flow-input",
             original with { Content = JsonDocument.Parse("{\"type\":\"array\"}").RootElement.Clone() },

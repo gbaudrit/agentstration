@@ -416,6 +416,37 @@ else
                         </section>
                         }
                     }
+                    else if (SelectedStep is TransformFlowStepDefinition transform)
+                    {
+                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
+                        {
+                            <label>@T("TransformMapping")<textarea data-testid="transform-mapping" disabled="@ReadOnly" value="@JsonText(transform.Mapping)" @onchange="UpdateTransformMappingAsync"></textarea></label>
+                        }
+                        @if (activeStepSettingsTab == StepSettingsTab.Input)
+                        {
+                            <section class="step-contract-section">
+                                <ContractHeading Direction="Input" Source="@T("ContractSource.IncomingTransition")" />
+                                @if (EffectiveIncomingSchema is { } incomingSchema)
+                                {
+                                    <SchemaDocumentEditor Value="incomingSchema" ReadOnly="true" />
+                                }
+                                else
+                                {
+                                    <p class="step-contract-empty muted">@T("InheritedContractUnavailable")</p>
+                                }
+                            </section>
+                        }
+                        @if (activeStepSettingsTab == StepSettingsTab.Output)
+                        {
+                            <section class="step-contract-section">
+                                <ContractHeading Direction="Output" Source="@T("ContractSource.Step")" />
+                                <SchemaBindingEditor Title="@T("OutputSchema")" TestId="transform-output-schema"
+                                    Binding="@transform.SchemaBinding" LegacySchema="@transform.Schema" SchemaVersions="schemaVersions"
+                                    ValueChanged="UpdateTransformSchemaBindingAsync" ReadOnly="ReadOnly"
+                                    DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
+                            </section>
+                        }
+                    }
                     else if (SelectedStep is ConditionFlowStepDefinition condition)
                     {
                         @if (activeStepSettingsTab == StepSettingsTab.Configuration)
@@ -427,6 +458,20 @@ else
                     }
                     else if (SelectedStep is OutputFlowStepDefinition output)
                     {
+                        @if (activeStepSettingsTab == StepSettingsTab.Input)
+                        {
+                            <section class="step-contract-section">
+                                <ContractHeading Direction="Input" Source="@T("ContractSource.IncomingTransition")" />
+                                @if (EffectiveIncomingSchema is { } incomingSchema)
+                                {
+                                    <SchemaDocumentEditor Value="incomingSchema" ReadOnly="true" />
+                                }
+                                else
+                                {
+                                    <p class="step-contract-empty muted">@T("InheritedContractUnavailable")</p>
+                                }
+                            </section>
+                        }
                         @if (activeStepSettingsTab == StepSettingsTab.Configuration)
                         {
                         <label>@T("OutputOutcome")<select data-testid="output-outcome" disabled="@ReadOnly" value="@(output.Outcome ?? FlowOutputOutcome.Success)" @onchange="UpdateOutputOutcomeAsync"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></select></label>
@@ -440,12 +485,20 @@ else
                         @if (activeStepSettingsTab == StepSettingsTab.Output)
                         {
                             <section class="step-contract-section">
-                                <ContractHeading Direction="Output" Source="@T("ContractSource.Step")" />
-                                <label>@T("OutputMapping")<textarea data-testid="output-mapping" disabled="@ReadOnly" value="@JsonText(output.OutputMapping)" @onchange="UpdateOutputMappingAsync"></textarea></label>
-                                <SchemaBindingEditor Title="@T("OutputSchema")" TestId="flow-output-schema"
-                                    Binding="@output.SchemaBinding" LegacySchema="@output.Schema" SchemaVersions="schemaVersions"
-                                    ValueChanged="UpdateOutputSchemaBindingAsync" ReadOnly="ReadOnly"
-                                    DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
+                                <ContractHeading Direction="Output" Source="@(EffectiveIncomingSchema is null && ResolveSchema(output.SchemaBinding, output.Schema) is not null ? T("ContractSource.LegacyOutput") : T("ContractSource.IncomingTransition"))" />
+                                <label>@T("ExposedValue")<textarea data-testid="output-mapping" readonly value="@OutputMappingText(output)"></textarea><small>@T("OutputMappingHelp")</small></label>
+                                @if (EffectiveIncomingSchema is { } incomingSchema)
+                                {
+                                    <SchemaDocumentEditor Value="incomingSchema" ReadOnly="true" />
+                                }
+                                else if (ResolveSchema(output.SchemaBinding, output.Schema) is { } legacyOutputSchema)
+                                {
+                                    <SchemaDocumentEditor Value="legacyOutputSchema" ReadOnly="true" />
+                                }
+                                else
+                                {
+                                    <p class="step-contract-empty muted">@T("InheritedContractUnavailable")</p>
+                                }
                             </section>
                         }
                     }
@@ -461,11 +514,11 @@ else
                     {
                         <div class="step-settings-empty"><UiIcon Name="adjustments" /><h3>@T("NoStepConfiguration")</h3><p class="muted">@T("NoStepConfigurationHelp")</p></div>
                     }
-                    @if (activeStepSettingsTab == StepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition)
+                    @if (activeStepSettingsTab == StepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not OutputFlowStepDefinition)
                     {
                         <div class="step-settings-empty"><UiIcon Name="arrow-bar-to-right" /><h3>@T("NoInputContract")</h3><p class="muted">@T("NoInputContractHelp")</p></div>
                     }
-                    @if (activeStepSettingsTab == StepSettingsTab.Output && SelectedStep is not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition)
+                    @if (activeStepSettingsTab == StepSettingsTab.Output && SelectedStep is not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition)
                     {
                         <div class="step-settings-empty"><UiIcon Name="arrow-bar-left" /><h3>@T("NoOutputContract")</h3><p class="muted">@T("NoOutputContractHelp")</p></div>
                     }
@@ -617,6 +670,24 @@ else
             var input = resource.Definition.Steps.OfType<InputFlowStepDefinition>().FirstOrDefault();
             return ResolveSchema(input?.SchemaBinding, input?.Schema)
                 ?? ResolveSchema(resource.Definition.InputSchemaBinding, resource.Definition.InputSchema);
+        }
+    }
+    private JsonElement? EffectiveIncomingSchema
+    {
+        get
+        {
+            if (Editor.State.Resource is not { } resource || SelectedStep is null) return null;
+            var candidates = resource.Definition.Transitions
+                .Where(transition => transition.ToStep == SelectedStep.Name)
+                .Select(transition => resource.Definition.Steps.FirstOrDefault(step => step.Name == transition.FromStep))
+                .Select(ResolveStepOutputSchema)
+                .Where(schema => schema is not null)
+                .Select(schema => schema!.Value)
+                .ToArray();
+            var distinct = new List<JsonElement>();
+            foreach (var candidate in candidates)
+                if (!distinct.Any(existing => JsonElement.DeepEquals(existing, candidate))) distinct.Add(candidate);
+            return distinct.Count == 1 ? distinct[0] : null;
         }
     }
     private IEnumerable<FlowDesignerTool> VisibleTools => string.IsNullOrWhiteSpace(toolSearch)
@@ -1096,15 +1167,26 @@ else
     }
     private Task UpdateOutputOutcomeAsync(ChangeEventArgs e) => SelectedStep is OutputFlowStepDefinition output && Enum.TryParse<FlowOutputOutcome>(Text(e), out var outcome)
         ? UpdateSelectedAsync(output with { Outcome = outcome }) : Task.CompletedTask;
-    private Task UpdateOutputMappingAsync(ChangeEventArgs e) => UpdateOutputJsonAsync(e, schema: false);
-    private Task UpdateOutputSchemaAsync(ChangeEventArgs e) => UpdateOutputJsonAsync(e, schema: true);
+    private Task UpdateTransformMappingAsync(ChangeEventArgs e)
+    {
+        if (ReadOnly || SelectedStep is not TransformFlowStepDefinition transform) return Task.CompletedTask;
+        var text = e.Value?.ToString()?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(text)) return UpdateSelectedAsync(transform with { Mapping = null });
+        if (!TryParseJson(text, out var value))
+        {
+            error = T("TransformMappingInvalid");
+            return Task.CompletedTask;
+        }
+        error = null;
+        return UpdateSelectedAsync(transform with { Mapping = value });
+    }
     private Task UpdateInputSchemaAsync(SchemaBindingEditorValue value) =>
         SelectedStep is InputFlowStepDefinition input
             ? UpdateSelectedAsync(input with { Schema = null, SchemaBinding = value.Binding })
             : Task.CompletedTask;
-    private Task UpdateOutputSchemaBindingAsync(SchemaBindingEditorValue value) =>
-        SelectedStep is OutputFlowStepDefinition output
-            ? UpdateSelectedAsync(output with { Schema = null, SchemaBinding = value.Binding })
+    private Task UpdateTransformSchemaBindingAsync(SchemaBindingEditorValue value) =>
+        SelectedStep is TransformFlowStepDefinition transform
+            ? UpdateSelectedAsync(transform with { Schema = null, SchemaBinding = value.Binding })
             : Task.CompletedTask;
     private Task<SchemaFormatValidationResult> ValidateSchemaDefinitionAsync(ValidateSchemaDefinitionRequest request) =>
         Resources.ValidateSchemaDefinitionAsync(request, cancellation.Token);
@@ -1120,20 +1202,21 @@ else
                 && (reference.ScopeRef is null || candidate.ScopeRef == reference.ScopeRef))?.Content;
         return legacy;
     }
-    private Task UpdateOutputJsonAsync(ChangeEventArgs e, bool schema)
+    private JsonElement? ResolveStepOutputSchema(FlowStepDefinition? step)
     {
-        if (ReadOnly || SelectedStep is not OutputFlowStepDefinition output) return Task.CompletedTask;
-        var text = e.Value?.ToString()?.Trim() ?? string.Empty;
-        if (string.IsNullOrEmpty(text))
-            return UpdateSelectedAsync(schema ? output with { Schema = null } : output with { OutputMapping = null });
-        if (!TryParseJson(text, out var value) || (schema && value.ValueKind != JsonValueKind.Object))
+        if (Editor.State.Resource is not { } resource) return null;
+        return step switch
         {
-            error = T(schema ? "OutputSchemaInvalid" : "OutputMappingInvalid");
-            return Task.CompletedTask;
-        }
-        error = null;
-        return UpdateSelectedAsync(schema ? output with { Schema = value } : output with { OutputMapping = value });
+            InputFlowStepDefinition input => ResolveSchema(input.SchemaBinding, input.Schema)
+                ?? ResolveSchema(resource.Definition.InputSchemaBinding, resource.Definition.InputSchema),
+            TransformFlowStepDefinition transform => ResolveSchema(transform.SchemaBinding, transform.Schema),
+            ToolFlowStepDefinition tool => tools.FirstOrDefault(candidate => ToolKey(candidate.Namespace, candidate.Name) == ToolKey(tool.Tool))?.OutputSchema,
+            FlowCallStepDefinition call => FlowVersion(call)?.OutputSchema,
+            _ => null
+        };
     }
+    private static string OutputMappingText(OutputFlowStepDefinition output) =>
+        output.OutputMapping is { } mapping ? JsonText(mapping) : "\"${transition.output}\"";
     private static string FlowKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}|{name}";
     private string FlowKey(FlowCallReference reference) => FlowKey(reference.Namespace ?? Namespace, reference.ResourceId);
     private static bool TryParseFlowKey(string value, out (ResourceNamespace Namespace, string Name) target)

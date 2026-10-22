@@ -36,6 +36,11 @@ internal sealed class FlowSchemaBindingSnapshotter(ISchemaBindingResolver resolv
                         inputStep.Schema, inputStep.SchemaBinding, context, snapshots, cancellationToken);
                     steps.Add(inputStep with { Schema = inputStepSchema, SchemaBinding = null });
                     break;
+                case TransformFlowStepDefinition transformStep:
+                    var transformStepSchema = await ResolveAsync($"$.steps[{transformStep.Name}].schema",
+                        transformStep.Schema, transformStep.SchemaBinding, context, snapshots, cancellationToken);
+                    steps.Add(transformStep with { Schema = transformStepSchema, SchemaBinding = null });
+                    break;
                 case OutputFlowStepDefinition outputStep:
                     var outputStepSchema = await ResolveAsync($"$.steps[{outputStep.Name}].schema",
                         outputStep.Schema, outputStep.SchemaBinding, context, snapshots, cancellationToken);
