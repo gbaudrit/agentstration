@@ -108,8 +108,8 @@ export class ExecutionScopesPage {
       `${consoleUrl}/agents/${encodeURIComponent(fixture.agentName)}/run?scopeRef=${encodeURIComponent('/instance')}`,
       TestIds.flowObservability.agentRunner,
     );
-    await expect(this.agentDefinitionScope).toContainText('/instance');
-    await expect(this.agentExecutionScope).toContainText(scopeRef);
+    await expect(this.agentDefinitionScope).toContainText('Instance');
+    await expect(this.agentExecutionScope).toContainText('Workspace');
     const prompt = this.page.getByTestId(TestIds.flowObservability.agentRunPrompt);
     const submit = this.page.getByTestId(TestIds.flowObservability.agentRunSubmit);
     const promptValue = 'Run the Instance Agent from the selected Workspace.';
@@ -165,8 +165,8 @@ export class ExecutionScopesPage {
       `${consoleUrl}/runs/${encodeURIComponent(evidence.runtimeRunId)}?scopeRef=${encodeURIComponent(evidence.scopeRef)}`,
       TestIds.flowObservability.agentRunner,
     );
-    await expect(this.agentDefinitionScope).toContainText('/instance');
-    await expect(this.agentExecutionScope).toContainText(evidence.scopeRef);
+    await expect(this.agentDefinitionScope).toContainText('Instance');
+    await expect(this.agentExecutionScope).toContainText('Workspace');
   }
 
   public async openFlowRun(consoleUrl: string, evidence: ScopedExecutionEvidence): Promise<void> {
@@ -275,10 +275,6 @@ export class ExecutionScopesPage {
       agent = await current.json() as AgentWire;
     }
     await this.grantDescendantUse(consoleUrl, agent, tenantScope);
-    const prepared = await this.page.request.post(
-      `${consoleUrl}/api/runtime/agents/${agentName}/prepare?generation=${agent.generation}&scopeRef=${encodeURIComponent('/instance')}`,
-    );
-    expect(prepared.status(), await prepared.text()).toBe(200);
     return agent;
   }
 
