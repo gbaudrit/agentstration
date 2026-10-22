@@ -1029,7 +1029,7 @@ public sealed class FlowDesignerReadOnlyTests
                     InputMapping = JsonSerializer.SerializeToElement("${transition.output}")
                 }
             ],
-            Transitions = [new("input-child", "input", "completed", "child")]
+            Transitions = []
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
@@ -1050,11 +1050,19 @@ public sealed class FlowDesignerReadOnlyTests
         context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
 
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.TransitionCreated.InvokeAsync(
+            new FlowTransitionDefinition("input-child", "input", "completed", "child")));
+        var connectionDialog = rendered.Find("[data-testid='connection-contract-dialog']");
+        StringAssert.Contains(connectionDialog.TextContent, "Configure the parent Flow input contract?");
+        StringAssert.Contains(connectionDialog.TextContent, "Reusable shared contract");
+        StringAssert.Contains(connectionDialog.TextContent, "pack.news/analysis-request · 1.2.0");
+        CollectionAssert.Contains(rendered.Find("[data-testid='connection-contract-apply']").ClassList.ToArray(), "button-primary");
+        rendered.Find("[data-testid='connection-contract-apply']").Click();
+
+        Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='connection-contract-dialog']"));
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
         rendered.Find("[data-testid='step-settings-tab-input']").Click();
         StringAssert.Contains(rendered.Find("[data-testid='flow-call-shared-input-contract']").TextContent, "pack.news/analysis-request · 1.2.0");
-        CollectionAssert.Contains(rendered.Find("[data-testid='use-called-flow-shared-input']").ClassList.ToArray(), "button-secondary");
-        rendered.Find("[data-testid='use-called-flow-shared-input']").Click();
 
         var input = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
             .OfType<InputFlowStepDefinition>().Single();
@@ -1089,7 +1097,7 @@ public sealed class FlowDesignerReadOnlyTests
                     InputMapping = JsonSerializer.SerializeToElement("${transition.output}")
                 }
             ],
-            Transitions = [new("input-child", "input", "completed", "child")]
+            Transitions = []
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
@@ -1104,6 +1112,14 @@ public sealed class FlowDesignerReadOnlyTests
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.TransitionCreated.InvokeAsync(
+            new FlowTransitionDefinition("input-child", "input", "completed", "child")));
+        var connectionDialog = rendered.Find("[data-testid='connection-contract-dialog']");
+        StringAssert.Contains(connectionDialog.TextContent, "Independent inline copy");
+        StringAssert.Contains(connectionDialog.TextContent, "make it shared manually in the called Flow");
+        rendered.Find("[data-testid='connection-contract-later']").Click();
+        Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='connection-contract-dialog']"));
 
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
         rendered.Find("[data-testid='step-settings-tab-input']").Click();

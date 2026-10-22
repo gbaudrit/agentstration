@@ -99,6 +99,9 @@
   <data name="CalledFlowInlineInputTitle"><value>Copie intégrée indépendante</value></data>
   <data name="CalledFlowInlineInputHelp"><value>Le Flow appelé utilise un contrat d’entrée intégré. Vous pouvez le recopier sur l’entrée du Flow parent, mais les modifications ultérieures ne seront pas synchronisées. Pour partager un même contrat, rendez-le d’abord partagé manuellement dans le Flow appelé.</value></data>
   <data name="CopyCalledFlowInlineInput"><value>Recopier le schéma sur l’entrée</value></data>
+  <data name="ConnectionContractTitle"><value>Configurer le contrat d’entrée du Flow parent ?</value></data>
+  <data name="ConnectionContractHelp"><value>La connexion à « {0} » peut maintenant configurer l’entrée du Flow parent.</value></data>
+  <data name="ConfigureContractLater"><value>Pas maintenant</value></data>
   <data name="ContractSource.CalledTool"><value>Fourni par le Tool appelé</value></data>
   <data name="ContractSource.IncomingTransition"><value>Hérité de la transition entrante</value></data>
   <data name="ContractSource.LegacyOutput"><value>Déclaré par cette ancienne sortie</value></data>

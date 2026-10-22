@@ -105,6 +105,9 @@
   <data name="CalledFlowInlineInputTitle"><value>Independent inline copy</value></data>
   <data name="CalledFlowInlineInputHelp"><value>The called Flow uses an inline input contract. You can copy it to the parent Flow input, but later changes will not be synchronized. To share one contract, make it shared manually in the called Flow first.</value></data>
   <data name="CopyCalledFlowInlineInput"><value>Copy Schema to the parent input</value></data>
+  <data name="ConnectionContractTitle"><value>Configure the parent Flow input contract?</value></data>
+  <data name="ConnectionContractHelp"><value>The connection to “{0}” can configure the parent Flow input now.</value></data>
+  <data name="ConfigureContractLater"><value>Not now</value></data>
   <data name="ContractSource.CalledTool"><value>Provided by the called Tool</value></data>
   <data name="ContractSource.IncomingTransition"><value>Inherited from the incoming transition</value></data>
   <data name="ContractSource.LegacyOutput"><value>Declared by this legacy output</value></data>
