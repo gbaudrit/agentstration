@@ -1076,6 +1076,7 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='connection-contract-dialog']"));
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
         rendered.Find("[data-testid='step-settings-tab-input']").Click();
+        Assert.HasCount(0, rendered.FindAll(".step-contract-source"));
         StringAssert.Contains(rendered.Find("[data-testid='flow-call-shared-input-contract']").TextContent, "pack.news/analysis-request · 1.2.0");
 
         var input = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
@@ -1279,6 +1280,7 @@ public sealed class FlowDesignerReadOnlyTests
 
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("input"));
         rendered.Find("[data-testid='step-settings-tab-input']").Click();
+        Assert.HasCount(0, rendered.FindAll(".step-contract-source"));
         rendered.Find("[data-testid='flow-input-schema-remove']").Click();
 
         var updated = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition;

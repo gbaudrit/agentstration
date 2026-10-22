@@ -10,8 +10,6 @@ export interface NamedOutputAuthoring {
   name: string;
   displayName: string;
   outcome: 'Success' | 'Error';
-  mapping: string;
-  schema: string;
   code?: string;
   message?: string;
   details?: string;
@@ -63,9 +61,11 @@ export class FlowDesignerPage {
     await this.open(consoleUrl, 'default', name);
     await expect(this.node('transform')).toBeVisible();
     await expect(async () => {
-      await this.node('transform').click();
+      await this.node('transform').locator('.flow-node-settings').click();
       await expect(this.page.getByRole('textbox', { name: 'Step ID' })).toHaveValue('transform', { timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
+    await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
     return name;
   }
 
@@ -171,18 +171,24 @@ export class FlowDesignerPage {
 
   public async selectStep(displayName: string): Promise<void> {
     await expect(async () => {
-      await this.node(displayName).locator('.flow-node-copy').click();
+      await this.node(displayName).locator('.flow-node-settings').click();
       await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
   }
 
   public async useFlowCallVersion(strategy: 'Active' | 'Exact', version?: string): Promise<void> {
+    if (!await this.page.locator('.step-settings-dialog').isVisible()) {
+      await this.page.getByTestId('configure-selected-step').click();
+    }
+    await this.page.getByTestId('step-settings-tab-configuration').click();
     await this.page.getByTestId(TestIds.flowObservability.flowCallVersionStrategy).selectOption(strategy);
     if (strategy === 'Exact') {
       const versionSelect = this.page.getByTestId(TestIds.flowObservability.flowCallExactVersion);
       await expect(versionSelect).toBeVisible();
       if (version) await versionSelect.selectOption(version);
     }
+    await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
     // Persist each version switch before the next authoring action so a slower autosave from the
     // previous strategy cannot restore stale ports while the scenario edits another node.
     await this.save();
@@ -192,21 +198,23 @@ export class FlowDesignerPage {
   public async addNamedOutput(output: NamedOutputAuthoring): Promise<void> {
     await this.ensurePaletteVisible();
     await this.page.getByTestId(TestIds.flowObservability.paletteOutput).click();
-    await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toHaveValue('Output');
     // Complete the add-step save before editing the new node. On a busy smoke run, letting that
     // request overlap the first field change can reapply the initial "Output" projection.
     await this.save();
     await this.expectAutosaved();
+    await this.page.getByTestId('configure-selected-step').click();
+    await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toHaveValue('Output');
     await this.changeField(TestIds.flowObservability.stepDisplayName, output.displayName);
     await this.changeField(TestIds.flowObservability.stepName, output.name);
+    await this.page.getByTestId('step-settings-tab-configuration').click();
     await this.page.getByTestId(TestIds.flowObservability.outputOutcome).selectOption(output.outcome);
-    await this.changeField(TestIds.flowObservability.outputMapping, output.mapping);
-    await this.changeField(TestIds.flowObservability.outputSchema, output.schema);
     if (output.outcome === 'Error') {
       if (output.code) await this.changeField(TestIds.flowObservability.outputErrorCode, output.code);
       if (output.message) await this.changeField(TestIds.flowObservability.outputErrorMessage, output.message);
       if (output.details) await this.changeField(TestIds.flowObservability.outputErrorDetails, output.details);
     }
+    await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
     await expect(this.node(output.displayName)).toBeVisible();
   }
 
@@ -232,6 +240,8 @@ export class FlowDesignerPage {
 
   public async renameSelectedOutput(name: string): Promise<void> {
     await this.changeField(TestIds.flowObservability.stepName, name);
+    await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
   }
 
   public async dragOutputToInput(sourceName: string, targetName: string): Promise<void> {

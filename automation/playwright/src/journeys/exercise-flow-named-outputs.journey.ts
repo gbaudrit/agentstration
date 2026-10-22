@@ -39,13 +39,9 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
 
   await designer.addNamedOutput({
     name: 'approved-parent', displayName: 'Approved parent', outcome: 'Success',
-    mapping: '"${transition.output}"',
-    schema: '{"type":"object","properties":{"decision":{"type":"string"}}}',
   });
   await designer.addNamedOutput({
     name: 'error-parent', displayName: 'Error parent', outcome: 'Error',
-    mapping: '"${transition.output}"',
-    schema: '{"type":"object","properties":{"retryable":{"type":"boolean"}}}',
     code: 'PARENT_PROVIDER_ERROR', message: 'The child provider failed.', details: '${transition.output.details}',
   });
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.outputsAuthored, page: context.pages.page, target: designer.designer });

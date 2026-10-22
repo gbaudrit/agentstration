@@ -178,7 +178,7 @@ else
                         @if (activeStepSettingsTab == StepSettingsTab.Input)
                         {
                             <section class="step-contract-section">
-                                <ContractHeading Direction="Input" Source="@T("ContractSource.Flow")" />
+                                <ContractHeading Direction="Input" />
                                 <SchemaBindingEditor Title="@T("InputSchema")" TestId="flow-input-schema"
                                     Binding="@(input.SchemaBinding ?? Editor.State.Resource.Definition.InputSchemaBinding)" LegacySchema="@(input.Schema ?? Editor.State.Resource.Definition.InputSchema)"
                                     SchemaVersions="schemaVersions" ValueChanged="UpdateInputSchemaAsync" ReadOnly="ReadOnly"
@@ -267,7 +267,7 @@ else
                         @if (activeStepSettingsTab == StepSettingsTab.Input)
                         {
                             <section class="step-contract-section">
-                            <ContractHeading Direction="Input" Source="@T("ContractSource.CalledFlow")" />
+                            <ContractHeading Direction="Input" />
                         @if (SelectedFlowVersion is not null)
                         {
                             @if (FlowCallReceivesParentInput(flowCall) && SelectedFlowVersion.InputSchemaReference is { } sharedInputReference)
