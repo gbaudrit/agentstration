@@ -977,8 +977,9 @@ public sealed class FlowDesignerReadOnlyTests
         rendered.Find("[data-testid='step-settings-tab-output']").Click();
 
         var mapping = rendered.Find("[data-testid='output-mapping']");
-        Assert.IsTrue(mapping.HasAttribute("readonly"));
-        Assert.AreEqual("\"${transition.output}\"", mapping.GetAttribute("value"));
+        Assert.IsEmpty(mapping.QuerySelectorAll("input, textarea"));
+        Assert.AreEqual("${transition.output}", mapping.QuerySelector("code")!.TextContent);
+        StringAssert.Contains(mapping.TextContent, "Incoming transition output");
         Assert.AreEqual("object", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value.GetProperty("type").GetString());
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         rendered.FindAll(".flow-inspector input").Single(element => element.ParentElement!.TextContent.Contains("Error details expression", StringComparison.Ordinal)).Change("${transition.output.details}");

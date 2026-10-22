@@ -235,6 +235,10 @@
 .step-contract-heading h3{margin:3px 0 0;font-size:1.05rem}
 .step-contract-heading .eyebrow{color:var(--primary);font-size:.68rem;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
 .step-contract-source{padding:5px 9px;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-size:.72rem;font-weight:650}
+.output-passthrough{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}
+.output-passthrough-icon{display:grid;width:36px;height:36px;place-items:center;border-radius:50%;background:var(--primary-soft);color:var(--primary)}
+.output-passthrough-copy{display:grid;gap:3px}.output-passthrough-copy strong{color:var(--text);font-size:.86rem}.output-passthrough-copy small{color:var(--muted);font-size:.75rem;font-weight:400}
+.output-passthrough-technical{position:relative}.output-passthrough-technical summary{cursor:pointer;color:var(--primary);font-size:.75rem;font-weight:650;list-style:none}.output-passthrough-technical summary::-webkit-details-marker{display:none}.output-passthrough-technical code{display:block;margin-top:7px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);white-space:nowrap}
 .step-contract-empty{margin:0;padding:18px;border:1px dashed var(--border);border-radius:9px;background:var(--surface-2)}
 .step-settings-empty{display:grid;max-width:520px;margin:32px auto;padding:28px;place-items:center;text-align:center;border:1px dashed var(--border);border-radius:12px;background:var(--surface-2)}
 .step-settings-empty .ui-icon{width:28px;height:28px;margin-bottom:8px;color:var(--muted)}

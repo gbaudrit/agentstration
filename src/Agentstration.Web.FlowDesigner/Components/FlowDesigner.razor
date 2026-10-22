@@ -432,7 +432,7 @@ else
                                 }
                                 else
                                 {
-                                    <p class="step-contract-empty muted">@T("InheritedContractUnavailable")</p>
+                                    <p class="step-contract-empty muted">@IncomingContractUnavailableText()</p>
                                 }
                             </section>
                         }
@@ -468,7 +468,7 @@ else
                                 }
                                 else
                                 {
-                                    <p class="step-contract-empty muted">@T("InheritedContractUnavailable")</p>
+                                    <p class="step-contract-empty muted">@IncomingContractUnavailableText()</p>
                                 }
                             </section>
                         }
@@ -486,7 +486,11 @@ else
                         {
                             <section class="step-contract-section">
                                 <ContractHeading Direction="Output" Source="@(EffectiveIncomingSchema is null && ResolveSchema(output.SchemaBinding, output.Schema) is not null ? T("ContractSource.LegacyOutput") : T("ContractSource.IncomingTransition"))" />
-                                <label>@T("ExposedValue")<textarea data-testid="output-mapping" readonly value="@OutputMappingText(output)"></textarea><small>@T("OutputMappingHelp")</small></label>
+                                <div class="output-passthrough" data-testid="output-mapping">
+                                    <span class="output-passthrough-icon" aria-hidden="true"><UiIcon Name="arrow-right" /></span>
+                                    <span class="output-passthrough-copy"><strong>@T("IncomingTransitionOutput")</strong><small>@T("OutputMappingHelp")</small></span>
+                                    <details class="output-passthrough-technical"><summary>@T("TechnicalDetail")</summary><code>@OutputMappingExpression(output)</code></details>
+                                </div>
                                 @if (EffectiveIncomingSchema is { } incomingSchema)
                                 {
                                     <SchemaDocumentEditor Value="incomingSchema" ReadOnly="true" />
@@ -497,7 +501,7 @@ else
                                 }
                                 else
                                 {
-                                    <p class="step-contract-empty muted">@T("InheritedContractUnavailable")</p>
+                                    <p class="step-contract-empty muted">@IncomingContractUnavailableText()</p>
                                 }
                             </section>
                         }
@@ -1215,8 +1219,21 @@ else
             _ => null
         };
     }
-    private static string OutputMappingText(OutputFlowStepDefinition output) =>
-        output.OutputMapping is { } mapping ? JsonText(mapping) : "\"${transition.output}\"";
+    private string IncomingContractUnavailableText()
+    {
+        if (Editor.State.Resource is not { } resource || SelectedStep is null) return T("InheritedContractUnavailable");
+        var incoming = resource.Definition.Transitions.Where(transition => transition.ToStep == SelectedStep.Name).ToArray();
+        if (incoming.Length == 0) return T("NoIncomingTransitionContract");
+        if (incoming.Length != 1) return T("InheritedContractUnavailable");
+        var source = resource.Definition.Steps.FirstOrDefault(step => step.Name == incoming[0].FromStep);
+        return source is null
+            ? T("InheritedContractUnavailable")
+            : T("UpstreamContractUnavailable", source.DisplayName ?? source.Name);
+    }
+    private static string OutputMappingExpression(OutputFlowStepDefinition output) =>
+        output.OutputMapping is { ValueKind: JsonValueKind.String } mapping
+            ? mapping.GetString() ?? "${transition.output}"
+            : output.OutputMapping is { } complex ? JsonText(complex) : "${transition.output}";
     private static string FlowKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}|{name}";
     private string FlowKey(FlowCallReference reference) => FlowKey(reference.Namespace ?? Namespace, reference.ResourceId);
     private static bool TryParseFlowKey(string value, out (ResourceNamespace Namespace, string Name) target)
