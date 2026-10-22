@@ -1,10 +1,15 @@
 .flow-schema-binding { display: grid; gap: .85rem; padding: .9rem; border: 1px solid var(--border-color, #d9e2f1); border-radius: .75rem; background: var(--surface-subtle, #f8faff); }
 .flow-schema-binding-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .flow-schema-binding-heading p { margin: .2rem 0 0; }
+.flow-schema-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; flex-wrap: wrap; }
 .flow-schema-mode { display: inline-flex; padding: .2rem; border: 1px solid var(--border-color, #d9e2f1); border-radius: .55rem; background: var(--surface, #fff); }
 .flow-schema-mode button { border: 0; border-radius: .4rem; padding: .45rem .7rem; background: transparent; color: inherit; }
 .flow-schema-mode button.active { background: var(--primary, #356df3); color: #fff; }
+.flow-schema-remove { white-space: nowrap; }
+.flow-schema-empty { display: grid; gap: .75rem; padding: 1rem; border: 1px dashed var(--border-color, #d9e2f1); border-radius: .65rem; background: var(--surface, #fff); }
+.flow-schema-empty p { margin: 0; color: var(--muted, #647086); }
+.flow-schema-empty > div { display: flex; gap: .6rem; flex-wrap: wrap; }
 .flow-schema-reference-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(8rem, 1fr); gap: .75rem; }
 .flow-schema-reference-fields label { display: grid; gap: .35rem; }
 .flow-schema-reference-summary { display: flex; align-items: center; gap: .65rem; margin: 0; }
-@media (max-width: 720px) { .flow-schema-binding-heading, .flow-schema-reference-fields { grid-template-columns: 1fr; flex-direction: column; } }
+@media (max-width: 720px) { .flow-schema-binding-heading, .flow-schema-reference-fields { grid-template-columns: 1fr; flex-direction: column; } .flow-schema-heading-actions { width: 100%; align-items: stretch; flex-direction: column; } .flow-schema-mode { justify-content: stretch; } .flow-schema-mode button { flex: 1; } .flow-schema-remove, .flow-schema-empty button { width: 100%; } .flow-schema-empty > div { flex-direction: column; } }

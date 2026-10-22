@@ -91,6 +91,15 @@ public sealed record UpdateStepCommand(FlowStepDefinition Step) : IFlowEditorCom
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with { Steps = definition.Steps.Select(current => current.Name == Step.Name ? Step : current).ToArray() };
 }
+public sealed record UpdateFlowInputContractCommand(InputFlowStepDefinition Step) : IFlowEditorCommand
+{
+    public FlowGraphDefinition Apply(FlowGraphDefinition definition) => definition with
+    {
+        InputSchema = null,
+        InputSchemaBinding = null,
+        Steps = definition.Steps.Select(current => current.Name == Step.Name ? Step : current).ToArray()
+    };
+}
 public sealed record RenameStepCommand(string OldName, string NewName) : IFlowEditorCommand
 {
     public FlowGraphDefinition Apply(FlowGraphDefinition definition)

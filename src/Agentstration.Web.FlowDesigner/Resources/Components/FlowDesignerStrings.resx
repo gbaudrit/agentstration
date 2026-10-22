@@ -79,6 +79,10 @@
   <data name="ExactSchemaVersion"><value>Published version</value></data>
   <data name="NoCompatibleSchemas"><value>No published JSON Schema is available. Publish a compatible Schema first or use an inline contract.</value></data>
   <data name="SchemaReferenceUnavailable"><value>The referenced Schema {0}/{1} version {2} is no longer available.</value></data>
+  <data name="RemoveSchemaContract"><value>Remove contract</value></data>
+  <data name="NoSchemaContractConfigured"><value>No contract is configured.</value></data>
+  <data name="DefineInlineContract"><value>Define an inline contract</value></data>
+  <data name="UseSharedSchemaContract"><value>Use a shared Schema</value></data>
   <data name="InputSchema"><value>Input schema</value></data>
   <data name="ConfigureStep"><value>Configure step</value></data>
   <data name="ConfigureStepNamed"><value>Configure step {0}</value></data>

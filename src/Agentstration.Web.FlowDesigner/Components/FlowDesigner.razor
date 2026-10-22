@@ -180,7 +180,7 @@ else
                             <section class="step-contract-section">
                                 <ContractHeading Direction="Input" Source="@T("ContractSource.Flow")" />
                                 <SchemaBindingEditor Title="@T("InputSchema")" TestId="flow-input-schema"
-                                    Binding="@input.SchemaBinding" LegacySchema="@(input.Schema ?? Editor.State.Resource.Definition.InputSchema)"
+                                    Binding="@(input.SchemaBinding ?? Editor.State.Resource.Definition.InputSchemaBinding)" LegacySchema="@(input.Schema ?? Editor.State.Resource.Definition.InputSchema)"
                                     SchemaVersions="schemaVersions" ValueChanged="UpdateInputSchemaAsync" ReadOnly="ReadOnly"
                                     DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
                             </section>
@@ -1176,7 +1176,7 @@ else
         return SetParentInputSharedContractAsync(input, reference);
     }
     private Task SetParentInputSharedContractAsync(InputFlowStepDefinition input, SchemaVersionReference reference) =>
-        DispatchAsync(new UpdateStepCommand(input with
+        DispatchAsync(new UpdateFlowInputContractCommand(input with
         {
             Schema = null,
             SchemaBinding = new SchemaBinding { Reference = reference }
@@ -1193,7 +1193,7 @@ else
         return SetParentInputInlineContractAsync(input, schema);
     }
     private Task SetParentInputInlineContractAsync(InputFlowStepDefinition input, JsonElement schema) =>
-        DispatchAsync(new UpdateStepCommand(input with
+        DispatchAsync(new UpdateFlowInputContractCommand(input with
         {
             Schema = null,
             SchemaBinding = new SchemaBinding
@@ -1363,7 +1363,7 @@ else
     }
     private Task UpdateInputSchemaAsync(SchemaBindingEditorValue value) =>
         SelectedStep is InputFlowStepDefinition input
-            ? UpdateSelectedAsync(input with { Schema = null, SchemaBinding = value.Binding })
+            ? DispatchAsync(new UpdateFlowInputContractCommand(input with { Schema = null, SchemaBinding = value.Binding }))
             : Task.CompletedTask;
     private Task UpdateTransformSchemaBindingAsync(SchemaBindingEditorValue value) =>
         SelectedStep is TransformFlowStepDefinition transform

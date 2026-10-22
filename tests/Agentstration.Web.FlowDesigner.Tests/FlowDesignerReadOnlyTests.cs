@@ -1224,8 +1224,7 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("transform"));
         rendered.Find("[data-testid='step-settings-tab-output']").Click();
 
-        rendered.FindAll("[data-testid='transform-output-schema'] button")
-            .Single(button => button.TextContent.Trim() == "Shared Schema").Click();
+        rendered.Find("[data-testid='transform-output-schema-start-shared']").Click();
 
         var transform = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
             .OfType<TransformFlowStepDefinition>().Single();
@@ -1233,6 +1232,56 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.AreEqual("task-result", transform.SchemaBinding?.Reference?.Name);
         Assert.AreEqual("1.2.0", transform.SchemaBinding?.Reference?.Version);
         Assert.AreEqual(scope, transform.SchemaBinding?.Reference?.ScopeRef);
+
+        rendered.Find("[data-testid='transform-output-schema-remove']").Click();
+
+        transform = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<TransformFlowStepDefinition>().Single();
+        Assert.IsNull(transform.Schema);
+        Assert.IsNull(transform.SchemaBinding);
+        StringAssert.Contains(rendered.Find("[data-testid='transform-output-schema-empty']").TextContent, "No contract is configured");
+    }
+
+    [TestMethod]
+    public async Task InputInspectorCanRemoveALegacyRootContractAndCreateANewInlineContract()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { request = new { type = "string" } } });
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            InputSchema = schema,
+            Steps = [new InputFlowStepDefinition { Name = "input" }],
+            Transitions = []
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("input"));
+        rendered.Find("[data-testid='step-settings-tab-input']").Click();
+        rendered.Find("[data-testid='flow-input-schema-remove']").Click();
+
+        var updated = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition;
+        var input = updated.Steps.OfType<InputFlowStepDefinition>().Single();
+        Assert.IsNull(updated.InputSchema);
+        Assert.IsNull(updated.InputSchemaBinding);
+        Assert.IsNull(input.Schema);
+        Assert.IsNull(input.SchemaBinding);
+        StringAssert.Contains(rendered.Find("[data-testid='flow-input-schema-empty']").TextContent, "No contract is configured");
+
+        rendered.Find("[data-testid='flow-input-schema-start-inline']").Click();
+
+        updated = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition;
+        input = updated.Steps.OfType<InputFlowStepDefinition>().Single();
+        Assert.IsNull(updated.InputSchema);
+        Assert.IsNotNull(input.SchemaBinding?.Inline);
+        Assert.AreEqual("object", input.SchemaBinding.Inline.Content.GetProperty("type").GetString());
     }
 
     [TestMethod]

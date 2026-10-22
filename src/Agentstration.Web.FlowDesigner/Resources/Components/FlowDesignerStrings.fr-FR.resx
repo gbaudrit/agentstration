@@ -73,6 +73,10 @@
   <data name="ExactSchemaVersion"><value>Version publiée</value></data>
   <data name="NoCompatibleSchemas"><value>Aucun JSON Schema publié n’est disponible. Publiez d’abord un schéma compatible ou utilisez un contrat intégré.</value></data>
   <data name="SchemaReferenceUnavailable"><value>Le schéma référencé {0}/{1}, version {2}, n’est plus disponible.</value></data>
+  <data name="RemoveSchemaContract"><value>Retirer le contrat</value></data>
+  <data name="NoSchemaContractConfigured"><value>Aucun contrat n’est configuré.</value></data>
+  <data name="DefineInlineContract"><value>Définir un contrat intégré</value></data>
+  <data name="UseSharedSchemaContract"><value>Utiliser un schéma partagé</value></data>
   <data name="InputSchema"><value>Schéma d’entrée</value></data>
   <data name="ConfigureStep"><value>Configurer l’étape</value></data>
   <data name="ConfigureStepNamed"><value>Configurer l’étape {0}</value></data>

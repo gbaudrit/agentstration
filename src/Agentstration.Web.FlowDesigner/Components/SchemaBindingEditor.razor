@@ -3,13 +3,35 @@
 <section class="flow-schema-binding" data-testid="@TestId">
     <div class="flow-schema-binding-heading">
         <div><strong>@Title</strong><p class="muted">@Localizer["SchemaContractHelp"]</p></div>
-        <div class="flow-schema-mode" role="group" aria-label="@Localizer["SchemaSource"]">
-            <button type="button" class="@(mode == BindingMode.Inline ? "active" : null)" disabled="@ReadOnly" @onclick="() => ChangeModeAsync(BindingMode.Inline)">@Localizer["SchemaInline"]</button>
-            <button type="button" class="@(mode == BindingMode.Shared ? "active" : null)" disabled="@ReadOnly" @onclick="() => ChangeModeAsync(BindingMode.Shared)">@Localizer["SchemaShared"]</button>
-        </div>
+        @if (HasContract)
+        {
+            <div class="flow-schema-heading-actions">
+                <div class="flow-schema-mode" role="group" aria-label="@Localizer["SchemaSource"]">
+                    <button type="button" class="@(mode == BindingMode.Inline ? "active" : null)" disabled="@ReadOnly" @onclick="() => ChangeModeAsync(BindingMode.Inline)">@Localizer["SchemaInline"]</button>
+                    <button type="button" class="@(mode == BindingMode.Shared ? "active" : null)" disabled="@ReadOnly" @onclick="() => ChangeModeAsync(BindingMode.Shared)">@Localizer["SchemaShared"]</button>
+                </div>
+                @if (!ReadOnly)
+                {
+                    <button type="button" class="button-secondary flow-schema-remove" data-testid="@($"{TestId}-remove")" @onclick="ClearAsync">@Localizer["RemoveSchemaContract"]</button>
+                }
+            </div>
+        }
     </div>
 
-    @if (mode == BindingMode.Shared)
+    @if (!HasContract)
+    {
+        <div class="flow-schema-empty" data-testid="@($"{TestId}-empty")">
+            <p>@Localizer["NoSchemaContractConfigured"]</p>
+            @if (!ReadOnly)
+            {
+                <div>
+                    <button type="button" class="button-secondary" data-testid="@($"{TestId}-start-inline")" @onclick="StartInlineAsync">@Localizer["DefineInlineContract"]</button>
+                    <button type="button" class="button-secondary" data-testid="@($"{TestId}-start-shared")" disabled="@(SchemaVersions.Count == 0)" @onclick="StartSharedAsync">@Localizer["UseSharedSchemaContract"]</button>
+                </div>
+            }
+        </div>
+    }
+    else if (mode == BindingMode.Shared)
     {
         @if (SchemaVersions.Count == 0)
         {
@@ -83,6 +105,7 @@
         ? []
         : SchemaVersions.Where(candidate => SchemaKey(candidate) == SchemaKey(selectedVersion));
     private string SelectedSchemaKey => selectedVersion is null ? string.Empty : SchemaKey(selectedVersion);
+    private bool HasContract => Binding is not null || LegacySchema is not null;
 
     protected override void OnParametersSet()
     {
@@ -109,6 +132,25 @@
             await PublishReferenceAsync();
         }
     }
+
+    private async Task StartInlineAsync()
+    {
+        if (ReadOnly) return;
+        mode = BindingMode.Inline;
+        await PublishInlineAsync();
+    }
+
+    private async Task StartSharedAsync()
+    {
+        if (ReadOnly || SchemaVersions.Count == 0) return;
+        mode = BindingMode.Shared;
+        selectedVersion ??= SchemaVersions.First();
+        await PublishReferenceAsync();
+    }
+
+    private Task ClearAsync() => ReadOnly
+        ? Task.CompletedTask
+        : ValueChanged.InvokeAsync(new SchemaBindingEditorValue(null, null));
 
     private async Task ChangeSchemaAsync(ChangeEventArgs args)
     {
