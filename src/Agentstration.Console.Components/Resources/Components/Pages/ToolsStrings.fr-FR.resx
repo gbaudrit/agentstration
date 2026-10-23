@@ -50,6 +50,10 @@
   <data name="SelectFlow"><value>Sélectionnez un Flow publié.</value></data>
   <data name="FlowVersionRequired"><value>Le Flow sélectionné ne possède aucune version utilisable.</value></data>
   <data name="FlowOutputContractAmbiguous"><value>Le Flow sélectionné expose des sorties de succès avec des contrats différents. Une ToolDefinition requiert un contrat de sortie non ambigu.</value></data>
+  <data name="LoadingFlowContract"><value>Chargement des contrats du Flow sélectionné…</value></data>
+  <data name="SelectFlowToViewContracts"><value>Sélectionnez un Flow pour consulter les contrats que la ToolDefinition exposera.</value></data>
+  <data name="ContractsProvidedByFlow"><value>Contrats en lecture seule fournis par la version publiée {0} du Flow. Modifiez-les dans le Designer du Flow.</value></data>
+  <data name="FlowContractReadOnlyHelp"><value>Ce contrat est hérité du Flow publié sélectionné et ne peut pas être modifié ici.</value></data>
   <data name="Save"><value>Enregistrer</value></data>
   <data name="Cancel"><value>Annuler</value></data>
   <data name="Delete"><value>Supprimer</value></data>

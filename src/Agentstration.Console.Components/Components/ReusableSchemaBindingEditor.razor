@@ -2,6 +2,7 @@
 
 <SchemaBindingEditor Title="@Title" TestId="@TestId" Binding="@Binding" LegacySchema="@LegacySchema"
     SchemaVersions="versions" ValueChanged="@ValueChanged" ReadOnly="@ReadOnly"
+    HelpText="@HelpText" ShowSourceControls="@ShowSourceControls"
     DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
 
 @code {
@@ -11,6 +12,8 @@
     [Parameter] public JsonElement? LegacySchema { get; set; }
     [Parameter] public EventCallback<SchemaBindingEditorValue> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public string? HelpText { get; set; }
+    [Parameter] public bool ShowSourceControls { get; set; } = true;
 
     private IReadOnlyList<FlowDesignerSchemaVersion> versions = [];
 

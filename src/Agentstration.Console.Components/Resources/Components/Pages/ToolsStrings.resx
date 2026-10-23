@@ -50,6 +50,10 @@
   <data name="SelectFlow"><value>Select a published Flow.</value></data>
   <data name="FlowVersionRequired"><value>The selected Flow has no usable version.</value></data>
   <data name="FlowOutputContractAmbiguous"><value>The selected Flow exposes success outputs with different contracts. A ToolDefinition requires one unambiguous output contract.</value></data>
+  <data name="LoadingFlowContract"><value>Loading contracts from the selected Flow…</value></data>
+  <data name="SelectFlowToViewContracts"><value>Select a Flow to inspect the contracts that the ToolDefinition will expose.</value></data>
+  <data name="ContractsProvidedByFlow"><value>Read-only contracts provided by published Flow version {0}. Change them in the Flow Designer.</value></data>
+  <data name="FlowContractReadOnlyHelp"><value>This contract is inherited from the selected published Flow and cannot be changed here.</value></data>
   <data name="Save"><value>Save</value></data>
   <data name="Cancel"><value>Cancel</value></data>
   <data name="Delete"><value>Delete</value></data>

@@ -2,8 +2,8 @@
 
 <section class="flow-schema-binding" data-testid="@TestId">
     <div class="flow-schema-binding-heading">
-        <div><strong>@Title</strong><p class="muted">@Localizer["SchemaContractHelp"]</p></div>
-        @if (HasContract)
+        <div><strong>@Title</strong><p class="muted">@(HelpText ?? Localizer["SchemaContractHelp"])</p></div>
+        @if (HasContract && ShowSourceControls)
         {
             <div class="flow-schema-heading-actions">
                 <div class="flow-schema-mode" role="group" aria-label="@Localizer["SchemaSource"]">
@@ -94,6 +94,8 @@
     [Parameter] public Func<ValidateSchemaDefinitionRequest, Task<SchemaFormatValidationResult>>? DefinitionValidator { get; set; }
     [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? InstanceValidator { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public string? HelpText { get; set; }
+    [Parameter] public bool ShowSourceControls { get; set; } = true;
 
     private BindingMode mode;
     private JsonElement inlineContent = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } });
