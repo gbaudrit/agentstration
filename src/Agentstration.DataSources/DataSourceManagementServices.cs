@@ -22,6 +22,7 @@ public sealed class DataSourceProfileService(
     IResourceScopeOperations scopeOperations,
     IDataSourceAcquisitionCompositionResolver compositions,
     ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider)
 {
@@ -332,9 +333,21 @@ public sealed class DataSourceProfileService(
     private async Task<StoredResource<DataSourceProfileRevisionResource>?> GetRevisionCoreAsync(
         DataSourceProfileResource profile,
         string version,
-        CancellationToken cancellationToken) =>
-        await store.GetExactAsync<DataSourceProfileRevisionResource>(Address(RequireScope(profile), profile.Namespace,
+        CancellationToken cancellationToken)
+    {
+        var profileScope = RequireScope(profile);
+        using var exactScope = requestContext.AccessMode == ControlPlaneAccessMode.Workspace
+            ? profileScope.Kind switch
+            {
+                ResourceScopeKind.Instance => requestScopes.PushInstance(requestContext.Current),
+                ResourceScopeKind.Tenant when profileScope.TargetId == requestContext.Current.TenantId =>
+                    requestScopes.PushTenantAdministration(requestContext.Current),
+                _ => null
+            }
+            : null;
+        return await store.GetExactAsync<DataSourceProfileRevisionResource>(Address(profileScope, profile.Namespace,
             DataSourceResourceKinds.DataSourceProfileRevision, RevisionName(profile.Name, version)), cancellationToken);
+    }
 
     private Task AuditAsync(string action, ResourceScopeRef scope, string reason, CancellationToken cancellationToken)
     {

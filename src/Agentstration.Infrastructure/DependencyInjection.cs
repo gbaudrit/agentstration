@@ -460,6 +460,7 @@ public static class DependencyInjection
             services.AddSqliteFlowStorage(flowConnectionString);
         }
         services.AddSingleton<IFlowScopeHierarchy, ResourceFlowScopeHierarchy>();
+        services.AddSingleton<IFlowDiscoveryPolicy, FlowDiscoveryPolicy>();
         services.AddSingleton<IFlowAgentReferenceResolver, FlowAgentReferenceResolver>();
         services.AddSingleton<FlowService>();
         services.AddSingleton<IEntryExecutionResolver, EntryExecutionResolver>();

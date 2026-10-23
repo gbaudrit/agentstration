@@ -338,19 +338,21 @@ public sealed class SecretManagementService(
             if (resolved?.Value.ScopeRef == scopeRef)
                 usages.Add(new(registration.Value.Kind, registration.Value.Name, registration.Value.Definition.DisplayName));
         }
-        foreach (var registration in await store.ListExactAsync<SourceRegistryRegistrationResource>(
-                     ResourceScopeRef.Instance,
-                     SourceRegistryKinds.SourceRegistryRegistration,
-                     0,
-                     1000,
-                     cancellationToken))
+        if (scopeRef == ResourceScopeRef.Instance)
         {
-            var credential = registration.Value.Definition.Credential;
-            if (scopeRef != ResourceScopeRef.Instance || credential is null
-                || !string.Equals(credential.Name, name, StringComparison.Ordinal)) continue;
-            var address = credential.Resolve(registration.Value.Namespace, SecretResourceKinds.Secret);
-            if (address.Namespace == ResourceNamespace.Default)
-                usages.Add(new(registration.Value.Kind, registration.Value.Name, registration.Value.Definition.DisplayName));
+            foreach (var registration in await store.ListExactAsync<SourceRegistryRegistrationResource>(
+                         ResourceScopeRef.Instance,
+                         SourceRegistryKinds.SourceRegistryRegistration,
+                         0,
+                         1000,
+                         cancellationToken))
+            {
+                var credential = registration.Value.Definition.Credential;
+                if (credential is null || !string.Equals(credential.Name, name, StringComparison.Ordinal)) continue;
+                var address = credential.Resolve(registration.Value.Namespace, SecretResourceKinds.Secret);
+                if (address.Namespace == ResourceNamespace.Default)
+                    usages.Add(new(registration.Value.Kind, registration.Value.Name, registration.Value.Definition.DisplayName));
+            }
         }
         return usages;
     }
@@ -510,10 +512,13 @@ public sealed class SecretManagementService(
 
     private async Task<bool> CanDiscoverAsync(Resource resource, CancellationToken cancellationToken)
     {
-        if (currentRequestContext.AccessMode == ControlPlaneAccessMode.System) return true;
+        if (currentRequestContext.AccessMode is ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance)
+            return currentRequestContext.AccessMode == ControlPlaneAccessMode.System
+                || resource.ScopeRef == ResourceScopeRef.Instance;
         var consumerScopeRef = currentRequestContext.AccessMode switch
         {
             ControlPlaneAccessMode.Tenant => ResourceScopeRef.Tenant(currentRequestContext.Current.TenantId),
+            ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(currentRequestContext.Current.TenantId),
             ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(currentRequestContext.Current.WorkspaceId),
             _ => default
         };

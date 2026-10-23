@@ -530,7 +530,8 @@ public sealed class PackTests
                 new ResourceAccessPolicy(
                     new(runtime.Value.Uid, ResourceScopeRef.Instance, runtime.Value.Namespace,
                         runtime.Value.Kind, runtime.Value.Generation),
-                    [new(ResourceScopeRef.Workspace(requestContext.WorkspaceId), [ResourceAccessAction.Use])]),
+                    [new(ResourceScopeRef.Workspace(requestContext.WorkspaceId),
+                        [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
                 null, default);
         }
         await using var archive = CreateZip(new Dictionary<string, string>

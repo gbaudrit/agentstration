@@ -49,7 +49,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
                 new(new(profile.Value.Uid, instance, profile.Value.Namespace,
                         DataSourceResourceKinds.DataSourceProfile, profile.Value.Generation),
-                    [new(workspace, [ResourceAccessAction.Use])]), null, default);
+                    [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
         }
 
         using var createdSource = await client.PostAsJsonAsync("/api/datasources",
@@ -59,7 +59,8 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
                 Profile = new("shared-http", instance),
                 Configuration = JsonSerializer.SerializeToElement(new { url = "https://docs.example.test" })
             }, ScopeRef: workspace));
-        Assert.AreEqual(HttpStatusCode.Created, createdSource.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Created, createdSource.StatusCode,
+            await createdSource.Content.ReadAsStringAsync());
         var source = await createdSource.Content.ReadFromJsonAsync<DataSourceResource>();
         Assert.AreEqual(workspace, source?.ScopeRef);
 

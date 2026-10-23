@@ -355,6 +355,41 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public async Task ConsoleContextSelectionPersistsExactAuthorizedHierarchyAndRejectsUnknownTenant()
+    {
+        await using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
+            });
+        using var client = factory.CreateClient();
+        var initial = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.IsNotNull(initial);
+        var instance = initial.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Instance);
+        var tenant = initial.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Tenant);
+        Assert.IsTrue(initial.AvailableContexts.Any(value => value.Kind == IdentityConsoleContextKind.Workspace));
+
+        var selectedInstance = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(instance.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.OK, selectedInstance.StatusCode);
+        var instanceContext = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.AreEqual(IdentityConsoleContextKind.Instance, instanceContext?.SelectedKind);
+        Assert.AreEqual("/instance", instanceContext?.SelectedScopeRef);
+
+        var selectedTenant = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(tenant.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.OK, selectedTenant.StatusCode);
+        var tenantContext = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.AreEqual(IdentityConsoleContextKind.Tenant, tenantContext?.SelectedKind);
+        Assert.AreEqual(tenant.ScopeRef, tenantContext?.SelectedScopeRef);
+
+        var denied = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(ResourceScopeRef.Tenant(Guid.NewGuid()).Value));
+        Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+    }
+
+    [TestMethod]
     public async Task ExternalIdentityUsesIssuerAndSubjectAndIgnoresEmailChanges()
     {
         await using var fixture = await IdentityFixture.CreateAsync();

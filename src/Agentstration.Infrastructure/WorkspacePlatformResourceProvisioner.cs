@@ -3,6 +3,7 @@ using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Profiles;
@@ -20,6 +21,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     IRequestContextScopeFactory scopes,
     IResourceStore resources,
     IResourceGovernanceContext governance,
+    IResourceAccessPolicyService accessPolicies,
     InternalMcpToolProjectionService internalTools,
     ArtifactPlatformResourceProvisioner artifacts,
     KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
@@ -38,7 +40,8 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public async Task EnsureAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         using var systemScope = scopes.PushSystem();
-        await EnsureStandardRuntimeProfileAsync(cancellationToken);
+        var runtimeProfile = await EnsureStandardRuntimeProfileAsync(cancellationToken);
+        await EnsureWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
         await artifacts.EnsureAsync(ResourceScopeRef.Instance, cancellationToken);
         await internalTools.EnsureAsync(
@@ -57,7 +60,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken) =>
         EnsureAsync(workspace.TenantId, workspace.Id, cancellationToken);
 
-    private async Task EnsureStandardRuntimeProfileAsync(CancellationToken cancellationToken)
+    private async Task<StoredResource<RuntimeProfileResource>> EnsureStandardRuntimeProfileAsync(CancellationToken cancellationToken)
     {
         using var governanceScope = governance.Push(ResourceGovernance.Core("runtime.standard-profile"));
         var instanceScope = ResourceScopeRef.Instance;
@@ -66,7 +69,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
             ResourceNamespace.Default,
             RuntimeProfileResourceKinds.RuntimeProfile,
             "maf-builtin");
-        if (await resources.GetExactAsync<RuntimeProfileResource>(address, cancellationToken) is not null) return;
+        if (await resources.GetExactAsync<RuntimeProfileResource>(address, cancellationToken) is { } existing) return existing;
         var profile = new RuntimeProfileResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -96,12 +99,43 @@ internal sealed class WorkspacePlatformResourceProvisioner(
         };
         try
         {
-            await resources.PutExactAsync(instanceScope, profile, null, true, cancellationToken);
+            return await resources.PutExactAsync(instanceScope, profile, null, true, cancellationToken);
         }
         catch (ResourceConcurrencyException)
         {
-            if (await resources.GetExactAsync<RuntimeProfileResource>(address, cancellationToken) is null)
-                throw;
+            var recovered = await resources.GetExactAsync<RuntimeProfileResource>(address, cancellationToken);
+            if (recovered is null) throw;
+            return recovered;
+        }
+    }
+
+    private async Task EnsureWorkspaceAccessAsync(
+        Resource resource,
+        ResourceScopeRef workspaceScope,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var current = await accessPolicies.GetAsync(resource.Uid, cancellationToken);
+            if (current?.Policy.Grants.Any(grant => grant.TargetScopeRef == workspaceScope
+                    && grant.Actions.Contains(ResourceAccessAction.Discover)
+                    && grant.Actions.Contains(ResourceAccessAction.Use)) == true)
+                return;
+            var grants = (current?.Policy.Grants ?? [])
+                .Where(grant => grant.TargetScopeRef != workspaceScope)
+                .Append(new ResourceAccessGrant(workspaceScope,
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use]))
+                .ToArray();
+            try
+            {
+                _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(
+                    new(resource.Uid, resource.ScopeRef!.Value, resource.Namespace, resource.Kind, resource.Generation),
+                    grants), current?.ETag, cancellationToken);
+                return;
+            }
+            catch (ResourceConcurrencyException) when (attempt < 2)
+            {
+            }
         }
     }
 }

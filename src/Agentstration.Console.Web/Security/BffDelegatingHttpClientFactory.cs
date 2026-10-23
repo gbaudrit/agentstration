@@ -20,7 +20,9 @@ public sealed class BffDelegatingHttpClientFactory(
         HttpMessageHandler handler = new PooledHandlerLease(pooledHandler);
         if (targetsByName.TryGetValue(name, out var target))
             handler = new BffDelegationHandler(
-                services.GetRequiredService<BffDelegationTokenProvider>(), target.Audience, target.Origin)
+                services.GetRequiredService<BffDelegationTokenProvider>(),
+                services.GetRequiredService<IHttpContextAccessor>(),
+                target.Audience, target.Origin)
             { InnerHandler = handler };
         var client = new HttpClient(handler, disposeHandler: true);
         foreach (var configure in options.Get(name).HttpClientActions) configure(client);

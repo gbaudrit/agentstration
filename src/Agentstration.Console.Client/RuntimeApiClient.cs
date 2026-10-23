@@ -133,6 +133,10 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
         ReadArrayAsync<AgentInstanceResponse>("api/runtime/agent-instances", cancellationToken);
 
+    public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        ReadArrayAsync<AgentInstanceResponse>(
+            $"api/runtime/agent-instances?scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken);
+
     public Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
         ReadArrayAsync<RuntimeWorkerSummaryResponse>("api/runtime/workers", cancellationToken);
 

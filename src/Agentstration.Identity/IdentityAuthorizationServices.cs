@@ -81,8 +81,6 @@ public sealed class PermissionAuthorizationService(
     {
         var principal = await store.GetPrincipalAsync(context.PrincipalId, cancellationToken);
         if (principal?.Status != PrincipalStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
-        var workspace = await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
-        if (workspace?.Status != WorkspaceStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
         var tenant = await store.GetTenantAsync(context.TenantId, cancellationToken);
         if (tenant?.Status != TenantStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
 
@@ -93,8 +91,20 @@ public sealed class PermissionAuthorizationService(
             return platformPermissions;
         }
 
-        var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
-        if (membership?.Status != MembershipStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
+        var tenantOnly = context.WorkspaceId == Guid.Empty;
+        if (tenantOnly)
+        {
+            var tenantMembership = await store.FindMembershipAsync(context.TenantId, context.PrincipalId, cancellationToken);
+            if (tenantMembership?.Status != MembershipStatus.Active)
+                return new HashSet<string>(StringComparer.Ordinal);
+        }
+        else
+        {
+            var workspace = await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
+            if (workspace?.Status != WorkspaceStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
+            var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
+            if (membership?.Status != MembershipStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
+        }
 
         var tenantScope = AuthorizationScopes.Tenant(context.TenantId);
         var workspaceScope = AuthorizationScopes.Workspace(context.WorkspaceId);
@@ -102,7 +112,7 @@ public sealed class PermissionAuthorizationService(
         var permissions = new HashSet<string>(StringComparer.Ordinal);
         foreach (var assignment in assignments.Where(value => value.PrincipalType == PrincipalType.User
                      && (string.Equals(value.Scope, tenantScope, StringComparison.Ordinal)
-                         || string.Equals(value.Scope, workspaceScope, StringComparison.Ordinal))))
+                         || !tenantOnly && string.Equals(value.Scope, workspaceScope, StringComparison.Ordinal))))
         {
             var role = await store.GetRoleDefinitionAsync(assignment.RoleDefinitionId, cancellationToken);
             if (role is not null) permissions.UnionWith(role.Permissions);

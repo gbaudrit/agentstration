@@ -1,8 +1,10 @@
 using Agentstration.Console.Web;
 using Agentstration.Console.Web.Components;
 using Agentstration.Console.Web.Configuration;
+using Agentstration.Identity.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
+using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -54,6 +56,24 @@ app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
 app.MapAgentstrationCultureEndpoint().AllowAnonymous();
+app.MapPost("/bff/identity/context/selection", async (
+    SelectConsoleContextRequest request,
+    IIdentityAdministrationApiClient identity,
+    HttpRequest httpRequest,
+    HttpResponse response,
+    CancellationToken cancellationToken) =>
+{
+    await identity.SelectConsoleContextAsync(request.ScopeRef, cancellationToken);
+    response.Cookies.Append("agentstration.context", request.ScopeRef, new CookieOptions
+    {
+        HttpOnly = true,
+        IsEssential = true,
+        SameSite = SameSiteMode.Strict,
+        Secure = httpRequest.IsHttps,
+        MaxAge = TimeSpan.FromDays(30)
+    });
+    return Results.Ok();
+}).RequireAuthorization().DisableAntiforgery();
 app.MapStaticAssets();
 app.MapRazorPages();
 app.MapRazorComponents<App>()

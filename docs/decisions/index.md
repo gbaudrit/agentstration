@@ -206,3 +206,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 178. [ADR-0178 — Managed resources record origin and management authority](0178-managed-resources-record-origin-and-management-authority.md)
 179. [ADR-0179 — Data Sources discover and promote acquisition targets](0179-data-sources-discover-and-promote-acquisition-targets.md)
 180. [ADR-0180 — Knowledge Source definitions use hierarchical ownership](0180-knowledge-source-definitions-use-hierarchical-ownership.md)
+181. [ADR-0181 — Console context is one exact administrative scope](0181-console-context-is-a-single-exact-administrative-scope.md)

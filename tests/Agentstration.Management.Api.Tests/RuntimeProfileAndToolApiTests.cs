@@ -82,7 +82,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         var requestContext = await GetBootstrapContextAsync(factory);
-        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext);
         var service = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         var id = RuntimeProfileManagementService.ProfileId("maf-persistent-test");
         var stored = await service.CreateAsync(new RuntimeProfileResource
@@ -281,6 +281,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         const string resourceNamespace = "team-a";
         const string providerName = "ollama-local";
 
@@ -400,11 +401,13 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
     private static async Task GrantRuntimeUseAsync(WebApplicationFactory<Program> factory,
         RequestContext context, RuntimeProfileResource runtime)
     {
+        using var instanceScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
         var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
         _ = await policies.PutAsync(new ResourceAccessPolicy(
             new(runtime.Uid, ResourceScopeRef.Instance, runtime.Namespace,
                 RuntimeProfileResourceKinds.RuntimeProfile, runtime.Generation),
-            [new(ResourceScopeRef.Workspace(context.WorkspaceId), [ResourceAccessAction.Use])]),
+            [new(ResourceScopeRef.Workspace(context.WorkspaceId),
+                [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
             null, default);
     }
 

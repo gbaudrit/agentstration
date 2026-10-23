@@ -61,6 +61,8 @@ public interface IRuntimeApiClient
     Task<RuntimeRun> RetryRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => RetryRunAsync(runId, cancellationToken);
     Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Agent instance observability.");
+    Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        GetAgentInstancesAsync(cancellationToken);
     Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Runtime Worker inventory.");
     Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken) =>
@@ -179,6 +181,8 @@ public interface IFlowApiClient
     async Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
         (await GetFlowVersionsAsync(@namespace, flowId, scopeRef, cancellationToken)).Single(value => string.Equals(value.Version, version, StringComparison.Ordinal));
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        GetFlowRunsAsync(flowId, cancellationToken);
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetFlowRunsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? definitionScopeRef, CancellationToken cancellationToken) =>

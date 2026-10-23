@@ -1,11 +1,15 @@
 using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Artifacts;
 
-public sealed class ToolSetArtifactStagingExecutor(ToolSetService toolSets, IToolExecutionPipeline pipeline) : IArtifactStagingToolExecutor
+public sealed class ToolSetArtifactStagingExecutor(
+    ToolSetService toolSets,
+    IToolExecutionPipeline pipeline,
+    IRequestContextScopeFactory requestScopes) : IArtifactStagingToolExecutor
 {
     public async Task ValidateAsync(ArtifactStagingBindingResource binding, ArtifactBackendCommandContext context, CancellationToken cancellationToken)
     {
@@ -85,13 +89,19 @@ public sealed class ToolSetArtifactStagingExecutor(ToolSetService toolSets, IToo
             : throw Error("artifact_staging_backend_result_invalid", $"Capability '{capability}' returned no structured result.");
     }
 
-    private Task<ToolSetRouteSelection> ResolveAsync(ArtifactStagingBindingResource binding, string capability, CancellationToken cancellationToken) =>
-        toolSets.ResolveRouteExactAsync(
+    private async Task<ToolSetRouteSelection> ResolveAsync(
+        ArtifactStagingBindingResource binding,
+        string capability,
+        CancellationToken cancellationToken)
+    {
+        using var systemScope = requestScopes.PushSystem();
+        return await toolSets.ResolveRouteExactAsync(
             binding.Definition.ToolSet.ScopeRef
                 ?? binding.ScopeRef
                 ?? throw Error("artifact_staging_binding_scope_invalid", "The Artifact staging binding and ToolSet reference have no scope."),
             binding.Definition.ToolSet.Namespace ?? binding.Namespace, binding.Definition.ToolSet.Name,
             binding.Definition.ToolSetVersion, capability, "default", cancellationToken);
+    }
 
     private static readonly string[] RequiredCapabilities =
         [ArtifactCapabilities.Create, ArtifactCapabilities.Write, ArtifactCapabilities.Read, ArtifactCapabilities.Stat, ArtifactCapabilities.Delete];

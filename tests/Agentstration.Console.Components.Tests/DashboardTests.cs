@@ -155,6 +155,44 @@ public sealed class DashboardTests
     }
 
     [TestMethod]
+    public async Task TenantDashboardUsesItsOperationalWorkspaceForExecutionMetrics()
+    {
+        var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var workspaceId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var fake = new MockApiClient(new FixedTimeProvider(Now));
+        var work = new StubWorkClient(new(2, 0, 0, 0, 0));
+        var context = new ConsoleContextSnapshot(
+            Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+            "Administrator",
+            $"/tenants/{tenantId:D}",
+            ConsoleContextKind.Tenant,
+            tenantId,
+            "development",
+            "Development",
+            workspaceId,
+            "default",
+            "Default workspace",
+            new HashSet<string>(StringComparer.Ordinal),
+            [new(workspaceId, tenantId, "development", "Development", "default", "Default workspace")],
+            [new($"/tenants/{tenantId:D}", ConsoleContextKind.Tenant, tenantId, "development", "Development", null, null, "Development")]);
+        var service = new PlatformDashboardService(
+            new StubManagementClient([], [], []),
+            fake,
+            work,
+            fake,
+            new StubModelProvidersClient([]),
+            new StubExtensionsClient([]),
+            NullLogger<PlatformDashboardService>.Instance,
+            new StubConsoleContextProvider(context));
+
+        var snapshot = await service.GetAsync(CancellationToken.None);
+
+        Assert.AreEqual(workspaceId.ToString("D"), work.RequestedWorkspaceId);
+        Assert.AreEqual(2, snapshot.RunningTasks);
+        Assert.AreEqual("Operational", snapshot.Status);
+    }
+
+    [TestMethod]
     public async Task PageWaitCancellationDoesNotCancelSharedPlatformStatusLoad()
     {
         var fake = new MockApiClient(new FixedTimeProvider(Now));
@@ -308,9 +346,14 @@ public sealed class DashboardTests
 
     private sealed class StubWorkClient(WorkTaskOperationsCountersResponse counters) : IWorkApiClient
     {
+        public string? RequestedWorkspaceId { get; private set; }
         public Task<IReadOnlyList<WorkSummary>> GetWorkItemsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WorkSummary>>([]);
         public Task<WorkTaskOperationsPageResponse> GetTasksAsync(string? workspaceId, WorkTaskStatus? status, string? search, bool? hasPendingAction, int page, int pageSize, string sort, string direction, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken) => Task.FromResult(counters);
+        public Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken)
+        {
+            RequestedWorkspaceId = workspaceId;
+            return Task.FromResult(counters);
+        }
         public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Agentstration.Flows.FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PendingActionContract> RespondTaskPendingActionAsync(Guid taskId, Guid actionId, IReadOnlyDictionary<string, System.Text.Json.JsonElement> values, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -318,6 +361,11 @@ public sealed class DashboardTests
         public Task PauseTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task ResumeTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task CancelTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class StubConsoleContextProvider(ConsoleContextSnapshot context) : IConsoleContextProvider
+    {
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(context);
     }
 
     private sealed class ControlledWorkClient : IWorkApiClient

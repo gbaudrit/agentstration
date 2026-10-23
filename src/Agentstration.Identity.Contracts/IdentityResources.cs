@@ -134,7 +134,15 @@ public sealed record RequestContext(
 {
     public Guid UserId => PrincipalId;
 }
-public enum ControlPlaneAccessMode { Unavailable = 0, Workspace = 1, System = 2, Tenant = 3 }
+public enum ControlPlaneAccessMode
+{
+    Unavailable = 0,
+    Workspace = 1,
+    System = 2,
+    Tenant = 3,
+    Instance = 4,
+    TenantAdministration = 5
+}
 
 public interface ICurrentRequestContext
 {
@@ -160,8 +168,20 @@ public sealed class SystemOperationRequestContext : ICurrentRequestContext
 public interface IRequestContextScopeFactory
 {
     IDisposable Push(RequestContext context);
+    IDisposable PushInstance(RequestContext operationalContext);
+    IDisposable PushTenantAdministration(RequestContext operationalContext);
     IDisposable PushTenant(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null);
     IDisposable PushSystem();
+}
+
+public sealed class InstanceOperationRequestContext(Guid principalId) : ICurrentRequestContext
+{
+    public Guid PrincipalId { get; } = principalId != Guid.Empty
+        ? principalId
+        : throw new ArgumentException("An instance context requires a non-empty Principal ID.", nameof(principalId));
+    public bool IsInitialized => false;
+    public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.Instance;
+    public RequestContext Current => throw new InvalidOperationException("Instance operations do not have a workspace request context.");
 }
 
 public sealed class TenantOperationRequestContext(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null) : ICurrentRequestContext
@@ -169,6 +189,13 @@ public sealed class TenantOperationRequestContext(Guid principalId, Guid tenantI
     public bool IsInitialized => false;
     public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.Tenant;
     public RequestContext Current { get; } = new(principalId, tenantId, Guid.Empty, restriction);
+}
+
+public sealed class TenantAdministrationRequestContext(Guid principalId, Guid tenantId) : ICurrentRequestContext
+{
+    public bool IsInitialized => false;
+    public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.TenantAdministration;
+    public RequestContext Current { get; } = new(principalId, tenantId, Guid.Empty);
 }
 
 public interface IPrincipalResolver

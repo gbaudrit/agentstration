@@ -140,6 +140,7 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
             services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector(requirements));
         }));
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
 
         var response = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
         var projected = response!.Value.Single(value => value.RegistrationName == "ollama-extension").ValueRequirements!;
@@ -203,6 +204,8 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
                 services.AddSingleton<IExtensionInspector, ConfiguredEndpointInspector>();
             }));
         using var client = factory.CreateClient();
+        var context = await GetBootstrapContextAsync(factory);
+        SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
         var properties = new ExtensionRegistrationProperties
         {
             DisplayName = "Registered extension",
@@ -319,6 +322,7 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         using var registrationResponse = await client.PostAsJsonAsync(
             "/api/extensionregistrations",
             new CreateExtensionRegistrationRequest("bound-extension", new ExtensionRegistrationProperties
@@ -350,6 +354,7 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         using var registrationResponse = await client.PostAsJsonAsync(
             "/api/extensionregistrations",
             new CreateExtensionRegistrationRequest("ollama-lab-extension", new ExtensionRegistrationProperties

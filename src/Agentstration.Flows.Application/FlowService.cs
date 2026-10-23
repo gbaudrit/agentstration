@@ -24,6 +24,12 @@ public interface IFlowAgentReferenceResolver
         FlowTargetReference reference, CancellationToken cancellationToken);
 }
 
+public interface IFlowDiscoveryPolicy
+{
+    Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken);
+}
+
 public sealed class FlowService(
     IFlowRepository repository,
     TimeProvider timeProvider,
@@ -31,6 +37,7 @@ public sealed class FlowService(
     IEnumerable<IFlowVersionActivationGuard>? activationGuards = null,
     IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null,
     IFlowAgentReferenceResolver? agentReferences = null,
+    IFlowDiscoveryPolicy? discoveryPolicy = null,
     IResourceGovernanceContext? governanceContext = null,
     ISecurityAuditWriter? audit = null)
 {
@@ -80,7 +87,10 @@ public sealed class FlowService(
         {
             if (!visibleScopes.Contains(scopeRef))
                 throw new FlowReferenceOutsideScopeException(scopeRef, consumerScopeRef);
-            return await repository.GetExactAsync(scopeRef, id, cancellationToken);
+            var exact = await repository.GetExactAsync(scopeRef, id, cancellationToken);
+            return exact is not null && await CanDiscoverAsync(exact.Value, consumerScopeRef, cancellationToken)
+                ? exact
+                : null;
         }
 
         StoredFlow? result = null;
@@ -88,6 +98,7 @@ public sealed class FlowService(
         {
             var candidate = await repository.GetExactAsync(visibleScope, id, cancellationToken);
             if (candidate is null) continue;
+            if (!await CanDiscoverAsync(candidate.Value, consumerScopeRef, cancellationToken)) continue;
             if (result is not null)
                 throw new FlowReferenceAmbiguousException(new FlowReference(id));
             result = candidate;
@@ -119,7 +130,9 @@ public sealed class FlowService(
                 var page = @namespace is null
                     ? await repository.ListExactAsync(scopeRef, offset, pageSize, cancellationToken)
                     : await repository.ListExactAsync(scopeRef, @namespace.Value, offset, pageSize, cancellationToken);
-                values.AddRange(page.Items);
+                foreach (var item in page.Items)
+                    if (await CanDiscoverAsync(item.Value, consumerScopeRef, cancellationToken))
+                        values.Add(item);
                 offset += page.Items.Count;
                 if (!page.HasMore || page.Items.Count == 0) break;
             }
@@ -134,6 +147,13 @@ public sealed class FlowService(
             .ToArray();
         return new FlowPage(ordered.Take(take).ToArray(), ordered.Length > take);
     }
+
+    private Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken) =>
+        flow.ScopeRef == consumerScopeRef
+            ? Task.FromResult(true)
+            : discoveryPolicy?.CanDiscoverAsync(flow, consumerScopeRef, cancellationToken)
+                ?? Task.FromResult(false);
 
     public async Task<StoredFlow> UpdateAsync(WorkspaceId workspaceId, FlowId id, UpdateFlowCommand command, string expectedETag, CancellationToken cancellationToken)
         => await UpdateExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, command, expectedETag, cancellationToken);

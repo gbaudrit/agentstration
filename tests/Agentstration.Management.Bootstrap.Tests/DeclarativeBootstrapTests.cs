@@ -882,7 +882,7 @@ public sealed partial class DeclarativeBootstrapTests
     }
 
     [TestMethod]
-    public async Task WorkspaceCreatedByBootstrapReceivesDiscoveredExtensions()
+    public async Task WorkspaceCreatedByBootstrapDoesNotImplicitlyDiscoverExtensions()
     {
         using var directory = new TemporaryDirectory();
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "profile.yaml"), Profile(Path.GetFileName(directory.Path), "instance"));
@@ -902,12 +902,17 @@ public sealed partial class DeclarativeBootstrapTests
         var workspace = (await identities.ListWorkspacesAsync(tenant.Id, default)).Single();
         var localIdentity = (await identities.ListLocalIdentitiesAsync(default)).Single();
         var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
-        using var workspaceScope = scopes.Push(new RequestContext(localIdentity.PrincipalId, tenant.Id, workspace.Id));
-        var registration = await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>()
-            .GetAsync(ResourceNamespace.Default, "startup-order", default);
+        var registrations = factory.Services.GetRequiredService<ExtensionRegistrationManagementService>();
+        StoredResource<ExtensionRegistrationResource>? registration;
+        using (scopes.Push(new RequestContext(localIdentity.PrincipalId, tenant.Id, workspace.Id)))
+            registration = await registrations.GetAsync(ResourceNamespace.Default, "startup-order", default);
 
-        Assert.IsNotNull(registration);
-        Assert.AreEqual(ResourceScopeRef.Instance, registration.Value.ScopeRef);
+        Assert.IsNull(registration);
+        using var instanceScope = scopes.PushInstance(new RequestContext(localIdentity.PrincipalId, tenant.Id, workspace.Id));
+        var exact = await registrations.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default,
+            "startup-order", default);
+        Assert.IsNotNull(exact);
+        Assert.AreEqual(ResourceScopeRef.Instance, exact.Value.ScopeRef);
     }
 
     [TestMethod]

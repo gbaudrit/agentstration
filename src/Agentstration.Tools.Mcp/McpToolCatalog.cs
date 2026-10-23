@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -384,6 +385,7 @@ internal sealed record ExactAgentTool(IAgentTool Inner, ToolResource Tool, ToolP
 public sealed class McpToolInvoker(
     IResourceStore store,
     ToolProviderAdapter providers,
+    IRequestContextScopeFactory? requestScopes = null,
     Lazy<IToolDefinitionExecutor>? internalTools = null,
     Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null) : IToolInvoker
 {
@@ -472,6 +474,7 @@ public sealed class McpToolInvoker(
         ToolExecutionContext context,
         CancellationToken cancellationToken)
     {
+        using var exactResolutionScope = ExactResolutionScope(context);
         var toolNamespace = context.ToolNamespace ?? default;
         var tool = context.ToolScopeRef is { } toolScopeRef
             ? await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
@@ -502,6 +505,25 @@ public sealed class McpToolInvoker(
             throw new ToolResolutionException("tool_provider_stale", $"ToolProvider '{providerId}' no longer matches the resolved execution material.");
         if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{providerId}' is disabled.");
         return (tool.Value, provider.Value);
+    }
+
+    private IDisposable? ExactResolutionScope(ToolExecutionContext context)
+    {
+        if (requestScopes is null || context.ToolScopeRef is not { } scopeRef
+            || context.PrincipalId is not { } principalId || context.ToolUid is null
+            || context.ToolGeneration is null)
+            return null;
+        var operational = new RequestContext(
+            principalId,
+            context.TenantId ?? Guid.Empty,
+            context.WorkspaceId?.Value ?? Guid.Empty);
+        return scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => requestScopes.PushInstance(operational),
+            ResourceScopeKind.Tenant when scopeRef.TargetId == context.TenantId =>
+                requestScopes.PushTenantAdministration(operational),
+            _ => null
+        };
     }
 
     private static ToolDefinitionInvocationContext InvocationContext(ToolExecutionContext context) => new(

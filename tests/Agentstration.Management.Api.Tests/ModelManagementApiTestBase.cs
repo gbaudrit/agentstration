@@ -41,6 +41,12 @@ public abstract class ModelManagementApiTestBase
             .GetRequiredService<ILocalEnvironmentBootstrapper>()
             .EnsureInitializedAsync(default);
 
+    protected static void SelectConsoleContext(HttpClient client, ResourceScopeRef scopeRef)
+    {
+        client.DefaultRequestHeaders.Remove("X-Agentstration-Context");
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", scopeRef.Value);
+    }
+
     private sealed class DiagnosticModelProvider : IModelProviderDiscovery, IModelProviderCapabilitiesResolver
     {
         public string ProviderType => "diagnostic";

@@ -40,6 +40,29 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task WorkClientSelectsTheExplicitWorkspaceForTaskSummary()
+    {
+        var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        string? contextHeader = null;
+        string? requested = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri!.PathAndQuery;
+            contextHeader = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new WorkTaskOperationsCountersResponse(0, 0, 0, 0, 0))
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new WorkApiClient(httpClient).GetTaskSummaryAsync(workspaceId.ToString("D"), default);
+
+        Assert.AreEqual($"/api/tasks/summary?workspaceId={workspaceId:D}", requested);
+        Assert.AreEqual($"/workspaces/{workspaceId:D}", contextHeader);
+    }
+
+    [TestMethod]
     public async Task WorkClientRespondsToTaskScopedPendingActionWithoutInteractionToken()
     {
         var taskId = Guid.NewGuid();

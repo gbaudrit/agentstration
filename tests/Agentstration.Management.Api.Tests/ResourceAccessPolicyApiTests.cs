@@ -21,6 +21,7 @@ public sealed class ResourceAccessPolicyApiTests : ModelManagementApiTestBase
             $"/api/resource-scopes/targets?kind={ParameterResourceKinds.Parameter}"))!;
         var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
         var workspace = targets.Single(value => value.Kind == ResourceScopeKind.Workspace).ScopeRef;
+        SelectConsoleContext(client, tenant);
 
         using var createdResponse = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
             "shared-policy-api", new ParameterProperties

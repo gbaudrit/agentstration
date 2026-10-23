@@ -48,7 +48,8 @@ public sealed partial class FlowTests
         public static async Task<FlowFixture> CreateAsync(
             DbCommandInterceptor? commandInterceptor = null,
             TimeProvider? timeProvider = null,
-            IFlowScopeHierarchy? scopeHierarchy = null)
+            IFlowScopeHierarchy? scopeHierarchy = null,
+            IFlowDiscoveryPolicy? discoveryPolicy = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -66,6 +67,7 @@ public sealed partial class FlowTests
                 services.AddSingleton<IFlowRepository, SqliteFlowRepository>();
             }
             if (scopeHierarchy is not null) services.AddSingleton(scopeHierarchy);
+            if (discoveryPolicy is not null) services.AddSingleton(discoveryPolicy);
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);
@@ -77,6 +79,12 @@ public sealed partial class FlowTests
             await _provider.DisposeAsync();
             if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
         }
+    }
+
+    private sealed class AllowFlowDiscoveryPolicy : IFlowDiscoveryPolicy
+    {
+        public Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef,
+            CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private sealed class TestFlowRunQueue : IFlowRunQueue

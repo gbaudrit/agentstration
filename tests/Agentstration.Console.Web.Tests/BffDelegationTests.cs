@@ -35,8 +35,11 @@ public sealed class BffDelegationTests
         var authority = new StubAuthority(identity);
         var issuer = new StubIssuer();
         var cache = new BffDelegationTokenCache(TimeProvider.System);
+        var httpContext = new DefaultHttpContext { User = principal };
+        httpContext.Request.Headers.Cookie = "agentstration.context=/instance";
+        var accessor = new HttpContextAccessor { HttpContext = httpContext };
         var provider = new BffDelegationTokenProvider(
-            new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = principal } },
+            accessor,
             new StubAuthenticationStateProvider(principal), store, authority, issuer, cache,
             Options.Create(new BffWorkloadClientOptions { Enabled = true }));
 
@@ -71,14 +74,17 @@ public sealed class BffDelegationTests
         var store = new InMemoryBffSessionStore(Options.Create(new BffSessionOptions()), TimeProvider.System);
         await store.StoreAsync(new AuthenticationTicket(principal, ConsoleAuthenticationDefaults.Scheme));
         var issuer = new StubIssuer();
+        var httpContext = new DefaultHttpContext { User = principal };
+        httpContext.Request.Headers.Cookie = "agentstration.context=/instance";
+        var accessor = new HttpContextAccessor { HttpContext = httpContext };
         var provider = new BffDelegationTokenProvider(
-            new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = principal } },
+            accessor,
             new StubAuthenticationStateProvider(principal), store, new StubAuthority(identity), issuer,
             new BffDelegationTokenCache(TimeProvider.System),
             Options.Create(new BffWorkloadClientOptions { Enabled = true }));
         var downstream = new CaptureHandler();
         using var client = new HttpClient(new BffDelegationHandler(
-            provider, InternalDelegationAudiences.Management, new Uri("https://api.example.test/"))
+            provider, accessor, InternalDelegationAudiences.Management, new Uri("https://api.example.test/"))
         {
             InnerHandler = downstream
         });
@@ -87,6 +93,7 @@ public sealed class BffDelegationTests
         using var denied = await client.GetAsync("https://other.example.test/api/identity/context");
         Assert.AreEqual(HttpStatusCode.OK, allowed.StatusCode);
         Assert.AreEqual("agd_1", downstream.Token);
+        Assert.AreEqual("/instance", downstream.ConsoleContext);
         Assert.IsNull(client.DefaultRequestHeaders.Authorization);
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
         Assert.AreEqual(1, downstream.Calls);
@@ -128,11 +135,13 @@ public sealed class BffDelegationTests
     {
         public int Calls { get; private set; }
         public string? Token { get; private set; }
+        public string? ConsoleContext { get; private set; }
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Calls++;
             Token = request.Headers.Authorization?.Parameter;
+            ConsoleContext = request.Headers.GetValues("X-Agentstration-Context").SingleOrDefault();
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
         }
     }

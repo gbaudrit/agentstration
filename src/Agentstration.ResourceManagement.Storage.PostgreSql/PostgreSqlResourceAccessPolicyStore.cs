@@ -110,10 +110,17 @@ public sealed class PostgreSqlResourceAccessPolicyStore(
 
     private async Task EnsureCanReadAsync(ResourceScopeRef ownerScopeRef, CancellationToken cancellationToken)
     {
-        if (requestContext.AccessMode == ControlPlaneAccessMode.System) return;
+        if (requestContext.AccessMode is ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance)
+        {
+            if (requestContext.AccessMode == ControlPlaneAccessMode.Instance
+                && ownerScopeRef != ResourceScopeRef.Instance)
+                throw new InvalidOperationException($"The current Control Plane context cannot read scope '{ownerScopeRef}'.");
+            return;
+        }
         var currentRef = requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.Tenant => ResourceScopeRef.Tenant(requestContext.Current.TenantId),
+            ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(requestContext.Current.TenantId),
             ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
             _ => throw new InvalidOperationException("Control Plane access requires an explicit scope.")
         };
@@ -128,6 +135,8 @@ public sealed class PostgreSqlResourceAccessPolicyStore(
         var allowed = requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.System => true,
+            ControlPlaneAccessMode.Instance => ownerScopeRef == ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.TenantAdministration => ownerScopeRef == ResourceScopeRef.Tenant(requestContext.Current.TenantId),
             ControlPlaneAccessMode.Tenant => ownerScopeRef == ResourceScopeRef.Tenant(requestContext.Current.TenantId),
             ControlPlaneAccessMode.Workspace => ownerScopeRef == ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
             _ => false

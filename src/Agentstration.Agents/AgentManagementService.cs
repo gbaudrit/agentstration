@@ -43,6 +43,8 @@ public sealed class AgentManagementService(
     IResourceAccessPolicyService accessPolicies,
     ToolSetService toolSets,
     IResourceScopeOperations scopeOperations,
+    ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
     IEnumerable<IResourceDeletionGuard> deletionGuards,
     IAgentRevisionRunRetention revisionRunRetention,
@@ -437,6 +439,9 @@ public sealed class AgentManagementService(
 
     private async Task ValidateReferencesAsync(AgentResource resource, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
     {
+        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId)
+            : null;
         await modelProfiles.ValidateAsync(resource.Definition.ModelProfile, resource.Namespace, scopeRef, cancellationToken);
         _ = await ResolveDependencyAsync(resource.Definition.RuntimeProfile, resource.Namespace,
             RuntimeProfileResourceKinds.RuntimeProfile, scopeRef, cancellationToken);
@@ -448,6 +453,9 @@ public sealed class AgentManagementService(
         ResourceNamespace ownerNamespace, string kind, ResourceScopeRef consumerScopeRef,
         CancellationToken cancellationToken)
     {
+        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId)
+            : null;
         Resource? stored;
         try
         {

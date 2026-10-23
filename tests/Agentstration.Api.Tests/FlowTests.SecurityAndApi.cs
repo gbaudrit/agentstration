@@ -140,6 +140,21 @@ public sealed partial class FlowTests
         var instanceFlow = await instanceResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
         Assert.AreEqual(ResourceScopeRef.Instance, instanceFlow?.ScopeRef);
         await service.PublishVersionExactAsync(ResourceScopeRef.Instance, new FlowId("scoped-collision"), "1.0.0", activate: true, default);
+        var storedInstanceFlow = await service.GetExactAsync(
+            ResourceScopeRef.Instance, new FlowId("scoped-collision"), default);
+        Assert.IsNotNull(storedInstanceFlow);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+                new ResourceAccessPolicy(
+                    new(storedInstanceFlow.Value.Uid, ResourceScopeRef.Instance,
+                        storedInstanceFlow.Value.Id.Namespace, FlowResourceKinds.Flow,
+                        Version: storedInstanceFlow.Value.Version),
+                    [new(ResourceScopeRef.Workspace(context.Context.WorkspaceId),
+                        [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+                null,
+                default);
+        }
 
         var page = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?allNamespaces=true&top=200", JsonOptions);
         CollectionAssert.AreEquivalent(
@@ -151,6 +166,9 @@ public sealed partial class FlowTests
         using var inheritedResponse = await client.GetAsync(exactPath);
         var inherited = await inheritedResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
         Assert.AreEqual(ResourceScopeRef.Instance, inherited?.ScopeRef);
+        client.DefaultRequestHeaders.Add(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
         using var mutation = new HttpRequestMessage(HttpMethod.Put, exactPath)
         {
             Content = JsonContent.Create(new UpdateFlowRequest("Changed", "1.0.0", true, definition), options: JsonOptions)
@@ -720,6 +738,9 @@ public sealed partial class FlowTests
         await factory.Services.GetRequiredService<IIdentityStore>().AddPlatformAdministratorAsync(
             new PlatformAdministrator(context!.Context.PrincipalId, DateTimeOffset.UtcNow), default);
         client.DefaultRequestHeaders.Add(PrincipalResolutionMiddleware.WorkspaceHeader, context.Context.WorkspaceId.ToString("D"));
+        client.DefaultRequestHeaders.Add(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
         var request = new CreateFlowDraftRequest("instance-designer-flow", "Instance Designer Flow", Template: "Empty")
         {
             ScopeRef = ResourceScopeRef.Instance
