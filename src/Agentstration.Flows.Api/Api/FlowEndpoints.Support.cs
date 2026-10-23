@@ -23,8 +23,20 @@ public static partial class FlowEndpoints
         await service.GetVisibleAsync(CurrentConsumerScope(requestContext), id, ParseScopeRef(scopeRef), token)
         ?? throw new FlowNotFoundException(id);
 
-    private static WorkspaceId CurrentWorkspace(ICurrentRequestContext requestContext) => CurrentScope(requestContext).WorkspaceId;
-    private static ResourceScopeRef CurrentConsumerScope(ICurrentRequestContext requestContext) => ResourceScopeRef.Workspace(CurrentWorkspace(requestContext).Value);
+    private static WorkspaceId CurrentWorkspace(ICurrentRequestContext requestContext) => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration =>
+            new(requestContext.Current.WorkspaceId),
+        _ => throw new FlowValidationException("flow_context_required", "A Flow operation requires an operational Workspace context.")
+    };
+    private static ResourceScopeRef CurrentConsumerScope(ICurrentRequestContext requestContext) => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+        ControlPlaneAccessMode.TenantAdministration or ControlPlaneAccessMode.Tenant =>
+            ResourceScopeRef.Tenant(requestContext.Current.TenantId),
+        ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(CurrentWorkspace(requestContext).Value),
+        _ => throw new FlowValidationException("flow_context_required", "A Flow operation requires an explicit Console context.")
+    };
     private static ResourceScopeRef? ParseScopeRef(string? value) => string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);
     private static ResourceScopeRef RequestedOwnerScope(ResourceScopeRef? value, ICurrentRequestContext requestContext) => value ?? CurrentConsumerScope(requestContext);
     private static ResourceScopeRef RequestedOwnerScope(string? value, ICurrentRequestContext requestContext) => ParseScopeRef(value) ?? CurrentConsumerScope(requestContext);

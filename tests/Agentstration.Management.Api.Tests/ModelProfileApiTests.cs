@@ -451,6 +451,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
     {
         await using var factory = DiagnosticFactory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         var providerProperties = new ModelProviderProperties
         {
             DisplayName = "Diagnostic provider",

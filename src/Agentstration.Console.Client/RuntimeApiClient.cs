@@ -43,7 +43,7 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
         ApiResponse.ReadAsync<RuntimeRun>(httpClient, $"api/runtime/runs/{Uri.EscapeDataString(runId)}", cancellationToken);
 
     public Task<RuntimeRun> GetRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<RuntimeRun>(httpClient, $"api/runtime/runs/{Uri.EscapeDataString(runId)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken);
+        ApiResponse.ReadAsync<RuntimeRun>(httpClient, $"api/runtime/runs/{Uri.EscapeDataString(runId)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}", scopeRef, cancellationToken);
 
     public async Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, CancellationToken cancellationToken)
     {
@@ -56,7 +56,7 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     {
         var agentQuery = string.IsNullOrWhiteSpace(agentResourceId) ? string.Empty : $"&agentResourceId={Uri.EscapeDataString(agentResourceId)}";
         var page = await ApiResponse.ReadAsync<RuntimeRunPageResponse>(httpClient,
-            $"api/runtime/runs?scopeRef={Uri.EscapeDataString(scopeRef.Value)}{agentQuery}", cancellationToken);
+            $"api/runtime/runs?scopeRef={Uri.EscapeDataString(scopeRef.Value)}{agentQuery}", scopeRef, cancellationToken);
         return page.Value;
     }
 
@@ -68,6 +68,7 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     public async Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<RuntimeRunEvent[]>(httpClient,
             $"api/runtime/runs/{Uri.EscapeDataString(runId)}/eventHistory?scopeRef={Uri.EscapeDataString(scopeRef.Value)}&afterSequence={Math.Max(0, afterSequence)}",
+            scopeRef,
             cancellationToken);
 
     public async IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -85,6 +86,7 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
         var query = scopeRef is null ? string.Empty : $"?scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}";
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/runtime/runs/{Uri.EscapeDataString(runId)}/events{query}");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        if (scopeRef is not null) AddContext(request, scopeRef.Value);
         if (afterSequence > 0) request.Headers.TryAddWithoutValidation("Last-Event-ID", afterSequence.ToString(System.Globalization.CultureInfo.InvariantCulture));
         using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
@@ -133,6 +135,10 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
         ReadArrayAsync<AgentInstanceResponse>("api/runtime/agent-instances", cancellationToken);
 
+    public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        ReadArrayAsync<AgentInstanceResponse>(
+            $"api/runtime/agent-instances?scopeRef={Uri.EscapeDataString(scopeRef.Value)}", scopeRef, cancellationToken);
+
     public Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
         ReadArrayAsync<RuntimeWorkerSummaryResponse>("api/runtime/workers", cancellationToken);
 
@@ -169,6 +175,7 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef scopeRef, long generation, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<AgentRuntimeReadinessResponse>(httpClient,
             $"{RuntimeAgentPath(@namespace, agentName)}/readiness?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}",
+            scopeRef,
             cancellationToken);
 
     public async Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken)
@@ -209,6 +216,12 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
 
     private async Task<IReadOnlyList<T>> ReadArrayAsync<T>(string path, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<T[]>(httpClient, path, cancellationToken);
+
+    private async Task<IReadOnlyList<T>> ReadArrayAsync<T>(string path, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<T[]>(httpClient, path, scopeRef, cancellationToken);
+
+    private static void AddContext(HttpRequestMessage request, ResourceScopeRef scopeRef) =>
+        request.Headers.TryAddWithoutValidation("X-Agentstration-Context", scopeRef.Value);
 
 }
 

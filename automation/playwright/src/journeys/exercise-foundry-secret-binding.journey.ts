@@ -15,9 +15,11 @@ export const exerciseFoundrySecretBinding: Journey<ExerciseFoundrySecretBindingI
   const page = context.pages.foundrySecretBinding;
   await context.pages.login.signIn(context.consoleUrl, input.username, input.password);
   await context.pages.organizationWorkspaces.selectByName(input.workspaceName);
+  await context.pages.organizationWorkspaces.selectInstance();
   await context.pages.descendantSecrets.openNewVault(context.consoleUrl);
   await context.pages.descendantSecrets.selectScope('instance');
   await context.pages.descendantSecrets.createVault(`${input.providerName}-vault`, `${input.providerDisplayName} Vault`);
+  await context.pages.descendantSecrets.saveChangesIfPresent();
   await context.pages.descendantSecrets.initializeVault();
   await page.createProvider(context.consoleUrl, input.providerName, input.providerDisplayName);
   await page.createParameter('projectEndpoint', 'https://foundry.example.test/api/projects/browser');

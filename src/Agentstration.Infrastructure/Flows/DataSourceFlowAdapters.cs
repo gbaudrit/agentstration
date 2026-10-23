@@ -4,6 +4,7 @@ using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -15,7 +16,9 @@ public sealed class DataSourceAcquisitionCompositionResolver(
     FlowService flows,
     IResourceStore store,
     IResourceReferenceResolver references,
-    IResourceAccessPolicyService accessPolicies) : IDataSourceAcquisitionCompositionResolver
+    IResourceAccessPolicyService accessPolicies,
+    ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes) : IDataSourceAcquisitionCompositionResolver
 {
     public async Task<ResolvedDataSourceFlowBinding> ResolveFlowAsync(
         ResourceScopeRef ownerScope,
@@ -206,8 +209,8 @@ public sealed class DataSourceAcquisitionCompositionResolver(
     {
         foreach (var binding in bindings)
         {
-            var tool = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(binding.ToolScopeRef,
-                binding.ToolNamespace, ToolResourceKinds.Tool, binding.ToolName), cancellationToken);
+            var tool = await GetExactDependencyAsync<ToolResource>(ScopedResourceAddress.Create(binding.ToolScopeRef,
+                binding.ToolNamespace, ToolResourceKinds.Tool, binding.ToolName), consumerScope, cancellationToken);
             if (tool is null || tool.Value.Uid != binding.ToolUid || tool.Value.Generation != binding.ToolGeneration)
                 throw Error($"data_source_{purpose}_tool_stale", $"Pinned Tool binding '{binding.BindingName}' is stale.");
             await EnsureUseAsync(tool.Value, binding.ToolScopeRef, consumerScope,
@@ -216,9 +219,9 @@ public sealed class DataSourceAcquisitionCompositionResolver(
                 || !string.Equals(tool.Value.Definition.ExternalId, binding.ExternalToolId, StringComparison.Ordinal))
                 throw Error($"data_source_{purpose}_tool_unavailable", $"Pinned Tool binding '{binding.BindingName}' is unavailable.");
 
-            var provider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+            var provider = await GetExactDependencyAsync<ToolProviderResource>(ScopedResourceAddress.Create(
                 binding.ProviderScopeRef, binding.ProviderNamespace, ToolResourceKinds.ToolProvider,
-                binding.ProviderName), cancellationToken);
+                binding.ProviderName), consumerScope, cancellationToken);
             if (provider is null || provider.Value.Uid != binding.ProviderUid
                 || provider.Value.Generation != binding.ProviderGeneration)
                 throw Error($"data_source_{purpose}_provider_stale", $"Pinned provider for binding '{binding.BindingName}' is stale.");
@@ -243,6 +246,23 @@ public sealed class DataSourceAcquisitionCompositionResolver(
         if (!decision.Allowed)
             throw Error("data_source_dependency_access_denied",
                 $"Referenced {kind} '{resource.Address}' does not authorize use from '{consumerScope}' ({decision.ReasonCode}).");
+    }
+
+    private async Task<StoredResource<T>?> GetExactDependencyAsync<T>(
+        ScopedResourceAddress address,
+        ResourceScopeRef consumerScope,
+        CancellationToken cancellationToken) where T : Resource
+    {
+        using var exactScope = requestContext.AccessMode == ControlPlaneAccessMode.Workspace
+            ? address.ScopeRef.Kind switch
+            {
+                ResourceScopeKind.Instance => requestScopes.PushInstance(requestContext.Current),
+                ResourceScopeKind.Tenant when address.ScopeRef.TargetId == requestContext.Current.TenantId =>
+                    requestScopes.PushTenantAdministration(requestContext.Current),
+                _ => null
+            }
+            : null;
+        return await store.GetExactAsync<T>(address, cancellationToken);
     }
 
     private static DataSourceAcquisitionException Error(string code, string message) => new(code, message);

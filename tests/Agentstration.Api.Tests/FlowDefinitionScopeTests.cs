@@ -18,7 +18,9 @@ public sealed partial class FlowTests
     public async Task ExactScopeOperationsKeepSameFlowIdentityIsolated()
     {
         var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-        await using var fixture = await FlowFixture.CreateAsync(scopeHierarchy: new TestFlowScopeHierarchy(tenantId));
+        await using var fixture = await FlowFixture.CreateAsync(
+            scopeHierarchy: new TestFlowScopeHierarchy(tenantId),
+            discoveryPolicy: new AllowFlowDiscoveryPolicy());
         var scopes = new[]
         {
             ResourceScopeRef.Instance,
@@ -68,7 +70,9 @@ public sealed partial class FlowTests
     public async Task UnqualifiedReferenceRejectsMultipleVisibleOwners()
     {
         var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-        await using var fixture = await FlowFixture.CreateAsync(scopeHierarchy: new TestFlowScopeHierarchy(tenantId));
+        await using var fixture = await FlowFixture.CreateAsync(
+            scopeHierarchy: new TestFlowScopeHierarchy(tenantId),
+            discoveryPolicy: new AllowFlowDiscoveryPolicy());
         var flowId = new FlowId("ambiguous-flow");
         var command = new CreateFlowCommand(
             flowId.Value,
@@ -91,7 +95,9 @@ public sealed partial class FlowTests
     public async Task VisibleAdministrationListIncludesEveryAncestorAndExactReadDisambiguates()
     {
         var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-        await using var fixture = await FlowFixture.CreateAsync(scopeHierarchy: new TestFlowScopeHierarchy(tenantId));
+        await using var fixture = await FlowFixture.CreateAsync(
+            scopeHierarchy: new TestFlowScopeHierarchy(tenantId),
+            discoveryPolicy: new AllowFlowDiscoveryPolicy());
         var consumerScope = ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value);
         var flowId = new FlowId("governed-flow");
         var command = new CreateFlowCommand(
@@ -121,7 +127,9 @@ public sealed partial class FlowTests
     public async Task GovernedFlowConsumersPreserveExactOwnerScope()
     {
         var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-        await using var fixture = await FlowFixture.CreateAsync(scopeHierarchy: new TestFlowScopeHierarchy(tenantId));
+        await using var fixture = await FlowFixture.CreateAsync(
+            scopeHierarchy: new TestFlowScopeHierarchy(tenantId),
+            discoveryPolicy: new AllowFlowDiscoveryPolicy());
         var flowId = new FlowId("governed-consumer");
         var command = new CreateFlowCommand(
             flowId.Value,

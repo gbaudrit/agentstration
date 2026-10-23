@@ -12,6 +12,7 @@ using Agentstration.Triggers;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Http.Connections.Client;
@@ -125,6 +126,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
 
@@ -151,6 +153,7 @@ public sealed class FlowDetailsDesignerTests
         var inheritedScope = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         var client = new FlowClientStub(scopeRef: inheritedScope, managed: true);
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo($"?scopeRef={Uri.EscapeDataString(inheritedScope.Value)}");
@@ -188,6 +191,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
@@ -219,6 +223,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub(scopeRef: ResourceScopeRef.Instance);
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo($"?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}");
@@ -240,6 +245,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
@@ -258,6 +264,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub { SimulateDraftConflict = true };
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
@@ -296,6 +303,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(orchestration: true));
         context.Services.AddSingleton<IManagementApiClient>(new ManagementClientStub());
+        AddConsoleContext(context);
         var detailsStrings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         var editorStrings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings>>();
 
@@ -654,6 +662,30 @@ public sealed class FlowDetailsDesignerTests
         public Task<FlowVersionResponse> PublishDraftAsync(string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private static void AddConsoleContext(BunitContext context)
+    {
+        var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var workspaceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var snapshot = new ConsoleContextSnapshot(
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            "Test user",
+            tenantId,
+            "test",
+            "Test tenant",
+            workspaceId,
+            "default",
+            "Default workspace",
+            new HashSet<string>(StringComparer.Ordinal),
+            [new(workspaceId, tenantId, "test", "Test tenant", "default", "Default workspace")]);
+        context.Services.AddSingleton<IConsoleContextProvider>(new TestConsoleContextProvider(snapshot));
+        context.Services.AddScoped<ConsoleContextState>();
+    }
+
+    private sealed class TestConsoleContextProvider(ConsoleContextSnapshot snapshot) : IConsoleContextProvider
+    {
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(snapshot);
     }
 
     private sealed class ManagementClientStub : IManagementApiClient

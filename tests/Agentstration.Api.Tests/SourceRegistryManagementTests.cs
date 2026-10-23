@@ -12,6 +12,7 @@ using Agentstration.Security.Contracts;
 using Agentstration.Sources;
 using Agentstration.Sources.Contracts;
 using Agentstration.Web.Api.Models;
+using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -40,8 +41,13 @@ public sealed class SourceRegistryManagementTests
         await factory.Services.GetRequiredService<IIdentityStore>().AddPlatformAdministratorAsync(
             new PlatformAdministrator(context.Context.PrincipalId, DateTimeOffset.UtcNow),
             default);
+        client.DefaultRequestHeaders.Add(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
 
-        var list = await client.GetFromJsonAsync<ValueResponse<SourceRegistryRegistrationView>>("/api/sourceregistries");
+        using var listResponse = await client.GetAsync("/api/sourceregistries");
+        Assert.AreEqual(HttpStatusCode.OK, listResponse.StatusCode, await listResponse.Content.ReadAsStringAsync());
+        var list = await listResponse.Content.ReadFromJsonAsync<ValueResponse<SourceRegistryRegistrationView>>();
         var official = list!.Value.Single();
         Assert.AreEqual(SourceRegistryWellKnown.OfficialIndexUrl, official.Registration.Definition.IndexUrl.AbsoluteUri);
         Assert.AreEqual(SourceRegistryObservedStatus.NeverFetched, official.Observed.Definition.Status);

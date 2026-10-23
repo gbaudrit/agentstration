@@ -1,5 +1,6 @@
 using Agentstration.Agents;
 using Agentstration.Extensions;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
@@ -21,7 +22,7 @@ public static class ManagementDemoData
         var accessPolicies = services.GetRequiredService<IResourceAccessPolicyService>();
         var resources = services.GetRequiredService<IResourceStore>();
         var requestContext = services.GetRequiredService<ICurrentRequestContext>();
-        var tenantId = requestContext.Current.TenantId;
+        var workspaceId = requestContext.Current.WorkspaceId;
         var scopeFactory = services.GetRequiredService<IRequestContextScopeFactory>();
         using (scopeFactory.PushSystem())
         {
@@ -76,18 +77,22 @@ public static class ManagementDemoData
             }, cancellationToken);
         }
 
+        foreach (var extension in await extensions.ListAsync(cancellationToken))
+        {
+            if (extension.Value.ScopeRef != ResourceScopeRef.Instance) continue;
+            await EnsureWorkspaceAccessAsync(accessPolicies, new ResourceAccessIdentity(
+                extension.Value.Uid, ResourceScopeRef.Instance, extension.Value.Namespace,
+                ExtensionKinds.ExtensionRegistration, extension.Value.Generation), workspaceId, cancellationToken);
+        }
+
         foreach (var providerName in new[] { "ollama-local", "llama-cpp-local", "localai-local" })
         {
             var provider = await providers.GetExactAsync(ResourceScopeRef.Instance,
                 ResourceNamespace.Default, providerName, cancellationToken);
-            if (provider is null || await accessPolicies.GetAsync(provider.Value.Uid, cancellationToken) is not null)
-                continue;
-            _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(
-                new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
-                    ModelResourceKinds.ModelProvider, provider.Value.Generation),
-                [new(ResourceScopeRef.Tenant(tenantId),
-                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
-                null, cancellationToken);
+            if (provider is null) continue;
+            await EnsureWorkspaceAccessAsync(accessPolicies, new ResourceAccessIdentity(
+                provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                ModelResourceKinds.ModelProvider, provider.Value.Generation), workspaceId, cancellationToken);
         }
 
         var ollamaProvider = await providers.GetAsync("ollama-local", cancellationToken);
@@ -113,33 +118,43 @@ public static class ManagementDemoData
         var reasoningProfile = await profiles.GetExactAsync(ResourceScopeRef.Instance,
             ResourceNamespace.Default, "reasoning-default", cancellationToken);
         if (reasoningProfile is null) return;
-        if (await accessPolicies.GetAsync(reasoningProfile.Value.Uid, cancellationToken) is null)
-        {
-            _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(
-                new(reasoningProfile.Value.Uid, ResourceScopeRef.Instance, reasoningProfile.Value.Namespace,
-                    ModelResourceKinds.ModelProfile, reasoningProfile.Value.Generation),
-                [new(ResourceScopeRef.Tenant(tenantId),
-                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
-                null, cancellationToken);
-        }
+        await EnsureWorkspaceAccessAsync(accessPolicies, new ResourceAccessIdentity(
+            reasoningProfile.Value.Uid, ResourceScopeRef.Instance, reasoningProfile.Value.Namespace,
+            ModelResourceKinds.ModelProfile, reasoningProfile.Value.Generation), workspaceId, cancellationToken);
 
         var runtimeProfile = await resources.GetExactAsync<RuntimeProfileResource>(
             ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
                 RuntimeProfileResourceKinds.RuntimeProfile, "maf-builtin"), cancellationToken);
-        if (runtimeProfile is not null
-            && await accessPolicies.GetAsync(runtimeProfile.Value.Uid, cancellationToken) is null)
+        if (runtimeProfile is not null)
         {
-            _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(
-                new(runtimeProfile.Value.Uid, ResourceScopeRef.Instance, runtimeProfile.Value.Namespace,
-                    RuntimeProfileResourceKinds.RuntimeProfile, runtimeProfile.Value.Generation),
-                [new(ResourceScopeRef.Tenant(tenantId),
-                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
-                null, cancellationToken);
+            await EnsureWorkspaceAccessAsync(accessPolicies, new ResourceAccessIdentity(
+                runtimeProfile.Value.Uid, ResourceScopeRef.Instance, runtimeProfile.Value.Namespace,
+                RuntimeProfileResourceKinds.RuntimeProfile, runtimeProfile.Value.Generation), workspaceId, cancellationToken);
         }
         }
 
         await EnsureAgentAsync(agents, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], [], cancellationToken);
         await EnsureAgentAsync(agents, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], [], cancellationToken);
+    }
+
+    private static async Task EnsureWorkspaceAccessAsync(
+        IResourceAccessPolicyService accessPolicies,
+        ResourceAccessIdentity identity,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await accessPolicies.GetAsync(identity.Uid, cancellationToken);
+        var workspaceScope = ResourceScopeRef.Workspace(workspaceId);
+        var grants = (existing?.Policy.Grants ?? [])
+            .Where(grant => grant.TargetScopeRef != workspaceScope)
+            .Append(new ResourceAccessGrant(workspaceScope,
+                [ResourceAccessAction.Discover, ResourceAccessAction.Use]))
+            .ToArray();
+        if (existing?.Policy.Grants.Any(grant => grant.TargetScopeRef == workspaceScope
+                && grant.Actions.Contains(ResourceAccessAction.Discover)
+                && grant.Actions.Contains(ResourceAccessAction.Use)) == true)
+            return;
+        _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(identity, grants), existing?.ETag, cancellationToken);
     }
 
     internal static async Task EnsureAgentAsync(

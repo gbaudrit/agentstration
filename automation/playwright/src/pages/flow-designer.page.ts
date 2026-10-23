@@ -350,7 +350,9 @@ export class FlowDesignerPage {
   }
 
   public async expectReadOnlyPublished(consoleUrl: string, namespace: string, name: string): Promise<void> {
-    await this.open(consoleUrl, namespace, name);
+    const response = await this.page.goto(`${consoleUrl}/namespaces/${encodeURIComponent(namespace)}/flows/${encodeURIComponent(name)}/designer?scopeRef=${encodeURIComponent('/instance')}&context=${encodeURIComponent('/instance')}`, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error(`Managed Flow designer returned HTTP ${response?.status() ?? 'no response'}.`);
+    await this.page.getByTestId(TestIds.flowObservability.designer).waitFor({ state: 'visible' });
     await expect(this.page.locator('.read-only-badge')).toBeVisible();
     await expect(this.page.locator('.flow-port-handle.locked').first()).toBeVisible();
     await expect(this.page.locator('.flow-port-handle:not(.locked)')).toHaveCount(0);

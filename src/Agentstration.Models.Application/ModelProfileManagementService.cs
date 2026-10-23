@@ -20,7 +20,9 @@ public sealed class ModelProfileManagementService(
     ModelDiscoveryService modelDiscovery,
     IEnumerable<IModelProviderDiscovery> discoveries,
     IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers,
-    IEnumerable<IExtensionInspector> inspectors) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
+    IEnumerable<IExtensionInspector> inspectors,
+    ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
     public static string ProfileId(string name) => name;
     public async Task ValidateForCreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
@@ -271,6 +273,9 @@ public sealed class ModelProfileManagementService(
 
     public async Task<ResolvedResourceDependency> ResolveReferenceAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken)
     {
+        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId)
+            : null;
         StoredResource<ModelProfileResource>? profile;
         try
         {
@@ -320,9 +325,28 @@ public sealed class ModelProfileManagementService(
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
         if (definition.Provider.ScopeRef != ResourceScopeRef.Instance)
             throw Invalid("definition.provider.scopeRef", "A model profile requires an exact Instance Model Provider reference.");
-        var providerResource = await references.ResolveAsync<ModelProviderResource>(
-            definition.Provider, ownerNamespace, ModelResourceKinds.ModelProvider, ownerScopeRef, cancellationToken)
-            ?? throw Invalid("definition.provider.name", "The referenced model provider does not exist.");
+        StoredResource<ModelProviderResource>? providerResource;
+        ModelProviderConfiguration provider;
+        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId)
+            : null;
+        if (ownerScopeRef == ResourceScopeRef.Instance)
+        {
+            using var systemScope = requestScopes.PushSystem();
+            providerResource = await references.ResolveAsync<ModelProviderResource>(
+                definition.Provider, ownerNamespace, ModelResourceKinds.ModelProvider, ownerScopeRef, cancellationToken);
+            try { provider = await providerConfigurations.GetConfigurationRequiredAsync(definition.Provider, ownerNamespace, ownerScopeRef, cancellationToken); }
+            catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
+        }
+        else
+        {
+            providerResource = await references.ResolveAsync<ModelProviderResource>(
+                definition.Provider, ownerNamespace, ModelResourceKinds.ModelProvider, ownerScopeRef, cancellationToken);
+            try { provider = await providerConfigurations.GetConfigurationRequiredAsync(definition.Provider, ownerNamespace, ownerScopeRef, cancellationToken); }
+            catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
+        }
+        if (providerResource is null)
+            throw Invalid("definition.provider.name", "The referenced model provider does not exist.");
         if (ownerScopeRef != ResourceScopeRef.Instance)
         {
             var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
@@ -335,9 +359,6 @@ public sealed class ModelProfileManagementService(
                 throw Invalid("definition.provider.scopeRef",
                     $"The Instance Model Provider does not authorize use from '{ownerScopeRef}' ({access.ReasonCode}).");
         }
-        ModelProviderConfiguration provider;
-        try { provider = await providerConfigurations.GetConfigurationRequiredAsync(definition.Provider, ownerNamespace, ownerScopeRef, cancellationToken); }
-        catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
         if (string.IsNullOrWhiteSpace(definition.Model.Name)) throw Invalid("definition.model.name", "A model name is required.");
         if (definition.SecretBindings is null) throw Invalid("definition.secretBindings", "Secret bindings must be an array.");
         if (definition.Generation.Temperature is < 0 or > 2) throw Invalid("definition.generation.temperature", "Temperature must be between 0 and 2.");

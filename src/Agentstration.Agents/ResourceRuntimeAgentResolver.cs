@@ -1,4 +1,5 @@
 using Agentstration.Agents;
+using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -9,7 +10,9 @@ namespace Agentstration.Agents;
 
 public sealed class ResourceRuntimeAgentResolver(
     IResourceStore store,
-    IAgentResourceQueries queries) : IRuntimeAgentResolver
+    IAgentResourceQueries queries,
+    ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes) : IRuntimeAgentResolver
 {
     public async Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, CancellationToken cancellationToken)
         => await ResolveLatestAsync(resourceId, ResourceNamespace.Default, cancellationToken);
@@ -23,6 +26,9 @@ public sealed class ResourceRuntimeAgentResolver(
 
     public async Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken)
     {
+        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId)
+            : null;
         var agent = reference.ScopeRef is { } scopeRef
             ? await store.GetExactAsync<AgentResource>(ScopedResourceAddress.Create(scopeRef, reference.Namespace,
                 AgentResourceKinds.Agent, reference.ResourceId), cancellationToken)

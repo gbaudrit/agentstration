@@ -11,9 +11,11 @@ public sealed class ConsoleContextStateTests
         var workspaceId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
         var snapshot = new ConsoleContextSnapshot(
-            Guid.NewGuid(), "Alice", tenantId, "acme", "ACME", workspaceId, "support", "Support",
+            Guid.NewGuid(), "Alice", $"/workspaces/{workspaceId:D}", ConsoleContextKind.Workspace,
+            tenantId, "acme", "ACME", workspaceId, "support", "Support",
             new HashSet<string>(["resources/read"], StringComparer.Ordinal),
-            [new(workspaceId, tenantId, "acme", "ACME", "support", "Support")]);
+            [new(workspaceId, tenantId, "acme", "ACME", "support", "Support")],
+            [new($"/workspaces/{workspaceId:D}", ConsoleContextKind.Workspace, tenantId, "acme", "ACME", workspaceId, "support", "Support")]);
         var state = new ConsoleContextState(new StubProvider(snapshot));
 
         await state.LoadAsync(default);

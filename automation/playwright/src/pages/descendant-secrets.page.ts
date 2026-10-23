@@ -78,6 +78,7 @@ export class DescendantSecretsPage {
   }
 
   public async addGrant(scopeRef: string): Promise<void> {
+    await this.openAccessTab();
     const target = this.page.getByTestId(TestIds.secretGrants.grantTarget);
     await target.selectOption(scopeRef);
     await this.page.getByTestId(TestIds.secretGrants.grantAdd).click();
@@ -85,6 +86,7 @@ export class DescendantSecretsPage {
   }
 
   public async removeGrant(scopeRef: string): Promise<void> {
+    await this.openAccessTab();
     await this.grantRow(scopeRef).getByTestId(TestIds.secretGrants.grantRemove).click();
     await this.grantRow(scopeRef).waitFor({ state: 'detached' });
   }
@@ -104,10 +106,23 @@ export class DescendantSecretsPage {
     await bar.waitFor({ state: 'hidden' });
   }
 
+  public async saveChangesIfPresent(): Promise<void> {
+    const bar = this.page.locator('.resource-form .unsaved-changes-bar');
+    await bar.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
+    if (await bar.isVisible()) await this.saveChanges();
+  }
+
   private async vaultOption(name: string, scopeRef: string): Promise<string | undefined> {
     const options = await this.page.getByTestId(TestIds.secretGrants.secretVault).locator('option').evaluateAll(elements =>
       elements.map(element => (element as HTMLOptionElement).value));
     return options.find(value => value === `${scopeRef}|default|${name}`);
+  }
+
+  private async openAccessTab(): Promise<void> {
+    const target = this.page.getByTestId(TestIds.secretGrants.grantTarget);
+    if (await target.count() > 0) return;
+    await this.page.locator('[data-testid="vault-access-tab"], [data-testid="secret-access-tab"]').click();
+    await target.waitFor({ state: 'visible' });
   }
 
   private async saveNew(kind: 'vaults' | 'secrets', name: string): Promise<void> {

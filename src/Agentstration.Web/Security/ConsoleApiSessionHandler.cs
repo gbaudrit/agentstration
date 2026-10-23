@@ -17,17 +17,27 @@ public sealed class ConsoleApiSessionHandler(
             && IsTrusted(request.RequestUri)
             && !request.Headers.Contains(HeaderNames.Cookie))
         {
+            var cookieValues = new List<string>();
             if (incoming.Request.Cookies.TryGetValue(sessionCookieName, out var sessionCookie)
                 && !string.IsNullOrWhiteSpace(sessionCookie))
             {
-                var cookieValues = new List<string> { $"{sessionCookieName}={sessionCookie}" };
+                cookieValues.Add($"{sessionCookieName}={sessionCookie}");
                 if (sessionCookie.StartsWith("chunks-", StringComparison.Ordinal))
                     cookieValues.AddRange(incoming.Request.Cookies
                         .Where(cookie => cookie.Key.StartsWith($"{sessionCookieName}C", StringComparison.Ordinal))
                         .OrderBy(cookie => cookie.Key, StringComparer.Ordinal)
                         .Select(cookie => $"{cookie.Key}={cookie.Value}"));
-                request.Headers.TryAddWithoutValidation(HeaderNames.Cookie, string.Join("; ", cookieValues));
             }
+            if (incoming.Request.Cookies.TryGetValue(RequestContextMiddleware.WorkspaceCookie, out var workspaceCookie))
+                cookieValues.Add($"{RequestContextMiddleware.WorkspaceCookie}={workspaceCookie}");
+            if (incoming.Request.Cookies.TryGetValue(RequestContextMiddleware.ConsoleContextCookie, out var contextCookie))
+            {
+                cookieValues.Add($"{RequestContextMiddleware.ConsoleContextCookie}={contextCookie}");
+                if (!request.Headers.Contains(RequestContextMiddleware.ConsoleContextHeader))
+                    request.Headers.TryAddWithoutValidation(RequestContextMiddleware.ConsoleContextHeader, contextCookie);
+            }
+            if (cookieValues.Count > 0)
+                request.Headers.TryAddWithoutValidation(HeaderNames.Cookie, string.Join("; ", cookieValues));
             if (requestContext.IsInitialized && !request.Headers.Contains(PrincipalResolutionMiddleware.WorkspaceHeader))
                 request.Headers.TryAddWithoutValidation(
                     PrincipalResolutionMiddleware.WorkspaceHeader,

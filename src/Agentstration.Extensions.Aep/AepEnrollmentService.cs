@@ -699,8 +699,19 @@ public sealed class AepEnrollmentService(
     }
 
     private async Task<StoredResource<AepEnrollmentRequestResource>> GetAsync(Guid requestId, CancellationToken cancellationToken) =>
-        await store.GetExactAsync<AepEnrollmentRequestResource>(Address(ResourceScopeRef.Instance, requestId.ToString("N")), cancellationToken)
+        await GetExactEnrollmentRequestAsync(requestId, cancellationToken)
         ?? throw new AepEnrollmentException("request_not_found", "The enrollment request was not found.", 404);
+
+    private async Task<StoredResource<AepEnrollmentRequestResource>?> GetExactEnrollmentRequestAsync(
+        Guid requestId,
+        CancellationToken cancellationToken)
+    {
+        using var exactScope = requestContext.AccessMode is ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance
+            ? null
+            : RequestScopes().PushInstance(requestContext.Current);
+        return await store.GetExactAsync<AepEnrollmentRequestResource>(
+            Address(ResourceScopeRef.Instance, requestId.ToString("N")), cancellationToken);
+    }
 
     private async Task<StoredResource<AepEnrollmentRequestResource>> GetVisibleAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
     {

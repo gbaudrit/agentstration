@@ -1,6 +1,8 @@
 using Agentstration.Flows;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Web.Components.Models;
+using Agentstration.Web.Components.State;
 using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Web.Console;
@@ -8,15 +10,22 @@ namespace Agentstration.Web.Console;
 public sealed class HttpAgentstrationEventStream(
     IAgentRunnerRuntimeClient runtime,
     IFlowApiClient flows,
-    ILogger<HttpAgentstrationEventStream> logger) : IAgentstrationEventStream
+    ILogger<HttpAgentstrationEventStream> logger,
+    IConsoleContextProvider? contextProvider = null) : IAgentstrationEventStream
 {
     private const int RecentRunLimitPerSource = 10;
     private const int EventLimit = 200;
 
     public async Task<IReadOnlyList<EventListItem>> GetRecentEventsAsync(CancellationToken cancellationToken)
     {
-        var runtimeRunsTask = TryLoadAsync("Runtime Runs", token => runtime.GetRunsAsync(null, token), cancellationToken);
-        var flowRunsTask = TryLoadAsync("Flow Runs", token => flows.GetFlowRunsAsync(null, token), cancellationToken);
+        var context = contextProvider is null ? null : await contextProvider.GetAsync(cancellationToken);
+        ResourceScopeRef? executionScope = context is null ? null : ResourceScopeRef.Workspace(context.WorkspaceId);
+        var runtimeRunsTask = TryLoadAsync("Runtime Runs", token => executionScope is null
+            ? runtime.GetRunsAsync(null, token)
+            : runtime.GetRunsAsync(null, executionScope.Value, token), cancellationToken);
+        var flowRunsTask = TryLoadAsync("Flow Runs", token => executionScope is null
+            ? flows.GetFlowRunsAsync(null, token)
+            : flows.GetFlowRunsAsync(null, executionScope.Value, token), cancellationToken);
         await Task.WhenAll(runtimeRunsTask, flowRunsTask);
 
         var runtimeRunsResult = await runtimeRunsTask;
@@ -26,26 +35,36 @@ public sealed class HttpAgentstrationEventStream(
 
         var runtimeRuns = runtimeRunsResult.Value.OrderByDescending(run => run.Status.CreatedAt).Take(RecentRunLimitPerSource).ToArray();
         var flowRuns = flowRunsResult.Value.OrderByDescending(run => run.CreatedAt).Take(RecentRunLimitPerSource).ToArray();
-        var runtimeEventTasks = runtimeRuns.Select(run => LoadRuntimeEventsAsync(run, cancellationToken));
-        var flowEventTasks = flowRuns.Select(run => LoadFlowEventsAsync(run, cancellationToken));
+        var runtimeEventTasks = runtimeRuns.Select(run => LoadRuntimeEventsAsync(run, executionScope, cancellationToken));
+        var flowEventTasks = flowRuns.Select(run => LoadFlowEventsAsync(run, executionScope, cancellationToken));
 
         var runtimeEvents = (await Task.WhenAll(runtimeEventTasks)).SelectMany(events => events);
         var flowEvents = (await Task.WhenAll(flowEventTasks)).SelectMany(events => events);
         return runtimeEvents.Concat(flowEvents).OrderByDescending(runEvent => runEvent.Timestamp).Take(EventLimit).ToArray();
     }
 
-    private async Task<IReadOnlyList<EventListItem>> LoadRuntimeEventsAsync(RuntimeRun run, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<EventListItem>> LoadRuntimeEventsAsync(
+        RuntimeRun run,
+        ResourceScopeRef? executionScope,
+        CancellationToken cancellationToken)
     {
-        var result = await TryLoadAsync($"Runtime Run {run.Id}", token => runtime.GetRunEventsAsync(run.Id, 0, token), cancellationToken);
+        var result = await TryLoadAsync($"Runtime Run {run.Id}", token => executionScope is null
+            ? runtime.GetRunEventsAsync(run.Id, 0, token)
+            : runtime.GetRunEventsAsync(run.Id, executionScope.Value, 0, token), cancellationToken);
         return result.Value
             .Where(runEvent => runEvent.Kind != RuntimeRunEventKind.ResponseDelta)
             .Select(runEvent => FromRuntime(run, runEvent))
             .ToArray();
     }
 
-    private async Task<IReadOnlyList<EventListItem>> LoadFlowEventsAsync(FlowRun run, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<EventListItem>> LoadFlowEventsAsync(
+        FlowRun run,
+        ResourceScopeRef? executionScope,
+        CancellationToken cancellationToken)
     {
-        var result = await TryLoadAsync($"Flow Run {run.Id}", token => flows.GetFlowRunEventsAsync(run.Id, 0, token), cancellationToken);
+        var result = await TryLoadAsync($"Flow Run {run.Id}", token => executionScope is null
+            ? flows.GetFlowRunEventsAsync(run.Id, 0, token)
+            : flows.GetFlowRunEventsAsync(run.Id, executionScope.Value, 0, token), cancellationToken);
         return result.Value
             .Where(runEvent => runEvent.Type != FlowRunEventType.StepOutputDelta)
             .Select(runEvent => FromFlow(run, runEvent))

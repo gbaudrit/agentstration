@@ -470,6 +470,7 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/identity/accounts", StringComparison.OrdinalIgnoreCase))
             return path == "/api/identity/accounts" && method == "GET" ? Json<IReadOnlyList<LocalAccountResponse>>(200, "List local accounts") : Json<LocalAccountResponse>(method == "POST" ? 201 : 200, method == "POST" ? "Create a local account" : "Update local account status");
         if (path == "/api/identity/context") return Json<IdentityConsoleContextResponse>(200, "Get the current identity context");
+        if (path == "/api/identity/context/selection") return Json<SelectConsoleContextResponse>(200, "Select the current Console context");
         if (path == "/api/identity/context/workspace") return Json<RequestContext>(200, "Select the current workspace");
         if (path == "/api/identity/administration-capabilities") return Json<IdentityAdministrationCapabilitiesResponse>(200, "Get identity administration capabilities");
         if (path == "/api/identity/preferences") return Json<PrincipalPreferencesResponse>(200, method == "PUT" ? "Update principal preferences" : "Get principal preferences");

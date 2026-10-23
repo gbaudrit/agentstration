@@ -47,9 +47,10 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             }
         }, default);
         var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
-        _ = await policies.PutAsync(new(new(source.Value.Uid, instanceScope, source.Value.Namespace,
-            source.Value.Kind, source.Value.Generation),
-            [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
+            _ = await policies.PutAsync(new(new(source.Value.Uid, instanceScope, source.Value.Namespace,
+                source.Value.Kind, source.Value.Generation),
+                [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
 
         var knowledge = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
         async Task<StoredResource<KnowledgeSourceResource>> CreateAsync(ResourceScopeRef scope, string name) =>
@@ -115,14 +116,14 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             Assert.IsFalse(string.IsNullOrWhiteSpace(dependency.ProfileDependencyHash));
         }
 
-        var denied = await Assert.ThrowsAsync<KnowledgeSourceValidationException>(() =>
+        await Assert.ThrowsExactlyAsync<KnowledgeSourceNotFoundException>(() =>
             knowledge.ResolveForUseAsync(new(instance.Value.Name, instance.Value.Namespace, instanceScope),
                 workspaceScope, default));
-        Assert.AreEqual("knowledge_source_access_denied", denied.Code);
 
-        _ = await policies.PutAsync(new(new(instance.Value.Uid, instanceScope, instance.Value.Namespace,
-            instance.Value.Kind, instance.Value.Generation),
-            [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
+            _ = await policies.PutAsync(new(new(instance.Value.Uid, instanceScope, instance.Value.Namespace,
+                instance.Value.Kind, instance.Value.Generation),
+                [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
         var inherited = await knowledge.ResolveForUseAsync(
             new(instance.Value.Name, instance.Value.Namespace, instanceScope), workspaceScope, default);
         Assert.AreEqual(instance.Value.Uid, inherited.Value.Uid);
@@ -171,8 +172,9 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             Assert.AreEqual("projection-b", (await projections.ListAsync(sourceId, default)).Single().Name);
         }
 
-        _ = await dataSources.PutAsync(source.Value.Namespace, source.Value.Name, instanceScope,
-            source.Value.Definition with { Description = "Changed dependency" }, source.ETag, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
+            _ = await dataSources.PutAsync(source.Value.Namespace, source.Value.Name, instanceScope,
+                source.Value.Definition with { Description = "Changed dependency" }, source.ETag, default);
         var stale = await knowledge.GetReadinessAsync(
             new(instance.Value.Name, instance.Value.Namespace, instanceScope), default);
         Assert.IsFalse(stale.Ready);

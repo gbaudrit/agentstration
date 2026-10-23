@@ -307,7 +307,10 @@ public sealed class ManagementFlowResourceReferenceResolver(
     };
 }
 
-public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFlowToolSetResolver
+public sealed class ManagementFlowToolSetResolver(
+    ToolSetService toolSets,
+    ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes) : IFlowToolSetResolver
 {
     public async Task<ResolvedFlowToolRoute> ResolveAsync(
         WorkspaceId workspaceId,
@@ -320,7 +323,15 @@ public sealed class ManagementFlowToolSetResolver(ToolSetService toolSets) : IFl
         try
         {
             var toolSetNamespace = step.ToolSet.ResolveNamespace(ownerNamespace);
-            var selected = await toolSets.ResolveRouteExactAsync(step.ToolSet.ScopeRef ?? ownerScopeRef,
+            var toolSetScopeRef = step.ToolSet.ScopeRef ?? ownerScopeRef;
+            using var exactScope = toolSetScopeRef.Kind switch
+            {
+                ResourceScopeKind.Instance => requestScopes.PushInstance(requestContext.Current),
+                ResourceScopeKind.Tenant when toolSetScopeRef.TargetId == requestContext.Current.TenantId =>
+                    requestScopes.PushTenantAdministration(requestContext.Current),
+                _ => null
+            };
+            var selected = await toolSets.ResolveRouteExactAsync(toolSetScopeRef,
                 toolSetNamespace, step.ToolSet.ResourceId,
                 step.ToolSet.Version, step.Capability, step.Route, cancellationToken);
             var member = selected.Member;
@@ -411,7 +422,8 @@ public sealed class ToolSetDeletionGuard(
 
 public sealed class ManagedFlowToolExecutor(
     IResourceStore store,
-    IToolExecutionPipeline pipeline) : IFlowToolExecutor
+    IToolExecutionPipeline pipeline,
+    IRequestContextScopeFactory? requestScopes = null) : IFlowToolExecutor
 {
     public async Task<FlowToolExecutionResult> ExecuteAsync(
         FlowToolExecutionRequest request,
@@ -420,8 +432,8 @@ public sealed class ManagedFlowToolExecutor(
         ArgumentNullException.ThrowIfNull(request);
         var toolNamespace = request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace);
         var toolScope = request.Route?.ToolScopeRef ?? request.DefinitionScopeRef;
-        var stored = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
-            toolScope, toolNamespace, ToolResourceKinds.Tool, request.Tool.ResourceId), cancellationToken);
+        var stored = await GetForExecutionAsync<ToolResource>(ScopedResourceAddress.Create(
+            toolScope, toolNamespace, ToolResourceKinds.Tool, request.Tool.ResourceId), request.Scope, cancellationToken);
         if (stored is null)
             throw Error("tool_not_found", $"Tool resource '{toolNamespace}/{request.Tool.ResourceId}' was not found.");
 
@@ -439,8 +451,8 @@ public sealed class ManagedFlowToolExecutor(
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no ToolProvider mapping.");
         var providerNamespace = tool.Definition.Provider!.Namespace ?? tool.Metadata.Namespace;
         var providerScope = request.Route?.ProviderScopeRef ?? tool.Definition.Provider.ScopeRef ?? toolScope;
-        var provider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
-            providerScope, providerNamespace, ToolResourceKinds.ToolProvider, providerId), cancellationToken);
+        var provider = await GetForExecutionAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+            providerScope, providerNamespace, ToolResourceKinds.ToolProvider, providerId), request.Scope, cancellationToken);
         if (provider is null)
             throw Error("tool_provider_not_found",
                 $"ToolProvider resource '{providerNamespace}/{providerId}' was not found.");
@@ -504,6 +516,28 @@ public sealed class ManagedFlowToolExecutor(
         {
             throw Error(exception.Code, exception.Message, exception);
         }
+    }
+
+    private async Task<StoredResource<T>?> GetForExecutionAsync<T>(
+        ScopedResourceAddress address,
+        FlowRunScope runScope,
+        CancellationToken cancellationToken) where T : Resource
+    {
+        using var exactScope = ExactResolutionScope(address.ScopeRef, runScope);
+        return await store.GetExactAsync<T>(address, cancellationToken);
+    }
+
+    private IDisposable? ExactResolutionScope(ResourceScopeRef resourceScope, FlowRunScope runScope)
+    {
+        if (requestScopes is null || resourceScope.Kind == ResourceScopeKind.Workspace) return null;
+        var operational = new RequestContext(runScope.PrincipalId, runScope.TenantId, runScope.WorkspaceId.Value);
+        return resourceScope.Kind switch
+        {
+            ResourceScopeKind.Instance => requestScopes.PushInstance(operational),
+            ResourceScopeKind.Tenant when resourceScope.TargetId == runScope.TenantId =>
+                requestScopes.PushTenantAdministration(operational),
+            _ => null
+        };
     }
 
     private static void ValidateArguments(JsonElement arguments, JsonElement schema)

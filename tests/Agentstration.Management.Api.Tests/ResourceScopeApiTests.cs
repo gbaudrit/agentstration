@@ -102,6 +102,15 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             "/api/vaults",
             new CreateVaultRequest("tenant-vault", new VaultProperties { DisplayName = "Tenant Vault", ProviderType = "local" }, tenant.ScopeRef));
         Assert.AreEqual(HttpStatusCode.Created, tenantVaultResponse.StatusCode);
+        var tenantVault = await tenantVaultResponse.Content.ReadFromJsonAsync<VaultResource>();
+        Assert.IsNotNull(tenantVault);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+                new(new(tenantVault.Uid, tenant.ScopeRef, tenantVault.Namespace,
+                        tenantVault.Kind, tenantVault.Generation),
+                    [new(workspace.ScopeRef, [ResourceAccessAction.Discover])]), null, default);
+        }
 
         using var rejected = await client.PostAsJsonAsync(
             "/api/secrets",
@@ -176,6 +185,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             $"/api/resource-scopes/targets?kind={SecretResourceKinds.Secret}"))!;
         var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
         var workspace = targets.Single(value => value.Kind == ResourceScopeKind.Workspace).ScopeRef;
+        SelectConsoleContext(client, tenant);
         using var vaultResponse = await client.PostAsJsonAsync("/api/vaults", new CreateVaultRequest(
             "resolution-vault", new VaultProperties { DisplayName = "Resolution Vault", ProviderType = "test" }, tenant));
         Assert.AreEqual(HttpStatusCode.Created, vaultResponse.StatusCode);
@@ -194,8 +204,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             new SetSecretValueRequest(secretValue));
         Assert.AreEqual(HttpStatusCode.NoContent, setValue.StatusCode);
         using var valueRead = await client.GetAsync($"/api/secrets/resolution-secret?scopeRef={Uri.EscapeDataString(tenant.Value)}");
-        using var valueList = await client.GetAsync("/api/secrets");
         using var valueUsages = await client.GetAsync($"/api/secrets/resolution-secret/usages?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        SelectConsoleContext(client, workspace);
+        using var valueList = await client.GetAsync("/api/secrets");
         Assert.AreEqual(HttpStatusCode.OK, valueRead.StatusCode);
         Assert.AreEqual(HttpStatusCode.OK, valueList.StatusCode);
         Assert.AreEqual(HttpStatusCode.OK, valueUsages.StatusCode);
@@ -219,6 +230,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             Assert.IsNull(await resolver.ResolveAsync(new SecretReference(address), context));
         }
 
+        SelectConsoleContext(client, tenant);
         using var secretRead = await client.GetAsync($"/api/secrets/resolution-secret?scopeRef={Uri.EscapeDataString(tenant.Value)}");
         using var grantRequest = new HttpRequestMessage(HttpMethod.Put,
             $"/api/secrets/resolution-secret?scopeRef={Uri.EscapeDataString(tenant.Value)}")
@@ -238,6 +250,14 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         var savedSecret = await savedSecretResponse.Content.ReadFromJsonAsync<SecretResponse>();
         Assert.IsNotNull(savedSecret);
         Assert.AreEqual(workspace, savedSecret.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+                new(new(savedSecret.Resource.Uid, tenant, savedSecret.Resource.Namespace,
+                        savedSecret.Resource.Kind, savedSecret.Resource.Generation),
+                    [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+        }
+        SelectConsoleContext(client, workspace);
         var visibleAfterGrant = await client.GetFromJsonAsync<SecretResponse[]>("/api/secrets");
         Assert.IsTrue(visibleAfterGrant!.Any(value => value.Resource.Uid == savedSecret.Resource.Uid));
 
@@ -305,6 +325,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, bytes);
         System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes);
 
+        SelectConsoleContext(client, tenant);
         using var revokeRequest = new HttpRequestMessage(HttpMethod.Put,
             $"/api/secrets/resolution-secret?scopeRef={Uri.EscapeDataString(tenant.Value)}")
         {
@@ -365,16 +386,16 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             }, tenant.ScopeRef));
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
 
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", tenant.ScopeRef.Value);
         var inventory = await client.GetFromJsonAsync<ResourceScopeInventoryResponse>("/api/resource-scopes");
         Assert.IsNotNull(inventory);
-        var instanceNode = inventory.Scopes.Single(value => value.Kind == ResourceScopeKind.Instance);
         var tenantNode = inventory.Scopes.Single(value => value.ScopeRef == tenant.ScopeRef);
         var workspaceNode = inventory.Scopes.Single(value => value.ScopeRef == workspace.ScopeRef);
-        Assert.IsNull(instanceNode.ParentScopeRef);
-        Assert.AreEqual(instanceNode.ScopeRef, tenantNode.ParentScopeRef);
+        Assert.IsFalse(inventory.Scopes.Any(value => value.Kind == ResourceScopeKind.Instance));
+        Assert.IsNull(tenantNode.ParentScopeRef);
         Assert.AreEqual(tenantNode.ScopeRef, workspaceNode.ParentScopeRef);
-        Assert.IsFalse(tenantNode.IsCurrent);
-        Assert.IsTrue(workspaceNode.IsCurrent);
+        Assert.IsTrue(tenantNode.IsCurrent);
+        Assert.IsFalse(workspaceNode.IsCurrent);
         Assert.IsTrue(tenantNode.Resources.Any(value =>
             value.Kind == SecretResourceKinds.Vault && value.Name == "inventory-vault"));
         Assert.IsFalse(workspaceNode.Resources.Any(value => value.Name == "inventory-vault"));
@@ -401,14 +422,13 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         }
 
         using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         var inventory = await client.GetFromJsonAsync<ResourceScopeInventoryResponse>("/api/resource-scopes");
         var item = inventory!.Scopes.Single(value => value.ScopeRef == ResourceScopeRef.Instance).Resources
             .Single(value => value.Kind == FlowResourceKinds.Flow && value.Name == created.Value.Name);
         Assert.AreEqual(created.Value.Uid, item.Uid);
 
-        var tenant = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
-            $"/api/resource-scopes/targets?kind={FlowResourceKinds.Flow}"))!
-            .Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        var tenant = ResourceScopeRef.Tenant(context.TenantId);
         var identity = new ResourceAccessIdentity(
             created.Value.Uid,
             ResourceScopeRef.Instance,
@@ -455,6 +475,18 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         var tenantScope = ResourceScopeRef.Tenant(context.TenantId);
         var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
 
+        var provider = await factory.Services.GetRequiredService<IResourceStore>()
+            .GetExactAsync<ModelProviderResource>(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, ModelResourceKinds.ModelProvider, "ollama-local"), default);
+        Assert.IsNotNull(provider);
+        var providerPolicy = await policies.GetAsync(provider.Value.Uid, default);
+        _ = await policies.PutAsync(new ResourceAccessPolicy(
+            new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                ModelResourceKinds.ModelProvider, provider.Value.Generation),
+            (providerPolicy?.Policy.Grants ?? []).Append(new ResourceAccessGrant(tenantScope,
+                [ResourceAccessAction.Discover, ResourceAccessAction.Use])).ToArray()),
+            providerPolicy?.ETag, default);
+
         var profile = await profiles.CreateAsync(new ModelProfileResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -497,31 +529,36 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             }
         };
 
-        var ambiguousAgent = agent with
+        var inheritedAgent = agent with
         {
-            Metadata = new ResourceMetadata { Name = "ambiguous-model-agent" },
+            Metadata = new ResourceMetadata { Name = "inherited-model-agent" },
             Definition = agent.Definition with { ModelProfile = new ResourceReference(profile.Value.Name) }
         };
-        await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
-            await agents.PutAgentAsync(ambiguousAgent, null, true, default));
+        var inherited = await agents.PutAgentAsync(inheritedAgent, null, true, default);
+        var inheritedRevision = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default,
+            inherited.Value.Name, inherited.Value.Generation, default);
+        Assert.AreEqual(workspaceProfile.Value.Uid, inheritedRevision.Value.Definition.ModelProfilePin?.Uid);
+        Assert.AreEqual(workspaceScope, inheritedRevision.Value.Definition.ModelProfilePin?.ScopeRef);
 
         await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
             await agents.PutAgentAsync(agent, null, true, default));
 
-        _ = await policies.PutAsync(new ResourceAccessPolicy(
-            new(profile.Value.Uid, tenantScope, profile.Value.Namespace, profile.Value.Kind,
-                profile.Value.Generation),
-            [new(workspaceScope, [ResourceAccessAction.Use])]), null, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(profile.Value.Uid, tenantScope, profile.Value.Namespace, profile.Value.Kind,
+                    profile.Value.Generation),
+                [new(workspaceScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
         var runtime = await factory.Services.GetRequiredService<IResourceStore>()
             .GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
                 ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile, "maf-builtin"), default);
         Assert.IsNotNull(runtime);
         if (await policies.GetAsync(runtime.Value.Uid, default) is null)
         {
-            _ = await policies.PutAsync(new ResourceAccessPolicy(
-                new(runtime.Value.Uid, ResourceScopeRef.Instance, runtime.Value.Namespace,
-                    RuntimeProfileResourceKinds.RuntimeProfile, runtime.Value.Generation),
-                [new(workspaceScope, [ResourceAccessAction.Use])]), null, default);
+            using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
+                _ = await policies.PutAsync(new ResourceAccessPolicy(
+                    new(runtime.Value.Uid, ResourceScopeRef.Instance, runtime.Value.Namespace,
+                        RuntimeProfileResourceKinds.RuntimeProfile, runtime.Value.Generation),
+                    [new(workspaceScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
         }
         var storedAgent = await agents.PutAgentAsync(agent, null, true, default);
         var revision = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default,
@@ -533,8 +570,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.RuntimeProfilePin?.ScopeRef);
         Assert.AreEqual("maf-builtin", revision.Value.Definition.RuntimeProfilePin?.Name);
 
-        _ = await profiles.PutAsync(profile.Value.Namespace, profile.Value.Name, tenantScope,
-            profile.Value.Definition with { Description = "Generation two" }, profile.ETag, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
+            _ = await profiles.PutAsync(profile.Value.Namespace, profile.Value.Name, tenantScope,
+                profile.Value.Definition with { Description = "Generation two" }, profile.ETag, default);
         var staleAgent = agent with
         {
             Metadata = new ResourceMetadata { Name = "stale-model-agent" }
@@ -548,100 +586,128 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         var context = await GetBootstrapContextAsync(factory);
-        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var requestScopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         var store = factory.Services.GetRequiredService<IResourceStore>();
         var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var runtimeAgents = factory.Services.GetRequiredService<IRuntimeAgentResolver>();
         using var client = factory.CreateClient();
+        using (var identityResponse = await client.GetAsync("/api/identity/context"))
+            Assert.AreEqual(HttpStatusCode.OK, identityResponse.StatusCode,
+                await identityResponse.Content.ReadAsStringAsync());
         var tenantScope = ResourceScopeRef.Tenant(context.TenantId);
         var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
         var scopes = new[] { ResourceScopeRef.Instance, tenantScope, workspaceScope };
-        var profile = await store.GetExactAsync<ModelProfileResource>(ScopedResourceAddress.Create(
-            ResourceScopeRef.Instance, ResourceNamespace.Default, ModelResourceKinds.ModelProfile,
-            "reasoning-default"), default);
-        var runtime = await store.GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(
-            ResourceScopeRef.Instance, ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile,
-            "maf-builtin"), default);
-        Assert.IsNotNull(profile);
-        Assert.IsNotNull(runtime);
-        await GrantDescendantsAsync(profile.Value);
-        await GrantDescendantsAsync(runtime.Value);
+        using (requestScopes.PushInstance(context))
+        {
+            var profile = await store.GetExactAsync<ModelProfileResource>(ScopedResourceAddress.Create(
+                ResourceScopeRef.Instance, ResourceNamespace.Default, ModelResourceKinds.ModelProfile,
+                "reasoning-default"), default);
+            var runtime = await store.GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(
+                ResourceScopeRef.Instance, ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile,
+                "maf-builtin"), default);
+            Assert.IsNotNull(profile);
+            Assert.IsNotNull(runtime);
+            await GrantDescendantsAsync(profile.Value);
+            await GrantDescendantsAsync(runtime.Value);
+        }
 
         foreach (var scopeRef in scopes)
         {
-            var stored = await agents.PutAgentAsync(new AgentResource
+            Guid storedUid;
+            using (ExactScope(scopeRef))
             {
-                ApiVersion = ResourceApiVersions.CoreV1,
-                Kind = AgentResourceKinds.Agent,
-                Metadata = new ResourceMetadata { Name = "shared-agent" },
-                ScopeRef = scopeRef,
-                Definition = new AgentProperties
+                var stored = await agents.PutAgentAsync(new AgentResource
                 {
-                    DisplayName = $"Agent at {scopeRef}",
-                    Instructions = "Keep the exact owner graph.",
-                    ModelProfile = new ResourceReference("reasoning-default", ResourceScopeRef.Instance),
-                    RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance)
-                }
-            }, null, true, default);
-            var revision = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default,
-                stored.Value.Name, scopeRef, stored.Value.Generation, default);
-            Assert.AreEqual(scopeRef, stored.Value.ScopeRef);
-            var apiAgent = await client.GetFromJsonAsync<AgentResource>(
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = AgentResourceKinds.Agent,
+                    Metadata = new ResourceMetadata { Name = "shared-agent" },
+                    ScopeRef = scopeRef,
+                    Definition = new AgentProperties
+                    {
+                        DisplayName = $"Agent at {scopeRef}",
+                        Instructions = "Keep the exact owner graph.",
+                        ModelProfile = new ResourceReference("reasoning-default", ResourceScopeRef.Instance),
+                        RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance)
+                    }
+                }, null, true, default);
+                var revision = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default,
+                    stored.Value.Name, scopeRef, stored.Value.Generation, default);
+                Assert.AreEqual(scopeRef, stored.Value.ScopeRef);
+                Assert.AreEqual(scopeRef, revision.Value.ScopeRef);
+                Assert.AreEqual(stored.Value.Uid, revision.Value.AgentUid);
+                Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.ModelProfilePin?.ScopeRef);
+                Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.RuntimeProfilePin?.ScopeRef);
+                var resolved = await runtimeAgents.ResolveAsync(new RuntimeAgentReference(stored.Value.Name,
+                    stored.Value.Generation) { ScopeRef = scopeRef }, default);
+                Assert.AreEqual(stored.Value.Uid, resolved.AgentId);
+                Assert.AreEqual(scopeRef, resolved.AgentScopeRef);
+                Assert.AreEqual(revision.Value.Uid, resolved.RevisionUid);
+                storedUid = stored.Value.Uid;
+            }
+
+            SelectConsoleContext(client, scopeRef);
+            using var response = await client.GetAsync(
                 $"/api/agents/shared-agent?scopeRef={Uri.EscapeDataString(scopeRef.ToString())}");
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode,
+                $"Scope {scopeRef}: {await response.Content.ReadAsStringAsync()}");
+            var apiAgent = await response.Content.ReadFromJsonAsync<AgentResource>();
             Assert.IsNotNull(apiAgent);
-            Assert.AreEqual(stored.Value.Uid, apiAgent.Uid);
+            Assert.AreEqual(storedUid, apiAgent.Uid);
             Assert.AreEqual(scopeRef, apiAgent.ScopeRef);
-            Assert.AreEqual(scopeRef, revision.Value.ScopeRef);
-            Assert.AreEqual(stored.Value.Uid, revision.Value.AgentUid);
-            Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.ModelProfilePin?.ScopeRef);
-            Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.RuntimeProfilePin?.ScopeRef);
-            var resolved = await runtimeAgents.ResolveAsync(new RuntimeAgentReference(stored.Value.Name,
-                stored.Value.Generation) { ScopeRef = scopeRef }, default);
-            Assert.AreEqual(stored.Value.Uid, resolved.AgentId);
-            Assert.AreEqual(scopeRef, resolved.AgentScopeRef);
-            Assert.AreEqual(revision.Value.Uid, resolved.RevisionUid);
         }
 
-        var flowService = factory.Services.GetRequiredService<FlowService>();
-        var flowId = new FlowId("instance-agent-flow");
-        _ = await flowService.CreateExactAsync(ResourceScopeRef.Instance,
-            new CreateFlowCommand(flowId.Value, null, "1.0.0", true,
-                new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "shared-agent",
-                    Namespace: ResourceNamespace.Default, ScopeRef: ResourceScopeRef.Instance))),
-            ResourceNamespace.Default, default);
-        var published = await flowService.PublishVersionExactAsync(ResourceScopeRef.Instance, flowId,
-            "1.0.0", false, default);
-        var target = ((DirectFlowDefinition)published.Value.Definition).Target;
-        var instanceAgent = await agents.GetAgentExactAsync(ResourceScopeRef.Instance,
-            ResourceNamespace.Default, "shared-agent", default);
-        var instanceRevision = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default,
-            "shared-agent", ResourceScopeRef.Instance, 1, default);
-        Assert.AreEqual(ResourceScopeRef.Instance, target.ScopeRef);
-        Assert.AreEqual("1", target.Version);
-        Assert.AreEqual(instanceAgent!.Value.Uid, target.ResourceUid);
-        Assert.AreEqual(instanceRevision.Value.Uid, target.RevisionUid);
-        Assert.AreEqual(instanceRevision.Value.DefinitionHash, target.DefinitionHash);
-        var staleReference = new RuntimeAgentReference("shared-agent", 1)
+        using (requestScopes.PushInstance(context))
         {
-            ScopeRef = ResourceScopeRef.Instance,
-            ResourceUid = Guid.NewGuid(),
-            RevisionUid = instanceRevision.Value.Uid,
-            DefinitionHash = instanceRevision.Value.DefinitionHash
-        };
-        var stale = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(async () =>
-            await runtimeAgents.ResolveAsync(staleReference, default));
-        Assert.AreEqual("agent_reference_stale", stale.Code);
+            var flowService = factory.Services.GetRequiredService<FlowService>();
+            var flowId = new FlowId("instance-agent-flow");
+            _ = await flowService.CreateExactAsync(ResourceScopeRef.Instance,
+                new CreateFlowCommand(flowId.Value, null, "1.0.0", true,
+                    new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "shared-agent",
+                        Namespace: ResourceNamespace.Default, ScopeRef: ResourceScopeRef.Instance))),
+                ResourceNamespace.Default, default);
+            var published = await flowService.PublishVersionExactAsync(ResourceScopeRef.Instance, flowId,
+                "1.0.0", false, default);
+            var target = ((DirectFlowDefinition)published.Value.Definition).Target;
+            var instanceAgent = await agents.GetAgentExactAsync(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "shared-agent", default);
+            var instanceRevision = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default,
+                "shared-agent", ResourceScopeRef.Instance, 1, default);
+            Assert.AreEqual(ResourceScopeRef.Instance, target.ScopeRef);
+            Assert.AreEqual("1", target.Version);
+            Assert.AreEqual(instanceAgent!.Value.Uid, target.ResourceUid);
+            Assert.AreEqual(instanceRevision.Value.Uid, target.RevisionUid);
+            Assert.AreEqual(instanceRevision.Value.DefinitionHash, target.DefinitionHash);
+            var staleReference = new RuntimeAgentReference("shared-agent", 1)
+            {
+                ScopeRef = ResourceScopeRef.Instance,
+                ResourceUid = Guid.NewGuid(),
+                RevisionUid = instanceRevision.Value.Uid,
+                DefinitionHash = instanceRevision.Value.DefinitionHash
+            };
+            var stale = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(async () =>
+                await runtimeAgents.ResolveAsync(staleReference, default));
+            Assert.AreEqual("agent_reference_stale", stale.Code);
+        }
 
         async Task GrantDescendantsAsync(Resource resource)
         {
             var current = await policies.GetAsync(resource.Uid, default);
             var grants = (current?.Policy.Grants ?? [])
                 .Where(value => value.TargetScopeRef != tenantScope)
-                .Append(new ResourceAccessGrant(tenantScope, [ResourceAccessAction.Use], IncludeDescendants: true))
+                .Append(new ResourceAccessGrant(tenantScope,
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true))
                 .ToArray();
             _ = await policies.PutAsync(new ResourceAccessPolicy(new(resource.Uid, ResourceScopeRef.Instance,
                 resource.Namespace, resource.Kind, resource.Generation), grants), current?.ETag, default);
         }
+
+        IDisposable ExactScope(ResourceScopeRef scopeRef) => scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => requestScopes.PushInstance(context),
+            ResourceScopeKind.Tenant => requestScopes.PushTenantAdministration(context),
+            ResourceScopeKind.Workspace => requestScopes.Push(context),
+            _ => throw new ArgumentOutOfRangeException(nameof(scopeRef))
+        };
     }
 }

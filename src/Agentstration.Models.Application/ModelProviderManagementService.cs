@@ -21,6 +21,8 @@ public sealed class ModelProviderManagementService(
     IEnumerable<IExtensionInspector> inspectors,
     IParameterResolver parameters,
     ISecretAccessAuthorizer secrets,
+    ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider) : IModelProviderConfigurationStore
 {
     public static string ModelProviderId(string name) => name;
@@ -386,12 +388,18 @@ public sealed class ModelProviderManagementService(
     private async Task<ModelProviderConfiguration> ToConfigurationAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         var extensionAddress = resource.Definition.Extension.Resolve(resource.Namespace, ExtensionKinds.ExtensionRegistration);
+        var providerScopeRef = resource.ScopeRef
+            ?? throw new ModelProviderConfigurationException("The model provider has no ownership scope.");
+        using var exactScope = providerScopeRef == ResourceScopeRef.Instance
+            && requestContext.AccessMode is not (ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance)
+                ? requestScopes.PushInstance(requestContext.Current)
+                : null;
         var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
-            resource.Definition.Extension,
-            resource.Namespace,
-            ExtensionKinds.ExtensionRegistration,
-            resource.ScopeRef ?? throw new ModelProviderConfigurationException("The model provider has no ownership scope."),
-            cancellationToken)
+                resource.Definition.Extension,
+                resource.Namespace,
+                ExtensionKinds.ExtensionRegistration,
+                providerScopeRef,
+                cancellationToken)
             ?? throw new ModelProviderConfigurationException($"Extension registration '{extensionAddress}' was not found.");
         return new()
         {

@@ -22,4 +22,18 @@
   <data name="Nav.DataSourceProfiles" xml:space="preserve"><value>Profils de source de données</value></data>
   <data name="Nav.Schemas" xml:space="preserve"><value>Schémas</value></data>
   <data name="Command.CreateSchema" xml:space="preserve"><value>Créer un schéma</value></data>
+  <data name="CurrentContext" xml:space="preserve"><value>Contexte Console actuel</value></data>
+  <data name="ChangeContext" xml:space="preserve"><value>Changer de contexte Console</value></data>
+  <data name="ChooseContext" xml:space="preserve"><value>Choisir un contexte</value></data>
+  <data name="CloseContextSelector" xml:space="preserve"><value>Fermer le sélecteur de contexte</value></data>
+  <data name="SearchContexts" xml:space="preserve"><value>Rechercher une Instance, un Tenant ou un Workspace…</value></data>
+  <data name="NoContextMatch" xml:space="preserve"><value>Aucun contexte accessible ne correspond à cette recherche.</value></data>
+  <data name="ContextKind.Instance" xml:space="preserve"><value>Instance</value></data>
+  <data name="ContextKind.Tenant" xml:space="preserve"><value>Tenant</value></data>
+  <data name="ContextKind.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="InstanceAdministration" xml:space="preserve"><value>Administration de l’Instance</value></data>
+  <data name="GlobalAdministration" xml:space="preserve"><value>Administration globale</value></data>
+  <data name="TenantAdministration" xml:space="preserve"><value>Administration du Tenant</value></data>
+  <data name="ConfirmContextChange" xml:space="preserve"><value>Des modifications ne sont pas enregistrées. Les abandonner et changer de contexte ?</value></data>
+  <data name="ContextChangeFailed" xml:space="preserve"><value>Échec du changement de contexte</value></data>
 </root>

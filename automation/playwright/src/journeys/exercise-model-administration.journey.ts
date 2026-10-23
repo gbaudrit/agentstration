@@ -12,6 +12,7 @@ export type ExerciseModelAdministrationInput = ModelAdministrationDefinition & {
 export const exerciseModelAdministration: Journey<ExerciseModelAdministrationInput> = async (context, input) => {
   validate(input);
   await prepareConsoleJourney(context, input);
+  await context.pages.organizationWorkspaces.selectInstance();
   const administration = context.pages.modelAdministration;
 
   const provider = await administration.createProvider(context.consoleUrl, input);

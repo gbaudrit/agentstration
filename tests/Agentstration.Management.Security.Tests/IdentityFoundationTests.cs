@@ -355,6 +355,61 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public async Task ConsoleContextSelectionPersistsExactAuthorizedHierarchyAndRejectsUnknownTenant()
+    {
+        await using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
+            });
+        using var client = factory.CreateClient();
+        var initial = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.IsNotNull(initial);
+        var instance = initial.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Instance);
+        var tenant = initial.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Tenant);
+        Assert.IsTrue(initial.AvailableContexts.Any(value => value.Kind == IdentityConsoleContextKind.Workspace));
+
+        var selectedInstance = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(instance.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.OK, selectedInstance.StatusCode);
+        Assert.IsTrue(selectedInstance.Headers.GetValues("Set-Cookie")
+            .All(value => value.Contains("path=/", StringComparison.OrdinalIgnoreCase)));
+        var instanceContext = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.AreEqual(IdentityConsoleContextKind.Instance, instanceContext?.SelectedKind);
+        Assert.AreEqual("/instance", instanceContext?.SelectedScopeRef);
+
+        var selectedTenant = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(tenant.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.OK, selectedTenant.StatusCode);
+        var tenantContext = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.AreEqual(IdentityConsoleContextKind.Tenant, tenantContext?.SelectedKind);
+        Assert.AreEqual(tenant.ScopeRef, tenantContext?.SelectedScopeRef);
+
+        using var delegatedContextRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        delegatedContextRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, instance.ScopeRef);
+        using var delegatedContextResponse = await client.SendAsync(delegatedContextRequest);
+        delegatedContextResponse.EnsureSuccessStatusCode();
+        var delegatedContext = await delegatedContextResponse.Content
+            .ReadFromJsonAsync<IdentityConsoleContextResponse>();
+        Assert.AreEqual(IdentityConsoleContextKind.Instance, delegatedContext?.SelectedKind);
+        Assert.AreEqual(instance.ScopeRef, delegatedContext?.SelectedScopeRef);
+
+        using var requestScopedContext = new HttpRequestMessage(
+            HttpMethod.Get, "/api/identity/administration-capabilities");
+        requestScopedContext.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, instance.ScopeRef);
+        using var requestScopedResponse = await client.SendAsync(requestScopedContext);
+        requestScopedResponse.EnsureSuccessStatusCode();
+        Assert.IsFalse(requestScopedResponse.Headers.TryGetValues("Set-Cookie", out var requestScopedCookies)
+            && requestScopedCookies.Any(value => value.StartsWith(
+                $"{RequestContextMiddleware.ConsoleContextCookie}=", StringComparison.OrdinalIgnoreCase)));
+
+        var denied = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(ResourceScopeRef.Tenant(Guid.NewGuid()).Value));
+        Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+    }
+
+    [TestMethod]
     public async Task ExternalIdentityUsesIssuerAndSubjectAndIgnoresEmailChanges()
     {
         await using var fixture = await IdentityFixture.CreateAsync();

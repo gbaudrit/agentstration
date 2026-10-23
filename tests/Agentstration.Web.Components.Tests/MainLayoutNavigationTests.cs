@@ -123,6 +123,31 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/agent-instances']").Count);
     }
 
+    [TestMethod]
+    public void ContextSelectorPresentsOneSearchableInstanceTenantWorkspaceHierarchy()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(AllNavigationPermissions);
+        var rendered = RenderLayout(context);
+
+        rendered.Find("[data-testid='context-selector-trigger']").Click();
+
+        Assert.AreEqual(1, rendered.FindAll("[data-testid='context-selector']").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-option-instance").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-option-tenant").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-option-workspace").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-tenant-group").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-tenant-group .context-tenant-workspaces .context-option-workspace").Count);
+        Assert.AreEqual("Workspace", rendered.Find("[data-testid='context-selector-trigger'] .context-kind").TextContent.Trim());
+        Assert.AreEqual("Test organization / Default workspace",
+            rendered.Find("[data-testid='console-breadcrumb'] span").TextContent.Trim());
+
+        rendered.Find("[data-testid='context-selector-search']").Input("Instance");
+        Assert.AreEqual(1, rendered.FindAll(".context-option-instance").Count);
+        Assert.AreEqual(0, rendered.FindAll(".context-option-tenant").Count);
+        Assert.AreEqual(0, rendered.FindAll(".context-option-workspace").Count);
+    }
+
     private static readonly IReadOnlySet<string> AllNavigationPermissions = new HashSet<string>(
         ["resources/read", "resources/delete", "runs/read", "runs/delete"],
         StringComparer.Ordinal);
@@ -170,6 +195,8 @@ public sealed class MainLayoutNavigationTests
             return Task.FromResult(new ConsoleContextSnapshot(
                 Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 "Test User",
+                $"/workspaces/{workspaceId:D}",
+                ConsoleContextKind.Workspace,
                 tenantId,
                 "test",
                 "Test organization",
@@ -177,7 +204,12 @@ public sealed class MainLayoutNavigationTests
                 "default",
                 "Default workspace",
                 permissions,
-                [new(workspaceId, tenantId, "test", "Test organization", "default", "Default workspace")]));
+                [new(workspaceId, tenantId, "test", "Test organization", "default", "Default workspace")],
+                [
+                    new("/instance", ConsoleContextKind.Instance, null, null, null, null, null, "Instance"),
+                    new($"/tenants/{tenantId:D}", ConsoleContextKind.Tenant, tenantId, "test", "Test organization", null, null, "Test organization"),
+                    new($"/workspaces/{workspaceId:D}", ConsoleContextKind.Workspace, tenantId, "test", "Test organization", workspaceId, "default", "Default workspace")
+                ]));
         }
     }
 

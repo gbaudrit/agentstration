@@ -8,6 +8,7 @@ public interface IIdentityAdministrationApiClient
 {
     Task<IdentityConsoleContextResponse> GetContextAsync(CancellationToken cancellationToken);
     Task SelectWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken);
+    Task SelectConsoleContextAsync(string scopeRef, CancellationToken cancellationToken);
     Task<OrganizationAdministrationResponse> GetOrganizationAsync(CancellationToken cancellationToken);
     Task<Workspace> CreateWorkspaceAsync(string name, string displayName, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkspaceMemberResponse>> GetWorkspaceMembersAsync(Guid workspaceId, CancellationToken cancellationToken);
@@ -35,6 +36,15 @@ public sealed class IdentityAdministrationApiClient(HttpClient httpClient) : IId
         using var response = await httpClient.PostAsJsonAsync(
             "api/identity/context/workspace",
             new SelectWorkspaceRequest(workspaceId),
+            cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task SelectConsoleContextAsync(string scopeRef, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/identity/context/selection",
+            new SelectConsoleContextRequest(scopeRef),
             cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }

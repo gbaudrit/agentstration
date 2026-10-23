@@ -209,6 +209,42 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task RuntimeClientListsRunsAndAgentInstancesInTheExplicitExecutionScope()
+    {
+        var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var requested = new List<string>();
+        var contexts = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested.Add(request.RequestUri!.PathAndQuery);
+            contexts.Add(request.Headers.GetValues("X-Agentstration-Context").Single());
+            object payload = request.RequestUri.AbsolutePath switch
+            {
+                "/api/runtime/runs" => new RuntimeRunPageResponse([]),
+                _ => Array.Empty<AgentInstanceResponse>()
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new RuntimeApiClient(httpClient);
+        var scope = ResourceScopeRef.Workspace(workspaceId);
+
+        _ = await client.GetRunsAsync(null, scope, default);
+        _ = await client.GetAgentInstancesAsync(scope, default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            $"/api/runtime/runs?scopeRef=%2Fworkspaces%2F{workspaceId:D}",
+            $"/api/runtime/agent-instances?scopeRef=%2Fworkspaces%2F{workspaceId:D}"
+        }, requested);
+        CollectionAssert.AreEqual(new[]
+        {
+            $"/workspaces/{workspaceId:D}",
+            $"/workspaces/{workspaceId:D}"
+        }, contexts);
+    }
+
+    [TestMethod]
     public void AgentRunnerRestoresToolCallsFromTheDurableRunProjection()
     {
         var persistedToolCall = new RuntimeToolCall

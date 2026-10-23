@@ -1302,7 +1302,7 @@ public sealed class SourceTests
                     Source = ExtensionRegistrationSource.Configuration
                 }
             }, default);
-            await factory.Services.GetRequiredService<SourceProviderManagementService>().CreateAsync(new SourceProviderResource
+            var provider = await factory.Services.GetRequiredService<SourceProviderManagementService>().CreateAsync(new SourceProviderResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = SourceResourceKinds.SourceProvider,
@@ -1315,6 +1315,13 @@ public sealed class SourceTests
                     ContributionId = "git"
                 }
             }, default);
+            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+                new ResourceAccessPolicy(
+                    new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                        provider.Value.Kind, provider.Value.Generation),
+                    [new(workspaceScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+                null,
+                default);
         }
 
         using var configure = new HttpRequestMessage(

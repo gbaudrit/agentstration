@@ -63,6 +63,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             () => throw new InvalidOperationException("observation failed"));
         await using var factory = DiscoveryFactory(discovery);
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
 
         var before = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>("/api/modelproviders/ollama-local/models");
         Assert.AreEqual(0, before?.Value.Count);
@@ -117,6 +118,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         var discovery = new PerProviderModelDiscovery();
         await using var factory = DiscoveryFactory(discovery);
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/ollama-local");
         var tenant = provider!.ScopeRef!.Value;
 
@@ -172,6 +174,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             ]);
         await using var factory = DiscoveryFactory(discovery);
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         _ = await RefreshAsync(client);
 
         using var providerResponse = await client.GetAsync("/api/modelproviders/ollama-local");
@@ -339,6 +342,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector(requirements));
         }));
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         var targets = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
             $"/api/resource-scopes/targets?kind={ParameterResourceKinds.Parameter}"))!;
         var instance = targets.Single(value => value.Kind == ResourceScopeKind.Instance).ScopeRef;

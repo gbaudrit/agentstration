@@ -14,6 +14,13 @@ interface AgentWire {
   kind: string;
 }
 
+interface ResourceIdentityWire {
+  uid: string;
+  generation?: number;
+  namespace: string;
+  kind: string;
+}
+
 interface RuntimeRunWire {
   id: string;
   executionScopeRef: string;
@@ -275,6 +282,25 @@ export class ExecutionScopesPage {
       agent = await current.json() as AgentWire;
     }
     await this.grantDescendantUse(consoleUrl, agent, tenantScope);
+    const contextHeaders = { 'X-Agentstration-Context': '/instance' };
+    const revisionName = `${agentName}--${agent.generation.toString().padStart(6, '0')}`;
+    let revision = await this.page.request.get(
+      `${consoleUrl}/api/agents/${agentName}/revisions/${revisionName}?scopeRef=${encodeURIComponent('/instance')}`,
+      { headers: contextHeaders },
+    );
+    if (revision.status() === 404) {
+      const prepared = await this.page.request.post(
+        `${consoleUrl}/api/runtime/agents/${agentName}/prepare?generation=${agent.generation}&scopeRef=${encodeURIComponent('/instance')}`,
+        { headers: contextHeaders },
+      );
+      expect(prepared.status(), await prepared.text()).toBe(200);
+      revision = await this.page.request.get(
+        `${consoleUrl}/api/agents/${agentName}/revisions/${revisionName}?scopeRef=${encodeURIComponent('/instance')}`,
+        { headers: contextHeaders },
+      );
+    }
+    expect(revision.status(), await revision.text()).toBe(200);
+    await this.grantDescendantUse(consoleUrl, await revision.json() as AgentWire, tenantScope);
     return agent;
   }
 
@@ -339,9 +365,14 @@ export class ExecutionScopesPage {
   }
 
   private async ensureInstanceFlow(consoleUrl: string, agentUid: string, tenantScope: string): Promise<void> {
-    const current = await this.page.request.get(`${consoleUrl}/api/flows/${flowName}?scopeRef=${encodeURIComponent('/instance')}`);
+    const contextHeaders = { 'X-Agentstration-Context': '/instance' };
+    const current = await this.page.request.get(
+      `${consoleUrl}/api/flows/${flowName}?scopeRef=${encodeURIComponent('/instance')}`,
+      { headers: contextHeaders },
+    );
     if (current.status() === 404) {
       const created = await this.page.request.post(`${consoleUrl}/api/flows`, {
+        headers: contextHeaders,
         data: {
           name: flowName, displayName: 'Hierarchical execution Flow',
           description: 'Deterministic Instance Flow for exact execution-scope browser coverage.',
@@ -355,36 +386,30 @@ export class ExecutionScopesPage {
       expect(created.status(), await created.text()).toBe(201);
       const published = await this.page.request.post(
         `${consoleUrl}/api/flows/${flowName}/versions?scopeRef=${encodeURIComponent('/instance')}`,
-        { data: { version: '1.0.0', activate: true } },
+        { headers: contextHeaders, data: { version: '1.0.0', activate: true } },
       );
       expect(published.status(), await published.text()).toBe(201);
     } else {
       expect(current.status(), await current.text()).toBe(200);
     }
-    await this.open(`${consoleUrl}/flows/${flowName}?scopeRef=${encodeURIComponent('/instance')}`, TestIds.flowObservability.flowDetails);
-    await expect(async () => {
-      await this.page.getByTestId(TestIds.flowObservability.flowAccessTab).click();
-      await expect(this.page.getByTestId(TestIds.resourceAccess.panel)).toBeVisible();
-    }).toPass({ timeout: 30_000 });
-    if (await this.page.locator(`[data-testid="${TestIds.resourceAccess.grant}"][data-scope-ref="${tenantScope}"]`).count() === 0) {
-      await this.page.getByTestId(TestIds.resourceAccess.target).selectOption(tenantScope);
-      await this.page.getByTestId(TestIds.resourceAccess.add).click();
-      await this.page.locator(`[data-testid="${TestIds.resourceAccess.grant}"][data-scope-ref="${tenantScope}"]`).waitFor({ state: 'visible' });
-      await this.page.getByTestId(TestIds.resourceAccess.save).click();
-      await this.page.getByTestId(TestIds.resourceAccess.saved).waitFor({ state: 'visible' });
-    }
+    const flow = await this.resolveExactResourceIdentity(consoleUrl, '/instance', 'Flow', flowName);
+    await this.grantDescendantUse(consoleUrl, flow, tenantScope);
   }
 
-  private async grantDescendantUse(consoleUrl: string, resource: AgentWire, tenantScope: string): Promise<void> {
+  private async grantDescendantUse(consoleUrl: string, resource: ResourceIdentityWire, tenantScope: string): Promise<void> {
     const url = `${consoleUrl}/api/resource-access-policies/${resource.uid}`;
-    const current = await this.page.request.get(url);
+    const contextHeaders = { 'X-Agentstration-Context': '/instance' };
+    const current = await this.page.request.get(url, { headers: contextHeaders });
     const grants = current.status() === 404
       ? []
       : ((await current.json()) as { grants: Array<{ targetScopeRef: string; actions: string[]; includeDescendants: boolean }> }).grants;
     if (grants.some(grant => grant.targetScopeRef === tenantScope
       && grant.includeDescendants && grant.actions.includes('discover') && grant.actions.includes('use'))) return;
     const saved = await this.page.request.put(url, {
-      headers: current.status() === 200 && current.headers()['etag'] ? { 'If-Match': current.headers()['etag']! } : undefined,
+      headers: {
+        ...contextHeaders,
+        ...(current.status() === 200 && current.headers()['etag'] ? { 'If-Match': current.headers()['etag']! } : {}),
+      },
       data: {
         resource: {
           uid: resource.uid, ownerScopeRef: '/instance', namespace: resource.namespace,
@@ -397,6 +422,28 @@ export class ExecutionScopesPage {
       },
     });
     expect(saved.status(), await saved.text()).toBe(200);
+  }
+
+  private async resolveExactResourceIdentity(
+    consoleUrl: string,
+    scopeRef: string,
+    kind: string,
+    name: string,
+  ): Promise<ResourceIdentityWire> {
+    const response = await this.page.request.get(`${consoleUrl}/api/resource-scopes`, {
+      headers: { 'X-Agentstration-Context': scopeRef },
+    });
+    expect(response.status(), await response.text()).toBe(200);
+    const inventory = await response.json() as {
+      scopes: Array<{
+        scopeRef: string;
+        resources: Array<{ uid: string; namespace: string; kind: string; name: string }>;
+      }>;
+    };
+    const resource = inventory.scopes.find(scope => scope.scopeRef === scopeRef)?.resources
+      .find(candidate => candidate.kind === kind && candidate.name === name);
+    expect(resource, `${kind} '${name}' in '${scopeRef}'`).toBeDefined();
+    return resource!;
   }
 
   private runtimeRunRequest(fixture: ExecutionScopeFixture, scopeRef: string): object {
@@ -465,8 +512,8 @@ export class ExecutionScopesPage {
         data: this.runtimeRunRequest(fixture, deniedScope),
       });
       const deniedBody = await denied.text();
-      expect(denied.status(), deniedBody).toBe(400);
-      expect(deniedBody).toContain('agent_not_found');
+      expect(denied.status(), deniedBody).toBe(404);
+      expect(deniedBody).toContain('resource_not_found');
       for (const item of evidence) {
         for (const path of [
           `/api/runtime/runs/${encodeURIComponent(item.runtimeRunId)}`,

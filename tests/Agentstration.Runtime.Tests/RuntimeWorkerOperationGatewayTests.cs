@@ -151,6 +151,10 @@ public sealed class RuntimeWorkerOperationGatewayTests
         public IDisposable PushTenant(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null) =>
             throw new NotSupportedException();
 
+        public IDisposable PushTenantAdministration(RequestContext operationalContext) => throw new NotSupportedException();
+
+        public IDisposable PushInstance(RequestContext operationalContext) => throw new NotSupportedException();
+
         public IDisposable PushSystem() => throw new NotSupportedException();
 
         private sealed class Scope(Action dispose) : IDisposable
