@@ -5,8 +5,8 @@ using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Security.Contracts;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Security.Contracts;
 using Agentstration.Tools;
 
 namespace Agentstration.Agents;
@@ -188,7 +188,8 @@ public sealed class AgentManagementService(
             agent.Value.Namespace,
             cancellationToken);
         var resolved = compiler.Compile(agent.Value with { Definition = contracts.Definition }, spec, toolSetTools, toolSetAssignments)
-            with { SchemaBindings = contracts.Snapshots };
+            with
+        { SchemaBindings = contracts.Snapshots };
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
         var existing = await store.GetAsync<AgentRevision>(new(AgentResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
