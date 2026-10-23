@@ -213,9 +213,11 @@ public sealed partial class ApiClientTests
     {
         var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         var requested = new List<string>();
+        var contexts = new List<string>();
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
             requested.Add(request.RequestUri!.PathAndQuery);
+            contexts.Add(request.Headers.GetValues("X-Agentstration-Context").Single());
             object payload = request.RequestUri.AbsolutePath switch
             {
                 "/api/runtime/runs" => new RuntimeRunPageResponse([]),
@@ -235,6 +237,11 @@ public sealed partial class ApiClientTests
             $"/api/runtime/runs?scopeRef=%2Fworkspaces%2F{workspaceId:D}",
             $"/api/runtime/agent-instances?scopeRef=%2Fworkspaces%2F{workspaceId:D}"
         }, requested);
+        CollectionAssert.AreEqual(new[]
+        {
+            $"/workspaces/{workspaceId:D}",
+            $"/workspaces/{workspaceId:D}"
+        }, contexts);
     }
 
     [TestMethod]
