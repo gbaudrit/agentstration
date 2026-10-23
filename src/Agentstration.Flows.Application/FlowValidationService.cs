@@ -181,6 +181,9 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             case TransformFlowStepDefinition transform:
                 if (transform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)) ValidateExpression(transform.Expression, issues, step.Name, property: "expression");
                 else ValidateJsonExpressions(transform.Mapping, issues, step.Name, "mapping");
+                if (!ValidContractSchema(transform.Schema))
+                    issues.Add(Error("flow_transform_schema_invalid", "The transformed output has an invalid or unsupported schema.", step.Name, property: "schema"));
+                ValidateSchemaContract(transform.Schema, transform.SchemaBinding, "schema", transform.Name, issues);
                 break;
             case FlowCallStepDefinition flowCall:
                 await ValidateFlowCallAsync(flowCall, transitions, context, issues, token);

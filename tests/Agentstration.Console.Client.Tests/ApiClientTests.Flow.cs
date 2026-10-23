@@ -253,7 +253,11 @@ public sealed partial class ApiClientTests
         var now = new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
         var @namespace = new ResourceNamespace("agentstration.who-am-i");
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "who-am-i-host"));
-        var summary = new FlowSummaryResponse("who-am-i-game", "Who Am I?", null, FlowKind.Direct, "0.1.0", true, "0.1.0", now) { Namespace = @namespace };
+        var summary = new FlowSummaryResponse("who-am-i-game", "who-am-i-game", null, FlowKind.Direct, "0.1.0", true, "0.1.0", now)
+        {
+            Namespace = @namespace,
+            DisplayName = "Who Am I?"
+        };
         var flow = new FlowResponse(summary.Id, summary.Name, null, summary.Version, true, summary.ActiveVersion, definition, new Dictionary<string, string>(), now, now) { Namespace = @namespace };
         var version = new FlowVersionResponse(summary.Id, summary.Version, null, definition, new Dictionary<string, string>(), now) { Namespace = @namespace };
         var requests = new List<string>();
@@ -280,6 +284,7 @@ public sealed partial class ApiClientTests
         _ = await client.GetFlowRunsAsync(@namespace, summary.Id, default);
 
         Assert.HasCount(1, listed);
+        Assert.AreEqual("Who Am I?", listed[0].Name);
         Assert.AreEqual(@namespace, listed[0].Namespace);
         Assert.AreEqual("/namespaces/agentstration.who-am-i/flows/who-am-i-game", listed[0].DetailsUrl);
         CollectionAssert.AreEqual(new[]

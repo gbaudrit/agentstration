@@ -29,13 +29,14 @@
   <data name="ShowErrorTransitions"><value>Afficher les chemins d’erreur</value></data><data name="HideErrorTransitions"><value>Masquer les chemins d’erreur</value></data>
   <data name="Inspector"><value>Inspecteur</value></data><data name="SelectStep"><value>Sélectionnez une étape pour la modifier.</value></data>
   <data name="DisplayName"><value>Nom d’affichage</value></data><data name="TechnicalName"><value>Nom technique</value></data><data name="Type"><value>Type</value></data>
-  <data name="StepDetails"><value>Étape</value></data><data name="StepDisplayName"><value>Nom affiché de l’étape</value></data><data name="StepId"><value>ID de l’étape</value></data><data name="OutputOutcome"><value>Résultat de sortie</value></data><data name="OutputOutcome.Success"><value>Succès</value></data><data name="OutputOutcome.Error"><value>Erreur</value></data><data name="OutputMapping"><value>Mapping de sortie</value></data><data name="OutputSchema"><value>Schéma de sortie</value></data><data name="ErrorDetailsExpression"><value>Expression des détails d’erreur</value></data><data name="OutputNameInvalid"><value>Le nom de sortie ne peut contenir que des lettres, des chiffres, '-' et '_'.</value></data><data name="OutputNameDuplicate"><value>Une sortie ou une étape nommée « {0} » existe déjà.</value></data><data name="OutputMappingInvalid"><value>Le mapping de sortie doit être un JSON valide.</value></data><data name="OutputSchemaInvalid"><value>Le schéma de sortie doit être un objet JSON valide.</value></data>
+  <data name="StepDetails"><value>Étape</value></data><data name="StepDisplayName"><value>Nom affiché de l’étape</value></data><data name="StepId"><value>ID de l’étape</value></data><data name="OutputOutcome"><value>Résultat de sortie</value></data><data name="OutputOutcome.Success"><value>Succès</value></data><data name="OutputOutcome.Error"><value>Erreur</value></data><data name="OutputMapping"><value>Mapping de sortie</value></data><data name="ExposedValue"><value>Valeur exposée</value></data><data name="IncomingTransitionOutput"><value>Sortie de la transition entrante</value></data><data name="TechnicalDetail"><value>Détail technique</value></data><data name="OutputMappingHelp"><value>Exposée sans modification comme sortie de ce Flow. Utilisez une étape Transformation pour restructurer la valeur.</value></data><data name="TransformMapping"><value>Mapping de transformation</value></data><data name="TransformMappingInvalid"><value>Le mapping de transformation doit être un JSON valide.</value></data><data name="OutputSchema"><value>Schéma de sortie</value></data><data name="ErrorDetailsExpression"><value>Expression des détails d’erreur</value></data><data name="OutputNameInvalid"><value>Le nom de sortie ne peut contenir que des lettres, des chiffres, '-' et '_'.</value></data><data name="OutputNameDuplicate"><value>Une sortie ou une étape nommée « {0} » existe déjà.</value></data><data name="OutputMappingInvalid"><value>Le mapping de sortie doit être un JSON valide.</value></data><data name="OutputSchemaInvalid"><value>Le schéma de sortie doit être un objet JSON valide.</value></data>
   <data name="CalledResource"><value>Ressource appelée</value></data><data name="CalledAgent"><value>Agent</value></data><data name="AgentId"><value>ID de l’agent</value></data><data name="FlowId"><value>ID du Flow</value></data>
   <data name="ToolId"><value>ID du Tool</value></data><data name="CurrentToolUnavailable"><value>Tool actuel absent de la liste disponible</value></data>
   <data name="SearchTools"><value>Rechercher un Tool</value></data><data name="NoMatchingTools"><value>Aucun Tool correspondant</value></data>
   <data name="Agent"><value>Agent</value></data><data name="RouterOutput"><value>Sortie du routeur</value></data>
   <data name="OpenAgent"><value>Ouvrir l’agent</value></data><data name="OpenAgentInNewTab"><value>Ouvrir l’agent dans un nouvel onglet</value></data>
   <data name="OpenFlow"><value>Ouvrir le Flow</value></data><data name="OpenFlowInNewTab"><value>Ouvrir le Flow dans un nouvel onglet</value></data>
+  <data name="OpenToolInNewTab"><value>Ouvrir le Tool dans un nouvel onglet</value></data>
   <data name="CalledFlow"><value>Flow appelé</value></data><data name="VersionStrategy"><value>Stratégie de version</value></data>
   <data name="VersionStrategy.Active"><value>Version active</value></data><data name="VersionStrategy.Exact"><value>Version exacte</value></data>
   <data name="ExactVersion"><value>Version exacte</value></data><data name="InputMapping"><value>Mappage d’entrée</value></data><data name="PassIncomingTransitionOutput"><value>Transmettre la sortie de la transition entrante</value></data><data name="PassIncomingTransitionOutputHelp"><value>Le Flow enfant reçoit la sortie complète portée par la transition empruntée vers cette étape.</value></data><data name="AvailableOutput"><value>Propriétés de sortie disponibles</value></data>
@@ -65,4 +66,61 @@
   <data name="EdgeDescription"><value>{0} vers {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>déclaré</value></data><data name="EdgeState.Observed"><value>observé</value></data><data name="EdgeState.Failed"><value>erreur observée</value></data><data name="EdgeState.Inactive"><value>non sélectionné</value></data>
   <data name="ExpandTopology"><value>Agrandir</value></data><data name="ReduceTopology"><value>Réduire</value></data><data name="ShowInfo"><value>Infos</value></data><data name="HideInfo"><value>Masquer les infos</value></data>
   <data name="Replay"><value>Revoir</value></data><data name="Replaying"><value>Lecture…</value></data><data name="ReplaySequence"><value>Revoir la séquence d’exécution</value></data><data name="ReplayInProgress"><value>Relecture de la séquence d’exécution en cours</value></data><data name="ReplayElapsedCounter"><value>Temps écoulé de l’exécution originale</value></data>
+  <data name="SchemaContractHelp"><value>Définissez ce contrat localement ou épinglez-le sur une version publiée exacte d’un schéma.</value></data>
+  <data name="SchemaSource"><value>Source du schéma</value></data>
+  <data name="SchemaInline"><value>Intégré</value></data>
+  <data name="SchemaShared"><value>Schéma partagé</value></data>
+  <data name="SharedSchema"><value>Schéma</value></data>
+  <data name="ExactSchemaVersion"><value>Version publiée</value></data>
+  <data name="NoCompatibleSchemas"><value>Aucun JSON Schema publié n’est disponible. Publiez d’abord un schéma compatible ou utilisez un contrat intégré.</value></data>
+  <data name="SchemaReferenceUnavailable"><value>Le schéma référencé {0}/{1}, version {2}, n’est plus disponible.</value></data>
+  <data name="RemoveSchemaContract"><value>Retirer le contrat</value></data>
+  <data name="NoSchemaContractConfigured"><value>Aucun contrat n’est configuré.</value></data>
+  <data name="DefineInlineContract"><value>Définir un contrat intégré</value></data>
+  <data name="UseSharedSchemaContract"><value>Utiliser un schéma partagé</value></data>
+  <data name="InputSchema"><value>Schéma d’entrée</value></data>
+  <data name="ConfigureStep"><value>Configurer l’étape</value></data>
+  <data name="ConfigureStepNamed"><value>Configurer l’étape {0}</value></data>
+  <data name="ConfigureStepTitle"><value>Configurer {0}</value></data>
+  <data name="CloseStepSettings"><value>Fermer la configuration de l’étape</value></data>
+  <data name="Done"><value>Terminé</value></data>
+  <data name="StepSettingsSections"><value>Sections de configuration de l’étape</value></data>
+  <data name="StepSettingsTab.General"><value>Général</value></data>
+  <data name="StepSettingsTab.Configuration"><value>Configuration</value></data>
+  <data name="StepSettingsTab.Input"><value>Entrée</value></data>
+  <data name="StepSettingsTab.Output"><value>Sortie</value></data>
+  <data name="ContractDirection.Input"><value>Entrée</value></data>
+  <data name="ContractDirection.Output"><value>Sortie</value></data>
+  <data name="InputContract"><value>Contrat d’entrée</value></data>
+  <data name="OutputContract"><value>Contrat de sortie</value></data>
+  <data name="ContractSource.Flow"><value>Défini par le Flow</value></data>
+  <data name="ContractSource.Step"><value>Défini par cette étape</value></data>
+  <data name="ContractSource.CalledFlow"><value>Fourni par le Flow appelé</value></data>
+  <data name="ContractSource.SameAsInput"><value>Identique au contrat d’entrée</value></data>
+  <data name="CalledFlowSharedInputTitle"><value>Contrat partagé réutilisable</value></data>
+  <data name="CalledFlowSharedInputHelp"><value>Le Flow enfant épingle son entrée sur cette version publiée d’un schéma. Vous pouvez utiliser exactement le même contrat sans le recopier.</value></data>
+  <data name="UseCalledFlowSharedInput"><value>Exploiter le contrat du Flow enfant</value></data>
+  <data name="ParentInputContractAlreadyDefined"><value>Entrée du Flow parent déjà configurée</value></data>
+  <data name="CalledFlowInlineInputTitle"><value>Copie intégrée indépendante</value></data>
+  <data name="CalledFlowInlineInputHelp"><value>Le Flow enfant utilise un contrat d’entrée intégré. Vous pouvez le recopier ici, mais les modifications ultérieures ne seront pas synchronisées. Pour partager un même contrat, rendez-le d’abord partagé manuellement dans le Flow enfant.</value></data>
+  <data name="CopyCalledFlowInlineInput"><value>Recopier le contrat du Flow enfant</value></data>
+  <data name="ConnectionContractTitle"><value>Exploiter le contrat d’entrée du Flow enfant ?</value></data>
+  <data name="ConnectionContractHelp"><value>Le Flow enfant « {0} » expose un contrat d’entrée. Souhaitez-vous l’utiliser pour l’entrée de ce Flow ?</value></data>
+  <data name="ConnectionContractOverwriteWarning"><value>Le contrat d’entrée actuel sera remplacé.</value></data>
+  <data name="ConfigureContractLater"><value>Pas maintenant</value></data>
+  <data name="ContractSource.CalledTool"><value>Fourni par le Tool appelé</value></data>
+  <data name="ContractSource.IncomingTransition"><value>Hérité de la transition entrante</value></data>
+  <data name="ContractSource.LegacyOutput"><value>Déclaré par cette ancienne sortie</value></data>
+  <data name="InheritedContractUnavailable"><value>Aucun contrat non ambigu n’est disponible depuis la transition entrante.</value></data>
+  <data name="NoIncomingTransitionContract"><value>Connectez une transition entrante pour hériter de son contrat de sortie.</value></data>
+  <data name="UpstreamContractUnavailable"><value>L’étape amont « {0} » ne déclare aucun contrat de sortie.</value></data>
+  <data name="NamedOutputContractUnavailable"><value>La sortie nommée « {0} » ne déclare aucun contrat.</value></data>
+  <data name="NoStepConfiguration"><value>Aucune configuration spécifique</value></data>
+  <data name="NoStepConfigurationHelp"><value>Cette étape se configure au travers de ses contrats d’entrée et de sortie.</value></data>
+  <data name="NoInputContract"><value>Aucun contrat d’entrée</value></data>
+  <data name="NoInputContractHelp"><value>Cette étape n’expose actuellement aucun contrat d’entrée configurable.</value></data>
+  <data name="NoOutputContract"><value>Aucun contrat de sortie</value></data>
+  <data name="NoOutputContractHelp"><value>Cette étape n’expose actuellement aucun contrat de sortie configurable.</value></data>
+  <data name="SelectFlowVersionForContract"><value>Sélectionnez une version de Flow disponible pour consulter son contrat.</value></data>
+  <data name="SelectToolForContract"><value>Sélectionnez un Tool disponible pour consulter son contrat.</value></data>
 </root>

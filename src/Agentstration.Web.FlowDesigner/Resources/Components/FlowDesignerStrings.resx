@@ -35,13 +35,14 @@
   <data name="ShowErrorTransitions"><value>Show error paths</value></data><data name="HideErrorTransitions"><value>Hide error paths</value></data>
   <data name="Inspector"><value>Inspector</value></data><data name="SelectStep"><value>Select a step to edit it.</value></data>
   <data name="DisplayName"><value>Display name</value></data><data name="TechnicalName"><value>Technical name</value></data><data name="Type"><value>Type</value></data>
-  <data name="StepDetails"><value>Step</value></data><data name="StepDisplayName"><value>Step display name</value></data><data name="StepId"><value>Step ID</value></data><data name="OutputOutcome"><value>Output outcome</value></data><data name="OutputOutcome.Success"><value>Success</value></data><data name="OutputOutcome.Error"><value>Error</value></data><data name="OutputMapping"><value>Output mapping</value></data><data name="OutputSchema"><value>Output schema</value></data><data name="ErrorDetailsExpression"><value>Error details expression</value></data><data name="OutputNameInvalid"><value>The output name may contain only letters, digits, '-' and '_'.</value></data><data name="OutputNameDuplicate"><value>An output or step named '{0}' already exists.</value></data><data name="OutputMappingInvalid"><value>The output mapping must be valid JSON.</value></data><data name="OutputSchemaInvalid"><value>The output schema must be a valid JSON object.</value></data>
+  <data name="StepDetails"><value>Step</value></data><data name="StepDisplayName"><value>Step display name</value></data><data name="StepId"><value>Step ID</value></data><data name="OutputOutcome"><value>Output outcome</value></data><data name="OutputOutcome.Success"><value>Success</value></data><data name="OutputOutcome.Error"><value>Error</value></data><data name="OutputMapping"><value>Output mapping</value></data><data name="ExposedValue"><value>Exposed value</value></data><data name="IncomingTransitionOutput"><value>Incoming transition output</value></data><data name="TechnicalDetail"><value>Technical detail</value></data><data name="OutputMappingHelp"><value>Exposed unchanged as this Flow output. Use a Transform step to reshape the value.</value></data><data name="TransformMapping"><value>Transformation mapping</value></data><data name="TransformMappingInvalid"><value>The transformation mapping must be valid JSON.</value></data><data name="OutputSchema"><value>Output schema</value></data><data name="ErrorDetailsExpression"><value>Error details expression</value></data><data name="OutputNameInvalid"><value>The output name may contain only letters, digits, '-' and '_'.</value></data><data name="OutputNameDuplicate"><value>An output or step named '{0}' already exists.</value></data><data name="OutputMappingInvalid"><value>The output mapping must be valid JSON.</value></data><data name="OutputSchemaInvalid"><value>The output schema must be a valid JSON object.</value></data>
   <data name="CalledResource"><value>Called resource</value></data><data name="CalledAgent"><value>Agent</value></data><data name="AgentId"><value>Agent ID</value></data><data name="FlowId"><value>Flow ID</value></data>
   <data name="ToolId"><value>Tool ID</value></data><data name="CurrentToolUnavailable"><value>Current Tool is not in the available list</value></data>
   <data name="SearchTools"><value>Search Tools</value></data><data name="NoMatchingTools"><value>No matching Tools</value></data>
   <data name="Agent"><value>Agent</value></data><data name="RouterOutput"><value>Router output</value></data>
   <data name="OpenAgent"><value>Open agent</value></data><data name="OpenAgentInNewTab"><value>Open agent in a new tab</value></data>
   <data name="OpenFlow"><value>Open Flow</value></data><data name="OpenFlowInNewTab"><value>Open Flow in a new tab</value></data>
+  <data name="OpenToolInNewTab"><value>Open Tool in a new tab</value></data>
   <data name="CalledFlow"><value>Called Flow</value></data><data name="VersionStrategy"><value>Version strategy</value></data>
   <data name="VersionStrategy.Active"><value>Active version</value></data><data name="VersionStrategy.Exact"><value>Exact version</value></data>
   <data name="ExactVersion"><value>Exact version</value></data><data name="InputMapping"><value>Input mapping</value></data><data name="PassIncomingTransitionOutput"><value>Pass incoming transition output</value></data><data name="PassIncomingTransitionOutputHelp"><value>The child Flow receives the complete output carried by the transition taken into this step.</value></data><data name="AvailableOutput"><value>Available output properties</value></data>
@@ -71,4 +72,61 @@
   <data name="EdgeDescription"><value>{0} to {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>declared</value></data><data name="EdgeState.Observed"><value>observed</value></data><data name="EdgeState.Failed"><value>observed error</value></data><data name="EdgeState.Inactive"><value>not selected</value></data>
   <data name="ExpandTopology"><value>Expand</value></data><data name="ReduceTopology"><value>Reduce</value></data><data name="ShowInfo"><value>Details</value></data><data name="HideInfo"><value>Hide details</value></data>
   <data name="Replay"><value>Replay</value></data><data name="Replaying"><value>Replaying…</value></data><data name="ReplaySequence"><value>Replay the execution sequence</value></data><data name="ReplayInProgress"><value>Execution sequence replay in progress</value></data><data name="ReplayElapsedCounter"><value>Original execution elapsed time</value></data>
+  <data name="SchemaContractHelp"><value>Author this contract inline or pin it to an exact published Schema version.</value></data>
+  <data name="SchemaSource"><value>Schema source</value></data>
+  <data name="SchemaInline"><value>Inline</value></data>
+  <data name="SchemaShared"><value>Shared Schema</value></data>
+  <data name="SharedSchema"><value>Schema</value></data>
+  <data name="ExactSchemaVersion"><value>Published version</value></data>
+  <data name="NoCompatibleSchemas"><value>No published JSON Schema is available. Publish a compatible Schema first or use an inline contract.</value></data>
+  <data name="SchemaReferenceUnavailable"><value>The referenced Schema {0}/{1} version {2} is no longer available.</value></data>
+  <data name="RemoveSchemaContract"><value>Remove contract</value></data>
+  <data name="NoSchemaContractConfigured"><value>No contract is configured.</value></data>
+  <data name="DefineInlineContract"><value>Define an inline contract</value></data>
+  <data name="UseSharedSchemaContract"><value>Use a shared Schema</value></data>
+  <data name="InputSchema"><value>Input schema</value></data>
+  <data name="ConfigureStep"><value>Configure step</value></data>
+  <data name="ConfigureStepNamed"><value>Configure step {0}</value></data>
+  <data name="ConfigureStepTitle"><value>Configure {0}</value></data>
+  <data name="CloseStepSettings"><value>Close step settings</value></data>
+  <data name="Done"><value>Done</value></data>
+  <data name="StepSettingsSections"><value>Step settings sections</value></data>
+  <data name="StepSettingsTab.General"><value>General</value></data>
+  <data name="StepSettingsTab.Configuration"><value>Configuration</value></data>
+  <data name="StepSettingsTab.Input"><value>Input</value></data>
+  <data name="StepSettingsTab.Output"><value>Output</value></data>
+  <data name="ContractDirection.Input"><value>Input</value></data>
+  <data name="ContractDirection.Output"><value>Output</value></data>
+  <data name="InputContract"><value>Input contract</value></data>
+  <data name="OutputContract"><value>Output contract</value></data>
+  <data name="ContractSource.Flow"><value>Defined by the Flow</value></data>
+  <data name="ContractSource.Step"><value>Defined by this step</value></data>
+  <data name="ContractSource.CalledFlow"><value>Provided by the called Flow</value></data>
+  <data name="ContractSource.SameAsInput"><value>Same as input contract</value></data>
+  <data name="CalledFlowSharedInputTitle"><value>Reusable shared contract</value></data>
+  <data name="CalledFlowSharedInputHelp"><value>The child Flow pins its input to this published Schema version. You can use the exact same contract without copying it.</value></data>
+  <data name="UseCalledFlowSharedInput"><value>Use the child Flow contract</value></data>
+  <data name="ParentInputContractAlreadyDefined"><value>Parent input already configured</value></data>
+  <data name="CalledFlowInlineInputTitle"><value>Independent inline copy</value></data>
+  <data name="CalledFlowInlineInputHelp"><value>The child Flow uses an inline input contract. You can copy it here, but later changes will not be synchronized. To share one contract, make it shared manually in the child Flow first.</value></data>
+  <data name="CopyCalledFlowInlineInput"><value>Copy the child Flow contract</value></data>
+  <data name="ConnectionContractTitle"><value>Use the child Flow input contract?</value></data>
+  <data name="ConnectionContractHelp"><value>The child Flow “{0}” exposes an input contract. Do you want to use it for this Flow input?</value></data>
+  <data name="ConnectionContractOverwriteWarning"><value>The current input contract will be replaced.</value></data>
+  <data name="ConfigureContractLater"><value>Not now</value></data>
+  <data name="ContractSource.CalledTool"><value>Provided by the called Tool</value></data>
+  <data name="ContractSource.IncomingTransition"><value>Inherited from the incoming transition</value></data>
+  <data name="ContractSource.LegacyOutput"><value>Declared by this legacy output</value></data>
+  <data name="InheritedContractUnavailable"><value>No unambiguous contract is available from the incoming transition.</value></data>
+  <data name="NoIncomingTransitionContract"><value>Connect an incoming transition to inherit its output contract.</value></data>
+  <data name="UpstreamContractUnavailable"><value>The upstream step '{0}' does not declare an output contract.</value></data>
+  <data name="NamedOutputContractUnavailable"><value>The named output '{0}' does not declare a contract.</value></data>
+  <data name="NoStepConfiguration"><value>No specific configuration</value></data>
+  <data name="NoStepConfigurationHelp"><value>This step is configured through its input and output contracts.</value></data>
+  <data name="NoInputContract"><value>No input contract</value></data>
+  <data name="NoInputContractHelp"><value>This step does not currently expose a configurable input contract.</value></data>
+  <data name="NoOutputContract"><value>No output contract</value></data>
+  <data name="NoOutputContractHelp"><value>This step does not currently expose a configurable output contract.</value></data>
+  <data name="SelectFlowVersionForContract"><value>Select an available Flow version to inspect its contract.</value></data>
+  <data name="SelectToolForContract"><value>Select an available Tool to inspect its contract.</value></data>
 </root>

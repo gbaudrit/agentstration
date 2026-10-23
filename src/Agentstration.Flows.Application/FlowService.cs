@@ -23,7 +23,8 @@ public sealed class FlowService(
     TimeProvider timeProvider,
     IEnumerable<IFlowDeletionGuard> deletionGuards,
     ISchemaBindingResolver schemaBindingResolver,
-    IEnumerable<IFlowVersionActivationGuard>? activationGuards = null)
+    IEnumerable<IFlowVersionActivationGuard>? activationGuards = null,
+    IFlowResourceReferenceResolver? resourceReferenceResolver = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -96,7 +97,8 @@ public sealed class FlowService(
         {
             var resolved = await new FlowSchemaBindingSnapshotter(schemaBindingResolver)
                 .ResolveAsync(workspaceId, id, graph, cancellationToken);
-            graph = resolved.Graph;
+            graph = await new FlowOutputContractSnapshotter(resourceReferenceResolver)
+                .ResolveAsync(workspaceId, id, resolved.Graph, cancellationToken);
             schemaBindings = resolved.Snapshots;
         }
         var published = new FlowVersion(workspaceId, id, version, stored.Value.Description, stored.Value.Definition, stored.Value.Metadata, timeProvider.GetUtcNow(), graph,

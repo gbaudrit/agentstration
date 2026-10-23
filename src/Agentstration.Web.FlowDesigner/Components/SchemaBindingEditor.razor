@@ -1,0 +1,196 @@
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+<section class="flow-schema-binding" data-testid="@TestId">
+    <div class="flow-schema-binding-heading">
+        <div><strong>@Title</strong><p class="muted">@Localizer["SchemaContractHelp"]</p></div>
+        @if (HasContract)
+        {
+            <div class="flow-schema-heading-actions">
+                <div class="flow-schema-mode" role="group" aria-label="@Localizer["SchemaSource"]">
+                    <button type="button" class="@(mode == BindingMode.Inline ? "active" : null)" disabled="@ReadOnly" @onclick="() => ChangeModeAsync(BindingMode.Inline)">@Localizer["SchemaInline"]</button>
+                    <button type="button" class="@(mode == BindingMode.Shared ? "active" : null)" disabled="@ReadOnly" @onclick="() => ChangeModeAsync(BindingMode.Shared)">@Localizer["SchemaShared"]</button>
+                </div>
+                @if (!ReadOnly)
+                {
+                    <button type="button" class="button-secondary flow-schema-remove" data-testid="@($"{TestId}-remove")" @onclick="ClearAsync">@Localizer["RemoveSchemaContract"]</button>
+                }
+            </div>
+        }
+    </div>
+
+    @if (!HasContract)
+    {
+        <div class="flow-schema-empty" data-testid="@($"{TestId}-empty")">
+            <p>@Localizer["NoSchemaContractConfigured"]</p>
+            @if (!ReadOnly)
+            {
+                <div>
+                    <button type="button" class="button-secondary" data-testid="@($"{TestId}-start-inline")" @onclick="StartInlineAsync">@Localizer["DefineInlineContract"]</button>
+                    <button type="button" class="button-secondary" data-testid="@($"{TestId}-start-shared")" disabled="@(SchemaVersions.Count == 0)" @onclick="StartSharedAsync">@Localizer["UseSharedSchemaContract"]</button>
+                </div>
+            }
+        </div>
+    }
+    else if (mode == BindingMode.Shared)
+    {
+        @if (SchemaVersions.Count == 0)
+        {
+            <p class="form-alert form-alert-warning" role="status">@Localizer["NoCompatibleSchemas"]</p>
+        }
+        else
+        {
+            <div class="flow-schema-reference-fields">
+                <label><span>@Localizer["SharedSchema"]</span>
+                    <select disabled="@ReadOnly" value="@SelectedSchemaKey" @onchange="ChangeSchemaAsync" data-testid="@($"{TestId}-resource")">
+                        @foreach (var schema in Schemas)
+                        {
+                            <option value="@SchemaKey(schema)">@schema.DisplayName (@schema.Namespace.Value/@schema.Name)</option>
+                        }
+                    </select>
+                </label>
+                <label><span>@Localizer["ExactSchemaVersion"]</span>
+                    <select disabled="@ReadOnly" value="@selectedVersion?.Version" @onchange="ChangeVersionAsync" data-testid="@($"{TestId}-version")">
+                        @foreach (var version in VersionsForSelectedSchema)
+                        {
+                            <option value="@version.Version">@version.Version</option>
+                        }
+                    </select>
+                </label>
+            </div>
+            @if (selectedVersion is not null)
+            {
+                <p class="flow-schema-reference-summary"><span>@selectedVersion.Format</span><code>@(selectedVersion.Dialect ?? "—")</code></p>
+                <SchemaDocumentEditor Format="@selectedVersion.Format" Dialect="@selectedVersion.Dialect" Descriptor="JsonSchemaDescriptor"
+                    Value="@selectedVersion.Content" ReadOnly="true" DefinitionValidator="ValidateDefinitionAsync"
+                    InstanceValidator="ValidateInstanceAsync" />
+            }
+            else if (Binding?.Reference is { } missing)
+            {
+                <p class="form-alert form-alert-danger" role="alert">@Localizer["SchemaReferenceUnavailable", missing.Namespace?.Value ?? "default", missing.Name, missing.Version]</p>
+            }
+        }
+    }
+    else
+    {
+        <SchemaDocumentEditor Format="@SchemaFormatIds.JsonSchema" Dialect="@JsonSchemaDialect" Descriptor="JsonSchemaDescriptor"
+            Value="@inlineContent" ValueChanged="ChangeInlineContentAsync" ReadOnly="@ReadOnly"
+            DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
+    }
+</section>
+
+@code {
+    private const string JsonSchemaDialect = "https://json-schema.org/draft/2020-12/schema";
+    private static readonly SchemaFormatDescriptor JsonSchemaDescriptor = new(
+        SchemaFormatIds.JsonSchema, "JSON Schema", new("builtin.json-schema", "1.0.0"),
+        [JsonSchemaDialect], SchemaFormatCapabilities.ValidateDefinition | SchemaFormatCapabilities.ValidateInstance
+            | SchemaFormatCapabilities.VisualAuthoring | SchemaFormatCapabilities.InstancePreview, true);
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string TestId { get; set; } = "schema-binding";
+    [Parameter] public SchemaBinding? Binding { get; set; }
+    [Parameter] public JsonElement? LegacySchema { get; set; }
+    [Parameter] public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; set; } = [];
+    [Parameter] public EventCallback<SchemaBindingEditorValue> ValueChanged { get; set; }
+    [Parameter] public Func<ValidateSchemaDefinitionRequest, Task<SchemaFormatValidationResult>>? DefinitionValidator { get; set; }
+    [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? InstanceValidator { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private BindingMode mode;
+    private JsonElement inlineContent = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } });
+    private FlowDesignerSchemaVersion? selectedVersion;
+    private string stateKey = string.Empty;
+    private IReadOnlyList<FlowDesignerSchemaVersion> Schemas => SchemaVersions
+        .GroupBy(SchemaKey, StringComparer.Ordinal).Select(group => group.First()).ToArray();
+    private IEnumerable<FlowDesignerSchemaVersion> VersionsForSelectedSchema => selectedVersion is null
+        ? []
+        : SchemaVersions.Where(candidate => SchemaKey(candidate) == SchemaKey(selectedVersion));
+    private string SelectedSchemaKey => selectedVersion is null ? string.Empty : SchemaKey(selectedVersion);
+    private bool HasContract => Binding is not null || LegacySchema is not null;
+
+    protected override void OnParametersSet()
+    {
+        var nextKey = $"{Binding?.Inline?.Content.GetRawText()}|{Binding?.Reference?.ScopeRef?.Value}|{Binding?.Reference?.Namespace?.Value}|{Binding?.Reference?.Name}|{Binding?.Reference?.Version}|{LegacySchema?.GetRawText()}";
+        if (nextKey == stateKey) return;
+        stateKey = nextKey;
+        mode = Binding?.Reference is null ? BindingMode.Inline : BindingMode.Shared;
+        inlineContent = Binding?.Inline?.Content.Clone() ?? LegacySchema?.Clone()
+            ?? JsonSerializer.SerializeToElement(new { type = "object", properties = new { } });
+        selectedVersion = Binding?.Reference is { } reference
+            ? SchemaVersions.FirstOrDefault(candidate => Matches(candidate, reference))
+            : SchemaVersions.FirstOrDefault();
+    }
+
+    private async Task ChangeModeAsync(BindingMode value)
+    {
+        if (ReadOnly || mode == value) return;
+        mode = value;
+        if (mode == BindingMode.Inline)
+            await PublishInlineAsync();
+        else
+        {
+            selectedVersion ??= SchemaVersions.FirstOrDefault();
+            await PublishReferenceAsync();
+        }
+    }
+
+    private async Task StartInlineAsync()
+    {
+        if (ReadOnly) return;
+        mode = BindingMode.Inline;
+        await PublishInlineAsync();
+    }
+
+    private async Task StartSharedAsync()
+    {
+        if (ReadOnly || SchemaVersions.Count == 0) return;
+        mode = BindingMode.Shared;
+        selectedVersion ??= SchemaVersions.First();
+        await PublishReferenceAsync();
+    }
+
+    private Task ClearAsync() => ReadOnly
+        ? Task.CompletedTask
+        : ValueChanged.InvokeAsync(new SchemaBindingEditorValue(null, null));
+
+    private async Task ChangeSchemaAsync(ChangeEventArgs args)
+    {
+        selectedVersion = SchemaVersions.FirstOrDefault(candidate => SchemaKey(candidate) == args.Value?.ToString());
+        await PublishReferenceAsync();
+    }
+
+    private async Task ChangeVersionAsync(ChangeEventArgs args)
+    {
+        var version = args.Value?.ToString();
+        selectedVersion = VersionsForSelectedSchema.FirstOrDefault(candidate => candidate.Version == version) ?? selectedVersion;
+        await PublishReferenceAsync();
+    }
+
+    private async Task ChangeInlineContentAsync(JsonElement content)
+    {
+        inlineContent = content.Clone();
+        await PublishInlineAsync();
+    }
+
+    private Task PublishInlineAsync() => ValueChanged.InvokeAsync(new(
+        new SchemaBinding { Inline = new InlineSchemaBinding { Format = SchemaFormatIds.JsonSchema, Dialect = JsonSchemaDialect, Content = inlineContent.Clone() } },
+        inlineContent.Clone()));
+
+    private Task PublishReferenceAsync()
+    {
+        if (selectedVersion is null) return Task.CompletedTask;
+        return ValueChanged.InvokeAsync(new(
+            new SchemaBinding { Reference = new SchemaVersionReference { Name = selectedVersion.Name, Version = selectedVersion.Version, Namespace = selectedVersion.Namespace, ScopeRef = selectedVersion.ScopeRef } },
+            selectedVersion.Content.Clone()));
+    }
+
+    private Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request) =>
+        DefinitionValidator?.Invoke(request) ?? Task.FromResult(SchemaFormatValidationResult.Valid);
+    private Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request) =>
+        InstanceValidator?.Invoke(request) ?? Task.FromResult(SchemaFormatValidationResult.Valid);
+    private static bool Matches(FlowDesignerSchemaVersion candidate, SchemaVersionReference reference) =>
+        candidate.Name == reference.Name && candidate.Version == reference.Version
+        && candidate.Namespace == (reference.Namespace ?? ResourceNamespace.Default)
+        && (reference.ScopeRef is null || candidate.ScopeRef == reference.ScopeRef);
+    private static string SchemaKey(FlowDesignerSchemaVersion schema) => $"{schema.ScopeRef.Value}\u001f{schema.Namespace.Value}\u001f{schema.Name}";
+    private enum BindingMode { Inline, Shared }
+}
