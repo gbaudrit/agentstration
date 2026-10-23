@@ -373,6 +373,8 @@ public sealed class IdentityFoundationTests
         var selectedInstance = await client.PostAsJsonAsync("/api/identity/context/selection",
             new SelectConsoleContextRequest(instance.ScopeRef));
         Assert.AreEqual(HttpStatusCode.OK, selectedInstance.StatusCode);
+        Assert.IsTrue(selectedInstance.Headers.GetValues("Set-Cookie")
+            .All(value => value.Contains("path=/", StringComparison.OrdinalIgnoreCase)));
         var instanceContext = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
         Assert.AreEqual(IdentityConsoleContextKind.Instance, instanceContext?.SelectedKind);
         Assert.AreEqual("/instance", instanceContext?.SelectedScopeRef);
@@ -383,6 +385,24 @@ public sealed class IdentityFoundationTests
         var tenantContext = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
         Assert.AreEqual(IdentityConsoleContextKind.Tenant, tenantContext?.SelectedKind);
         Assert.AreEqual(tenant.ScopeRef, tenantContext?.SelectedScopeRef);
+
+        using var delegatedContextRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        delegatedContextRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, instance.ScopeRef);
+        using var delegatedContextResponse = await client.SendAsync(delegatedContextRequest);
+        delegatedContextResponse.EnsureSuccessStatusCode();
+        var delegatedContext = await delegatedContextResponse.Content
+            .ReadFromJsonAsync<IdentityConsoleContextResponse>();
+        Assert.AreEqual(IdentityConsoleContextKind.Instance, delegatedContext?.SelectedKind);
+        Assert.AreEqual(instance.ScopeRef, delegatedContext?.SelectedScopeRef);
+
+        using var requestScopedContext = new HttpRequestMessage(
+            HttpMethod.Get, "/api/identity/administration-capabilities");
+        requestScopedContext.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, instance.ScopeRef);
+        using var requestScopedResponse = await client.SendAsync(requestScopedContext);
+        requestScopedResponse.EnsureSuccessStatusCode();
+        Assert.IsFalse(requestScopedResponse.Headers.TryGetValues("Set-Cookie", out var requestScopedCookies)
+            && requestScopedCookies.Any(value => value.StartsWith(
+                $"{RequestContextMiddleware.ConsoleContextCookie}=", StringComparison.OrdinalIgnoreCase)));
 
         var denied = await client.PostAsJsonAsync("/api/identity/context/selection",
             new SelectConsoleContextRequest(ResourceScopeRef.Tenant(Guid.NewGuid()).Value));

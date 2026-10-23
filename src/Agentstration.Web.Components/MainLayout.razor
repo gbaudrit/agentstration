@@ -86,7 +86,7 @@
                                             @foreach (var group in ContextTenantGroups)
                                             {
                                                 <section class="context-tenant-group" data-tenant-id="@group.Tenant.TenantId">
-                                                    <button type="button" class="context-option context-option-tenant @(group.Tenant.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(group.Tenant)" aria-current="@(group.Tenant.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="context-option-tenant">
+                                                    <button type="button" class="context-option context-option-tenant @(group.Tenant.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(group.Tenant)" aria-current="@(group.Tenant.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-context-tenant-id="@group.Tenant.TenantId" data-context-scope-ref="@group.Tenant.ScopeRef" data-testid="context-option-tenant">
                                                         <span><strong>@group.Tenant.DisplayName</strong><small>@ContextOptionPath(group.Tenant)</small></span><span class="context-kind">@ContextKindLabel(group.Tenant.Kind)</span>
                                                     </button>
                                                     @if (group.Workspaces.Count > 0)
@@ -94,7 +94,7 @@
                                                         <div class="context-tenant-workspaces">
                                                             @foreach (var workspace in group.Workspaces)
                                                             {
-                                                                <button type="button" class="context-option context-option-workspace @(workspace.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(workspace)" aria-current="@(workspace.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="context-option-workspace">
+                                                                <button type="button" class="context-option context-option-workspace @(workspace.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(workspace)" aria-current="@(workspace.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-context-tenant-id="@workspace.TenantId" data-context-workspace-id="@workspace.WorkspaceId" data-context-workspace-name="@workspace.WorkspaceName" data-context-scope-ref="@workspace.ScopeRef" data-testid="context-option-workspace">
                                                                     <span><strong>@workspace.DisplayName</strong><small>@workspace.TenantDisplayName</small></span><span class="context-kind">@ContextKindLabel(workspace.Kind)</span>
                                                                 </button>
                                                             }

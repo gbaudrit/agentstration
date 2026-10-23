@@ -79,7 +79,10 @@ public static class IdentityEndpoints
         CancellationToken cancellationToken)
     {
         ResourceScopeRef? selected = null;
-        if (request.Cookies.TryGetValue(RequestContextMiddleware.ConsoleContextCookie, out var rawScopeRef))
+        var rawScopeRef = request.Headers[RequestContextMiddleware.ConsoleContextHeader].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(rawScopeRef))
+            request.Cookies.TryGetValue(RequestContextMiddleware.ConsoleContextCookie, out rawScopeRef);
+        if (!string.IsNullOrWhiteSpace(rawScopeRef))
         {
             try { selected = ResourceScopeRef.Parse(rawScopeRef); }
             catch (ArgumentException) { }
@@ -306,6 +309,7 @@ public static class IdentityEndpoints
             {
                 HttpOnly = true,
                 IsEssential = true,
+                Path = "/",
                 SameSite = SameSiteMode.Strict,
                 Secure = httpRequest.IsHttps,
                 MaxAge = TimeSpan.FromDays(30)
@@ -337,6 +341,7 @@ public static class IdentityEndpoints
             {
                 HttpOnly = true,
                 IsEssential = true,
+                Path = "/",
                 SameSite = SameSiteMode.Strict,
                 Secure = httpRequest.IsHttps,
                 MaxAge = TimeSpan.FromDays(30)

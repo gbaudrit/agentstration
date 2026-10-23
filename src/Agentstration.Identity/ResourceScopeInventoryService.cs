@@ -15,47 +15,62 @@ public sealed record ResourceScopeInventoryNode(
 public sealed class ResourceScopeInventoryService(
     IdentityExperienceService identityExperience,
     IResourceIdentityCatalog identities,
+    ICurrentRequestContext requestContext,
     IRequestContextScopeFactory scopeFactory)
 {
     public async Task<IReadOnlyList<ResourceScopeInventoryNode>> GetAsync(CancellationToken cancellationToken)
     {
         var contextView = await identityExperience.GetContextAsync(cancellationToken);
         var current = contextView.Context;
-        var result = new List<ResourceScopeInventoryNode>
+        var accessMode = requestContext.AccessMode;
+        var result = new List<ResourceScopeInventoryNode>();
+
+        if (accessMode == ControlPlaneAccessMode.Instance)
         {
-            new(
+            result.Add(new(
                 ResourceScopeRef.Instance,
                 ResourceScopeKind.Instance,
                 string.Empty,
                 null,
-                false,
-                await ListAllAsync(ResourceScopeRef.Instance, cancellationToken))
-        };
+                true,
+                await ListAllAsync(ResourceScopeRef.Instance, cancellationToken)));
+        }
 
         foreach (var tenantGroup in contextView.AvailableWorkspaces
+                     .Where(workspace => accessMode == ControlPlaneAccessMode.Instance
+                         || workspace.TenantId == current.TenantId)
                      .Where(workspace => workspace.Permissions.Contains(AuthorizationPermissions.ResourcesRead, StringComparer.Ordinal))
                      .GroupBy(workspace => new { workspace.TenantId, workspace.TenantDisplayName })
                      .OrderBy(group => group.Key.TenantDisplayName, StringComparer.CurrentCultureIgnoreCase))
         {
             var firstWorkspace = tenantGroup.First();
+            var tenantScopeRef = ResourceScopeRef.Tenant(tenantGroup.Key.TenantId);
+            var includeTenant = accessMode is ControlPlaneAccessMode.Instance
+                or ControlPlaneAccessMode.Tenant
+                or ControlPlaneAccessMode.TenantAdministration;
             var tenantContext = current with
             {
                 TenantId = tenantGroup.Key.TenantId,
                 WorkspaceId = firstWorkspace.Id
             };
-            using (scopeFactory.Push(tenantContext))
+            if (includeTenant)
             {
+                using var tenantTarget = accessMode == ControlPlaneAccessMode.Instance
+                    ? scopeFactory.PushTenant(current.PrincipalId, tenantGroup.Key.TenantId)
+                    : null;
                 result.Add(new(
-                    ResourceScopeRef.Tenant(tenantGroup.Key.TenantId),
+                    tenantScopeRef,
                     ResourceScopeKind.Tenant,
                     tenantGroup.Key.TenantDisplayName,
-                    ResourceScopeRef.Instance,
-                    false,
-                    await ListAllAsync(ResourceScopeRef.Tenant(tenantGroup.Key.TenantId), cancellationToken)));
+                    accessMode == ControlPlaneAccessMode.Instance ? ResourceScopeRef.Instance : null,
+                    accessMode is ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration,
+                    await ListAllAsync(tenantScopeRef, cancellationToken)));
             }
 
             foreach (var workspace in tenantGroup.OrderBy(value => value.DisplayName, StringComparer.CurrentCultureIgnoreCase))
             {
+                if (accessMode == ControlPlaneAccessMode.Workspace && workspace.Id != current.WorkspaceId)
+                    continue;
                 var workspaceContext = current with
                 {
                     TenantId = workspace.TenantId,
@@ -67,8 +82,8 @@ public sealed class ResourceScopeInventoryService(
                         ResourceScopeRef.Workspace(workspace.Id),
                         ResourceScopeKind.Workspace,
                         workspace.DisplayName,
-                        ResourceScopeRef.Tenant(workspace.TenantId),
-                        current.WorkspaceId == workspace.Id,
+                        includeTenant ? ResourceScopeRef.Tenant(workspace.TenantId) : null,
+                        accessMode == ControlPlaneAccessMode.Workspace && current.WorkspaceId == workspace.Id,
                         await ListAllAsync(ResourceScopeRef.Workspace(workspace.Id), cancellationToken)));
                 }
             }

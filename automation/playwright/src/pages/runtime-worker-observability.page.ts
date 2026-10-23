@@ -359,6 +359,7 @@ export class RuntimeWorkerObservabilityPage {
       providerResource = await provider.json() as ScopedResourceWire;
     }
     const policy = await this.page.request.put(`${consoleUrl}/api/resource-access-policies/${providerResource.uid}`, {
+      headers: { 'X-Agentstration-Context': '/instance' },
       data: {
         resource: {
           uid: providerResource.uid,
@@ -412,7 +413,8 @@ export class RuntimeWorkerObservabilityPage {
     targetScopeRef: string,
   ): Promise<void> {
     const policyUrl = `${consoleUrl}/api/resource-access-policies/${resource.uid}`;
-    const current = await this.page.request.get(policyUrl);
+    const contextHeaders = { 'X-Agentstration-Context': ownerScopeRef };
+    const current = await this.page.request.get(policyUrl, { headers: contextHeaders });
     let policy: ResourceAccessPolicyWire;
     let headers: Record<string, string> | undefined;
     if (current.status() === 404) {
@@ -437,7 +439,7 @@ export class RuntimeWorkerObservabilityPage {
     const grants = policy.grants.filter(grant => grant.targetScopeRef !== targetScopeRef);
     grants.push({ targetScopeRef, actions: ['discover', 'use'], includeDescendants: false });
     const saved = await this.page.request.put(policyUrl, {
-      headers,
+      headers: { ...contextHeaders, ...headers },
       data: { ...policy, grants },
     });
     expect(saved.status(), await saved.text()).toBe(200);

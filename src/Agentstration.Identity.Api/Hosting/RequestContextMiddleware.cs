@@ -37,7 +37,8 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
 
             if (httpContext.Request.Path.StartsWithSegments("/api/identity/context")
                 || httpContext.Request.Path.StartsWithSegments("/bff/identity/context")
-                || !TryGetConsoleScope(httpContext.Request, out var rawScopeRef))
+                || !TryGetConsoleScope(httpContext.Request, out var rawScopeRef, out var persistSelection,
+                    out var clearInvalidSelection))
             {
                 await next(httpContext);
                 return;
@@ -59,19 +60,24 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
             }
             catch (Exception exception) when (exception is AuthorizationDeniedException or ArgumentException)
             {
-                httpContext.Response.Cookies.Delete(ConsoleContextCookie);
-                httpContext.Response.Cookies.Delete(WorkspaceCookie);
+                if (clearInvalidSelection)
+                {
+                    httpContext.Response.Cookies.Delete(ConsoleContextCookie);
+                    httpContext.Response.Cookies.Delete(WorkspaceCookie);
+                }
                 await next(httpContext);
                 return;
             }
 
-            if (!string.Equals(httpContext.Request.Cookies[ConsoleContextCookie], scopeRef.Value,
+            if (persistSelection
+                && !string.Equals(httpContext.Request.Cookies[ConsoleContextCookie], scopeRef.Value,
                     StringComparison.Ordinal))
             {
                 var options = new CookieOptions
                 {
                     HttpOnly = true,
                     IsEssential = true,
+                    Path = "/",
                     SameSite = SameSiteMode.Strict,
                     Secure = httpContext.Request.IsHttps,
                     MaxAge = TimeSpan.FromDays(30)
@@ -96,12 +102,28 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
         }
     }
 
-    private static bool TryGetConsoleScope(HttpRequest request, out string scopeRef)
+    private static bool TryGetConsoleScope(
+        HttpRequest request,
+        out string scopeRef,
+        out bool persistSelection,
+        out bool clearInvalidSelection)
     {
         scopeRef = request.Headers[ConsoleContextHeader].FirstOrDefault() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(scopeRef))
-            scopeRef = request.Query["context"].FirstOrDefault() ?? string.Empty;
-        return !string.IsNullOrWhiteSpace(scopeRef)
-            || request.Cookies.TryGetValue(ConsoleContextCookie, out scopeRef!);
+        if (!string.IsNullOrWhiteSpace(scopeRef))
+        {
+            persistSelection = false;
+            clearInvalidSelection = false;
+            return true;
+        }
+        scopeRef = request.Query["context"].FirstOrDefault() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(scopeRef))
+        {
+            persistSelection = true;
+            clearInvalidSelection = true;
+            return true;
+        }
+        persistSelection = false;
+        clearInvalidSelection = true;
+        return request.Cookies.TryGetValue(ConsoleContextCookie, out scopeRef!);
     }
 }

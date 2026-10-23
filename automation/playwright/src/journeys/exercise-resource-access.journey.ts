@@ -24,11 +24,14 @@ export const exerciseResourceAccess: Journey<ExerciseResourceAccessInput> = asyn
   const toolName = input.managedToolName ?? await access.ensureManagedUtilitiesTool(context.consoleUrl);
   const authorizedWorkspaceId = await workspaces.selectByName(input.authorizedWorkspaceName);
   const authorizedScope = `/workspaces/${authorizedWorkspaceId}`;
+  const tenantScope = await workspaces.selectTenantForWorkspaceId(authorizedWorkspaceId);
 
   await secrets.openNewVault(context.consoleUrl);
-  const tenantScope = await secrets.selectScope('tenant');
+  await secrets.selectScope('tenant');
   await secrets.createVault(input.vaultName, input.vaultDisplayName);
+  await secrets.saveChangesIfPresent();
 
+  await workspaces.select(authorizedWorkspaceId);
   await secrets.openNewSecret(context.consoleUrl);
   await assertVaultOffer(secrets, input.vaultName, tenantScope, false, 'authorized Workspace before grant');
   const siblingWorkspaceId = await workspaces.selectByName(input.siblingWorkspaceName);
@@ -37,7 +40,7 @@ export const exerciseResourceAccess: Journey<ExerciseResourceAccessInput> = asyn
   await assertVaultOffer(secrets, input.vaultName, tenantScope, false, 'sibling Workspace');
   await context.checkpoint({ name: Checkpoints.resourceAccess.defaultDenied, page: context.pages.page, target: secrets.secretEditor });
 
-  await workspaces.selectByName(input.authorizedWorkspaceName);
+  await workspaces.selectTenantForWorkspaceId(authorizedWorkspaceId);
   await secrets.openVault(context.consoleUrl, input.vaultName, tenantScope);
   await access.openVaultAccess();
   await access.rejectInjectedTarget('/instance', invalidTargetEnglish);
@@ -45,24 +48,26 @@ export const exerciseResourceAccess: Journey<ExerciseResourceAccessInput> = asyn
   await access.addGrant(authorizedScope);
   await context.checkpoint({ name: Checkpoints.resourceAccess.editableGranted, page: context.pages.page, target: access.grant(authorizedScope) });
 
+  await workspaces.select(authorizedWorkspaceId);
   await secrets.openNewSecret(context.consoleUrl);
   await secrets.createSecret(input.workspaceSecretName, input.workspaceSecretName, input.vaultName, tenantScope);
-  await workspaces.selectByName(input.siblingWorkspaceName);
+  await secrets.saveChangesIfPresent();
+  await workspaces.select(siblingWorkspaceId);
   await secrets.openNewSecret(context.consoleUrl);
   await assertVaultOffer(secrets, input.vaultName, tenantScope, false, 'sibling Workspace after exact grant');
   await context.checkpoint({ name: Checkpoints.resourceAccess.siblingDenied, page: context.pages.page, target: secrets.secretEditor });
 
-  await workspaces.selectByName(input.authorizedWorkspaceName);
+  await workspaces.selectInstance();
   const managedIdentity = await access.openManagedTool(context.consoleUrl, toolName);
   expect(managedIdentity.originVersion).not.toBe('');
   await access.addGrant(authorizedScope);
   await context.checkpoint({ name: Checkpoints.resourceAccess.managedGranted, page: context.pages.page, target: access.grant(authorizedScope) });
 
-  await workspaces.selectByName(input.siblingWorkspaceName);
   expect(siblingScope).not.toBe(authorizedScope);
 
   await context.pages.consoleAdministration.open(context.consoleUrl, '/settings/profile', 'profileSettings');
   await context.pages.consoleAdministration.restoreLanguage(context.consoleUrl, 'fr-FR');
+  await workspaces.selectInstance();
   await access.openManagedTool(context.consoleUrl, toolName);
   await access.rejectInjectedTarget('/instance', invalidTargetFrench);
   await context.pages.consoleAdministration.restoreLanguage(context.consoleUrl, 'en-US');
@@ -72,10 +77,11 @@ export const exerciseResourceAccess: Journey<ExerciseResourceAccessInput> = asyn
   await access.removeGrant(authorizedScope);
   await access.assertIdentity(managedIdentity);
 
-  await workspaces.selectByName(input.authorizedWorkspaceName);
+  await workspaces.selectTenantForWorkspaceId(authorizedWorkspaceId);
   await secrets.openVault(context.consoleUrl, input.vaultName, tenantScope);
   await access.openVaultAccess();
   await access.removeGrant(authorizedScope);
+  await workspaces.select(authorizedWorkspaceId);
   await secrets.openNewSecret(context.consoleUrl);
   await assertVaultOffer(secrets, input.vaultName, tenantScope, false, 'authorized Workspace after revocation');
   await context.checkpoint({ name: Checkpoints.resourceAccess.revoked, page: context.pages.page, target: secrets.secretEditor });

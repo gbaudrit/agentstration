@@ -68,6 +68,7 @@ app.MapPost("/bff/identity/context/selection", async (
     {
         HttpOnly = true,
         IsEssential = true,
+        Path = "/",
         SameSite = SameSiteMode.Strict,
         Secure = httpRequest.IsHttps,
         MaxAge = TimeSpan.FromDays(30)

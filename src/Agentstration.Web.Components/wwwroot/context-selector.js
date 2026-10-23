@@ -26,7 +26,7 @@ export async function selectContext(scopeRef, confirmationMessage) {
         const problem = await response.json().catch(() => null);
         throw new Error(problem?.detail ?? 'The Console context could not be selected.');
     }
-    const url = new URL(window.location.href);
+    const url = new URL('/', window.location.origin);
     url.searchParams.set('context', scopeRef);
     window.location.assign(url.toString());
     return true;

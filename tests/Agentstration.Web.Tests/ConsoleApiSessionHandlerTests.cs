@@ -44,7 +44,11 @@ public sealed class ConsoleApiSessionHandlerTests
         var workspaceId = Guid.NewGuid();
         var terminal = new CaptureHandler();
         using var handler = new ConsoleApiSessionHandler(
-            new HttpContextAccessor { HttpContext = AuthenticatedContext(string.Empty) },
+            new HttpContextAccessor
+            {
+                HttpContext = AuthenticatedContext(
+                    $"{RequestContextMiddleware.WorkspaceCookie}={workspaceId:D}; {RequestContextMiddleware.ConsoleContextCookie}=%2Finstance")
+            },
             new TestRequestContext(workspaceId),
             TrustedOrigin,
             SessionCookie)
@@ -53,7 +57,9 @@ public sealed class ConsoleApiSessionHandlerTests
 
         using var response = await client.GetAsync(new Uri(TrustedOrigin, "/api/identity/context"));
 
-        Assert.IsFalse(terminal.Request!.Headers.Contains(HeaderNames.Cookie));
+        Assert.AreEqual(workspaceId.ToString("D"), Cookie(terminal.Request!, RequestContextMiddleware.WorkspaceCookie));
+        Assert.AreEqual("/instance", Cookie(terminal.Request!, RequestContextMiddleware.ConsoleContextCookie));
+        Assert.AreEqual("/instance", terminal.Request!.Headers.GetValues(RequestContextMiddleware.ConsoleContextHeader).Single());
         Assert.AreEqual(workspaceId.ToString("D"), terminal.Request.Headers.GetValues(PrincipalResolutionMiddleware.WorkspaceHeader).Single());
     }
 

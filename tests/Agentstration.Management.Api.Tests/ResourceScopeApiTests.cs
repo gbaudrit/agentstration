@@ -386,16 +386,16 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             }, tenant.ScopeRef));
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
 
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", tenant.ScopeRef.Value);
         var inventory = await client.GetFromJsonAsync<ResourceScopeInventoryResponse>("/api/resource-scopes");
         Assert.IsNotNull(inventory);
-        var instanceNode = inventory.Scopes.Single(value => value.Kind == ResourceScopeKind.Instance);
         var tenantNode = inventory.Scopes.Single(value => value.ScopeRef == tenant.ScopeRef);
         var workspaceNode = inventory.Scopes.Single(value => value.ScopeRef == workspace.ScopeRef);
-        Assert.IsNull(instanceNode.ParentScopeRef);
-        Assert.AreEqual(instanceNode.ScopeRef, tenantNode.ParentScopeRef);
+        Assert.IsFalse(inventory.Scopes.Any(value => value.Kind == ResourceScopeKind.Instance));
+        Assert.IsNull(tenantNode.ParentScopeRef);
         Assert.AreEqual(tenantNode.ScopeRef, workspaceNode.ParentScopeRef);
-        Assert.IsFalse(tenantNode.IsCurrent);
-        Assert.IsTrue(workspaceNode.IsCurrent);
+        Assert.IsTrue(tenantNode.IsCurrent);
+        Assert.IsFalse(workspaceNode.IsCurrent);
         Assert.IsTrue(tenantNode.Resources.Any(value =>
             value.Kind == SecretResourceKinds.Vault && value.Name == "inventory-vault"));
         Assert.IsFalse(workspaceNode.Resources.Any(value => value.Name == "inventory-vault"));
@@ -422,14 +422,13 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         }
 
         using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         var inventory = await client.GetFromJsonAsync<ResourceScopeInventoryResponse>("/api/resource-scopes");
         var item = inventory!.Scopes.Single(value => value.ScopeRef == ResourceScopeRef.Instance).Resources
             .Single(value => value.Kind == FlowResourceKinds.Flow && value.Name == created.Value.Name);
         Assert.AreEqual(created.Value.Uid, item.Uid);
 
-        var tenant = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
-            $"/api/resource-scopes/targets?kind={FlowResourceKinds.Flow}"))!
-            .Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        var tenant = ResourceScopeRef.Tenant(context.TenantId);
         var identity = new ResourceAccessIdentity(
             created.Value.Uid,
             ResourceScopeRef.Instance,

@@ -18,6 +18,11 @@ export class ResourceAccessPage {
     await this.panel.waitFor({ state: 'visible' });
   }
 
+  public async openSecretAccess(): Promise<void> {
+    await this.page.getByTestId('secret-access-tab').click();
+    await this.panel.waitFor({ state: 'visible' });
+  }
+
   public async ensureManagedUtilitiesTool(consoleUrl: string): Promise<string> {
     let requestId = '';
     let pairingUri = '';
@@ -71,7 +76,10 @@ export class ResourceAccessPage {
 
     const toolName = `${registrationName}.hash.compute`;
     await expect(async () => {
-      const response = await this.page.request.get(`${consoleUrl}/api/tools/${encodeURIComponent(toolName)}?scopeRef=${encodeURIComponent('/instance')}`);
+      const response = await this.page.request.get(
+        `${consoleUrl}/api/tools/${encodeURIComponent(toolName)}?scopeRef=${encodeURIComponent('/instance')}`,
+        { headers: { 'X-Agentstration-Context': '/instance' } },
+      );
       expect(response.status(), await response.text()).toBe(200);
     }).toPass({ timeout: 30_000 });
     return toolName;
