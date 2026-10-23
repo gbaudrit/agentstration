@@ -12,22 +12,18 @@
 .app-shell .context-selector-search > input:hover:not(:disabled):not([readonly]),
 .app-shell .context-selector-search > input:focus-visible { min-width: 0; min-height: 0; height: 100%; flex: 1; padding: 0; border: 0; border-radius: 0; outline: 0; background: transparent; box-shadow: none; color: var(--text); }
 .context-selector-options { display: grid; gap: 3px; margin-top: 10px; max-height: 430px; overflow: auto; }
-.context-option { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 9px; border: 0; border-radius: 7px; background: transparent; color: var(--text); cursor: pointer; text-align: left; }
+.context-option { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 9px; border: 0; border-radius: 7px; background: transparent; color: var(--text); cursor: pointer; text-align: left; }
 .context-option:hover, .context-option:focus-visible { background: var(--surface-2); outline: 0; }
 .context-option.selected { background: var(--primary-soft); }
 .context-option strong, .context-option small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .context-option small { margin-top: 2px; color: var(--muted); font-size: .7rem; }
-.context-option-indent { width: 8px; height: 8px; border: 2px solid var(--border); border-radius: 50%; background: var(--surface); }
 .context-option-root { margin-bottom: 5px; border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border)); background: color-mix(in srgb, var(--primary-soft) 44%, transparent); }
-.context-option-root .context-option-indent { border-color: var(--primary); background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 13%, transparent); }
 .context-tenant-tree { display: grid; gap: 7px; padding-left: 14px; border-left: 1px solid var(--border); }
 .context-tenant-group { position: relative; display: grid; gap: 2px; }
 .context-tenant-group::before { position: absolute; top: 18px; left: -14px; width: 12px; border-top: 1px solid var(--border); content: ""; }
-.context-option-tenant .context-option-indent { border-color: color-mix(in srgb, var(--primary) 58%, var(--border)); }
 .context-tenant-workspaces { position: relative; display: grid; gap: 2px; margin-left: 17px; padding-left: 13px; }
 .context-tenant-workspaces::before { position: absolute; top: 0; bottom: 18px; left: 0; width: 1px; background: var(--border); content: ""; }
 .context-tenant-workspaces .context-option::before { position: absolute; top: 50%; left: -13px; width: 11px; border-top: 1px solid var(--border); content: ""; }
-.context-option-workspace .context-option-indent { width: 6px; height: 6px; border-width: 1px; }
 .context-option-search-result { margin: 0; }
 .context-option-search-result::before { display: none; }
 .context-selector-empty { padding: 18px 10px; margin: 0; color: var(--muted); font-size: .8rem; text-align: center; }
