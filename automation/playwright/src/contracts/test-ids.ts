@@ -300,6 +300,7 @@ export const TestIds = {
     designerValidate: 'flow-designer-validation-run',
     designerPublish: 'flow-designer-publish',
     paletteOutput: 'flow-palette-output',
+    paletteTransform: 'flow-palette-transform',
     selectedTransitionEditor: 'selected-transition-editor',
     transitionFrom: 'transition-from',
     transitionEvent: 'transition-event',
