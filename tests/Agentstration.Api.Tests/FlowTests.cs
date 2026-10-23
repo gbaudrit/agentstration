@@ -44,7 +44,10 @@ public sealed partial class FlowTests
         public FlowService Service => _provider.GetRequiredService<FlowService>();
         public IFlowRepository Repository => _provider.GetRequiredService<IFlowRepository>();
         private FlowFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
-        public static async Task<FlowFixture> CreateAsync(DbCommandInterceptor? commandInterceptor = null, TimeProvider? timeProvider = null)
+        public static async Task<FlowFixture> CreateAsync(
+            DbCommandInterceptor? commandInterceptor = null,
+            TimeProvider? timeProvider = null,
+            IFlowResourceReferenceResolver? resourceReferenceResolver = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -61,6 +64,8 @@ public sealed partial class FlowTests
                 services.AddSingleton<IFlowRepository, SqliteFlowRepository>();
             }
             services.AddSingleton<ISchemaBindingResolver, TestSchemaBindingResolver>();
+            if (resourceReferenceResolver is not null)
+                services.AddSingleton(resourceReferenceResolver);
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);
