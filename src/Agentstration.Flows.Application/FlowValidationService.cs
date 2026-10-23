@@ -341,7 +341,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             issues.Add(Error("tool_input_schema_invalid", "The selected Tool has an invalid or unsupported input schema.", step.Name, property: "tool.inputSchema"));
             return;
         }
-        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping, target.InputSchema, "tool_argument", issues);
+        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping, target.InputSchema, "tool_argument", issues,
+            allowCompleteObjectReference: true);
     }
 
     private async Task ValidateFlowCallAsync(
@@ -458,8 +459,14 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         JsonElement? candidate,
         JsonElement schema,
         string codePrefix,
-        List<FlowValidationIssue> issues)
+        List<FlowValidationIssue> issues,
+        bool allowCompleteObjectReference = false)
     {
+        if (allowCompleteObjectReference
+            && candidate is { ValueKind: JsonValueKind.String } expressionValue
+            && FlowExpressionParser.TryParse(expressionValue.GetString()!, out var expression, out _)
+            && IsCompleteObjectReference(expression.Body))
+            return;
         if (candidate is not { ValueKind: JsonValueKind.Object } mapping)
         {
             issues.Add(Error($"{codePrefix}_object_required", "The selected resource requires an object mapping.", stepName, property: propertyPath));

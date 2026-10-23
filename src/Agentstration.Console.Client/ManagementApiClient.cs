@@ -36,7 +36,9 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
                 Namespace = agent.Namespace,
                 ScopeRef = agent.ScopeRef,
                 ModelProfileNamespace = modelProfile.Namespace,
-                DeploymentId = deployment?.Metadata.Name
+                DeploymentId = deployment?.Metadata.Name,
+                InputSchema = agent.Definition.InputSchema?.Clone(),
+                InputSchemaReference = agent.Definition.InputSchemaBinding?.Reference
             };
         }).ToArray();
     }

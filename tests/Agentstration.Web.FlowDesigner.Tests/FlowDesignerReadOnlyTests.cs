@@ -809,7 +809,8 @@ public sealed class FlowDesignerReadOnlyTests
 
         rendered.Find("[data-testid='step-settings-tab-input']").Click();
         StringAssert.Contains(rendered.Markup, "message");
-        rendered.Find(".flow-mapping-editor input").Change("hello");
+        rendered.Find("[data-testid='tool-pass-transition-output']").Change(false);
+        rendered.Find(".flow-mapping-editor input:not([type='checkbox'])").Change("hello");
         var store = context.Services.GetRequiredService<FlowEditorStore>();
         var toolStep = store.State.Resource!.Definition.Steps.OfType<ToolFlowStepDefinition>().Single();
         Assert.AreEqual("hello", toolStep.ArgumentsMapping?.GetProperty("message").GetString());
@@ -1224,6 +1225,156 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
+    public async Task AgentConnectionCanReplaceTheFlowInputWithItsSharedContract()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { prompt = new { type = "string" } } });
+        var reference = new SchemaVersionReference
+        {
+            Name = "agent-request",
+            Version = "2.1.0",
+            Namespace = new("pack.agents"),
+            ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"))
+        };
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input", Schema = JsonSerializer.SerializeToElement(new { type = "string" }) },
+                new AgentFlowStepDefinition
+                {
+                    Name = "writer",
+                    Agent = new("writer", Namespace: new("pack.agents")),
+                    InputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+                }
+            ],
+            Transitions = []
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            Agents =
+            [
+                new FlowDesignerAgent("writer", "Editorial writer")
+                {
+                    Namespace = new("pack.agents"),
+                    InputSchema = schema,
+                    InputSchemaReference = reference
+                }
+            ]
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.TransitionCreated.InvokeAsync(
+            new FlowTransitionDefinition("input-writer", "input", "completed", "writer")));
+
+        var dialog = rendered.Find("[data-testid='connection-contract-dialog']");
+        StringAssert.Contains(dialog.TextContent, "Use the Agent input contract?");
+        StringAssert.Contains(dialog.TextContent, "Editorial writer");
+        StringAssert.Contains(dialog.TextContent, "The current input contract will be replaced.");
+        StringAssert.Contains(dialog.TextContent, "pack.agents/agent-request · 2.1.0");
+        rendered.Find("[data-testid='connection-contract-apply']").Click();
+
+        var input = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<InputFlowStepDefinition>().Single();
+        Assert.AreEqual(reference, input.SchemaBinding?.Reference);
+        Assert.IsNull(input.Schema);
+    }
+
+    [TestMethod]
+    public async Task ToolConnectionCanDeferAnIndependentInlineContractCopy()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new ToolFlowStepDefinition
+                {
+                    Name = "notify",
+                    Tool = new("notification.send"),
+                    ArgumentsMapping = JsonSerializer.SerializeToElement("${transition.output}")
+                }
+            ],
+            Transitions = []
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.TransitionCreated.InvokeAsync(
+            new FlowTransitionDefinition("input-notify", "input", "completed", "notify")));
+
+        var dialog = rendered.Find("[data-testid='connection-contract-dialog']");
+        StringAssert.Contains(dialog.TextContent, "Use the Tool input contract?");
+        StringAssert.Contains(dialog.TextContent, "Send notification");
+        StringAssert.Contains(dialog.TextContent, "later changes will not be synchronized");
+        rendered.Find("[data-testid='connection-contract-later']").Click();
+
+        Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='connection-contract-dialog']"));
+        var input = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<InputFlowStepDefinition>().Single();
+        Assert.IsNull(input.Schema);
+        Assert.IsNull(input.SchemaBinding);
+    }
+
+    [TestMethod]
+    public async Task AgentConnectionDoesNotPromptWhenItsMappingIsNotAPassthrough()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition
+                {
+                    Name = "writer",
+                    Agent = new("writer"),
+                    InputMapping = JsonSerializer.SerializeToElement(new { prompt = "${transition.output.prompt}" })
+                }
+            ],
+            Transitions = []
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            Agents =
+            [
+                new FlowDesignerAgent("writer", "Writer")
+                {
+                    InputSchema = JsonSerializer.SerializeToElement(new { type = "object" })
+                }
+            ]
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.TransitionCreated.InvokeAsync(
+            new FlowTransitionDefinition("input-writer", "input", "completed", "writer")));
+
+        Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='connection-contract-dialog']"));
+    }
+
+    [TestMethod]
     public async Task OutputInspectorShowsCanonicalMappingAndInheritedSchemaAndEditsErrorDetails()
     {
         using var culture = new CultureScope("en-US");
@@ -1492,6 +1643,27 @@ public sealed class FlowDesignerReadOnlyTests
         public IReadOnlyList<FlowDesignerFlow> Flows { get; init; } = [new("analysis", "News analysis", new("pack.news"), "2.0.0")];
         public IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerFlowVersion>> FlowVersions { get; init; } = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal);
         public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; init; } = [];
+        public IReadOnlyList<FlowDesignerTool> Tools { get; init; } =
+        [
+            new(
+                "notification.send",
+                "Send notification",
+                ResourceNamespace.Default,
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { message = new { type = "string" } } }),
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { deliveryId = new { type = "string" } } }),
+                Enabled: true,
+                Available: true,
+                RequiresApproval: false),
+            new(
+                "warehouse.lookup",
+                "Look up warehouse",
+                new("pack.tools"),
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { requestId = new { type = "string" } } }),
+                null,
+                Enabled: true,
+                Available: true,
+                RequiresApproval: false)
+        ];
 
         public ResourceProviderStub(params string[] publishedVersions) => this.publishedVersions = publishedVersions;
 
@@ -1509,24 +1681,7 @@ public sealed class FlowDesignerReadOnlyTests
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { summary = new { type = "string" } } }),
                 [new("approved", "Approved", FlowOutputOutcome.Success, null), new("rejected", "Rejected", FlowOutputOutcome.Error, null)])]);
         public Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<FlowDesignerTool>>([new(
-                "notification.send",
-                "Send notification",
-                ResourceNamespace.Default,
-                JsonSerializer.SerializeToElement(new { type = "object", properties = new { message = new { type = "string" } } }),
-                JsonSerializer.SerializeToElement(new { type = "object", properties = new { deliveryId = new { type = "string" } } }),
-                Enabled: true,
-                Available: true,
-                RequiresApproval: false),
-                new(
-                    "warehouse.lookup",
-                    "Look up warehouse",
-                    new("pack.tools"),
-                    JsonSerializer.SerializeToElement(new { type = "object", properties = new { requestId = new { type = "string" } } }),
-                    null,
-                    Enabled: true,
-                    Available: true,
-                    RequiresApproval: false)]);
+            Task.FromResult(Tools);
         public Task<IReadOnlyList<FlowDesignerSchemaVersion>> GetSchemaVersionsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(SchemaVersions);
     }

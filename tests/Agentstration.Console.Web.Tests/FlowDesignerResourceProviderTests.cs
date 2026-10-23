@@ -10,7 +10,7 @@ public sealed class FlowDesignerResourceProviderTests
     public async Task AgentListKeepsTechnicalIdSeparateFromDisplayName()
     {
         var client = new MockApiClient(TimeProvider.System);
-        var provider = new FlowDesignerResourceProvider(client, client, null!, null!);
+        var provider = new FlowDesignerResourceProvider(client, client, null!, null!, null!);
 
         var agents = await provider.GetAgentsAsync(CancellationToken.None);
 

@@ -9,6 +9,8 @@ namespace Agentstration.Web.FlowDesigner.Backend;
 public sealed record FlowDesignerAgent(string Name, string DisplayName)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public JsonElement? InputSchema { get; init; }
+    public SchemaVersionReference? InputSchemaReference { get; init; }
 }
 public sealed record FlowDesignerFlow(string Name, string DisplayName, ResourceNamespace Namespace, string? ActiveVersion);
 public sealed record FlowDesignerOutput(string Name, string? DisplayName, FlowOutputOutcome Outcome, JsonElement? Schema);
@@ -24,7 +26,10 @@ public sealed record FlowDesignerTool(
     JsonElement? OutputSchema,
     bool Enabled,
     bool Available,
-    bool RequiresApproval);
+    bool RequiresApproval)
+{
+    public SchemaVersionReference? InputSchemaReference { get; init; }
+}
 public sealed record FlowDesignerSchemaVersion(
     string Name,
     string DisplayName,

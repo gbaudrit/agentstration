@@ -6,12 +6,22 @@ using Agentstration.Web.FlowDesigner.Backend;
 
 namespace Agentstration.Web.Features.Flows.Designer;
 
-public sealed class FlowDesignerResourceProvider(IManagementApiClient client, IFlowApiClient flowClient, IToolsClient toolsClient, ISchemasClient schemasClient) : IFlowDesignerResourceProvider
+public sealed class FlowDesignerResourceProvider(
+    IManagementApiClient client,
+    IFlowApiClient flowClient,
+    IToolsClient toolsClient,
+    IToolDefinitionsClient toolDefinitionsClient,
+    ISchemasClient schemasClient) : IFlowDesignerResourceProvider
 {
     public async Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken)
     {
         var agents = await client.GetAgentsAsync(cancellationToken);
-        return agents.Select(agent => new FlowDesignerAgent(agent.Id, agent.Name) { Namespace = agent.Namespace }).ToArray();
+        return agents.Select(agent => new FlowDesignerAgent(agent.Id, agent.Name)
+        {
+            Namespace = agent.Namespace,
+            InputSchema = agent.InputSchema?.Clone(),
+            InputSchemaReference = agent.InputSchemaReference
+        }).ToArray();
     }
 
     public async Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken)
@@ -42,7 +52,12 @@ public sealed class FlowDesignerResourceProvider(IManagementApiClient client, IF
 
     public async Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken)
     {
-        var tools = await toolsClient.GetToolsAsync(cancellationToken: cancellationToken);
+        var toolsTask = toolsClient.GetToolsAsync(cancellationToken: cancellationToken);
+        var definitionsTask = toolDefinitionsClient.GetAsync(cancellationToken);
+        await Task.WhenAll(toolsTask, definitionsTask);
+        var tools = await toolsTask;
+        var definitions = (await definitionsTask).ToDictionary(
+            definition => (definition.Namespace, definition.Name));
         return tools.Where(tool => tool.Definition.Schema is not null).Select(tool => new FlowDesignerTool(
             tool.Metadata.Name,
             tool.Definition.DisplayName,
@@ -51,7 +66,20 @@ public sealed class FlowDesignerResourceProvider(IManagementApiClient client, IF
             tool.Definition.Schema.Output?.Clone(),
             tool.Definition.Enabled,
             tool.Definition.Discovery?.Available == true,
-            tool.Definition.RequiresApproval)).ToArray();
+            tool.Definition.RequiresApproval)
+        {
+            InputSchemaReference = ToolInputSchemaReference(tool, definitions)
+        }).ToArray();
+    }
+
+    private static SchemaVersionReference? ToolInputSchemaReference(
+        Agentstration.Tools.ToolResource tool,
+        IReadOnlyDictionary<(Agentstration.Resources.ResourceNamespace Namespace, string Name), Agentstration.Tools.ToolDefinitionResource> definitions)
+    {
+        if (tool.Definition.Provider?.Name != Agentstration.Tools.AgentstrationToolProvider.Name
+            || string.IsNullOrWhiteSpace(tool.Definition.ExternalId))
+            return null;
+        return definitions.GetValueOrDefault((tool.Namespace, tool.Definition.ExternalId))?.Definition.InputSchemaBinding?.Reference;
     }
 
     public async Task<IReadOnlyList<FlowDesignerSchemaVersion>> GetSchemaVersionsAsync(CancellationToken cancellationToken)

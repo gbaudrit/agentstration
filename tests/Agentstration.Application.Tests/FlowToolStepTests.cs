@@ -108,6 +108,26 @@ public sealed class FlowToolStepTests
     }
 
     [TestMethod]
+    public async Task ToolStepAcceptsTheCompleteIncomingTransitionOutput()
+    {
+        var schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { message = new { type = "string" } },
+            required = new[] { "message" }
+        });
+        var graph = Graph(JsonSerializer.SerializeToElement("${transition.output}"));
+
+        var result = await new FlowGraphValidator(new ToolResolver(schema)).ValidateAsync(
+            graph,
+            new(true, Workspace, new FlowId("parent")),
+            default);
+
+        Assert.IsFalse(result.Issues.Any(issue => issue.Code.StartsWith("tool_argument_", StringComparison.Ordinal)),
+            string.Join(Environment.NewLine, result.Issues.Select(issue => issue.Message)));
+    }
+
+    [TestMethod]
     public async Task AgentAndToolTransitionsRejectLegacyOutcomeEvents()
     {
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });
