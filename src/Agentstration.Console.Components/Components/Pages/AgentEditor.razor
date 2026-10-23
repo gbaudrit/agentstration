@@ -73,6 +73,7 @@ else
             <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
             <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div>
         </section>
+
     }
     else
     {
@@ -105,6 +106,14 @@ else
                 <label class="form-span-2"><span>@T("RuntimeProfile")</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged" data-testid="agent-runtime-profile">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option> }</select><small>@T("RuntimeProfileHelp")</small></label>
                 <label class="form-span-2"><span>@T("Instructions")</span><InputTextArea @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /><ValidationMessage For="() => model.Instructions" /></label>
             </div>
+        </section>
+
+        <section class="panel form-section" data-testid="agent-contracts-section">
+            <div class="panel-header"><div><p class="eyebrow">@T("Contracts")</p><h2>@T("InvocationContracts")</h2><p>@T("InvocationContractsHelp")</p></div></div>
+            <ReusableSchemaBindingEditor Title="@T("InputContract")" TestId="agent-input-schema"
+                Binding="model.InputSchemaBinding" LegacySchema="model.InputSchema" ValueChanged="UpdateAgentInputSchemaAsync" />
+            <ReusableSchemaBindingEditor Title="@T("OutputContract")" TestId="agent-output-schema"
+                Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
         </section>
 
         @if (!IsNew)
@@ -366,6 +375,26 @@ else
         if (model is not null)
         {
             model.ToolSets = values;
+            isDirty = true;
+        }
+        return Task.CompletedTask;
+    }
+    private Task UpdateAgentInputSchemaAsync(SchemaBindingEditorValue value)
+    {
+        if (model is not null)
+        {
+            model.InputSchemaBinding = value.Binding;
+            model.InputSchema = value.EffectiveContent?.Clone();
+            isDirty = true;
+        }
+        return Task.CompletedTask;
+    }
+    private Task UpdateAgentOutputSchemaAsync(SchemaBindingEditorValue value)
+    {
+        if (model is not null)
+        {
+            model.OutputSchemaBinding = value.Binding;
+            model.OutputSchema = value.EffectiveContent?.Clone();
             isDirty = true;
         }
         return Task.CompletedTask;

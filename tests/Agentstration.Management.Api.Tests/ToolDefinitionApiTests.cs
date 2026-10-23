@@ -8,6 +8,8 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -162,6 +164,54 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.IsNull(await store.GetAsync<ToolDefinitionResource>(new(ToolResourceKinds.ToolDefinition, "notification.send"), default));
         Assert.IsNull(await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("notification.send")), default));
+    }
+
+    [TestMethod]
+    public async Task ToolDefinitionPinsSharedSchemaAndMaterializesItsEffectiveContract()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var contract = await CreatePublishedFlowAsync(factory.Services, requestContext, "shared-contract-flow");
+        var scope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var schemas = factory.Services.GetRequiredService<SchemaManagementService>();
+        await schemas.CreateAsync(new SchemaResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SchemaResourceKinds.Schema,
+            Metadata = new() { Name = "tool-input" },
+            ScopeRef = scope,
+            Definition = new SchemaProperties
+            {
+                DisplayName = "Tool input",
+                Format = SchemaFormatIds.JsonSchema,
+                Dialect = "https://json-schema.org/draft/2020-12/schema",
+                Content = contract.Input.Clone()
+            }
+        }, default);
+        var published = await schemas.PublishAsync(scope, ResourceNamespace.Default, "tool-input", "1.0.0", default);
+        var properties = Properties("Shared contract", "shared-contract-flow", contract.Input, contract.Output) with
+        {
+            InputSchemaBinding = new SchemaBinding
+            {
+                Reference = new()
+                {
+                    Name = "tool-input",
+                    Version = "1.0.0",
+                    ScopeRef = scope
+                }
+            }
+        };
+
+        var stored = await factory.Services.GetRequiredService<ToolDefinitionService>().PutAsync(
+            Resource("shared.contract", scope, properties), null, true, default);
+
+        Assert.AreEqual(published.Value.DefinitionHash, stored.Value.SchemaBindings["$.inputSchema"].DefinitionHash);
+        Assert.AreEqual("1.0.0", stored.Value.SchemaBindings["$.inputSchema"].Source?.Version);
+        var materialized = await factory.Services.GetRequiredService<IResourceStore>().GetAsync<ToolResource>(
+            new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("shared.contract")), default);
+        Assert.IsNotNull(materialized);
+        Assert.IsTrue(ToolDefinitionService.SameSchema(contract.Input, materialized.Value.Definition.Schema?.Input));
     }
 
     private sealed class RecordingToolExecutionPipeline : IToolExecutionPipeline
