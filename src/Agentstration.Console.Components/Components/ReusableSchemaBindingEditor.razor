@@ -1,0 +1,48 @@
+@inject ISchemasClient Schemas
+
+<SchemaBindingEditor Title="@Title" TestId="@TestId" Binding="@Binding" LegacySchema="@LegacySchema"
+    SchemaVersions="versions" ValueChanged="@ValueChanged" ReadOnly="@ReadOnly"
+    HelpText="@HelpText" ShowSourceControls="@ShowSourceControls"
+    DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string TestId { get; set; } = "reusable-schema-binding";
+    [Parameter] public SchemaBinding? Binding { get; set; }
+    [Parameter] public JsonElement? LegacySchema { get; set; }
+    [Parameter] public EventCallback<SchemaBindingEditorValue> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public string? HelpText { get; set; }
+    [Parameter] public bool ShowSourceControls { get; set; } = true;
+
+    private IReadOnlyList<FlowDesignerSchemaVersion> versions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var schemas = await Schemas.GetSchemasAsync();
+        var pending = schemas
+            .Where(schema => schema.ScopeRef is not null)
+            .Select(async schema => (Schema: schema, Versions: await Schemas.GetVersionsAsync(
+                schema.ScopeRef!.Value, schema.Namespace, schema.Name)))
+            .ToArray();
+        await Task.WhenAll(pending);
+        versions = pending.SelectMany(task => task.Result.Versions.Select(version =>
+            new FlowDesignerSchemaVersion(
+                version.SchemaName,
+                task.Result.Schema.Definition.DisplayName,
+                version.SchemaNamespace,
+                version.ScopeRef!.Value,
+                version.Version,
+                version.Format,
+                version.Dialect,
+                version.Content.Clone())))
+            .Where(version => string.Equals(version.Format, SchemaFormatIds.JsonSchema, StringComparison.Ordinal))
+            .ToArray();
+    }
+
+    private Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request) =>
+        Schemas.ValidateDefinitionAsync(request);
+
+    private Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request) =>
+        Schemas.ValidateInstanceAsync(request);
+}

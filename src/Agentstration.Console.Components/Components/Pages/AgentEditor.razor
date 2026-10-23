@@ -33,7 +33,7 @@ else
             <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
             <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button></Actions>
         </ResourceHeader>
-        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
                 <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
@@ -62,7 +62,7 @@ else
 
     @if (IsNew)
     {
-        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
     }
 
     @if (sourceMode)
@@ -73,6 +73,7 @@ else
             <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
             <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div>
         </section>
+
     }
     else
     {
@@ -84,6 +85,23 @@ else
         {
             <AgentToolSetConfiguration Versions="catalogToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
             <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" Categories="catalogCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" />
+        }
+        else if (contractsMode)
+        {
+            <section class="panel form-section" data-testid="agent-contracts-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Contracts")</p><h2>@T("InvocationContracts")</h2><p>@T("InvocationContractsHelp")</p></div></div>
+                <ContractDirectionTabs Label="@T("InvocationContracts")" InputLabel="@T("InputContract")"
+                    OutputLabel="@T("OutputContract")" TestId="agent-contract">
+                    <InputContent>
+                        <ReusableSchemaBindingEditor Title="@T("InputContract")" TestId="agent-input-schema"
+                            Binding="model.InputSchemaBinding" LegacySchema="model.InputSchema" ValueChanged="UpdateAgentInputSchemaAsync" />
+                    </InputContent>
+                    <OutputContent>
+                        <ReusableSchemaBindingEditor Title="@T("OutputContract")" TestId="agent-output-schema"
+                            Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
+                    </OutputContent>
+                </ContractDirectionTabs>
+            </section>
         }
         else
         {
@@ -173,6 +191,7 @@ else
     private bool applyRuntimeOnSubmit = true;
     private bool sourceMode;
     private bool toolsMode;
+    private bool contractsMode;
     private bool interactive;
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
@@ -273,15 +292,16 @@ else
     }
 
     private void MarkDirty(EventArgs _) => isDirty = true;
-    private void ShowDefinition() => (sourceMode, toolsMode) = (false, false);
-    private void ShowTools() => (sourceMode, toolsMode) = (false, true);
+    private void ShowDefinition() => (sourceMode, toolsMode, contractsMode) = (false, false, false);
+    private void ShowContracts() => (sourceMode, toolsMode, contractsMode) = (false, false, true);
+    private void ShowTools() => (sourceMode, toolsMode, contractsMode) = (false, true, false);
     private void ShowSource()
     {
         if (model is null) return;
         rawError = null;
         try { rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest()); }
         catch (Exception exception) { rawError = exception.Message; }
-        (sourceMode, toolsMode) = (true, false);
+        (sourceMode, toolsMode, contractsMode) = (true, false, false);
     }
 
     private bool ApplyRawYaml()
@@ -366,6 +386,26 @@ else
         if (model is not null)
         {
             model.ToolSets = values;
+            isDirty = true;
+        }
+        return Task.CompletedTask;
+    }
+    private Task UpdateAgentInputSchemaAsync(SchemaBindingEditorValue value)
+    {
+        if (model is not null)
+        {
+            model.InputSchemaBinding = value.Binding;
+            model.InputSchema = value.EffectiveContent?.Clone();
+            isDirty = true;
+        }
+        return Task.CompletedTask;
+    }
+    private Task UpdateAgentOutputSchemaAsync(SchemaBindingEditorValue value)
+    {
+        if (model is not null)
+        {
+            model.OutputSchemaBinding = value.Binding;
+            model.OutputSchema = value.EffectiveContent?.Clone();
             isDirty = true;
         }
         return Task.CompletedTask;

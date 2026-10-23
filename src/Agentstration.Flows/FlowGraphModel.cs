@@ -319,6 +319,31 @@ public static class FlowStepDefinitionExtensions
 
 public static class FlowGraphDefinitionExtensions
 {
+    public static JsonElement? ResolveInputSchema(this FlowGraphDefinition definition) =>
+        definition.Steps.OfType<InputFlowStepDefinition>().FirstOrDefault()?.Schema
+        ?? definition.InputSchema;
+
+    public static JsonElement? ResolveSingleSuccessOutputSchema(
+        this FlowGraphDefinition definition,
+        out bool ambiguous)
+    {
+        ambiguous = false;
+        var outputs = definition.GetOutputs()
+            .Where(output => output.Outcome is FlowOutputOutcome.Success)
+            .ToArray();
+        if (outputs.Length == 0) return definition.OutputSchema;
+
+        var distinct = new List<JsonElement?>();
+        foreach (var output in outputs)
+        {
+            if (distinct.Any(existing => SameSchema(existing, output.Schema))) continue;
+            distinct.Add(output.Schema?.Clone());
+        }
+
+        ambiguous = distinct.Count > 1;
+        return distinct.Count == 1 ? distinct[0] : null;
+    }
+
     public static IReadOnlyList<FlowOutputDefinition> GetOutputs(this FlowGraphDefinition definition) =>
         definition.Steps
             .Select(step => step switch
@@ -337,6 +362,12 @@ public static class FlowGraphDefinitionExtensions
             })
             .OfType<FlowOutputDefinition>()
             .ToArray();
+
+    private static bool SameSchema(JsonElement? left, JsonElement? right)
+    {
+        if (left is null) return right is null;
+        return right is not null && JsonElement.DeepEquals(left.Value, right.Value);
+    }
 
     public static JsonElement? ResolveOutputSchema(
         this FlowGraphDefinition definition,
