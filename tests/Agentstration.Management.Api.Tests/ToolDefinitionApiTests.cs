@@ -286,6 +286,79 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
+    public async Task FlowWithDistinctNamedSuccessContractsActivatesWithoutAToolDefinition()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        var workspaceId = new WorkspaceId(requestContext.WorkspaceId);
+        var approved = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { decision = new { type = "string" } },
+            required = new[] { "decision" }
+        });
+        var rejected = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { reason = new { type = "string" } },
+            required = new[] { "reason" }
+        });
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input", DisplayName = "Input" },
+                new ConditionFlowStepDefinition
+                {
+                    Name = "decision",
+                    DisplayName = "Decision",
+                    Left = "${input.approved}",
+                    Operator = "equals",
+                    Right = "true"
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "approved",
+                    DisplayName = "Approved",
+                    Outcome = FlowOutputOutcome.Success,
+                    OutputMapping = JsonSerializer.SerializeToElement("${transition.output}"),
+                    Schema = approved
+                },
+                new OutputFlowStepDefinition
+                {
+                    Name = "rejected",
+                    DisplayName = "Rejected",
+                    Outcome = FlowOutputOutcome.Success,
+                    OutputMapping = JsonSerializer.SerializeToElement("${transition.output}"),
+                    Schema = rejected
+                }
+            ],
+            Transitions =
+            [
+                new("input-decision", "input", "completed", "decision"),
+                new("decision-approved", "decision", "true", "approved"),
+                new("decision-rejected", "decision", "false", "rejected")
+            ]
+        };
+
+        await flows.CreateAsync(workspaceId, new CreateFlowCommand(
+            "named-output-flow",
+            null,
+            "1.0.0",
+            true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            Graph: graph), ResourceNamespace.Default, default);
+
+        var published = await flows.PublishVersionAsync(workspaceId,
+            new FlowId("named-output-flow"), "1.0.0", true, default);
+
+        Assert.AreEqual("1.0.0", published.Value.Version);
+    }
+
+    [TestMethod]
     public async Task EnabledDefinitionIsListedByMcpAndExecutesItsFlowIdempotently()
     {
         await using var factory = Factory();
