@@ -17,7 +17,7 @@ public sealed class ConsoleApiSessionHandlerTests
     public async Task AuthenticatedSessionAndWorkspaceAreForwardedToTrustedApi()
     {
         var workspaceId = Guid.NewGuid();
-        var httpContext = AuthenticatedContext($"{SessionCookie}=chunks-2; {SessionCookie}C1=part-one; {SessionCookie}C2=part-two; unrelated=secret");
+        var httpContext = AuthenticatedContext($"{SessionCookie}=chunks-2; {SessionCookie}C1=part-one; {SessionCookie}C2=part-two; {RequestContextMiddleware.ConsoleContextCookie}=%2Finstance; unrelated=secret");
         var terminal = new CaptureHandler();
         using var handler = new ConsoleApiSessionHandler(
             new HttpContextAccessor { HttpContext = httpContext },
@@ -32,7 +32,9 @@ public sealed class ConsoleApiSessionHandlerTests
         Assert.AreEqual("chunks-2", Cookie(terminal.Request!, SessionCookie));
         Assert.AreEqual("part-one", Cookie(terminal.Request!, $"{SessionCookie}C1"));
         Assert.AreEqual("part-two", Cookie(terminal.Request!, $"{SessionCookie}C2"));
+        Assert.AreEqual("/instance", Cookie(terminal.Request!, RequestContextMiddleware.ConsoleContextCookie));
         Assert.IsNull(Cookie(terminal.Request!, "unrelated"));
+        Assert.AreEqual("/instance", terminal.Request!.Headers.GetValues(RequestContextMiddleware.ConsoleContextHeader).Single());
         Assert.AreEqual(workspaceId.ToString("D"), terminal.Request!.Headers.GetValues(PrincipalResolutionMiddleware.WorkspaceHeader).Single());
     }
 

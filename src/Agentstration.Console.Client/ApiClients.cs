@@ -187,6 +187,8 @@ public interface IFlowApiClient
         @namespace.IsDefault ? GetFlowRunsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? definitionScopeRef, CancellationToken cancellationToken) =>
         GetFlowRunsAsync(@namespace, flowId, cancellationToken);
+    Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? definitionScopeRef, ResourceScopeRef executionScopeRef, CancellationToken cancellationToken) =>
+        GetFlowRunsAsync(@namespace, flowId, definitionScopeRef, cancellationToken);
     Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken);
     Task<FlowRun> GetFlowRunAsync(string runId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetFlowRunAsync(runId, cancellationToken);
     Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken) =>

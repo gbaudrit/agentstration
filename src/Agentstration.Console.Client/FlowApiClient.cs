@@ -129,6 +129,16 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
             .Where(run => definitionScopeRef is null || run.DefinitionScopeRef == definitionScopeRef)
             .ToArray();
 
+    public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(
+        ResourceNamespace @namespace,
+        string flowId,
+        ResourceScopeRef? definitionScopeRef,
+        ResourceScopeRef executionScopeRef,
+        CancellationToken cancellationToken) =>
+        (await GetAllFlowRunPagesAsync($"{FlowPath(@namespace, flowId)}/runs?top=200", executionScopeRef, cancellationToken))
+            .Where(run => definitionScopeRef is null || run.DefinitionScopeRef == definitionScopeRef)
+            .ToArray();
+
     private async Task<IReadOnlyList<FlowRun>> GetAllFlowRunPagesAsync(string initialPath, CancellationToken cancellationToken)
         => await GetAllFlowRunPagesAsync(initialPath, null, cancellationToken);
 

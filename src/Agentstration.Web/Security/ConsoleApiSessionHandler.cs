@@ -29,7 +29,11 @@ public sealed class ConsoleApiSessionHandler(
                 if (incoming.Request.Cookies.TryGetValue(RequestContextMiddleware.WorkspaceCookie, out var workspaceCookie))
                     cookieValues.Add($"{RequestContextMiddleware.WorkspaceCookie}={workspaceCookie}");
                 if (incoming.Request.Cookies.TryGetValue(RequestContextMiddleware.ConsoleContextCookie, out var contextCookie))
+                {
                     cookieValues.Add($"{RequestContextMiddleware.ConsoleContextCookie}={contextCookie}");
+                    if (!request.Headers.Contains(RequestContextMiddleware.ConsoleContextHeader))
+                        request.Headers.TryAddWithoutValidation(RequestContextMiddleware.ConsoleContextHeader, contextCookie);
+                }
                 request.Headers.TryAddWithoutValidation(HeaderNames.Cookie, string.Join("; ", cookieValues));
             }
             if (requestContext.IsInitialized && !request.Headers.Contains(PrincipalResolutionMiddleware.WorkspaceHeader))

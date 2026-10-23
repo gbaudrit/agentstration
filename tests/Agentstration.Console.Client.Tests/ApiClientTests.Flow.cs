@@ -400,6 +400,34 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task FlowClientListsDefinitionRunsUsingTheOperationalWorkspaceContext()
+    {
+        var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        string? requested = null;
+        string? contextHeader = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri!.PathAndQuery;
+            contextHeader = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FlowRunPageResponse([], null))
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new FlowApiClient(httpClient).GetFlowRunsAsync(
+            ResourceNamespace.Default,
+            "instance-flow",
+            ResourceScopeRef.Instance,
+            ResourceScopeRef.Workspace(workspaceId),
+            default);
+
+        Assert.AreEqual("/api/flows/instance-flow/runs?top=200", requested);
+        Assert.AreEqual($"/workspaces/{workspaceId:D}", contextHeader);
+    }
+
+    [TestMethod]
     public async Task FlowClientLoadsEveryCausalityPageWithoutDroppingDescendants()
     {
         var rootRun = CreateFlowRun("root");

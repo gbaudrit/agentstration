@@ -4,6 +4,7 @@
 @implements IDisposable
 @inject IFlowApiClient Client
 @inject NavigationManager Navigation
+@inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings> Localizer
 <PageTitle>@(flow?.Name ?? T("Flow")) · Agentstration</PageTitle>
 <div data-testid="flow-observability-flow-details">
@@ -157,7 +158,10 @@ else
         ResourceScopeRef? requestedScope = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
         flow = await Client.GetFlowAsync(FlowResourceNamespace, FlowId, requestedScope, cancellation.Token);
         versions = await Client.GetFlowVersionsAsync(FlowResourceNamespace, FlowId, flow.ScopeRef, cancellation.Token);
-        runs = await Client.GetFlowRunsAsync(FlowResourceNamespace, FlowId, flow.ScopeRef, cancellation.Token);
+        if (ContextState.Current is null) await ContextState.LoadAsync(cancellation.Token);
+        var executionScope = ResourceScopeRef.Workspace(ContextState.Current?.WorkspaceId
+            ?? throw new InvalidOperationException("The Console context is unavailable."));
+        runs = await Client.GetFlowRunsAsync(FlowResourceNamespace, FlowId, flow.ScopeRef, executionScope, cancellation.Token);
         runVersion = flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";
         if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = "Definition";
         else if (string.Equals(View, "access", StringComparison.OrdinalIgnoreCase)) activeTab = "Access";
