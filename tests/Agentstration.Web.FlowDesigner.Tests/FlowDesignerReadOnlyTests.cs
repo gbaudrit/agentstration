@@ -682,6 +682,60 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
+    public async Task InspectorOmitsTechnicalResourceNameWhenItDuplicatesTheDisplayName()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new FlowCallStepDefinition
+                {
+                    Name = "child",
+                    Flow = new("same-flow", FlowCallVersionStrategy.Exact, "1.0.0")
+                },
+                new AgentFlowStepDefinition
+                {
+                    Name = "agent",
+                    Agent = new("same-agent")
+                }
+            ]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            Agents = [new("same-agent", "same-agent")],
+            Flows = [new("same-flow", "same-flow", ResourceNamespace.Default, "1.0.0")]
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "parent"));
+        var canvas = rendered.FindComponent<FlowCanvas>();
+
+        await rendered.InvokeAsync(() => canvas.Instance.SelectedStepChanged.InvokeAsync("child"));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("same-flow", rendered.Find(".inspector-resource-summary-link strong").TextContent);
+            Assert.IsEmpty(rendered.FindAll(".inspector-step-summary-copy code"));
+        });
+
+        await rendered.InvokeAsync(() => canvas.Instance.SelectedStepChanged.InvokeAsync("agent"));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("same-agent", rendered.Find(".inspector-resource-summary-link strong").TextContent);
+            Assert.IsEmpty(rendered.FindAll(".inspector-step-summary-copy code"));
+        });
+    }
+
+    [TestMethod]
     public async Task SelectingLegacyGenericAgentLabelUsesCurrentResourceName()
     {
         using var culture = new CultureScope("en-US");
@@ -1435,6 +1489,7 @@ public sealed class FlowDesignerReadOnlyTests
     {
         private readonly IReadOnlyList<string> publishedVersions;
         public IReadOnlyList<FlowDesignerAgent> Agents { get; init; } = [];
+        public IReadOnlyList<FlowDesignerFlow> Flows { get; init; } = [new("analysis", "News analysis", new("pack.news"), "2.0.0")];
         public IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerFlowVersion>> FlowVersions { get; init; } = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal);
         public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; init; } = [];
 
@@ -1443,7 +1498,7 @@ public sealed class FlowDesignerReadOnlyTests
         public Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(Agents);
         public Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<FlowDesignerFlow>>([new("analysis", "News analysis", new("pack.news"), "2.0.0")]);
+            Task.FromResult(Flows);
         public Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
             FlowVersions.TryGetValue($"{@namespace.Value}|{name}", out var configured)
                 ? Task.FromResult(configured)
