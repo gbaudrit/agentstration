@@ -135,9 +135,20 @@ else
                     <article class="inspector-step-summary">
                         <span class="inspector-step-summary-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(SelectedStep.Type())" /></span>
                         <span class="inspector-step-summary-copy">
-                            <strong>@(SelectedStep.DisplayName ?? SelectedStep.Name)</strong>
-                            <small>@T($"Step.{SelectedStep.Type()}")</small>
-                            <code>@SelectedStep.Name</code>
+                            @if (SelectedInspectorResource is { } resource)
+                            {
+                                <a class="inspector-resource-summary-link" href="@resource.Url" target="_blank" rel="noopener noreferrer" aria-label="@T(resource.OpenLabelKey)">
+                                    <strong>@resource.DisplayName</strong><UiIcon Name="external-link" />
+                                </a>
+                                <small>@T($"Step.{SelectedStep.Type()}")</small>
+                                <code>@resource.Name</code>
+                            }
+                            else
+                            {
+                                <strong>@(SelectedStep.DisplayName ?? SelectedStep.Name)</strong>
+                                <small>@T($"Step.{SelectedStep.Type()}")</small>
+                                <code>@SelectedStep.Name</code>
+                            }
                         </span>
                     </article>
                     <button type="button" class="button-primary inspector-configure-step" data-testid="configure-selected-step" @onclick="OpenSelectedStepSettings">
@@ -146,8 +157,8 @@ else
                     </button>
                     @if (showStepSettings)
                     {
-                    <div class="step-settings-backdrop" @onclick="CloseStepSettings">
-                        <section class="step-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="step-settings-title" data-testid="step-settings-dialog" @onclick:stopPropagation="true">
+                    <div class="step-settings-backdrop" @onpointerdown="CloseStepSettings">
+                        <section class="step-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="step-settings-title" data-testid="step-settings-dialog" @onpointerdown:stopPropagation="true">
                             <header class="step-settings-header">
                                 <div>
                                     <span class="eyebrow">@T($"Step.{SelectedStep.Type()}")</span>
@@ -770,6 +781,13 @@ else
     private FlowDesignerTool? SelectedTool => SelectedStep is ToolFlowStepDefinition tool
         ? tools.FirstOrDefault(item => ToolKey(item.Namespace, item.Name) == ToolKey(tool.Tool))
         : null;
+    private InspectorResourceSummary? SelectedInspectorResource => SelectedStep switch
+    {
+        AgentFlowStepDefinition when SelectedAgent is { } agent => new(agent.DisplayName, agent.Name, AgentUrl(agent), "OpenAgentInNewTab"),
+        FlowCallStepDefinition when SelectedFlow is { } flow => new(flow.DisplayName, flow.Name, FlowUrl(flow), "OpenFlowInNewTab"),
+        ToolFlowStepDefinition when SelectedTool is { } tool => new(tool.DisplayName, tool.Name, ToolUrl(tool), "OpenToolInNewTab"),
+        _ => null
+    };
     private InputFlowStepDefinition? ParentInputStep => Editor.State.Resource?.Definition.Steps.OfType<InputFlowStepDefinition>().SingleOrDefault();
     private bool ParentInputHasExplicitContract => ParentInputStep is { Schema: not null } or { SchemaBinding: not null }
         || Editor.State.Resource?.Definition is { InputSchema: not null } or { InputSchemaBinding: not null };
@@ -1286,6 +1304,9 @@ else
     private static string FlowUrl(FlowDesignerFlow flow) => flow.Namespace.IsDefault
         ? $"/flows/{Uri.EscapeDataString(flow.Name)}"
         : $"/namespaces/{Uri.EscapeDataString(flow.Namespace.Value)}/flows/{Uri.EscapeDataString(flow.Name)}";
+    private static string ToolUrl(FlowDesignerTool tool) => tool.Namespace.IsDefault
+        ? $"/tools/{Uri.EscapeDataString(tool.Name)}"
+        : $"/tools/{Uri.EscapeDataString(tool.Name)}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}";
     private FlowCallReference DefaultFlowReference()
     {
         var target = flows.FirstOrDefault(item => item.Name != ResourceId || item.Namespace != Namespace);
@@ -1494,6 +1515,7 @@ else
     private const string UnconfiguredAgent = "unconfigured";
     private const string UnconfiguredFlow = "unconfigured";
     private const string UnconfiguredTool = "unconfigured";
+    private sealed record InspectorResourceSummary(string DisplayName, string Name, string Url, string OpenLabelKey);
 
     public async ValueTask DisposeAsync()
     {

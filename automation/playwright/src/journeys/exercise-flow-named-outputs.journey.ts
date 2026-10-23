@@ -22,6 +22,7 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.activePorts, page: context.pages.page, target: designer.designer });
 
   await designer.selectStep('Child review');
+  await designer.expectTextSelectionKeepsStepSettingsOpen();
   await designer.useFlowCallVersion('Exact', '1.0.0');
   await designer.expectNamedPorts('Child review', [
     { event: 'historical-result', outcome: 'success' },

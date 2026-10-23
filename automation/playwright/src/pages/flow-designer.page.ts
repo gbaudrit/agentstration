@@ -176,6 +176,19 @@ export class FlowDesignerPage {
     }).toPass({ timeout: 20_000 });
   }
 
+  public async expectTextSelectionKeepsStepSettingsOpen(): Promise<void> {
+    const dialog = this.page.locator('.step-settings-dialog');
+    const field = this.page.getByTestId(TestIds.flowObservability.stepDisplayName);
+    const dialogBox = await dialog.boundingBox();
+    const fieldBox = await field.boundingBox();
+    if (!dialogBox || !fieldBox) throw new Error('The step settings dialog is not measurable.');
+    await this.page.mouse.move(fieldBox.x + fieldBox.width - 10, fieldBox.y + fieldBox.height / 2);
+    await this.page.mouse.down();
+    await this.page.mouse.move(dialogBox.x - 4, fieldBox.y + fieldBox.height / 2, { steps: 8 });
+    await this.page.mouse.up();
+    await expect(dialog).toBeVisible();
+  }
+
   public async useFlowCallVersion(strategy: 'Active' | 'Exact', version?: string): Promise<void> {
     if (!await this.page.locator('.step-settings-dialog').isVisible()) {
       await this.page.getByTestId('configure-selected-step').click();

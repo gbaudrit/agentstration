@@ -542,6 +542,10 @@ public sealed class FlowDesignerReadOnlyTests
             Assert.HasCount(1, cards);
         });
         cards[0].Click();
+        var flowSummaryLink = rendered.Find(".inspector-resource-summary-link");
+        StringAssert.Contains(flowSummaryLink.TextContent, "News analysis");
+        Assert.AreEqual("/namespaces/pack.news/flows/analysis", flowSummaryLink.GetAttribute("href"));
+        Assert.AreEqual("_blank", flowSummaryLink.GetAttribute("target"));
         rendered.Find("[data-testid='configure-selected-step']").Click();
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         rendered.WaitForAssertion(() =>
@@ -735,6 +739,10 @@ public sealed class FlowDesignerReadOnlyTests
             Assert.HasCount(1, cards);
         });
         cards[0].Click();
+        var toolLink = rendered.Find(".inspector-resource-summary-link");
+        StringAssert.Contains(toolLink.TextContent, "Send notification");
+        Assert.AreEqual("/tools/notification.send", toolLink.GetAttribute("href"));
+        Assert.AreEqual("_blank", toolLink.GetAttribute("target"));
         rendered.Find("[data-testid='configure-selected-step']").Click();
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
         rendered.WaitForAssertion(() =>
@@ -987,6 +995,10 @@ public sealed class FlowDesignerReadOnlyTests
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
 
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
+        var flowLink = rendered.Find(".inspector-resource-summary-link");
+        StringAssert.Contains(flowLink.TextContent, "News analysis");
+        Assert.AreEqual("/namespaces/pack.news/flows/analysis", flowLink.GetAttribute("href"));
+        Assert.AreEqual("_blank", flowLink.GetAttribute("target"));
         rendered.Find("[data-testid='step-settings-tab-input']").Click();
         Assert.AreEqual("string", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
             .GetProperty("properties").GetProperty("request").GetProperty("type").GetString());
