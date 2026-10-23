@@ -48,6 +48,18 @@ export interface ExpectedText {
     formMode: string;
     rawMode: string;
   };
+  contextSelector: {
+    change: string;
+    choose: string;
+    close: string;
+    search: string;
+    instance: string;
+    tenant: string;
+    workspace: string;
+    globalAdministration: string;
+    tenantAdministration: string;
+    confirmDiscard: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -106,6 +118,18 @@ export const ExpectedTextByLocale = {
       formMode: 'Form',
       rawMode: 'Raw JSON',
     },
+    contextSelector: {
+      change: 'Change Console context',
+      choose: 'Choose a context',
+      close: 'Close context selector',
+      search: 'Search Instances, Tenants or Workspaces…',
+      instance: 'Instance',
+      tenant: 'Tenant',
+      workspace: 'Workspace',
+      globalAdministration: 'Global administration',
+      tenantAdministration: 'Tenant administration',
+      confirmDiscard: 'You have unsaved changes. Discard them and change context?',
+    },
   },
   'fr-FR': {
     navigation: {
@@ -161,6 +185,18 @@ export const ExpectedTextByLocale = {
     schemaDrivenSources: {
       formMode: 'Formulaire',
       rawMode: 'JSON brut',
+    },
+    contextSelector: {
+      change: 'Changer de contexte Console',
+      choose: 'Choisir un contexte',
+      close: 'Fermer le sélecteur de contexte',
+      search: 'Rechercher une Instance, un Tenant ou un Workspace…',
+      instance: 'Instance',
+      tenant: 'Tenant',
+      workspace: 'Workspace',
+      globalAdministration: 'Administration globale',
+      tenantAdministration: 'Administration du Tenant',
+      confirmDiscard: 'Des modifications ne sont pas enregistrées. Les abandonner et changer de contexte ?',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;
