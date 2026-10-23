@@ -141,10 +141,7 @@ else
                                     <strong>@resource.DisplayName</strong><UiIcon Name="external-link" />
                                 </a>
                                 <small>@T($"Step.{SelectedStep.Type()}")</small>
-                                @if (!string.Equals(resource.DisplayName, resource.Name, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <code>@resource.Name</code>
-                                }
+                                <code>@resource.Name</code>
                             }
                             else
                             {

@@ -682,7 +682,7 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
-    public async Task InspectorOmitsTechnicalResourceNameWhenItDuplicatesTheDisplayName()
+    public async Task InspectorAlwaysShowsDisplayAndTechnicalResourceNames()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
@@ -724,14 +724,14 @@ public sealed class FlowDesignerReadOnlyTests
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("same-flow", rendered.Find(".inspector-resource-summary-link strong").TextContent);
-            Assert.IsEmpty(rendered.FindAll(".inspector-step-summary-copy code"));
+            Assert.AreEqual("same-flow", rendered.Find(".inspector-step-summary-copy code").TextContent);
         });
 
         await rendered.InvokeAsync(() => canvas.Instance.SelectedStepChanged.InvokeAsync("agent"));
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("same-agent", rendered.Find(".inspector-resource-summary-link strong").TextContent);
-            Assert.IsEmpty(rendered.FindAll(".inspector-step-summary-copy code"));
+            Assert.AreEqual("same-agent", rendered.Find(".inspector-step-summary-copy code").TextContent);
         });
     }
 
