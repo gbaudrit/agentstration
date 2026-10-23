@@ -65,11 +65,44 @@
                                 <header><strong>@T("ChooseContext")</strong><button type="button" class="context-selector-close" @onclick="ToggleContextSelector" aria-label="@T("CloseContextSelector")">×</button></header>
                                 <label class="context-selector-search"><span class="sr-only">@T("SearchContexts")</span><UiIcon Name="search" /><input value="@contextQuery" @oninput="UpdateContextQuery" placeholder="@T("SearchContexts")" data-testid="context-selector-search" /></label>
                                 <div class="context-selector-options">
-                                    @foreach (var option in FilteredContexts)
+                                    @if (IsFilteringContexts)
                                     {
-                                        <button type="button" class="context-option context-option-@option.Kind.ToString().ToLowerInvariant() @(option.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(option)" aria-current="@(option.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="@($"context-option-{option.Kind.ToString().ToLowerInvariant()}")">
-                                            <span class="context-option-indent" aria-hidden="true"></span><span><strong>@option.DisplayName</strong><small>@ContextOptionPath(option)</small></span><span class="context-kind">@ContextKindLabel(option.Kind)</span>
-                                        </button>
+                                        @foreach (var option in FilteredContexts)
+                                        {
+                                            <button type="button" class="context-option context-option-search-result context-option-@option.Kind.ToString().ToLowerInvariant() @(option.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(option)" aria-current="@(option.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="@($"context-option-{option.Kind.ToString().ToLowerInvariant()}")">
+                                                <span class="context-option-indent" aria-hidden="true"></span><span><strong>@option.DisplayName</strong><small>@ContextOptionPath(option)</small></span><span class="context-kind">@ContextKindLabel(option.Kind)</span>
+                                            </button>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        @foreach (var option in InstanceContexts)
+                                        {
+                                            <button type="button" class="context-option context-option-instance context-option-root @(option.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(option)" aria-current="@(option.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="context-option-instance">
+                                                <span class="context-option-indent" aria-hidden="true"></span><span><strong>@option.DisplayName</strong><small>@ContextOptionPath(option)</small></span><span class="context-kind">@ContextKindLabel(option.Kind)</span>
+                                            </button>
+                                        }
+                                        <div class="context-tenant-tree">
+                                            @foreach (var group in ContextTenantGroups)
+                                            {
+                                                <section class="context-tenant-group" data-tenant-id="@group.Tenant.TenantId">
+                                                    <button type="button" class="context-option context-option-tenant @(group.Tenant.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(group.Tenant)" aria-current="@(group.Tenant.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="context-option-tenant">
+                                                        <span class="context-option-indent" aria-hidden="true"></span><span><strong>@group.Tenant.DisplayName</strong><small>@ContextOptionPath(group.Tenant)</small></span><span class="context-kind">@ContextKindLabel(group.Tenant.Kind)</span>
+                                                    </button>
+                                                    @if (group.Workspaces.Count > 0)
+                                                    {
+                                                        <div class="context-tenant-workspaces">
+                                                            @foreach (var workspace in group.Workspaces)
+                                                            {
+                                                                <button type="button" class="context-option context-option-workspace @(workspace.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(workspace)" aria-current="@(workspace.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="context-option-workspace">
+                                                                    <span class="context-option-indent" aria-hidden="true"></span><span><strong>@workspace.DisplayName</strong><small>@workspace.TenantDisplayName</small></span><span class="context-kind">@ContextKindLabel(workspace.Kind)</span>
+                                                                </button>
+                                                            }
+                                                        </div>
+                                                    }
+                                                </section>
+                                            }
+                                        </div>
                                     }
                                     @if (FilteredContexts.Count == 0) { <p class="context-selector-empty">@T("NoContextMatch")</p> }
                                 </div>

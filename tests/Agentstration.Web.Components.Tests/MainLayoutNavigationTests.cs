@@ -136,6 +136,8 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(1, rendered.FindAll(".context-option-instance").Count);
         Assert.AreEqual(1, rendered.FindAll(".context-option-tenant").Count);
         Assert.AreEqual(1, rendered.FindAll(".context-option-workspace").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-tenant-group").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-tenant-group .context-tenant-workspaces .context-option-workspace").Count);
         Assert.AreEqual("Workspace", rendered.Find("[data-testid='context-selector-trigger'] .context-kind").TextContent.Trim());
         Assert.AreEqual("Test organization / Default workspace",
             rendered.Find("[data-testid='console-breadcrumb'] span").TextContent.Trim());

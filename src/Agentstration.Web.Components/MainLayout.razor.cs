@@ -15,6 +15,7 @@ public partial class MainLayout
     private sealed record NavigationGroup(string LabelKey, string Tone, IReadOnlyList<NavigationItem> Items);
     private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null, bool IsFallback = false);
+    private sealed record ContextTenantGroup(ConsoleContextOption Tenant, IReadOnlyList<ConsoleContextOption> Workspaces);
 
     private static readonly NavigationGroup[] NavigationGroups =
     [
@@ -129,6 +130,18 @@ public partial class MainLayout
             || (option.TenantDisplayName?.Contains(contextQuery, StringComparison.CurrentCultureIgnoreCase) ?? false)
             || (option.WorkspaceName?.Contains(contextQuery, StringComparison.OrdinalIgnoreCase) ?? false)
             || option.Kind.ToString().Contains(contextQuery, StringComparison.OrdinalIgnoreCase))
+        .ToArray() ?? [];
+    private bool IsFilteringContexts => !string.IsNullOrWhiteSpace(contextQuery);
+    private IReadOnlyList<ConsoleContextOption> InstanceContexts => ContextState.Current?.Contexts
+        .Where(option => option.Kind == ConsoleContextKind.Instance)
+        .ToArray() ?? [];
+    private IReadOnlyList<ContextTenantGroup> ContextTenantGroups => ContextState.Current?.Contexts
+        .Where(option => option.Kind == ConsoleContextKind.Tenant)
+        .Select(tenant => new ContextTenantGroup(
+            tenant,
+            ContextState.Current.Contexts
+                .Where(option => option.Kind == ConsoleContextKind.Workspace && option.TenantId == tenant.TenantId)
+                .ToArray()))
         .ToArray() ?? [];
 
     private string CurrentSection
