@@ -42,10 +42,14 @@
   <data name="UseActiveVersion"><value>Follow the active version</value></data>
   <data name="Version"><value>Version</value></data>
   <data name="LoadFlowContract"><value>Load Flow contract</value></data>
+  <data name="Contracts"><value>Contracts</value></data>
+  <data name="InputContract"><value>Input</value></data>
+  <data name="OutputContract"><value>Output</value></data>
   <data name="InputSchema"><value>Input schema</value></data>
   <data name="OutputSchema"><value>Output schema</value></data>
   <data name="SelectFlow"><value>Select a published Flow.</value></data>
   <data name="FlowVersionRequired"><value>The selected Flow has no usable version.</value></data>
+  <data name="FlowOutputContractAmbiguous"><value>The selected Flow exposes success outputs with different contracts. A ToolDefinition requires one unambiguous output contract.</value></data>
   <data name="Save"><value>Save</value></data>
   <data name="Cancel"><value>Cancel</value></data>
   <data name="Delete"><value>Delete</value></data>

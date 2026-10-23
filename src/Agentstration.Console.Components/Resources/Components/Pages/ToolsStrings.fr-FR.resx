@@ -42,10 +42,14 @@
   <data name="UseActiveVersion"><value>Suivre la version active</value></data>
   <data name="Version"><value>Version</value></data>
   <data name="LoadFlowContract"><value>Charger le contrat du Flow</value></data>
+  <data name="Contracts"><value>Contrats</value></data>
+  <data name="InputContract"><value>Entrée</value></data>
+  <data name="OutputContract"><value>Sortie</value></data>
   <data name="InputSchema"><value>Schéma d’entrée</value></data>
   <data name="OutputSchema"><value>Schéma de sortie</value></data>
   <data name="SelectFlow"><value>Sélectionnez un Flow publié.</value></data>
   <data name="FlowVersionRequired"><value>Le Flow sélectionné ne possède aucune version utilisable.</value></data>
+  <data name="FlowOutputContractAmbiguous"><value>Le Flow sélectionné expose des sorties de succès avec des contrats différents. Une ToolDefinition requiert un contrat de sortie non ambigu.</value></data>
   <data name="Save"><value>Enregistrer</value></data>
   <data name="Cancel"><value>Annuler</value></data>
   <data name="Delete"><value>Supprimer</value></data>

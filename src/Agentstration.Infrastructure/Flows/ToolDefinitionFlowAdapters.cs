@@ -29,12 +29,21 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
         return Contract(resolved);
     }
 
-    internal static ResolvedToolDefinitionFlowContract Contract(FlowVersion version) => new(
-        version.FlowId.Value,
-        version.FlowId.Namespace,
-        version.Version,
-        version.Graph?.InputSchema?.Clone(),
-        version.Graph?.OutputSchema?.Clone());
+    internal static ResolvedToolDefinitionFlowContract Contract(FlowVersion version)
+    {
+        var ambiguous = false;
+        var output = version.Graph?.ResolveSingleSuccessOutputSchema(out ambiguous);
+        if (ambiguous)
+            throw new ToolDefinitionValidationException(
+                "tool_definition_flow_output_schema_ambiguous",
+                $"Flow version '{version.FlowId}:{version.Version}' exposes success outputs with different contracts.");
+        return new(
+            version.FlowId.Value,
+            version.FlowId.Namespace,
+            version.Version,
+            version.Graph?.ResolveInputSchema()?.Clone(),
+            output?.Clone());
+    }
 }
 
 public sealed class ToolDefinitionFlowActivationGuard(
