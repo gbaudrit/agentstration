@@ -58,14 +58,22 @@ public sealed class AepEnrollmentTests
             string registrationName,
             Uri endpoint,
             CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult(new ExtensionInspection(
-                registrationName,
-                endpoint,
-                "unavailable",
-                null,
-                [],
-                [],
-                "The test extension is intentionally unavailable."));
+            endpoint.Host == "instance-inventory.extension.example"
+                ? ValueTask.FromResult(new ExtensionInspection(
+                    registrationName,
+                    endpoint,
+                    "available",
+                    new ExtensionIdentity("extension.instance-inventory", "Instance inventory", "1.0.0", null),
+                    [new ExtensionContribution(AepContributionKinds.Tool, "lookup")],
+                    []))
+                : ValueTask.FromResult(new ExtensionInspection(
+                    registrationName,
+                    endpoint,
+                    "unavailable",
+                    null,
+                    [],
+                    [],
+                    "The test extension is intentionally unavailable."));
     }
 
     [TestMethod]
@@ -302,6 +310,42 @@ public sealed class AepEnrollmentTests
         Assert.AreEqual($"paired-{instanceId:N}", recorder.Registration.Name);
         Assert.HasCount(1, recorder.Manifest!.Contributions.Tools!);
         Assert.AreEqual("lookup", recorder.Manifest.Contributions.Tools![0].Id);
+    }
+
+    [TestMethod]
+    public async Task InstanceInventoryPreservesTheSelectedScopeWhenLoadingContributions()
+    {
+        var handler = new EnrollmentLifecycleHandler("extension.instance-inventory", advertiseTool: true);
+        await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IToolProviderDiscovery>();
+            services.AddSingleton<IToolProviderDiscovery, StaticToolDiscovery>();
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var enrollment = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var instanceId = Guid.NewGuid();
+        var endpoint = new Uri("https://instance-inventory.extension.example/");
+        _ = await enrollment.AnnounceAsync(new(
+            instanceId,
+            new AepExtensionIdentity("extension.instance-inventory", "Instance inventory", "1.0.0"),
+            endpoint,
+            new Uri(endpoint, AepEnrollmentProtocol.PairingPath)), default);
+        await enrollment.AssignAsync(context, instanceId, ResourceScopeRef.Instance, default);
+        var code = await enrollment.RotateAsync(context, instanceId, default);
+        var credential = await enrollment.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+        _ = await enrollment.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default);
+
+        using var instanceScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
+        var item = (await factory.Services.GetRequiredService<ExtensionInventoryService>().ListAsync(context, default))
+            .Single(value => value.EnrollmentInstanceId == instanceId);
+
+        Assert.AreEqual(ResourceScopeRef.Instance, item.RegistrationScopeRef);
+        Assert.IsNotNull(item.Extension);
+        Assert.IsTrue(
+            item.Extension.Contributions.Any(value => value.Kind == AepContributionKinds.Tool && value.Id == "lookup"),
+            $"Expected lookup Tool contribution; status={item.AvailabilityStatus}, details={item.Extension.Details}, contributions={string.Join(',', item.Extension.Contributions.Select(value => $"{value.Kind}:{value.Id}"))}.");
     }
 
     [TestMethod]
