@@ -1,0 +1,7 @@
+.contract-direction-tabs .section-tabs {
+    margin: 0 0 18px;
+}
+
+.contract-direction-tabs [role="tabpanel"] {
+    min-width: 0;
+}
