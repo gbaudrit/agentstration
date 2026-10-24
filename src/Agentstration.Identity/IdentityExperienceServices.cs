@@ -119,20 +119,30 @@ public sealed class IdentityExperienceService(
         var available = new List<ConsoleWorkspaceView>();
         var tenantPermissions = new Dictionary<Guid, IReadOnlySet<string>>();
         var isPlatformAdministrator = await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken);
-        var tenants = isPlatformAdministrator
-            ? await store.ListTenantsAsync(cancellationToken)
-            : (await store.GetTenantAsync(context.TenantId, cancellationToken)) is { } currentTenant
-                ? [currentTenant]
-                : throw new InvalidOperationException("The current tenant no longer exists.");
+        var tenants = await store.ListTenantsAsync(cancellationToken);
+        var workspaces = await store.ListWorkspacesAsync(cancellationToken);
+        IReadOnlyList<TenantMembership> tenantMemberships = isPlatformAdministrator
+            ? []
+            : await store.ListTenantMembershipsAsync(context.PrincipalId, cancellationToken);
+        IReadOnlyList<WorkspaceMembership> workspaceMemberships = isPlatformAdministrator
+            ? []
+            : await store.ListWorkspaceMembershipsAsync(context.PrincipalId, cancellationToken);
+        IReadOnlyList<RoleAssignment> assignments = isPlatformAdministrator
+            ? []
+            : await store.ListRoleAssignmentsAsync(context.PrincipalId, cancellationToken);
+        IReadOnlyDictionary<Guid, RoleDefinition> roles = isPlatformAdministrator
+            ? new Dictionary<Guid, RoleDefinition>()
+            : (await store.ListRoleDefinitionsAsync(cancellationToken)).ToDictionary(value => value.Id);
         foreach (var tenant in tenants.Where(value => value.Status == TenantStatus.Active))
         {
-            tenantPermissions[tenant.Id] = await authorization.GetPermissionsAsync(
-                new RequestContext(context.PrincipalId, tenant.Id, Guid.Empty), cancellationToken);
-            var workspaces = await store.ListWorkspacesAsync(tenant.Id, cancellationToken);
-            foreach (var workspace in workspaces.Where(value => value.Status == WorkspaceStatus.Active))
+            tenantPermissions[tenant.Id] = ResolvePermissions(
+                context with { TenantId = tenant.Id, WorkspaceId = Guid.Empty },
+                isPlatformAdministrator, tenantMemberships, workspaceMemberships, assignments, roles);
+            foreach (var workspace in workspaces.Where(value => value.TenantId == tenant.Id && value.Status == WorkspaceStatus.Active))
             {
                 var candidate = context with { TenantId = tenant.Id, WorkspaceId = workspace.Id };
-                var permissions = await authorization.GetPermissionsAsync(candidate, cancellationToken);
+                var permissions = ResolvePermissions(
+                    candidate, isPlatformAdministrator, tenantMemberships, workspaceMemberships, assignments, roles);
                 if (permissions.Contains(AuthorizationPermissions.WorkspacesRead))
                     available.Add(new ConsoleWorkspaceView(
                         workspace.Id,
@@ -192,10 +202,16 @@ public sealed class IdentityExperienceService(
         var current = requestContext.Current;
         if (current.PrincipalId != principalId)
             throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
-        var view = await GetContextAsync(scopeRef, cancellationToken);
-        if (view.SelectedScopeRef != scopeRef)
-            throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
-        return new(scopeRef, view.SelectedKind, view.Context);
+        return scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => await ValidateInstanceSelectionAsync(
+                principalId, current, scopeRef, cancellationToken),
+            ResourceScopeKind.Tenant => await ValidateTenantSelectionAsync(
+                principalId, current, scopeRef, cancellationToken),
+            ResourceScopeKind.Workspace => new(scopeRef, IdentityConsoleContextKind.Workspace,
+                await ValidateWorkspaceSelectionAsync(principalId, scopeRef.TargetId!.Value, cancellationToken)),
+            _ => throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead)
+        };
     }
 
     public async Task<RequestContext> ValidateWorkspaceSelectionAsync(Guid workspaceId, CancellationToken cancellationToken)
@@ -239,6 +255,76 @@ public sealed class IdentityExperienceService(
         }
         return contexts;
     }
+
+    private async Task<ConsoleContextSelection> ValidateInstanceSelectionAsync(
+        Guid principalId,
+        RequestContext operationalContext,
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken)
+    {
+        if (!await platformAuthorization.IsPlatformAdministratorAsync(principalId, cancellationToken))
+            throw new AuthorizationDeniedException(AuthorizationPermissions.TenantsRead);
+        return new(scopeRef, IdentityConsoleContextKind.Instance, operationalContext);
+    }
+
+    private async Task<ConsoleContextSelection> ValidateTenantSelectionAsync(
+        Guid principalId,
+        RequestContext current,
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken)
+    {
+        var tenantId = scopeRef.TargetId!.Value;
+        var tenant = await store.GetTenantAsync(tenantId, cancellationToken);
+        if (tenant?.Status != TenantStatus.Active)
+            throw new AuthorizationDeniedException(AuthorizationPermissions.TenantsRead);
+        var isPlatformAdministrator = await platformAuthorization.IsPlatformAdministratorAsync(principalId, cancellationToken);
+        if (!isPlatformAdministrator)
+        {
+            var tenantContext = new RequestContext(principalId, tenantId, Guid.Empty, current.Restriction);
+            await authorization.EnsurePermissionAsync(tenantContext, AuthorizationPermissions.TenantsRead, cancellationToken);
+        }
+        var workspaces = await store.ListWorkspacesAsync(tenantId, cancellationToken);
+        Workspace? operationalWorkspace;
+        if (isPlatformAdministrator)
+        {
+            operationalWorkspace = workspaces
+                .Where(value => value.Status == WorkspaceStatus.Active)
+                .OrderByDescending(value => value.Id == current.WorkspaceId)
+                .FirstOrDefault();
+        }
+        else
+        {
+            var memberships = await store.ListWorkspaceMembershipsAsync(principalId, cancellationToken);
+            var assignments = await store.ListRoleAssignmentsAsync(principalId, cancellationToken);
+            var roles = (await store.ListRoleDefinitionsAsync(cancellationToken)).ToDictionary(value => value.Id);
+            operationalWorkspace = workspaces
+                .Where(value => value.Status == WorkspaceStatus.Active)
+                .OrderByDescending(value => value.Id == current.WorkspaceId)
+                .FirstOrDefault(value => ResolvePermissions(
+                    new RequestContext(principalId, tenantId, value.Id, current.Restriction),
+                    false, [], memberships, assignments, roles)
+                    .Contains(AuthorizationPermissions.WorkspacesRead));
+        }
+        if (operationalWorkspace is null)
+            throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
+        return new(scopeRef, IdentityConsoleContextKind.Tenant,
+            new RequestContext(principalId, tenantId, operationalWorkspace.Id, current.Restriction));
+    }
+
+    private static IReadOnlySet<string> ResolvePermissions(
+        RequestContext context,
+        bool isPlatformAdministrator,
+        IReadOnlyList<TenantMembership> tenantMemberships,
+        IReadOnlyList<WorkspaceMembership> workspaceMemberships,
+        IReadOnlyList<RoleAssignment> assignments,
+        IReadOnlyDictionary<Guid, RoleDefinition> roles)
+        => PermissionAuthorizationService.ResolvePermissions(
+            context,
+            isPlatformAdministrator,
+            tenantMemberships.Any(value => value.TenantId == context.TenantId && value.Status == MembershipStatus.Active),
+            workspaceMemberships.Any(value => value.WorkspaceId == context.WorkspaceId && value.Status == MembershipStatus.Active),
+            assignments,
+            roles);
 
     private static readonly IReadOnlySet<string> InstanceAdministrativePermissions = new HashSet<string>(
         [

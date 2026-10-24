@@ -21,6 +21,7 @@ public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestCont
 {
     private readonly AsyncLocal<AmbientRequestContext?> ambient = new();
     public bool IsInitialized => AccessMode == ControlPlaneAccessMode.Workspace;
+    public Guid? ActorPrincipalId => ambient.Value?.PrincipalId;
     public ControlPlaneAccessMode AccessMode => ambient.Value?.AccessMode ?? ControlPlaneAccessMode.Unavailable;
     public RequestContext Current => ambient.Value switch
     {
@@ -225,7 +226,8 @@ public sealed class LocalPrincipalProvisioner(
 {
     public async Task<Principal> ProvisionAsync(LocalPrincipalProvisioning request, CancellationToken cancellationToken)
     {
-        if (!requestContext.IsInitialized || !await platformAuthorization.IsPlatformAdministratorAsync(requestContext.Current.PrincipalId, cancellationToken))
+        if (requestContext.ActorPrincipalId is not Guid actorPrincipalId
+            || !await platformAuthorization.IsPlatformAdministratorAsync(actorPrincipalId, cancellationToken))
             throw new AuthorizationDeniedException("platform/admin");
         if (await store.FindLocalIdentityAsync(request.AccountId, cancellationToken) is not null)
             throw new InvalidOperationException("The local account is already linked.");
