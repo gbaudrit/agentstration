@@ -898,8 +898,10 @@ public sealed partial class DeclarativeBootstrapTests
         health.EnsureSuccessStatusCode();
 
         var identities = factory.Services.GetRequiredService<IIdentityStore>();
-        var tenant = (await identities.ListTenantsAsync(default)).Single();
-        var workspace = (await identities.ListWorkspacesAsync(tenant.Id, default)).Single();
+        var tenant = (await identities.ListTenantsAsync(default)).Single(value =>
+            !OperationalTopologyIdentities.IsSystemTenant(value.Id));
+        var workspace = (await identities.ListWorkspacesAsync(tenant.Id, default)).Single(value =>
+            !OperationalTopologyIdentities.IsOperationalWorkspace(value));
         var localIdentity = (await identities.ListLocalIdentitiesAsync(default)).Single();
         var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         var registrations = factory.Services.GetRequiredService<ExtensionRegistrationManagementService>();

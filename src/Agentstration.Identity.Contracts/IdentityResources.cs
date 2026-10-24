@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace Agentstration.Identity.Contracts;
 
 public enum TenantStatus { Active, Disabled }
@@ -12,6 +14,45 @@ public static class OfficialWorkspaceIdentities
 {
     public const string AgentstrationAssistant = "agentstration-assistant";
     public const string AgentstrationAssistantDisplayName = "Agentstration Assistant";
+}
+
+public static class OperationalTopologyIdentities
+{
+    private static readonly Guid TenantOperationsNamespaceId = new("d60771d3-03f4-4bf3-a15a-2cb5adca25b8");
+
+    public static readonly Guid SystemTenantId = new("3d39a580-ea2e-4f23-91a9-53fd89c3b2bd");
+    public static readonly Guid InstanceOperationsWorkspaceId = new("1fd19051-64a2-4c0c-8f52-5543ae99d95f");
+
+    public const string SystemTenantName = "agentstration-system";
+    public const string SystemTenantDisplayName = "Agentstration System";
+    public const string InstanceOperationsWorkspaceName = "agentstration-instance-operations";
+    public const string InstanceOperationsWorkspaceDisplayName = "Instance operations";
+    public const string TenantOperationsWorkspaceName = "agentstration-tenant-operations";
+    public const string TenantOperationsWorkspaceDisplayName = "Tenant operations";
+
+    public static Guid TenantOperationsWorkspaceId(Guid tenantId)
+    {
+        if (tenantId == Guid.Empty) throw new ArgumentException("A Tenant operations Workspace requires a non-empty Tenant ID.", nameof(tenantId));
+        Span<byte> input = stackalloc byte[32];
+        _ = TenantOperationsNamespaceId.TryWriteBytes(input[..16]);
+        _ = tenantId.TryWriteBytes(input[16..]);
+        Span<byte> hash = stackalloc byte[32];
+        _ = SHA256.HashData(input, hash);
+        return new Guid(hash[..16]);
+    }
+
+    public static bool IsSystemTenant(Guid tenantId) => tenantId == SystemTenantId;
+
+    public static bool IsOperationalWorkspace(Workspace workspace) =>
+        workspace.Id == InstanceOperationsWorkspaceId
+        || (!IsSystemTenant(workspace.TenantId) && workspace.Id == TenantOperationsWorkspaceId(workspace.TenantId));
+
+    public static bool IsReservedTenantName(string name) =>
+        string.Equals(name, SystemTenantName, StringComparison.Ordinal);
+
+    public static bool IsReservedWorkspaceName(string name) =>
+        string.Equals(name, InstanceOperationsWorkspaceName, StringComparison.Ordinal)
+        || string.Equals(name, TenantOperationsWorkspaceName, StringComparison.Ordinal);
 }
 
 public sealed record Tenant(
@@ -272,6 +313,14 @@ public interface ILocalEnvironmentBootstrapper
 public interface IWorkspaceProvisioner
 {
     Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken);
+}
+
+public interface IOperationalTopologyProvisioner
+{
+    Task EnsureAllAsync(CancellationToken cancellationToken);
+    Task<Workspace> EnsureTenantAsync(Tenant tenant, CancellationToken cancellationToken);
+    Task<Workspace> GetInstanceOperationsWorkspaceAsync(CancellationToken cancellationToken);
+    Task<Workspace> GetTenantOperationsWorkspaceAsync(Guid tenantId, CancellationToken cancellationToken);
 }
 
 public interface IAuthorizationService
