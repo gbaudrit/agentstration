@@ -655,6 +655,31 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             Assert.IsNotNull(apiAgent);
             Assert.AreEqual(storedUid, apiAgent.Uid);
             Assert.AreEqual(scopeRef, apiAgent.ScopeRef);
+            if (scopeRef.Kind is ResourceScopeKind.Instance or ResourceScopeKind.Tenant)
+            {
+                using var runResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
+                {
+                    Agent = new RuntimeAgentReference(apiAgent.Name, apiAgent.Generation)
+                    {
+                        Namespace = apiAgent.Namespace,
+                        ScopeRef = apiAgent.ScopeRef,
+                        ResourceUid = apiAgent.Uid
+                    },
+                    Input = new RuntimeRunInput
+                    {
+                        Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, $"Run from {scopeRef.Kind} context")]
+                    },
+                    Origin = RuntimeRunOrigin.Api
+                });
+                Assert.AreEqual(HttpStatusCode.Accepted, runResponse.StatusCode,
+                    await runResponse.Content.ReadAsStringAsync());
+                var run = await runResponse.Content.ReadFromJsonAsync<RuntimeRun>();
+                Assert.IsNotNull(run);
+                var expectedExecutionScope = scopeRef.Kind == ResourceScopeKind.Instance
+                    ? ResourceScopeRef.Workspace(OperationalTopologyIdentities.InstanceOperationsWorkspaceId)
+                    : ResourceScopeRef.Workspace(OperationalTopologyIdentities.TenantOperationsWorkspaceId(context.TenantId));
+                Assert.AreEqual(expectedExecutionScope, run.ExecutionScopeRef);
+            }
         }
 
         using (requestScopes.PushInstance(context))

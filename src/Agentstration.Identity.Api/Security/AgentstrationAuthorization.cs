@@ -55,7 +55,10 @@ public sealed class WorkspacePermissionHandler(
                 AuthorizationPermissions.ResourcesWrite or
                 AuthorizationPermissions.ResourcesDelete or
                 AuthorizationPermissions.AuthorizationRead or
-                AuthorizationPermissions.AuthorizationWrite;
+                AuthorizationPermissions.AuthorizationWrite or
+                AuthorizationPermissions.RunsRead or
+                AuthorizationPermissions.RunsExecute or
+                AuthorizationPermissions.RunsDelete;
             if (administrativePermission
                 && await platformAuthorization.IsPlatformAdministratorAsync(
                     feature.PrincipalId, httpContextAccessor.HttpContext!.RequestAborted))

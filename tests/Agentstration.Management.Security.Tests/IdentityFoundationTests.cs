@@ -5,8 +5,10 @@ using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Profiles;
 using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -95,6 +97,23 @@ public sealed class IdentityFoundationTests
         var secondTenantWorkspaces = await store.ListWorkspacesAsync(secondTenant.Id, default);
         Assert.HasCount(1, secondTenantWorkspaces);
         Assert.IsTrue(OperationalTopologyIdentities.IsOperationalWorkspace(secondTenantWorkspaces[0]));
+        using var systemScope = fixture.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var runtimeProfile = await fixture.Services.GetRequiredService<IResourceStore>()
+            .GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(
+                ResourceScopeRef.Instance,
+                ResourceNamespace.Default,
+                RuntimeProfileResourceKinds.RuntimeProfile,
+                "maf-builtin"), default);
+        Assert.IsNotNull(runtimeProfile);
+        var runtimePolicy = await fixture.Services.GetRequiredService<IResourceAccessPolicyService>()
+            .GetAsync(runtimeProfile.Value.Uid, default);
+        Assert.IsNotNull(runtimePolicy);
+        Assert.IsFalse(runtimePolicy.Policy.Grants.Any(grant =>
+            grant.TargetScopeRef == ResourceScopeRef.Workspace(instanceOperations.Id)
+            || grant.TargetScopeRef == ResourceScopeRef.Workspace(firstTenantOperations.Id)
+            || grant.TargetScopeRef == ResourceScopeRef.Workspace(secondTenantOperations.Id)));
+        Assert.IsTrue(runtimePolicy.Policy.Grants.Any(grant =>
+            grant.TargetScopeRef == ResourceScopeRef.Workspace(fixture.InitialContext.WorkspaceId)));
     }
 
     [TestMethod]
