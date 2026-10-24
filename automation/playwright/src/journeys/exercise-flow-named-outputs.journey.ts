@@ -26,7 +26,7 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
   await designer.useFlowCallVersion('Exact', '1.0.0');
   await designer.expectNamedPorts('Child review', [
     { event: 'historical-result', outcome: 'success' },
-    { event: 'legacy-failure', outcome: 'error' },
+    { event: 'historical-error', outcome: 'error' },
   ]);
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.historicalPorts, page: context.pages.page, target: designer.designer });
 
