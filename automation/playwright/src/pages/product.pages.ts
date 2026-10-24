@@ -27,6 +27,7 @@ import { AgentInstanceObservabilityPage } from './agent-instance-observability.p
 import { SchemaDrivenSourcesPage } from './schema-driven-sources.page.js';
 import { SchemaAdministrationPage } from './schema-administration.page.js';
 import { SchemaContractsPage } from './schema-contracts.page.js';
+import { SchemaDrivenFlowInputsPage } from './schema-driven-flow-inputs.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -56,6 +57,7 @@ export class ProductPages {
   public readonly schemaDrivenSources: SchemaDrivenSourcesPage;
   public readonly schemaAdministration: SchemaAdministrationPage;
   public readonly schemaContracts: SchemaContractsPage;
+  public readonly schemaDrivenFlowInputs: SchemaDrivenFlowInputsPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -85,6 +87,7 @@ export class ProductPages {
     this.schemaDrivenSources = new SchemaDrivenSourcesPage(page);
     this.schemaAdministration = new SchemaAdministrationPage(page);
     this.schemaContracts = new SchemaContractsPage(page);
+    this.schemaDrivenFlowInputs = new SchemaDrivenFlowInputsPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

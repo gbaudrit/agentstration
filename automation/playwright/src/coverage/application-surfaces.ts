@@ -179,7 +179,12 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   },
 
   coveredFlow('flows', `${consolePages}/Flows.razor`, ['/flows']),
-  coveredFlow('flow-details', `${consolePages}/FlowDetails.razor`, ['/flows/{FlowId}', '/namespaces/{FlowNamespace}/flows/{FlowId}'], ['flowId', 'flowNamespace']),
+  {
+    id: 'flow-details', host: 'console', source: `${consolePages}/FlowDetails.razor`,
+    routes: ['/flows/{FlowId}', '/namespaces/{FlowNamespace}/flows/{FlowId}'], fixtureKeys: ['flowId', 'flowNamespace'],
+    pageObject: 'src/pages/schema-driven-flow-inputs.page.ts', journey: 'exercise-schema-driven-flow-inputs',
+    specification: 'tests/schema-driven-flow-inputs.spec.ts', coverage: 'covered',
+  },
   {
     id: 'flow-designer', host: 'console', source: `${consolePages}/FlowDesigner.razor`,
     routes: ['/flows/{FlowId}/designer', '/namespaces/{FlowNamespace}/flows/{FlowId}/designer'], fixtureKeys: ['flowId', 'flowNamespace'],
