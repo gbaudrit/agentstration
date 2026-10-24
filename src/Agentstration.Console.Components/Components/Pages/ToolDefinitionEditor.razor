@@ -24,9 +24,9 @@ else
     </section>
     <section class="panel"><div class="panel-header"><h2>@T("FlowImplementation")</h2></div>
         <div class="form-grid">
-            <label><span>@T("Flow")</span><select @bind="selectedFlow" @bind:after="FlowSelectionChangedAsync"><option value="">—</option>@foreach(var flow in flows){<option value="@FlowKey(flow)">@flow.Namespace/@flow.Name (@flow.ActiveVersion)</option>}</select></label>
-            <label><input type="checkbox" @bind="useActiveVersion" @bind:after="LoadContractAsync" /> <span>@T("UseActiveVersion")</span></label>
-            @if (!useActiveVersion) { <label><span>@T("Version")</span><input @bind="flowVersion" @bind:after="LoadContractAsync" /></label> }
+            <label><span>@T("Flow")</span><select data-testid="tool-definition-flow" @bind="selectedFlow" @bind:after="FlowSelectionChangedAsync"><option value="">—</option>@foreach(var flow in flows){<option value="@FlowKey(flow)">@flow.Namespace/@flow.Name (@flow.ActiveVersion)</option>}</select></label>
+            <label><input type="checkbox" data-testid="tool-definition-use-active-version" @bind="useActiveVersion" @bind:after="LoadContractAsync" /> <span>@T("UseActiveVersion")</span></label>
+            @if (!useActiveVersion) { <label><span>@T("Version")</span><input data-testid="tool-definition-version" @bind="flowVersion" @bind:after="LoadContractAsync" /></label> }
             <div class="form-span-2">
                 @if (loadingContract)
                 {
@@ -56,7 +56,7 @@ else
             </div>
         </div>
     </section>
-    <div class="page-actions"><button class="button-primary" @onclick="SaveAsync" disabled="@(saving || loadingContract || !contractLoaded)">@T("Save")</button><a class="button-secondary" href="/tools/definitions">@T("Cancel")</a>@if(!IsNew){<button class="button-danger" @onclick="DeleteAsync">@T("Delete")</button>}</div>
+    <div class="page-actions"><button class="button-primary" data-testid="tool-definition-save" @onclick="SaveAsync" disabled="@(saving || loadingContract || !contractLoaded)">@T("Save")</button><a class="button-secondary" href="/tools/definitions">@T("Cancel")</a>@if(!IsNew){<button class="button-danger" @onclick="DeleteAsync">@T("Delete")</button>}</div>
 }
 
 @code {

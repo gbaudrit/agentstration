@@ -26,6 +26,8 @@ import { inspectRuntimeWorkerObservability, type InspectRuntimeWorkerObservabili
 import { inspectAgentInstanceObservability, type InspectAgentInstanceObservabilityInput } from './inspect-agent-instance-observability.journey.js';
 import { exerciseSchemaDrivenSources, type ExerciseSchemaDrivenSourcesInput } from './exercise-schema-driven-sources.journey.js';
 import { exerciseSchemaAdministration, type ExerciseSchemaAdministrationInput } from './exercise-schema-administration.journey.js';
+import { exerciseSchemaContractBindings, type ExerciseSchemaContractBindingsInput } from './exercise-schema-contract-bindings.journey.js';
+import { exerciseFlowConnectionContracts, type ExerciseFlowConnectionContractsInput } from './exercise-flow-connection-contracts.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -57,4 +59,6 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'inspect-agent-instance-observability': (context, input) => inspectAgentInstanceObservability(context, input as unknown as InspectAgentInstanceObservabilityInput),
   'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),
   'exercise-schema-administration': (context, input) => exerciseSchemaAdministration(context, input as unknown as ExerciseSchemaAdministrationInput),
+  'exercise-schema-contract-bindings': (context, input) => exerciseSchemaContractBindings(context, input as unknown as ExerciseSchemaContractBindingsInput),
+  'exercise-flow-connection-contracts': (context, input) => exerciseFlowConnectionContracts(context, input as unknown as ExerciseFlowConnectionContractsInput),
 };

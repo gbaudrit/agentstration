@@ -136,8 +136,8 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   },
   {
     id: 'agent-editor', host: 'console', source: `${consolePages}/AgentEditor.razor`,
-    routes: ['/agents/new', '/agents/{Name}'], fixtureKeys: ['name'], pageObject: 'src/pages/agent-editor.page.ts',
-    journey: 'exercise-bootstrap-provenance', specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
+    routes: ['/agents/new', '/agents/{Name}'], fixtureKeys: ['name'], pageObject: 'src/pages/schema-contracts.page.ts',
+    journey: 'exercise-schema-contract-bindings', specification: 'tests/schema-contract-bindings.spec.ts', coverage: 'covered',
   },
   {
     id: 'new-flow', host: 'console', source: `${consolePages}/NewFlow.razor`, routes: ['/flows/new'], fixtureKeys: [],
@@ -183,8 +183,8 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'flow-designer', host: 'console', source: `${consolePages}/FlowDesigner.razor`,
     routes: ['/flows/{FlowId}/designer', '/namespaces/{FlowNamespace}/flows/{FlowId}/designer'], fixtureKeys: ['flowId', 'flowNamespace'],
-    pageObject: 'src/pages/flow-designer.page.ts', journey: 'exercise-flow-designer-responsive',
-    specification: 'tests/flow-designer-responsive.spec.ts', coverage: 'covered',
+    pageObject: 'src/pages/schema-contracts.page.ts', journey: 'exercise-flow-connection-contracts',
+    specification: 'tests/flow-connection-contracts.spec.ts', coverage: 'covered',
   },
   coveredFlow('flow-runs', `${consolePages}/FlowRuns.razor`, ['/flow-runs'], [], 'inspect-flow-observability'),
   coveredFlow('flow-run-details', `${consolePages}/FlowRunDetails.razor`, ['/flow-runs/{RunId}'], ['runId'], 'inspect-flow-observability'),
@@ -227,7 +227,12 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('tool-providers', `${consolePages}/ToolProviders.razor`, ['/tools/providers'], 422),
   partialResourceAdministration('tool-provider-editor', `${consolePages}/ToolProviderEditor.razor`, ['/tools/providers/new', '/tools/providers/{Name}'], 423, ['name']),
   partialResourceAdministration('tool-definitions', `${consolePages}/ToolDefinitions.razor`, ['/tools/definitions'], 424),
-  partialResourceAdministration('tool-definition-editor', `${consolePages}/ToolDefinitionEditor.razor`, ['/tools/definitions/new', '/tools/definitions/{Name}'], 425, ['name']),
+  {
+    id: 'tool-definition-editor', host: 'console', source: `${consolePages}/ToolDefinitionEditor.razor`,
+    routes: ['/tools/definitions/new', '/tools/definitions/{Name}'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/schema-contracts.page.ts', journey: 'exercise-schema-contract-bindings',
+    specification: 'tests/schema-contract-bindings.spec.ts', coverage: 'covered',
+  },
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),
   partialResourceAdministration('triggers', `${consolePages}/Triggers.razor`, ['/triggers'], 427),
   planned('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], 428, ['name']),
