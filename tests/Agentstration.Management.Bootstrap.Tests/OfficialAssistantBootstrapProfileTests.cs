@@ -81,7 +81,6 @@ public sealed class OfficialAssistantBootstrapProfileTests
         foreach (var flow in flows)
         {
             var graph = flow.Graph;
-            Assert.IsFalse(graph.Steps.OfType<FailureFlowStepDefinition>().Any(), $"Flow '{flow.Id}' still uses a legacy failure terminal.");
             Assert.IsTrue(
                 graph.Steps.OfType<OutputFlowStepDefinition>().All(output => output.Outcome is not null),
                 $"Every output in Flow '{flow.Id}' must declare its outcome.");

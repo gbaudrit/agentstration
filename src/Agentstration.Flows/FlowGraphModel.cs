@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 namespace Agentstration.Flows;
 
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 public sealed record FlowResourceReference(string ResourceId, string VersionStrategy = "UseDeploymentVersion", long? Version = null, ResourceNamespace? Namespace = null);
 public sealed record FlowNodePosition(double X, double Y);
@@ -28,7 +29,6 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
 [JsonDerivedType(typeof(ToolRouteFlowStepDefinition), "toolRoute")]
 [JsonDerivedType(typeof(OutputFlowStepDefinition), "output")]
-[JsonDerivedType(typeof(FailureFlowStepDefinition), "failure")]
 public abstract record FlowStepDefinition
 {
     public required string Name { get; init; }
@@ -95,6 +95,7 @@ public enum FlowStepArtifactContentEncoding
 public sealed record InputFlowStepDefinition : FlowStepDefinition
 {
     public JsonElement? Schema { get; init; }
+    public SchemaBinding? SchemaBinding { get; init; }
 }
 
 public sealed record AgentFlowStepDefinition : FlowStepDefinition
@@ -130,6 +131,10 @@ public sealed record TransformFlowStepDefinition : FlowStepDefinition
     public string Mode { get; init; } = "Mapping";
     public JsonElement? Mapping { get; init; }
     public string? Expression { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? Schema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBinding? SchemaBinding { get; init; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<FlowCallVersionStrategy>))]
@@ -210,18 +215,12 @@ public sealed record OutputFlowStepDefinition : FlowStepDefinition
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Schema { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBinding? SchemaBinding { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Code { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? DetailsExpression { get; init; }
-}
-
-/// <summary>Compatibility shape for persisted Flow definitions authored before named outputs.</summary>
-public sealed record FailureFlowStepDefinition : FlowStepDefinition
-{
-    public string Code { get; init; } = "FLOW_FAILED";
-    public string Message { get; init; } = "Flow execution failed.";
     public string? DetailsExpression { get; init; }
 }
 
@@ -243,9 +242,11 @@ public sealed record FlowGraphDefinition
 {
     public required string EntryStep { get; init; }
     public JsonElement? InputSchema { get; init; }
+    public SchemaBinding? InputSchemaBinding { get; init; }
     public IReadOnlyList<FlowStepDefinition> Steps { get; init; } = [];
     public IReadOnlyList<FlowTransitionDefinition> Transitions { get; init; } = [];
     public JsonElement? OutputSchema { get; init; }
+    public SchemaBinding? OutputSchemaBinding { get; init; }
     public FlowDesignerMetadata Designer { get; init; } = new();
 }
 
@@ -288,7 +289,6 @@ public static class FlowStepDefinitionExtensions
         ToolFlowStepDefinition => "tool",
         ToolRouteFlowStepDefinition => "toolRoute",
         OutputFlowStepDefinition => "output",
-        FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))
     };
 
@@ -302,31 +302,53 @@ public static class FlowStepDefinitionExtensions
         ToolFlowStepDefinition => ["success", "error"],
         ToolRouteFlowStepDefinition => ["success", "error"],
         FlowCallStepDefinition => [],
-        OutputFlowStepDefinition or FailureFlowStepDefinition => [],
+        OutputFlowStepDefinition => [],
         _ => throw new ArgumentOutOfRangeException(nameof(step))
     };
 }
 
 public static class FlowGraphDefinitionExtensions
 {
+    public static JsonElement? ResolveInputSchema(this FlowGraphDefinition definition) =>
+        definition.Steps.OfType<InputFlowStepDefinition>().FirstOrDefault()?.Schema
+        ?? definition.InputSchema;
+
+    public static JsonElement? ResolveSingleSuccessOutputSchema(
+        this FlowGraphDefinition definition,
+        out bool ambiguous)
+    {
+        ambiguous = false;
+        var outputs = definition.GetOutputs()
+            .Where(output => output.Outcome is FlowOutputOutcome.Success)
+            .ToArray();
+        if (outputs.Length == 0) return definition.OutputSchema;
+
+        var distinct = new List<JsonElement?>();
+        foreach (var output in outputs)
+        {
+            if (distinct.Any(existing => SameSchema(existing, output.Schema))) continue;
+            distinct.Add(output.Schema?.Clone());
+        }
+
+        ambiguous = distinct.Count > 1;
+        return distinct.Count == 1 ? distinct[0] : null;
+    }
+
     public static IReadOnlyList<FlowOutputDefinition> GetOutputs(this FlowGraphDefinition definition) =>
         definition.Steps
-            .Select(step => step switch
-            {
-                OutputFlowStepDefinition output => new FlowOutputDefinition(
-                    output.Name,
-                    output.DisplayName,
-                    output.Outcome ?? FlowOutputOutcome.Success,
-                    definition.ResolveOutputSchema(output, out _)?.Clone()),
-                FailureFlowStepDefinition failure => new FlowOutputDefinition(
-                    failure.Name,
-                    failure.DisplayName,
-                    FlowOutputOutcome.Error,
-                    null),
-                _ => null
-            })
-            .OfType<FlowOutputDefinition>()
+            .OfType<OutputFlowStepDefinition>()
+            .Select(output => new FlowOutputDefinition(
+                output.Name,
+                output.DisplayName,
+                output.Outcome ?? FlowOutputOutcome.Success,
+                definition.ResolveOutputSchema(output, out _)?.Clone()))
             .ToArray();
+
+    private static bool SameSchema(JsonElement? left, JsonElement? right)
+    {
+        if (left is null) return right is null;
+        return right is not null && JsonElement.DeepEquals(left.Value, right.Value);
+    }
 
     public static JsonElement? ResolveOutputSchema(
         this FlowGraphDefinition definition,
@@ -344,7 +366,12 @@ public static class FlowGraphDefinitionExtensions
         var candidates = definition.Transitions
             .Where(transition => transition.ToStep == output.Name)
             .Select(transition => definition.Steps.FirstOrDefault(step => step.Name == transition.FromStep))
-            .Select(step => step is InputFlowStepDefinition input ? input.Schema ?? definition.InputSchema : null)
+            .Select(step => step switch
+            {
+                InputFlowStepDefinition input => input.Schema ?? definition.InputSchema,
+                TransformFlowStepDefinition transform => transform.Schema,
+                _ => null
+            })
             .Where(schema => schema is not null)
             .Select(schema => schema!.Value)
             .ToArray();

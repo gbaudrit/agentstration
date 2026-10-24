@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Agents;
 
@@ -31,6 +32,10 @@ public record AgentProperties
     public IReadOnlyList<string> Middleware { get; init; } = [];
     public IReadOnlyList<string> ContextProviders { get; init; } = [];
     public IReadOnlyDictionary<string, JsonElement> Settings { get; init; } = new Dictionary<string, JsonElement>();
+    public JsonElement? InputSchema { get; init; }
+    public SchemaBinding? InputSchemaBinding { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public SchemaBinding? OutputSchemaBinding { get; init; }
 }
 
 public sealed record ResolvedAgentToolSetAssignment
@@ -103,6 +108,10 @@ public sealed record ResolvedAgentDefinition
     public required IReadOnlyCollection<string> Capabilities { get; init; }
     public required string Handler { get; init; }
     public required string DefinitionHash { get; init; }
+    public JsonElement? InputSchema { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public IReadOnlyDictionary<string, SchemaBindingSnapshot> SchemaBindings { get; init; }
+        = new Dictionary<string, SchemaBindingSnapshot>(StringComparer.Ordinal);
 }
 
 public sealed record AgentDeployment : Resource

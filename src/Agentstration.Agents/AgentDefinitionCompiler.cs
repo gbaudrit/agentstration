@@ -69,7 +69,9 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             Middleware = middleware,
             ContextProviders = contextProviders,
             Capabilities = capabilities,
-            Settings = agent.Settings.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray()
+            Settings = agent.Settings.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray(),
+            agent.InputSchema,
+            agent.OutputSchema
         };
         var hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(canonical))).ToLowerInvariant();
 
@@ -91,7 +93,9 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             ContextProviderIds = contextProviders,
             Capabilities = capabilities,
             Handler = agent.Handler,
-            DefinitionHash = hash
+            DefinitionHash = hash,
+            InputSchema = agent.InputSchema?.Clone(),
+            OutputSchema = agent.OutputSchema?.Clone()
         };
     }
 

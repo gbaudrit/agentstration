@@ -132,7 +132,7 @@ public sealed class FlowTopologyViewerTests
         var graph = new FlowTopologyGraph(
             [
                 new("step:fetch", "fetch", "Fetch", "tool", 0, 0),
-                new("step:failure", "failure", "Failure", "failure", 220, 0)
+                new("step:failure", "failure", "Error", "output", 220, 0)
             ],
             [new("fetch-failure", "step:fetch", "step:failure", "error", State: FlowTopologyEdgeState.Failed)],
             "graph",

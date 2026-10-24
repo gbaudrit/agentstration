@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Tools;
 
@@ -14,8 +15,11 @@ public sealed class ToolDefinitionService(
     IResourceStore store,
     IToolDefinitionFlowResolver flows,
     TimeProvider timeProvider,
-    IEnumerable<IInternalMcpToolDefinitionProvider>? internalTools = null)
+    IEnumerable<IInternalMcpToolDefinitionProvider>? internalTools = null,
+    ISchemaBindingResolver? schemaBindingResolver = null)
 {
+    private const string JsonSchemaFormat = "json-schema";
+
     public Task<IReadOnlyList<StoredResource<ToolDefinitionResource>>> ListAsync(CancellationToken cancellationToken) =>
         store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
 
@@ -35,11 +39,14 @@ public sealed class ToolDefinitionService(
         if ((internalTools ?? []).Any(value => string.Equals(value.Definition.Name, resource.Name, StringComparison.Ordinal)))
             throw new ToolDefinitionValidationException("tool_definition_name_reserved", $"ToolDefinition name '{resource.Name}' is reserved by an internal Agentstration MCP Tool.");
         var scopeRef = resource.ScopeRef!.Value;
+        var contracts = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
         var resolved = await flows.ResolveAsync(scopeRef, resource.Namespace, resource.Definition.Flow, cancellationToken);
-        ValidateContract(resource.Definition, resolved);
+        ValidateContract(contracts.Definition, resolved);
         var existing = await GetAsync(resource.Name, resource.Namespace, cancellationToken);
         var value = resource with
         {
+            Definition = contracts.Definition,
+            SchemaBindings = contracts.Snapshots,
             Uid = existing?.Value.Uid ?? Guid.Empty,
             Generation = existing is null ? 1 : checked(existing.Value.Generation + 1),
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
@@ -166,12 +173,67 @@ public sealed class ToolDefinitionService(
         if ((resource.Definition.Flow.UseActiveVersion && !string.IsNullOrWhiteSpace(resource.Definition.Flow.Version))
             || (!resource.Definition.Flow.UseActiveVersion && string.IsNullOrWhiteSpace(resource.Definition.Flow.Version)))
             throw new ToolDefinitionValidationException("tool_definition_flow_reference_invalid", "Select either the active Flow version or one exact version.");
-        if (resource.Definition.InputSchema.ValueKind != JsonValueKind.Object)
+        if (resource.Definition.InputSchemaBinding is null
+            && resource.Definition.InputSchema.ValueKind != JsonValueKind.Object)
             throw new ToolDefinitionValidationException("tool_definition_input_schema_invalid", "The Tool input schema must be a JSON object.");
+        ValidateBinding(resource.Definition.InputSchemaBinding, "input");
+        if (resource.Definition.OutputSchema is { ValueKind: not JsonValueKind.Object })
+            throw new ToolDefinitionValidationException("tool_definition_output_schema_invalid", "The Tool output schema must be a JSON object.");
+        ValidateBinding(resource.Definition.OutputSchemaBinding, "output");
         if (resource.Definition.FixedArguments is { ValueKind: not JsonValueKind.Object })
             throw new ToolDefinitionValidationException("tool_definition_fixed_arguments_invalid", "ToolDefinition fixed arguments must be a JSON object.");
         if (resource.Definition.InvocationTimeoutSeconds is < 1 or > 900)
             throw new ToolDefinitionValidationException("tool_definition_timeout_invalid", "Tool invocation timeout must be between 1 and 900 seconds.");
+    }
+
+    private static void ValidateBinding(SchemaBinding? binding, string direction)
+    {
+        if (binding is { Inline: null, Reference: null } or { Inline: not null, Reference: not null })
+            throw new ToolDefinitionValidationException("schema_binding_invalid", $"The Tool {direction} contract must select exactly one Schema binding form.");
+    }
+
+    private async ValueTask<(ToolDefinitionProperties Definition, IReadOnlyDictionary<string, SchemaBindingSnapshot> Snapshots)> ResolveContractsAsync(
+        ToolDefinitionProperties definition,
+        ResourceScopeRef scopeRef,
+        ResourceNamespace ownerNamespace,
+        CancellationToken cancellationToken)
+    {
+        var snapshots = new Dictionary<string, SchemaBindingSnapshot>(StringComparer.Ordinal);
+        var input = await ResolveContractAsync("$.inputSchema", definition.InputSchema, definition.InputSchemaBinding,
+            scopeRef, ownerNamespace, snapshots, cancellationToken);
+        var output = await ResolveContractAsync("$.outputSchema", definition.OutputSchema, definition.OutputSchemaBinding,
+            scopeRef, ownerNamespace, snapshots, cancellationToken);
+        if (input is null)
+            throw new ToolDefinitionValidationException("tool_definition_input_schema_invalid", "The Tool input schema is required.");
+        return (definition with { InputSchema = input.Value, OutputSchema = output }, snapshots);
+    }
+
+    private async ValueTask<JsonElement?> ResolveContractAsync(
+        string path,
+        JsonElement? legacy,
+        SchemaBinding? binding,
+        ResourceScopeRef scopeRef,
+        ResourceNamespace ownerNamespace,
+        Dictionary<string, SchemaBindingSnapshot> snapshots,
+        CancellationToken cancellationToken)
+    {
+        if (binding is null)
+            return legacy is null || legacy.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+                ? null
+                : legacy.Value.Clone();
+        if (schemaBindingResolver is null)
+            throw new ToolDefinitionValidationException("schema_binding_resolver_unavailable", "Schema bindings are not available in this composition.");
+        try
+        {
+            var snapshot = await schemaBindingResolver.ResolveAsync(path, binding,
+                new SchemaBindingResolutionContext(scopeRef, ownerNamespace, JsonSchemaFormat), cancellationToken);
+            snapshots[path] = snapshot;
+            return snapshot.Content.Clone();
+        }
+        catch (SchemaBindingResolutionException exception)
+        {
+            throw new ToolDefinitionValidationException(exception.Code, exception.Message);
+        }
     }
 
     private async Task EnsureProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, CancellationToken cancellationToken)

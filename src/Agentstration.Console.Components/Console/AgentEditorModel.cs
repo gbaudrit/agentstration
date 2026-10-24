@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Web.Console;
 
@@ -24,6 +26,10 @@ public sealed class AgentEditorModel
     public string Tags { get; set; } = string.Empty;
     public string Annotations { get; set; } = string.Empty;
     public AgentProperties? SourceDefinition { get; set; }
+    public JsonElement? InputSchema { get; set; }
+    public SchemaBinding? InputSchemaBinding { get; set; }
+    public JsonElement? OutputSchema { get; set; }
+    public SchemaBinding? OutputSchemaBinding { get; set; }
 
     public bool SelectModelProfile(ModelProfileSummaryResponse profile)
     {
@@ -60,7 +66,11 @@ public sealed class AgentEditorModel
                 ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace)),
                 RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), @namespace: ResourceNamespace.Parse(RuntimeProfileNamespace)),
                 Tools = tools,
-                ToolSets = ToolSets
+                ToolSets = ToolSets,
+                InputSchema = InputSchema?.Clone(),
+                InputSchemaBinding = InputSchemaBinding,
+                OutputSchema = OutputSchema?.Clone(),
+                OutputSchemaBinding = OutputSchemaBinding
             }
         };
     }
@@ -79,6 +89,10 @@ public sealed class AgentEditorModel
         RuntimeProfileNamespace = (resource.Definition.RuntimeProfile.Namespace ?? resource.Namespace).Value,
         ToolNames = string.Join(Environment.NewLine, resource.Definition.Tools.Select(tool => tool.Name)),
         ToolSets = resource.Definition.ToolSets,
+        InputSchema = resource.Definition.InputSchema?.Clone(),
+        InputSchemaBinding = resource.Definition.InputSchemaBinding,
+        OutputSchema = resource.Definition.OutputSchema?.Clone(),
+        OutputSchemaBinding = resource.Definition.OutputSchemaBinding,
         Tags = Format(resource.Metadata.Tags),
         Annotations = Format(resource.Metadata.Annotations),
         SourceDefinition = resource.Definition
@@ -98,6 +112,10 @@ public sealed class AgentEditorModel
         RuntimeProfileNamespace = (request.Definition.RuntimeProfile.Namespace ?? ResourceNamespace.Default).Value,
         ToolNames = string.Join(Environment.NewLine, request.Definition.Tools.Select(tool => tool.Name)),
         ToolSets = request.Definition.ToolSets,
+        InputSchema = request.Definition.InputSchema?.Clone(),
+        InputSchemaBinding = request.Definition.InputSchemaBinding,
+        OutputSchema = request.Definition.OutputSchema?.Clone(),
+        OutputSchemaBinding = request.Definition.OutputSchemaBinding,
         Tags = Format(request.Metadata.Tags),
         Annotations = Format(request.Metadata.Annotations),
         SourceDefinition = request.Definition
