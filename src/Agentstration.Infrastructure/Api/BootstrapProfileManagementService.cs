@@ -34,11 +34,13 @@ public sealed class BootstrapProfileManagementService(
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         var tenants = await identities.ListTenantsAsync(cancellationToken);
         var workspaces = new List<BootstrapTargetWorkspace>();
-        foreach (var tenant in tenants.Where(tenant => tenant.Status == TenantStatus.Active))
+        foreach (var tenant in tenants.Where(tenant => tenant.Status == TenantStatus.Active
+                     && !OperationalTopologyIdentities.IsSystemTenant(tenant.Id)))
         {
             var tenantWorkspaces = await identities.ListWorkspacesAsync(tenant.Id, cancellationToken);
             workspaces.AddRange(tenantWorkspaces
-                .Where(workspace => workspace.Status == WorkspaceStatus.Active)
+                .Where(workspace => workspace.Status == WorkspaceStatus.Active
+                    && !OperationalTopologyIdentities.IsOperationalWorkspace(workspace))
                 .Select(workspace => new BootstrapTargetWorkspace(
                     tenant.Id,
                     tenant.Name,
@@ -50,7 +52,8 @@ public sealed class BootstrapProfileManagementService(
         var applications = await ListApplicationsWithRecoveryAsync(cancellationToken);
         return new(
             await catalog.GetSnapshotAsync(cancellationToken),
-            tenants.Where(tenant => tenant.Status == TenantStatus.Active)
+            tenants.Where(tenant => tenant.Status == TenantStatus.Active
+                    && !OperationalTopologyIdentities.IsSystemTenant(tenant.Id))
                 .Select(tenant => new BootstrapTargetTenant(tenant.Id, tenant.Name, tenant.DisplayName))
                 .ToArray(),
             workspaces,
@@ -353,7 +356,8 @@ public sealed class BootstrapProfileManagementService(
             if (target?.TenantId is { } tenantId)
             {
                 var tenant = await identities.GetTenantAsync(tenantId, cancellationToken);
-                if (tenant is null || tenant.Status != TenantStatus.Active)
+                if (tenant is null || tenant.Status != TenantStatus.Active
+                    || OperationalTopologyIdentities.IsSystemTenant(tenant.Id))
                     throw new DeclarativeBootstrapException($"Bootstrap target Tenant '{tenantId}' is missing or inactive.");
             }
             return null;
@@ -361,7 +365,8 @@ public sealed class BootstrapProfileManagementService(
         if (target.TenantId is not { } targetTenantId)
             throw new DeclarativeBootstrapException("A Workspace bootstrap target requires its Tenant identifier.");
         var workspace = await identities.GetWorkspaceAsync(targetTenantId, target.WorkspaceId.Value, cancellationToken);
-        if (workspace is null || workspace.Status != WorkspaceStatus.Active)
+        if (workspace is null || workspace.Status != WorkspaceStatus.Active
+            || OperationalTopologyIdentities.IsOperationalWorkspace(workspace))
             throw new DeclarativeBootstrapException($"Bootstrap target Workspace '{target.WorkspaceId}' is missing, inactive, or outside Tenant '{targetTenantId}'.");
         var tenantForWorkspace = await identities.GetTenantAsync(targetTenantId, cancellationToken);
         if (tenantForWorkspace is null || tenantForWorkspace.Status != TenantStatus.Active)

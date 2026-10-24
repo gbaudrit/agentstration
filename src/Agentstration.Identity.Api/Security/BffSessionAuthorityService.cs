@@ -93,6 +93,15 @@ public sealed class BffSessionAuthorityService(
                 var tenant = await identities.GetTenantAsync(workspace.TenantId, cancellationToken);
                 if (tenant?.Status == TenantStatus.Active) candidates.Add(workspace);
             }
+            foreach (var membership in (await identities.ListTenantMembershipsAsync(principalId, cancellationToken))
+                         .Where(value => value.Status == MembershipStatus.Active))
+            {
+                var workspace = await identities.GetWorkspaceAsync(
+                    membership.TenantId,
+                    OperationalTopologyIdentities.TenantOperationsWorkspaceId(membership.TenantId),
+                    cancellationToken);
+                if (workspace is { Status: WorkspaceStatus.Active }) candidates.Add(workspace);
+            }
         }
 
         var readable = new List<Workspace>();
@@ -116,7 +125,13 @@ public sealed class BffSessionAuthorityService(
             selected = readable.SingleOrDefault(value => value.Id == preferences?.DefaultWorkspaceId
                 && (preferences?.DefaultTenantId is null || value.TenantId == preferences.DefaultTenantId));
         }
-        selected ??= readable.OrderBy(value => value.TenantId).ThenBy(value => value.Name, StringComparer.Ordinal).First();
+        selected ??= readable.Where(value => !OperationalTopologyIdentities.IsOperationalWorkspace(value))
+            .OrderBy(value => value.TenantId)
+            .ThenBy(value => value.Name, StringComparer.Ordinal)
+            .FirstOrDefault();
+        selected ??= readable.OrderBy(value => value.TenantId)
+            .ThenBy(value => value.Name, StringComparer.Ordinal)
+            .First();
 
         return new(
             principal.Id,

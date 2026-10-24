@@ -69,8 +69,10 @@ public sealed partial class SecurityApiTests
             Assert.IsTrue(result.Succeeded, string.Join("; ", result.Errors.Select(error => error.Description)));
 
             var store = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
-            var tenant = (await store.ListTenantsAsync(default)).Single();
-            var workspace = (await store.ListWorkspacesAsync(tenant.Id, default)).Single();
+            var tenant = (await store.ListTenantsAsync(default)).Single(value =>
+                !OperationalTopologyIdentities.IsSystemTenant(value.Id));
+            var workspace = (await store.ListWorkspacesAsync(tenant.Id, default)).Single(value =>
+                !OperationalTopologyIdentities.IsOperationalWorkspace(value));
             var owner = await store.FindRoleDefinitionByNameAsync("Owner", default);
             Assert.IsNotNull(owner);
             var principal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Workspace owner", null, PrincipalStatus.Active, DateTimeOffset.UtcNow);

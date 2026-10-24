@@ -170,6 +170,7 @@ public static class DependencyInjection
         services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();
         services.AddSingleton<IInitialPrincipalProvisioner, InitialPrincipalProvisioner>();
         services.AddSingleton<IInitialTopologyProvisioner, InitialTopologyProvisioner>();
+        services.AddSingleton<IOperationalTopologyProvisioner, OperationalTopologyProvisioner>();
         services.AddSingleton<ILocalPrincipalProvisioner, LocalPrincipalProvisioner>();
         services.AddSingleton<IPlatformAuthorizationService, PlatformAuthorizationService>();
         services.AddSingleton<PlatformAdministratorLifecycleLock>();

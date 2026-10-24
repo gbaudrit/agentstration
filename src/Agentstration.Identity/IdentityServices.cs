@@ -109,7 +109,8 @@ public sealed class InitialPrincipalProvisioner(
 public sealed class InitialTopologyProvisioner(
     IIdentityStore store,
     TimeProvider timeProvider,
-    IWorkspaceProvisioner workspaceProvisioner) : IInitialTopologyProvisioner
+    IWorkspaceProvisioner workspaceProvisioner,
+    IOperationalTopologyProvisioner operationalTopology) : IInitialTopologyProvisioner
 {
     public async Task<InitialTopologyProvisioningResult> ProvisionAsync(
         InitialTopologyProvisioning request,
@@ -124,6 +125,10 @@ public sealed class InitialTopologyProvisioner(
         var tenantDisplayName = IdentityBootstrapValidation.DisplayName(request.TenantDisplayName, "Tenant");
         var workspaceName = IdentityBootstrapValidation.Name(request.WorkspaceName, "Workspace");
         var workspaceDisplayName = IdentityBootstrapValidation.DisplayName(request.WorkspaceDisplayName, "Workspace");
+        if (OperationalTopologyIdentities.IsReservedTenantName(tenantName))
+            throw new ArgumentException("The Tenant name is reserved for Agentstration operations.", nameof(request));
+        if (OperationalTopologyIdentities.IsReservedWorkspaceName(workspaceName))
+            throw new ArgumentException("The Workspace name is reserved for Agentstration operations.", nameof(request));
         var now = timeProvider.GetUtcNow();
 
         var tenant = await store.FindTenantByNameAsync(tenantName, cancellationToken);
@@ -154,6 +159,7 @@ public sealed class InitialTopologyProvisioner(
             DefaultWorkspaceId = workspace.Id,
             UpdatedAt = now
         }, cancellationToken);
+        _ = await operationalTopology.EnsureTenantAsync(tenant, cancellationToken);
         return new InitialTopologyProvisioningResult(tenant, workspace);
     }
 }
