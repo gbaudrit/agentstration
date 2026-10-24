@@ -643,6 +643,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                 Assert.AreEqual(stored.Value.Uid, resolved.AgentId);
                 Assert.AreEqual(scopeRef, resolved.AgentScopeRef);
                 Assert.AreEqual(revision.Value.Uid, resolved.RevisionUid);
+                Assert.AreEqual(ResourceScopeRef.Instance, resolved.ModelProfileScopeRef);
                 storedUid = stored.Value.Uid;
             }
 

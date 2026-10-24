@@ -33,7 +33,8 @@ public sealed class RuntimeWorkerOperationGateway(
         RuntimeGovernedModelRequest request,
         CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.ExecutionScopeRef, request.TenantId, request.WorkspaceId, request.PrincipalId);
+        using var requestScope = EnterScope(request.Agent.ModelProfileScopeRef ?? request.ExecutionScopeRef,
+            request.TenantId, request.PrincipalId);
         var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
             request.Agent.ModelProfileName, cancellationToken);
         var messages = ToMessages(request.Messages);
@@ -55,7 +56,8 @@ public sealed class RuntimeWorkerOperationGateway(
         RuntimeGovernedModelRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.ExecutionScopeRef, request.TenantId, request.WorkspaceId, request.PrincipalId);
+        using var requestScope = EnterScope(request.Agent.ModelProfileScopeRef ?? request.ExecutionScopeRef,
+            request.TenantId, request.PrincipalId);
         var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
             request.Agent.ModelProfileName, cancellationToken);
         var metadata = client.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
@@ -77,7 +79,7 @@ public sealed class RuntimeWorkerOperationGateway(
 
     public async Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.ExecutionScopeRef, request.TenantId, request.WorkspaceId, request.PrincipalId);
+        using var requestScope = EnterScope(request.ExecutionScopeRef, request.TenantId, request.PrincipalId);
         return await toolExecution.ExecuteAsync(new ToolExecutionContext
         {
             OwnerKind = request.StepExecutionId is null ? ToolExecutionOwnerKind.RuntimeRun : ToolExecutionOwnerKind.FlowRun,
@@ -365,17 +367,17 @@ public sealed class RuntimeWorkerOperationGateway(
                 "The StepDefinition is not present in the assigned Flow snapshot.");
         return (stored.Value, step);
     }
-    private IDisposable EnterScope(ResourceScopeRef scopeRef, Guid tenantId, Agentstration.Resources.WorkspaceId workspaceId, Guid principalId) =>
+    private IDisposable EnterScope(ResourceScopeRef scopeRef, Guid tenantId, Guid principalId) =>
         scopeRef.Kind switch
         {
             ResourceScopeKind.Instance => requestScopes.PushSystem(),
-            ResourceScopeKind.Tenant => requestScopes.PushTenant(principalId, tenantId),
-            ResourceScopeKind.Workspace => requestScopes.Push(new RequestContext(principalId, tenantId, workspaceId.Value)),
+            ResourceScopeKind.Tenant => requestScopes.PushTenant(principalId, scopeRef.TargetId!.Value),
+            ResourceScopeKind.Workspace => requestScopes.Push(new RequestContext(principalId, tenantId, scopeRef.TargetId!.Value)),
             _ => throw new RuntimeExecutionMaterialException("execution_scope_invalid", "The execution scope is invalid.")
         };
 
     private IDisposable EnterScope(FlowRunScope scope) =>
-        EnterScope(scope.ScopeRef, scope.TenantId, scope.WorkspaceId, scope.PrincipalId);
+        EnterScope(scope.ScopeRef, scope.TenantId, scope.PrincipalId);
 
     private sealed record ArtifactState(Guid ArtifactId, string Name, ArtifactReference Reference);
 }

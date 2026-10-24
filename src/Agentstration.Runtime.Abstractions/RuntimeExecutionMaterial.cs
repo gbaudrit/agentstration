@@ -46,6 +46,7 @@ public sealed record RuntimeExecutionAgentMaterial(
 {
     public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? AgentScopeRef { get; init; }
+    public ResourceScopeRef? ModelProfileScopeRef { get; init; }
     public Guid RevisionUid { get; init; }
     public string RuntimeProfileName { get; init; } = string.Empty;
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;

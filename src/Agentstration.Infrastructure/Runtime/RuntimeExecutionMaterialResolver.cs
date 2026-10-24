@@ -348,6 +348,7 @@ public sealed class RuntimeExecutionMaterialResolver(
         {
             AgentNamespace = resolved.AgentNamespace,
             AgentScopeRef = resolved.AgentScopeRef,
+            ModelProfileScopeRef = resolved.ModelProfileScopeRef,
             RevisionUid = resolved.RevisionUid,
             RuntimeProfileName = resolved.RuntimeProfileName,
             RuntimeProfileNamespace = resolved.RuntimeProfileNamespace

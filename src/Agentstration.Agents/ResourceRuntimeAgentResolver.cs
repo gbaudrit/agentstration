@@ -67,7 +67,8 @@ public sealed class ResourceRuntimeAgentResolver(
             AgentScopeRef = agent.Value.ScopeRef,
             RevisionUid = revision.Value.Uid,
             RuntimeProfileNamespace = revision.Value.Definition.RuntimeProfileNamespace,
-            ModelProfileNamespace = modelProfileNamespace
+            ModelProfileNamespace = modelProfileNamespace,
+            ModelProfileScopeRef = revision.Value.Definition.ModelProfilePin?.ScopeRef
         };
     }
 

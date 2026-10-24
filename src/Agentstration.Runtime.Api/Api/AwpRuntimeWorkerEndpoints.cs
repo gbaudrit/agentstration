@@ -780,6 +780,7 @@ public static class AwpRuntimeWorkerEndpoints
         }).ToArray())
     {
         AgentNamespace = agent.AgentNamespace.ToString(),
+        ModelProfileScopeRef = agent.ModelProfileScopeRef?.ToString(),
         RuntimeProfileName = agent.RuntimeProfileName,
         RuntimeProfileNamespace = agent.RuntimeProfileNamespace.ToString()
     };
