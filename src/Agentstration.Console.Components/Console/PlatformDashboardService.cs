@@ -20,7 +20,8 @@ public sealed class PlatformDashboardService(
     IModelProvidersClient modelProviders,
     IExtensionsClient extensions,
     ILogger<PlatformDashboardService> logger,
-    IConsoleContextProvider? contextProvider = null) : IPlatformStatusProvider, IDisposable
+    IConsoleContextProvider? contextProvider = null,
+    ConsoleContextState? contextState = null) : IPlatformStatusProvider, IDisposable
 {
     private readonly CancellationTokenSource lifetime = new();
     private readonly object loadLock = new();
@@ -38,9 +39,11 @@ public sealed class PlatformDashboardService(
 
     public PlatformDashboardLoad Start(CancellationToken cancellationToken)
     {
-        var contextTask = contextProvider is null
-            ? Task.FromResult<ConsoleContextSnapshot?>(null)
-            : LoadContextAsync(contextProvider, cancellationToken);
+        var contextTask = contextState is not null
+            ? LoadContextAsync(contextState, cancellationToken)
+            : contextProvider is null
+                ? Task.FromResult<ConsoleContextSnapshot?>(null)
+                : LoadContextAsync(contextProvider, cancellationToken);
         var agentsTask = LoadAsync("Agents", management.GetAgentsAsync, Array.Empty<AgentSummary>(), cancellationToken);
         var instancesTask = LoadAsync("Agent instances", token => GetAgentInstancesAsync(contextTask, token), Array.Empty<AgentInstanceResponse>(), cancellationToken);
         var runtimeRunsTask = LoadAsync("Agents Run", token => GetRuntimeRunsAsync(contextTask, token), Array.Empty<RuntimeRun>(), cancellationToken);
@@ -131,6 +134,14 @@ public sealed class PlatformDashboardService(
     private static async Task<ConsoleContextSnapshot?> LoadContextAsync(
         IConsoleContextProvider provider,
         CancellationToken cancellationToken) => await provider.GetAsync(cancellationToken);
+
+    private static async Task<ConsoleContextSnapshot?> LoadContextAsync(
+        ConsoleContextState state,
+        CancellationToken cancellationToken)
+    {
+        await state.EnsureLoadedAsync(cancellationToken);
+        return state.Current;
+    }
 
     private static ResourceScopeRef OperationalScope(ConsoleContextSnapshot context) =>
         ResourceScopeRef.Workspace(context.WorkspaceId);

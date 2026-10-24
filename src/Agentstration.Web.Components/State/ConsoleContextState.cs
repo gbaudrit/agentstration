@@ -67,18 +67,37 @@ public interface IConsoleContextProvider
 
 public sealed class ConsoleContextState(IConsoleContextProvider provider)
 {
+    private readonly object loadLock = new();
+    private Task? loadTask;
     public event Action? Changed;
     public ConsoleContextSnapshot? Current { get; private set; }
     public bool IsLoading { get; private set; }
     public string? Error { get; private set; }
 
-    public async Task LoadAsync(CancellationToken cancellationToken)
+    public Task LoadAsync(CancellationToken cancellationToken)
+    {
+        lock (loadLock)
+            return loadTask ??= LoadCoreAsync(cancellationToken);
+    }
+
+    public Task EnsureLoadedAsync(CancellationToken cancellationToken)
+    {
+        lock (loadLock)
+            return Current is not null ? Task.CompletedTask : loadTask ??= LoadCoreAsync(cancellationToken);
+    }
+
+    private async Task LoadCoreAsync(CancellationToken cancellationToken)
     {
         IsLoading = true;
         Error = null;
         try { Current = await provider.GetAsync(cancellationToken); }
         catch (Exception exception) { Error = exception.Message; }
-        finally { IsLoading = false; Changed?.Invoke(); }
+        finally
+        {
+            IsLoading = false;
+            lock (loadLock) loadTask = null;
+            Changed?.Invoke();
+        }
     }
 
     public bool HasPermission(string permission) => Current?.Permissions.Contains(permission) == true;

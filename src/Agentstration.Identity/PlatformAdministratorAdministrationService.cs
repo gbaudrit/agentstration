@@ -98,10 +98,9 @@ public sealed class PlatformAdministratorAdministrationService(
 
     private async Task<Guid> RequireActorAsync(CancellationToken cancellationToken)
     {
-        if (!requestContext.IsInitialized
-            || !await authorization.IsPlatformAdministratorAsync(requestContext.Current.PrincipalId, cancellationToken))
+        if (requestContext.ActorPrincipalId is not Guid actorId
+            || !await authorization.IsPlatformAdministratorAsync(actorId, cancellationToken))
             throw new AuthorizationDeniedException("platform/admin");
-        var actorId = requestContext.Current.PrincipalId;
         if ((await store.GetPrincipalAsync(actorId, cancellationToken))?.Status != PrincipalStatus.Active)
             throw new AuthorizationDeniedException("platform/admin");
         return actorId;
