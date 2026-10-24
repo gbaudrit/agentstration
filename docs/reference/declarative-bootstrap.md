@@ -190,7 +190,7 @@ Workspace profiles support direct editable `ModelProvider`, `RuntimeProfile`, `M
 
 ## Flow authoring requirements
 
-Bootstrap Flow manifests use named `output` steps for every terminal result. New manifests must not use the legacy `failure` step. Declare at least one successful output and one error output; `completed` and `error` are the recommended names. An error output declares `outcome: error` and should provide a stable code, message, and an `outputMapping` when the failure payload must be preserved.
+Bootstrap Flow manifests use named `output` steps for every terminal result. Manifests must not use the removed, unreleased `failure` step. Declare at least one successful output and one error output; `completed` and `error` are the recommended names. An error output declares `outcome: error` and should provide a stable code, message, and an `outputMapping` when the failure payload must be preserved.
 
 Every Agent and Tool step exposes `success` and `error`; both paths must be connected. Every Flow-call step must likewise connect each named error output declared by the called Flow, using that output name as the transition event. Put referenced Agents and child Flows earlier in lexical profile order than their consumers.
 
