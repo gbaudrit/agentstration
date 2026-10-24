@@ -7,8 +7,10 @@
         {
             <div class="flow-schema-heading-actions">
                 <div class="flow-schema-mode" role="group" aria-label="@Localizer["SchemaSource"]">
-                    <button type="button" class="@(mode == BindingMode.Inline ? "active" : null)" disabled="@ReadOnly" @onclick="() => ChangeModeAsync(BindingMode.Inline)">@Localizer["SchemaInline"]</button>
-                    <button type="button" class="@(mode == BindingMode.Shared ? "active" : null)" disabled="@ReadOnly" @onclick="() => ChangeModeAsync(BindingMode.Shared)">@Localizer["SchemaShared"]</button>
+                    <button type="button" class="@(mode == BindingMode.Inline ? "active" : null)" disabled="@ReadOnly"
+                        data-testid="@($"{TestId}-mode-inline")" @onclick="() => ChangeModeAsync(BindingMode.Inline)">@Localizer["SchemaInline"]</button>
+                    <button type="button" class="@(mode == BindingMode.Shared ? "active" : null)" disabled="@ReadOnly"
+                        data-testid="@($"{TestId}-mode-shared")" @onclick="() => ChangeModeAsync(BindingMode.Shared)">@Localizer["SchemaShared"]</button>
                 </div>
                 @if (!ReadOnly)
                 {
@@ -111,7 +113,9 @@
 
     protected override void OnParametersSet()
     {
-        var nextKey = $"{Binding?.Inline?.Content.GetRawText()}|{Binding?.Reference?.ScopeRef?.Value}|{Binding?.Reference?.Namespace?.Value}|{Binding?.Reference?.Name}|{Binding?.Reference?.Version}|{LegacySchema?.GetRawText()}";
+        var versionsKey = string.Join(';', SchemaVersions.Select(version =>
+            $"{version.ScopeRef.Value}/{version.Namespace.Value}/{version.Name}:{version.Version}"));
+        var nextKey = $"{Binding?.Inline?.Content.GetRawText()}|{Binding?.Reference?.ScopeRef?.Value}|{Binding?.Reference?.Namespace?.Value}|{Binding?.Reference?.Name}|{Binding?.Reference?.Version}|{LegacySchema?.GetRawText()}|{versionsKey}";
         if (nextKey == stateKey) return;
         stateKey = nextKey;
         mode = Binding?.Reference is null ? BindingMode.Inline : BindingMode.Shared;
