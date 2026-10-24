@@ -346,21 +346,12 @@ public static class FlowGraphDefinitionExtensions
 
     public static IReadOnlyList<FlowOutputDefinition> GetOutputs(this FlowGraphDefinition definition) =>
         definition.Steps
-            .Select(step => step switch
-            {
-                OutputFlowStepDefinition output => new FlowOutputDefinition(
-                    output.Name,
-                    output.DisplayName,
-                    output.Outcome ?? FlowOutputOutcome.Success,
-                    definition.ResolveOutputSchema(output, out _)?.Clone()),
-                FailureFlowStepDefinition failure => new FlowOutputDefinition(
-                    failure.Name,
-                    failure.DisplayName,
-                    FlowOutputOutcome.Error,
-                    null),
-                _ => null
-            })
-            .OfType<FlowOutputDefinition>()
+            .OfType<OutputFlowStepDefinition>()
+            .Select(output => new FlowOutputDefinition(
+                output.Name,
+                output.DisplayName,
+                output.Outcome ?? FlowOutputOutcome.Success,
+                definition.ResolveOutputSchema(output, out _)?.Clone()))
             .ToArray();
 
     private static bool SameSchema(JsonElement? left, JsonElement? right)

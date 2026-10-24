@@ -52,7 +52,7 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public void LegacyOutputAndFailureRemainReadableWithTheirPreviousDefaults()
+    public void LegacyFailureRemainsReadableWithoutBecomingANamedOutput()
     {
         const string json = """
             {"entryStep":"input","steps":[{"type":"input","name":"input"},{"type":"output","name":"output"},{"type":"failure","name":"failure"}],"transitions":[{"id":"done","fromStep":"input","event":"completed","toStep":"output"}]}
@@ -63,7 +63,11 @@ public sealed partial class FlowTests
         var failure = Assert.IsInstanceOfType<FailureFlowStepDefinition>(restored.Steps[2]);
 
         Assert.IsNull(output.Outcome);
-        Assert.AreEqual(FlowOutputOutcome.Success, restored.GetOutputs().Single(value => value.Name == "output").Outcome);
+        var namedOutputs = restored.GetOutputs();
+        Assert.HasCount(1, namedOutputs);
+        var namedOutput = namedOutputs[0];
+        Assert.AreEqual("output", namedOutput.Name);
+        Assert.AreEqual(FlowOutputOutcome.Success, namedOutput.Outcome);
         Assert.AreEqual("FLOW_FAILED", failure.Code);
         using var serialized = JsonDocument.Parse(JsonSerializer.Serialize(restored, JsonOptions));
         var legacyOutput = serialized.RootElement.GetProperty("steps")[1];

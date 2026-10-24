@@ -1015,7 +1015,7 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
-    public async Task ChangingCalledFlowRemovesAnObsoleteAutomaticFailureRoute()
+    public async Task ChangingCalledFlowRemovesAnAutomaticErrorRouteWhenNoErrorOutcomeRemains()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
@@ -1031,7 +1031,7 @@ public sealed class FlowDesignerReadOnlyTests
             Transitions =
             [
                 new("child-completed", "child", "completed", "done"),
-                new("child-failure", "child", "failure", "error")
+                new("child-rejected", "child", "rejected", "error")
             ]
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
@@ -1044,7 +1044,7 @@ public sealed class FlowDesignerReadOnlyTests
             ],
             FlowVersions = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal)
             {
-                ["pack.news|analysis"] = [new("1.0.0", null, null, [new("completed", null, FlowOutputOutcome.Success, null), new("failure", null, FlowOutputOutcome.Error, null)])],
+                ["pack.news|analysis"] = [new("1.0.0", null, null, [new("completed", null, FlowOutputOutcome.Success, null), new("rejected", null, FlowOutputOutcome.Error, null)])],
                 ["pack.news|summary"] = [new("1.0.0", null, null, [new("completed", null, FlowOutputOutcome.Success, null)])]
             }
         });
@@ -1054,7 +1054,7 @@ public sealed class FlowDesignerReadOnlyTests
         context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
         var store = context.Services.GetRequiredService<FlowEditorStore>();
-        rendered.WaitForAssertion(() => Assert.IsTrue(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "failure")));
+        rendered.WaitForAssertion(() => Assert.IsTrue(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "rejected")));
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
 
