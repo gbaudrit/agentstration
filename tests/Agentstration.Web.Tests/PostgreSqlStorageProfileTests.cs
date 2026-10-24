@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Agentstration.DataSources.Contracts;
+using Agentstration.Flows.Storage.PostgreSql;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -11,6 +12,7 @@ using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -18,6 +20,14 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class PostgreSqlStorageProfileTests
 {
+    [TestMethod]
+    public void FlowMigrationsMatchCurrentModel()
+    {
+        using var context = new PostgreSqlDesignTimeFactory().CreateDbContext([]);
+
+        Assert.IsFalse(context.Database.HasPendingModelChanges());
+    }
+
     [TestMethod]
     public async Task EmptyDatabaseMigratesAndRemainsReadyAfterRestart()
     {
