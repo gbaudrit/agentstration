@@ -1015,6 +1015,61 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
+    public async Task ChangingCalledFlowRemovesAnObsoleteAutomaticFailureRoute()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps =
+            [
+                new FlowCallStepDefinition { Name = "child", Flow = new("analysis", FlowCallVersionStrategy.Exact, "1.0.0", new("pack.news")) },
+                new OutputFlowStepDefinition { Name = "done" },
+                new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
+            ],
+            Transitions =
+            [
+                new("child-completed", "child", "completed", "done"),
+                new("child-failure", "child", "failure", "error")
+            ]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            Flows =
+            [
+                new("analysis", "Analysis", new("pack.news"), "1.0.0"),
+                new("summary", "Summary", new("pack.news"), "1.0.0")
+            ],
+            FlowVersions = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal)
+            {
+                ["pack.news|analysis"] = [new("1.0.0", null, null, [new("completed", null, FlowOutputOutcome.Success, null), new("failure", null, FlowOutputOutcome.Error, null)])],
+                ["pack.news|summary"] = [new("1.0.0", null, null, [new("completed", null, FlowOutputOutcome.Success, null)])]
+            }
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+        var store = context.Services.GetRequiredService<FlowEditorStore>();
+        rendered.WaitForAssertion(() => Assert.IsTrue(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "failure")));
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
+
+        rendered.Find("[data-testid='flow-call-reference']").Change("pack.news|summary");
+
+        rendered.WaitForAssertion(() =>
+        {
+            var transitions = store.State.Resource!.Definition.Transitions.Where(transition => transition.FromStep == "child").ToArray();
+            Assert.HasCount(1, transitions);
+            Assert.AreEqual("completed", transitions[0].Event);
+            CollectionAssert.AreEqual(new[] { "completed" }, store.State.Diagram.Nodes.Single(node => node.Name == "child").OutputEvents.ToArray());
+        });
+    }
+
+    [TestMethod]
     public async Task FlowCallInspectorShowsPublishedInputAndNamedOutputContracts()
     {
         using var culture = new CultureScope("en-US");

@@ -171,6 +171,15 @@ public sealed class FlowEditorStoreTests
         });
         Assert.AreEqual("failed", replaced.Transitions.Single().Event);
         Assert.AreEqual("arbitrary-legacy-id", replaced.Transitions.Single().Id);
+
+        var removed = new ReconcileFlowCallTransitionsCommand(new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal)
+        {
+            ["child"] = [new("done", "Done", FlowOutputOutcome.Success, null)]
+        }).Apply(definition with
+        {
+            Transitions = [new("obsolete-failure", "child", "failure", "error")]
+        });
+        Assert.HasCount(0, removed.Transitions);
     }
 
     [TestMethod]

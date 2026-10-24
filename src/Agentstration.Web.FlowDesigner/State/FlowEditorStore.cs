@@ -181,11 +181,11 @@ public sealed record ReconcileFlowCallTransitionsCommand(
                     .Where(output => output.Outcome == localOutputs[invalid.ToStep])
                     .Select(output => output.Name)
                     .ToArray();
-                var replacement = candidates.Length == 1 ? candidates[0] : null;
-                if (replacement is null) continue;
+                if (candidates.Length > 1) continue;
+                var replacement = candidates.SingleOrDefault();
 
                 var index = transitions.IndexOf(invalid);
-                if (transitions.Any(transition =>
+                if (replacement is null || transitions.Any(transition =>
                     transition.Id != invalid.Id
                     && transition.FromStep == call.Name
                     && transition.ToStep == invalid.ToStep

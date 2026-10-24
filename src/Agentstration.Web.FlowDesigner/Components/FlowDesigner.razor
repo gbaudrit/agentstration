@@ -1090,7 +1090,7 @@ else
             : ErrorOutputTransition(Editor.State.Resource.Definition, name, errorEvent);
         await DispatchAsync(new AddStepCommand(step, new(40 + index * 180, 250), errorTransition));
         Editor.SelectStep(name);
-        if (step is FlowCallStepDefinition addedCall) SyncFlowCallOutputs(addedCall, callVersions ?? []);
+        if (step is FlowCallStepDefinition addedCall) await SyncFlowCallOutputsAsync(addedCall, callVersions ?? []);
     }
 
     private static FlowTransitionDefinition? ErrorOutputTransition(FlowGraphDefinition definition, string sourceStep, string errorEvent)
@@ -1154,7 +1154,7 @@ else
         var updated = call with { Flow = reference };
         await UpdateSelectedAsync(updated);
         flowVersions = versions;
-        SyncFlowCallOutputs(updated, versions);
+        await SyncFlowCallOutputsAsync(updated, versions);
     }
     private async Task UpdateFlowVersionStrategyAsync(ChangeEventArgs e)
     {
@@ -1162,14 +1162,14 @@ else
         var reference = call.Flow with { VersionStrategy = strategy, Version = strategy == FlowCallVersionStrategy.Exact ? flowVersions.FirstOrDefault()?.Version : null };
         var updated = call with { Flow = reference };
         await UpdateSelectedAsync(updated);
-        SyncFlowCallOutputs(updated, flowVersions);
+        await SyncFlowCallOutputsAsync(updated, flowVersions);
     }
     private async Task UpdateFlowExactVersionAsync(ChangeEventArgs e)
     {
         if (SelectedStep is not FlowCallStepDefinition call) return;
         var updated = call with { Flow = call.Flow with { Version = Text(e) } };
         await UpdateSelectedAsync(updated);
-        SyncFlowCallOutputs(updated, flowVersions);
+        await SyncFlowCallOutputsAsync(updated, flowVersions);
     }
     private Task UpdateFlowMappingAsync(string propertyName, ChangeEventArgs e)
     {
@@ -1349,7 +1349,7 @@ else
     private async Task LoadFlowVersionsAsync(FlowCallStepDefinition call)
     {
         flowVersions = await Resources.GetFlowVersionsAsync(call.Flow.Namespace ?? Namespace, call.Flow.ResourceId, cancellation.Token);
-        SyncFlowCallOutputs(call, flowVersions);
+        await SyncFlowCallOutputsAsync(call, flowVersions);
     }
     private async Task RefreshFlowCallOutputsAsync(FlowGraphDefinition definition)
     {
@@ -1375,10 +1375,22 @@ else
             if (Editor.State.LocalRevision != revision) ScheduleAutosave();
         }
     }
-    private void SyncFlowCallOutputs(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions)
+    private async Task SyncFlowCallOutputsAsync(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions)
     {
-        if (Editor.SetFlowCallOutputs(call.Name, ResolveFlowVersion(call, versions)?.NamedOutputs ?? []))
+        var outputs = ResolveFlowVersion(call, versions)?.NamedOutputs ?? [];
+        if (Editor.SetFlowCallOutputs(call.Name, outputs))
             flowCallRenderRevision++;
+        if (ReadOnly || outputs.Count == 0) return;
+
+        var revision = Editor.State.LocalRevision;
+        await Editor.DispatchAsync(
+            new ReconcileFlowCallTransitionsCommand(
+                new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal)
+                {
+                    [call.Name] = outputs
+                }),
+            cancellation.Token);
+        if (Editor.State.LocalRevision != revision) ScheduleAutosave();
     }
     private FlowDesignerFlowVersion? ResolveFlowVersion(FlowCallStepDefinition call, IReadOnlyList<FlowDesignerFlowVersion> versions)
     {
