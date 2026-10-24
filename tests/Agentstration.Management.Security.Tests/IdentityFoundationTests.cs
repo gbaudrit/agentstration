@@ -64,6 +64,39 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public async Task ConsoleContextDiscoversAndSelectsEveryAuthorizedTenantWithoutPlatformAdministration()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var experience = fixture.Services.GetRequiredService<IdentityExperienceService>();
+        var now = DateTimeOffset.UtcNow;
+        var tenant = new Tenant(Guid.NewGuid(), "customer", "Customer", TenantStatus.Active, now);
+        var workspace = new Workspace(Guid.NewGuid(), tenant.Id, "operations", "Operations", WorkspaceStatus.Active, now);
+        await store.AddTenantAsync(tenant, default);
+        await store.AddWorkspaceAsync(workspace, default);
+        await store.AddMembershipAsync(new TenantMembership(
+            Guid.NewGuid(), tenant.Id, fixture.InitialContext.PrincipalId, MembershipStatus.Active, now), default);
+        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(
+            Guid.NewGuid(), workspace.Id, fixture.InitialContext.PrincipalId, MembershipStatus.Active, now), default);
+        await store.AddRoleAssignmentAsync(new RoleAssignment(
+            Guid.NewGuid(), tenant.Id, fixture.InitialContext.PrincipalId, PrincipalType.User,
+            LocalEnvironmentBootstrapper.OwnerRoleId, AuthorizationScopes.Tenant(tenant.Id)), default);
+
+        var context = await experience.GetContextAsync(default);
+        var selected = await experience.ValidateConsoleContextSelectionAsync(
+            fixture.InitialContext.PrincipalId, ResourceScopeRef.Tenant(tenant.Id), default);
+
+        Assert.IsTrue(context.AvailableContexts.Any(value =>
+            value.Kind == IdentityConsoleContextKind.Tenant && value.TenantId == tenant.Id));
+        Assert.IsTrue(context.AvailableContexts.Any(value =>
+            value.Kind == IdentityConsoleContextKind.Workspace && value.WorkspaceId == workspace.Id));
+        Assert.AreEqual(IdentityConsoleContextKind.Tenant, selected.Kind);
+        Assert.AreEqual(tenant.Id, selected.OperationalContext.TenantId);
+        Assert.AreEqual(workspace.Id, selected.OperationalContext.WorkspaceId);
+    }
+
+    [TestMethod]
     public async Task PrincipalPreferencesArePersistedPerPrincipal()
     {
         await using var fixture = await IdentityFixture.CreateAsync();

@@ -286,6 +286,7 @@ public interface IIdentityStore
     Task<Workspace?> FindWorkspaceByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken);
     Task<Workspace?> GetWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken);
     Task<Workspace?> GetWorkspaceAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(Guid tenantId, CancellationToken cancellationToken);
     Task AddWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken);
     Task UpdateWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken);
@@ -309,6 +310,7 @@ public interface IIdentityStore
     Task RemovePlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
     Task<TenantMembership?> FindMembershipAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TenantMembership>> ListMembershipsAsync(Guid tenantId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TenantMembership>> ListTenantMembershipsAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddMembershipAsync(TenantMembership membership, CancellationToken cancellationToken);
     Task<WorkspaceMembership?> FindWorkspaceMembershipAsync(Guid workspaceId, Guid principalId, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkspaceMembership>> ListWorkspaceMembershipsAsync(Guid principalId, CancellationToken cancellationToken);
@@ -318,9 +320,11 @@ public interface IIdentityStore
     Task RemoveWorkspaceMembershipAsync(Guid membershipId, CancellationToken cancellationToken);
     Task<RoleDefinition?> FindRoleDefinitionByNameAsync(string name, CancellationToken cancellationToken);
     Task<RoleDefinition?> GetRoleDefinitionAsync(Guid roleDefinitionId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RoleDefinition>> ListRoleDefinitionsAsync(CancellationToken cancellationToken);
     Task AddRoleDefinitionAsync(RoleDefinition roleDefinition, CancellationToken cancellationToken);
     Task UpdateRoleDefinitionAsync(RoleDefinition roleDefinition, CancellationToken cancellationToken);
     Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddRoleAssignmentAsync(RoleAssignment roleAssignment, CancellationToken cancellationToken);
     Task RemoveRoleAssignmentAsync(Guid roleAssignmentId, CancellationToken cancellationToken);
 }
