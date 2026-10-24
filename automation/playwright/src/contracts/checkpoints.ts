@@ -134,6 +134,15 @@ export const Checkpoints = {
     workspaceRecovery: 'execution-scopes-workspace-recovery',
     isolation: 'execution-scopes-isolation',
   },
+  hierarchicalContext: {
+    hierarchy: 'hierarchical-context-tree',
+    defaultDenied: 'hierarchical-context-default-denied',
+    discoverOnly: 'hierarchical-context-discover-only',
+    usable: 'hierarchical-context-usable',
+    revoked: 'hierarchical-context-revoked',
+    unauthorized: 'hierarchical-context-unauthorized',
+    dirtyGuard: 'hierarchical-context-dirty-guard',
+  },
   modelAdministration: {
     provider: 'model-administration-provider',
     runtime: 'model-administration-runtime',

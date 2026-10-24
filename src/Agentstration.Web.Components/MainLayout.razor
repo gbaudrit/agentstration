@@ -85,10 +85,17 @@
                                         <div class="context-tenant-tree">
                                             @foreach (var group in ContextTenantGroups)
                                             {
-                                                <section class="context-tenant-group" data-tenant-id="@group.Tenant.TenantId">
-                                                    <button type="button" class="context-option context-option-tenant @(group.Tenant.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(group.Tenant)" aria-current="@(group.Tenant.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-context-tenant-id="@group.Tenant.TenantId" data-context-scope-ref="@group.Tenant.ScopeRef" data-testid="context-option-tenant">
-                                                        <span><strong>@group.Tenant.DisplayName</strong><small>@ContextOptionPath(group.Tenant)</small></span><span class="context-kind">@ContextKindLabel(group.Tenant.Kind)</span>
-                                                    </button>
+                                                <section class="context-tenant-group" data-tenant-id="@group.TenantId">
+                                                    @if (group.Tenant is { } tenant)
+                                                    {
+                                                        <button type="button" class="context-option context-option-tenant @(tenant.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(tenant)" aria-current="@(tenant.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-context-tenant-id="@tenant.TenantId" data-context-scope-ref="@tenant.ScopeRef" data-testid="context-option-tenant">
+                                                            <span><strong>@tenant.DisplayName</strong><small>@ContextOptionPath(tenant)</small></span><span class="context-kind">@ContextKindLabel(tenant.Kind)</span>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="context-tenant-label"><strong>@group.DisplayName</strong></div>
+                                                    }
                                                     @if (group.Workspaces.Count > 0)
                                                     {
                                                         <div class="context-tenant-workspaces">

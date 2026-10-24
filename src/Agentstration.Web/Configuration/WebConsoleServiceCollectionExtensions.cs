@@ -116,7 +116,11 @@ public static class WebConsoleServiceCollectionExtensions
         });
         if (options.ForwardSessionCookie)
         {
-            builder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+            builder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false
+            });
             builder.AddHttpMessageHandler(provider => new ConsoleApiSessionHandler(
                 provider.GetRequiredService<IHttpContextAccessor>(),
                 provider.GetRequiredService<ICurrentRequestContext>(),

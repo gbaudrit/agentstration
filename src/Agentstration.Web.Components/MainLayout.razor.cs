@@ -15,7 +15,11 @@ public partial class MainLayout
     private sealed record NavigationGroup(string LabelKey, string Tone, IReadOnlyList<NavigationItem> Items);
     private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null, bool IsFallback = false);
-    private sealed record ContextTenantGroup(ConsoleContextOption Tenant, IReadOnlyList<ConsoleContextOption> Workspaces);
+    private sealed record ContextTenantGroup(
+        Guid TenantId,
+        string DisplayName,
+        ConsoleContextOption? Tenant,
+        IReadOnlyList<ConsoleContextOption> Workspaces);
 
     private static readonly NavigationGroup[] NavigationGroups =
     [
@@ -135,14 +139,28 @@ public partial class MainLayout
     private IReadOnlyList<ConsoleContextOption> InstanceContexts => ContextState.Current?.Contexts
         .Where(option => option.Kind == ConsoleContextKind.Instance)
         .ToArray() ?? [];
-    private IReadOnlyList<ContextTenantGroup> ContextTenantGroups => ContextState.Current?.Contexts
-        .Where(option => option.Kind == ConsoleContextKind.Tenant)
-        .Select(tenant => new ContextTenantGroup(
-            tenant,
-            ContextState.Current.Contexts
-                .Where(option => option.Kind == ConsoleContextKind.Workspace && option.TenantId == tenant.TenantId)
-                .ToArray()))
-        .ToArray() ?? [];
+    private IReadOnlyList<ContextTenantGroup> ContextTenantGroups
+    {
+        get
+        {
+            var contexts = ContextState.Current?.Contexts ?? [];
+            return contexts
+                .Where(option => option.TenantId.HasValue
+                    && option.Kind is ConsoleContextKind.Tenant or ConsoleContextKind.Workspace)
+                .GroupBy(option => option.TenantId!.Value)
+                .Select(group =>
+                {
+                    var tenant = group.FirstOrDefault(option => option.Kind == ConsoleContextKind.Tenant);
+                    var workspaces = group.Where(option => option.Kind == ConsoleContextKind.Workspace).ToArray();
+                    var displayName = tenant?.DisplayName
+                        ?? workspaces.FirstOrDefault()?.TenantDisplayName
+                        ?? string.Empty;
+                    return new ContextTenantGroup(group.Key, displayName, tenant, workspaces);
+                })
+                .OrderBy(group => group.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+        }
+    }
 
     private string CurrentSection
     {

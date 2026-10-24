@@ -11,6 +11,7 @@ export const TestIds = {
     themeToggle: 'theme-toggle',
     contextSelectorTrigger: 'context-selector-trigger',
     contextSelector: 'context-selector',
+    contextSearch: 'context-selector-search',
     contextOptionInstance: 'context-option-instance',
     contextOptionTenant: 'context-option-tenant',
     contextOptionWorkspace: 'context-option-workspace',

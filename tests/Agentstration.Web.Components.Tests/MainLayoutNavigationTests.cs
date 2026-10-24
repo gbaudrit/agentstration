@@ -148,16 +148,32 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(0, rendered.FindAll(".context-option-workspace").Count);
     }
 
+    [TestMethod]
+    public void ContextSelectorKeepsAuthorizedWorkspaceVisibleWithoutTenantAdministration()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(AllNavigationPermissions, workspaceOnly: true);
+        var rendered = RenderLayout(context);
+
+        rendered.Find("[data-testid='context-selector-trigger']").Click();
+
+        Assert.AreEqual(0, rendered.FindAll(".context-option-instance").Count);
+        Assert.AreEqual(0, rendered.FindAll(".context-option-tenant").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-tenant-label").Count);
+        Assert.AreEqual("Test organization", rendered.Find(".context-tenant-label").TextContent.Trim());
+        Assert.AreEqual(1, rendered.FindAll(".context-option-workspace").Count);
+    }
+
     private static readonly IReadOnlySet<string> AllNavigationPermissions = new HashSet<string>(
         ["resources/read", "resources/delete", "runs/read", "runs/delete"],
         StringComparer.Ordinal);
 
-    private static BunitContext CreateContext(IReadOnlySet<string> permissions)
+    private static BunitContext CreateContext(IReadOnlySet<string> permissions, bool workspaceOnly = false)
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
-        context.Services.AddScoped<IConsoleContextProvider>(_ => new StubContextProvider(permissions));
+        context.Services.AddScoped<IConsoleContextProvider>(_ => new StubContextProvider(permissions, workspaceOnly));
         return context;
     }
 
@@ -186,7 +202,7 @@ public sealed class MainLayoutNavigationTests
     private static string GroupLabel(AngleSharp.Dom.IElement group) =>
         group.QuerySelector("h2")?.TextContent.Trim() ?? string.Empty;
 
-    private sealed class StubContextProvider(IReadOnlySet<string> permissions) : IConsoleContextProvider
+    private sealed class StubContextProvider(IReadOnlySet<string> permissions, bool workspaceOnly) : IConsoleContextProvider
     {
         public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken)
         {
@@ -205,11 +221,14 @@ public sealed class MainLayoutNavigationTests
                 "Default workspace",
                 permissions,
                 [new(workspaceId, tenantId, "test", "Test organization", "default", "Default workspace")],
-                [
-                    new("/instance", ConsoleContextKind.Instance, null, null, null, null, null, "Instance"),
-                    new($"/tenants/{tenantId:D}", ConsoleContextKind.Tenant, tenantId, "test", "Test organization", null, null, "Test organization"),
-                    new($"/workspaces/{workspaceId:D}", ConsoleContextKind.Workspace, tenantId, "test", "Test organization", workspaceId, "default", "Default workspace")
-                ]));
+                workspaceOnly
+                    ? [new($"/workspaces/{workspaceId:D}", ConsoleContextKind.Workspace, tenantId, "test", "Test organization", workspaceId, "default", "Default workspace")]
+                    :
+                    [
+                        new("/instance", ConsoleContextKind.Instance, null, null, null, null, null, "Instance"),
+                        new($"/tenants/{tenantId:D}", ConsoleContextKind.Tenant, tenantId, "test", "Test organization", null, null, "Test organization"),
+                        new($"/workspaces/{workspaceId:D}", ConsoleContextKind.Workspace, tenantId, "test", "Test organization", workspaceId, "default", "Default workspace")
+                    ]));
         }
     }
 
