@@ -590,14 +590,6 @@ else
                             </section>
                         }
                     }
-                    else if (SelectedStep is FailureFlowStepDefinition failure)
-                    {
-                        @if (activeStepSettingsTab == StepSettingsTab.Configuration)
-                        {
-                        <label>@T("ErrorCode")<input disabled="@ReadOnly" value="@failure.Code" @onchange="e => UpdateSelectedAsync(failure with { Code = Text(e) })" /></label>
-                        <label>@T("Message")<textarea disabled="@ReadOnly" value="@failure.Message" @onchange="e => UpdateSelectedAsync(failure with { Message = Text(e) })"></textarea></label>
-                        }
-                    }
                     @if (activeStepSettingsTab == StepSettingsTab.Configuration && SelectedStep is InputFlowStepDefinition)
                     {
                         <div class="step-settings-empty"><UiIcon Name="adjustments" /><h3>@T("NoStepConfiguration")</h3><p class="muted">@T("NoStepConfigurationHelp")</p></div>

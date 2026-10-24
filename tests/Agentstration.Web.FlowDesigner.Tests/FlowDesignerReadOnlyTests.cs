@@ -64,7 +64,7 @@ public sealed class FlowDesignerReadOnlyTests
             [
                 new("agent", "agent", "Agent", new(20, 20), "sample-agent", ["success", "error"]),
                 new("output", "output", "Output", new(300, 20), null, []),
-                new("failure", "failure", "Failure", new(300, 220), null, [])
+                new("failure", "output", "Error", new(300, 220), null, [])
             ],
             [
                 new("agent-success-output", "agent", "output", "success"),
@@ -938,7 +938,7 @@ public sealed class FlowDesignerReadOnlyTests
                 new("input-deliver", "input", "completed", "deliver"),
                 new("old-success-id", "deliver", "completed", "done"),
                 new("deliver-approved-done", "deliver", "approved", "done"),
-                new("unexpected-id", "deliver", "failure", "error"),
+                new("unexpected-id", "deliver", "obsolete-error", "error"),
                 new("deliver-rejected-error", "deliver", "rejected", "error")
             ]
         };
@@ -957,7 +957,7 @@ public sealed class FlowDesignerReadOnlyTests
             var node = store.State.Diagram.Nodes.Single(item => item.Name == "deliver");
             CollectionAssert.AreEqual(new[] { "approved", "rejected" }, node.OutputEvents.ToArray());
             Assert.AreEqual(FlowOutputOutcome.Error, node.OutputOutcomes["rejected"]);
-            Assert.IsFalse(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "failure"));
+            Assert.IsFalse(store.State.Resource!.Definition.Transitions.Any(transition => transition.Event == "obsolete-error"));
             Assert.IsFalse(store.State.Resource.Definition.Transitions.Any(transition => transition.Event == "completed" && transition.FromStep == "deliver"));
             Assert.HasCount(2, store.State.Resource.Definition.Transitions.Where(transition => transition.FromStep == "deliver"));
             var renderedNode = GetDiagram(rendered.FindComponent<FlowCanvas>().Instance).Nodes
@@ -972,7 +972,7 @@ public sealed class FlowDesignerReadOnlyTests
             var backend = context.Services.GetRequiredService<IFlowDesignerBackend>() as BackendStub;
             Assert.IsNotNull(backend);
             Assert.AreEqual(1, backend.ValidationCount);
-            Assert.IsFalse(backend.LastSavedDefinition!.Transitions.Any(transition => transition.Event == "failure"));
+            Assert.IsFalse(backend.LastSavedDefinition!.Transitions.Any(transition => transition.Event == "obsolete-error"));
             Assert.IsFalse(backend.LastSavedDefinition.Transitions.Any(transition => transition.Event == "completed" && transition.FromStep == "deliver"));
         });
     }

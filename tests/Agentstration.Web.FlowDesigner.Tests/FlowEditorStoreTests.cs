@@ -74,7 +74,7 @@ public sealed class FlowEditorStoreTests
                 new InputFlowStepDefinition { Name = "input" },
                 new RouterFlowStepDefinition { Name = "router" },
                 new AgentFlowStepDefinition { Name = "agent", Agent = new("/agents/main") },
-                new FailureFlowStepDefinition { Name = "failure" },
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error },
                 new OutputFlowStepDefinition { Name = "output" }
             ],
             Transitions =
@@ -151,7 +151,7 @@ public sealed class FlowEditorStoreTests
             [
                 new("old-success", "child", "completed", "done"),
                 new("current-success", "child", "done", "done"),
-                new("arbitrary-legacy-id", "child", "failure", "error"),
+                new("arbitrary-obsolete-id", "child", "obsolete-error", "error"),
                 new("child-failed-error", "child", "failed", "error")
             ]
         };
@@ -167,17 +167,17 @@ public sealed class FlowEditorStoreTests
 
         var replaced = new ReconcileFlowCallTransitionsCommand(outputs).Apply(definition with
         {
-            Transitions = [new("arbitrary-legacy-id", "child", "failure", "error")]
+            Transitions = [new("arbitrary-obsolete-id", "child", "obsolete-error", "error")]
         });
         Assert.AreEqual("failed", replaced.Transitions.Single().Event);
-        Assert.AreEqual("arbitrary-legacy-id", replaced.Transitions.Single().Id);
+        Assert.AreEqual("arbitrary-obsolete-id", replaced.Transitions.Single().Id);
 
         var removed = new ReconcileFlowCallTransitionsCommand(new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal)
         {
             ["child"] = [new("done", "Done", FlowOutputOutcome.Success, null)]
         }).Apply(definition with
         {
-            Transitions = [new("obsolete-failure", "child", "failure", "error")]
+            Transitions = [new("obsolete-error", "child", "obsolete-error", "error")]
         });
         Assert.HasCount(0, removed.Transitions);
     }

@@ -167,7 +167,7 @@ public sealed class FlowToolStepTests
             new InputFlowStepDefinition { Name = "input" },
             new ToolFlowStepDefinition { Name = "notify", Tool = new("notification.send"), ArgumentsMapping = mapping },
             new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") },
-            new FailureFlowStepDefinition { Name = "failure" }
+            new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }
         ],
         Transitions =
         [

@@ -156,13 +156,8 @@ public sealed record ReconcileFlowCallTransitionsCommand(
         var transitions = definition.Transitions.ToList();
         var changed = false;
         var localOutputs = definition.Steps
-            .Select(step => step switch
-            {
-                FailureFlowStepDefinition => new KeyValuePair<string, FlowOutputOutcome>(step.Name, FlowOutputOutcome.Error),
-                OutputFlowStepDefinition output => new(step.Name, output.Outcome ?? FlowOutputOutcome.Success),
-                _ => (KeyValuePair<string, FlowOutputOutcome>?)null
-            })
-            .OfType<KeyValuePair<string, FlowOutputOutcome>>()
+            .OfType<OutputFlowStepDefinition>()
+            .Select(output => new KeyValuePair<string, FlowOutputOutcome>(output.Name, output.Outcome ?? FlowOutputOutcome.Success))
             .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
         foreach (var call in definition.Steps.OfType<FlowCallStepDefinition>())
         {

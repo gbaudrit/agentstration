@@ -107,7 +107,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
         if (definition.Steps.Count(step => step is InputFlowStepDefinition) != 1) issues.Add(Error("input_step_required", "A Flow requires exactly one Input step."));
-        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));
+        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));
 
         var transitionIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var transition in definition.Transitions)
@@ -131,7 +131,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (HasCycle(definition.EntryStep, definition.Transitions)) issues.Add(Error("flow_cycle_not_supported", "Cycles are not supported in this execution increment."));
         }
 
-        foreach (var terminal in definition.Steps.Where(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition))
+        foreach (var terminal in definition.Steps.OfType<OutputFlowStepDefinition>())
             if (definition.Transitions.Any(transition => transition.FromStep == terminal.Name)) issues.Add(Error("terminal_has_transition", $"Terminal step '{terminal.Name}' cannot have outgoing transitions.", terminal.Name));
 
         foreach (var output in definition.Steps.OfType<OutputFlowStepDefinition>())

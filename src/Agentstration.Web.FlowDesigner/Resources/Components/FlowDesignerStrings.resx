@@ -28,7 +28,6 @@
   <data name="Step.input"><value>Input</value></data><data name="Step.agent"><value>Agent</value></data>
   <data name="Step.router"><value>Router</value></data><data name="Step.condition"><value>Condition</value></data>
   <data name="Step.transform"><value>Transform</value></data><data name="Step.output"><value>Output</value></data>
-  <data name="Step.failure"><value>Failure</value></data>
   <data name="Step.flow"><value>Flow</value></data>
   <data name="Step.tool"><value>Tool</value></data>
   <data name="HorizontalLayout"><value>Horizontal layout</value></data><data name="VerticalLayout"><value>Vertical layout</value></data><data name="Center"><value>Center</value></data>

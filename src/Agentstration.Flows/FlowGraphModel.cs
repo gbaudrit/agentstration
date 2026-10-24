@@ -29,7 +29,6 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
 [JsonDerivedType(typeof(ToolRouteFlowStepDefinition), "toolRoute")]
 [JsonDerivedType(typeof(OutputFlowStepDefinition), "output")]
-[JsonDerivedType(typeof(FailureFlowStepDefinition), "failure")]
 public abstract record FlowStepDefinition
 {
     public required string Name { get; init; }
@@ -225,14 +224,6 @@ public sealed record OutputFlowStepDefinition : FlowStepDefinition
     public string? DetailsExpression { get; init; }
 }
 
-/// <summary>Compatibility shape for persisted Flow definitions authored before named outputs.</summary>
-public sealed record FailureFlowStepDefinition : FlowStepDefinition
-{
-    public string Code { get; init; } = "FLOW_FAILED";
-    public string Message { get; init; } = "Flow execution failed.";
-    public string? DetailsExpression { get; init; }
-}
-
 public sealed record FlowOutputDefinition(
     string Name,
     string? DisplayName,
@@ -298,7 +289,6 @@ public static class FlowStepDefinitionExtensions
         ToolFlowStepDefinition => "tool",
         ToolRouteFlowStepDefinition => "toolRoute",
         OutputFlowStepDefinition => "output",
-        FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))
     };
 
@@ -312,7 +302,7 @@ public static class FlowStepDefinitionExtensions
         ToolFlowStepDefinition => ["success", "error"],
         ToolRouteFlowStepDefinition => ["success", "error"],
         FlowCallStepDefinition => [],
-        OutputFlowStepDefinition or FailureFlowStepDefinition => [],
+        OutputFlowStepDefinition => [],
         _ => throw new ArgumentOutOfRangeException(nameof(step))
     };
 }
