@@ -126,7 +126,8 @@ public sealed class LocalAccountAdministrationService(
 
     private async Task EnsurePlatformAdministratorAsync(CancellationToken cancellationToken)
     {
-        if (!requestContext.IsInitialized || !await platformAuthorization.IsPlatformAdministratorAsync(requestContext.Current.PrincipalId, cancellationToken))
+        if (requestContext.ActorPrincipalId is not Guid actorPrincipalId
+            || !await platformAuthorization.IsPlatformAdministratorAsync(actorPrincipalId, cancellationToken))
             throw new AuthorizationDeniedException("platform/admin");
     }
 

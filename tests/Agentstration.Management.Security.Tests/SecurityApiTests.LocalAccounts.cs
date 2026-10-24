@@ -279,5 +279,30 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.OK, authenticated.StatusCode);
     }
 
+    [TestMethod]
+    public async Task PlatformAdministratorCanOpenMembersFromTenantContext()
+    {
+        await using var factory = Factory("Local");
+        using var client = UnredirectedClient(factory);
+        await BootstrapAsync(client, "tenant-members-admin");
+
+        var context = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.IsNotNull(context);
+        var tenant = context.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Tenant);
+        using var selected = await client.PostAsJsonAsync(
+            "/api/identity/context/selection",
+            new SelectConsoleContextRequest(tenant.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.OK, selected.StatusCode);
+
+        using var accounts = await client.GetAsync("/api/identity/accounts/");
+        Assert.AreEqual(HttpStatusCode.OK, accounts.StatusCode);
+        var localAccounts = await accounts.Content.ReadFromJsonAsync<LocalAccountResponse[]>();
+        Assert.IsNotNull(localAccounts);
+        Assert.HasCount(1, localAccounts);
+
+        using var membersPage = await client.GetAsync("/settings/organization/members");
+        Assert.AreEqual(HttpStatusCode.OK, membersPage.StatusCode);
+    }
+
 }
 

@@ -147,6 +147,7 @@ public enum ControlPlaneAccessMode
 public interface ICurrentRequestContext
 {
     bool IsInitialized { get; }
+    Guid? ActorPrincipalId => IsInitialized ? Current.PrincipalId : null;
     RequestContext Current { get; }
     ControlPlaneAccessMode AccessMode => IsInitialized ? ControlPlaneAccessMode.Workspace : ControlPlaneAccessMode.Unavailable;
 }
@@ -180,6 +181,7 @@ public sealed class InstanceOperationRequestContext(Guid principalId) : ICurrent
         ? principalId
         : throw new ArgumentException("An instance context requires a non-empty Principal ID.", nameof(principalId));
     public bool IsInitialized => false;
+    public Guid? ActorPrincipalId => PrincipalId;
     public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.Instance;
     public RequestContext Current => throw new InvalidOperationException("Instance operations do not have a workspace request context.");
 }
@@ -187,6 +189,7 @@ public sealed class InstanceOperationRequestContext(Guid principalId) : ICurrent
 public sealed class TenantOperationRequestContext(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null) : ICurrentRequestContext
 {
     public bool IsInitialized => false;
+    public Guid? ActorPrincipalId => Current.PrincipalId;
     public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.Tenant;
     public RequestContext Current { get; } = new(principalId, tenantId, Guid.Empty, restriction);
 }
@@ -194,6 +197,7 @@ public sealed class TenantOperationRequestContext(Guid principalId, Guid tenantI
 public sealed class TenantAdministrationRequestContext(Guid principalId, Guid tenantId) : ICurrentRequestContext
 {
     public bool IsInitialized => false;
+    public Guid? ActorPrincipalId => Current.PrincipalId;
     public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.TenantAdministration;
     public RequestContext Current { get; } = new(principalId, tenantId, Guid.Empty);
 }

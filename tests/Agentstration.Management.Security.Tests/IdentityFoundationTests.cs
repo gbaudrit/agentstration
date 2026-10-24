@@ -323,10 +323,36 @@ public sealed class IdentityFoundationTests
     {
         var accessor = new CurrentRequestContext();
         var selected = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        using (accessor.Push(selected)) Assert.AreEqual(selected, accessor.Current);
+        using (accessor.Push(selected))
+        {
+            Assert.AreEqual(selected, accessor.Current);
+            Assert.AreEqual(selected.PrincipalId, accessor.ActorPrincipalId);
+        }
         Assert.AreEqual(ControlPlaneAccessMode.Unavailable, accessor.AccessMode);
         Assert.IsFalse(accessor.IsInitialized);
+        Assert.IsNull(accessor.ActorPrincipalId);
         Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
+    }
+
+    [TestMethod]
+    public void AdministrativeRequestContextsKeepTheActorWithoutBecomingWorkspaceContexts()
+    {
+        var accessor = new CurrentRequestContext();
+        var operational = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        using (accessor.PushInstance(operational))
+        {
+            Assert.AreEqual(ControlPlaneAccessMode.Instance, accessor.AccessMode);
+            Assert.IsFalse(accessor.IsInitialized);
+            Assert.AreEqual(operational.PrincipalId, accessor.ActorPrincipalId);
+        }
+
+        using (accessor.PushTenantAdministration(operational))
+        {
+            Assert.AreEqual(ControlPlaneAccessMode.TenantAdministration, accessor.AccessMode);
+            Assert.IsFalse(accessor.IsInitialized);
+            Assert.AreEqual(operational.PrincipalId, accessor.ActorPrincipalId);
+        }
     }
 
     [TestMethod]
