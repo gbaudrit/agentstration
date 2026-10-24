@@ -66,7 +66,7 @@ public static class Crawl4AiDataSourceProfileBundle
                 name: output
                 displayName: Chunk progress
                 outputMapping: { contentReference: "${input.contentReference}", stagedArtifactId: "${input.stagedArtifactId}", nextOffset: "${steps.read.output.structuredContent.nextOffset}", endOfContent: "${steps.read.output.structuredContent.endOfContent}" }
-              - { type: failure, name: failure, displayName: Transfer failed }
+              - { type: output, name: failure, displayName: Transfer failed, outcome: error }
             transitions:
               - { id: input-read, fromStep: input, event: completed, toStep: read }
               - { id: read-write, fromStep: read, event: success, toStep: write }
@@ -158,7 +158,7 @@ public static class Crawl4AiDataSourceProfileBundle
                 outputMapping:
                   artifacts:
                     - { artifactId: "${steps.persist.output.flowRunArtifactId}", kind: durable, disposition: publishable, name: "${input.dataSourceId}", mediaType: "${steps.seal.output.MediaType}", digest: "${steps.seal.output.Sha256}" }
-              - { type: failure, name: failure, displayName: Acquisition failed }
+              - { type: output, name: failure, displayName: Acquisition failed, outcome: error }
             transitions:
               - { id: input-crawl, fromStep: input, event: completed, toStep: crawl }
               - { id: crawl-create, fromStep: crawl, event: success, toStep: create }

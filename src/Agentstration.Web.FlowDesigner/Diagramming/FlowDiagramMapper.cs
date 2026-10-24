@@ -56,7 +56,7 @@ public sealed class FlowDiagramPort(
         var input = Direction == FlowDiagramPortDirection.Input ? this : candidate;
         var outputNode = (FlowDiagramNode)output.Parent;
         var inputNode = (FlowDiagramNode)input.Parent;
-        return outputNode.Source.Type is not ("output" or "failure") && inputNode.Source.Type != "input";
+        return outputNode.Source.Type != "output" && inputNode.Source.Type != "input";
     }
 }
 

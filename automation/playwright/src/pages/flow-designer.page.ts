@@ -114,23 +114,26 @@ export class FlowDesignerPage {
     const parentName = `aaa-named-output-parent-${suffix}`;
 
     const child = await this.createDraft(consoleUrl, childName, 'Named output child');
-    const legacyDefinition = {
+    const initialDefinition = {
       entryStep: 'input',
       steps: [
         { type: 'input', name: 'input', displayName: 'Input' },
         {
           type: 'output', name: 'historical-result', displayName: 'Historical result',
           outputMapping: '${transition.output}',
-          schema: { type: 'object', properties: { legacyValue: { type: 'string' } } },
+          schema: { type: 'object', properties: { historicalValue: { type: 'string' } } },
         },
-        { type: 'failure', name: 'legacy-failure', displayName: 'Legacy failure', code: 'LEGACY_FAILURE', message: 'Legacy failure.' },
+        {
+          type: 'output', name: 'historical-error', displayName: 'Historical error', outcome: 'error',
+          code: 'HISTORICAL_ERROR', message: 'Historical error.',
+        },
       ],
       transitions: [{ id: 'input-completed-historical', fromStep: 'input', event: 'completed', toStep: 'historical-result' }],
       designer: { preferredLayout: 'Horizontal', nodePositions: {
-        input: { x: 80, y: 220 }, 'historical-result': { x: 500, y: 120 }, 'legacy-failure': { x: 500, y: 360 },
+        input: { x: 80, y: 220 }, 'historical-result': { x: 500, y: 120 }, 'historical-error': { x: 500, y: 360 },
       } },
     };
-    let childEtag = await this.updateDraft(consoleUrl, childName, child, legacyDefinition);
+    let childEtag = await this.updateDraft(consoleUrl, childName, child, initialDefinition);
     await this.publishDraft(consoleUrl, childName, '1.0.0', false);
 
     const modernDefinition = {

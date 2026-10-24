@@ -156,13 +156,8 @@ public sealed record ReconcileFlowCallTransitionsCommand(
         var transitions = definition.Transitions.ToList();
         var changed = false;
         var localOutputs = definition.Steps
-            .Select(step => step switch
-            {
-                FailureFlowStepDefinition => new KeyValuePair<string, FlowOutputOutcome>(step.Name, FlowOutputOutcome.Error),
-                OutputFlowStepDefinition output => new(step.Name, output.Outcome ?? FlowOutputOutcome.Success),
-                _ => (KeyValuePair<string, FlowOutputOutcome>?)null
-            })
-            .OfType<KeyValuePair<string, FlowOutputOutcome>>()
+            .OfType<OutputFlowStepDefinition>()
+            .Select(output => new KeyValuePair<string, FlowOutputOutcome>(output.Name, output.Outcome ?? FlowOutputOutcome.Success))
             .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
         foreach (var call in definition.Steps.OfType<FlowCallStepDefinition>())
         {
@@ -181,11 +176,11 @@ public sealed record ReconcileFlowCallTransitionsCommand(
                     .Where(output => output.Outcome == localOutputs[invalid.ToStep])
                     .Select(output => output.Name)
                     .ToArray();
-                var replacement = candidates.Length == 1 ? candidates[0] : null;
-                if (replacement is null) continue;
+                if (candidates.Length > 1) continue;
+                var replacement = candidates.SingleOrDefault();
 
                 var index = transitions.IndexOf(invalid);
-                if (transitions.Any(transition =>
+                if (replacement is null || transitions.Any(transition =>
                     transition.Id != invalid.Id
                     && transition.FromStep == call.Name
                     && transition.ToStep == invalid.ToStep

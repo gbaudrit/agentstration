@@ -107,7 +107,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
         if (definition.Steps.Count(step => step is InputFlowStepDefinition) != 1) issues.Add(Error("input_step_required", "A Flow requires exactly one Input step."));
-        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));
+        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));
 
         var transitionIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var transition in definition.Transitions)
@@ -131,7 +131,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (HasCycle(definition.EntryStep, definition.Transitions)) issues.Add(Error("flow_cycle_not_supported", "Cycles are not supported in this execution increment."));
         }
 
-        foreach (var terminal in definition.Steps.Where(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition))
+        foreach (var terminal in definition.Steps.OfType<OutputFlowStepDefinition>())
             if (definition.Transitions.Any(transition => transition.FromStep == terminal.Name)) issues.Add(Error("terminal_has_transition", $"Terminal step '{terminal.Name}' cannot have outgoing transitions.", terminal.Name));
 
         foreach (var output in definition.Steps.OfType<OutputFlowStepDefinition>())
@@ -341,7 +341,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             issues.Add(Error("tool_input_schema_invalid", "The selected Tool has an invalid or unsupported input schema.", step.Name, property: "tool.inputSchema"));
             return;
         }
-        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping, target.InputSchema, "tool_argument", issues);
+        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping, target.InputSchema, "tool_argument", issues,
+            allowCompleteObjectReference: true);
     }
 
     private async Task ValidateFlowCallAsync(
@@ -458,8 +459,14 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         JsonElement? candidate,
         JsonElement schema,
         string codePrefix,
-        List<FlowValidationIssue> issues)
+        List<FlowValidationIssue> issues,
+        bool allowCompleteObjectReference = false)
     {
+        if (allowCompleteObjectReference
+            && candidate is { ValueKind: JsonValueKind.String } expressionValue
+            && FlowExpressionParser.TryParse(expressionValue.GetString()!, out var expression, out _)
+            && IsCompleteObjectReference(expression.Body))
+            return;
         if (candidate is not { ValueKind: JsonValueKind.Object } mapping)
         {
             issues.Add(Error($"{codePrefix}_object_required", "The selected resource requires an object mapping.", stepName, property: propertyPath));

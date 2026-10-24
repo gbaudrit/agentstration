@@ -430,7 +430,7 @@ public sealed partial class FlowTests
                 new ToolFlowStepDefinition { Name = "tool", Tool = new("sample-tool") },
                 new FlowCallStepDefinition { Name = "child", Flow = new("sample-flow") },
                 new OutputFlowStepDefinition { Name = "output" },
-                new FailureFlowStepDefinition { Name = "failure" }
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions =
             [

@@ -434,15 +434,6 @@ internal sealed class AwpAssignmentExecutor(
                             outputStep.DetailsExpression is null ? null
                                 : await ResolveFailureDetailsAsync(outputStep.DetailsExpression, context, cancellationToken));
                         break;
-                    case FailureFlowStepDefinition failure:
-                        output = JsonSerializer.SerializeToElement(new { error = failure.Message, code = failure.Code });
-                        eventName = failure.Name;
-                        errorCode = failure.Code;
-                        errorMessage = failure.Message;
-                        final = new(output, null, "error", failure.Code, failure.Message,
-                            failure.DetailsExpression is null ? null
-                                : await ResolveFailureDetailsAsync(failure.DetailsExpression, context, cancellationToken));
-                        break;
                     default:
                         throw new AwpExecutionNotSupportedException("flow_step_type_unsupported",
                             $"Step '{stepDefinition.Name}' of type '{stepDefinition.Type()}' is not yet supported by the external Worker.");
@@ -545,7 +536,7 @@ internal sealed class AwpAssignmentExecutor(
                         errorCode,
                         error = errorMessage
                     }), null, cancellationToken);
-                if (stepDefinition is OutputFlowStepDefinition or FailureFlowStepDefinition) break;
+                if (stepDefinition is OutputFlowStepDefinition) break;
                 if (transition is null && errorCode is not null)
                     throw new AwpExecutionNotSupportedException(errorCode, errorMessage ?? "The Flow step failed.");
                 if (transition is null)
