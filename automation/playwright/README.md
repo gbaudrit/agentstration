@@ -114,6 +114,12 @@ The exact execution-scope journey creates an Instance-owned Agent and Flow, gran
 npm run capture -- --plan examples/exercise-execution-scopes.capture-plan.json --output .work/execution-scopes
 ```
 
+The operational Workspace journey verifies that Instance and Tenant administration route Flow execution into their dedicated protected Workspaces. It checks that those Workspaces never appear as business choices, that definition and storage scopes remain distinct, that Runs survive navigation in the matching administrative context, and that business and unrelated Tenant contexts cannot discover them:
+
+```powershell
+npm run capture -- --plan examples/exercise-operational-workspaces.capture-plan.json --output .work/operational-workspaces
+```
+
 The local Ollama extension backs a fully offline create/update/delete journey for a model provider, model profile, and runtime profile:
 
 ```powershell
