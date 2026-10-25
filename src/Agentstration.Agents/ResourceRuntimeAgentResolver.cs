@@ -37,8 +37,11 @@ public sealed class ResourceRuntimeAgentResolver(
             ?? throw new RuntimeAgentResolutionException("agent_not_found", $"Agent '{reference.Namespace}/{reference.ResourceId}' was not found.");
         if (reference.ResourceUid is { } resourceUid && agent.Value.Uid != resourceUid)
             throw new RuntimeAgentResolutionException("agent_reference_stale", "The Agent no longer matches the exact pinned identity.");
-        var revision = await queries.FindRevisionAsync(agent.Value.Uid, reference.Version, cancellationToken)
-            ?? throw new RuntimeAgentResolutionException("agent_version_not_found", $"Agent version '{reference.Version}' does not exist.");
+        StoredResource<AgentRevision>? revision;
+        using (requestScopes.PushSystem())
+            revision = await queries.FindRevisionAsync(agent.Value.Uid, reference.Version, cancellationToken);
+        if (revision is null)
+            throw new RuntimeAgentResolutionException("agent_version_not_found", $"Agent version '{reference.Version}' does not exist.");
         if (revision.Value.ScopeRef != agent.Value.ScopeRef || revision.Value.AgentUid != agent.Value.Uid)
             throw new RuntimeAgentResolutionException("agent_revision_scope_mismatch", "The Agent revision does not belong to the exact Agent ownership scope.");
         if (reference.RevisionUid is { } revisionUid && revision.Value.Uid != revisionUid

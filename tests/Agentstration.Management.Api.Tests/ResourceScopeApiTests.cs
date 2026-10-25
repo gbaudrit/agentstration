@@ -692,6 +692,41 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             }
         }
 
+        StoredResource<AgentResource> sharedInstanceAgent;
+        using (requestScopes.PushInstance(context))
+        {
+            sharedInstanceAgent = await agents.GetAgentExactAsync(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "shared-agent", default)
+                ?? throw new AssertFailedException("The Instance Agent was not found.");
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(sharedInstanceAgent.Value.Uid, ResourceScopeRef.Instance,
+                    sharedInstanceAgent.Value.Namespace, sharedInstanceAgent.Value.Kind,
+                    sharedInstanceAgent.Value.Generation),
+                [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]),
+                null, default);
+        }
+
+        SelectConsoleContext(client, workspaceScope);
+        using (var inheritedRunResponse = await client.PostAsJsonAsync("/api/runtime/runs",
+            new CreateRuntimeRunRequest
+            {
+                Agent = new RuntimeAgentReference(sharedInstanceAgent.Value.Name,
+                    sharedInstanceAgent.Value.Generation)
+                {
+                    Namespace = sharedInstanceAgent.Value.Namespace,
+                    ScopeRef = ResourceScopeRef.Instance,
+                    ResourceUid = sharedInstanceAgent.Value.Uid
+                },
+                Input = new RuntimeRunInput
+                {
+                    Messages = [new RuntimeRunMessage(RuntimeMessageRole.User,
+                        "Run the inherited Instance Agent from a descendant Workspace")]
+                },
+                Origin = RuntimeRunOrigin.Api
+            }))
+            Assert.AreEqual(HttpStatusCode.Accepted, inheritedRunResponse.StatusCode,
+                await inheritedRunResponse.Content.ReadAsStringAsync());
+
         using (requestScopes.PushInstance(context))
         {
             var flowService = factory.Services.GetRequiredService<FlowService>();
