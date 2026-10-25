@@ -1,5 +1,6 @@
 using System.Globalization;
 using Agentstration.Triggers;
+using Agentstration.Web.Console;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.WorkOperations;
 using Agentstration.Work;
@@ -62,6 +63,33 @@ public sealed class TriggerUxTests
         finally
         {
             CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
+    }
+
+    [TestMethod]
+    public void TriggerAccessFailuresUseActionableLocalizedMessages()
+    {
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+            var collection = new ServiceCollection();
+            collection.AddLogging();
+            collection.AddLocalization(options => options.ResourcesPath = "Resources");
+            using var services = collection.BuildServiceProvider();
+            var strings = services.GetRequiredService<IStringLocalizer<TriggerStrings>>();
+            var exception = new AgentstrationApiException(
+                "server detail", "error-id", System.Net.HttpStatusCode.UnprocessableEntity,
+                "trigger_target_use_denied");
+
+            var message = TriggerUi.ErrorMessage(exception, strings);
+
+            StringAssert.Contains(message, "politique d’accès");
+            Assert.DoesNotContain("server detail", message, StringComparison.Ordinal);
+        }
+        finally
+        {
             CultureInfo.CurrentUICulture = originalUiCulture;
         }
     }

@@ -1,4 +1,5 @@
 using Agentstration.Triggers;
+using Agentstration.Web.Console;
 using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.Components.Pages;
@@ -35,6 +36,18 @@ public static class TriggerUi
     }
 
     public static DateTime LocalInput(DateTimeOffset value, string timeZone) => DateTime.SpecifyKind(TimeZoneInfo.ConvertTime(value, TimeZoneInfo.FindSystemTimeZoneById(timeZone)).DateTime, DateTimeKind.Unspecified);
+    public static string ErrorMessage(Exception exception, IStringLocalizer<TriggerStrings> localizer) =>
+        exception is AgentstrationApiException api && api.ProblemTitle is { } code
+            ? code switch
+            {
+                "trigger_operational_workspace_unavailable" => localizer["Error.OperationalWorkspaceUnavailable"].Value,
+                "trigger_target_not_discoverable" => localizer["Error.TargetNotDiscoverable"].Value,
+                "trigger_target_ambiguous" => localizer["Error.TargetAmbiguous"].Value,
+                "trigger_target_use_denied" => localizer["Error.TargetUseDenied"].Value,
+                "trigger_target_identity_stale" or "trigger_target_identity_missing" or "trigger_target_version_missing" => localizer["Error.TargetStale"].Value,
+                _ => exception.Message
+            }
+            : exception.Message;
     public static string OccurrenceLabel(DateTimeOffset value, string timeZone, DateTimeOffset now, IStringLocalizer<TriggerStrings>? localizer = null) { var scheduled = TimeZoneInfo.ConvertTime(value, TimeZoneInfo.FindSystemTimeZoneById(timeZone)); var relative = value <= now ? Text(localizer, "Due", "due") : Relative(value - now, localizer); var sign = scheduled.Offset < TimeSpan.Zero ? "-" : "+"; return $"{scheduled:ddd d MMM yyyy · HH:mm} ({timeZone}, UTC{sign}{scheduled.Offset.Duration():hh\\:mm}) · {relative}"; }
     private static string Relative(TimeSpan value, IStringLocalizer<TriggerStrings>? localizer) => value.TotalDays >= 2 ? Format(localizer, "Relative.Days", "in {0} days", (int)value.TotalDays) : value.TotalHours >= 2 ? Format(localizer, "Relative.Hours", "in {0} hours", (int)value.TotalHours) : Format(localizer, "Relative.Minutes", "in {0} minutes", Math.Max(1, (int)value.TotalMinutes));
     private static string Text(IStringLocalizer<TriggerStrings>? localizer, string key, string fallback) => localizer is null ? fallback : localizer[key].Value;

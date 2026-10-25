@@ -36,4 +36,15 @@
   <data name="RunCompleted"><value>L’exécution immédiate s’est terminée avec le résultat {0}.</value></data><data name="WorkSubmitted"><value>Work {0} soumis.</value></data><data name="EnabledSuccess"><value>Déclencheur activé. Les occurrences futures seront planifiées.</value></data><data name="DisabledSuccess"><value>Déclencheur désactivé. Aucune autre occurrence planifiée ne sera exécutée.</value></data>
 <data name="Flow"><value>Flow</value></data><data name="Uid"><value>UID</value></data>
   <data name="Scope"><value>Périmètre</value></data>
+  <data name="OperationalWorkspace"><value>Workspace opérationnel</value></data>
+  <data name="OperationalWorkspaceHelp"><value>Le déclencheur et son historique d’exécution appartiennent au Workspace opérationnel du contexte sélectionné.</value></data>
+  <data name="DefinitionScope"><value>Périmètre de définition</value></data>
+  <data name="ExecutionScope"><value>Périmètre d’exécution</value></data>
+  <data name="Instance"><value>Instance</value></data>
+  <data name="Tenant"><value>Tenant</value></data>
+  <data name="Error.OperationalWorkspaceUnavailable"><value>Le contexte sélectionné ne dispose d’aucun Workspace opérationnel pour les déclencheurs.</value></data>
+  <data name="Error.TargetNotDiscoverable"><value>Ce Flow n’est plus visible depuis le contexte sélectionné. Choisissez un autre Flow publié.</value></data>
+  <data name="Error.TargetAmbiguous"><value>Plusieurs Flows visibles ont cette identité. Sélectionnez un périmètre de Flow exact.</value></data>
+  <data name="Error.TargetUseDenied"><value>Ce contexte n’est pas autorisé à utiliser le Flow sélectionné. Modifiez sa politique d’accès avant d’activer le déclencheur.</value></data>
+  <data name="Error.TargetStale"><value>L’identité du Flow ou sa version publiée a changé. Rouvrez le déclencheur et sélectionnez de nouveau le Flow.</value></data>
 </root>

@@ -48,7 +48,7 @@ else
             </section>
             <section class="panel">
                 <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("WorkSubmission")</h2></div></div>
-                <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>@T("Flow")</dd><dt>@T("Flow")</dt><dd><a href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
+                <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>@T("Flow")</dd><dt>@T("Flow")</dt><dd><a href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("DefinitionScope")</dt><dd><StatusBadge Text="@ScopeLabel(trigger.Definition.Target.Flow.ScopeRef)" Status="UiStatus.Info" /></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
             </section>
         </div>
         <aside class="trigger-detail-stack">
@@ -56,7 +56,7 @@ else
                 <div class="panel-header"><div><p class="eyebrow">@T("Security")</p><h2>@T("ExecutionIdentity")</h2></div></div>
                 @if (trigger.Definition.ExecutionScope is { } scope)
                 {
-                    <dl class="resource-details"><dt>@T("Principal")</dt><dd><code>@Short(scope.PrincipalId)</code></dd><dt>@T("Workspace")</dt><dd><code>@Short(scope.WorkspaceId)</code></dd><dt>@T("Authorization")</dt><dd>@T("AuthorizationReevaluated")</dd><dt>@T("Revocation")</dt><dd>@T("FailsClosed")</dd></dl>
+                    <dl class="resource-details"><dt>@T("Principal")</dt><dd><code>@Short(scope.PrincipalId)</code></dd><dt>@T("OperationalWorkspace")</dt><dd>@OperationalWorkspace(scope.WorkspaceId)</dd><dt>@T("ExecutionScope")</dt><dd><StatusBadge Text="@ScopeLabel(scope.AccessScopeRef)" Status="UiStatus.Info" /></dd><dt>@T("Authorization")</dt><dd>@T("AuthorizationReevaluated")</dd><dt>@T("Revocation")</dt><dd>@T("FailsClosed")</dd></dl>
                 }
                 else { <p>@T("NoExecutionIdentity")</p> }
             </section>
@@ -115,11 +115,21 @@ else
     private async Task ReloadAsync() { if (stored is null) return; stored = await Client.GetAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); await LoadHistoryAsync(); }
     private void ClearMessage() { message = null; hasError = false; }
     private void SetSuccess(string value) { message = value; hasError = false; }
-    private void SetError(Exception exception) { message = exception.Message; hasError = true; }
+    private void SetError(Exception exception) { message = TriggerUi.ErrorMessage(exception, Localizer); hasError = true; }
     private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace)); }
     private static string? TaskUrl(TriggerOccurrence value) => Guid.TryParse(value.WorkItemId, out var taskId) ? $"/tasks/{taskId:D}" : null;
     private static string Short(Guid value) => value.ToString("N")[..12];
     private static string Short(string value) => value.Length <= 12 ? value : value[..12];
+    private string OperationalWorkspace(Guid workspaceId) => ContextState.Current?.WorkspaceId == workspaceId
+        ? ContextState.Current.WorkspaceDisplayName
+        : Short(workspaceId);
+    private string ScopeLabel(ResourceScopeRef? scopeRef) => scopeRef?.Kind switch
+    {
+        ResourceScopeKind.Instance => T("Instance"),
+        ResourceScopeKind.Tenant => T("Tenant"),
+        ResourceScopeKind.Workspace => T("Workspace"),
+        _ => "—"
+    };
     private static string PrettyInput(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private string MisfireLabel(TriggerMisfirePolicy value) => T(value == TriggerMisfirePolicy.FireOnce ? "Misfire.FireOnceAfterRecovery" : "Misfire.Skip");
     private string ConcurrencyLabel(TriggerConcurrencyPolicy value) => T(value == TriggerConcurrencyPolicy.Skip ? "Concurrency.SkipActive" : "Concurrency.AllowOverlap");

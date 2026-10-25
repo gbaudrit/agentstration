@@ -310,6 +310,7 @@ public static class DependencyInjection
         services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();
         services.AddSingleton<RuntimeProfileManagementService>();
         services.AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>();
+        services.AddSingleton<ITriggerOperationalContext, TriggerOperationalContextAdapter>();
         services.AddSingleton<ITriggerTargetValidator, FlowTriggerTargetValidator>();
         services.AddSingleton<ITriggerExecutionAuthorizer, WorkspaceTriggerExecutionAuthorizer>();
         services.AddSingleton<ITriggerWorkSubmitter, TriggerWorkSubmitter>();

@@ -208,3 +208,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 180. [ADR-0180 — Knowledge Source definitions use hierarchical ownership](0180-knowledge-source-definitions-use-hierarchical-ownership.md)
 181. [ADR-0181 — Console context is one exact administrative scope](0181-console-context-is-a-single-exact-administrative-scope.md)
 182. [ADR-0182 — Administrative execution uses governed operational Workspaces](0182-administrative-execution-uses-governed-operational-workspaces.md)
+183. [ADR-0183 — Triggers use operational Workspaces for administrative contexts](0183-triggers-use-operational-workspaces-for-administrative-contexts.md)

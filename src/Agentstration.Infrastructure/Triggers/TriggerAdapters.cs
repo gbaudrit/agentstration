@@ -3,7 +3,9 @@ using System.Xml;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Triggers;
 using Agentstration.Work;
@@ -74,35 +76,154 @@ public sealed class QuartzTriggerScheduleCalculator : ITriggerScheduleCalculator
     private static TriggerValidationException Invalid(string message) => new("schedule_invalid", message);
 }
 
-public sealed class FlowTriggerTargetValidator(FlowService flows, ICurrentRequestContext context) : ITriggerTargetValidator
+public sealed class TriggerOperationalContextAdapter(
+    ICurrentRequestContext context,
+    IRequestContextScopeFactory scopes) : ITriggerOperationalContext
 {
-    public async Task ValidateAsync(ResourceNamespace ownerNamespace, TriggerTarget target, CancellationToken cancellationToken)
+    public TriggerOperationalContext Current
     {
-        if (!context.IsInitialized) throw new TriggerValidationException("trigger_context_missing", "Flow target validation requires a workspace context.");
-        var flow = target.Flow ?? throw new TriggerValidationException("target_invalid", "A Flow target is required.");
-        var reference = new FlowReference(new FlowId(flow.Name, flow.Namespace ?? ownerNamespace), flow.Version, flow.Version is null, flow.Namespace, flow.ScopeRef);
-        _ = await flows.ResolveAsync(new WorkspaceId(context.Current.WorkspaceId), reference, ownerNamespace, cancellationToken);
+        get
+        {
+            if (context.AccessMode is not (ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration))
+                throw new TriggerValidationException("trigger_operational_workspace_unavailable", "The selected context has no governed operational Workspace.");
+            var current = context.Current;
+            if (current.WorkspaceId == Guid.Empty)
+                throw new TriggerValidationException("trigger_operational_workspace_unavailable", "The selected context has no governed operational Workspace.");
+            var logicalScope = context.AccessMode switch
+            {
+                ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+                ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(current.TenantId),
+                _ => ResourceScopeRef.Workspace(current.WorkspaceId)
+            };
+            return new(current.TenantId, current.WorkspaceId, current.PrincipalId, logicalScope);
+        }
+    }
+
+    public IDisposable EnterWorkspace()
+    {
+        var current = Current;
+        return scopes.Push(new RequestContext(current.PrincipalId, current.TenantId, current.WorkspaceId));
+    }
+
+    public IDisposable EnterWorkspace(TriggerExecutionScope executionScope) =>
+        scopes.Push(new RequestContext(
+            executionScope.PrincipalId,
+            executionScope.TenantId,
+            executionScope.WorkspaceId));
+}
+
+public sealed class FlowTriggerTargetValidator(
+    FlowService flows,
+    IResourceAccessPolicyService accessPolicies) : ITriggerTargetValidator
+{
+    public async Task<TriggerFlowTarget> ResolveAsync(
+        ResourceNamespace ownerNamespace,
+        TriggerFlowTarget target,
+        ResourceScopeRef consumerScopeRef,
+        bool requireUse,
+        CancellationToken cancellationToken)
+    {
+        var flowId = new FlowId(target.Name, target.Namespace ?? ownerNamespace);
+        StoredFlow? stored;
+        try
+        {
+            stored = await flows.GetVisibleAsync(consumerScopeRef, flowId, target.ScopeRef, cancellationToken);
+        }
+        catch (FlowReferenceOutsideScopeException exception)
+        {
+            throw new TriggerValidationException("trigger_target_not_discoverable", exception.Message);
+        }
+        catch (FlowReferenceAmbiguousException exception)
+        {
+            throw new TriggerValidationException("trigger_target_ambiguous", exception.Message);
+        }
+        if (stored is null)
+            throw new TriggerValidationException("trigger_target_not_discoverable", "The selected Flow is not discoverable from this context.");
+        var version = target.Version ?? stored.Value.ActiveVersion
+            ?? throw new TriggerValidationException("trigger_target_version_missing", "The selected Flow has no active published version.");
+        var published = await flows.GetVersionExactAsync(stored.Value.ScopeRef, flowId, version, cancellationToken)
+            ?? throw new TriggerValidationException("trigger_target_version_missing", "The selected Flow version is no longer published.");
+        var definitionHash = published.Value.DefinitionHash;
+        if (string.IsNullOrWhiteSpace(definitionHash))
+            throw new TriggerValidationException("trigger_target_identity_missing", "The selected Flow version has no immutable integrity identity.");
+
+        if (target.Uid is { } expectedUid && expectedUid != stored.Value.Uid
+            || target.DefinitionHash is { } expectedHash
+                && !string.Equals(expectedHash, definitionHash, StringComparison.Ordinal))
+            throw new TriggerValidationException("trigger_target_identity_stale", "The selected Flow identity no longer matches the saved Trigger target.");
+
+        if (requireUse && stored.Value.ScopeRef != consumerScopeRef)
+        {
+            var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
+                stored.Value.Uid,
+                stored.Value.ScopeRef,
+                stored.Value.Id.Namespace,
+                FlowResourceKinds.Flow,
+                Version: stored.Value.ActiveVersion ?? stored.Value.Version), consumerScopeRef, ResourceAccessAction.Use, cancellationToken);
+            if (!access.Allowed)
+                throw new TriggerValidationException("trigger_target_use_denied", "The selected Flow cannot be used from this context.");
+        }
+
+        return target with
+        {
+            Namespace = stored.Value.Id.Namespace,
+            ScopeRef = stored.Value.ScopeRef,
+            Version = version,
+            Uid = stored.Value.Uid,
+            DefinitionHash = definitionHash
+        };
     }
 }
 
 public sealed class WorkspaceTriggerExecutionAuthorizer(
-    IIdentityStore identities,
-    IAuthorizationService authorization,
-    IRequestContextScopeFactory scopes) : ITriggerExecutionAuthorizer
+    IFlowRunExecutionScope flowExecutionScope,
+    IRequestContextScopeFactory requestScopes) : ITriggerExecutionAuthorizer
 {
     public async Task AuthorizeAsync(TriggerExecutionScope executionScope, CancellationToken cancellationToken)
     {
-        var principal = await identities.GetPrincipalAsync(executionScope.PrincipalId, cancellationToken);
-        var workspace = await identities.GetWorkspaceAsync(executionScope.TenantId, executionScope.WorkspaceId, cancellationToken);
-        if (principal?.Status != PrincipalStatus.Active || workspace?.Status != WorkspaceStatus.Active)
-            throw new TriggerExecutionException("trigger_authorization_denied", "The Trigger owner or Workspace is disabled.");
-        var context = new RequestContext(executionScope.PrincipalId, executionScope.TenantId, executionScope.WorkspaceId);
-        try { await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken); }
-        catch (AuthorizationDeniedException) { throw new TriggerExecutionException("trigger_authorization_denied", "The Trigger owner no longer has runs/execute permission."); }
+        try
+        {
+            await flowExecutionScope.ValidateAsync(FlowScope(executionScope), cancellationToken);
+        }
+        catch (FlowValidationException exception)
+        {
+            throw new TriggerExecutionException("trigger_authorization_denied", exception.Message);
+        }
     }
 
-    public IDisposable Enter(TriggerExecutionScope executionScope) =>
-        scopes.Push(new RequestContext(executionScope.PrincipalId, executionScope.TenantId, executionScope.WorkspaceId));
+    public IDisposable Enter(TriggerExecutionScope triggerScope)
+    {
+        var flowScope = flowExecutionScope.Enter(FlowScope(triggerScope));
+        try
+        {
+            var workspaceScope = requestScopes.Push(new RequestContext(
+                triggerScope.PrincipalId, triggerScope.TenantId, triggerScope.WorkspaceId));
+            return new CompositeScope(workspaceScope, flowScope);
+        }
+        catch
+        {
+            flowScope.Dispose();
+            throw;
+        }
+    }
+
+    private static FlowRunScope FlowScope(TriggerExecutionScope scope) =>
+        FlowRunScope.Workspace(scope.TenantId, new WorkspaceId(scope.WorkspaceId), scope.PrincipalId) with
+        {
+            LogicalScopeRef = scope.LogicalScopeRef
+        };
+
+    private sealed class CompositeScope(IDisposable workspaceScope, IDisposable flowScope) : IDisposable
+    {
+        private IDisposable? workspace = workspaceScope;
+        private IDisposable? flow = flowScope;
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref workspace, null)?.Dispose();
+            Interlocked.Exchange(ref flow, null)?.Dispose();
+        }
+    }
 }
 
 public sealed class TriggerWorkSubmitter(RootFlowSubmissionService rootFlows, IWorkItemRepository repository, IWorkExecutionScopeAccessor executionScopeAccessor) : ITriggerWorkSubmitter
