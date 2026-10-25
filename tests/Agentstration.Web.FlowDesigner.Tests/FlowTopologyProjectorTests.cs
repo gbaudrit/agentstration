@@ -163,7 +163,7 @@ public sealed class FlowTopologyProjectorTests
             Steps =
             [
                 new ToolFlowStepDefinition { Name = "fetch", Tool = new("rest.get") },
-                new FailureFlowStepDefinition { Name = "failure" }
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions = [new("fetch-failure", "fetch", "error", "failure")]
         };
@@ -178,7 +178,7 @@ public sealed class FlowTopologyProjectorTests
                     Status = FlowStepRunStatus.Failed,
                     SelectedTransition = "fetch-failure"
                 },
-                new FlowStepRun { StepName = "failure", StepType = "failure", Status = FlowStepRunStatus.Failed }
+                new FlowStepRun { StepName = "failure", StepType = "output", Status = FlowStepRunStatus.Failed }
             ]
         };
 
@@ -198,7 +198,7 @@ public sealed class FlowTopologyProjectorTests
                 new InputFlowStepDefinition { Name = "input" },
                 new ConditionFlowStepDefinition { Name = "decision", Mode = "Simple" },
                 new OutputFlowStepDefinition { Name = "accepted" },
-                new FailureFlowStepDefinition { Name = "rejected" }
+                new OutputFlowStepDefinition { Name = "rejected", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions =
             [
@@ -379,7 +379,7 @@ public sealed class FlowTopologyProjectorTests
         var graph = new FlowGraphDefinition
         {
             EntryStep = "input",
-            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }, new FailureFlowStepDefinition { Name = "failure" }],
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }, new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
             Transitions = [new("success", "input", "completed", "output"), new("failed", "input", "failed", "failure")]
         };
         var run = Run(WorkflowDefinition(), graph) with
@@ -388,7 +388,7 @@ public sealed class FlowTopologyProjectorTests
             [
                 new FlowStepRun { StepName = "input", StepType = "input", Status = FlowStepRunStatus.Succeeded, SelectedTransition = "success" },
                 new FlowStepRun { StepName = "output", StepType = "output", Status = FlowStepRunStatus.Succeeded },
-                new FlowStepRun { StepName = "failure", StepType = "failure", Status = FlowStepRunStatus.Skipped }
+                new FlowStepRun { StepName = "failure", StepType = "output", Status = FlowStepRunStatus.Skipped }
             ]
         };
 

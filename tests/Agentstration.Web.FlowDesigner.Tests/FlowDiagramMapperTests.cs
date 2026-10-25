@@ -60,7 +60,7 @@ public sealed class FlowDiagramMapperTests
             [
                 new ConditionFlowStepDefinition { Name = "condition", Left = "${input.ready}", Operator = "equals", Right = "true" },
                 new OutputFlowStepDefinition { Name = "accepted" },
-                new FailureFlowStepDefinition { Name = "rejected" }
+                new OutputFlowStepDefinition { Name = "rejected", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions =
             [

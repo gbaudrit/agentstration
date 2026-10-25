@@ -1,7 +1,7 @@
+@using System.Text.Json
 @using System.Text.Json.Nodes
 @using Agentstration.Schemas
 @using Agentstration.Schemas.Contracts
-@inject ISchemasClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SchemaDocumentEditorStrings> Localizer
 
 <section class="schema-document-editor" data-testid="schema-document-editor">
@@ -112,6 +112,8 @@
     [Parameter] public SchemaFormatDescriptor? Descriptor { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public Func<ValidateSchemaDefinitionRequest, Task<SchemaFormatValidationResult>>? DefinitionValidator { get; set; }
+    [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? InstanceValidator { get; set; }
 
     private JsonObject document = [];
     private string source = "{}", valueKey = string.Empty;
@@ -200,9 +202,14 @@
 
     private async Task ValidateDefinitionAsync()
     {
+        if (DefinitionValidator is null)
+        {
+            definitionValidation = null;
+            return;
+        }
         try
         {
-            definitionValidation = await Client.ValidateDefinitionAsync(
+            definitionValidation = await DefinitionValidator(
                 new(Format, Dialect, JsonSerializer.SerializeToElement(document)));
         }
         catch (Exception exception)
@@ -213,9 +220,14 @@
 
     private async Task ValidateInstanceAsync()
     {
+        if (InstanceValidator is null)
+        {
+            instanceValidation = null;
+            return;
+        }
         try
         {
-            instanceValidation = await Client.ValidateInstanceAsync(
+            instanceValidation = await InstanceValidator(
                 new(Format, Dialect, JsonSerializer.SerializeToElement(document), previewValue));
         }
         catch (Exception exception)

@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -13,6 +16,132 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class SchemaApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task FlowPublicationPinsReusableSchemaAndRejectsUnsafeBindings()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>()
+            .Push(requestContext);
+        var workspaceScope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var workspaceId = new WorkspaceId(requestContext.WorkspaceId);
+        var schemaService = factory.Services.GetRequiredService<SchemaManagementService>();
+        var bindings = factory.Services.GetRequiredService<ISchemaBindingResolver>();
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        var original = Definition(
+            "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}");
+        var createdSchema = await schemaService.CreateAsync(
+            Resource(workspaceScope, "flow-input", original), default);
+        var schemaVersion = await schemaService.PublishAsync(workspaceScope, ResourceNamespace.Default,
+            "flow-input", "1.0.0", default);
+        var reference = new SchemaBinding
+        {
+            Reference = new()
+            {
+                Name = "flow-input",
+                Version = "1.0.0",
+                ScopeRef = workspaceScope
+            }
+        };
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            InputSchemaBinding = reference,
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new TransformFlowStepDefinition
+                {
+                    Name = "normalize",
+                    Mapping = JsonSerializer.SerializeToElement("${transition.output}"),
+                    SchemaBinding = reference
+                },
+                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }
+            ],
+            Transitions =
+            [
+                new("normalize", "input", "completed", "normalize"),
+                new("completed", "normalize", "completed", "completed")
+            ]
+        };
+        var createdFlow = await flows.CreateAsync(workspaceId, new CreateFlowCommand(
+            "schema-bound-flow", null, "1.0.0", true,
+            new DirectFlowDefinition(new(FlowTargetKind.Agent, "agent")), Graph: graph), default);
+
+        var published = await flows.PublishVersionAsync(workspaceId, createdFlow.Value.Id,
+            "1.0.0", false, default);
+
+        Assert.IsNull(published.Value.Graph!.InputSchemaBinding);
+        Assert.AreEqual("string", published.Value.Graph.InputSchema!.Value.GetProperty("properties")
+            .GetProperty("name").GetProperty("type").GetString());
+        var publishedTransform = published.Value.Graph.Steps.OfType<TransformFlowStepDefinition>().Single();
+        Assert.IsNull(publishedTransform.SchemaBinding);
+        Assert.AreEqual("string", publishedTransform.Schema!.Value.GetProperty("properties")
+            .GetProperty("name").GetProperty("type").GetString());
+        Assert.AreEqual("string", published.Value.Graph.GetOutputs().Single().Schema!.Value
+            .GetProperty("properties").GetProperty("name").GetProperty("type").GetString());
+        var snapshot = published.Value.SchemaBindings!["$.inputSchema"];
+        Assert.AreEqual(schemaVersion.Value.DefinitionHash, snapshot.DefinitionHash);
+        Assert.AreEqual(schemaVersion.Value.SchemaUid, snapshot.SchemaUid);
+        Assert.AreEqual("1.0.0", snapshot.Source!.Version);
+        Assert.AreEqual(schemaVersion.Value.DefinitionHash,
+            published.Value.SchemaBindings["$.steps[normalize].schema"].DefinitionHash);
+
+        using var client = factory.CreateClient();
+        var publishedResponse = await client.GetFromJsonAsync<FlowVersionResponse>(
+            "/api/flows/schema-bound-flow/versions/1.0.0");
+        Assert.IsNotNull(publishedResponse);
+        Assert.AreEqual("1.0.0", publishedResponse.SchemaBindings!["$.inputSchema"].Source!.Version);
+
+        _ = await schemaService.PutAsync(workspaceScope, ResourceNamespace.Default, "flow-input",
+            original with { Content = JsonDocument.Parse("{\"type\":\"array\"}").RootElement.Clone() },
+            createdSchema.ETag, default);
+        var reloaded = await flows.GetVersionAsync(workspaceId, createdFlow.Value.Id, "1.0.0", default);
+        Assert.AreEqual("object", reloaded!.Value.Graph!.InputSchema!.Value.GetProperty("type").GetString());
+        Assert.AreEqual(schemaVersion.Value.DefinitionHash,
+            reloaded.Value.SchemaBindings!["$.inputSchema"].DefinitionHash);
+
+        var forbidden = await Assert.ThrowsAsync<SchemaBindingResolutionException>(async () =>
+            await bindings.ResolveAsync("$.inputSchema", reference,
+                new(ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceNamespace.Default,
+                    SchemaFormatIds.JsonSchema), default));
+        Assert.AreEqual("schema_reference_forbidden", forbidden.Code);
+
+        var missing = await Assert.ThrowsAsync<SchemaBindingResolutionException>(async () =>
+            await bindings.ResolveAsync("$.inputSchema", new SchemaBinding
+            {
+                Reference = new()
+                {
+                    Name = "flow-input",
+                    Version = "9.9.9",
+                    ScopeRef = workspaceScope
+                }
+            }, new(workspaceScope, ResourceNamespace.Default, SchemaFormatIds.JsonSchema), default));
+        Assert.AreEqual("schema_version_not_found", missing.Code);
+
+        var incompatible = await Assert.ThrowsAsync<SchemaBindingResolutionException>(async () =>
+            await bindings.ResolveAsync("$.inputSchema", new SchemaBinding
+            {
+                Inline = new()
+                {
+                    Format = "xml-schema",
+                    Content = JsonDocument.Parse("{}").RootElement.Clone()
+                }
+            }, new(workspaceScope, ResourceNamespace.Default, SchemaFormatIds.JsonSchema), default));
+        Assert.AreEqual("schema_format_incompatible", incompatible.Code);
+
+        var unavailable = await Assert.ThrowsAsync<SchemaBindingResolutionException>(async () =>
+            await bindings.ResolveAsync("$.inputSchema", new SchemaBinding
+            {
+                Inline = new()
+                {
+                    Format = "unavailable-format",
+                    Content = JsonDocument.Parse("{}").RootElement.Clone()
+                }
+            }, new(workspaceScope, ResourceNamespace.Default, "unavailable-format"), default));
+        Assert.AreEqual("schema_format_unavailable", unavailable.Code);
+    }
+
     [TestMethod]
     public async Task SchemaDraftRoundTripsThroughApiAndPublishedVersionsAreImmutable()
     {

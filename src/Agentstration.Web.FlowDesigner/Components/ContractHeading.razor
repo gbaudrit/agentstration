@@ -1,0 +1,17 @@
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+<header class="step-contract-heading">
+    <div>
+        <span class="eyebrow">@Localizer[$"ContractDirection.{Direction}"]</span>
+        <h3>@Localizer[$"{Direction}Contract"]</h3>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Source))
+    {
+        <span class="step-contract-source">@Source</span>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Direction { get; set; } = string.Empty;
+    [Parameter] public string? Source { get; set; }
+}

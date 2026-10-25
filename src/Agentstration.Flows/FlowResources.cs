@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Flows;
 
@@ -34,4 +35,5 @@ public sealed record FlowVersion(
     DateTimeOffset PublishedAt,
     FlowGraphDefinition? Graph = null,
     string? DefinitionHash = null,
-    string? ReleaseNotes = null);
+    string? ReleaseNotes = null,
+    IReadOnlyDictionary<string, SchemaBindingSnapshot>? SchemaBindings = null);

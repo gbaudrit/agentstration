@@ -4,5 +4,6 @@
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Schemas.Contracts/Agentstration.Schemas.Contracts.csproj" />
   </ItemGroup>
 </Project>

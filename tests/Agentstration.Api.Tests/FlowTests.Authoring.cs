@@ -109,6 +109,57 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task PublicationSnapshotsInheritedToolContractForEveryNamedSuccessOutput()
+    {
+        var outputSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { answer = new { type = "string" } }
+        });
+        await using var fixture = await FlowFixture.CreateAsync(
+            resourceReferenceResolver: new ToolContractResolver(outputSchema));
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new ToolFlowStepDefinition { Name = "tool", Tool = new("answer") },
+                new OutputFlowStepDefinition
+                {
+                    Name = "output2",
+                    DisplayName = "Output 2",
+                    Outcome = FlowOutputOutcome.Success,
+                    OutputMapping = JsonSerializer.SerializeToElement("${transition.output}")
+                },
+                new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
+            ],
+            Transitions =
+            [
+                new("input-tool", "input", "completed", "tool"),
+                new("tool-output2", "tool", "success", "output2"),
+                new("tool-error", "tool", "error", "error")
+            ]
+        };
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "tool-contract-output", null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent")),
+            Graph: graph), default);
+
+        var published = await fixture.Service.PublishVersionAsync(
+            TestScope.WorkspaceId, created.Value.Id, "1.0.0", false, default);
+
+        var publishedGraph = published.Value.Graph!;
+        var output = publishedGraph.GetOutputs().Single(candidate => candidate.Name == "output2");
+        Assert.AreEqual("string", output.Schema!.Value.GetProperty("properties")
+            .GetProperty("answer").GetProperty("type").GetString());
+        Assert.IsNull(publishedGraph.GetOutputs().Single(candidate => candidate.Name == "error").Schema);
+        var draftOutput = created.Value.Graph!.Steps.OfType<OutputFlowStepDefinition>()
+            .Single(candidate => candidate.Name == "output2");
+        Assert.IsNull(draftOutput.Schema);
+    }
+
+    [TestMethod]
     public async Task DuplicateDraftPublicationDoesNotChangeTheFlowDefinition()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -170,6 +221,25 @@ public sealed partial class FlowTests
     {
         public ValueTask<FlowValidationResult> ValidateAsync(FlowGraphDefinition definition, FlowValidationContext context, CancellationToken cancellationToken) =>
             ValueTask.FromResult(new FlowValidationResult([]));
+    }
+
+    private sealed class ToolContractResolver(JsonElement outputSchema) : IFlowResourceReferenceResolver
+    {
+        public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace,
+            CancellationToken cancellationToken) => Task.FromResult(true);
+
+        public Task<ResolvedFlowTool?> ResolveToolAsync(
+            WorkspaceId workspaceId,
+            ResourceNamespace ownerNamespace,
+            FlowToolReference reference,
+            CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowTool?>(new(
+                reference.ResourceId,
+                reference.ResolveNamespace(ownerNamespace),
+                JsonSerializer.SerializeToElement(new { type = "object" }),
+                outputSchema.Clone(),
+                true,
+                true,
+                false));
     }
 
     [TestMethod]
@@ -360,7 +430,7 @@ public sealed partial class FlowTests
                 new ToolFlowStepDefinition { Name = "tool", Tool = new("sample-tool") },
                 new FlowCallStepDefinition { Name = "child", Flow = new("sample-flow") },
                 new OutputFlowStepDefinition { Name = "output" },
-                new FailureFlowStepDefinition { Name = "failure" }
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions =
             [

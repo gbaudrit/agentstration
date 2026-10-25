@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Models;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Components.Models;
 using Agentstration.Work;
 
@@ -12,6 +14,8 @@ public sealed record AgentSummary(string Id, string Name, string Type, string Ve
     public ResourceScopeRef? ScopeRef { get; init; }
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
     public string? DeploymentId { get; init; }
+    public JsonElement? InputSchema { get; init; }
+    public SchemaVersionReference? InputSchemaReference { get; init; }
     public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, ModelResourceKinds.ModelProfile, ModelProfile);
     public string? DeploymentUrl => DeploymentId is null ? null : ConsoleResourceUrls.Deployment(Namespace, DeploymentId);
     public string DetailsUrl => Namespace.IsDefault
