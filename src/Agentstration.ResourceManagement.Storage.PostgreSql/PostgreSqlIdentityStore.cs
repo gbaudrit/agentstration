@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Agentstration.ResourceManagement.Storage.PostgreSql;
 
-internal sealed class TenantRow { public Guid Id { get; set; } public required string Name { get; set; } public required string DisplayName { get; set; } public TenantStatus Status { get; set; } public DateTimeOffset CreatedAt { get; set; } }
-internal sealed class WorkspaceRow { public Guid Id { get; set; } public Guid TenantId { get; set; } public required string Name { get; set; } public required string DisplayName { get; set; } public WorkspaceStatus Status { get; set; } public DateTimeOffset CreatedAt { get; set; } }
+internal sealed class TenantRow { public Guid Id { get; set; } public required string Name { get; set; } public required string DisplayName { get; set; } public TenantStatus Status { get; set; } public TenantKind Kind { get; set; } public DateTimeOffset CreatedAt { get; set; } }
+internal sealed class WorkspaceRow { public Guid Id { get; set; } public Guid TenantId { get; set; } public required string Name { get; set; } public required string DisplayName { get; set; } public WorkspaceStatus Status { get; set; } public WorkspaceKind Kind { get; set; } public DateTimeOffset CreatedAt { get; set; } }
 internal sealed class PrincipalRow { public Guid Id { get; set; } public string? LegacyExternalSubject { get; set; } public PrincipalKind Kind { get; set; } public required string DisplayName { get; set; } public string? Email { get; set; } public PrincipalStatus Status { get; set; } public DateTimeOffset CreatedAt { get; set; } }
 internal sealed class PrincipalPreferencesRow { public Guid PrincipalId { get; set; } public required string PreferencesJson { get; set; } public DateTimeOffset UpdatedAt { get; set; } }
 internal sealed class ExternalIdentityRow { public Guid Id { get; set; } public required string Issuer { get; set; } public required string Subject { get; set; } public Guid PrincipalId { get; set; } public DateTimeOffset LinkedAt { get; set; } }
@@ -25,8 +25,8 @@ internal static class IdentityModel
 {
     public static void ConfigureIdentityModel(this ModelBuilder modelBuilder)
     {
-        var tenant = modelBuilder.Entity<TenantRow>(); tenant.ToTable("Tenants"); tenant.HasKey(x => x.Id); tenant.HasIndex(x => x.Name).IsUnique();
-        var workspace = modelBuilder.Entity<WorkspaceRow>(); workspace.ToTable("Workspaces"); workspace.HasKey(x => x.Id); workspace.HasIndex(x => new { x.TenantId, x.Name }).IsUnique(); workspace.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+        var tenant = modelBuilder.Entity<TenantRow>(); tenant.ToTable("Tenants"); tenant.HasKey(x => x.Id); tenant.HasIndex(x => x.Name).IsUnique(); tenant.HasIndex(x => x.Kind).IsUnique().HasFilter("\"Kind\" = 1");
+        var workspace = modelBuilder.Entity<WorkspaceRow>(); workspace.ToTable("Workspaces"); workspace.HasKey(x => x.Id); workspace.HasIndex(x => new { x.TenantId, x.Name }).IsUnique(); workspace.HasIndex(x => x.Kind).IsUnique().HasFilter("\"Kind\" = 1"); workspace.HasIndex(x => new { x.TenantId, x.Kind }).IsUnique().HasFilter("\"Kind\" = 2"); workspace.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
         var principal = modelBuilder.Entity<PrincipalRow>(); principal.ToTable("Users"); principal.HasKey(x => x.Id); principal.Property(x => x.LegacyExternalSubject).HasColumnName("ExternalSubject");
         var preferences = modelBuilder.Entity<PrincipalPreferencesRow>(); preferences.ToTable("PrincipalPreferences"); preferences.HasKey(x => x.PrincipalId); preferences.HasOne<PrincipalRow>().WithOne().HasForeignKey<PrincipalPreferencesRow>(x => x.PrincipalId).OnDelete(DeleteBehavior.Cascade);
         var externalIdentity = modelBuilder.Entity<ExternalIdentityRow>(); externalIdentity.ToTable("ExternalIdentities"); externalIdentity.HasKey(x => x.Id); externalIdentity.HasIndex(x => new { x.Issuer, x.Subject }).IsUnique(); externalIdentity.HasIndex(x => x.PrincipalId); externalIdentity.HasOne<PrincipalRow>().WithMany().HasForeignKey(x => x.PrincipalId).OnDelete(DeleteBehavior.Cascade);
@@ -50,7 +50,7 @@ public sealed class PostgreSqlIdentityStore(IDbContextFactory<ResourceManagement
     {
         await using var db = await CreateAsync(token);
         var parent = await db.ResourceScopes.SingleAsync(value => value.Ref == ResourceScopeRef.Instance.Value, token);
-        db.Tenants.Add(new() { Id = x.Id, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, CreatedAt = x.CreatedAt });
+        db.Tenants.Add(new() { Id = x.Id, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, Kind = x.Kind, CreatedAt = x.CreatedAt });
         db.ResourceScopes.Add(new() { Ref = ResourceScopeRef.Tenant(x.Id).Value, Kind = "tenant", TargetKey = x.Id.ToString("D"), ParentScopeId = parent.Id });
         await SaveAsync(db, token);
     }
@@ -65,7 +65,7 @@ public sealed class PostgreSqlIdentityStore(IDbContextFactory<ResourceManagement
         var parentRef = ResourceScopeRef.Tenant(x.TenantId).Value;
         var parent = await db.ResourceScopes.SingleOrDefaultAsync(value => value.Ref == parentRef, token)
             ?? throw new InvalidOperationException($"Tenant scope '{parentRef}' does not exist.");
-        db.Workspaces.Add(new() { Id = x.Id, TenantId = x.TenantId, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, CreatedAt = x.CreatedAt });
+        db.Workspaces.Add(new() { Id = x.Id, TenantId = x.TenantId, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, Kind = x.Kind, CreatedAt = x.CreatedAt });
         db.ResourceScopes.Add(new() { Ref = ResourceScopeRef.Workspace(x.Id).Value, Kind = "workspace", TargetKey = x.Id.ToString("D"), ParentScopeId = parent.Id });
         await SaveAsync(db, token);
     }
@@ -131,8 +131,8 @@ public sealed class PostgreSqlIdentityStore(IDbContextFactory<ResourceManagement
         try { await db.SaveChangesAsync(token); }
         catch (DbUpdateException exception) { throw new ResourceConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
     }
-    private static Tenant? Map(TenantRow? x) => x is null ? null : new(x.Id, x.Name, x.DisplayName, x.Status, x.CreatedAt);
-    private static Workspace? Map(WorkspaceRow? x) => x is null ? null : new(x.Id, x.TenantId, x.Name, x.DisplayName, x.Status, x.CreatedAt);
+    private static Tenant? Map(TenantRow? x) => x is null ? null : new(x.Id, x.Name, x.DisplayName, x.Status, x.CreatedAt, x.Kind);
+    private static Workspace? Map(WorkspaceRow? x) => x is null ? null : new(x.Id, x.TenantId, x.Name, x.DisplayName, x.Status, x.CreatedAt, x.Kind);
     private static Principal? Map(PrincipalRow? x) => x is null ? null : new(x.Id, x.Kind, x.DisplayName, x.Email, x.Status, x.CreatedAt);
     private static ExternalIdentity? Map(ExternalIdentityRow? x) => x is null ? null : new(x.Id, x.Issuer, x.Subject, x.PrincipalId, x.LinkedAt);
     private static LocalIdentity? Map(LocalIdentityRow? x) => x is null ? null : new(x.AccountId, x.PrincipalId, x.LinkedAt);

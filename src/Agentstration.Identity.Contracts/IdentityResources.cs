@@ -1,9 +1,9 @@
-using System.Security.Cryptography;
-
 namespace Agentstration.Identity.Contracts;
 
 public enum TenantStatus { Active, Disabled }
+public enum TenantKind { Standard = 0, System = 1 }
 public enum WorkspaceStatus { Active = 0, Disabled = 1, Initializing = 2 }
+public enum WorkspaceKind { Business = 0, InstanceOperations = 1, TenantOperations = 2 }
 public enum PrincipalStatus { Active, Disabled }
 public enum PrincipalKind { Human, Workload }
 public enum MembershipStatus { Active, Suspended }
@@ -18,11 +18,6 @@ public static class OfficialWorkspaceIdentities
 
 public static class OperationalTopologyIdentities
 {
-    private static readonly Guid TenantOperationsNamespaceId = new("d60771d3-03f4-4bf3-a15a-2cb5adca25b8");
-
-    public static readonly Guid SystemTenantId = new("3d39a580-ea2e-4f23-91a9-53fd89c3b2bd");
-    public static readonly Guid InstanceOperationsWorkspaceId = new("1fd19051-64a2-4c0c-8f52-5543ae99d95f");
-
     public const string SystemTenantName = "agentstration-system";
     public const string SystemTenantDisplayName = "Agentstration System";
     public const string InstanceOperationsWorkspaceName = "agentstration-instance-operations";
@@ -30,22 +25,9 @@ public static class OperationalTopologyIdentities
     public const string TenantOperationsWorkspaceName = "agentstration-tenant-operations";
     public const string TenantOperationsWorkspaceDisplayName = "Tenant operations";
 
-    public static Guid TenantOperationsWorkspaceId(Guid tenantId)
-    {
-        if (tenantId == Guid.Empty) throw new ArgumentException("A Tenant operations Workspace requires a non-empty Tenant ID.", nameof(tenantId));
-        Span<byte> input = stackalloc byte[32];
-        _ = TenantOperationsNamespaceId.TryWriteBytes(input[..16]);
-        _ = tenantId.TryWriteBytes(input[16..]);
-        Span<byte> hash = stackalloc byte[32];
-        _ = SHA256.HashData(input, hash);
-        return new Guid(hash[..16]);
-    }
+    public static bool IsSystemTenant(Tenant tenant) => tenant.Kind == TenantKind.System;
 
-    public static bool IsSystemTenant(Guid tenantId) => tenantId == SystemTenantId;
-
-    public static bool IsOperationalWorkspace(Workspace workspace) =>
-        workspace.Id == InstanceOperationsWorkspaceId
-        || (!IsSystemTenant(workspace.TenantId) && workspace.Id == TenantOperationsWorkspaceId(workspace.TenantId));
+    public static bool IsOperationalWorkspace(Workspace workspace) => workspace.Kind != WorkspaceKind.Business;
 
     public static bool IsReservedTenantName(string name) =>
         string.Equals(name, SystemTenantName, StringComparison.Ordinal);
@@ -60,7 +42,8 @@ public sealed record Tenant(
     string Name,
     string DisplayName,
     TenantStatus Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    TenantKind Kind = TenantKind.Standard);
 
 public sealed record Workspace(
     Guid Id,
@@ -68,7 +51,8 @@ public sealed record Workspace(
     string Name,
     string DisplayName,
     WorkspaceStatus Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    WorkspaceKind Kind = WorkspaceKind.Business);
 
 public sealed record Principal(
     Guid Id,

@@ -64,7 +64,7 @@ public sealed class RuntimeRunService(
                 agentReference.Version,
                 cancellationToken);
             resolved = await agents.ResolveAsync(agentReference, cancellationToken);
-            await agentAccess.ValidateUseAsync(resolved, scope.ScopeRef, cancellationToken);
+            await agentAccess.ValidateUseAsync(resolved, scope.AccessScopeRef, cancellationToken);
         }
         catch (RuntimeAgentResolutionException exception) { throw new RuntimeRunValidationException(exception.Code, exception.Message); }
 

@@ -139,19 +139,19 @@ public sealed class IdentityExperienceService(
             ? new Dictionary<Guid, RoleDefinition>()
             : (await store.ListRoleDefinitionsAsync(cancellationToken)).ToDictionary(value => value.Id);
         var activeTenants = tenants.Where(value => value.Status == TenantStatus.Active
-            && !OperationalTopologyIdentities.IsSystemTenant(value.Id)).ToArray();
+            && !OperationalTopologyIdentities.IsSystemTenant(value)).ToArray();
         foreach (var tenant in activeTenants)
         {
             tenantPermissions[tenant.Id] = ResolvePermissions(
                 context with { TenantId = tenant.Id, WorkspaceId = Guid.Empty },
-                isPlatformAdministrator, tenantMemberships, workspaceMemberships, assignments, roles);
+                isPlatformAdministrator, tenantMemberships, workspaceMemberships, assignments, roles, workspaces);
             foreach (var workspace in workspaces.Where(value => value.TenantId == tenant.Id
                          && value.Status == WorkspaceStatus.Active
                          && !OperationalTopologyIdentities.IsOperationalWorkspace(value)))
             {
                 var candidate = context with { TenantId = tenant.Id, WorkspaceId = workspace.Id };
                 var permissions = ResolvePermissions(
-                    candidate, isPlatformAdministrator, tenantMemberships, workspaceMemberships, assignments, roles);
+                    candidate, isPlatformAdministrator, tenantMemberships, workspaceMemberships, assignments, roles, workspaces);
                 if (permissions.Contains(AuthorizationPermissions.WorkspacesRead))
                     available.Add(new ConsoleWorkspaceView(
                         workspace.Id,
@@ -168,7 +168,7 @@ public sealed class IdentityExperienceService(
         var selected = selectedScopeRef is { } requested
             ? contexts.SingleOrDefault(value => value.ScopeRef == requested)
             : null;
-        selected ??= ResolveCurrentSelection(context, contexts);
+        selected ??= ResolveCurrentSelection(context, contexts, workspaces);
         selected ??= contexts.FirstOrDefault()
             ?? throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
         var operationalWorkspaceResource = selected.Kind switch
@@ -194,7 +194,7 @@ public sealed class IdentityExperienceService(
             operationalWorkspaceResource.DisplayName,
             operationalWorkspaceResource.Status,
             ResolvePermissions(operationalContext, isPlatformAdministrator,
-                tenantMemberships, workspaceMemberships, assignments, roles)
+                tenantMemberships, workspaceMemberships, assignments, roles, workspaces)
                 .Order(StringComparer.Ordinal).ToArray());
         var selectedContext = context with
         {
@@ -287,12 +287,13 @@ public sealed class IdentityExperienceService(
 
     private static ConsoleContextOptionView? ResolveCurrentSelection(
         RequestContext context,
-        IReadOnlyList<ConsoleContextOptionView> contexts)
+        IReadOnlyList<ConsoleContextOptionView> contexts,
+        IReadOnlyList<Workspace> workspaces)
     {
-        if (context.WorkspaceId == OperationalTopologyIdentities.InstanceOperationsWorkspaceId)
+        var workspace = workspaces.SingleOrDefault(value => value.Id == context.WorkspaceId);
+        if (workspace?.Kind == WorkspaceKind.InstanceOperations)
             return contexts.SingleOrDefault(value => value.Kind == IdentityConsoleContextKind.Instance);
-        if (!OperationalTopologyIdentities.IsSystemTenant(context.TenantId)
-            && context.WorkspaceId == OperationalTopologyIdentities.TenantOperationsWorkspaceId(context.TenantId))
+        if (workspace?.Kind == WorkspaceKind.TenantOperations)
             return contexts.SingleOrDefault(value => value.ScopeRef == ResourceScopeRef.Tenant(context.TenantId));
         return contexts.SingleOrDefault(value => value.ScopeRef == ResourceScopeRef.Workspace(context.WorkspaceId));
     }
@@ -342,13 +343,14 @@ public sealed class IdentityExperienceService(
         IReadOnlyList<TenantMembership> tenantMemberships,
         IReadOnlyList<WorkspaceMembership> workspaceMemberships,
         IReadOnlyList<RoleAssignment> assignments,
-        IReadOnlyDictionary<Guid, RoleDefinition> roles)
+        IReadOnlyDictionary<Guid, RoleDefinition> roles,
+        IReadOnlyList<Workspace> workspaces)
     {
         var hasTenantMembership = tenantMemberships.Any(value => value.TenantId == context.TenantId
             && value.Status == MembershipStatus.Active);
-        var tenantOperations = context.WorkspaceId != Guid.Empty
-            && !OperationalTopologyIdentities.IsSystemTenant(context.TenantId)
-            && context.WorkspaceId == OperationalTopologyIdentities.TenantOperationsWorkspaceId(context.TenantId);
+        var tenantOperations = workspaces.Any(value => value.Id == context.WorkspaceId
+            && value.TenantId == context.TenantId
+            && value.Kind == WorkspaceKind.TenantOperations);
         var hasWorkspaceMembership = tenantOperations
             ? hasTenantMembership
             : workspaceMemberships.Any(value => value.WorkspaceId == context.WorkspaceId

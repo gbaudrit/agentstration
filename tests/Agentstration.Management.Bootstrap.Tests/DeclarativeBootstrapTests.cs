@@ -899,7 +899,7 @@ public sealed partial class DeclarativeBootstrapTests
 
         var identities = factory.Services.GetRequiredService<IIdentityStore>();
         var tenant = (await identities.ListTenantsAsync(default)).Single(value =>
-            !OperationalTopologyIdentities.IsSystemTenant(value.Id));
+            !OperationalTopologyIdentities.IsSystemTenant(value));
         var workspace = (await identities.ListWorkspacesAsync(tenant.Id, default)).Single(value =>
             !OperationalTopologyIdentities.IsOperationalWorkspace(value));
         var localIdentity = (await identities.ListLocalIdentitiesAsync(default)).Single();

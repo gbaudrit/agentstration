@@ -97,9 +97,10 @@ public sealed class PermissionAuthorizationService(
             return ResolvePermissions(context, true, false, false, [], new Dictionary<Guid, RoleDefinition>());
 
         var tenantOnly = context.WorkspaceId == Guid.Empty;
-        var tenantOperations = !tenantOnly
-            && !OperationalTopologyIdentities.IsSystemTenant(context.TenantId)
-            && context.WorkspaceId == OperationalTopologyIdentities.TenantOperationsWorkspaceId(context.TenantId);
+        var workspace = tenantOnly
+            ? null
+            : await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
+        var tenantOperations = workspace?.Kind == WorkspaceKind.TenantOperations;
         var hasTenantMembership = false;
         var hasWorkspaceMembership = false;
         if (tenantOnly || tenantOperations)
@@ -109,7 +110,6 @@ public sealed class PermissionAuthorizationService(
         }
         if (!tenantOnly)
         {
-            var workspace = await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
             if (workspace?.Status != WorkspaceStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
             if (tenantOperations)
                 hasWorkspaceMembership = hasTenantMembership;

@@ -1,6 +1,5 @@
-using Agentstration.Identity.Contracts;
-using Agentstration.Infrastructure.Runtime;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Runtime.Tests;
 
@@ -8,49 +7,39 @@ namespace Agentstration.Runtime.Tests;
 public sealed class RuntimeAgentAccessValidatorTests
 {
     [TestMethod]
-    public void InstanceOperationsWorkspaceUsesInstanceAsItsLogicalAccessScope()
+    public void PhysicalWorkspaceCanCarryInstanceLogicalAccessScope()
     {
-        var executionScope = ResourceScopeRef.Workspace(
-            OperationalTopologyIdentities.InstanceOperationsWorkspaceId);
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var scope = RuntimeRunScope.Workspace(Guid.NewGuid(), workspaceId, Guid.NewGuid()) with
+        {
+            LogicalScopeRef = ResourceScopeRef.Instance
+        };
 
-        var accessScope = RuntimeAgentAccessValidator.MapOperationalScope(executionScope, null);
-
-        Assert.AreEqual(ResourceScopeRef.Instance, accessScope);
+        Assert.AreEqual(ResourceScopeRef.Workspace(workspaceId.Value), scope.ScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, scope.AccessScopeRef);
     }
 
     [TestMethod]
-    public void TenantOperationsWorkspaceUsesTenantAsItsLogicalAccessScope()
+    public void PhysicalWorkspaceCanCarryTenantLogicalAccessScope()
     {
         var tenantId = Guid.NewGuid();
-        var workspace = new Workspace(
-            OperationalTopologyIdentities.TenantOperationsWorkspaceId(tenantId),
-            tenantId,
-            OperationalTopologyIdentities.TenantOperationsWorkspaceName,
-            OperationalTopologyIdentities.TenantOperationsWorkspaceDisplayName,
-            WorkspaceStatus.Active,
-            DateTimeOffset.UtcNow);
-        var executionScope = ResourceScopeRef.Workspace(workspace.Id);
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var scope = RuntimeRunScope.Workspace(tenantId, workspaceId, Guid.NewGuid()) with
+        {
+            LogicalScopeRef = ResourceScopeRef.Tenant(tenantId)
+        };
 
-        var accessScope = RuntimeAgentAccessValidator.MapOperationalScope(executionScope, workspace);
-
-        Assert.AreEqual(ResourceScopeRef.Tenant(tenantId), accessScope);
+        Assert.AreEqual(ResourceScopeRef.Workspace(workspaceId.Value), scope.ScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Tenant(tenantId), scope.AccessScopeRef);
     }
 
     [TestMethod]
-    public void BusinessWorkspaceRemainsItsOwnLogicalAccessScope()
+    public void BusinessWorkspaceDefaultsToItsPhysicalAccessScope()
     {
         var tenantId = Guid.NewGuid();
-        var workspace = new Workspace(
-            Guid.NewGuid(),
-            tenantId,
-            "business",
-            "Business",
-            WorkspaceStatus.Active,
-            DateTimeOffset.UtcNow);
-        var executionScope = ResourceScopeRef.Workspace(workspace.Id);
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var scope = RuntimeRunScope.Workspace(tenantId, workspaceId, Guid.NewGuid());
 
-        var accessScope = RuntimeAgentAccessValidator.MapOperationalScope(executionScope, workspace);
-
-        Assert.AreEqual(executionScope, accessScope);
+        Assert.AreEqual(scope.ScopeRef, scope.AccessScopeRef);
     }
 }

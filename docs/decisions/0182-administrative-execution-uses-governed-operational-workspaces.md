@@ -21,8 +21,12 @@ governed Workspaces with the same isolation and durable lifecycle as every other
 - Agentstration owns one reserved system Tenant with one protected Instance operations Workspace.
 - Every active ordinary Tenant owns exactly one protected Tenant operations Workspace. It is created
   automatically for new Tenants and reconciled idempotently for existing Tenants during startup.
-- Reserved topology uses stable code-owned identities and names. A collision with those identities or
-  names fails explicitly; ordinary creation, selection as a business Workspace, membership mutation,
+- Tenant and Workspace records carry an immutable semantic kind. The single system Tenant is identified
+  by `System`; its Workspace is `InstanceOperations`; and each ordinary Tenant has one
+  `TenantOperations` Workspace. Their GUIDs are generated and persisted like ordinary identities; no
+  authorization or topology rule depends on a reserved GUID. Database constraints enforce the
+  cardinalities, and reserved-name collisions fail explicitly. Ordinary creation, selection as a
+  business Workspace, membership mutation,
   rename, deletion, transfer, and reassignment are not allowed.
 - Selecting the Instance Console context places operational work in the Instance operations Workspace.
   Selecting a Tenant Console context places it in that Tenant's operations Workspace. Selecting a
@@ -33,6 +37,9 @@ governed Workspaces with the same isolation and durable lifecycle as every other
 - WorkItems, Flow Runs, Runtime Runs, sessions, assignments, input requests, artifacts, and
   conversations remain Workspace-owned. Execution evidence independently retains the exact owner
   scope and immutable identity of each Instance- or Tenant-owned definition.
+- Administrative Runs retain both coordinates explicitly: the operational Workspace is the durable
+  storage scope, while the selected Instance or Tenant is the logical authorization scope. Resource
+  visibility and use decisions consume the logical scope and never infer it from a Workspace GUID.
 - The system Tenant is an administrative topology boundary only. It is not an ancestor of business
   Tenants, and its operational state is never inherited by them.
 

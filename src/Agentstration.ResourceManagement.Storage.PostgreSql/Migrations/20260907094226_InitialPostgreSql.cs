@@ -103,6 +103,7 @@ public partial class InitialPostgreSql : Migration
                 Name = table.Column<string>(type: "text", nullable: false),
                 DisplayName = table.Column<string>(type: "text", nullable: false),
                 Status = table.Column<int>(type: "integer", nullable: false),
+                Kind = table.Column<int>(type: "integer", nullable: false),
                 CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
@@ -190,6 +191,7 @@ public partial class InitialPostgreSql : Migration
                 Name = table.Column<string>(type: "text", nullable: false),
                 DisplayName = table.Column<string>(type: "text", nullable: false),
                 Status = table.Column<int>(type: "integer", nullable: false),
+                Kind = table.Column<int>(type: "integer", nullable: false),
                 CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
@@ -528,6 +530,14 @@ public partial class InitialPostgreSql : Migration
             column: "UserId");
 
         migrationBuilder.CreateIndex(
+            name: "IX_Tenants_Kind",
+            schema: "management",
+            table: "Tenants",
+            column: "Kind",
+            unique: true,
+            filter: "\"Kind\" = 1");
+
+        migrationBuilder.CreateIndex(
             name: "IX_Tenants_Name",
             schema: "management",
             table: "Tenants",
@@ -552,6 +562,22 @@ public partial class InitialPostgreSql : Migration
             table: "WorkspaceMemberships",
             columns: new[] { "WorkspaceId", "PrincipalId" },
             unique: true);
+
+        migrationBuilder.CreateIndex(
+            name: "IX_Workspaces_Kind",
+            schema: "management",
+            table: "Workspaces",
+            column: "Kind",
+            unique: true,
+            filter: "\"Kind\" = 1");
+
+        migrationBuilder.CreateIndex(
+            name: "IX_Workspaces_TenantId_Kind",
+            schema: "management",
+            table: "Workspaces",
+            columns: new[] { "TenantId", "Kind" },
+            unique: true,
+            filter: "\"Kind\" = 2");
 
         migrationBuilder.CreateIndex(
             name: "IX_Workspaces_TenantId_Name",

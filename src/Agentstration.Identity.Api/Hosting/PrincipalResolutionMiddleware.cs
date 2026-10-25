@@ -146,8 +146,7 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         {
             var candidate = await store.GetWorkspaceAsync(requested, cancellationToken);
             if (candidate is { Status: WorkspaceStatus.Active }
-                && !OperationalTopologyIdentities.IsSystemTenant(candidate.TenantId)
-                && candidate.Id == OperationalTopologyIdentities.TenantOperationsWorkspaceId(candidate.TenantId))
+                && candidate.Kind == WorkspaceKind.TenantOperations)
             {
                 var tenantMembership = await store.FindMembershipAsync(candidate.TenantId, principalId, cancellationToken);
                 if (tenantMembership?.Status == MembershipStatus.Active) return candidate;
@@ -177,7 +176,7 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         }
 
         foreach (var tenant in (await store.ListTenantsAsync(cancellationToken)).Where(value => value.Status == TenantStatus.Active
-                     && !OperationalTopologyIdentities.IsSystemTenant(value.Id)))
+                     && !OperationalTopologyIdentities.IsSystemTenant(value)))
         {
             var workspace = (await store.ListWorkspacesAsync(tenant.Id, cancellationToken))
                 .FirstOrDefault(value => value.Status == WorkspaceStatus.Active

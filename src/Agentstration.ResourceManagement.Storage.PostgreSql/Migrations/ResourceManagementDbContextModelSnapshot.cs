@@ -487,6 +487,9 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -498,6 +501,10 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique();
+
+                    b.HasIndex("Kind")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 1");
 
                     b.ToTable("Tenants", "management");
                 });
@@ -605,6 +612,9 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -619,6 +629,14 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
 
                     b.HasIndex("TenantId", "Name")
                         .IsUnique();
+
+                    b.HasIndex("Kind")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 1");
+
+                    b.HasIndex("TenantId", "Kind")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 2");
 
                     b.ToTable("Workspaces", "management");
                 });

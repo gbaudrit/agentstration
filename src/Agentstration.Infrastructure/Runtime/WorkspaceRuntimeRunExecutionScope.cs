@@ -23,22 +23,7 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
     {
         var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
         if (principal?.Status != PrincipalStatus.Active) throw Denied();
-        if (scope.ScopeRef == ResourceScopeRef.Workspace(OperationalTopologyIdentities.InstanceOperationsWorkspaceId))
-        {
-            if (!await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) throw Denied();
-            return;
-        }
-        if (scope.ScopeRef.Kind == ResourceScopeKind.Workspace
-            && scope.ScopeRef.TargetId == OperationalTopologyIdentities.TenantOperationsWorkspaceId(scope.TenantId))
-        {
-            var operationalTenant = await identities.GetTenantAsync(scope.TenantId, cancellationToken);
-            if (operationalTenant?.Status != TenantStatus.Active) throw Denied();
-            if (await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) return;
-            var membership = await identities.FindMembershipAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
-            if (membership?.Status != MembershipStatus.Active || !await HasTenantPermissionAsync(scope, permission, cancellationToken)) throw Denied();
-            return;
-        }
-        if (scope.ScopeRef.Kind == ResourceScopeKind.Instance)
+        if (scope.AccessScopeRef.Kind == ResourceScopeKind.Instance)
         {
             if (!await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) throw Denied();
             return;
@@ -46,7 +31,7 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
         var tenant = scope.TenantId == Guid.Empty ? null : await identities.GetTenantAsync(scope.TenantId, cancellationToken);
         if (tenant?.Status != TenantStatus.Active || scope.ScopeRef.TargetId != scope.TenantId && scope.ScopeRef.Kind == ResourceScopeKind.Tenant)
             throw Denied();
-        if (scope.ScopeRef.Kind == ResourceScopeKind.Tenant)
+        if (scope.AccessScopeRef.Kind == ResourceScopeKind.Tenant)
         {
             if (await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) return;
             var membership = await identities.FindMembershipAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
@@ -54,19 +39,14 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
             return;
         }
         var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId.Value, cancellationToken);
-        if (workspace?.Status != WorkspaceStatus.Active || scope.ScopeRef != ResourceScopeRef.Workspace(scope.WorkspaceId.Value)) throw Denied();
+        if (workspace?.Status != WorkspaceStatus.Active || scope.AccessScopeRef != ResourceScopeRef.Workspace(scope.WorkspaceId.Value)) throw Denied();
         try { await authorization.EnsurePermissionAsync(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value), permission, cancellationToken); }
         catch (AuthorizationDeniedException) { throw Denied(); }
     }
 
     public IDisposable Enter(RuntimeRunScope scope)
     {
-        if (scope.ScopeRef == ResourceScopeRef.Workspace(OperationalTopologyIdentities.InstanceOperationsWorkspaceId))
-            return scopeFactory.PushSystem();
-        if (scope.ScopeRef.Kind == ResourceScopeKind.Workspace
-            && scope.ScopeRef.TargetId == OperationalTopologyIdentities.TenantOperationsWorkspaceId(scope.TenantId))
-            return scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId);
-        return scope.ScopeRef.Kind switch
+        return scope.AccessScopeRef.Kind switch
         {
             ResourceScopeKind.Instance => scopeFactory.PushSystem(),
             ResourceScopeKind.Tenant => scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId),

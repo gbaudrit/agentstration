@@ -70,7 +70,7 @@ public sealed partial class SecurityApiTests
 
             var store = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
             var tenant = (await store.ListTenantsAsync(default)).Single(value =>
-                !OperationalTopologyIdentities.IsSystemTenant(value.Id));
+                !OperationalTopologyIdentities.IsSystemTenant(value));
             var workspace = (await store.ListWorkspacesAsync(tenant.Id, default)).Single(value =>
                 !OperationalTopologyIdentities.IsOperationalWorkspace(value));
             var owner = await store.FindRoleDefinitionByNameAsync("Owner", default);

@@ -96,10 +96,8 @@ public sealed class BffSessionAuthorityService(
             foreach (var membership in (await identities.ListTenantMembershipsAsync(principalId, cancellationToken))
                          .Where(value => value.Status == MembershipStatus.Active))
             {
-                var workspace = await identities.GetWorkspaceAsync(
-                    membership.TenantId,
-                    OperationalTopologyIdentities.TenantOperationsWorkspaceId(membership.TenantId),
-                    cancellationToken);
+                var workspace = (await identities.ListWorkspacesAsync(membership.TenantId, cancellationToken))
+                    .SingleOrDefault(value => value.Kind == WorkspaceKind.TenantOperations);
                 if (workspace is { Status: WorkspaceStatus.Active }) candidates.Add(workspace);
             }
         }

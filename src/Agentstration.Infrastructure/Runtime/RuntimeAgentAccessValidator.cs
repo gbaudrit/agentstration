@@ -6,8 +6,7 @@ using Agentstration.Runtime.Abstractions;
 namespace Agentstration.Infrastructure.Runtime;
 
 public sealed class RuntimeAgentAccessValidator(
-    IResourceAccessPolicyService accessPolicies,
-    IIdentityStore identities)
+    IResourceAccessPolicyService accessPolicies)
     : IRuntimeAgentAccessValidator
 {
     public async Task ValidateUseAsync(
@@ -17,8 +16,7 @@ public sealed class RuntimeAgentAccessValidator(
     {
         if (agent.AgentScopeRef is not { } ownerScopeRef)
             throw NotFound(agent);
-        var accessScopeRef = await ResolveAccessScopeAsync(consumerScopeRef, cancellationToken);
-        if (ownerScopeRef == accessScopeRef) return;
+        if (ownerScopeRef == consumerScopeRef) return;
 
         var decision = await accessPolicies.EvaluateAsync(
             new ResourceAccessIdentity(
@@ -27,33 +25,10 @@ public sealed class RuntimeAgentAccessValidator(
                 agent.AgentNamespace,
                 "Agent",
                 agent.Generation),
-            accessScopeRef,
+            consumerScopeRef,
             ResourceAccessAction.Use,
             cancellationToken);
         if (!decision.Allowed) throw NotFound(agent);
-    }
-
-    private async Task<ResourceScopeRef> ResolveAccessScopeAsync(
-        ResourceScopeRef executionScopeRef,
-        CancellationToken cancellationToken)
-    {
-        if (executionScopeRef.Kind != ResourceScopeKind.Workspace) return executionScopeRef;
-        if (executionScopeRef.TargetId == OperationalTopologyIdentities.InstanceOperationsWorkspaceId)
-            return ResourceScopeRef.Instance;
-        var workspace = await identities.GetWorkspaceAsync(executionScopeRef.TargetId!.Value, cancellationToken);
-        return MapOperationalScope(executionScopeRef, workspace);
-    }
-
-    internal static ResourceScopeRef MapOperationalScope(ResourceScopeRef executionScopeRef, Workspace? workspace)
-    {
-        if (executionScopeRef.Kind == ResourceScopeKind.Workspace
-            && executionScopeRef.TargetId == OperationalTopologyIdentities.InstanceOperationsWorkspaceId)
-            return ResourceScopeRef.Instance;
-        if (workspace is not null
-            && !OperationalTopologyIdentities.IsSystemTenant(workspace.TenantId)
-            && workspace.Id == OperationalTopologyIdentities.TenantOperationsWorkspaceId(workspace.TenantId))
-            return ResourceScopeRef.Tenant(workspace.TenantId);
-        return executionScopeRef;
     }
 
     private static RuntimeAgentResolutionException NotFound(ResolvedRuntimeAgent agent) =>

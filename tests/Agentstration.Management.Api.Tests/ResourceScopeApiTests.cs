@@ -676,10 +676,16 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                     await runResponse.Content.ReadAsStringAsync());
                 var run = await runResponse.Content.ReadFromJsonAsync<RuntimeRun>();
                 Assert.IsNotNull(run);
-                var expectedExecutionScope = scopeRef.Kind == ResourceScopeKind.Instance
-                    ? ResourceScopeRef.Workspace(OperationalTopologyIdentities.InstanceOperationsWorkspaceId)
-                    : ResourceScopeRef.Workspace(OperationalTopologyIdentities.TenantOperationsWorkspaceId(context.TenantId));
+                var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+                var operationalWorkspace = scopeRef.Kind == ResourceScopeKind.Instance
+                    ? await topology.GetInstanceOperationsWorkspaceAsync(default)
+                    : await topology.GetTenantOperationsWorkspaceAsync(context.TenantId, default);
+                var expectedExecutionScope = ResourceScopeRef.Workspace(operationalWorkspace.Id);
                 Assert.AreEqual(expectedExecutionScope, run.ExecutionScopeRef);
+                using var instancesResponse = await client.GetAsync(
+                    $"/api/runtime/agent-instances?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}");
+                Assert.AreEqual(HttpStatusCode.OK, instancesResponse.StatusCode,
+                    await instancesResponse.Content.ReadAsStringAsync());
             }
         }
 
