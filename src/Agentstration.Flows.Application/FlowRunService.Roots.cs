@@ -41,7 +41,7 @@ public sealed partial class FlowRunService
             return existing;
         }
 
-        var resolved = await ResolveVersionAsync(command.Scope.ScopeRef, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
+        var resolved = await ResolveVersionAsync(command.Scope.AccessScopeRef, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, command.Input);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun

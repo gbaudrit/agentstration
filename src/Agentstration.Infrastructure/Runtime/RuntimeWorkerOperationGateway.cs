@@ -377,7 +377,7 @@ public sealed class RuntimeWorkerOperationGateway(
         };
 
     private IDisposable EnterScope(FlowRunScope scope) =>
-        EnterScope(scope.ScopeRef, scope.TenantId, scope.PrincipalId);
+        EnterScope(scope.AccessScopeRef, scope.TenantId, scope.PrincipalId);
 
     private sealed record ArtifactState(Guid ArtifactId, string Name, ArtifactReference Reference);
 }

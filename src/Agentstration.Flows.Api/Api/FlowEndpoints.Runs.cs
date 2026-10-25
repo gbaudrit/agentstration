@@ -206,19 +206,7 @@ public static partial class FlowEndpoints
         await service.GetAsync(id, scope, token) ?? throw new FlowRunNotFoundException(id);
 
     private static FlowRunScope CurrentScope(ICurrentRequestContext requestContext, ResourceScopeRef? requestedScopeRef = null)
-    {
-        if (!requestContext.IsInitialized)
-            throw new FlowValidationException("flow_run_context_required", "A Flow Run requires an authenticated Workspace context.");
-        var current = requestContext.Current;
-        var requested = requestedScopeRef ?? ResourceScopeRef.Workspace(current.WorkspaceId);
-        return requested.Kind switch
-        {
-            ResourceScopeKind.Instance => FlowRunScope.Instance(current.PrincipalId),
-            ResourceScopeKind.Tenant when requested.TargetId == current.TenantId => FlowRunScope.Tenant(current.TenantId, current.PrincipalId),
-            ResourceScopeKind.Workspace when requested.TargetId == current.WorkspaceId => FlowRunScope.Workspace(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId),
-            _ => throw new FlowValidationException("flow_invocation_scope_mismatch", "The requested Flow execution scope is not the current Instance, Tenant, or Workspace context.")
-        };
-    }
+        => FlowRunHttp.CurrentScope(requestContext, requestedScopeRef);
 
     private static ResourceScopeRef? ParseScope(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);

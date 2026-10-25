@@ -24,15 +24,15 @@ public sealed class FlowRunHub(ICurrentRequestContext requestContext, FlowRunSer
 
     private FlowRunScope CurrentScope(string? scopeRef)
     {
-        var current = requestContext.Current;
-        var requested = string.IsNullOrWhiteSpace(scopeRef) ? ResourceScopeRef.Workspace(current.WorkspaceId) : ResourceScopeRef.Parse(scopeRef);
-        return requested.Kind switch
+        try
         {
-            ResourceScopeKind.Instance => FlowRunScope.Instance(current.PrincipalId),
-            ResourceScopeKind.Tenant when requested.TargetId == current.TenantId => FlowRunScope.Tenant(current.TenantId, current.PrincipalId),
-            ResourceScopeKind.Workspace when requested.TargetId == current.WorkspaceId => FlowRunScope.Workspace(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId),
-            _ => throw new HubException("The requested Flow Run scope is outside the current context.")
-        };
+            ResourceScopeRef? requested = string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef);
+            return FlowRunHttp.CurrentScope(requestContext, requested);
+        }
+        catch (FlowValidationException exception)
+        {
+            throw new HubException(exception.Message);
+        }
     }
 
     internal static string Group(ResourceScopeRef scopeRef, string runId) => $"scope:{scopeRef.Value}:flow-run:{runId}";
