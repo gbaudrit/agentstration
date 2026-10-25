@@ -37,7 +37,6 @@
 <data name="Flow"><value>Flow</value></data><data name="Uid"><value>UID</value></data>
   <data name="Scope"><value>Scope</value></data>
   <data name="OperationalWorkspace"><value>Operational Workspace</value></data>
-  <data name="OperationalWorkspaceHelp"><value>The Trigger and its execution history are owned by the operational Workspace of the selected context.</value></data>
   <data name="DefinitionScope"><value>Definition scope</value></data>
   <data name="ExecutionScope"><value>Execution scope</value></data>
   <data name="Instance"><value>Instance</value></data>

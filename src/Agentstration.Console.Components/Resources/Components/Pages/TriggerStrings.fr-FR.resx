@@ -37,7 +37,6 @@
 <data name="Flow"><value>Flow</value></data><data name="Uid"><value>UID</value></data>
   <data name="Scope"><value>Périmètre</value></data>
   <data name="OperationalWorkspace"><value>Workspace opérationnel</value></data>
-  <data name="OperationalWorkspaceHelp"><value>Le déclencheur et son historique d’exécution appartiennent au Workspace opérationnel du contexte sélectionné.</value></data>
   <data name="DefinitionScope"><value>Périmètre de définition</value></data>
   <data name="ExecutionScope"><value>Périmètre d’exécution</value></data>
   <data name="Instance"><value>Instance</value></data>
