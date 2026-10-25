@@ -143,6 +143,13 @@ export const Checkpoints = {
     unauthorized: 'hierarchical-context-unauthorized',
     dirtyGuard: 'hierarchical-context-dirty-guard',
   },
+  operationalWorkspaces: {
+    topology: 'operational-workspaces-topology',
+    instanceRun: 'operational-workspaces-instance-run',
+    tenantRun: 'operational-workspaces-tenant-run',
+    recovery: 'operational-workspaces-recovery',
+    isolation: 'operational-workspaces-isolation',
+  },
   modelAdministration: {
     provider: 'model-administration-provider',
     runtime: 'model-administration-runtime',

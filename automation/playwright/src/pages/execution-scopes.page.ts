@@ -92,6 +92,7 @@ export class ExecutionScopesPage {
     };
     await this.ensureInstanceModelProfile(consoleUrl, scopes.tenant);
     const agent = await this.ensureInstanceAgent(consoleUrl, scopes.tenant);
+    await this.ensureInstanceFlow(consoleUrl, agent.uid, scopes.tenant);
 
     return {
       agentName,
@@ -121,7 +122,7 @@ export class ExecutionScopesPage {
     const promptValue = 'Run the Instance Agent from the selected Workspace.';
     await expect(async () => {
       await prompt.fill(promptValue);
-      await prompt.blur();
+      await prompt.dispatchEvent('change');
       await expect(prompt).toHaveValue(promptValue);
       await expect(submit).toBeEnabled();
     }).toPass({ timeout: 30_000 });
@@ -132,8 +133,6 @@ export class ExecutionScopesPage {
     const runtimeRunId = await agentRun.getAttribute('data-run-id');
     if (!runtimeRunId) throw new Error('The Agent runner did not expose the created Runtime Run identifier.');
     const runtime = await this.read<RuntimeRunWire>(`${consoleUrl}/api/runtime/runs/${encodeURIComponent(runtimeRunId)}`);
-
-    await this.ensureInstanceFlow(consoleUrl, fixture.agentUid, fixture.scopes.tenant);
 
     await this.open(
       `${consoleUrl}/flows/${encodeURIComponent(fixture.flowName)}?scopeRef=${encodeURIComponent('/instance')}`,
@@ -253,11 +252,12 @@ export class ExecutionScopesPage {
 
   private async ensureInstanceAgent(consoleUrl: string, tenantScope: string): Promise<AgentWire> {
     const url = `${consoleUrl}/api/agents/${agentName}?scopeRef=${encodeURIComponent('/instance')}`;
-    const current = await this.page.request.get(url);
+    const contextHeaders = { 'X-Agentstration-Context': '/instance' };
+    const current = await this.page.request.get(url, { headers: contextHeaders });
     let agent: AgentWire;
     if (current.status() === 404) {
       const created = await this.page.request.put(`${consoleUrl}/api/agents/${agentName}`, {
-        headers: { 'If-None-Match': '*' },
+        headers: { ...contextHeaders, 'If-None-Match': '*' },
         data: {
           apiVersion: 'agentstration.io/v1', kind: 'Agent', scopeRef: '/instance',
           metadata: { name: agentName, namespace: 'default' },
@@ -278,7 +278,6 @@ export class ExecutionScopesPage {
       agent = await current.json() as AgentWire;
     }
     await this.grantDescendantUse(consoleUrl, agent, tenantScope);
-    const contextHeaders = { 'X-Agentstration-Context': '/instance' };
     const revisionName = `${agentName}--${agent.generation.toString().padStart(6, '0')}`;
     let revision = await this.page.request.get(
       `${consoleUrl}/api/agents/${agentName}/revisions/${revisionName}?scopeRef=${encodeURIComponent('/instance')}`,
@@ -300,11 +299,13 @@ export class ExecutionScopesPage {
   }
 
   private async ensureInstanceModelProfile(consoleUrl: string, tenantScope: string): Promise<void> {
+    const contextHeaders = { 'X-Agentstration-Context': '/instance' };
     const providerUrl = `${consoleUrl}/api/modelproviders/${modelProviderName}?scopeRef=${encodeURIComponent('/instance')}`;
-    const currentProvider = await this.page.request.get(providerUrl);
+    const currentProvider = await this.page.request.get(providerUrl, { headers: contextHeaders });
     let provider: AgentWire;
     if (currentProvider.status() === 404) {
       const created = await this.page.request.post(`${consoleUrl}/api/modelproviders`, {
+        headers: contextHeaders,
         data: {
           name: modelProviderName,
           namespace: 'default',
@@ -325,14 +326,18 @@ export class ExecutionScopesPage {
       provider = await currentProvider.json() as AgentWire;
     }
     await this.grantDescendantUse(consoleUrl, provider, tenantScope);
-    const refreshed = await this.page.request.post(`${consoleUrl}/api/modelproviders/${modelProviderName}/models/refresh`);
+    const refreshed = await this.page.request.post(
+      `${consoleUrl}/api/modelproviders/${modelProviderName}/models/refresh`,
+      { headers: contextHeaders },
+    );
     expect(refreshed.status(), await refreshed.text()).toBe(200);
 
     const profileUrl = `${consoleUrl}/api/modelprofiles/${modelProfileName}?scopeRef=${encodeURIComponent('/instance')}`;
-    const currentProfile = await this.page.request.get(profileUrl);
+    const currentProfile = await this.page.request.get(profileUrl, { headers: contextHeaders });
     let profile: AgentWire;
     if (currentProfile.status() === 404) {
       const created = await this.page.request.post(`${consoleUrl}/api/modelprofiles`, {
+        headers: contextHeaders,
         data: {
           name: modelProfileName,
           namespace: 'default',

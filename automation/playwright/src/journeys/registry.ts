@@ -28,6 +28,7 @@ import { exerciseSchemaAdministration, type ExerciseSchemaAdministrationInput } 
 import { exerciseResourceAccess, type ExerciseResourceAccessInput } from './exercise-resource-access.journey.js';
 import { exerciseExecutionScopes, type ExerciseExecutionScopesInput } from './exercise-execution-scopes.journey.js';
 import { exerciseHierarchicalContext, type ExerciseHierarchicalContextInput } from './exercise-hierarchical-context.journey.js';
+import { exerciseOperationalWorkspaces, type ExerciseOperationalWorkspacesInput } from './exercise-operational-workspaces.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -61,4 +62,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-resource-access': (context, input) => exerciseResourceAccess(context, input as unknown as ExerciseResourceAccessInput),
   'exercise-execution-scopes': (context, input) => exerciseExecutionScopes(context, input as unknown as ExerciseExecutionScopesInput),
   'exercise-hierarchical-context': (context, input) => exerciseHierarchicalContext(context, input as unknown as ExerciseHierarchicalContextInput),
+  'exercise-operational-workspaces': (context, input) => exerciseOperationalWorkspaces(context, input as unknown as ExerciseOperationalWorkspacesInput),
 };

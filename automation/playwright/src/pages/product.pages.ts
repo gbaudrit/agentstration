@@ -29,6 +29,7 @@ import { SchemaAdministrationPage } from './schema-administration.page.js';
 import { ResourceAccessPage } from './resource-access.page.js';
 import { ExecutionScopesPage } from './execution-scopes.page.js';
 import { HierarchicalContextPage } from './hierarchical-context.page.js';
+import { OperationalWorkspacesPage } from './operational-workspaces.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -60,6 +61,7 @@ export class ProductPages {
   public readonly resourceAccess: ResourceAccessPage;
   public readonly executionScopes: ExecutionScopesPage;
   public readonly hierarchicalContext: HierarchicalContextPage;
+  public readonly operationalWorkspaces: OperationalWorkspacesPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -91,6 +93,7 @@ export class ProductPages {
     this.resourceAccess = new ResourceAccessPage(page);
     this.executionScopes = new ExecutionScopesPage(page);
     this.hierarchicalContext = new HierarchicalContextPage(page);
+    this.operationalWorkspaces = new OperationalWorkspacesPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {
