@@ -425,6 +425,7 @@ public sealed class RuntimeRunTests
         var agent = await agentResponse.Content.ReadFromJsonAsync<AgentResource>();
         Assert.IsNotNull(agent);
 
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         using var runResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
         {
             Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation)
@@ -442,9 +443,11 @@ public sealed class RuntimeRunTests
         var claim = await worker.ClaimAsync();
 
         Assert.IsNotNull(claim.Assignment);
-        Assert.AreEqual(ResourceScopeRef.Instance.Value, claim.Assignment.Scope.ScopeRef);
-        Assert.AreEqual(Guid.Empty, claim.Assignment.Scope.TenantId);
-        Assert.AreEqual(string.Empty, claim.Assignment.Scope.WorkspaceId);
+        var operationalWorkspace = await factory.Services.GetRequiredService<IOperationalTopologyProvisioner>()
+            .GetInstanceOperationsWorkspaceAsync(default);
+        Assert.AreEqual(ResourceScopeRef.Workspace(operationalWorkspace.Id).Value, claim.Assignment.Scope.ScopeRef);
+        Assert.AreEqual(operationalWorkspace.TenantId, claim.Assignment.Scope.TenantId);
+        Assert.AreEqual(operationalWorkspace.Id.ToString("D"), claim.Assignment.Scope.WorkspaceId);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await worker.RunAsync(claim.Assignment, claim.ServerTime, timeout.Token);
         var run = await runResponse.Content.ReadFromJsonAsync<RuntimeRun>();

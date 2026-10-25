@@ -40,8 +40,13 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public async Task EnsureAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         using var systemScope = scopes.PushSystem();
+        var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
+            ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
         var runtimeProfile = await EnsureStandardRuntimeProfileAsync(cancellationToken);
-        await EnsureWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
+        if (OperationalTopologyIdentities.IsOperationalWorkspace(workspace))
+            await RemoveWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
+        else
+            await EnsureWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
         await artifacts.EnsureAsync(ResourceScopeRef.Instance, cancellationToken);
         await internalTools.EnsureAsync(
@@ -51,8 +56,6 @@ internal sealed class WorkspacePlatformResourceProvisioner(
         await artifacts.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         await knowledge.EnsureAsync(ResourceScopeRef.Tenant(tenantId),
             ResourceScopeRef.Workspace(workspaceId), cancellationToken);
-        var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
-            ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
         if (workspace.Status == WorkspaceStatus.Initializing)
             await identities.UpdateWorkspaceAsync(workspace with { Status = WorkspaceStatus.Active }, cancellationToken);
     }
@@ -131,6 +134,31 @@ internal sealed class WorkspacePlatformResourceProvisioner(
                 _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(
                     new(resource.Uid, resource.ScopeRef!.Value, resource.Namespace, resource.Kind, resource.Generation),
                     grants), current?.ETag, cancellationToken);
+                return;
+            }
+            catch (ResourceConcurrencyException) when (attempt < 2)
+            {
+            }
+        }
+    }
+
+    private async Task RemoveWorkspaceAccessAsync(
+        Resource resource,
+        ResourceScopeRef workspaceScope,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var current = await accessPolicies.GetAsync(resource.Uid, cancellationToken);
+            if (current is null || current.Policy.Grants.All(grant => grant.TargetScopeRef != workspaceScope)) return;
+            var grants = current.Policy.Grants
+                .Where(grant => grant.TargetScopeRef != workspaceScope)
+                .ToArray();
+            try
+            {
+                _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(
+                    current.Policy.Resource,
+                    grants), current.ETag, cancellationToken);
                 return;
             }
             catch (ResourceConcurrencyException) when (attempt < 2)

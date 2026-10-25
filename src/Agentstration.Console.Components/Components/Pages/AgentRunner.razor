@@ -48,10 +48,6 @@ else
             <span>@T("DefinitionScope")</span>
             <strong><ResourceScopeBadge ScopeRef="@AgentDefinitionScope" /></strong>
         </div>
-        <div data-testid="agent-execution-scope">
-            <span>@T("ExecutionScope")</span>
-            <strong><ResourceScopeBadge ScopeRef="@SelectedExecutionScope" /></strong>
-        </div>
     </section>
 
     @if (readiness is { Ready: false })
@@ -107,7 +103,6 @@ else
                     <dl class="runner-details">
                         <dt>@I("RunId")</dt><dd><code>@state.Run.Id</code></dd>
                         <dt>@I("DefinitionScope")</dt><dd data-testid="agent-run-definition-scope"><ResourceScopeBadge ScopeRef="@AgentDefinitionScope" /></dd>
-                        <dt>@I("ExecutionScope")</dt><dd data-testid="agent-run-execution-scope"><ResourceScopeBadge ScopeRef="@state.Run.ExecutionScopeRef" /></dd>
                         <dt>@I("Status")</dt><dd><StatusBadge Text="@I($"RunState.{state.State}")" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
                         <dt>@I("Duration")</dt><dd>@Duration(state.Run)</dd>
                         <dt>@I("AgentVersion")</dt><dd>@state.Run.Properties.Agent.Version</dd>

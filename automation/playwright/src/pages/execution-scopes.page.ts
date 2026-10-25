@@ -116,7 +116,6 @@ export class ExecutionScopesPage {
       TestIds.flowObservability.agentRunner,
     );
     await expect(this.agentDefinitionScope).toContainText('Instance');
-    await expect(this.agentExecutionScope).toContainText('Workspace');
     const prompt = this.page.getByTestId(TestIds.flowObservability.agentRunPrompt);
     const submit = this.page.getByTestId(TestIds.flowObservability.agentRunSubmit);
     const promptValue = 'Run the Instance Agent from the selected Workspace.';
@@ -173,7 +172,6 @@ export class ExecutionScopesPage {
       TestIds.flowObservability.agentRunner,
     );
     await expect(this.agentDefinitionScope).toContainText('Instance');
-    await expect(this.agentExecutionScope).toContainText('Workspace');
   }
 
   public async openFlowRun(consoleUrl: string, evidence: ScopedExecutionEvidence): Promise<void> {
@@ -224,9 +222,7 @@ export class ExecutionScopesPage {
   }
 
   public get agentDefinitionScope(): Locator { return this.page.getByTestId(TestIds.flowObservability.agentDefinitionScope); }
-  public get agentExecutionScope(): Locator { return this.page.getByTestId(TestIds.flowObservability.agentExecutionScope); }
   public get agentRunDefinitionScope(): Locator { return this.page.getByTestId(TestIds.flowObservability.agentRunDefinitionScope); }
-  public get agentRunExecutionScope(): Locator { return this.page.getByTestId(TestIds.flowObservability.agentRunExecutionScope); }
   public get flowRunDefinitionScope(): Locator { return this.page.getByTestId(TestIds.flowObservability.flowRunDefinitionScope); }
   public get flowRunExecutionScope(): Locator { return this.page.getByTestId(TestIds.flowObservability.flowRunExecutionScope); }
 
@@ -300,7 +296,6 @@ export class ExecutionScopesPage {
       );
     }
     expect(revision.status(), await revision.text()).toBe(200);
-    await this.grantDescendantUse(consoleUrl, await revision.json() as AgentWire, tenantScope);
     return agent;
   }
 

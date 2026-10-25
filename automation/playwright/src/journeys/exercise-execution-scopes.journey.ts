@@ -17,7 +17,7 @@ export const exerciseExecutionScopes: Journey<ExerciseExecutionScopesInput> = as
   await context.checkpoint({
     name: Checkpoints.executionScopes.workspaceAgentRun,
     page: context.pages.page,
-    target: scopes.agentRunExecutionScope,
+    target: scopes.agentRunDefinitionScope,
   });
 
   await scopes.openFlowRun(context.consoleUrl, evidence);

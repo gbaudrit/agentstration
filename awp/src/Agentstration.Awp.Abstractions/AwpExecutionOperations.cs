@@ -37,6 +37,7 @@ public sealed record AwpExecutionAgentMaterial(
     IReadOnlyList<AwpExecutionToolMaterial> Tools)
 {
     public string AgentNamespace { get; init; } = "default";
+    public string? ModelProfileScopeRef { get; init; }
     public string RuntimeProfileName { get; init; } = string.Empty;
     public string RuntimeProfileNamespace { get; init; } = "default";
 }

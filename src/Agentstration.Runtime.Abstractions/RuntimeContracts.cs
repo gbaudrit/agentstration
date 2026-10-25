@@ -160,6 +160,7 @@ public sealed record ResolvedRuntimeAgent(
     public Guid RevisionUid { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ModelProfileScopeRef { get; init; }
 }
 
 public interface IRuntimeAgentResolver

@@ -23,7 +23,7 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
     {
         var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
         if (principal?.Status != PrincipalStatus.Active) throw Denied();
-        if (scope.ScopeRef.Kind == ResourceScopeKind.Instance)
+        if (scope.AccessScopeRef.Kind == ResourceScopeKind.Instance)
         {
             if (!await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) throw Denied();
             return;
@@ -31,7 +31,7 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
         var tenant = scope.TenantId == Guid.Empty ? null : await identities.GetTenantAsync(scope.TenantId, cancellationToken);
         if (tenant?.Status != TenantStatus.Active || scope.ScopeRef.TargetId != scope.TenantId && scope.ScopeRef.Kind == ResourceScopeKind.Tenant)
             throw Denied();
-        if (scope.ScopeRef.Kind == ResourceScopeKind.Tenant)
+        if (scope.AccessScopeRef.Kind == ResourceScopeKind.Tenant)
         {
             if (await platformAuthorization.IsPlatformAdministratorAsync(scope.PrincipalId, cancellationToken)) return;
             var membership = await identities.FindMembershipAsync(scope.TenantId, scope.PrincipalId, cancellationToken);
@@ -39,18 +39,21 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
             return;
         }
         var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId.Value, cancellationToken);
-        if (workspace?.Status != WorkspaceStatus.Active || scope.ScopeRef != ResourceScopeRef.Workspace(scope.WorkspaceId.Value)) throw Denied();
+        if (workspace?.Status != WorkspaceStatus.Active || scope.AccessScopeRef != ResourceScopeRef.Workspace(scope.WorkspaceId.Value)) throw Denied();
         try { await authorization.EnsurePermissionAsync(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value), permission, cancellationToken); }
         catch (AuthorizationDeniedException) { throw Denied(); }
     }
 
-    public IDisposable Enter(RuntimeRunScope scope) => scope.ScopeRef.Kind switch
+    public IDisposable Enter(RuntimeRunScope scope)
     {
-        ResourceScopeKind.Instance => scopeFactory.PushSystem(),
-        ResourceScopeKind.Tenant => scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId),
-        ResourceScopeKind.Workspace => scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value)),
-        _ => throw Denied()
-    };
+        return scope.AccessScopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => scopeFactory.PushSystem(),
+            ResourceScopeKind.Tenant => scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId),
+            ResourceScopeKind.Workspace => scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value)),
+            _ => throw Denied()
+        };
+    }
 
     private async Task<bool> HasTenantPermissionAsync(RuntimeRunScope scope, string permission, CancellationToken cancellationToken)
     {

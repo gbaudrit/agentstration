@@ -1,10 +1,12 @@
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure.Runtime;
 
-public sealed class RuntimeAgentAccessValidator(IResourceAccessPolicyService accessPolicies)
+public sealed class RuntimeAgentAccessValidator(
+    IResourceAccessPolicyService accessPolicies)
     : IRuntimeAgentAccessValidator
 {
     public async Task ValidateUseAsync(

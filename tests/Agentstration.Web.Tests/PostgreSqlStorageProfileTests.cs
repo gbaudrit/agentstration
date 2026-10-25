@@ -21,6 +21,15 @@ namespace Agentstration.Web.Tests;
 public sealed class PostgreSqlStorageProfileTests
 {
     [TestMethod]
+    public void ResourceManagementMigrationsMatchCurrentModel()
+    {
+        using var context = new Agentstration.ResourceManagement.Storage.PostgreSql.PostgreSqlDesignTimeFactory()
+            .CreateDbContext([]);
+
+        Assert.IsFalse(context.Database.HasPendingModelChanges());
+    }
+
+    [TestMethod]
     public void FlowMigrationsMatchCurrentModel()
     {
         using var context = new PostgreSqlDesignTimeFactory().CreateDbContext([]);

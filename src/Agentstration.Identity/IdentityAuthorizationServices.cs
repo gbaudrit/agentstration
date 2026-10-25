@@ -12,14 +12,20 @@ public sealed class LocalEnvironmentBootstrapper(
     IIdentityStore store,
     TimeProvider timeProvider,
     LocalBootstrapOptions options,
-    IWorkspaceProvisioner workspaceProvisioner) : ILocalEnvironmentBootstrapper
+    IWorkspaceProvisioner workspaceProvisioner,
+    IOperationalTopologyProvisioner operationalTopology) : ILocalEnvironmentBootstrapper
 {
     public static readonly Guid OwnerRoleId = new("65c86c44-4c42-4e33-91d4-2d8d13bdd681");
 
     public async Task<RequestContext> EnsureInitializedAsync(CancellationToken cancellationToken)
     {
+        if (OperationalTopologyIdentities.IsReservedTenantName(options.TenantName))
+            throw new InvalidOperationException("The configured Tenant name is reserved for Agentstration operations.");
+        if (OperationalTopologyIdentities.IsReservedWorkspaceName(options.WorkspaceName))
+            throw new InvalidOperationException("The configured Workspace name is reserved for Agentstration operations.");
         var now = timeProvider.GetUtcNow();
         var tenant = await store.FindTenantByNameAsync(options.TenantName, cancellationToken);
+        var tenantCreated = tenant is null;
         if (tenant is null)
         {
             tenant = new Tenant(Guid.NewGuid(), options.TenantName, options.TenantDisplayName, TenantStatus.Active, now);
@@ -69,6 +75,9 @@ public sealed class LocalEnvironmentBootstrapper(
             workspace = workspace with { Status = WorkspaceStatus.Active };
         }
 
+        if (tenantCreated)
+            _ = await operationalTopology.EnsureTenantAsync(tenant, cancellationToken);
+
         return new RequestContext(principal.Id, tenant.Id, workspace.Id);
     }
 }
@@ -88,19 +97,27 @@ public sealed class PermissionAuthorizationService(
             return ResolvePermissions(context, true, false, false, [], new Dictionary<Guid, RoleDefinition>());
 
         var tenantOnly = context.WorkspaceId == Guid.Empty;
+        var workspace = tenantOnly
+            ? null
+            : await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
+        var tenantOperations = workspace?.Kind == WorkspaceKind.TenantOperations;
         var hasTenantMembership = false;
         var hasWorkspaceMembership = false;
-        if (tenantOnly)
+        if (tenantOnly || tenantOperations)
         {
             var tenantMembership = await store.FindMembershipAsync(context.TenantId, context.PrincipalId, cancellationToken);
             hasTenantMembership = tenantMembership?.Status == MembershipStatus.Active;
         }
-        else
+        if (!tenantOnly)
         {
-            var workspace = await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
             if (workspace?.Status != WorkspaceStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
-            var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
-            hasWorkspaceMembership = membership?.Status == MembershipStatus.Active;
+            if (tenantOperations)
+                hasWorkspaceMembership = hasTenantMembership;
+            else
+            {
+                var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
+                hasWorkspaceMembership = membership?.Status == MembershipStatus.Active;
+            }
         }
         if (tenantOnly ? !hasTenantMembership : !hasWorkspaceMembership)
             return new HashSet<string>(StringComparer.Ordinal);

@@ -1,7 +1,9 @@
 namespace Agentstration.Identity.Contracts;
 
 public enum TenantStatus { Active, Disabled }
+public enum TenantKind { Standard = 0, System = 1 }
 public enum WorkspaceStatus { Active = 0, Disabled = 1, Initializing = 2 }
+public enum WorkspaceKind { Business = 0, InstanceOperations = 1, TenantOperations = 2 }
 public enum PrincipalStatus { Active, Disabled }
 public enum PrincipalKind { Human, Workload }
 public enum MembershipStatus { Active, Suspended }
@@ -14,12 +16,34 @@ public static class OfficialWorkspaceIdentities
     public const string AgentstrationAssistantDisplayName = "Agentstration Assistant";
 }
 
+public static class OperationalTopologyIdentities
+{
+    public const string SystemTenantName = "agentstration-system";
+    public const string SystemTenantDisplayName = "Agentstration System";
+    public const string InstanceOperationsWorkspaceName = "agentstration-instance-operations";
+    public const string InstanceOperationsWorkspaceDisplayName = "Instance operations";
+    public const string TenantOperationsWorkspaceName = "agentstration-tenant-operations";
+    public const string TenantOperationsWorkspaceDisplayName = "Tenant operations";
+
+    public static bool IsSystemTenant(Tenant tenant) => tenant.Kind == TenantKind.System;
+
+    public static bool IsOperationalWorkspace(Workspace workspace) => workspace.Kind != WorkspaceKind.Business;
+
+    public static bool IsReservedTenantName(string name) =>
+        string.Equals(name, SystemTenantName, StringComparison.Ordinal);
+
+    public static bool IsReservedWorkspaceName(string name) =>
+        string.Equals(name, InstanceOperationsWorkspaceName, StringComparison.Ordinal)
+        || string.Equals(name, TenantOperationsWorkspaceName, StringComparison.Ordinal);
+}
+
 public sealed record Tenant(
     Guid Id,
     string Name,
     string DisplayName,
     TenantStatus Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    TenantKind Kind = TenantKind.Standard);
 
 public sealed record Workspace(
     Guid Id,
@@ -27,7 +51,8 @@ public sealed record Workspace(
     string Name,
     string DisplayName,
     WorkspaceStatus Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    WorkspaceKind Kind = WorkspaceKind.Business);
 
 public sealed record Principal(
     Guid Id,
@@ -272,6 +297,14 @@ public interface ILocalEnvironmentBootstrapper
 public interface IWorkspaceProvisioner
 {
     Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken);
+}
+
+public interface IOperationalTopologyProvisioner
+{
+    Task EnsureAllAsync(CancellationToken cancellationToken);
+    Task<Workspace> EnsureTenantAsync(Tenant tenant, CancellationToken cancellationToken);
+    Task<Workspace> GetInstanceOperationsWorkspaceAsync(CancellationToken cancellationToken);
+    Task<Workspace> GetTenantOperationsWorkspaceAsync(Guid tenantId, CancellationToken cancellationToken);
 }
 
 public interface IAuthorizationService

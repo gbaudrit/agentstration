@@ -12,7 +12,7 @@ public sealed class RootFlowTargetResolver(FlowService flows) : IRootFlowTargetR
         System.Text.Json.JsonElement input,
         CancellationToken cancellationToken)
     {
-        var resolved = await flows.ResolveAsync(scope.ScopeRef, target, target.FlowId.Namespace, cancellationToken);
+        var resolved = await flows.ResolveAsync(scope.AccessScopeRef, target, target.FlowId.Namespace, cancellationToken);
         FlowRunService.ValidateInput(resolved.Graph?.InputSchema, input);
         return new(new FlowReference(resolved.FlowId, resolved.Version, false, resolved.FlowId.Namespace, resolved.ScopeRef));
     }

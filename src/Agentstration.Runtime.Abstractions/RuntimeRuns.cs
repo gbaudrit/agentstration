@@ -39,11 +39,14 @@ public sealed record RuntimeRunScope(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] WorkspaceId WorkspaceId,
     Guid PrincipalId)
 {
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
     public ResourceScopeRef ScopeRef => WorkspaceId.Value != Guid.Empty
         ? ResourceScopeRef.Workspace(WorkspaceId.Value)
         : TenantId != Guid.Empty
             ? ResourceScopeRef.Tenant(TenantId)
             : ResourceScopeRef.Instance;
+    [JsonIgnore]
+    public ResourceScopeRef AccessScopeRef => LogicalScopeRef ?? ScopeRef;
     [JsonIgnore]
     public ExactExecutionScope Exact => ExactExecutionScope.Create(
         ScopeRef,

@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Agents;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Flows.Contracts;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
@@ -591,6 +593,8 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var runtimeAgents = factory.Services.GetRequiredService<IRuntimeAgentResolver>();
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var instanceOperations = await topology.GetInstanceOperationsWorkspaceAsync(default);
         using var client = factory.CreateClient();
         using (var identityResponse = await client.GetAsync("/api/identity/context"))
             Assert.AreEqual(HttpStatusCode.OK, identityResponse.StatusCode,
@@ -643,6 +647,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                 Assert.AreEqual(stored.Value.Uid, resolved.AgentId);
                 Assert.AreEqual(scopeRef, resolved.AgentScopeRef);
                 Assert.AreEqual(revision.Value.Uid, resolved.RevisionUid);
+                Assert.AreEqual(ResourceScopeRef.Instance, resolved.ModelProfileScopeRef);
                 storedUid = stored.Value.Uid;
             }
 
@@ -655,7 +660,72 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             Assert.IsNotNull(apiAgent);
             Assert.AreEqual(storedUid, apiAgent.Uid);
             Assert.AreEqual(scopeRef, apiAgent.ScopeRef);
+            if (scopeRef.Kind is ResourceScopeKind.Instance or ResourceScopeKind.Tenant)
+            {
+                using var runResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
+                {
+                    Agent = new RuntimeAgentReference(apiAgent.Name, apiAgent.Generation)
+                    {
+                        Namespace = apiAgent.Namespace,
+                        ScopeRef = apiAgent.ScopeRef,
+                        ResourceUid = apiAgent.Uid
+                    },
+                    Input = new RuntimeRunInput
+                    {
+                        Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, $"Run from {scopeRef.Kind} context")]
+                    },
+                    Origin = RuntimeRunOrigin.Api
+                });
+                Assert.AreEqual(HttpStatusCode.Accepted, runResponse.StatusCode,
+                    await runResponse.Content.ReadAsStringAsync());
+                var run = await runResponse.Content.ReadFromJsonAsync<RuntimeRun>();
+                Assert.IsNotNull(run);
+                var operationalWorkspace = scopeRef.Kind == ResourceScopeKind.Instance
+                    ? instanceOperations
+                    : await topology.GetTenantOperationsWorkspaceAsync(context.TenantId, default);
+                var expectedExecutionScope = ResourceScopeRef.Workspace(operationalWorkspace.Id);
+                Assert.AreEqual(expectedExecutionScope, run.ExecutionScopeRef);
+                using var instancesResponse = await client.GetAsync(
+                    $"/api/runtime/agent-instances?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}");
+                Assert.AreEqual(HttpStatusCode.OK, instancesResponse.StatusCode,
+                    await instancesResponse.Content.ReadAsStringAsync());
+            }
         }
+
+        StoredResource<AgentResource> sharedInstanceAgent;
+        using (requestScopes.PushInstance(context))
+        {
+            sharedInstanceAgent = await agents.GetAgentExactAsync(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "shared-agent", default)
+                ?? throw new AssertFailedException("The Instance Agent was not found.");
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(sharedInstanceAgent.Value.Uid, ResourceScopeRef.Instance,
+                    sharedInstanceAgent.Value.Namespace, sharedInstanceAgent.Value.Kind,
+                    sharedInstanceAgent.Value.Generation),
+                [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]),
+                null, default);
+        }
+
+        SelectConsoleContext(client, workspaceScope);
+        using (var inheritedRunResponse = await client.PostAsJsonAsync("/api/runtime/runs",
+            new CreateRuntimeRunRequest
+            {
+                Agent = new RuntimeAgentReference(sharedInstanceAgent.Value.Name,
+                    sharedInstanceAgent.Value.Generation)
+                {
+                    Namespace = sharedInstanceAgent.Value.Namespace,
+                    ScopeRef = ResourceScopeRef.Instance,
+                    ResourceUid = sharedInstanceAgent.Value.Uid
+                },
+                Input = new RuntimeRunInput
+                {
+                    Messages = [new RuntimeRunMessage(RuntimeMessageRole.User,
+                        "Run the inherited Instance Agent from a descendant Workspace")]
+                },
+                Origin = RuntimeRunOrigin.Api
+            }))
+            Assert.AreEqual(HttpStatusCode.Accepted, inheritedRunResponse.StatusCode,
+                await inheritedRunResponse.Content.ReadAsStringAsync());
 
         using (requestScopes.PushInstance(context))
         {
@@ -678,6 +748,11 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             Assert.AreEqual(instanceAgent!.Value.Uid, target.ResourceUid);
             Assert.AreEqual(instanceRevision.Value.Uid, target.RevisionUid);
             Assert.AreEqual(instanceRevision.Value.DefinitionHash, target.DefinitionHash);
+            var drafts = factory.Services.GetRequiredService<FlowDraftService>();
+            _ = await drafts.CreateExactAsync(new WorkspaceId(instanceOperations.Id),
+                ResourceScopeRef.Instance,
+                new CreateFlowDraftCommand("instance-draft-flow", "Instance draft flow", null, null,
+                    "empty", "scope-test"), default);
             var staleReference = new RuntimeAgentReference("shared-agent", 1)
             {
                 ScopeRef = ResourceScopeRef.Instance,
@@ -689,6 +764,25 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                 await runtimeAgents.ResolveAsync(staleReference, default));
             Assert.AreEqual("agent_reference_stale", stale.Code);
         }
+
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+        using var flowInput = JsonDocument.Parse("""{"prompt":"Run from the Instance context"}""");
+        using var flowRunResponse = await client.PostAsJsonAsync(
+            "/api/flows/instance-draft-flow/draft/runs?scopeRef=%2Finstance",
+            new CreateFlowRunRequest(flowInput.RootElement.Clone()));
+        Assert.AreEqual(HttpStatusCode.Accepted, flowRunResponse.StatusCode,
+            await flowRunResponse.Content.ReadAsStringAsync());
+        var flowRun = await flowRunResponse.Content.ReadFromJsonAsync<FlowRun>();
+        Assert.IsNotNull(flowRun);
+        Assert.AreEqual(ResourceScopeRef.Workspace(instanceOperations.Id), flowRun.ExecutionScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, flowRun.Scope.AccessScopeRef);
+        using var flowRunRead = await client.GetAsync(
+            $"/api/flowRuns/{flowRun.Id}?scopeRef={Uri.EscapeDataString(flowRun.ExecutionScopeRef.Value)}");
+        Assert.AreEqual(HttpStatusCode.OK, flowRunRead.StatusCode,
+            await flowRunRead.Content.ReadAsStringAsync());
+        var reloadedFlowRun = await flowRunRead.Content.ReadFromJsonAsync<FlowRun>();
+        Assert.IsNotNull(reloadedFlowRun);
+        Assert.AreEqual(ResourceScopeRef.Instance, reloadedFlowRun.Scope.AccessScopeRef);
 
         async Task GrantDescendantsAsync(Resource resource)
         {

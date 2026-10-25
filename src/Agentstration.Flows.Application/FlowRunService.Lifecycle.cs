@@ -93,7 +93,7 @@ public sealed partial class FlowRunService
         FlowRunScope scope,
         CancellationToken cancellationToken)
     {
-        var resolved = await ResolveVersionAsync(scope.ScopeRef, flowId, version, null, cancellationToken);
+        var resolved = await ResolveVersionAsync(scope.AccessScopeRef, flowId, version, null, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, input);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
@@ -129,11 +129,12 @@ public sealed partial class FlowRunService
 
     public async Task<StoredFlowRun> CreateDraftAsync(FlowDraft draft, FlowRunTrigger trigger, string? startedBy, string? correlationId, JsonElement input, FlowRunScope scope, CancellationToken cancellationToken)
     {
-        if (draft.WorkspaceId != scope.WorkspaceId)
-            throw new FlowValidationException("flow_run_scope_mismatch", "The Flow Draft and execution scope must belong to the same Workspace.");
+        var draftScopeRef = draft.ScopeRef ?? ResourceScopeRef.Workspace(draft.WorkspaceId.Value);
+        if (draft.WorkspaceId != scope.WorkspaceId || draftScopeRef != scope.AccessScopeRef)
+            throw new FlowValidationException("flow_run_scope_mismatch", "The Flow Draft and execution scope must belong to the same context.");
         ValidateInput(draft.Definition.InputSchema, input);
         var validationVersion = $"0.0.0-draft.{draft.Revision}";
-        var snapshot = new FlowVersion(ResourceScopeRef.Workspace(draft.WorkspaceId.Value), draft.FlowId, validationVersion, draft.Description, FlowDraftSnapshotAdapter.ToRoutingDefinition(draft.Definition), draft.Tags,
+        var snapshot = new FlowVersion(draftScopeRef, draft.FlowId, validationVersion, draft.Description, FlowDraftSnapshotAdapter.ToRoutingDefinition(draft.Definition), draft.Tags,
             timeProvider.GetUtcNow(), draft.Definition, draft.DefinitionHash);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun

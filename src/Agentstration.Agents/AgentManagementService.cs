@@ -199,13 +199,13 @@ public sealed class AgentManagementService(
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
         var revisionAddress = ScopedResourceAddress.Create(ownerScopeRef, @namespace, AgentResourceKinds.AgentRevision, revisionName);
-        var existing = await store.GetExactAsync<AgentRevision>(revisionAddress, cancellationToken);
+        var existing = await GetRevisionInternalAsync(revisionAddress, cancellationToken);
         if (existing is not null)
         {
             if (Matches(existing.Value, agent.Value, resolved)) return existing;
             revisionName = $"{revisionName}--{agent.Value.Uid:N}";
             revisionAddress = ScopedResourceAddress.Create(ownerScopeRef, @namespace, AgentResourceKinds.AgentRevision, revisionName);
-            existing = await store.GetExactAsync<AgentRevision>(revisionAddress, cancellationToken);
+            existing = await GetRevisionInternalAsync(revisionAddress, cancellationToken);
             if (existing is not null)
             {
                 if (Matches(existing.Value, agent.Value, resolved)) return existing;
@@ -241,7 +241,7 @@ public sealed class AgentManagementService(
         }
         catch (ResourceConcurrencyException)
         {
-            existing = await store.GetExactAsync<AgentRevision>(revisionAddress, cancellationToken);
+            existing = await GetRevisionInternalAsync(revisionAddress, cancellationToken);
             if (existing is not null && Matches(existing.Value, agent.Value, resolved)) return existing;
             throw;
         }
@@ -263,7 +263,7 @@ public sealed class AgentManagementService(
     {
         var agent = await GetAgentAsync(@namespace, agentName, scopeRef, cancellationToken)
             ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        var existing = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken);
+        var existing = await FindRevisionInternalAsync(agent.Value.Uid, generation, cancellationToken);
         if (existing is not null) return existing;
         if (agent.Value.Generation != generation)
             throw new ArgumentException($"Agent generation '{generation}' has no immutable revision.", nameof(generation));
@@ -282,6 +282,23 @@ public sealed class AgentManagementService(
         revision.AgentUid == agent.Uid
         && revision.AgentVersion == agent.Generation
         && string.Equals(revision.DefinitionHash, definition.DefinitionHash, StringComparison.Ordinal);
+
+    private async Task<StoredResource<AgentRevision>?> FindRevisionInternalAsync(
+        Guid agentUid,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        using var systemScope = requestScopes.PushSystem();
+        return await agentQueries.FindRevisionAsync(agentUid, generation, cancellationToken);
+    }
+
+    private async Task<StoredResource<AgentRevision>?> GetRevisionInternalAsync(
+        ScopedResourceAddress address,
+        CancellationToken cancellationToken)
+    {
+        using var systemScope = requestScopes.PushSystem();
+        return await store.GetExactAsync<AgentRevision>(address, cancellationToken);
+    }
 
     public async Task<StoredResource<AgentRevision>> GetRevisionAsync(
         ResourceNamespace @namespace,

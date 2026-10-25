@@ -10,14 +10,28 @@ internal static class RuntimeHttp
     public static RuntimeRunScope CurrentScope(ICurrentRequestContext context, ResourceScopeRef? requestedScopeRef = null)
     {
         var current = context.Current;
-        var requested = requestedScopeRef ?? ResourceScopeRef.Workspace(current.WorkspaceId);
+        var logicalCurrent = context.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(current.TenantId),
+            _ => ResourceScopeRef.Workspace(current.WorkspaceId)
+        };
+        var physicalCurrent = current.WorkspaceId == Guid.Empty
+            ? logicalCurrent
+            : ResourceScopeRef.Workspace(current.WorkspaceId);
+        var requested = requestedScopeRef ?? logicalCurrent;
+        if (requested != logicalCurrent && requested != physicalCurrent)
+            throw new RuntimeRunValidationException("execution_scope_not_authorized",
+                "The requested execution scope is not the current Instance, Tenant, or Workspace context.");
+        if (current.WorkspaceId != Guid.Empty)
+            return RuntimeRunScope.Workspace(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId) with
+            {
+                LogicalScopeRef = logicalCurrent == physicalCurrent ? null : logicalCurrent
+            };
         return requested.Kind switch
         {
             ResourceScopeKind.Instance => RuntimeRunScope.Instance(current.PrincipalId),
-            ResourceScopeKind.Tenant when requested.TargetId == current.TenantId =>
-                RuntimeRunScope.Tenant(current.TenantId, current.PrincipalId),
-            ResourceScopeKind.Workspace when requested.TargetId == current.WorkspaceId =>
-                RuntimeRunScope.Workspace(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId),
+            ResourceScopeKind.Tenant => RuntimeRunScope.Tenant(current.TenantId, current.PrincipalId),
             _ => throw new RuntimeRunValidationException("execution_scope_not_authorized",
                 "The requested execution scope is not the current Instance, Tenant, or Workspace context.")
         };
