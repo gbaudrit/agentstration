@@ -362,6 +362,13 @@ export class ExecutionScopesPage {
       profile = await currentProfile.json() as AgentWire;
     }
     await this.grantDescendantUse(consoleUrl, profile, tenantScope);
+    const runtimeProfile = await this.resolveExactResourceIdentity(
+      consoleUrl,
+      '/instance',
+      'RuntimeProfile',
+      'maf-builtin',
+    );
+    await this.grantDescendantUse(consoleUrl, runtimeProfile, tenantScope);
   }
 
   private async ensureInstanceFlow(consoleUrl: string, agentUid: string, tenantScope: string): Promise<void> {

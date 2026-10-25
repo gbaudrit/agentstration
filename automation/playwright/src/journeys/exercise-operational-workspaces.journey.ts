@@ -47,8 +47,8 @@ export const exerciseOperationalWorkspaces: Journey<ExerciseOperationalWorkspace
 
   const tenantRun = await operational.executeFlow(
     context.consoleUrl,
-    fixture.instanceFlowName,
-    execution.scopes.instance,
+    fixture.tenantFlowName,
+    execution.scopes.tenant,
     execution.scopes.tenant,
   );
   if (tenantRun.operationalWorkspaceId !== topology.tenantWorkspaceId) {

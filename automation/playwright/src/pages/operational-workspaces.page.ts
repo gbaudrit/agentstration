@@ -30,9 +30,15 @@ interface WorkItemWire {
   executionScopeRef: string;
 }
 
+interface AgentWire {
+  uid: string;
+  generation: number;
+}
+
 export interface OperationalWorkspaceFixture {
   execution: ExecutionScopeFixture;
   instanceFlowName: string;
+  tenantFlowName: string;
 }
 
 export interface OperationalRunEvidence {
@@ -44,6 +50,10 @@ export interface OperationalRunEvidence {
   operationalWorkspaceId: string;
 }
 
+const tenantAgentName = 'tenant-operational-agent';
+const tenantFlowName = 'tenant-operational-flow';
+const instanceModelProfileName = 'execution-scope-reasoning';
+
 export class OperationalWorkspacesPage {
   public constructor(private readonly page: Page) {}
 
@@ -53,10 +63,12 @@ export class OperationalWorkspacesPage {
   public get executionScope(): Locator { return this.page.getByTestId(TestIds.flowObservability.flowRunExecutionScope); }
 
   public async ensureFixture(
-    _consoleUrl: string,
+    consoleUrl: string,
     execution: ExecutionScopeFixture,
   ): Promise<OperationalWorkspaceFixture> {
-    return { execution, instanceFlowName: execution.flowName };
+    const agent = await this.ensureTenantAgent(consoleUrl, execution.scopes.tenant);
+    await this.ensureTenantFlow(consoleUrl, execution.scopes.tenant, agent.uid);
+    return { execution, instanceFlowName: execution.flowName, tenantFlowName };
   }
 
   public async assertOperationalTopologyHidden(
@@ -165,6 +177,97 @@ export class OperationalWorkspacesPage {
       const response = await this.page.request.get(`${consoleUrl}/api/flowRuns/${encodeURIComponent(run.flowRunId)}`);
       expect(response.status(), await response.text()).toBe(404);
     }
+  }
+
+  private async ensureTenantAgent(consoleUrl: string, tenantScopeRef: string): Promise<AgentWire> {
+    const headers = { 'X-Agentstration-Context': tenantScopeRef };
+    const url = `${consoleUrl}/api/agents/${tenantAgentName}?scopeRef=${encodeURIComponent(tenantScopeRef)}`;
+    const current = await this.page.request.get(url, { headers });
+    let agent: AgentWire;
+    if (current.status() === 404) {
+      const created = await this.page.request.put(`${consoleUrl}/api/agents/${tenantAgentName}`, {
+        headers: { ...headers, 'If-None-Match': '*' },
+        data: {
+          apiVersion: 'agentstration.io/v1',
+          kind: 'Agent',
+          scopeRef: tenantScopeRef,
+          metadata: { name: tenantAgentName, namespace: 'default' },
+          definition: {
+            displayName: 'Tenant operational Agent',
+            description: 'Deterministic Tenant Agent for operational Workspace browser coverage.',
+            instructions: 'Return a concise deterministic response.',
+            modelProfile: { name: instanceModelProfileName, namespace: 'default', scopeRef: '/instance' },
+            runtimeProfile: { name: 'maf-builtin', namespace: 'default', scopeRef: '/instance' },
+            tools: [],
+            toolSets: [],
+            behaviors: [],
+            middleware: [],
+            contextProviders: [],
+            settings: {},
+          },
+        },
+      });
+      expect(created.status(), await created.text()).toBe(200);
+      agent = await created.json() as AgentWire;
+    } else {
+      expect(current.status(), await current.text()).toBe(200);
+      agent = await current.json() as AgentWire;
+    }
+
+    const revisionName = `${tenantAgentName}--${agent.generation.toString().padStart(6, '0')}`;
+    let revision = await this.page.request.get(
+      `${consoleUrl}/api/agents/${tenantAgentName}/revisions/${revisionName}?scopeRef=${encodeURIComponent(tenantScopeRef)}`,
+      { headers },
+    );
+    if (revision.status() === 404) {
+      const prepared = await this.page.request.post(
+        `${consoleUrl}/api/runtime/agents/${tenantAgentName}/prepare?generation=${agent.generation}&scopeRef=${encodeURIComponent(tenantScopeRef)}`,
+        { headers },
+      );
+      expect(prepared.status(), await prepared.text()).toBe(200);
+      revision = await this.page.request.get(
+        `${consoleUrl}/api/agents/${tenantAgentName}/revisions/${revisionName}?scopeRef=${encodeURIComponent(tenantScopeRef)}`,
+        { headers },
+      );
+    }
+    expect(revision.status(), await revision.text()).toBe(200);
+    return agent;
+  }
+
+  private async ensureTenantFlow(consoleUrl: string, tenantScopeRef: string, agentUid: string): Promise<void> {
+    const headers = { 'X-Agentstration-Context': tenantScopeRef };
+    const url = `${consoleUrl}/api/flows/${tenantFlowName}?scopeRef=${encodeURIComponent(tenantScopeRef)}`;
+    const current = await this.page.request.get(url, { headers });
+    if (current.status() === 200) return;
+    expect(current.status(), await current.text()).toBe(404);
+
+    const created = await this.page.request.post(`${consoleUrl}/api/flows`, {
+      headers,
+      data: {
+        name: tenantFlowName,
+        displayName: 'Tenant operational Flow',
+        description: 'Deterministic Tenant Flow for operational Workspace browser coverage.',
+        version: '1.0.0',
+        enabled: true,
+        scopeRef: tenantScopeRef,
+        definition: {
+          flowKind: 'direct',
+          target: {
+            kind: 0,
+            id: tenantAgentName,
+            namespace: 'default',
+            scopeRef: tenantScopeRef,
+            resourceUid: agentUid,
+          },
+        },
+      },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const published = await this.page.request.post(
+      `${consoleUrl}/api/flows/${tenantFlowName}/versions?scopeRef=${encodeURIComponent(tenantScopeRef)}`,
+      { headers, data: { version: '1.0.0', activate: true } },
+    );
+    expect(published.status(), await published.text()).toBe(201);
   }
 
   private async selectContext(consoleUrl: string, scopeRef: string): Promise<IdentityContextWire> {
