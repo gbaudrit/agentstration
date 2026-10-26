@@ -150,6 +150,12 @@ export const Checkpoints = {
     recovery: 'operational-workspaces-recovery',
     isolation: 'operational-workspaces-isolation',
   },
+  operationalTriggers: {
+    editor: 'operational-triggers-editor',
+    created: 'operational-triggers-created',
+    submitted: 'operational-triggers-submitted',
+    isolation: 'operational-triggers-isolation',
+  },
   modelAdministration: {
     provider: 'model-administration-provider',
     runtime: 'model-administration-runtime',

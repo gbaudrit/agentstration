@@ -92,6 +92,24 @@ public sealed class RootFlowSubmissionTests
     }
 
     [TestMethod]
+    public async Task LogicalAdministrationScopeWinsOverPhysicalOperationalWorkspaceScope()
+    {
+        var logicalScope = Scope with { LogicalScopeRef = ResourceScopeRef.Instance };
+        await using var fixture = await Fixture.CreateAsync([
+            new ScopeAccessor(Scope),
+            new ScopeAccessor(logicalScope)
+        ]);
+
+        var result = await fixture.Submissions.SubmitAsync(
+            Command("logical-scope", JsonSerializer.SerializeToElement(new { })), default);
+
+        Assert.AreEqual(ResourceScopeRef.Instance, fixture.Authorizer.LastScope?.LogicalScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, result.FlowRun.Run.Scope.LogicalScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, fixture.Execution.LastRequest?.ExecutionScope?.LogicalScopeRef);
+        Assert.AreEqual(Scope.ScopeRef, result.WorkItem.Value.ExecutionScopeRef);
+    }
+
+    [TestMethod]
     public async Task ScopeIsAuthorizedAndCannotBeSuppliedThroughInvocationInput()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -124,7 +142,7 @@ public sealed class RootFlowSubmissionTests
         private readonly string directory;
         private readonly ServiceProvider provider;
 
-        private Fixture(string directory, ServiceProvider provider, IWorkItemRepository repository, RootFlowSubmissionService submissions, TargetResolver targets, RunGateway runs, Authorizer authorizer)
+        private Fixture(string directory, ServiceProvider provider, IWorkItemRepository repository, RootFlowSubmissionService submissions, TargetResolver targets, RunGateway runs, Authorizer authorizer, ExecutionGateway execution)
         {
             this.directory = directory;
             this.provider = provider;
@@ -133,6 +151,7 @@ public sealed class RootFlowSubmissionTests
             Targets = targets;
             Runs = runs;
             Authorizer = authorizer;
+            Execution = execution;
         }
 
         public IWorkItemRepository Repository { get; }
@@ -140,8 +159,9 @@ public sealed class RootFlowSubmissionTests
         public TargetResolver Targets { get; }
         public RunGateway Runs { get; }
         public Authorizer Authorizer { get; }
+        public ExecutionGateway Execution { get; }
 
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(IReadOnlyList<IWorkExecutionScopeAccessor>? accessors = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-root-flow-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -151,13 +171,13 @@ public sealed class RootFlowSubmissionTests
             var repository = provider.GetRequiredService<IWorkItemRepository>();
             await repository.InitializeAsync(default);
             var execution = new ExecutionGateway();
-            var accessor = new ScopeAccessor();
-            var work = new WorkItemService(repository, execution, TimeProvider.System, NullLogger<WorkItemService>.Instance, [], [accessor]);
+            accessors ??= [new ScopeAccessor(Scope)];
+            var work = new WorkItemService(repository, execution, TimeProvider.System, NullLogger<WorkItemService>.Instance, [], accessors);
             var targets = new TargetResolver();
             var runs = new RunGateway();
             var authorizer = new Authorizer();
-            var submissions = new RootFlowSubmissionService(work, repository, targets, runs, authorizer, [accessor]);
-            return new(directory, provider, repository, submissions, targets, runs, authorizer);
+            var submissions = new RootFlowSubmissionService(work, repository, targets, runs, authorizer, accessors);
+            return new(directory, provider, repository, submissions, targets, runs, authorizer, execution);
         }
 
         public async ValueTask DisposeAsync()
@@ -167,18 +187,19 @@ public sealed class RootFlowSubmissionTests
         }
     }
 
-    private sealed class ScopeAccessor : IWorkExecutionScopeAccessor
+    private sealed class ScopeAccessor(FlowRunScope scope) : IWorkExecutionScopeAccessor
     {
-        public FlowRunScope Current => Scope;
+        public FlowRunScope Current => scope;
     }
 
     private sealed class Authorizer : IRootFlowSubmissionAuthorizer
     {
         public int CallCount { get; private set; }
+        public FlowRunScope? LastScope { get; private set; }
         public Task AuthorizeAsync(FlowRunScope scope, CancellationToken cancellationToken)
         {
             CallCount++;
-            Assert.AreEqual(Scope, scope);
+            LastScope = scope;
             return Task.CompletedTask;
         }
     }
@@ -232,8 +253,13 @@ public sealed class RootFlowSubmissionTests
 
     private sealed class ExecutionGateway : IWorkExecutionGateway
     {
-        public Task<WorkExecutionAccepted> RequestExecutionAsync(WorkExecutionRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(new WorkExecutionAccepted(WorkExecutionId.New(), null, DateTimeOffset.UtcNow, Guid.NewGuid()));
+        public WorkExecutionRequest? LastRequest { get; private set; }
+
+        public Task<WorkExecutionAccepted> RequestExecutionAsync(WorkExecutionRequest request, CancellationToken cancellationToken)
+        {
+            LastRequest = request;
+            return Task.FromResult(new WorkExecutionAccepted(WorkExecutionId.New(), null, DateTimeOffset.UtcNow, Guid.NewGuid()));
+        }
 
         public Task ConfirmQueuedAsync(WorkExecutionAccepted accepted, CancellationToken cancellationToken) => Task.CompletedTask;
     }

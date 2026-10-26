@@ -29,6 +29,7 @@ import { exerciseResourceAccess, type ExerciseResourceAccessInput } from './exer
 import { exerciseExecutionScopes, type ExerciseExecutionScopesInput } from './exercise-execution-scopes.journey.js';
 import { exerciseHierarchicalContext, type ExerciseHierarchicalContextInput } from './exercise-hierarchical-context.journey.js';
 import { exerciseOperationalWorkspaces, type ExerciseOperationalWorkspacesInput } from './exercise-operational-workspaces.journey.js';
+import { exerciseOperationalTriggers, type ExerciseOperationalTriggersInput } from './exercise-operational-triggers.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -63,4 +64,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-execution-scopes': (context, input) => exerciseExecutionScopes(context, input as unknown as ExerciseExecutionScopesInput),
   'exercise-hierarchical-context': (context, input) => exerciseHierarchicalContext(context, input as unknown as ExerciseHierarchicalContextInput),
   'exercise-operational-workspaces': (context, input) => exerciseOperationalWorkspaces(context, input as unknown as ExerciseOperationalWorkspacesInput),
+  'exercise-operational-triggers': (context, input) => exerciseOperationalTriggers(context, input as unknown as ExerciseOperationalTriggersInput),
 };

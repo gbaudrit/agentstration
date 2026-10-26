@@ -124,7 +124,7 @@ public sealed class RootFlowSubmissionService(
         ArgumentNullException.ThrowIfNull(command);
         if (string.IsNullOrWhiteSpace(command.CallerId))
             throw new WorkValidationException("flow_invocation_caller_required", "A root Flow invocation requires a caller identity.");
-        var scope = executionScopeAccessors.Select(accessor => accessor.Current).FirstOrDefault(value => value is not null)
+        var scope = WorkExecutionScopeSelection.Select(executionScopeAccessors)
             ?? throw new WorkValidationException("work_execution_scope_required", "Root Flow submission requires an authenticated execution scope.");
         var requestedScopeRef = command.ExecutionScopeRef ?? (command.WorkspaceId.Value == Guid.Empty
             ? scope.ScopeRef

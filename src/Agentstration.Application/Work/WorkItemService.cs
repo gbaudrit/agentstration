@@ -245,7 +245,7 @@ public sealed class WorkItemService(
         await repository.GetForExecutionExactAsync(scopeRef, id, cancellationToken) ?? throw new KeyNotFoundException($"Work item '{id}' was not found in execution scope '{scopeRef}'.");
 
     private FlowRunScope CurrentExecutionScope() =>
-        executionScopeAccessors.Select(accessor => accessor.Current).FirstOrDefault(scope => scope is not null)
+        WorkExecutionScopeSelection.Select(executionScopeAccessors)
         ?? throw new WorkValidationException("work_execution_scope_required", "Work access requires an authenticated execution scope.");
 
     private async Task PublishAsync(WorkItem item, CancellationToken cancellationToken)
