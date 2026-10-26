@@ -50,7 +50,7 @@ Instance-, Tenant-, and Workspace-owned Knowledge Sources pin the exact identiti
 
 ## Schedule Triggers
 
-Agentstration can submit autonomous Work from a declarative Workspace-scoped `Trigger`. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.
+Agentstration can submit autonomous Work from a declarative Workspace-owned `Trigger`. In a Workspace context it belongs to that Workspace; in an Instance or Tenant administrative context it belongs to the corresponding protected operational Workspace. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.
 
 ```yaml
 apiVersion: agentstration.io/v1
@@ -75,11 +75,11 @@ definition:
   concurrencyPolicy: skip
 ```
 
-V1 supports once, interval and Quartz cron schedules, strict IANA time zones, ETag CRUD, enable/disable, `Run now`, next/last observed status and durable occurrence history. A Trigger can explicitly target a Flow in any namespace of its Workspace, including an installed Pack namespace; cross-Workspace resolution remains forbidden. Quartz registrations live in the scheduler schema or database of the selected relational storage profile and are reconciled from Trigger resources after restart. A deterministic occurrence/Work identity prevents duplicate local submission for the same scheduled instant. Current owner authorization is re-evaluated at every firing and fails closed after revocation.
+V1 supports once, interval and Quartz cron schedules, strict IANA time zones, ETag CRUD, enable/disable, `Run now`, next/last observed status and durable occurrence history. A Trigger selects only published Flows discoverable from its logical context. Saving pins the exact Flow scope, namespace, UID, version and definition hash; enabling and every firing re-evaluate `Use` and fail closed after revocation or identity drift. Quartz registrations live in the scheduler schema or database of the selected relational storage profile, carry the exact operational Workspace identity, and are reconciled from Trigger resources after restart. A deterministic occurrence/Work identity prevents duplicate local submission for the same scheduled instant.
 
 The Console exposes a searchable `/triggers` list, a guided schedule editor with Flow selection, IANA time zones and occurrence preview, plus a detail view for desired state, observed status, occurrence history, enable/disable and `Run now`. The Management API exposes `/api/triggers` and namespaced equivalents. A scheduled Work becomes an autonomous Task without a fabricated Entry or Interaction. Human input uses the existing task-scoped PendingAction panel and notification path directly from Task details.
 
-See [ADR-0068](../decisions/0068-triggers-submit-work-through-quartz-projection.md) for policies, guarantees and V1 limits.
+See [ADR-0068](../decisions/0068-triggers-submit-work-through-quartz-projection.md) for scheduling guarantees and V1 limits, and [ADR-0183](../decisions/0183-triggers-use-operational-workspaces-for-administrative-contexts.md) for administrative placement and target authorization.
 
 Packs are a Management/distribution concept above these planes: they install ordinary resources into deterministic `publisher.name` namespaces and retain provenance, but they are never run. Local ZIP installation, source/fork coexistence, installed-Pack inventory, compensating failure handling, modification-safe uninstall, and six resource handlers are implemented through the Management API. See [Pack format and lifecycle](packs.md).
 

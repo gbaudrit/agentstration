@@ -147,7 +147,7 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Routing | deterministic stateless decision | rule catalog and LLM router |
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
-| Scheduling | Workspace-scoped Trigger resources, durable occurrences, Quartz.NET projection in the selected SQLite or PostgreSQL store, startup reconciliation, explicit misfire/concurrency policy and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
+| Scheduling | Workspace-owned Trigger resources, including placement in governed Instance/Tenant operational Workspaces, durable occurrences, exact Workspace-keyed Quartz.NET projection in the selected SQLite or PostgreSQL store, startup reconciliation, explicit misfire/concurrency policy, pinned Flow identity and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
 | Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, governed execution, Workspace ToolDefinitions that publish bounded Flow-backed Tools, and immutable ToolSets for deterministic routing and pinned Agent assignment | richer permissions, credentials, connection policies, and additional built-in hook handlers |
 | Artifacts | Workspace-scoped staged content, provenance, bounded leases and retention, ToolSet-backed temporary storage, brokered MCP access, immutable Flow Run artifacts, and composable Storage Flows with a local filesystem default | additional provider-supplied staging ToolSets and packaged storage recipes |
 | Data Sources | Instance-, tenant-, and Workspace-scoped origins, reusable versioned acquisition profiles, schema-validated configuration, Workspace execution through `datasource.acquisition/v1`, and exact Flow, Tool, provider and policy provenance | source-usage policy and additional provider compositions |
@@ -188,13 +188,18 @@ Every workspace-owned record carries `WorkspaceId`. Queries require it alongside
 TriggerResource (Management desired state)
   -> Quartz projection in the selected relational store (reconstructible)
   -> durable TriggerOccurrence (idempotency and pre-Work outcome)
-  -> current Principal authorization
-  -> exact immutable FlowReference
+  -> current Principal and logical-scope authorization
+  -> exact immutable FlowReference (scope, UID, version and hash)
   -> WorkItem origin/correlation
   -> FlowRun
   -> Runtime
   -> autonomous Task/result or existing task-scoped PendingAction
 ```
+
+In an Instance or Tenant Console context, the Trigger and occurrence history remain physically owned by
+the corresponding operational Workspace. The execution scope separately retains the logical
+Instance/Tenant context used for Flow `Discover` and `Use` decisions. Quartz lookup includes the exact
+operational Workspace so identical names in different Workspaces never rebind. See ADR-0182 and ADR-0183.
 
 ### Work vertical
 

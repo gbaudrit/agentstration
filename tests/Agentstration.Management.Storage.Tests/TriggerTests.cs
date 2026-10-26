@@ -8,6 +8,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Triggers;
@@ -58,6 +59,42 @@ public sealed class TriggerTests
     }
 
     [TestMethod]
+    public async Task InstanceAdministrationStoresTriggerInOperationalWorkspaceAndPreservesLogicalScopeAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var scope = fixture.Context.PushInstance(fixture.Request);
+        var service = fixture.Services.GetRequiredService<TriggerManagementService>();
+
+        var created = await service.CreateAsync(Resource("instance-trigger", true), CancellationToken.None);
+
+        Assert.AreEqual(ResourceScopeRef.Workspace(fixture.Request.WorkspaceId), created.Value.ScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, created.Value.Definition.ExecutionScope!.LogicalScopeRef);
+        Assert.HasCount(1, await service.ListAsync(CancellationToken.None));
+        Assert.IsNotNull(await service.GetAsync(ResourceNamespace.Default, "instance-trigger", CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ScheduledFiringUsesExactOperationalWorkspaceForHomonymousTriggersAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var management = fixture.Services.GetRequiredService<TriggerManagementService>();
+        using (fixture.Context.Push(fixture.Request))
+            await management.CreateAsync(Resource("shared-name", true), CancellationToken.None);
+
+        var other = fixture.Request with { WorkspaceId = Guid.NewGuid() };
+        await fixture.Services.GetRequiredService<IIdentityStore>().AddWorkspaceAsync(
+            new(other.WorkspaceId, other.TenantId, "other", "Other", WorkspaceStatus.Active, DateTimeOffset.UtcNow), CancellationToken.None);
+        using (fixture.Context.Push(other))
+            await management.CreateAsync(Resource("shared-name", true), CancellationToken.None);
+
+        using var system = fixture.Context.PushSystem();
+        var occurrence = await fixture.Services.GetRequiredService<TriggerFiringService>().FireScheduledAsync(
+            other.WorkspaceId, ResourceNamespace.Default, "shared-name", DateTimeOffset.UtcNow, CancellationToken.None);
+
+        Assert.AreEqual(other.WorkspaceId, occurrence.WorkspaceId);
+    }
+
+    [TestMethod]
     public async Task TriggerRejectsRawCredentialsButAllowsExplicitReferencesAsync()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -87,10 +124,42 @@ public sealed class TriggerTests
         await fixture.CreatePublishedAsync(fixture.WorkspaceId, packNamespace, "pack-flow");
         await fixture.CreatePublishedAsync(new WorkspaceId(Guid.NewGuid()), packNamespace, "foreign-flow");
 
-        await fixture.Validator.ValidateAsync(ResourceNamespace.Default, Target("pack-flow", packNamespace), CancellationToken.None);
+        var resolved = await fixture.Validator.ResolveAsync(ResourceNamespace.Default, Target("pack-flow", packNamespace),
+            ResourceScopeRef.Workspace(fixture.WorkspaceId.Value), false, CancellationToken.None);
+        Assert.AreEqual("1.0.0", resolved.Version);
+        Assert.IsNotNull(resolved.Uid);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(resolved.DefinitionHash));
 
-        await Assert.ThrowsExactlyAsync<FlowNotFoundException>(() =>
-            fixture.Validator.ValidateAsync(ResourceNamespace.Default, Target("foreign-flow", packNamespace), CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<TriggerValidationException>(() =>
+            fixture.Validator.ResolveAsync(ResourceNamespace.Default, Target("foreign-flow", packNamespace),
+                ResourceScopeRef.Workspace(fixture.WorkspaceId.Value), false, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task AncestorFlowRequiresDiscoverAndUseAndRejectsStaleIdentityAsync()
+    {
+        await using var fixture = await FlowTargetFixture.CreateAsync();
+        var packNamespace = new ResourceNamespace("agentstration.instance-pack");
+        await fixture.CreatePublishedExactAsync(ResourceScopeRef.Instance, packNamespace, "ancestor-flow");
+        var consumer = ResourceScopeRef.Tenant(fixture.TenantId);
+
+        fixture.Access.AllowDiscover = false;
+        await Assert.ThrowsExactlyAsync<TriggerValidationException>(() => fixture.Validator.ResolveAsync(
+            ResourceNamespace.Default, Target("ancestor-flow", packNamespace) with { ScopeRef = ResourceScopeRef.Instance },
+            consumer, false, CancellationToken.None));
+
+        fixture.Access.AllowDiscover = true;
+        fixture.Access.AllowUse = false;
+        var discovered = await fixture.Validator.ResolveAsync(ResourceNamespace.Default,
+            Target("ancestor-flow", packNamespace) with { ScopeRef = ResourceScopeRef.Instance },
+            consumer, false, CancellationToken.None);
+        await Assert.ThrowsExactlyAsync<TriggerValidationException>(() => fixture.Validator.ResolveAsync(
+            ResourceNamespace.Default, discovered, consumer, true, CancellationToken.None));
+
+        fixture.Access.AllowUse = true;
+        _ = await fixture.Validator.ResolveAsync(ResourceNamespace.Default, discovered, consumer, true, CancellationToken.None);
+        await Assert.ThrowsExactlyAsync<TriggerValidationException>(() => fixture.Validator.ResolveAsync(
+            ResourceNamespace.Default, discovered with { Uid = Guid.NewGuid() }, consumer, true, CancellationToken.None));
     }
 
     [TestMethod]
@@ -137,8 +206,8 @@ public sealed class TriggerTests
         var firing = fixture.Services.GetRequiredService<TriggerFiringService>();
         var scheduledAt = DateTimeOffset.Parse("2026-08-21T06:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
 
-        var first = await firing.FireScheduledAsync(ResourceNamespace.Default, "deduplicated", scheduledAt, CancellationToken.None);
-        var duplicate = await firing.FireScheduledAsync(ResourceNamespace.Default, "deduplicated", scheduledAt, CancellationToken.None);
+        var first = await firing.FireScheduledAsync(fixture.Request.WorkspaceId, ResourceNamespace.Default, "deduplicated", scheduledAt, CancellationToken.None);
+        var duplicate = await firing.FireScheduledAsync(fixture.Request.WorkspaceId, ResourceNamespace.Default, "deduplicated", scheduledAt, CancellationToken.None);
 
         Assert.AreEqual(first.Id, duplicate.Id);
         Assert.AreEqual(TriggerOccurrenceOutcome.Submitted, duplicate.Outcome);
@@ -157,6 +226,7 @@ public sealed class TriggerTests
         using (fixture.Context.PushSystem())
         {
             await fixture.Services.GetRequiredService<TriggerFiringService>().FireScheduledAsync(
+                fixture.Request.WorkspaceId,
                 ResourceNamespace.Default,
                 "scoped",
                 DateTimeOffset.Parse("2026-08-21T06:00:00Z", System.Globalization.CultureInfo.InvariantCulture),
@@ -178,7 +248,7 @@ public sealed class TriggerTests
 
         await management.CreateAsync(Resource("revoked", true), CancellationToken.None);
         fixture.Authorizer.Deny = true;
-        var failed = await firing.FireScheduledAsync(ResourceNamespace.Default, "revoked", DateTimeOffset.UtcNow, CancellationToken.None);
+        var failed = await firing.FireScheduledAsync(fixture.Request.WorkspaceId, ResourceNamespace.Default, "revoked", DateTimeOffset.UtcNow, CancellationToken.None);
         Assert.AreEqual(TriggerOccurrenceOutcome.Failed, failed.Outcome);
         Assert.AreEqual("trigger_authorization_denied", failed.ErrorCode);
         Assert.AreEqual(0, fixture.Work.Submissions);
@@ -211,10 +281,8 @@ public sealed class TriggerTests
         ScheduledAt = DateTimeOffset.UtcNow
     };
 
-    private static TriggerTarget Target(string name, ResourceNamespace @namespace) => new()
-    {
-        Flow = new() { Name = name, Namespace = @namespace }
-    };
+    private static TriggerFlowTarget Target(string name, ResourceNamespace @namespace) =>
+        new() { Name = name, Namespace = @namespace };
 
     private sealed class FlowTargetFixture : IAsyncDisposable
     {
@@ -223,15 +291,18 @@ public sealed class TriggerTests
         private readonly CurrentRequestContext context;
         private readonly RequestContext requestContext;
         public WorkspaceId WorkspaceId { get; } = new(Guid.NewGuid());
+        public Guid TenantId => requestContext.TenantId;
         public FlowTriggerTargetValidator Validator { get; }
+        public AllowAccessPolicies Access { get; }
 
-        private FlowTargetFixture(string directory, ServiceProvider services, CurrentRequestContext context)
+        private FlowTargetFixture(string directory, ServiceProvider services, CurrentRequestContext context, AllowAccessPolicies access, Guid tenantId)
         {
             this.directory = directory;
             this.services = services;
             this.context = context;
-            requestContext = new(Guid.NewGuid(), Guid.NewGuid(), WorkspaceId.Value);
-            Validator = new(services.GetRequiredService<FlowService>(), context);
+            requestContext = new(Guid.NewGuid(), tenantId, WorkspaceId.Value);
+            Access = access;
+            Validator = new(services.GetRequiredService<FlowService>(), access);
         }
 
         public static async Task<FlowTargetFixture> CreateAsync()
@@ -239,12 +310,16 @@ public sealed class TriggerTests
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-trigger-flow-target-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
             var context = new CurrentRequestContext();
+            var access = new AllowAccessPolicies();
+            var tenantId = Guid.NewGuid();
             var services = new ServiceCollection()
                 .AddSingleton(TimeProvider.System)
                 .AddSqliteFlowStorage($"Data Source={Path.Combine(directory, "flow.db")};Pooling=False")
+                .AddSingleton<IFlowScopeHierarchy>(new TestFlowScopeHierarchy(tenantId))
+                .AddSingleton<IFlowDiscoveryPolicy>(new TestFlowDiscoveryPolicy(access))
                 .AddSingleton<FlowService>()
                 .BuildServiceProvider();
-            var fixture = new FlowTargetFixture(directory, services, context);
+            var fixture = new FlowTargetFixture(directory, services, context, access, tenantId);
             await services.GetRequiredService<FlowService>().InitializeAsync(CancellationToken.None);
             return fixture;
         }
@@ -257,6 +332,14 @@ public sealed class TriggerTests
             await flows.CreateAsync(workspaceId, new(name, null, "1.0.0", true,
                 new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "deterministic-agent"))), @namespace, CancellationToken.None);
             await flows.PublishVersionAsync(workspaceId, new(name, @namespace), "1.0.0", true, CancellationToken.None);
+        }
+
+        public async Task CreatePublishedExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name)
+        {
+            var flows = services.GetRequiredService<FlowService>();
+            await flows.CreateExactAsync(scopeRef, new(name, null, "1.0.0", true,
+                new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "deterministic-agent"))), @namespace, CancellationToken.None);
+            await flows.PublishVersionExactAsync(scopeRef, new(name, @namespace), "1.0.0", true, CancellationToken.None);
         }
 
         public async ValueTask DisposeAsync()
@@ -285,8 +368,10 @@ public sealed class TriggerTests
             var authorizer = new RecordingAuthorizer(context);
             var request = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
             var services = new ServiceCollection().AddSingleton(TimeProvider.System).AddSingleton(context).AddSingleton<ICurrentRequestContext>(context)
+                .AddSingleton<IRequestContextScopeFactory>(context)
                 .AddSqliteControlPlane($"Data Source={database}")
                 .AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>()
+                .AddSingleton<ITriggerOperationalContext, TriggerOperationalContextAdapter>()
                 .AddSingleton<ITriggerTargetValidator, AcceptingTargetValidator>()
                 .AddSingleton<ITriggerSchedulerProjection>(scheduler)
                 .AddSingleton<ITriggerOccurrenceStore, RecordingOccurrenceStore>()
@@ -327,7 +412,51 @@ public sealed class TriggerTests
 
     private sealed class AcceptingTargetValidator : ITriggerTargetValidator
     {
-        public Task ValidateAsync(ResourceNamespace ownerNamespace, TriggerTarget target, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<TriggerFlowTarget> ResolveAsync(ResourceNamespace ownerNamespace, TriggerFlowTarget target,
+            ResourceScopeRef consumerScopeRef, bool requireUse, CancellationToken cancellationToken) =>
+            Task.FromResult(target with
+            {
+                Namespace = target.Namespace ?? ownerNamespace,
+                ScopeRef = target.ScopeRef ?? consumerScopeRef,
+                Version = target.Version ?? "1.0.0",
+                Uid = target.Uid ?? Guid.NewGuid(),
+                DefinitionHash = target.DefinitionHash ?? "test-hash"
+            });
+    }
+
+    private sealed class AllowAccessPolicies : IResourceAccessPolicyService
+    {
+        public bool AllowDiscover { get; set; } = true;
+        public bool AllowUse { get; set; } = true;
+        public Task<IReadOnlyList<ResourceAccessPolicyResponse>> ListAsync(ResourceScopeRef ownerScopeRef, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourceAccessPolicyResponse>>([]);
+        public Task<ResourceAccessPolicyResponse?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) => Task.FromResult<ResourceAccessPolicyResponse?>(null);
+        public Task<ResourceAccessPolicyResponse> PutAsync(ResourceAccessPolicy policy, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAsync(Guid resourceUid, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceAccessDecision> EvaluateAsync(ResourceAccessIdentity resource, ResourceScopeRef consumerScopeRef, ResourceAccessAction action, CancellationToken cancellationToken)
+        {
+            var allowed = action == ResourceAccessAction.Discover ? AllowDiscover : AllowUse;
+            return Task.FromResult(new ResourceAccessDecision(allowed,
+                allowed ? ResourceAccessDecisionReasons.ExactGrant : ResourceAccessDecisionReasons.GrantMissing));
+        }
+    }
+
+    private sealed class TestFlowDiscoveryPolicy(AllowAccessPolicies access) : IFlowDiscoveryPolicy
+    {
+        public async Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken) =>
+            (await access.EvaluateAsync(new ResourceAccessIdentity(flow.Uid, flow.ScopeRef, flow.Id.Namespace,
+                FlowResourceKinds.Flow, Version: flow.ActiveVersion ?? flow.Version), consumerScopeRef,
+                ResourceAccessAction.Discover, cancellationToken)).Allowed;
+    }
+
+    private sealed class TestFlowScopeHierarchy(Guid tenantId) : IFlowScopeHierarchy
+    {
+        public Task<IReadOnlyList<ResourceScopeRef>> ListVisibleAsync(ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResourceScopeRef>>(consumerScopeRef.Kind switch
+            {
+                ResourceScopeKind.Workspace => [consumerScopeRef, ResourceScopeRef.Tenant(tenantId), ResourceScopeRef.Instance],
+                ResourceScopeKind.Tenant => [consumerScopeRef, ResourceScopeRef.Instance],
+                _ => [consumerScopeRef]
+            });
     }
 
     private sealed class RecordingScheduler : ITriggerSchedulerProjection

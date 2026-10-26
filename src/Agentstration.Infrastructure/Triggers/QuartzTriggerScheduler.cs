@@ -21,6 +21,7 @@ public sealed class QuartzTriggerScheduler(ISchedulerFactory schedulers) : ITrig
         var schedule = trigger.Definition.Source.Schedule ?? throw new TriggerValidationException("schedule_missing", "The schedule is missing.");
         var job = JobBuilder.Create<TriggerQuartzJob>()
             .WithIdentity(key)
+            .UsingJobData("workspaceId", trigger.RequireScopeTargetId(ResourceScopeKind.Workspace).ToString("D"))
             .UsingJobData("namespace", trigger.Namespace.Value)
             .UsingJobData("name", trigger.Name)
             .StoreDurably(false)
@@ -79,9 +80,11 @@ public sealed class TriggerQuartzJob(
     {
         var @namespace = new ResourceNamespace(context.MergedJobDataMap.GetString("namespace") ?? ResourceNamespace.DefaultValue);
         var name = context.MergedJobDataMap.GetString("name") ?? throw new JobExecutionException("Trigger name is missing.");
+        if (!Guid.TryParse(context.MergedJobDataMap.GetString("workspaceId"), out var workspaceId))
+            throw new JobExecutionException("Trigger Workspace identity is missing.");
         var scheduledAt = context.ScheduledFireTimeUtc ?? context.FireTimeUtc;
         using var system = scopes.PushSystem();
-        var occurrence = await firing.FireScheduledAsync(@namespace, name, scheduledAt, context.CancellationToken);
+        var occurrence = await firing.FireScheduledAsync(workspaceId, @namespace, name, scheduledAt, context.CancellationToken);
         if (occurrence.Outcome == TriggerOccurrenceOutcome.Failed)
             logger.LogWarning("Trigger {TriggerNamespace}/{TriggerName} occurrence {OccurrenceId} failed before Work submission with {ErrorCode}", @namespace.Value, name, occurrence.Id, occurrence.ErrorCode);
     }
