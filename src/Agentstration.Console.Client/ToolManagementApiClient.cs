@@ -16,6 +16,8 @@ public interface IToolsClient
     Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken);
     Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken);
     Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ToolResource>> GetToolsAsync(ResourceScopeRef contextScope, string? provider = null, CancellationToken cancellationToken = default) =>
+        GetToolsAsync(provider, cancellationToken);
     Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolResource>> GetToolAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
@@ -55,6 +57,12 @@ public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
     {
         var path = provider is null ? "api/tools" : ProviderChildPath(provider, "tools");
         return (await ApiResponse.ReadAsync<ValueResponse<ToolResource>>(httpClient, path, cancellationToken)).Value;
+    }
+
+    public async Task<IReadOnlyList<ToolResource>> GetToolsAsync(ResourceScopeRef contextScope, string? provider = null, CancellationToken cancellationToken = default)
+    {
+        var path = provider is null ? "api/tools" : ProviderChildPath(provider, "tools");
+        return (await ApiResponse.ReadAsync<ValueResponse<ToolResource>>(httpClient, path, contextScope, cancellationToken)).Value;
     }
 
     public async Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken)

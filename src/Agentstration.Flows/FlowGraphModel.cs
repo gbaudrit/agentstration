@@ -176,7 +176,8 @@ public sealed record RepeatFlowStepDefinition : FlowStepDefinition
 
 public sealed record FlowToolReference(
     string ResourceId,
-    ResourceNamespace? Namespace = null)
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
 }

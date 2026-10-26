@@ -1,3 +1,4 @@
+using Agentstration.Resources;
 using Agentstration.Console.Web.Features.Flows;
 using Agentstration.Web.Console;
 
@@ -12,9 +13,11 @@ public sealed class FlowDesignerResourceProviderTests
         var client = new MockApiClient(TimeProvider.System);
         var provider = new FlowDesignerResourceProvider(client, client, null!);
 
-        var agents = await provider.GetAgentsAsync(CancellationToken.None);
+        var scope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var agents = await provider.GetAgentsAsync(scope, CancellationToken.None);
 
         var agent = agents.Single(item => item.Name == "dotnet-expert");
         Assert.AreEqual(".NET Expert", agent.DisplayName);
+        Assert.AreEqual(scope, agent.ScopeRef);
     }
 }

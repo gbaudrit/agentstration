@@ -241,6 +241,31 @@ public sealed class FlowEditorStoreTests
     }
 
     [TestMethod]
+    public void OwnerScopeSurvivesSavedStateReprojection()
+    {
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var ownerScope = ResourceScopeRef.Tenant(Guid.Parse("4f8bdc56-42b8-4fdf-b0bf-79cba28a2197"));
+        var draft = new FlowDraft
+        {
+            WorkspaceId = WorkspaceId,
+            ScopeRef = ownerScope,
+            Id = "editor-draft",
+            FlowId = new("editor"),
+            DisplayName = "Editor",
+            Definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }] },
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var response = new FlowDraftResponse(draft, "\"etag-1\"");
+        var store = new FlowEditorStore();
+        store.Load(response, "entryStep: input");
+
+        store.MarkSaved(response, "entryStep: input");
+
+        Assert.AreEqual(ownerScope, store.State.Resource!.ScopeRef);
+    }
+
+    [TestMethod]
     public void ReapplyingEquivalentFlowCallOutputsDoesNotNotifyOrReproject()
     {
         var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);

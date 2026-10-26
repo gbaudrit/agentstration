@@ -97,6 +97,7 @@ public sealed class FlowToolStepTests
         var restored = new FlowDraftService(null!, null!, null!, TimeProvider.System).ParseSource(yaml, "yaml");
         var step = Assert.IsInstanceOfType<ToolFlowStepDefinition>(restored.Steps[1]);
         Assert.AreEqual("notification.send", step.Tool.ResourceId);
+        Assert.AreEqual(ResourceScopeRef.Instance, step.Tool.ScopeRef);
 
         var validator = new FlowGraphValidator(new ToolResolver(schema));
         var valid = await validator.ValidateAsync(restored, new(true, Workspace, new FlowId("parent")), default);
@@ -146,7 +147,7 @@ public sealed class FlowToolStepTests
         Steps =
         [
             new InputFlowStepDefinition { Name = "input" },
-            new ToolFlowStepDefinition { Name = "notify", Tool = new("notification.send"), ArgumentsMapping = mapping },
+            new ToolFlowStepDefinition { Name = "notify", Tool = new("notification.send", ScopeRef: ResourceScopeRef.Instance), ArgumentsMapping = mapping },
             new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.notify.output}") },
             new FailureFlowStepDefinition { Name = "failure" }
         ],

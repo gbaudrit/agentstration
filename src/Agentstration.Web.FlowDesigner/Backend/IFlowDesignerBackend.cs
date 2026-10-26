@@ -6,14 +6,20 @@ namespace Agentstration.Web.FlowDesigner.Backend;
 
 public sealed record FlowDesignerTarget(ResourceNamespace Namespace, string ResourceId, ResourceScopeRef? ScopeRef = null);
 
-public sealed record FlowDesignerResource(FlowId FlowId, string DisplayName, string? Description, IReadOnlyDictionary<string, string> Tags, FlowGraphDefinition Definition, long? DraftRevision = null);
+public sealed record FlowDesignerResource(FlowId FlowId, string DisplayName, string? Description, IReadOnlyDictionary<string, string> Tags, FlowGraphDefinition Definition, long? DraftRevision = null)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 
 public sealed record FlowDesignerLoadResult(FlowDesignerResource Resource, string Source, string? ETag = null, string? PublishedVersion = null)
 {
     public bool IsReadOnly => PublishedVersion is not null;
 
     public static FlowDesignerLoadResult FromDraft(FlowDraftResponse response, string source) => new(
-        new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags, response.Value.Definition, response.Value.Revision),
+        new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags, response.Value.Definition, response.Value.Revision)
+        {
+            ScopeRef = response.Value.ScopeRef
+        },
         source,
         response.ETag);
 }

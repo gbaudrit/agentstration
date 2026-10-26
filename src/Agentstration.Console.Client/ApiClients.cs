@@ -20,6 +20,8 @@ namespace Agentstration.Web.Console;
 public interface IManagementApiClient
 {
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        GetAgentsAsync(cancellationToken);
     Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<TriggerResource>> GetTriggersAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
@@ -159,6 +161,8 @@ public interface IEntryAdministrationApiClient
 public interface IFlowApiClient
 {
     Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        GetFlowsAsync(cancellationToken);
     Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken);
     Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetFlowAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");

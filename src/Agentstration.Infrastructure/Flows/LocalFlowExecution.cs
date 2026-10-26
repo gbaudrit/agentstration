@@ -214,9 +214,12 @@ public sealed class ManagementFlowResourceReferenceResolver(
     {
         _ = workspaceId;
         var toolNamespace = reference.ResolveNamespace(ownerNamespace);
-        var stored = await store.GetAsync<ToolResource>(
-            new ResourceKey(ToolResourceKinds.Tool, reference.ResourceId, toolNamespace),
-            cancellationToken);
+        var stored = reference.ScopeRef is { } scopeRef
+            ? await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+                scopeRef, toolNamespace, ToolResourceKinds.Tool, reference.ResourceId), cancellationToken)
+            : await store.GetAsync<ToolResource>(
+                new ResourceKey(ToolResourceKinds.Tool, reference.ResourceId, toolNamespace),
+                cancellationToken);
         if (stored is null || stored.Value.Definition.Schema is null) return null;
         var tool = stored.Value;
         return new ResolvedFlowTool(
@@ -431,7 +434,7 @@ public sealed class ManagedFlowToolExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var toolNamespace = request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace);
-        var toolScope = request.Route?.ToolScopeRef ?? request.DefinitionScopeRef;
+        var toolScope = request.Route?.ToolScopeRef ?? request.Tool.ScopeRef ?? request.DefinitionScopeRef;
         var stored = await GetForExecutionAsync<ToolResource>(ScopedResourceAddress.Create(
             toolScope, toolNamespace, ToolResourceKinds.Tool, request.Tool.ResourceId), request.Scope, cancellationToken);
         if (stored is null)

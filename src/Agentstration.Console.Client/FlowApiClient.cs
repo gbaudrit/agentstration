@@ -18,8 +18,16 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken)
+        => await GetFlowsCoreAsync(null, cancellationToken);
+
+    public async Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
+        => await GetFlowsCoreAsync(contextScope, cancellationToken);
+
+    private async Task<IReadOnlyList<FlowSummary>> GetFlowsCoreAsync(ResourceScopeRef? contextScope, CancellationToken cancellationToken)
     {
-        var page = await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", cancellationToken);
+        var page = contextScope is { } scope
+            ? await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", scope, cancellationToken)
+            : await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", cancellationToken);
         return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace, ScopeRef = item.ScopeRef, ActiveVersion = item.ActiveVersion }).ToArray();
     }
 
