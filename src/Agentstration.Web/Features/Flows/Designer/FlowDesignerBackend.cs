@@ -19,7 +19,10 @@ public sealed class FlowDesignerBackend(IFlowApiClient client) : IFlowDesignerBa
             var version = await client.GetFlowVersionAsync(target.Namespace, target.ResourceId, flow.ActiveVersion, target.ScopeRef, cancellationToken);
             if (version.Graph is null)
                 throw new InvalidOperationException($"Published version {version.Version} is a legacy Flow version without a Graph and cannot be opened in the Designer.");
-            var resource = new FlowDesignerResource(new(target.ResourceId), flow.Name, version.Description, version.Metadata, version.Graph);
+            var resource = new FlowDesignerResource(new(target.ResourceId, target.Namespace), flow.Name, version.Description, version.Metadata, version.Graph)
+            {
+                ScopeRef = flow.ScopeRef
+            };
             return new(resource, FlowDraftService.ToYaml(version.Graph), PublishedVersion: version.Version);
         }
 

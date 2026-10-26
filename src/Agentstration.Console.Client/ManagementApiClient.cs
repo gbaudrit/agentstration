@@ -25,9 +25,20 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         var agentsTask = ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, "api/agents?allNamespaces=true&top=1000", cancellationToken);
         var deploymentsTask = ApiResponse.ReadAsync<PagedResponse<AgentDeployment>>(httpClient, "api/deployments?top=1000", cancellationToken);
         await Task.WhenAll(agentsTask, deploymentsTask);
-        var page = await agentsTask;
-        var deployments = (await deploymentsTask).Value;
-        return page.Value.Select(agent =>
+        return ToSummaries((await agentsTask).Value, (await deploymentsTask).Value);
+    }
+
+    public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
+    {
+        var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(
+            httpClient, "api/agents?allNamespaces=true&top=1000", contextScope, cancellationToken);
+        return ToSummaries(page.Value, []);
+    }
+
+    private static IReadOnlyList<AgentSummary> ToSummaries(
+        IReadOnlyList<AgentResource> agents,
+        IReadOnlyList<AgentDeployment> deployments) =>
+        agents.Select(agent =>
         {
             var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ModelResourceKinds.ModelProfile);
             var deployment = FindCurrentDeployment(agent, deployments);
@@ -40,7 +51,6 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
                 DeploymentId = deployment?.Metadata.Name
             };
         }).ToArray();
-    }
 
     private static AgentDeployment? FindCurrentDeployment(AgentResource agent, IReadOnlyList<AgentDeployment> deployments)
     {

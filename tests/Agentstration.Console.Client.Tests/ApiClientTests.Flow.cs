@@ -323,6 +323,25 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task FlowClientListsDesignerFlowsInTheExplicitFlowContext()
+    {
+        var scope = ResourceScopeRef.Instance;
+        string? context = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            context = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FlowPageResponse([], null))
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new FlowApiClient(httpClient).GetFlowsAsync(scope, default);
+
+        Assert.AreEqual(scope.Value, context);
+    }
+
+    [TestMethod]
     public async Task FlowClientLoadsEveryRunPageAndRejectsRepeatedContinuationLinks()
     {
         var first = CreateFlowRun("run-1");

@@ -120,6 +120,27 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ManagementClientListsDesignerAgentsInTheExplicitFlowContext()
+    {
+        var scope = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        var contexts = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            contexts.Add(request.Headers.GetValues("X-Agentstration-Context").Single());
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = request.RequestUri!.AbsolutePath == "/api/agents"
+                    ? JsonContent.Create(new PagedResponse<AgentResource>([], null))
+                    : JsonContent.Create(new PagedResponse<AgentDeployment>([], null))
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new ManagementApiClient(httpClient).GetAgentsAsync(scope, default);
+
+        CollectionAssert.AreEqual(new[] { scope.Value }, contexts);
+    }
+
+    [TestMethod]
     public async Task ManagementClientReportsTheCurrentAgentDeployment()
     {
         var updatedAt = new DateTimeOffset(2026, 8, 31, 15, 20, 0, TimeSpan.Zero);

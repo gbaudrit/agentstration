@@ -11,6 +11,25 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ApiClientTests
 {
     [TestMethod]
+    public async Task ToolClientListsDesignerToolsInTheExplicitFlowContext()
+    {
+        var scope = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        string? context = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            context = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new Agentstration.Api.Contracts.ValueResponse<ToolResource>([]))
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new ToolsApiClient(httpClient).GetToolsAsync(scope, cancellationToken: default);
+
+        Assert.AreEqual(scope.Value, context);
+    }
+
+    [TestMethod]
     public async Task ToolClientReadsExactScopedTool()
     {
         HttpRequestMessage? captured = null;
