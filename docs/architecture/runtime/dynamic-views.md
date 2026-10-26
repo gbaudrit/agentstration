@@ -4,18 +4,21 @@ These Mermaid sequence diagrams describe the principal implemented execution pat
 
 ## Submit Work
 
-Entry, Trigger, REST, Console, and Flow-backed Tool callers converge on the same root submission boundary. Trusted execution scope comes from the authenticated context, never from caller-controlled arguments.
+Entry, Trigger, REST, Console, and Flow-backed Tool callers converge on the same root submission boundary. The authenticated context supplies both the logical authorization scope and the governed execution Workspace. In an Instance or Tenant Console context, the latter is the protected operational Workspace; clients never supply it as an arbitrary argument.
 
 ```mermaid
 sequenceDiagram
     participant Caller
     participant API as API transport
     participant Submit as Root Flow submission
+    participant Identity as Identity and authorization
     participant Work as Work application
     participant Flow as Flow engine
     Caller->>API: Submit executable Entry or Flow target
-    API->>Submit: Authorized request and idempotency context
-    Submit->>Submit: Resolve active reference to exact published version
+    API->>Identity: Resolve logical scope and operational Workspace
+    Identity-->>API: Authorized immutable execution context
+    API->>Submit: Authorized context and idempotency evidence
+    Submit->>Submit: Resolve and authorize exact published definition identity
     Submit->>Work: Create or recover idempotent Work Item
     Submit->>Flow: Create or recover deterministic root Flow Run
     Flow-->>Submit: Durable Flow Run identity
@@ -24,7 +27,7 @@ sequenceDiagram
     API-->>Caller: 202 Accepted and durable references
 ```
 
-Structural anchors: **API transport**, **Work and Workplace application**, and **Flow engine** in the L3 view. Decisions: [ADR-0024](../../decisions/0024-entries-always-target-executable-flows.md), [ADR-0053](../../decisions/0053-workspace-scope-is-part-of-durable-identity.md), and [ADR-0106](../../decisions/0106-tool-definitions-publish-flow-backed-mcp-tools.md).
+Structural anchors: **API transport**, **Identity and authorization**, **Work and Workplace application**, and **Flow engine** in the L3 view. Decisions: [ADR-0024](../../decisions/0024-entries-always-target-executable-flows.md), [ADR-0053](../../decisions/0053-workspace-scope-is-part-of-durable-identity.md), [ADR-0171](../../decisions/0171-flow-definitions-use-hierarchical-resource-ownership.md), [ADR-0181](../../decisions/0181-console-context-is-a-single-exact-administrative-scope.md), and [ADR-0182](../../decisions/0182-administrative-execution-uses-governed-operational-workspaces.md).
 
 ## Execute Flow
 
@@ -80,8 +83,8 @@ sequenceDiagram
     participant Adapter as Agent Framework adapter
     participant Model as Resolved chat client
     Caller->>Runtime: Create Run for exact Agent identity
-    Runtime->>Resources: Resolve Agent revision, deployment, profiles, and Tools
-    Runtime->>RuntimeData: Persist immutable scope and enqueue Run
+    Runtime->>Resources: Verify pinned Agent revision, profiles, and Tools
+    Runtime->>RuntimeData: Persist in the governed execution Workspace and enqueue Run
     Runtime->>Adapter: Materialize reconstructible agent
     Adapter->>Model: Invoke with effective capabilities and options
     Model-->>Adapter: Response, usage, and Tool activity
@@ -90,7 +93,7 @@ sequenceDiagram
     Runtime-->>Caller: Durable status and result
 ```
 
-Structural anchors: **Runtime execution**, **Resource-family services**, and **Runtime data**. Decisions: [ADR-0008](../../decisions/0008-reconstructible-maf-runtime.md), [ADR-0012](../../decisions/0012-runtime-run-resource.md), and [ADR-0017](../../decisions/0017-canonical-runtime-model-options-and-capabilities.md).
+The invocation context never re-resolves a dependency by name. Direct administrative runs use the protected operational Workspace while preserving the exact owner scope and immutable identity of the Agent definition. Structural anchors: **Runtime execution**, **Resource-family services**, and **Runtime data**. Decisions: [ADR-0008](../../decisions/0008-reconstructible-maf-runtime.md), [ADR-0012](../../decisions/0012-runtime-run-resource.md), [ADR-0017](../../decisions/0017-canonical-runtime-model-options-and-capabilities.md), [ADR-0174](../../decisions/0174-agent-definitions-use-hierarchical-resource-ownership.md), and [ADR-0182](../../decisions/0182-administrative-execution-uses-governed-operational-workspaces.md).
 
 ## Execute Tool
 
