@@ -144,7 +144,7 @@ jobs:
             "platforms=linux/amd64,linux/arm64"
           ) | Set-Content -Encoding utf8NoBOM artifacts/container-image.txt
       - name: Upload validated release artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: agentstration-${{ steps.version.outputs.version }}
           path: artifacts/*
