@@ -102,7 +102,16 @@ else
         }
         else if (activeTab == "Access")
         {
-            <ResourceAccessPanel OwnerScopeRef="TriggerOwnerScopeRef" Namespace="trigger.Namespace" Kind="@TriggerResourceKinds.Trigger" Name="@trigger.Name" Generation="@trigger.Generation" Governance="trigger.Governance" />
+            <section class="panel form-section" data-testid="trigger-access-panel">
+                <div class="panel-header"><div><p class="eyebrow">@T("Security")</p><h2>@T("TriggerAccessModel")</h2><p>@T("TriggerAccessModelHelp")</p></div><StatusBadge Text="@T("WorkspaceIsolated")" Status="UiStatus.Info" /></div>
+                <dl class="resource-details">
+                    <dt>@T("DefinitionScope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd>
+                    <dt>@T("Flow")</dt><dd><a class="text-button" href="@FlowAccessUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd>
+                    <dt>@T("Authorization")</dt><dd>@T("DiscoverUseReevaluated")</dd>
+                    <dt>@T("OperationalState")</dt><dd>@T("OperationalStateIsolated")</dd>
+                </dl>
+                <div class="form-actions"><a class="button-primary" href="@FlowAccessUrl(trigger)">@T("ManageFlowAccess")</a></div>
+            </section>
         }
         else
         {
@@ -153,11 +162,15 @@ else
     private void ClearMessage() { message = null; hasError = false; }
     private void SetSuccess(string value) { message = value; hasError = false; }
     private void SetError(Exception exception) { message = TriggerUi.ErrorMessage(exception, Localizer); hasError = true; }
-    private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace)); }
+    private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace), flow.ScopeRef); }
+    private static string FlowAccessUrl(TriggerResource value)
+    {
+        var url = FlowUrl(value);
+        return $"{url}{(url.Contains('?', StringComparison.Ordinal) ? '&' : '?')}view=access";
+    }
     private static string? TaskUrl(TriggerOccurrence value) => Guid.TryParse(value.WorkItemId, out var taskId) ? $"/tasks/{taskId:D}" : null;
     private static string Short(Guid value) => value.ToString("N")[..12];
     private static string Short(string value) => value.Length <= 12 ? value : value[..12];
-    private ResourceScopeRef TriggerOwnerScopeRef => stored?.Value.ScopeRef ?? ResourceScopeRef.Workspace(Guid.Empty);
     private string TriggerYaml => stored is null ? string.Empty : ResourceManifestSerializer.ToYaml(stored.Value);
     private static string PrettyInput(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private string MisfireLabel(TriggerMisfirePolicy value) => T(value == TriggerMisfirePolicy.FireOnce ? "Misfire.FireOnceAfterRecovery" : "Misfire.Skip");

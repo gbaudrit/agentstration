@@ -50,6 +50,13 @@
   <data name="TriggerYaml"><value>Trigger YAML</value></data>
   <data name="TriggerYamlHelp"><value>Inspect the complete persisted Trigger resource as read-only YAML.</value></data>
   <data name="ReadOnly"><value>Read-only</value></data>
+  <data name="TriggerAccessModel"><value>Trigger access</value></data>
+  <data name="TriggerAccessModelHelp"><value>Trigger state stays isolated in its operational Workspace. Access to the targeted Flow is governed on the Flow itself.</value></data>
+  <data name="WorkspaceIsolated"><value>Workspace isolated</value></data>
+  <data name="DiscoverUseReevaluated"><value>Flow Discover and Use permissions are re-evaluated before every firing.</value></data>
+  <data name="OperationalState"><value>Operational state</value></data>
+  <data name="OperationalStateIsolated"><value>The schedule, occurrences, Work and Runs are not shared with descendant Workspaces.</value></data>
+  <data name="ManageFlowAccess"><value>Manage Flow access</value></data>
   <data name="Error.OperationalWorkspaceUnavailable"><value>The selected context has no operational Workspace available for Triggers.</value></data>
   <data name="Error.TargetNotDiscoverable"><value>This Flow is no longer visible from the selected context. Choose another published Flow.</value></data>
   <data name="Error.TargetAmbiguous"><value>More than one visible Flow has this identity. Select an exact Flow scope.</value></data>
