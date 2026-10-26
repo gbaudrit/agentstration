@@ -25,6 +25,7 @@ public sealed record RuntimeAssignmentAttempt
     public DateTimeOffset? CompletedAt { get; init; }
     public Guid? TerminalEventId { get; init; }
     public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
 }
 
 public sealed record RuntimeWorkerAssignment
@@ -108,7 +109,8 @@ public sealed record RuntimeAssignmentAuthorization(
 public sealed record RuntimeAssignmentTerminalResult(
     RuntimeWorkerAssignment Assignment,
     RuntimeRunState RunState,
-    bool IdempotentReplay);
+    bool IdempotentReplay,
+    string? ErrorMessage = null);
 
 public sealed record RuntimeAssignmentStepExecution
 {

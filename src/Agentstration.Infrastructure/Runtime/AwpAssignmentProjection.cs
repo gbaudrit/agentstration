@@ -83,7 +83,7 @@ public sealed class AwpAssignmentProjection(
             Error = succeeded ? null : new FlowRunError(errorCode,
                 cancelled ? "The Flow Run was cancelled."
                 : functionalFailure ? StringProperty(terminalPayload, "error") ?? "Flow execution failed."
-                : "The Runtime Worker could not complete the Flow Run.",
+                : SafeAssignmentFailureMessage(errorCode, result.ErrorMessage),
                 functionalFailure ? StringProperty(terminalPayload, "errorDetails") : null),
             CompletedAt = now,
             ExecutionLeaseId = null,
@@ -340,6 +340,11 @@ public sealed class AwpAssignmentProjection(
     private static JsonElement? TerminalPayload(RuntimeWorkerAssignment assignment, string runId) =>
         assignment.ExecutionEvents.LastOrDefault(value => value.Kind == "RunCompleted"
             && string.Equals(value.RunId, runId, StringComparison.Ordinal))?.Payload;
+
+    private static string SafeAssignmentFailureMessage(string errorCode, string? errorMessage) =>
+        errorCode == "agent_model_profile_unavailable" && !string.IsNullOrWhiteSpace(errorMessage)
+            ? errorMessage
+            : "The Runtime Worker could not complete the Flow Run.";
 
     private static JsonElement? Property(JsonElement? payload, string name)
     {

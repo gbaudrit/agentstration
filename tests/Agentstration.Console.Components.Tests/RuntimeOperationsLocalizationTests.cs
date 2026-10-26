@@ -33,6 +33,12 @@ public sealed class RuntimeOperationsLocalizationTests
             Assert.AreEqual("Température", Localizer<AgentRunnerInspectorStrings>(services)["Temperature"].Value);
             Assert.AreEqual("Périmètre de définition", Localizer<AgentRunnerInspectorStrings>(services)["DefinitionScope"].Value);
             Assert.AreEqual("Périmètre de définition", Localizer<FlowRunDetailsStrings>(services)["DefinitionScope"].Value);
+            Assert.AreEqual(
+                "Un profil de modèle requis par un agent de ce Flow est indisponible dans le périmètre d’exécution. Vérifiez sa politique d’accès et republiez l’agent si sa révision épinglée a changé.",
+                Localizer<FlowRunDetailsStrings>(services)["Error.AgentModelProfileUnavailable"].Value);
+            Assert.AreEqual(
+                "Un profil de modèle requis par un agent de ce Flow est indisponible dans le périmètre d’exécution. Vérifiez sa politique d’accès et republiez l’agent si sa révision épinglée a changé.",
+                Localizer<TaskFlowRunDetailsStrings>(services)["Error.AgentModelProfileUnavailable"].Value);
         }
         finally
         {

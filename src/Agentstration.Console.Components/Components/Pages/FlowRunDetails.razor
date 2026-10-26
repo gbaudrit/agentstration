@@ -36,7 +36,7 @@ else
     </nav>
     @if (run.Error is not null)
     {
-        <article class="panel run-error"><strong>@run.Error.Code</strong><p>@run.Error.Message</p><code>@run.Error.Details</code></article>
+        <article class="panel run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
     }
     @if (pendingInput is not null)
     {
@@ -583,6 +583,10 @@ else
     }
 
     private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
+    private string RunErrorMessage(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
+        ? T("Error.AgentModelProfileUnavailable") : error.Message;
+    private static string? RunErrorDetail(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
+        ? error.Message : error.Details;
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);
     private static string Duration(DateTimeOffset? start, DateTimeOffset? end) { if (start is null) return "—"; var value = (end ?? DateTimeOffset.UtcNow) - start.Value; return value.TotalSeconds >= 1 ? $"{value.TotalSeconds:0.##} s" : $"{value.TotalMilliseconds:0} ms"; }

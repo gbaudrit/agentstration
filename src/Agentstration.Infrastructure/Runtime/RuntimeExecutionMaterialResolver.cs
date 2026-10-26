@@ -264,7 +264,7 @@ public sealed class RuntimeExecutionMaterialResolver(
     {
         _ = await agentManagement.EnsureExecutionRevisionAsync(
             reference.Namespace, reference.ResourceId, reference.ScopeRef, reference.Version, cancellationToken);
-        var resolved = await agents.ResolveAsync(reference, cancellationToken);
+        var resolved = await ResolveRuntimeAgentAsync(reference, cancellationToken);
         return await CreateAgentMaterialAsync(participantId, resolved, cancellationToken);
     }
 
@@ -290,7 +290,7 @@ public sealed class RuntimeExecutionMaterialResolver(
                 && !string.Equals(revision.Value.DefinitionHash, definitionHash, StringComparison.Ordinal))
             throw new RuntimeExecutionMaterialException("agent_reference_stale",
                 $"Agent reference '{@namespace}/{reference.Id}' no longer matches its published identity.");
-        var resolved = await agents.ResolveAsync(new RuntimeAgentReference(reference.Id, generation)
+        var resolved = await ResolveRuntimeAgentAsync(new RuntimeAgentReference(reference.Id, generation)
         {
             Namespace = @namespace,
             ScopeRef = agent.Value.ScopeRef,
@@ -299,6 +299,20 @@ public sealed class RuntimeExecutionMaterialResolver(
             DefinitionHash = reference.DefinitionHash
         }, cancellationToken);
         return await CreateAgentMaterialAsync(participantId, resolved, cancellationToken);
+    }
+
+    private async Task<ResolvedRuntimeAgent> ResolveRuntimeAgentAsync(
+        RuntimeAgentReference reference,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await agents.ResolveAsync(reference, cancellationToken);
+        }
+        catch (RuntimeAgentResolutionException exception)
+        {
+            throw new RuntimeExecutionMaterialException(exception.Code, exception.Message);
+        }
     }
 
     private async Task<RuntimeExecutionAgentMaterial> CreateAgentMaterialAsync(
