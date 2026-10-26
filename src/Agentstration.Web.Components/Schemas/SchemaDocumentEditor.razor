@@ -1,0 +1,298 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using Agentstration.Schemas
+@using Agentstration.Schemas.Contracts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SchemaDocumentEditorStrings> Localizer
+
+<section class="schema-document-editor" data-testid="schema-document-editor">
+    <div class="schema-document-toolbar" role="tablist" aria-label="@Localizer["EditorMode"]">
+        @if (visualSupported)
+        {
+            <button type="button" role="tab" aria-selected="@(mode == EditorMode.Visual)" class="@(mode == EditorMode.Visual ? "button-primary" : "button-secondary")" data-testid="schema-visual-mode" @onclick="() => SetMode(EditorMode.Visual)">@Localizer["Visual"]</button>
+        }
+        <button type="button" role="tab" aria-selected="@(mode == EditorMode.Source)" class="@(mode == EditorMode.Source ? "button-primary" : "button-secondary")" data-testid="schema-definition-source-mode" @onclick="() => SetMode(EditorMode.Source)">@Localizer["Source"]</button>
+        @if (CanPreview)
+        {
+            <button type="button" role="tab" aria-selected="@(mode == EditorMode.Preview)" class="@(mode == EditorMode.Preview ? "button-primary" : "button-secondary")" data-testid="schema-preview-mode" @onclick="() => SetMode(EditorMode.Preview)">@Localizer["Preview"]</button>
+        }
+    </div>
+
+    @if (!visualSupported && IsJsonSchema)
+    {
+        <p class="inline-warning" role="status" data-testid="schema-source-only">@Localizer["SourceOnly"]</p>
+    }
+
+    @if (visualSupported)
+    {
+        <div class="schema-visual-editor" role="tabpanel" data-testid="schema-visual-editor" hidden="@(mode != EditorMode.Visual)">
+            <div class="schema-visual-heading">
+                <div><h3>@Localizer["Properties"]</h3><p class="muted">@Localizer["PropertyTreeHelp"]</p></div>
+                @if (!ReadOnly)
+                {
+                    <button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-add-property" @onclick="AddPropertyAsync">@Localizer["AddProperty"]</button>
+                }
+            </div>
+            <div class="schema-visual-workbench">
+                <aside class="schema-tree-panel">
+                    <label class="schema-additional-properties"><input type="checkbox" checked="@AdditionalProperties" disabled="@EditorDisabled" @onchange="ChangeAdditionalPropertiesAsync" /> <span>@Localizer["AdditionalProperties"]</span></label>
+                    @if (Properties.Count == 0)
+                    {
+                        <p class="muted schema-tree-empty">@Localizer["EmptyProperties"]</p>
+                    }
+                    else
+                    {
+                        <ul class="schema-property-tree" role="tree" aria-label="@Localizer["PropertyTree"]">
+                            @foreach (var property in Properties)
+                            {
+                                var propertySchema = (JsonObject)property.Value!;
+                                <SchemaPropertyTreeNode @key="propertySchema" ParentSchema="document" Name="@property.Key"
+                                    Schema="propertySchema" SelectedSchema="selectedProperty?.Schema" Disabled="EditorDisabled"
+                                    Selected="SelectProperty" />
+                            }
+                        </ul>
+                    }
+                </aside>
+                <main class="schema-inspector-panel">
+                    @if (selectedProperty is not null)
+                    {
+                        <SchemaPropertyNode @key="selectedProperty.Schema" ParentSchema="selectedProperty.ParentSchema"
+                            Name="@selectedProperty.Name" Schema="selectedProperty.Schema" Depth="selectedProperty.Depth"
+                            Disabled="EditorDisabled" Changed="PublishAsync" Error="SetEditorError"
+                            SelectionChanged="SelectProperty" />
+                    }
+                    else
+                    {
+                        <div class="schema-inspector-empty" data-testid="schema-property-empty-selection">
+                            <span aria-hidden="true">↖</span>
+                            <strong>@Localizer["SelectProperty"]</strong>
+                            <p class="muted">@Localizer["SelectPropertyHelp"]</p>
+                        </div>
+                    }
+                </main>
+            </div>
+        </div>
+    }
+    @if (CanPreview)
+    {
+        <div class="schema-instance-preview" role="tabpanel" data-testid="schema-instance-preview" hidden="@(mode != EditorMode.Preview)">
+            <h3>@Localizer["InstancePreview"]</h3>
+            <p class="muted">@Localizer["InstancePreviewHelp"]</p>
+            <JsonSchemaInputEditor Schema="Value" Value="previewValue" ValueChanged="value => previewValue = value" Disabled="Disabled" />
+            <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" @onclick="ValidateInstanceAsync">@Localizer["ValidateInstance"]</button></div>
+            @if (instanceValidation is not null)
+            {
+                @ValidationResult(instanceValidation, Localizer["InstanceValid"], Localizer["InstanceInvalid"])
+            }
+        </div>
+    }
+    @if (sourceActivated)
+    {
+        <div role="tabpanel" class="schema-definition-source" hidden="@(mode != EditorMode.Source)">
+            <label><span>@Localizer["DefinitionSource"]</span></label>
+            <SchemaSourceEditor Value="@source" ValueChanged="value => source = value" ReadOnly="EditorDisabled" />
+            @if (!ReadOnly)
+            {
+                <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-apply-source" @onclick="ApplySourceAsync">@Localizer["ApplySource"]</button></div>
+            }
+        </div>
+    }
+
+    @if (sourceError is not null) { <p class="form-alert form-alert-danger" role="alert">@sourceError</p> }
+    @if (definitionValidation is not null)
+    {
+        @ValidationResult(definitionValidation, Localizer["DefinitionValid"], Localizer["DefinitionInvalid"])
+    }
+</section>
+
+@code {
+    [Parameter] public string Format { get; set; } = SchemaFormatIds.JsonSchema;
+    [Parameter] public string? Dialect { get; set; }
+    [Parameter] public JsonElement Value { get; set; }
+    [Parameter] public EventCallback<JsonElement> ValueChanged { get; set; }
+    [Parameter] public SchemaFormatDescriptor? Descriptor { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public Func<ValidateSchemaDefinitionRequest, Task<SchemaFormatValidationResult>>? DefinitionValidator { get; set; }
+    [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? InstanceValidator { get; set; }
+
+    private JsonObject document = [];
+    private string source = "{}", valueKey = string.Empty;
+    private string? sourceError;
+    private SchemaFormatValidationResult? definitionValidation, instanceValidation;
+    private JsonElement previewValue = JsonSerializer.SerializeToElement(new { });
+    private EditorMode mode = EditorMode.Visual;
+    private bool visualSupported, sourceActivated;
+    private SchemaPropertySelection? selectedProperty;
+    private bool IsJsonSchema => string.Equals(Format, SchemaFormatIds.JsonSchema, StringComparison.Ordinal);
+    private bool CanPreview => IsJsonSchema && (Descriptor?.Capabilities.HasFlag(SchemaFormatCapabilities.InstancePreview) ?? true);
+    private JsonObject Properties => document["properties"] as JsonObject ?? [];
+    private bool AdditionalProperties => document["additionalProperties"]?.GetValue<bool>() ?? true;
+    private bool EditorDisabled => Disabled || ReadOnly;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var nextKey = Value.ValueKind == JsonValueKind.Undefined ? "{}" : Value.GetRawText();
+        if (nextKey == valueKey) return;
+        valueKey = nextKey;
+        source = Pretty(nextKey);
+        document = JsonNode.Parse(nextKey) as JsonObject ?? [];
+        visualSupported = IsJsonSchema && SupportsVisual(document);
+        selectedProperty = FirstProperty(document);
+        if (!visualSupported && mode == EditorMode.Visual)
+        {
+            mode = EditorMode.Source;
+            sourceActivated = true;
+        }
+        await ValidateDefinitionAsync();
+    }
+
+    private void SetMode(EditorMode value)
+    {
+        if (value == EditorMode.Visual && !visualSupported) return;
+        if (value == EditorMode.Source) sourceActivated = true;
+        mode = value;
+        sourceError = null;
+    }
+
+    private async Task ApplySourceAsync()
+    {
+        sourceError = null;
+        try
+        {
+            document = JsonNode.Parse(source) as JsonObject
+                ?? throw new JsonException("The root value must be an object.");
+            visualSupported = IsJsonSchema && SupportsVisual(document);
+            await PublishAsync();
+        }
+        catch (JsonException exception)
+        {
+            sourceError = Localizer["InvalidJson", exception.Message];
+            definitionValidation = null;
+        }
+    }
+
+    private async Task AddPropertyAsync()
+    {
+        var properties = EnsureProperties();
+        var index = 1;
+        while (properties.ContainsKey($"field{index}")) index++;
+        properties[$"field{index}"] = new JsonObject { ["type"] = "string" };
+        selectedProperty = new(document, $"field{index}", (JsonObject)properties[$"field{index}"]!, 0);
+        await PublishAsync();
+    }
+
+    private async Task ChangeAdditionalPropertiesAsync(ChangeEventArgs args)
+    {
+        document["additionalProperties"] = args.Value is true;
+        await PublishAsync();
+    }
+
+    private void SetEditorError(string message) => sourceError = string.IsNullOrEmpty(message) ? null : message;
+    private void SelectProperty(SchemaPropertySelection? selection) => selectedProperty = selection;
+
+    private async Task PublishAsync()
+    {
+        var next = JsonSerializer.SerializeToElement(document);
+        valueKey = next.GetRawText();
+        source = Pretty(valueKey);
+        visualSupported = IsJsonSchema && SupportsVisual(document);
+        await ValueChanged.InvokeAsync(next);
+        await ValidateDefinitionAsync();
+    }
+
+    private async Task ValidateDefinitionAsync()
+    {
+        if (DefinitionValidator is null)
+        {
+            definitionValidation = null;
+            return;
+        }
+        try
+        {
+            definitionValidation = await DefinitionValidator(
+                new(Format, Dialect, JsonSerializer.SerializeToElement(document)));
+        }
+        catch (Exception exception)
+        {
+            definitionValidation = new([new("$", "schema_validation_unavailable", exception.Message)]);
+        }
+    }
+
+    private async Task ValidateInstanceAsync()
+    {
+        if (InstanceValidator is null)
+        {
+            instanceValidation = null;
+            return;
+        }
+        try
+        {
+            instanceValidation = await InstanceValidator(
+                new(Format, Dialect, JsonSerializer.SerializeToElement(document), previewValue));
+        }
+        catch (Exception exception)
+        {
+            instanceValidation = new([new("$", "schema_validation_unavailable", exception.Message)]);
+        }
+    }
+
+    private JsonObject EnsureProperties()
+    {
+        if (document["properties"] is JsonObject properties) return properties;
+        properties = [];
+        document["type"] ??= "object";
+        document["properties"] = properties;
+        return properties;
+    }
+
+    private static SchemaPropertySelection? FirstProperty(JsonObject schema)
+    {
+        if (schema["properties"] is not JsonObject properties || properties.Count == 0) return null;
+        var first = properties.First();
+        return first.Value is JsonObject value ? new(schema, first.Key, value, 0) : null;
+    }
+
+    private static bool SupportsVisual(JsonObject schema)
+    {
+        var unsupported = schema.Any(property => property.Key is "$ref" or "$defs" or "oneOf" or "anyOf"
+            or "allOf" or "not" or "if" or "then" or "else" or "dependentSchemas" or "prefixItems");
+        if (unsupported) return false;
+        if (schema["type"] is JsonArray) return false;
+        if (schema["properties"] is JsonObject properties
+            && properties.Any(property => property.Value is not JsonObject value || !SupportsVisual(value))) return false;
+        return schema["items"] is not JsonObject items || SupportsVisual(items);
+    }
+
+    private static string Pretty(string json)
+    {
+        using var parsed = JsonDocument.Parse(json);
+        return JsonSerializer.Serialize(parsed.RootElement, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private enum EditorMode { Visual, Source, Preview }
+}
+
+@code {
+    private RenderFragment ValidationResult(SchemaFormatValidationResult Result, string ValidText, string InvalidText) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", Result.IsValid ? "form-alert form-alert-success" : "form-alert form-alert-danger");
+        builder.AddAttribute(2, "role", Result.IsValid ? "status" : "alert");
+        builder.OpenElement(3, "p");
+        builder.AddContent(4, Result.IsValid ? ValidText : InvalidText);
+        builder.CloseElement();
+        if (!Result.IsValid)
+        {
+            builder.OpenElement(5, "ul");
+            foreach (var issue in Result.Issues)
+            {
+                builder.OpenElement(6, "li");
+                builder.OpenElement(7, "code"); builder.AddContent(8, issue.Path); builder.CloseElement();
+                builder.AddContent(9, $" — {issue.Message}");
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+}

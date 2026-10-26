@@ -1,0 +1,125 @@
+.schema-document-editor,
+.schema-visual-editor,
+.schema-instance-preview,
+.schema-definition-source {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.schema-visual-editor[hidden],
+.schema-instance-preview[hidden],
+.schema-definition-source[hidden] {
+    display: none;
+}
+
+.schema-document-toolbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    justify-content: flex-start;
+}
+
+.schema-visual-heading {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    justify-content: space-between;
+}
+
+.schema-visual-heading h3,
+.schema-visual-heading p {
+    margin: 0;
+}
+
+.schema-visual-heading p { margin-top: .25rem; }
+
+.schema-visual-workbench {
+    align-items: start;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(15rem, 22rem) minmax(0, 1fr);
+    min-width: 0;
+}
+
+.schema-tree-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: .8rem;
+    max-height: 42rem;
+    overflow: auto;
+    padding: .75rem;
+    position: sticky;
+    top: 1rem;
+}
+
+.schema-tree-panel > .schema-additional-properties {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: .55rem;
+    padding: .25rem .25rem .75rem;
+}
+
+.schema-property-tree {
+    margin: 0;
+    min-width: 0;
+    padding: 0;
+}
+
+.schema-tree-empty { margin: .75rem .25rem; }
+.schema-inspector-panel { min-width: 0; }
+
+.schema-inspector-empty {
+    align-items: center;
+    background: var(--surface-2);
+    border: 1px dashed var(--border);
+    border-radius: .8rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 18rem;
+    padding: 2rem;
+    text-align: center;
+}
+
+.schema-inspector-empty > span {
+    color: var(--primary);
+    font-size: 2rem;
+    margin-bottom: .5rem;
+}
+
+.schema-inspector-empty p {
+    margin: .35rem 0 0;
+    max-width: 28rem;
+}
+
+.schema-definition-source > label {
+    color: var(--text);
+    display: grid;
+    font-size: .82rem;
+    font-weight: 650;
+    gap: 7px;
+    min-width: 0;
+}
+
+.schema-additional-properties {
+    align-items: center;
+    display: flex;
+    gap: .5rem;
+}
+
+.schema-additional-properties input {
+    width: auto;
+}
+
+@media (max-width: 860px) {
+    .schema-visual-workbench { grid-template-columns: 1fr; }
+    .schema-tree-panel { max-height: 20rem; position: static; }
+
+    .schema-document-toolbar > button {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+}

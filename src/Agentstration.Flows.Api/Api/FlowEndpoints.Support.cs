@@ -22,7 +22,7 @@ public static partial class FlowEndpoints
 
     private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt) { Namespace = value.Id.Namespace, DisplayName = value.DisplayName };
 
-    private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Definition, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes) { Namespace = value.FlowId.Namespace };
+    private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Definition, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes, value.SchemaBindings) { Namespace = value.FlowId.Namespace };
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
@@ -33,6 +33,7 @@ public static partial class FlowEndpoints
         catch (InputRequestAlreadyResolvedException exception) { return Results.Problem(statusCode: 409, title: "input_request_already_resolved", detail: exception.Message); }
         catch (FlowConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (FlowValidationException exception) when (exception.Code == "flow_version_already_published") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
+        catch (FlowValidationException exception) when (exception.Code == "flow_run_in_use_by_knowledge_snapshot") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
         catch (FlowValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (WorkValidationException exception) when (exception.Code == "flow_invocation_idempotency_conflict") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
         catch (WorkValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }

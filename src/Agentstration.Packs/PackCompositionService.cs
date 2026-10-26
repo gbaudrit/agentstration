@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Agentstration.Agents;
 using Agentstration.Flows;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.Models;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
@@ -278,6 +279,7 @@ public sealed partial class PackCompositionService(
         {
             AgentResourceKinds.Agent => "agents",
             FlowResourceKinds.Flow => "flows",
+            KnowledgeResourceKinds.KnowledgeSource => "knowledge-sources",
             EntryResourceKinds.Entry => "entries",
             ModelResourceKinds.ModelProfile => "model-profiles",
             ModelResourceKinds.ModelProvider => "model-providers",
@@ -287,7 +289,7 @@ public sealed partial class PackCompositionService(
         };
         return $"{directory}/{resource.Name}.json";
     }
-    private static int KindOrder(string kind) => kind switch { ParameterResourceKinds.Parameter => 5, ModelResourceKinds.ModelProvider => 10, RuntimeProfileResourceKinds.RuntimeProfile => 20, ModelResourceKinds.ModelProfile => 30, AgentResourceKinds.Agent => 40, FlowResourceKinds.Flow => 50, EntryResourceKinds.Entry => 60, _ => 100 };
+    private static int KindOrder(string kind) => kind switch { ParameterResourceKinds.Parameter => 5, ModelResourceKinds.ModelProvider => 10, RuntimeProfileResourceKinds.RuntimeProfile => 20, ModelResourceKinds.ModelProfile => 30, AgentResourceKinds.Agent => 40, FlowResourceKinds.Flow => 50, KnowledgeResourceKinds.KnowledgeSource => 55, EntryResourceKinds.Entry => 60, _ => 100 };
     private static string BindingLabel(PackBindingTargetKind kind) => kind switch
     {
         PackBindingTargetKind.Secret => "Secret",

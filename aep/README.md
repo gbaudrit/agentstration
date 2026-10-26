@@ -51,6 +51,8 @@ Extensions declare contribution-scoped logical values through `AepExtensionOptio
 
 The `SourceProviderExtension` sample demonstrates the native `aep.source-provider` Resolve/Materialize lifecycle entirely offline. Source Provider configuration uses the versioned `source-channel` option scope, and materialization is bounded by archive size, entry count, expanded size, timeout, exact revision, and SHA-256 integrity checks. AEP does not interpret Source catalogs or expose acquisition as an MCP tool.
 
+Extensions may also publish `schema-format` contributions through `aep.schema-formats`. A contribution declares format metadata and maps `validateDefinition` and `validateInstance` to MCP operations. These mappings are consumer service operations, not Agent Tool contributions; consumers validate their bounded structured results and decide how providers participate in format resolution.
+
 ## Authenticate AEP traffic
 
 The client accepts a request-scoped credential provider. It applies the Bearer to each request without changing shared `HttpClient.DefaultRequestHeaders`:

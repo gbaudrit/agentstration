@@ -15,6 +15,8 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
+using Agentstration.Schemas;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
 using Microsoft.AspNetCore.Hosting;
@@ -74,6 +76,81 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         await agents.DeleteAgentExactAsync(scopeRef, created.Value.Namespace, agentName, created.ETag, default);
 
         Assert.IsNull(await agents.GetAgentExactAsync(scopeRef, created.Value.Namespace, agentName, default));
+    }
+
+    [TestMethod]
+    public async Task AgentRevisionPinsAnExactSharedInvocationContract()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var scope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var schemas = factory.Services.GetRequiredService<SchemaManagementService>();
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var input = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { prompt = new { type = "string" } },
+            required = new[] { "prompt" }
+        });
+        var schema = await schemas.CreateAsync(new SchemaResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SchemaResourceKinds.Schema,
+            Metadata = new ResourceMetadata { Name = "agent-invocation-input" },
+            ScopeRef = scope,
+            Definition = new SchemaProperties
+            {
+                DisplayName = "Agent invocation input",
+                Format = SchemaFormatIds.JsonSchema,
+                Dialect = "https://json-schema.org/draft/2020-12/schema",
+                Content = input
+            }
+        }, default);
+        var published = await schemas.PublishAsync(scope, ResourceNamespace.Default,
+            "agent-invocation-input", "1.0.0", default);
+        var stored = await agents.PutAgentAsync(new AgentResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = "schema-bound-agent" },
+            ScopeRef = scope,
+            Definition = new AgentProperties
+            {
+                DisplayName = "Schema-bound Agent",
+                Instructions = "Use the pinned invocation contract.",
+                ModelProfile = new ResourceReference("reasoning-default"),
+                InputSchemaBinding = new SchemaBinding
+                {
+                    Reference = new()
+                    {
+                        Name = "agent-invocation-input",
+                        Version = "1.0.0",
+                        ScopeRef = scope
+                    }
+                }
+            }
+        }, null, true, default);
+        var revision = await agents.CreateRevisionAsync("schema-bound-agent", new AgentDeploymentSpec
+        {
+            Environment = "local",
+            RuntimeProfileName = "maf-builtin",
+            HostingMode = AgentHostingMode.InProcess
+        }, default);
+
+        Assert.AreEqual("string", stored.Value.Definition.InputSchema?.GetProperty("properties")
+            .GetProperty("prompt").GetProperty("type").GetString());
+        Assert.AreEqual(published.Value.DefinitionHash,
+            revision.Value.Definition.SchemaBindings["$.inputSchema"].DefinitionHash);
+        Assert.AreEqual("1.0.0",
+            revision.Value.Definition.SchemaBindings["$.inputSchema"].Source?.Version);
+
+        _ = await schemas.PutAsync(scope, ResourceNamespace.Default, "agent-invocation-input",
+            schema.Value.Definition with { Content = JsonSerializer.SerializeToElement(new { type = "array" }) },
+            schema.ETag, default);
+        var reloaded = await agents.GetRevisionAsync(ResourceNamespace.Default,
+            "schema-bound-agent", revision.Value.Metadata.Name, default);
+        Assert.AreEqual("object", reloaded.Value.Definition.InputSchema?.GetProperty("type").GetString());
     }
 
     [TestMethod]
@@ -200,13 +277,13 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         var secondAgent = await agents.PutAgentAsync(Agent(agentName), null, true, default);
         var secondRevision = await agents.CreateRevisionAsync(agentName, spec, default);
         var repeated = await agents.CreateRevisionAsync(agentName, spec, default);
-        var prepared = await agents.PrepareLocalRuntimeAsync(agentName, secondAgent.Value.Generation, default);
+        var prepared = await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default, agentName, secondAgent.Value.Generation, default);
 
         Assert.AreNotEqual(firstAgent.Value.Uid, secondAgent.Value.Uid);
         Assert.AreNotEqual(firstRevision.Value.Metadata.Name, secondRevision.Value.Metadata.Name);
         Assert.AreEqual(secondAgent.Value.Uid, secondRevision.Value.AgentUid);
         Assert.AreEqual(secondRevision.Value.Metadata.Name, repeated.Value.Metadata.Name);
-        Assert.AreEqual(OperationalState.Ready, prepared.Value.OperationalState);
+        Assert.AreEqual(ProvisioningState.Succeeded, prepared.Value.ProvisioningState);
 
         static AgentResource Agent(string name) => new()
         {

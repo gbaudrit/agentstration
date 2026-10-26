@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Agents;
 
@@ -8,6 +9,13 @@ public static class AgentResourceKinds
     public const string Agent = "Agent";
     public const string AgentRevision = "AgentRevision";
     public const string AgentDeployment = "AgentDeployment";
+}
+
+public sealed record AgentToolSetSelection
+{
+    public required ResourceReference ToolSet { get; init; }
+    public required string Version { get; init; }
+    public IReadOnlyList<string> Members { get; init; } = [];
 }
 
 public record AgentProperties
@@ -19,10 +27,24 @@ public record AgentProperties
     public required ResourceReference ModelProfile { get; init; }
     public ResourceReference RuntimeProfile { get; init; } = new("maf-builtin", @namespace: ResourceNamespace.Default);
     public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
+    public IReadOnlyList<AgentToolSetSelection> ToolSets { get; init; } = [];
     public IReadOnlyList<string> Behaviors { get; init; } = [];
     public IReadOnlyList<string> Middleware { get; init; } = [];
     public IReadOnlyList<string> ContextProviders { get; init; } = [];
     public IReadOnlyDictionary<string, JsonElement> Settings { get; init; } = new Dictionary<string, JsonElement>();
+    public JsonElement? InputSchema { get; init; }
+    public SchemaBinding? InputSchemaBinding { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public SchemaBinding? OutputSchemaBinding { get; init; }
+}
+
+public sealed record ResolvedAgentToolSetAssignment
+{
+    public required string ToolSetName { get; init; }
+    public required ResourceNamespace ToolSetNamespace { get; init; }
+    public required string Version { get; init; }
+    public required string DefinitionHash { get; init; }
+    public required IReadOnlyList<string> Members { get; init; }
 }
 
 public sealed record AgentResource : Resource
@@ -80,11 +102,16 @@ public sealed record ResolvedAgentDefinition
     public required string RuntimeProfileName { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
+    public IReadOnlyCollection<ResolvedAgentToolSetAssignment> ToolSetAssignments { get; init; } = [];
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
     public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
     public required IReadOnlyCollection<string> Capabilities { get; init; }
     public required string Handler { get; init; }
     public required string DefinitionHash { get; init; }
+    public JsonElement? InputSchema { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public IReadOnlyDictionary<string, SchemaBindingSnapshot> SchemaBindings { get; init; }
+        = new Dictionary<string, SchemaBindingSnapshot>(StringComparer.Ordinal);
 }
 
 public sealed record AgentDeployment : Resource

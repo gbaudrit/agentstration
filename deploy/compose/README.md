@@ -10,6 +10,10 @@ Canonical deterministic extension topology without inference servers:
 docker compose -f deploy/compose/base.yml up -d --build --remove-orphans
 ```
 
+Every topology also starts `runtime-worker-1` as a separate
+`Agentstration.Runtime.Worker.MicrosoftAgentFramework` process. Compose provisions an isolated
+shared-key volume and identity for that Worker; it never runs inside the authoritative server.
+
 Ollama:
 
 ```powershell

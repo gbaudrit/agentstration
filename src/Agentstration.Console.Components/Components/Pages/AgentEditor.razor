@@ -7,6 +7,7 @@
 @inject IRuntimeProfilesClient RuntimeProfilesClient
 @inject IToolsClient ToolsClient
 @inject IToolCategoriesClient ToolCategoriesClient
+@inject IToolSetsClient ToolSetsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
@@ -32,10 +33,22 @@ else
             <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
             <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button></Actions>
         </ResourceHeader>
-        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
                 <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
+        @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
+        {
+            <section class="panel form-section" data-testid="agent-active-toolsets">
+                <div class="panel-header"><div><p class="eyebrow">@T("ActiveRevision")</p><h2>@T("PinnedToolSetAssignments")</h2><p>@T("PinnedToolSetAssignmentsHelp")</p></div><code>@activeRevision.Metadata.Name</code></div>
+                <div class="table-shell"><table class="resource-table"><thead><tr><th>@T("ToolSet")</th><th>@T("Version")</th><th>@T("DefinitionHash")</th><th>@T("EffectiveMembers")</th></tr></thead><tbody>
+                @foreach (var assignment in activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal))
+                {
+                    <tr><td><code>@assignment.ToolSetNamespace/@assignment.ToolSetName</code></td><td><code>@assignment.Version</code></td><td><code>@assignment.DefinitionHash</code></td><td>@string.Join(", ", assignment.Members)</td></tr>
+                }
+                </tbody></table></div>
+            </section>
+        }
     }
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
@@ -49,7 +62,7 @@ else
 
     @if (IsNew)
     {
-        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
     }
 
     @if (sourceMode)
@@ -60,6 +73,7 @@ else
             <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
             <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div>
         </section>
+
     }
     else
     {
@@ -69,7 +83,25 @@ else
 
         @if (toolsMode)
         {
-            <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" Categories="catalogCategories" SelectedToolIds="SelectedToolIds" SelectedToolIdsChanged="UpdateSelectedTools" />
+            <AgentToolSetConfiguration Versions="catalogToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
+            <AgentToolConfiguration Tools="catalogTools" Providers="catalogProviders" Categories="catalogCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" />
+        }
+        else if (contractsMode)
+        {
+            <section class="panel form-section" data-testid="agent-contracts-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Contracts")</p><h2>@T("InvocationContracts")</h2><p>@T("InvocationContractsHelp")</p></div></div>
+                <ContractDirectionTabs Label="@T("InvocationContracts")" InputLabel="@T("InputContract")"
+                    OutputLabel="@T("OutputContract")" TestId="agent-contract">
+                    <InputContent>
+                        <ReusableSchemaBindingEditor Title="@T("InputContract")" TestId="agent-input-schema"
+                            Binding="model.InputSchemaBinding" LegacySchema="model.InputSchema" ValueChanged="UpdateAgentInputSchemaAsync" />
+                    </InputContent>
+                    <OutputContent>
+                        <ReusableSchemaBindingEditor Title="@T("OutputContract")" TestId="agent-output-schema"
+                            Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
+                    </OutputContent>
+                </ContractDirectionTabs>
+            </section>
         }
         else
         {
@@ -138,6 +170,7 @@ else
     private IReadOnlyList<ToolResource> catalogTools = [];
     private IReadOnlyList<ToolProviderResource> catalogProviders = [];
     private IReadOnlyList<ToolCategoryResource> catalogCategories = [];
+    private IReadOnlyList<ToolSetVersionResource> catalogToolSetVersions = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private string? etag;
     private string? resourceId;
@@ -149,6 +182,7 @@ else
     private string? rawError;
     private AgentModelResponse? agentModel;
     private AgentRuntimeReadinessResponse? readiness;
+    private AgentRevision? activeRevision;
     private string provisioningStatus = "Valid";
     private long generation;
     private bool loading = true;
@@ -157,6 +191,7 @@ else
     private bool applyRuntimeOnSubmit = true;
     private bool sourceMode;
     private bool toolsMode;
+    private bool contractsMode;
     private bool interactive;
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
@@ -191,11 +226,13 @@ else
             var toolsTask = ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
             var providersTask = ToolsClient.GetProvidersAsync(cancellation.Token);
             var categoriesTask = ToolCategoriesClient.GetCategoriesAsync(cancellation.Token);
+            var toolSetVersionsTask = LoadToolSetVersionsAsync();
             var runtimeProfilesTask = RuntimeProfilesClient.GetRuntimeProfilesAsync(cancellation.Token);
-            await Task.WhenAll(toolsTask, providersTask, categoriesTask, runtimeProfilesTask);
+            await Task.WhenAll(toolsTask, providersTask, categoriesTask, toolSetVersionsTask, runtimeProfilesTask);
             catalogTools = await toolsTask;
             catalogProviders = await providersTask;
             catalogCategories = await categoriesTask;
+            catalogToolSetVersions = await toolSetVersionsTask;
             runtimeProfiles = await runtimeProfilesTask;
             if (IsNew)
             {
@@ -255,15 +292,16 @@ else
     }
 
     private void MarkDirty(EventArgs _) => isDirty = true;
-    private void ShowDefinition() => (sourceMode, toolsMode) = (false, false);
-    private void ShowTools() => (sourceMode, toolsMode) = (false, true);
+    private void ShowDefinition() => (sourceMode, toolsMode, contractsMode) = (false, false, false);
+    private void ShowContracts() => (sourceMode, toolsMode, contractsMode) = (false, false, true);
+    private void ShowTools() => (sourceMode, toolsMode, contractsMode) = (false, true, false);
     private void ShowSource()
     {
         if (model is null) return;
         rawError = null;
         try { rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest()); }
         catch (Exception exception) { rawError = exception.Message; }
-        (sourceMode, toolsMode) = (true, false);
+        (sourceMode, toolsMode, contractsMode) = (true, false, false);
     }
 
     private bool ApplyRawYaml()
@@ -298,6 +336,42 @@ else
         if (!IsNew) ShowSource();
     }
     private IReadOnlyList<string> SelectedToolIds => model?.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+    private IReadOnlyList<AgentToolSetSelection> SelectedToolSets => model?.ToolSets ?? [];
+    private IReadOnlyDictionary<string, IReadOnlyList<string>> ToolSetGrantedTools
+    {
+        get
+        {
+            var grants = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (var selection in SelectedToolSets)
+            {
+                var selectedNamespace = selection.ToolSet.Namespace ?? ResourceNamespace.Default;
+                var version = catalogToolSetVersions.SingleOrDefault(value =>
+                    value.Namespace == selectedNamespace
+                    && string.Equals(value.ToolSetName, selection.ToolSet.Name, StringComparison.Ordinal)
+                    && string.Equals(value.Version, selection.Version, StringComparison.Ordinal));
+                if (version is null) continue;
+
+                var selectedMembers = selection.Members.Count == 0
+                    ? version.Members
+                    : version.Members.Where(value => selection.Members.Contains(value.ToolName, StringComparer.Ordinal)).ToArray();
+                var source = $"{version.ToolSetName}@{version.Version}";
+                foreach (var member in selectedMembers)
+                {
+                    if (!grants.TryGetValue(member.ToolName, out var sources))
+                    {
+                        sources = [];
+                        grants.Add(member.ToolName, sources);
+                    }
+                    if (!sources.Contains(source, StringComparer.Ordinal)) sources.Add(source);
+                }
+            }
+
+            return grants.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyList<string>)pair.Value,
+                StringComparer.Ordinal);
+        }
+    }
     private Task UpdateSelectedTools(IReadOnlyList<string> values)
     {
         if (model is not null)
@@ -306,6 +380,42 @@ else
             isDirty = true;
         }
         return Task.CompletedTask;
+    }
+    private Task UpdateSelectedToolSets(IReadOnlyList<AgentToolSetSelection> values)
+    {
+        if (model is not null)
+        {
+            model.ToolSets = values;
+            isDirty = true;
+        }
+        return Task.CompletedTask;
+    }
+    private Task UpdateAgentInputSchemaAsync(SchemaBindingEditorValue value)
+    {
+        if (model is not null)
+        {
+            model.InputSchemaBinding = value.Binding;
+            model.InputSchema = value.EffectiveContent?.Clone();
+            isDirty = true;
+        }
+        return Task.CompletedTask;
+    }
+    private Task UpdateAgentOutputSchemaAsync(SchemaBindingEditorValue value)
+    {
+        if (model is not null)
+        {
+            model.OutputSchemaBinding = value.Binding;
+            model.OutputSchema = value.EffectiveContent?.Clone();
+            isDirty = true;
+        }
+        return Task.CompletedTask;
+    }
+    private async Task<IReadOnlyList<ToolSetVersionResource>> LoadToolSetVersionsAsync()
+    {
+        var toolSets = await ToolSetsClient.GetToolSetsAsync(cancellation.Token);
+        var tasks = toolSets.Select(value => ToolSetsClient.GetVersionsAsync(value.Namespace, value.Name, cancellation.Token)).ToArray();
+        await Task.WhenAll(tasks);
+        return tasks.SelectMany(task => task.Result).ToArray();
     }
     private Task DiscardAsync() => OnParametersSetAsync();
 
@@ -346,7 +456,17 @@ else
     private async Task LoadReadinessAsync(string name, long desiredGeneration)
     {
         readiness = null;
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, desiredGeneration, cancellation.Token); }
+        activeRevision = null;
+        try
+        {
+            readiness = await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, desiredGeneration, cancellation.Token);
+            if (readiness.Ready && !string.IsNullOrWhiteSpace(readiness.RevisionId))
+                activeRevision = (await Client.GetAgentRevisionAsync(
+                    AgentResourceNamespace,
+                    name,
+                    readiness.RevisionId,
+                    cancellation.Token)).Value;
+        }
         catch (AgentstrationApiException) { }
     }
 

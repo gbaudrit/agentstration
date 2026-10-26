@@ -4,6 +4,11 @@ using Agentstration.Resources;
 
 namespace Agentstration.Flows;
 
+public static class FlowMetadataKeys
+{
+    public const string Contract = "flow.contract";
+}
+
 public readonly record struct FlowId(string Value, ResourceNamespace Namespace = default)
 {
     public override string ToString() => Value;
@@ -17,7 +22,7 @@ public sealed record FlowReference(FlowId FlowId, string? Version = null, bool U
 public enum FlowKind { Direct, Routing, Workflow, Orchestration, Composite }
 public enum FlowTargetKind { Agent, Flow }
 public enum FlowRoutingStrategy { Deterministic, Capabilities, Semantic, Llm, Hybrid, Custom }
-public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Failure, Flow, Function, ExternalCall, HumanApproval, Custom }
+public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Flow, Function, ExternalCall, HumanApproval, Custom }
 public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupChat, Magentic }
 public enum FlowCompositionMode { Sequential, Concurrent, Custom }
 public enum FlowRunStatus { Pending, Running, WaitingForInput, Succeeded, Failed, Cancelled, TimedOut, WaitingForChild }

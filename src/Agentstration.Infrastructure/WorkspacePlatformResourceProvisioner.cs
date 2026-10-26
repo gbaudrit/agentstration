@@ -1,4 +1,6 @@
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -17,7 +19,9 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     IIdentityStore identities,
     IRequestContextScopeFactory scopes,
     IResourceStore resources,
-    InternalMcpToolProjectionService internalTools) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
+    InternalMcpToolProjectionService internalTools,
+    ArtifactPlatformResourceProvisioner artifacts,
+    KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
 {
     public async Task EnsureAllAsync(CancellationToken cancellationToken)
     {
@@ -38,6 +42,8 @@ internal sealed class WorkspacePlatformResourceProvisioner(
             ResourceScopeRef.Workspace(workspaceId),
             ResourceNamespace.Default,
             cancellationToken);
+        await artifacts.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
+        await knowledge.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
         if (workspace.Status == WorkspaceStatus.Initializing)

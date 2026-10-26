@@ -68,6 +68,36 @@ export const Checkpoints = {
     agentRun: 'flow-observability-agent-run',
     events: 'flow-observability-events',
   },
+  runtimeWorkerObservability: {
+    inventoryOnline: 'runtime-worker-inventory-online',
+    successfulAssignments: 'runtime-worker-successful-assignments',
+    runPlacement: 'runtime-worker-run-placement',
+    flowRunPlacement: 'runtime-worker-flow-run-placement',
+    workerOffline: 'runtime-worker-offline',
+    workerLoss: 'runtime-worker-loss',
+    workerReconnected: 'runtime-worker-reconnected',
+    authorizationBoundaries: 'runtime-worker-authorization-boundaries',
+  },
+  agentInstanceObservability: {
+    empty: 'agent-instance-empty',
+    directActive: 'agent-instance-direct-active',
+    flowParticipants: 'agent-instance-flow-participants',
+    concurrentRuns: 'agent-instance-concurrent-runs',
+    workerLossCleared: 'agent-instance-worker-loss-cleared',
+  },
+  flowNamedOutputs: {
+    activePorts: 'flow-named-outputs-active-ports',
+    historicalPorts: 'flow-named-outputs-historical-ports',
+    outputsAuthored: 'flow-named-outputs-authored',
+    transitionsConnected: 'flow-named-outputs-transitions-connected',
+    publishedReadOnly: 'flow-named-outputs-published-read-only',
+  },
+  flowDesignerResponsive: {
+    desktopWorkspace: 'flow-designer-responsive-desktop-workspace',
+    narrowDrawers: 'flow-designer-responsive-narrow-drawers',
+    focusModes: 'flow-designer-responsive-focus-modes',
+    verificationFailure: 'flow-designer-responsive-verification-failure',
+  },
   consoleAdministration: {
     organization: 'console-admin-organization',
     member: 'console-admin-member',
@@ -110,9 +140,26 @@ export const Checkpoints = {
     immutable: 'resource-naming-immutable',
     conflict: 'resource-naming-conflict',
   },
+  toolExecution: {
+    overview: 'tool-execution-overview',
+    simulationReady: 'tool-execution-simulation-ready',
+    simulationResult: 'tool-execution-simulation-result',
+    realResult: 'tool-execution-real-result',
+    simulationUnavailable: 'tool-execution-simulation-unavailable',
+    approvalRequired: 'tool-execution-approval-required',
+  },
   foundrySecretBinding: {
     providerCreated: 'foundry-secret-binding-provider-created',
     secretBound: 'foundry-secret-binding-secret-bound',
     secretUnavailable: 'foundry-secret-binding-secret-unavailable',
+  },
+  schemaDrivenSources: {
+    completed: 'schema-driven-sources-completed',
+  },
+  schemaDrivenFlowInputs: {
+    completed: 'schema-driven-flow-inputs-completed',
+  },
+  schemaAdministration: {
+    completed: 'schema-administration-completed',
   },
 } as const;

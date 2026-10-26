@@ -12,9 +12,11 @@ definition:
     steps:
       - { type: input, name: input, displayName: Solution goal }
       - { type: agent, name: analyze, displayName: Analyze intent, agent: { resourceId: resource-planning-intent-analyst }, inputMapping: "${input}" }
-      - { type: output, name: output, displayName: Intent analysis, outputMapping: "${steps.analyze.output}" }
+      - { type: output, name: completed, displayName: Intent analysis, outcome: success, outputMapping: "${steps.analyze.output}" }
+      - { type: output, name: error, displayName: Intent analysis failed, outcome: error, code: RESOURCE_PLANNING_AGENT_FAILED, message: The intent analysis Agent failed., outputMapping: "${transition.output}" }
     transitions:
       - { id: input-to-analyze, fromStep: input, event: completed, toStep: analyze }
-      - { id: analyze-to-output, fromStep: analyze, event: completed, toStep: output }
+      - { id: analyze-completed, fromStep: analyze, event: success, toStep: completed }
+      - { id: analyze-error, fromStep: analyze, event: error, toStep: error }
   publish: true
   activate: true

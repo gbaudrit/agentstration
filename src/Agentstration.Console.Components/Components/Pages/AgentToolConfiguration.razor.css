@@ -29,6 +29,30 @@
     margin-top: 0;
 }
 
+.agent-tool-access-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.agent-tool-access-summary span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 7px 11px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: .75rem;
+}
+
+.agent-tool-access-summary strong {
+    color: var(--text);
+    font-size: .85rem;
+}
+
 .agent-tool-groups {
     display: grid;
     gap: 18px;
@@ -194,6 +218,12 @@
     opacity: .62;
 }
 
+.agent-tool-option.inherited:has(input:disabled) {
+    opacity: 1;
+    border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 48%, var(--surface));
+}
+
 .agent-tool-option input {
     position: absolute;
     top: 12px;
@@ -279,6 +309,11 @@
 
 .tool-status.unavailable {
     color: var(--muted);
+}
+
+.tool-status.inherited {
+    color: var(--primary);
+    line-height: 1.25;
 }
 
 @media (max-width: 1100px) {

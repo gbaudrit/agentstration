@@ -10,6 +10,7 @@ using Agentstration.Infrastructure.Flows;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -43,7 +44,10 @@ public sealed partial class FlowTests
         public FlowService Service => _provider.GetRequiredService<FlowService>();
         public IFlowRepository Repository => _provider.GetRequiredService<IFlowRepository>();
         private FlowFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
-        public static async Task<FlowFixture> CreateAsync(DbCommandInterceptor? commandInterceptor = null, TimeProvider? timeProvider = null)
+        public static async Task<FlowFixture> CreateAsync(
+            DbCommandInterceptor? commandInterceptor = null,
+            TimeProvider? timeProvider = null,
+            IFlowResourceReferenceResolver? resourceReferenceResolver = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -59,6 +63,9 @@ public sealed partial class FlowTests
                 services.AddDbContextFactory<FlowDbContext>(options => options.UseSqlite(connectionString).AddInterceptors(commandInterceptor));
                 services.AddSingleton<IFlowRepository, SqliteFlowRepository>();
             }
+            services.AddSingleton<ISchemaBindingResolver, TestSchemaBindingResolver>();
+            if (resourceReferenceResolver is not null)
+                services.AddSingleton(resourceReferenceResolver);
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);
@@ -76,14 +83,6 @@ public sealed partial class FlowTests
     {
         public List<FlowRunQueueItem> Enqueued { get; } = [];
         public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) { Enqueued.Add(item); return ValueTask.CompletedTask; }
-        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
-    }
-
-    private sealed class TestFlowRunExecutionScope : IFlowRunExecutionScope
-    {
-        public ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public IDisposable Enter(FlowRunScope scope) => new Scope();
-        private sealed class Scope : IDisposable { public void Dispose() { } }
     }
 
     private sealed class DeniedFlowRunExecutionScope : IFlowRunExecutionScope
@@ -100,95 +99,6 @@ public sealed partial class FlowTests
         public CancellationToken Register(FlowRunKey run, CancellationToken stoppingToken) => stoppingToken;
         public bool Cancel(FlowRunKey run) => true;
         public void Complete(FlowRunKey run) { }
-    }
-
-    private sealed class TestAgentExecutor : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), $"/agents/{request.Target.Id}", 3, "/profiles/default", "Deterministic", new FlowStepRunUsage(12, 4), ["lookup"], ["executed"]));
-    }
-
-    private sealed class TrackingAgentExecutor : IFlowAgentExecutor
-    {
-        public int ExecutionCount { get; private set; }
-
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken)
-        {
-            ExecutionCount++;
-            return Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), "/agents/agent", 1, "/profiles/default", "Test", null, [], []));
-        }
-    }
-
-    private sealed class FailingAgentExecutor : IFlowAgentExecutor
-    {
-        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowAgentExecutionRequest request, CancellationToken cancellationToken) =>
-            Task.FromException<FlowAgentExecutionResult>(new InvalidOperationException("simulated agent failure"));
-    }
-
-    private sealed class TestOrchestrationEngine : IFlowOrchestrationEngine
-    {
-        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-            FlowOrchestrationExecutionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            Assert.AreEqual(FlowOrchestrationStrategy.Handoff, request.Definition.Strategy);
-            Assert.IsTrue(request.Definition.Participants.All(participant =>
-                participant.Namespace == new ResourceNamespace("daily-life-assistant")));
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return new FlowParticipantTurnStarted("researcher", 1);
-            yield return new FlowParticipantDelta("researcher", "draft");
-            yield return new FlowParticipantTurnCompleted("researcher", 1);
-            var researcher = Participant("researcher", 1, "draft");
-            yield return new FlowParticipantCompleted(researcher);
-            yield return new FlowParticipantHandoff("researcher", "reviewer");
-            yield return new FlowParticipantTurnStarted("reviewer", 2);
-            yield return new FlowParticipantDelta("reviewer", "reviewed");
-            yield return new FlowParticipantTurnCompleted("reviewer", 2);
-            var reviewer = Participant("reviewer", 2, "reviewed");
-            yield return new FlowParticipantCompleted(reviewer);
-            yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
-                FlowOrchestrationStrategy.Handoff,
-                JsonSerializer.SerializeToElement("reviewed"),
-                [researcher, reviewer]));
-            await Task.CompletedTask;
-        }
-
-        private static FlowParticipantResult Participant(string id, int turn, string output) => new(
-            id,
-            [new FlowParticipantTurnResult(turn, output)],
-            JsonSerializer.SerializeToElement(output),
-            id,
-            1,
-            "default",
-            "Deterministic",
-            [],
-            null);
-    }
-
-    private sealed class StalledOrchestrationEngine : IFlowOrchestrationEngine
-    {
-        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-            FlowOrchestrationExecutionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            yield break;
-        }
-    }
-
-    private sealed class ConcurrentTrackingAgentExecutor : IFlowAgentExecutor
-    {
-        private int executionCount;
-        public int ExecutionCount => executionCount;
-
-        public async Task<FlowAgentExecutionResult> ExecuteAsync(
-            FlowAgentExecutionRequest request,
-            CancellationToken cancellationToken)
-        {
-            Interlocked.Increment(ref executionCount);
-            await Task.Delay(100, cancellationToken);
-            return new(JsonSerializer.SerializeToElement("done"), request.Target.Id, 1, "default", "Test", null, [], []);
-        }
     }
 
     private sealed class AdvancingTimeProvider(DateTimeOffset initial) : TimeProvider
@@ -240,51 +150,6 @@ public sealed partial class FlowTests
         }
     }
 
-    private sealed class SuspendingOrchestrationEngine : IFlowOrchestrationEngine
-    {
-        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-            FlowOrchestrationExecutionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            var bindings = request.RuntimeBindings is { Count: > 0 }
-                ? request.RuntimeBindings
-                :
-                [
-                    Binding("agent-a", 7),
-                    Binding("agent-b", 4)
-                ];
-            yield return new FlowRuntimeBindingsResolved(bindings);
-            if (request.AnsweredInput?.Response is null)
-            {
-                yield return new FlowExternalInputRequested(
-                    "runtime-request-1", "What is your name?", InputRequestType.Text, [], "agent-a",
-                    new DurableRuntimeStateReference("test-runtime", "state-1", DateTimeOffset.UtcNow));
-                yield break;
-            }
-            Assert.AreEqual(7, bindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
-            var answer = request.AnsweredInput.Response.Value.GetString()!;
-            var participant = new FlowParticipantResult(
-                "agent-a", [new(1, answer)], JsonSerializer.SerializeToElement(answer), "agent-a", 7,
-                "default", "Deterministic", [], null);
-            yield return new FlowParticipantCompleted(participant);
-            yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
-                FlowOrchestrationStrategy.Handoff, JsonSerializer.SerializeToElement(answer), [participant]));
-            await Task.CompletedTask;
-        }
-
-        private static RuntimeExecutionBinding Binding(string participant, long generation) => new()
-        {
-            ParticipantId = participant,
-            AgentNamespace = ResourceNamespace.Default,
-            AgentResourceId = participant,
-            AgentGeneration = generation,
-            DeploymentId = $"deployment-{participant}-{generation}",
-            RevisionId = $"revision-{participant}-{generation}",
-            RuntimeProfileName = "local",
-            ModelProfileName = "default"
-        };
-    }
-
     private sealed record InteractionApiCase(
         string Kind,
         InputRequestType Type,
@@ -292,34 +157,20 @@ public sealed partial class FlowTests
         JsonElement ValidValue,
         JsonElement InvalidValue);
 
-    private sealed class TypedSuspendingOrchestrationEngine : IFlowOrchestrationEngine
-    {
-        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
-            FlowOrchestrationExecutionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var kind = request.Input.GetProperty("kind").GetString();
-            var type = kind switch
-            {
-                "choice" => InputRequestType.Choice,
-                "confirmation" => InputRequestType.Confirmation,
-                _ => InputRequestType.Text
-            };
-            var options = type == InputRequestType.Choice ? new[] { "red", "blue" } : [];
-            yield return new FlowExternalInputRequested(
-                $"runtime-{request.RunId}",
-                $"Provide a {kind} response",
-                type,
-                options,
-                "sql-expert",
-                new DurableRuntimeStateReference("test-runtime", $"state-{request.RunId}", DateTimeOffset.UtcNow));
-            await Task.CompletedTask;
-        }
-    }
-
     private sealed class ExistingResourceResolver : IFlowResourceReferenceResolver
     {
         public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) => Task.FromResult(true);
+    }
+
+    private sealed class TestSchemaBindingResolver : ISchemaBindingResolver
+    {
+        public ValueTask<SchemaBindingSnapshot> ResolveAsync(string path, SchemaBinding binding,
+            SchemaBindingResolutionContext context, CancellationToken cancellationToken)
+        {
+            var inline = binding.Inline ?? throw new SchemaBindingResolutionException(
+                "schema_reference_not_supported", "This test fixture only supports inline bindings.");
+            return ValueTask.FromResult(new SchemaBindingSnapshot(path, inline.Format, inline.Dialect,
+                inline.Content.Clone(), $"test:{inline.Content.GetRawText()}"));
+        }
     }
 }

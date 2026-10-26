@@ -19,7 +19,15 @@ import { ConsoleEntryInteractionPage } from './console-entry-interaction.page.js
 import { PlatformHealthPage } from './platform-health.page.js';
 import { ResourceNamingPage } from './resource-naming.page.js';
 import { FoundrySecretBindingPage } from './foundry-secret-binding.page.js';
+import { ArtifactAdministrationPage } from './artifact-administration.page.js';
 import { PlatformOverviewPage } from './platform-overview.page.js';
+import { ToolExecutionPage } from './tool-execution.page.js';
+import { RuntimeWorkerObservabilityPage } from './runtime-worker-observability.page.js';
+import { AgentInstanceObservabilityPage } from './agent-instance-observability.page.js';
+import { SchemaDrivenSourcesPage } from './schema-driven-sources.page.js';
+import { SchemaAdministrationPage } from './schema-administration.page.js';
+import { SchemaContractsPage } from './schema-contracts.page.js';
+import { SchemaDrivenFlowInputsPage } from './schema-driven-flow-inputs.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -41,7 +49,15 @@ export class ProductPages {
   public readonly platformHealth: PlatformHealthPage;
   public readonly resourceNaming: ResourceNamingPage;
   public readonly foundrySecretBinding: FoundrySecretBindingPage;
+  public readonly artifacts: ArtifactAdministrationPage;
   public readonly platformOverview: PlatformOverviewPage;
+  public readonly toolExecution: ToolExecutionPage;
+  public readonly runtimeWorkerObservability: RuntimeWorkerObservabilityPage;
+  public readonly agentInstanceObservability: AgentInstanceObservabilityPage;
+  public readonly schemaDrivenSources: SchemaDrivenSourcesPage;
+  public readonly schemaAdministration: SchemaAdministrationPage;
+  public readonly schemaContracts: SchemaContractsPage;
+  public readonly schemaDrivenFlowInputs: SchemaDrivenFlowInputsPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -63,7 +79,15 @@ export class ProductPages {
     this.platformHealth = new PlatformHealthPage(page);
     this.resourceNaming = new ResourceNamingPage(page);
     this.foundrySecretBinding = new FoundrySecretBindingPage(page);
+    this.artifacts = new ArtifactAdministrationPage(page);
     this.platformOverview = new PlatformOverviewPage(page);
+    this.toolExecution = new ToolExecutionPage(page);
+    this.runtimeWorkerObservability = new RuntimeWorkerObservabilityPage(page);
+    this.agentInstanceObservability = new AgentInstanceObservabilityPage(page);
+    this.schemaDrivenSources = new SchemaDrivenSourcesPage(page);
+    this.schemaAdministration = new SchemaAdministrationPage(page);
+    this.schemaContracts = new SchemaContractsPage(page);
+    this.schemaDrivenFlowInputs = new SchemaDrivenFlowInputsPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

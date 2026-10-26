@@ -22,7 +22,7 @@ public sealed class FlowTopologyProjectorTests
             Transitions =
             [
                 new("input-agent", "input", "completed", "agent"),
-                new("agent-output", "agent", "completed", "output")
+                new("agent-output", "agent", "success", "output")
             ],
             Designer = new FlowDesignerMetadata
             {
@@ -45,6 +45,149 @@ public sealed class FlowTopologyProjectorTests
     }
 
     [TestMethod]
+    public void RunPreviewArrangesTheSnapshotAndPreservesExecutionState()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("welcome-agent") },
+                new OutputFlowStepDefinition { Name = "completed" },
+                new OutputFlowStepDefinition { Name = "error" }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-completed", "agent", "success", "completed"),
+                new("agent-error", "agent", "error", "error")
+            ],
+            Designer = new FlowDesignerMetadata
+            {
+                NodePositions = new Dictionary<string, FlowNodePosition>
+                {
+                    ["input"] = new(0, 0),
+                    ["agent"] = new(420, 360),
+                    ["completed"] = new(900, 0),
+                    ["error"] = new(980, 420)
+                }
+            }
+        };
+        var run = Run(WorkflowDefinition(), graph) with
+        {
+            Steps =
+            [
+                new FlowStepRun { StepName = "input", StepType = "input", Status = FlowStepRunStatus.Succeeded, SelectedTransition = "input-agent" },
+                new FlowStepRun { StepName = "agent", StepType = "agent", Status = FlowStepRunStatus.Succeeded, SelectedTransition = "agent-completed" },
+                new FlowStepRun { StepName = "completed", StepType = "output", Status = FlowStepRunStatus.Succeeded },
+                new FlowStepRun { StepName = "error", StepType = "output", Status = FlowStepRunStatus.Skipped }
+            ]
+        };
+
+        var topology = FlowTopologyProjector.ProjectPreview(run);
+
+        var input = topology.FindBySelection("input")!;
+        var agent = topology.FindBySelection("agent")!;
+        var completed = topology.FindBySelection("completed")!;
+        var error = topology.FindBySelection("error")!;
+        Assert.IsTrue(input.X < agent.X);
+        Assert.IsTrue(agent.X < completed.X);
+        Assert.AreEqual(completed.X, error.X);
+        Assert.AreNotEqual(completed.Y, error.Y);
+        Assert.AreEqual("Succeeded", agent.Status);
+        Assert.AreEqual("Skipped", error.Status);
+        Assert.AreEqual(FlowTopologyEdgeState.Observed, topology.Edges.Single(edge => edge.Id == "agent-completed").State);
+        Assert.AreEqual(FlowTopologyEdgeState.Inactive, topology.Edges.Single(edge => edge.Id == "agent-error").State);
+        Assert.AreEqual(new FlowNodePosition(420, 360), graph.Designer.NodePositions["agent"]);
+    }
+
+    [TestMethod]
+    public void RunPreviewArrangesArbitraryAgentAndFlowStepCountsByGraphDepth()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition { Name = "triage", Agent = new("triage-agent") },
+                new FlowCallStepDefinition { Name = "delegate", Flow = new("child-flow") },
+                new AgentFlowStepDefinition { Name = "review", Agent = new("review-agent") },
+                new AgentFlowStepDefinition { Name = "audit", Agent = new("audit-agent") },
+                new OutputFlowStepDefinition { Name = "completed" },
+                new OutputFlowStepDefinition { Name = "rejected" }
+            ],
+            Transitions =
+            [
+                new("input-triage", "input", "completed", "triage"),
+                new("triage-delegate", "triage", "success", "delegate"),
+                new("delegate-review", "delegate", "success", "review"),
+                new("delegate-audit", "delegate", "audit", "audit"),
+                new("review-completed", "review", "success", "completed"),
+                new("audit-completed", "audit", "success", "completed"),
+                new("review-rejected", "review", "error", "rejected")
+            ],
+            Designer = new FlowDesignerMetadata { PreferredLayout = "Vertical" }
+        };
+
+        var topology = FlowTopologyProjector.ProjectPreview(Run(WorkflowDefinition(), graph));
+
+        var input = topology.FindBySelection("input")!;
+        var triage = topology.FindBySelection("triage")!;
+        var delegatedFlow = topology.FindBySelection("delegate")!;
+        var review = topology.FindBySelection("review")!;
+        var audit = topology.FindBySelection("audit")!;
+        var completed = topology.FindBySelection("completed")!;
+        var rejected = topology.FindBySelection("rejected")!;
+        Assert.AreEqual("horizontal", topology.Layout);
+        Assert.IsTrue(input.X < triage.X);
+        Assert.IsTrue(triage.X < delegatedFlow.X);
+        Assert.IsTrue(delegatedFlow.X < review.X);
+        Assert.AreEqual(review.X, audit.X);
+        Assert.AreNotEqual(review.Y, audit.Y);
+        Assert.IsTrue(review.X < completed.X);
+        Assert.AreEqual(completed.X, rejected.X);
+        Assert.AreNotEqual(completed.Y, rejected.Y);
+        Assert.AreEqual("flow", delegatedFlow.Type);
+        Assert.HasCount(graph.Steps.Count, topology.Nodes);
+        Assert.HasCount(graph.Transitions.Count, topology.Edges);
+    }
+
+    [TestMethod]
+    public void SelectedErrorTransitionIsProjectedAsFailedInsteadOfObserved()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "fetch",
+            Steps =
+            [
+                new ToolFlowStepDefinition { Name = "fetch", Tool = new("rest.get") },
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }
+            ],
+            Transitions = [new("fetch-failure", "fetch", "error", "failure")]
+        };
+        var run = Run(WorkflowDefinition(), graph) with
+        {
+            Steps =
+            [
+                new FlowStepRun
+                {
+                    StepName = "fetch",
+                    StepType = "tool",
+                    Status = FlowStepRunStatus.Failed,
+                    SelectedTransition = "fetch-failure"
+                },
+                new FlowStepRun { StepName = "failure", StepType = "output", Status = FlowStepRunStatus.Failed }
+            ]
+        };
+
+        var topology = FlowTopologyProjector.ProjectPreview(run);
+
+        Assert.AreEqual(FlowTopologyEdgeState.Failed, topology.Edges.Single().State);
+    }
+
+    [TestMethod]
     public void WorkflowProjectionPreservesBranchesPositionsAndConditions()
     {
         var graph = new FlowGraphDefinition
@@ -55,7 +198,7 @@ public sealed class FlowTopologyProjectorTests
                 new InputFlowStepDefinition { Name = "input" },
                 new ConditionFlowStepDefinition { Name = "decision", Mode = "Simple" },
                 new OutputFlowStepDefinition { Name = "accepted" },
-                new FailureFlowStepDefinition { Name = "rejected" }
+                new OutputFlowStepDefinition { Name = "rejected", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions =
             [
@@ -236,7 +379,7 @@ public sealed class FlowTopologyProjectorTests
         var graph = new FlowGraphDefinition
         {
             EntryStep = "input",
-            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }, new FailureFlowStepDefinition { Name = "failure" }],
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }, new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
             Transitions = [new("success", "input", "completed", "output"), new("failed", "input", "failed", "failure")]
         };
         var run = Run(WorkflowDefinition(), graph) with
@@ -245,7 +388,7 @@ public sealed class FlowTopologyProjectorTests
             [
                 new FlowStepRun { StepName = "input", StepType = "input", Status = FlowStepRunStatus.Succeeded, SelectedTransition = "success" },
                 new FlowStepRun { StepName = "output", StepType = "output", Status = FlowStepRunStatus.Succeeded },
-                new FlowStepRun { StepName = "failure", StepType = "failure", Status = FlowStepRunStatus.Skipped }
+                new FlowStepRun { StepName = "failure", StepType = "output", Status = FlowStepRunStatus.Skipped }
             ]
         };
 

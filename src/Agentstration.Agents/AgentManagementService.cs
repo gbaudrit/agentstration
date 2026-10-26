@@ -1,10 +1,13 @@
+using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Security.Contracts;
+using Agentstration.Tools;
 
 namespace Agentstration.Agents;
 
@@ -38,13 +41,17 @@ public sealed class AgentManagementService(
     IManagementEventPublisher eventBus,
     IModelProfileReferenceValidator modelProfiles,
     IResourceReferenceResolver references,
+    ToolSetService toolSets,
     IResourceScopeOperations scopeOperations,
     TimeProvider timeProvider,
     IEnumerable<IResourceDeletionGuard> deletionGuards,
     IAgentRevisionRunRetention revisionRunRetention,
     ISecurityAuditWriter audit,
-    AgentRevisionRetentionOptions revisionRetentionOptions)
+    AgentRevisionRetentionOptions revisionRetentionOptions,
+    ISchemaBindingResolver? schemaBindingResolver = null)
 {
+    private const string JsonSchemaFormat = "json-schema";
+
     public Task InitializeAsync(CancellationToken cancellationToken) => store.InitializeAsync(cancellationToken);
 
     public async Task ValidateForCreateAsync(AgentResource resource, CancellationToken cancellationToken)
@@ -53,6 +60,7 @@ public sealed class AgentManagementService(
         ValidateDefinition(resource.Definition);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(AgentResourceKinds.Agent);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
+        _ = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
         await ValidateReferencesAsync(resource, scopeRef, cancellationToken);
     }
 
@@ -63,10 +71,12 @@ public sealed class AgentManagementService(
         var key = ResourceKey.Create(AgentResourceKinds.Agent, resource.Metadata.Name, resource.Namespace);
         var existing = await store.GetAsync<AgentResource>(key, cancellationToken);
         ValidatePreconditions(existing, ifMatch, ifNoneMatch);
-        if (existing is not null && DesiredStateEquals(existing.Value, resource)) return existing;
         var scopeRef = existing?.Value.ScopeRef ?? resource.ScopeRef ?? scopeOperations.DefaultScopeRef(AgentResourceKinds.Agent);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
         await ValidateReferencesAsync(resource, scopeRef, cancellationToken);
+        var contracts = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
+        resource = resource with { Definition = contracts.Definition };
+        if (existing is not null && DesiredStateEquals(existing.Value, resource)) return existing;
 
         var desired = resource with
         {
@@ -171,7 +181,15 @@ public sealed class AgentManagementService(
     {
         await ValidateRuntimeProfileAsync(spec.RuntimeProfileNamespace, spec.RuntimeProfileName, cancellationToken);
         var agent = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        var resolved = compiler.Compile(agent.Value, spec);
+        var (toolSetTools, toolSetAssignments) = await ResolveToolSetAssignmentsAsync(agent.Value, cancellationToken);
+        var contracts = await ResolveContractsAsync(
+            agent.Value.Definition,
+            agent.Value.ScopeRef ?? scopeOperations.DefaultScopeRef(AgentResourceKinds.Agent),
+            agent.Value.Namespace,
+            cancellationToken);
+        var resolved = compiler.Compile(agent.Value with { Definition = contracts.Definition }, spec, toolSetTools, toolSetAssignments)
+            with
+        { SchemaBindings = contracts.Snapshots };
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
         var existing = await store.GetAsync<AgentRevision>(new(AgentResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
@@ -219,10 +237,47 @@ public sealed class AgentManagementService(
         }
     }
 
+    public async Task<StoredResource<AgentRevision>> EnsureExecutionRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
+        var existing = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken);
+        if (existing is not null) return existing;
+        if (agent.Value.Generation != generation)
+            throw new ArgumentException($"Agent generation '{generation}' has no immutable revision.", nameof(generation));
+        var runtimeProfile = agent.Value.Definition.RuntimeProfile.Resolve(
+            agent.Value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
+        return await CreateRevisionAsync(@namespace, agentName, new AgentDeploymentSpec
+        {
+            Environment = "worker",
+            RuntimeProfileName = runtimeProfile.Name,
+            RuntimeProfileNamespace = runtimeProfile.Namespace,
+            HostingMode = AgentHostingMode.DedicatedProcess
+        }, cancellationToken);
+    }
+
     private static bool Matches(AgentRevision revision, AgentResource agent, ResolvedAgentDefinition definition) =>
         revision.AgentUid == agent.Uid
         && revision.AgentVersion == agent.Generation
         && string.Equals(revision.DefinitionHash, definition.DefinitionHash, StringComparison.Ordinal);
+
+    public async Task<StoredResource<AgentRevision>> GetRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        CancellationToken cancellationToken)
+    {
+        var key = new ResourceKey(AgentResourceKinds.AgentRevision, revisionName, @namespace);
+        var revision = await store.GetAsync<AgentRevision>(key, cancellationToken)
+            ?? throw new ResourceNotFoundException(key);
+        if (!string.Equals(revision.Value.AgentName, agentName, StringComparison.Ordinal))
+            throw new ResourceNotFoundException(key);
+        return revision;
+    }
 
     public async Task<AgentRevisionPurgeImpact> GetRevisionPurgeImpactAsync(
         ResourceNamespace @namespace,
@@ -340,37 +395,6 @@ public sealed class AgentManagementService(
             : deployment;
     }
 
-    public async Task<StoredResource<AgentDeployment>> PrepareLocalRuntimeAsync(string agentName, long generation, CancellationToken cancellationToken)
-        => await PrepareLocalRuntimeAsync(ResourceNamespace.Default, agentName, generation, cancellationToken);
-
-    public async Task<StoredResource<AgentDeployment>> PrepareLocalRuntimeAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken)
-    {
-        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        if (agent.Value.Generation != generation) throw new ArgumentException($"Only current agent generation '{agent.Value.Generation}' can be prepared.", nameof(generation));
-        var runtimeProfile = agent.Value.Definition.RuntimeProfile.Resolve(agent.Value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
-        var spec = new AgentDeploymentSpec
-        {
-            Environment = "local",
-            RuntimeProfileName = runtimeProfile.Name,
-            RuntimeProfileNamespace = runtimeProfile.Namespace,
-            HostingMode = AgentHostingMode.InProcess
-        };
-        var revision = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken)
-            ?? await CreateRevisionAsync(@namespace, agentName, spec, cancellationToken);
-        var deployment = await agentQueries.FindDeploymentByRevisionAsync(@namespace, revision.Value.Metadata.Name, cancellationToken)
-            ?? await CreateDeploymentAsync(@namespace, $"{agentName}--g{generation:000000}", revision.Value.Metadata.Name, spec, cancellationToken);
-        if (deployment.Value.DesiredState != DesiredAgentState.Running) deployment = await StartAsync(deployment, cancellationToken);
-        var activated = await ReconcileAsync(deployment, cancellationToken);
-        if (activated.Value.OperationalState != OperationalState.Ready) return activated;
-
-        var current = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        if (current.Value.Generation != generation) throw new ResourceConcurrencyException($"Agent '{agentName}' changed while generation '{generation}' was being activated.");
-        var deployments = await agentQueries.ListDeploymentsForAgentAsync(@namespace, agentName, cancellationToken);
-        foreach (var previous in deployments.Where(item => item.Value.Uid != activated.Value.Uid && item.Value.AgentName == agentName && item.Value.DesiredState != DesiredAgentState.Stopped))
-            _ = await ReconcileAsync(await StopAsync(previous, cancellationToken), cancellationToken);
-        return activated;
-    }
-
     public async Task ReconcileAllAsync(CancellationToken cancellationToken)
     {
         foreach (var deployment in await agentQueries.ListDeploymentsAsync(cancellationToken))
@@ -397,6 +421,57 @@ public sealed class AgentManagementService(
             var runtime = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
             throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, runtime.Name, runtime.Namespace));
         }
+        _ = await ResolveToolSetAssignmentsAsync(resource with { ScopeRef = scopeRef }, cancellationToken);
+    }
+
+    private async Task<(IReadOnlyCollection<ResourceReference> Tools, IReadOnlyCollection<ResolvedAgentToolSetAssignment> Assignments)>
+        ResolveToolSetAssignmentsAsync(AgentResource resource, CancellationToken cancellationToken)
+    {
+        var tools = new List<ResourceReference>();
+        var assignments = new List<ResolvedAgentToolSetAssignment>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var selection in resource.Definition.ToolSets)
+        {
+            var toolSetNamespace = selection.ToolSet.Namespace ?? resource.Namespace;
+            var identity = $"{toolSetNamespace.Value}/{selection.ToolSet.Name}:{selection.Version}";
+            if (!seen.Add(identity))
+                throw new AgentDefinitionValidationException("duplicate_tool_set_reference", $"ToolSet reference '{identity}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(selection.Version))
+                throw new AgentDefinitionValidationException("tool_set_version_required", "An Agent ToolSet assignment requires an exact published version.");
+            var scopeRef = resource.ScopeRef
+                ?? throw new AgentDefinitionValidationException("agent_scope_invalid", "An Agent ToolSet assignment requires an Agent ownership scope.");
+            var published = await toolSets.GetVersionExactAsync(scopeRef, toolSetNamespace, selection.ToolSet.Name, selection.Version, cancellationToken)
+                ?? throw new AgentDefinitionValidationException("tool_set_version_not_found", $"Published ToolSet '{identity}' was not found.");
+
+            var requested = selection.Members.ToHashSet(StringComparer.Ordinal);
+            if (requested.Count != selection.Members.Count)
+                throw new AgentDefinitionValidationException("tool_set_member_selection_duplicate", $"ToolSet assignment '{identity}' contains duplicate members.");
+            var available = published.Value.Members
+                .ToDictionary(member => ToolResourceIdentity.CatalogId(member.ToolNamespace, member.ToolName), StringComparer.Ordinal);
+            if (requested.Count > 0)
+                foreach (var member in requested.Where(member => !available.ContainsKey(member)))
+                    throw new AgentDefinitionValidationException("tool_set_member_not_found", $"ToolSet member '{member}' does not exist in '{identity}'.");
+            IEnumerable<string> selectedNames = requested.Count == 0 ? available.Keys : requested;
+            var selected = selectedNames
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            tools.AddRange(selected.Select(member =>
+            {
+                var separator = member.IndexOf('/', StringComparison.Ordinal);
+                return separator < 0
+                    ? new ResourceReference(member)
+                    : new ResourceReference(member[(separator + 1)..], @namespace: ResourceNamespace.Parse(member[..separator]));
+            }));
+            assignments.Add(new ResolvedAgentToolSetAssignment
+            {
+                ToolSetName = selection.ToolSet.Name,
+                ToolSetNamespace = toolSetNamespace,
+                Version = selection.Version,
+                DefinitionHash = published.Value.DefinitionHash,
+                Members = selected
+            });
+        }
+        return (tools, assignments);
     }
 
     private async Task<StoredResource<AgentDeployment>> SetDesiredStateAsync(StoredResource<AgentDeployment> stored, DesiredAgentState state, CancellationToken cancellationToken) =>
@@ -426,6 +501,64 @@ public sealed class AgentManagementService(
         {
             ValidateReference(tool, "tool_reference_invalid");
             if (!tools.Add(tool.Name)) throw new AgentDefinitionValidationException("duplicate_tool_reference", $"Tool reference '{tool.Name}' is duplicated.");
+        }
+        foreach (var selection in definition.ToolSets)
+        {
+            ValidateReference(selection.ToolSet, "tool_set_reference_invalid");
+            if (string.IsNullOrWhiteSpace(selection.Version))
+                throw new AgentDefinitionValidationException("tool_set_version_required", "An exact ToolSet version is required.");
+            foreach (var member in selection.Members)
+                ValidateName(member.Contains('/', StringComparison.Ordinal) ? member[(member.IndexOf('/', StringComparison.Ordinal) + 1)..] : member, "tool_set.member");
+        }
+        ValidateSchema(definition.InputSchema, definition.InputSchemaBinding, "input");
+        ValidateSchema(definition.OutputSchema, definition.OutputSchemaBinding, "output");
+    }
+
+    private static void ValidateSchema(JsonElement? schema, SchemaBinding? binding, string direction)
+    {
+        if (schema is { ValueKind: not JsonValueKind.Object })
+            throw new AgentDefinitionValidationException($"agent_{direction}_schema_invalid", $"The Agent {direction} schema must be a JSON object.");
+        if (binding is { Inline: null, Reference: null } or { Inline: not null, Reference: not null })
+            throw new AgentDefinitionValidationException("schema_binding_invalid", $"The Agent {direction} contract must select exactly one Schema binding form.");
+    }
+
+    private async ValueTask<(AgentProperties Definition, IReadOnlyDictionary<string, SchemaBindingSnapshot> Snapshots)> ResolveContractsAsync(
+        AgentProperties definition,
+        ResourceScopeRef scopeRef,
+        ResourceNamespace ownerNamespace,
+        CancellationToken cancellationToken)
+    {
+        var snapshots = new Dictionary<string, SchemaBindingSnapshot>(StringComparer.Ordinal);
+        var input = await ResolveContractAsync("$.inputSchema", definition.InputSchema, definition.InputSchemaBinding,
+            scopeRef, ownerNamespace, snapshots, cancellationToken);
+        var output = await ResolveContractAsync("$.outputSchema", definition.OutputSchema, definition.OutputSchemaBinding,
+            scopeRef, ownerNamespace, snapshots, cancellationToken);
+        return (definition with { InputSchema = input, OutputSchema = output }, snapshots);
+    }
+
+    private async ValueTask<JsonElement?> ResolveContractAsync(
+        string path,
+        JsonElement? legacy,
+        SchemaBinding? binding,
+        ResourceScopeRef scopeRef,
+        ResourceNamespace ownerNamespace,
+        Dictionary<string, SchemaBindingSnapshot> snapshots,
+        CancellationToken cancellationToken)
+    {
+        if (binding is null)
+            return legacy?.Clone();
+        if (schemaBindingResolver is null)
+            throw new AgentDefinitionValidationException("schema_binding_resolver_unavailable", "Schema bindings are not available in this composition.");
+        try
+        {
+            var snapshot = await schemaBindingResolver.ResolveAsync(path, binding,
+                new SchemaBindingResolutionContext(scopeRef, ownerNamespace, JsonSchemaFormat), cancellationToken);
+            snapshots[path] = snapshot;
+            return snapshot.Content.Clone();
+        }
+        catch (SchemaBindingResolutionException exception)
+        {
+            throw new AgentDefinitionValidationException(exception.Code, exception.Message);
         }
     }
 

@@ -36,7 +36,9 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
                 Namespace = agent.Namespace,
                 ScopeRef = agent.ScopeRef,
                 ModelProfileNamespace = modelProfile.Namespace,
-                DeploymentId = deployment?.Metadata.Name
+                DeploymentId = deployment?.Metadata.Name,
+                InputSchema = agent.Definition.InputSchema?.Clone(),
+                InputSchemaReference = agent.Definition.InputSchemaBinding?.Reference
             };
         }).ToArray();
     }
@@ -90,6 +92,19 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         var path = AgentPath(@namespace, name);
         using var response = await httpClient.GetAsync(path, cancellationToken);
         return await ReadResourceAsync<AgentResource>(response, cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<AgentRevision>> GetAgentRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        CancellationToken cancellationToken)
+    {
+        var path = @namespace.IsDefault
+            ? $"api/agents/{Uri.EscapeDataString(agentName)}/revisions/{Uri.EscapeDataString(revisionName)}"
+            : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(agentName)}/revisions/{Uri.EscapeDataString(revisionName)}";
+        using var response = await httpClient.GetAsync(path, cancellationToken);
+        return await ReadResourceAsync<AgentRevision>(response, cancellationToken);
     }
 
     public async Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken)

@@ -6,6 +6,7 @@ using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.Tests;
 
@@ -33,15 +34,24 @@ public sealed class ResourceScopesComponentTests
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
+        var strings = context.Services.GetRequiredService<IStringLocalizer<ResourceScopesStrings>>();
 
         var rendered = context.Render<ResourceScopes>();
 
         Assert.IsNotNull(rendered.Find("a[href='/namespaces/team-a/agents/support%20agent']"));
         Assert.IsNotNull(rendered.Find($"a[href='/secrets/api%20key?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}']"));
         Assert.HasCount(2, rendered.FindAll("a.resource-name-link"));
-        Assert.HasCount(2, rendered.FindAll("td.resource-action a.text-button"));
-        Assert.HasCount(1, rendered.FindAll(".scope-no-link"));
-        Assert.HasCount(3, rendered.FindAll(".kind-summary-item"));
+        Assert.IsEmpty(rendered.FindAll("td.resource-action"));
+        Assert.HasCount(4, rendered.FindAll(".data-grid thead th"));
+        Assert.IsEmpty(rendered.FindAll(".kind-summary"));
+        Assert.HasCount(4, rendered.FindAll("[data-testid='resource-kind-filter'] option"));
+        StringAssert.Contains(rendered.Find("[data-testid='resource-kind-filter']").TextContent, "Agent (1)");
+        Assert.AreEqual(strings["ShowingResources", 3, 3].Value, rendered.Find("[data-testid='resource-result-count']").TextContent);
+
+        rendered.Find("[data-testid='resource-kind-filter']").Change(SecretResourceKinds.Secret);
+
+        Assert.HasCount(1, rendered.FindAll("tr.resource-row"));
+        Assert.AreEqual(strings["ShowingResources", 1, 3].Value, rendered.Find("[data-testid='resource-result-count']").TextContent);
         Assert.IsEmpty(rendered.FindAll(".resource-kind-mark"));
     }
 

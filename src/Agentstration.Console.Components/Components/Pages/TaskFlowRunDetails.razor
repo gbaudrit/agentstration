@@ -36,7 +36,8 @@ else
     <section class="designer-layout run-layout @(inspectorVisible ? null : "inspector-collapsed")">
         <div>
             <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
-                                ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible" />
+                                ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible"
+                                InitiallyFit="true" />
             <article class="panel io-panel"><div class="panel-header"><h2>@T("RunInputOutput")</h2></div><div class="io-grid"><div><span class="field-label">@T("Input")</span><pre>@Pretty(run.Input)</pre></div><div><span class="field-label">@T("Output")</span><pre>@Pretty(run.Output)</pre></div></div></article>
         </div>
         @if (inspectorVisible)
@@ -63,7 +64,7 @@ else
     private FlowStepRun? selected;
     private bool unavailable, notFound;
     private bool inspectorVisible;
-    private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(run);
+    private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(run);
     protected override async Task OnParametersSetAsync() => await LoadAsync();
     private async Task LoadAsync()
     {

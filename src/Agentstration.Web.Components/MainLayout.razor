@@ -12,7 +12,7 @@
 @inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
-<div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
+<div @ref="shellElement" class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
     <aside class="sidebar" aria-label="@T("MainNavigation")" data-testid="console-sidebar">
         <a class="brand-lockup" href="/" aria-label="@T("ControlPlaneHome")">
             <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
@@ -21,13 +21,13 @@
         <nav class="side-nav">
             @foreach (var group in NavigationGroups)
             {
-                <section class="navigation-group" aria-label="@T(group.LabelKey)">
+                <section class="navigation-group navigation-group-@group.Tone" aria-label="@T(group.LabelKey)">
                     @if (!string.IsNullOrWhiteSpace(group.LabelKey)) { <h2>@T(group.LabelKey)</h2> }
                     @foreach (var item in group.Items)
                     {
                         @if (CanNavigate(item.RequiredPermissions))
                         {
-                            <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@T(item.LabelKey)" title="@T(item.LabelKey)" class="@($"domain-{item.Domain}")">
+                            <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@T(item.LabelKey)" data-nav-tooltip="@T(item.LabelKey)" class="@($"domain-{item.Domain}")">
                                 <span class="nav-icon" aria-hidden="true"><UiIcon Name="@item.Icon" /></span><span class="nav-label">@T(item.LabelKey)</span>
                             </NavLink>
                         }

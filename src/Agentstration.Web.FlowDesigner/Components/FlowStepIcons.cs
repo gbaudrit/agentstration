@@ -12,7 +12,6 @@ internal static class FlowStepIcons
         "condition" => "git-branch",
         "transform" => "arrows-exchange",
         "output" => "log-out",
-        "failure" => "alert-triangle",
         "manager" => "users-group",
         "conversation" => "message",
         _ => "workflow"

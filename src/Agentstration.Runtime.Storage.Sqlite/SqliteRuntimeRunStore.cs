@@ -11,6 +11,7 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
     internal DbSet<RuntimeRunDocument> Runs => Set<RuntimeRunDocument>();
     internal DbSet<RuntimeRunEventDocument> Events => Set<RuntimeRunEventDocument>();
     internal DbSet<RuntimeExecutionStateDocument> ExecutionStates => Set<RuntimeExecutionStateDocument>();
+    internal DbSet<RuntimeWorkerAssignmentDocument> WorkerAssignments => Set<RuntimeWorkerAssignmentDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +41,8 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
         executionState.Property(value => value.StateId).HasMaxLength(256);
         executionState.Property(value => value.ParentStateId).HasMaxLength(256);
         executionState.HasIndex(value => new { value.WorkspaceId, value.RunId, value.RuntimeType, value.CreatedAt });
+
+        RuntimeWorkerAssignmentModel.Configure(modelBuilder);
     }
 }
 
@@ -97,6 +100,30 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
             );
             CREATE INDEX IF NOT EXISTS IX_RuntimeExecutionStates_WorkspaceId_RunId_RuntimeType_CreatedAt
                 ON RuntimeExecutionStates (WorkspaceId, RunId, RuntimeType, CreatedAt);
+            CREATE TABLE IF NOT EXISTS RuntimeWorkerAssignments (
+                WorkspaceId TEXT NOT NULL,
+                AssignmentId TEXT NOT NULL,
+                TargetKind TEXT NOT NULL,
+                TargetRunId TEXT NOT NULL,
+                RuntimeCapability TEXT NOT NULL,
+                RuntimeCapabilityVersion TEXT NOT NULL,
+                ExecutionMaterialVersion TEXT NOT NULL,
+                State TEXT NOT NULL,
+                FencingGeneration INTEGER NOT NULL,
+                LeaseExpiresAt INTEGER NULL,
+                OwnershipTokenDigest TEXT NULL,
+                Payload TEXT NOT NULL,
+                ETag TEXT NOT NULL,
+                CreatedAt INTEGER NOT NULL,
+                UpdatedAt INTEGER NOT NULL,
+                CONSTRAINT PK_RuntimeWorkerAssignments PRIMARY KEY (WorkspaceId, AssignmentId)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_RuntimeWorkerAssignments_WorkspaceId_TargetKind_TargetRunId
+                ON RuntimeWorkerAssignments (WorkspaceId, TargetKind, TargetRunId);
+            CREATE INDEX IF NOT EXISTS IX_RuntimeWorkerAssignments_State_RuntimeCapability_CreatedAt
+                ON RuntimeWorkerAssignments (State, RuntimeCapability, CreatedAt);
+            CREATE INDEX IF NOT EXISTS IX_RuntimeWorkerAssignments_State_LeaseExpiresAt
+                ON RuntimeWorkerAssignments (State, LeaseExpiresAt);
             """, cancellationToken);
     }
 
@@ -175,6 +202,7 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
             throw new RuntimeRunConcurrencyException("The supplied ETag does not match the current Runtime Run version.");
         context.Events.RemoveRange(await context.Events.Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
         context.ExecutionStates.RemoveRange(await context.ExecutionStates.Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
+        context.WorkerAssignments.RemoveRange(await context.WorkerAssignments.Where(value => value.WorkspaceId == workspaceId.Value && value.TargetRunId == runId).ToArrayAsync(cancellationToken));
         context.Runs.Remove(run);
         try { await context.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateConcurrencyException exception) { throw new RuntimeRunConcurrencyException(exception.Message); }
@@ -309,6 +337,7 @@ public static class SqliteRuntimeRunServiceCollectionExtensions
         services.AddDbContextFactory<RuntimeRunDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IRuntimeRunStore, SqliteRuntimeRunStore>();
         services.AddSingleton<IRuntimeExecutionStateStore, SqliteRuntimeExecutionStateStore>();
+        services.AddSingleton<IRuntimeWorkerAssignmentStore, SqliteRuntimeWorkerAssignmentStore>();
         return services;
     }
 }

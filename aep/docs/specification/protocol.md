@@ -38,6 +38,7 @@ Initial registered names are:
 - `aep.model-provider`
 - `aep.source-provider`
 - `aep.tools`
+- `aep.schema-formats`
 - `aep.configuration`
 - `aep.value-requirements`
 - `aep.bound-values`
@@ -46,6 +47,14 @@ Initial registered names are:
 Unknown names are preserved. Each capability evolves through its own version and may declare an endpoint and metadata. The manifest is the only input an Inspector needs to decide which explorers to display.
 
 The model-provider capability currently uses `/aep/model-providers`. AEP tool contributions may map to MCP servers; MCP remains authoritative for tool schema and invocation.
+
+### Schema formats
+
+An extension that advertises `aep.schema-formats` version `1.0` declares one or more `schema-format` contributions in its manifest. A contribution contains a stable id, format, display name, provider version, zero or more dialect identifiers, an optional default marker, and required `validateDefinition` and `validateInstance` mappings. Each mapping names one declared MCP server and tool.
+
+The validation operations accept a complete JSON definition plus an optional dialect; instance validation additionally accepts the complete JSON instance. They return a structured result with a bounded `issues` list. Each issue contains a required path, stable code and message; an empty list means valid. Consumers must reject malformed or oversized results and apply their own timeout and authorization policy.
+
+Schema-format mappings are internal consumer operations. They are not `tool` contributions, do not become Agent Tools automatically, and do not grant an agent authority to invoke them. An extension may publish unrelated ordinary Tool contributions alongside Schema formats.
 
 The model-provider capability is version `1.0`. `POST /aep/model-providers/{providerId}/models` returns bounded model observations. Each descriptor has a provider-local `id`, a `displayName`, an optional safe `identity` (`publisher`, `model`, and `version`) and an optional typed `specification`. The specification directly carries observed `input`, `output`, `features`, and `limits`; it does not contain a generic capabilities dictionary or provider metadata bag.
 

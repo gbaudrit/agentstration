@@ -43,6 +43,13 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
             : Task.FromException<ResourceSnapshot<AgentResource>>(Error(HttpStatusCode.NotFound, "resource_not_found", $"Agent '{name}' was not found."));
     }
 
+    public Task<ResourceSnapshot<AgentRevision>> GetAgentRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
     public Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -137,6 +144,9 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
             .ToArray();
         return Task.FromResult<IReadOnlyList<RuntimeRun>>(values);
     }
+
+    public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AgentInstanceResponse>>([]);
 
     public Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken)
     {

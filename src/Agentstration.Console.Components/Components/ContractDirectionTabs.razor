@@ -1,0 +1,27 @@
+<div class="contract-direction-tabs" data-testid="@TestId">
+    <nav class="section-tabs" role="tablist" aria-label="@Label">
+        <button id="@InputTabId" type="button" role="tab" aria-selected="@(!outputSelected ? "true" : "false")"
+            aria-controls="@PanelId" class="@(!outputSelected ? "active" : null)"
+            data-testid="@($"{TestId}-input-tab")" @onclick="() => outputSelected = false">@InputLabel</button>
+        <button id="@OutputTabId" type="button" role="tab" aria-selected="@(outputSelected ? "true" : "false")"
+            aria-controls="@PanelId" class="@(outputSelected ? "active" : null)"
+            data-testid="@($"{TestId}-output-tab")" @onclick="() => outputSelected = true">@OutputLabel</button>
+    </nav>
+    <div id="@PanelId" role="tabpanel" aria-labelledby="@(outputSelected ? OutputTabId : InputTabId)" tabindex="0">
+        @(outputSelected ? OutputContent : InputContent)
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string InputLabel { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string OutputLabel { get; set; } = string.Empty;
+    [Parameter] public string TestId { get; set; } = "contract-direction";
+    [Parameter] public RenderFragment? InputContent { get; set; }
+    [Parameter] public RenderFragment? OutputContent { get; set; }
+
+    private bool outputSelected;
+    private string InputTabId => $"{TestId}-input-tab";
+    private string OutputTabId => $"{TestId}-output-tab";
+    private string PanelId => $"{TestId}-panel";
+}

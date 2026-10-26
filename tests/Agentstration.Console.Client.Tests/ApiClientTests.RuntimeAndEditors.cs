@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
@@ -9,6 +10,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Console;
 using Agentstration.Work;
@@ -31,6 +33,15 @@ public sealed partial class ApiClientTests
             RuntimeProfileName = "maf-shared",
             RuntimeProfileNamespace = "shared.platform",
             ToolNames = "search",
+            ToolSets =
+            [
+                new AgentToolSetSelection
+                {
+                    ToolSet = new ResourceReference("documentation", @namespace: new ResourceNamespace("shared.knowledge")),
+                    Version = "2.1.0",
+                    Members = ["documentation.search"]
+                }
+            ],
             Tags = "domain=web\nowner=platform"
         };
 
@@ -41,6 +52,9 @@ public sealed partial class ApiClientTests
         Assert.AreEqual("maf-shared", request.Definition.RuntimeProfile.Name);
         Assert.AreEqual(new ResourceNamespace("shared.platform"), request.Definition.RuntimeProfile.Namespace);
         Assert.HasCount(1, request.Definition.Tools);
+        Assert.HasCount(1, request.Definition.ToolSets);
+        Assert.AreEqual("2.1.0", request.Definition.ToolSets[0].Version);
+        CollectionAssert.AreEqual(new[] { "documentation.search" }, request.Definition.ToolSets[0].Members.ToArray());
         Assert.AreEqual("web", request.Metadata.Tags["domain"]);
     }
 
@@ -56,6 +70,32 @@ public sealed partial class ApiClientTests
             ModelProfileName = "reasoning",
             RuntimeProfileName = "maf-shared",
             ToolNames = "search",
+            ToolSets =
+            [
+                new AgentToolSetSelection
+                {
+                    ToolSet = new ResourceReference("documentation"),
+                    Version = "1.0.0"
+                }
+            ],
+            InputSchema = JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new { prompt = new { type = "string" } }
+            }),
+            InputSchemaBinding = new SchemaBinding
+            {
+                Reference = new()
+                {
+                    Name = "agent-input",
+                    Version = "1.0.0"
+                }
+            },
+            OutputSchema = JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new { answer = new { type = "string" } }
+            }),
             Tags = "role=welcome"
         };
 
@@ -69,6 +109,11 @@ public sealed partial class ApiClientTests
         Assert.AreEqual(expected.Description, actual.Description);
         Assert.AreEqual(expected.Instructions, actual.Instructions);
         Assert.AreEqual(expected.ToolNames, actual.ToolNames);
+        Assert.AreEqual("1.0.0", actual.ToolSets.Single().Version);
+        Assert.AreEqual("agent-input", actual.InputSchemaBinding?.Reference?.Name);
+        Assert.AreEqual("1.0.0", actual.InputSchemaBinding?.Reference?.Version);
+        Assert.AreEqual("string", actual.InputSchema?.GetProperty("properties").GetProperty("prompt").GetProperty("type").GetString());
+        Assert.AreEqual("string", actual.OutputSchema?.GetProperty("properties").GetProperty("answer").GetProperty("type").GetString());
         Assert.AreEqual(expected.Tags, actual.Tags);
         CollectionAssert.AreEqual(new[] { "handoff" }, roundTripped.Definition.Behaviors.ToArray());
         CollectionAssert.AreEqual(new[] { "audit" }, roundTripped.Definition.Middleware.ToArray());
@@ -152,6 +197,38 @@ public sealed partial class ApiClientTests
         Assert.HasCount(1, actual);
         Assert.AreEqual(RuntimeRunEventKind.RunCompleted, actual[0].Kind);
         Assert.AreEqual("/api/runtime/runs/run-test/eventHistory?afterSequence=7", requested!.PathAndQuery);
+    }
+
+    [TestMethod]
+    public async Task RuntimeClientReadsWorkerInventoryAgentInstancesAndPlacement()
+    {
+        var requested = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested.Add(request.RequestUri!.PathAndQuery);
+            object payload = request.RequestUri.AbsolutePath switch
+            {
+                "/api/runtime/workers" => Array.Empty<RuntimeWorkerSummaryResponse>(),
+                "/api/runtime/agent-instances" => Array.Empty<AgentInstanceResponse>(),
+                _ => new RuntimeAssignmentPlacementResponse(Guid.NewGuid(), "RuntimeRun", "run-1", "Assigned",
+                    "microsoft-agent-framework", "1.0", "1.0", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, [])
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
+        var client = new RuntimeApiClient(httpClient);
+
+        _ = await client.GetRuntimeWorkersAsync(default);
+        _ = await client.GetAgentInstancesAsync(default);
+        var placement = await client.GetPlacementAsync(RuntimeAssignmentTargetKind.RuntimeRun, "run-1", default);
+
+        Assert.IsNotNull(placement);
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/runtime/workers", "/api/runtime/agent-instances", "/api/runtime/placements/RuntimeRun/run-1"
+        }, requested);
     }
 
     [TestMethod]
