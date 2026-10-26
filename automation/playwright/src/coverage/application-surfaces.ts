@@ -118,6 +118,20 @@ function coveredModelAdministration(id: string, source: string, routes: readonly
   };
 }
 
+function coveredOperationalTriggers(
+  id: string,
+  source: string,
+  routes: readonly string[],
+  fixtureKeys: readonly string[] = [],
+): ApplicationSurface {
+  return {
+    id, host: 'console', source, routes, fixtureKeys,
+    pageObject: 'src/pages/operational-triggers.page.ts',
+    journey: 'exercise-operational-triggers',
+    specification: 'tests/operational-triggers.spec.ts', coverage: 'covered',
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -237,9 +251,9 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('tool-definitions', `${consolePages}/ToolDefinitions.razor`, ['/tools/definitions'], 424),
   partialResourceAdministration('tool-definition-editor', `${consolePages}/ToolDefinitionEditor.razor`, ['/tools/definitions/new', '/tools/definitions/{Name}'], 425, ['name']),
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),
-  partialResourceAdministration('triggers', `${consolePages}/Triggers.razor`, ['/triggers'], 427),
-  planned('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], 428, ['name']),
-  partialResourceAdministration('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], 429, ['name']),
+  coveredOperationalTriggers('triggers', `${consolePages}/Triggers.razor`, ['/triggers']),
+  coveredOperationalTriggers('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], ['name']),
+  coveredOperationalTriggers('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], ['name']),
 
   coveredDistribution('extensions', `${consolePages}/Extensions.razor`, ['/extensions']),
   coveredDistribution('extension-details', `${consolePages}/ExtensionDetails.razor`, ['/extensions/{RegistrationName}', '/extensions/enrollment/{EnrollmentInstanceId:guid}'], ['registrationName', 'enrollmentInstanceId']),

@@ -20,13 +20,13 @@ else
 {
     var trigger = stored.Value;
     <PageHeader Title="@trigger.Definition.DisplayName" Description="@(T("TriggerResourceDescription", trigger.Namespace.Value, trigger.Name))" TestId="resource-trigger-details">
-        <Metadata><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /><span>@T("Generation", trigger.Generation)</span></Metadata>
+        <Metadata><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /><span data-testid="trigger-definition-scope"><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></span><span>@T("Generation", trigger.Generation)</span></Metadata>
         <Actions>
-            @if (CanExecute) { <button class="button-primary" disabled="@(!trigger.Definition.Enabled || running)" @onclick="RunNowAsync">@(running ? T("Submitting") : T("RunNow"))</button> }
+            @if (CanExecute) { <button class="button-primary" disabled="@(!trigger.Definition.Enabled || running)" @onclick="RunNowAsync" data-testid="trigger-run-now">@(running ? T("Submitting") : T("RunNow"))</button> }
             @if (CanManage)
             {
                 @if (trigger.Definition.Enabled) { <button class="button-secondary" disabled="@changingState" @onclick="DisableAsync">@(changingState ? T("Disabling") : T("Disable"))</button> }
-                else { <button class="button-primary" @onclick="() => confirmEnable = true">@T("Enable")</button> }
+                else { <button class="button-primary" @onclick="() => confirmEnable = true" data-testid="trigger-enable">@T("Enable")</button> }
                 <a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(trigger.Name)}/edit")">@T("Edit")</a>
                 <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button>
             }
@@ -41,7 +41,7 @@ else
         }
     </nav>
 
-    @if (!string.IsNullOrWhiteSpace(message)) { <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")">@message</div> }
+    @if (!string.IsNullOrWhiteSpace(message)) { <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")" data-testid="@(hasError ? "trigger-error" : null)">@message</div> }
     <main id="trigger-tab-panel" role="tabpanel" tabindex="0">
         @if (activeTab == "Overview")
         {
@@ -55,14 +55,14 @@ else
                 <MetricCard Label="@T("LastFired")" Value="@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" />
                 <MetricCard Label="@T("GenerationLabel")" Value="@trigger.Generation.ToString()" Detail="@($"{trigger.Namespace.Value}/{trigger.Name}")" Status="UiStatus.Neutral" />
             </section>
-            <section class="panel trigger-history">
-                <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("TriggerOccurrences")</h2></div><button class="text-button" disabled="@refreshing" @onclick="LoadHistoryAsync">@(refreshing ? T("Refreshing") : T("Refresh"))</button></div>
+            <section class="panel trigger-history" data-testid="trigger-occurrences">
+                <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("TriggerOccurrences")</h2></div><button class="text-button" disabled="@refreshing" @onclick="LoadHistoryAsync" data-testid="trigger-refresh-occurrences">@(refreshing ? T("Refreshing") : T("Refresh"))</button></div>
                 @if (history.Count == 0) { <EmptyState Title="@T("NoOccurrences")" Message="@T("NoOccurrencesMessage")" /> }
                 else
                 {
                     <DataGrid TItem="TriggerOccurrence" Items="history">
                         <Header><tr><th>@T("Kind")</th><th>@T("Scheduled")</th><th>@T("ActuallyFired")</th><th>@T("Outcome")</th><th>@T("GenerationLabel")</th><th>@T("WorkDetails")</th></tr></Header>
-                        <Row Context="occurrence"><tr>
+                        <Row Context="occurrence"><tr data-testid="trigger-occurrence-row" data-trigger-occurrence-id="@occurrence.Id">
                             <td>@T($"OccurrenceKind.{occurrence.Kind}")</td><td>@TriggerUi.FormatDate(occurrence.ScheduledAt)</td><td>@TriggerUi.FormatDate(occurrence.FiredAt)</td>
                             <td><StatusBadge Text="@T($"OccurrenceOutcome.{occurrence.Outcome}")" Status="@OccurrenceStatus(occurrence.Outcome)" /></td><td>@occurrence.TriggerGeneration</td>
                             <td>@if (TaskUrl(occurrence) is { } taskUrl) { <a class="text-button" href="@taskUrl">@T("OpenTask")</a> } else if (occurrence.ErrorCode is not null) { <details><summary>@occurrence.ErrorCode</summary><p>@occurrence.ErrorMessage</p></details> } else { <span>—</span> }</td>
@@ -121,7 +121,7 @@ else
     </main>
 }
 
-<ConfirmationDialog IsOpen="@confirmEnable" Title="@T("EnableTriggerTitle")" Message="@EnableMessage" ConfirmLabel="@T("EnableTrigger")" OnConfirm="EnableAsync" OnCancel="() => confirmEnable = false" />
+<ConfirmationDialog IsOpen="@confirmEnable" Title="@T("EnableTriggerTitle")" Message="@EnableMessage" ConfirmLabel="@T("EnableTrigger")" OnConfirm="EnableAsync" OnCancel="() => confirmEnable = false" TestId="trigger-enable-dialog" />
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteTriggerTitle")" Message="@T("DeleteTriggerMessage")" ConfirmLabel="@T("DeleteTrigger")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
