@@ -61,7 +61,7 @@ jobs:
         run: if (Test-Path -LiteralPath $env:AGENTSTRATION_STORAGE_BENCHMARK_REPORT) { Get-Content -LiteralPath $env:AGENTSTRATION_STORAGE_BENCHMARK_REPORT }
       - name: Upload storage report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: storage-benchmark-${{ matrix.provider }}-full
           path: ${{ env.AGENTSTRATION_STORAGE_BENCHMARK_REPORT }}

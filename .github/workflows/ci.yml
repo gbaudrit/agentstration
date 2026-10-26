@@ -234,7 +234,7 @@ jobs:
           }
       - name: Upload hosted module diagnostics
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: hosted-test-module-diagnostics
           path: artifacts/test-diagnostics/*.json
@@ -273,7 +273,7 @@ jobs:
         run: ./scripts/ci/run-functional-coverage.ps1 -Configuration Release -NoBuild -Shard ${{ matrix.shard }} -SkipPublish
       - name: Upload raw functional coverage shard ${{ matrix.shard }}
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: functional-code-coverage-raw-${{ matrix.shard }}
           path: artifacts/coverage/raw/${{ matrix.shard }}
@@ -315,7 +315,7 @@ jobs:
         shell: pwsh
         run: ./scripts/ci/publish-functional-coverage.ps1
       - name: Upload functional coverage report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: functional-code-coverage
           path: artifacts/coverage
@@ -371,7 +371,7 @@ jobs:
           cat "$AGENTSTRATION_STORAGE_BENCHMARK_REPORT"
       - name: Upload PostgreSQL storage smoke report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: storage-benchmark-postgresql-smoke
           path: ${{ runner.temp }}/agentstration-storage-benchmark-postgresql.json
