@@ -1,4 +1,5 @@
 using Agentstration.Triggers;
+using Agentstration.Resources;
 using Agentstration.Web.Console;
 using Microsoft.Extensions.Localization;
 
@@ -6,6 +7,10 @@ namespace Agentstration.Web.Components.Pages;
 
 public static class TriggerUi
 {
+    public static ResourceScopeRef? DefinitionScope(TriggerResource value) => value.Definition.Target.Flow?.ScopeRef
+        ?? value.Definition.ExecutionScope?.AccessScopeRef
+        ?? value.ScopeRef;
+
     public static string ScheduleLabel(TriggerSchedule? value, IStringLocalizer<TriggerStrings>? localizer = null) => value is null ? "—" : value.Type switch
     {
         TriggerScheduleType.Cron => $"{value.Expression} · {value.TimeZone}",

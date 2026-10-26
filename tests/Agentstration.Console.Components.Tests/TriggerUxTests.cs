@@ -15,6 +15,29 @@ namespace Agentstration.Web.Tests;
 public sealed class TriggerUxTests
 {
     [TestMethod]
+    public void DefinitionScopeUsesTheExactFlowScopeInsteadOfTheOperationalWorkspace()
+    {
+        var operationalWorkspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var trigger = new TriggerResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = TriggerResourceKinds.Trigger,
+            Metadata = new() { Name = "instance-trigger" },
+            ScopeRef = operationalWorkspace,
+            Definition = new()
+            {
+                DisplayName = "Instance Trigger",
+                Enabled = true,
+                Source = new() { Schedule = new() { Type = TriggerScheduleType.Interval, Every = "PT1H" } },
+                Target = new() { Flow = new() { Name = "instance-flow", ScopeRef = ResourceScopeRef.Instance } }
+            }
+        };
+
+        Assert.AreEqual(ResourceScopeRef.Instance, TriggerUi.DefinitionScope(trigger));
+        Assert.AreNotEqual(operationalWorkspace, TriggerUi.DefinitionScope(trigger));
+    }
+
+    [TestMethod]
     public void TimeZonePickerUsesIanaIdentifiersAndKeepsParisAvailable()
     {
         var zones = TriggerUi.IanaTimeZones();

@@ -42,15 +42,14 @@ else
     else
     {
         <DataGrid TItem="TriggerResource" Items="Filtered">
-            <Header><tr><th>@T("Trigger")</th><th>@T("State")</th><th>@T("Schedule")</th><th>@T("Target")</th><th>@T("NextOccurrence")</th><th>@T("LastOutcome")</th><th></th></tr></Header>
+            <Header><tr><th>@T("Trigger")</th><th>@T("State")</th><th>@T("Schedule")</th><th>@T("Target")</th><th>@T("NextOccurrence")</th><th>@T("LastOutcome")</th></tr></Header>
             <Row Context="trigger"><tr>
-                <td><span class="resource-name-with-scope"><strong><a href="@DetailsUrl(trigger)">@trigger.Definition.DisplayName</a></strong><ResourceScopeBadge ScopeRef="trigger.ScopeRef" Compact /></span><small class="table-secondary">@trigger.Namespace.Value/@trigger.Name</small></td>
+                <td><span class="resource-name-with-scope"><a class="text-button" href="@DetailsUrl(trigger)"><strong>@trigger.Definition.DisplayName</strong></a><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></span><small class="table-secondary">@trigger.Namespace.Value/@trigger.Name</small></td>
                 <td><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></td>
                 <td>@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)</td>
                 <td><a class="text-button" href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow?.Name</a></td>
                 <td>@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)</td>
                 <td><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" />@if (trigger.Observed.LastErrorCode is { } errorCode) { <small class="table-secondary">@errorCode</small> }</td>
-                <td><a class="text-button" href="@DetailsUrl(trigger)">@T("Open")</a>@if (CanManage) { <a class="text-button" href="@EditUrl(trigger)">@T("Edit")</a> }</td>
             </tr></Row>
         </DataGrid>
     }
@@ -74,7 +73,6 @@ else
     protected override async Task OnInitializedAsync() => await LoadAsync();
     private async Task LoadAsync() { loading = true; error = null; try { items = await Client.ListAsync(CancellationToken.None); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
     private static string DetailsUrl(TriggerResource value) => $"/triggers/{Uri.EscapeDataString(value.Name)}";
-    private static string EditUrl(TriggerResource value) => $"{DetailsUrl(value)}/edit";
     private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace)); }
     private static UiStatus OutcomeStatus(TriggerLastOutcome outcome) => outcome switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
 }

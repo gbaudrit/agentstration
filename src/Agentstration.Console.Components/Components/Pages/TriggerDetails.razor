@@ -20,7 +20,7 @@ else
 {
     var trigger = stored.Value;
     <PageHeader Title="@trigger.Definition.DisplayName" Description="@(T("TriggerResourceDescription", trigger.Namespace.Value, trigger.Name))" TestId="resource-trigger-details">
-        <Metadata><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /><span>@T("Generation", trigger.Generation)</span></Metadata>
+        <Metadata><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /><span>@T("Generation", trigger.Generation)</span></Metadata>
         <Actions>
             @if (CanExecute) { <button class="button-primary" disabled="@(!trigger.Definition.Enabled || running)" @onclick="RunNowAsync">@(running ? T("Submitting") : T("RunNow"))</button> }
             @if (CanManage)
@@ -34,54 +34,84 @@ else
         </Actions>
     </PageHeader>
 
+    <nav class="section-tabs" role="tablist" aria-label="@T("TriggerDetailsTabs")">
+        @foreach (var tab in Tabs)
+        {
+            <button type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="trigger-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
+        }
+    </nav>
+
     @if (!string.IsNullOrWhiteSpace(message)) { <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")">@message</div> }
-    @if (trigger.Observed.LastOutcome == TriggerLastOutcome.Failed)
-    {
-        <section class="panel trigger-attention"><div class="panel-header"><div><p class="eyebrow">@T("RequiresAttention")</p><h2>@T("LastFiringFailed")</h2></div><StatusBadge Text="@T("Outcome.Failed")" Status="UiStatus.Danger" /></div><p>@(trigger.Observed.LastErrorCode ?? T("UnknownTriggerError"))</p></section>
-    }
-
-    <div class="trigger-detail-grid">
-        <div class="trigger-detail-stack">
-            <section class="panel">
-                <div class="panel-header"><div><p class="eyebrow">@T("When")</p><h2>@T("Schedule")</h2></div><StatusBadge Text="@T($"ScheduleType.{trigger.Definition.Source.Schedule!.Type}")" Status="UiStatus.Info" /></div>
-                <dl class="resource-details"><dt>@T("Definition")</dt><dd>@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)</dd><dt>@T("NextOccurrence")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)</dd><dt>@T("LastScheduled")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastScheduledAt)</dd><dt>@T("LastFired")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)</dd><dt>@T("Misfire")</dt><dd>@MisfireLabel(trigger.Definition.MisfirePolicy)</dd><dt>@T("Concurrency")</dt><dd>@ConcurrencyLabel(trigger.Definition.ConcurrencyPolicy)</dd></dl>
+    <main id="trigger-tab-panel" role="tabpanel" tabindex="0">
+        @if (activeTab == "Overview")
+        {
+            @if (trigger.Observed.LastOutcome == TriggerLastOutcome.Failed)
+            {
+                <section class="panel trigger-attention"><div class="panel-header"><div><p class="eyebrow">@T("RequiresAttention")</p><h2>@T("LastFiringFailed")</h2></div><StatusBadge Text="@T("Outcome.Failed")" Status="UiStatus.Danger" /></div><p>@(trigger.Observed.LastErrorCode ?? T("UnknownTriggerError"))</p></section>
+            }
+            <section class="metric-grid trigger-metrics" aria-label="@T("Overview")">
+                <MetricCard Label="@T("State")" Value="@T(trigger.Definition.Enabled ? "Enabled" : "Disabled")" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" />
+                <MetricCard Label="@T("NextOccurrence")" Value="@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)" Detail="@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)" Status="UiStatus.Info" />
+                <MetricCard Label="@T("LastFired")" Value="@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" />
+                <MetricCard Label="@T("GenerationLabel")" Value="@trigger.Generation.ToString()" Detail="@($"{trigger.Namespace.Value}/{trigger.Name}")" Status="UiStatus.Neutral" />
             </section>
-            <section class="panel">
-                <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("WorkSubmission")</h2></div></div>
-                <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>@T("Flow")</dd><dt>@T("Flow")</dt><dd><a href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("DefinitionScope")</dt><dd><StatusBadge Text="@ScopeLabel(trigger.Definition.Target.Flow.ScopeRef)" Status="UiStatus.Info" /></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
-            </section>
-        </div>
-        <aside class="trigger-detail-stack">
-            <section class="panel">
-                <div class="panel-header"><div><p class="eyebrow">@T("Security")</p><h2>@T("ExecutionIdentity")</h2></div></div>
-                @if (trigger.Definition.ExecutionScope is { } scope)
+            <section class="panel trigger-history">
+                <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("TriggerOccurrences")</h2></div><button class="text-button" disabled="@refreshing" @onclick="LoadHistoryAsync">@(refreshing ? T("Refreshing") : T("Refresh"))</button></div>
+                @if (history.Count == 0) { <EmptyState Title="@T("NoOccurrences")" Message="@T("NoOccurrencesMessage")" /> }
+                else
                 {
-                    <dl class="resource-details"><dt>@T("Principal")</dt><dd><code>@Short(scope.PrincipalId)</code></dd><dt>@T("OperationalWorkspace")</dt><dd>@OperationalWorkspace(scope.WorkspaceId)</dd><dt>@T("ExecutionScope")</dt><dd><StatusBadge Text="@ScopeLabel(scope.AccessScopeRef)" Status="UiStatus.Info" /></dd><dt>@T("Authorization")</dt><dd>@T("AuthorizationReevaluated")</dd><dt>@T("Revocation")</dt><dd>@T("FailsClosed")</dd></dl>
+                    <DataGrid TItem="TriggerOccurrence" Items="history">
+                        <Header><tr><th>@T("Kind")</th><th>@T("Scheduled")</th><th>@T("ActuallyFired")</th><th>@T("Outcome")</th><th>@T("GenerationLabel")</th><th>@T("WorkDetails")</th></tr></Header>
+                        <Row Context="occurrence"><tr>
+                            <td>@T($"OccurrenceKind.{occurrence.Kind}")</td><td>@TriggerUi.FormatDate(occurrence.ScheduledAt)</td><td>@TriggerUi.FormatDate(occurrence.FiredAt)</td>
+                            <td><StatusBadge Text="@T($"OccurrenceOutcome.{occurrence.Outcome}")" Status="@OccurrenceStatus(occurrence.Outcome)" /></td><td>@occurrence.TriggerGeneration</td>
+                            <td>@if (TaskUrl(occurrence) is { } taskUrl) { <a class="text-button" href="@taskUrl">@T("OpenTask")</a> } else if (occurrence.ErrorCode is not null) { <details><summary>@occurrence.ErrorCode</summary><p>@occurrence.ErrorMessage</p></details> } else { <span>—</span> }</td>
+                        </tr></Row>
+                    </DataGrid>
                 }
-                else { <p>@T("NoExecutionIdentity")</p> }
             </section>
-            <section class="panel">
-                <div class="panel-header"><div><p class="eyebrow">@T("Observed")</p><h2>@T("CurrentStatus")</h2></div><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" /></div>
-                <dl class="resource-details"><dt>@T("Enabled")</dt><dd>@T(trigger.Definition.Enabled ? "Yes" : "No")</dd><dt>@T("LastOutcome")</dt><dd>@T($"Outcome.{trigger.Observed.LastOutcome}")</dd><dt>@T("ErrorCode")</dt><dd><code>@(trigger.Observed.LastErrorCode ?? "—")</code></dd><dt>@T("Uid")</dt><dd><code>@Short(trigger.Uid)</code></dd></dl>
-            </section>
-        </aside>
-    </div>
-
-    <section class="panel trigger-history">
-        <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("TriggerOccurrences")</h2></div><button class="text-button" disabled="@refreshing" @onclick="LoadHistoryAsync">@(refreshing ? T("Refreshing") : T("Refresh"))</button></div>
-        @if (history.Count == 0) { <EmptyState Title="@T("NoOccurrences")" Message="@T("NoOccurrencesMessage")" /> }
+        }
+        else if (activeTab == "Definition")
+        {
+            <div class="trigger-detail-grid">
+                <div class="trigger-detail-stack">
+                    <section class="panel">
+                        <div class="panel-header"><div><p class="eyebrow">@T("When")</p><h2>@T("Schedule")</h2></div><StatusBadge Text="@T($"ScheduleType.{trigger.Definition.Source.Schedule!.Type}")" Status="UiStatus.Info" /></div>
+                        <dl class="resource-details"><dt>@T("Definition")</dt><dd>@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)</dd><dt>@T("NextOccurrence")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)</dd><dt>@T("LastScheduled")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastScheduledAt)</dd><dt>@T("LastFired")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)</dd><dt>@T("Misfire")</dt><dd>@MisfireLabel(trigger.Definition.MisfirePolicy)</dd><dt>@T("Concurrency")</dt><dd>@ConcurrencyLabel(trigger.Definition.ConcurrencyPolicy)</dd></dl>
+                    </section>
+                    <section class="panel">
+                        <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("WorkSubmission")</h2></div></div>
+                        <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>@T("Flow")</dd><dt>@T("Flow")</dt><dd><a class="text-button" href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("DefinitionScope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
+                    </section>
+                </div>
+                <aside class="trigger-detail-stack">
+                    <section class="panel">
+                        <div class="panel-header"><div><p class="eyebrow">@T("Security")</p><h2>@T("ExecutionIdentity")</h2></div></div>
+                        @if (trigger.Definition.ExecutionScope is { } scope)
+                        {
+                            <dl class="resource-details"><dt>@T("Principal")</dt><dd><code>@Short(scope.PrincipalId)</code></dd><dt>@T("ExecutionScope")</dt><dd><ResourceScopeBadge ScopeRef="scope.AccessScopeRef" Compact /></dd><dt>@T("Authorization")</dt><dd>@T("AuthorizationReevaluated")</dd><dt>@T("Revocation")</dt><dd>@T("FailsClosed")</dd></dl>
+                        }
+                        else { <p>@T("NoExecutionIdentity")</p> }
+                    </section>
+                    <section class="panel">
+                        <div class="panel-header"><div><p class="eyebrow">@T("Observed")</p><h2>@T("CurrentStatus")</h2></div><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" /></div>
+                        <dl class="resource-details"><dt>@T("Enabled")</dt><dd>@T(trigger.Definition.Enabled ? "Yes" : "No")</dd><dt>@T("LastOutcome")</dt><dd>@T($"Outcome.{trigger.Observed.LastOutcome}")</dd><dt>@T("ErrorCode")</dt><dd><code>@(trigger.Observed.LastErrorCode ?? "—")</code></dd><dt>@T("Uid")</dt><dd><code>@Short(trigger.Uid)</code></dd></dl>
+                    </section>
+                </aside>
+            </div>
+        }
+        else if (activeTab == "Access")
+        {
+            <ResourceAccessPanel OwnerScopeRef="TriggerOwnerScopeRef" Namespace="trigger.Namespace" Kind="@TriggerResourceKinds.Trigger" Name="@trigger.Name" Generation="@trigger.Generation" Governance="trigger.Governance" />
+        }
         else
         {
-            <DataGrid TItem="TriggerOccurrence" Items="history">
-                <Header><tr><th>@T("Kind")</th><th>@T("Scheduled")</th><th>@T("ActuallyFired")</th><th>@T("Outcome")</th><th>@T("GenerationLabel")</th><th>@T("WorkDetails")</th></tr></Header>
-                <Row Context="occurrence"><tr>
-                    <td>@T($"OccurrenceKind.{occurrence.Kind}")</td><td>@TriggerUi.FormatDate(occurrence.ScheduledAt)</td><td>@TriggerUi.FormatDate(occurrence.FiredAt)</td>
-                    <td><StatusBadge Text="@T($"OccurrenceOutcome.{occurrence.Outcome}")" Status="@OccurrenceStatus(occurrence.Outcome)" /></td><td>@occurrence.TriggerGeneration</td>
-                    <td>@if (TaskUrl(occurrence) is { } taskUrl) { <a class="text-button" href="@taskUrl">@T("OpenTask")</a> } else if (occurrence.ErrorCode is not null) { <details><summary>@occurrence.ErrorCode</summary><p>@occurrence.ErrorMessage</p></details> } else { <span>—</span> }</td>
-                </tr></Row>
-            </DataGrid>
+            <section class="panel form-section" data-testid="trigger-yaml-viewer">
+                <div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("TriggerYaml")</h2><p>@T("TriggerYamlHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div>
+                <textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("TriggerYaml")">@TriggerYaml</textarea>
+            </section>
         }
-    </section>
+    </main>
 }
 
 <ConfirmationDialog IsOpen="@confirmEnable" Title="@T("EnableTriggerTitle")" Message="@EnableMessage" ConfirmLabel="@T("EnableTrigger")" OnConfirm="EnableAsync" OnCancel="() => confirmEnable = false" />
@@ -89,16 +119,23 @@ else
 
 @code {
     [Parameter] public string Name { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    private static readonly string[] Tabs = ["Overview", "Definition", "Access", "YAML"];
     private ResourceSnapshot<TriggerResource>? stored;
     private IReadOnlyList<TriggerOccurrence> history = [];
     private bool loading = true, notFound, running, changingState, refreshing, confirmEnable, confirmDelete, hasError;
+    private string activeTab = "Overview";
     private string? message;
     private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
     private bool CanExecute => ContextState.HasPermission(AuthorizationPermissions.RunsExecute);
     private string EnableMessage => stored is null ? T("EnableThisTrigger") : T("EnableMessage", stored.Value.Definition.DisplayName, TriggerUi.ScheduleLabel(stored.Value.Definition.Source.Schedule, Localizer), stored.Value.Definition.Target.Flow?.Name ?? "—");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 
-    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        activeTab = Tabs.FirstOrDefault(tab => string.Equals(tab, View, StringComparison.OrdinalIgnoreCase)) ?? "Overview";
+        await LoadAsync();
+    }
     private async Task LoadAsync()
     {
         loading = true; notFound = false; message = null;
@@ -120,16 +157,8 @@ else
     private static string? TaskUrl(TriggerOccurrence value) => Guid.TryParse(value.WorkItemId, out var taskId) ? $"/tasks/{taskId:D}" : null;
     private static string Short(Guid value) => value.ToString("N")[..12];
     private static string Short(string value) => value.Length <= 12 ? value : value[..12];
-    private string OperationalWorkspace(Guid workspaceId) => ContextState.Current?.WorkspaceId == workspaceId
-        ? ContextState.Current.WorkspaceDisplayName
-        : Short(workspaceId);
-    private string ScopeLabel(ResourceScopeRef? scopeRef) => scopeRef?.Kind switch
-    {
-        ResourceScopeKind.Instance => T("Instance"),
-        ResourceScopeKind.Tenant => T("Tenant"),
-        ResourceScopeKind.Workspace => T("Workspace"),
-        _ => "—"
-    };
+    private ResourceScopeRef TriggerOwnerScopeRef => stored?.Value.ScopeRef ?? ResourceScopeRef.Workspace(Guid.Empty);
+    private string TriggerYaml => stored is null ? string.Empty : ResourceManifestSerializer.ToYaml(stored.Value);
     private static string PrettyInput(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private string MisfireLabel(TriggerMisfirePolicy value) => T(value == TriggerMisfirePolicy.FireOnce ? "Misfire.FireOnceAfterRecovery" : "Misfire.Skip");
     private string ConcurrencyLabel(TriggerConcurrencyPolicy value) => T(value == TriggerConcurrencyPolicy.Skip ? "Concurrency.SkipActive" : "Concurrency.AllowOverlap");
