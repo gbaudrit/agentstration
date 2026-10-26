@@ -470,7 +470,8 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         if (existing.CurrentAttempt?.TerminalEventId == command.EventId)
         {
             ValidateTerminalReplay(document, proof, ownershipTokenDigest);
-            return new RuntimeAssignmentTerminalResult(existing, ToRunState(existing.State), true);
+            return new RuntimeAssignmentTerminalResult(existing, ToRunState(existing.State), true,
+                existing.CurrentAttempt.ErrorMessage);
         }
         if (existing.State is RuntimeAssignmentState.Succeeded or RuntimeAssignmentState.Failed or RuntimeAssignmentState.Cancelled)
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.TerminalConflict, "The assignment already has a different terminal outcome.");
@@ -488,7 +489,8 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
             State = attemptState,
             CompletedAt = completedAt,
             TerminalEventId = command.EventId,
-            ErrorCode = cancelled ? null : command.ErrorCode
+            ErrorCode = cancelled ? null : command.ErrorCode,
+            ErrorMessage = cancelled ? null : command.Error
         };
         assignment = assignment with
         {
@@ -510,7 +512,7 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         }
         await SaveAsync(context, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return new RuntimeAssignmentTerminalResult(assignment, runState, false);
+        return new RuntimeAssignmentTerminalResult(assignment, runState, false, current.ErrorMessage);
     }
 
     public async Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> ExpireLeasesAsync(

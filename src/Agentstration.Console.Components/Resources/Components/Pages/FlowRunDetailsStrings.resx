@@ -8,6 +8,7 @@
   <data name="BackToRuns"><value>Back to Flow Runs</value></data>
   <data name="UnableToLoad"><value>Unable to load Flow Run</value></data>
   <data name="Loading"><value>Loading Flow Run…</value></data>
+  <data name="Error.AgentModelProfileUnavailable"><value>An Agent model profile required by this Flow is unavailable in the execution context. Check its access policy and republish the Agent if its pinned revision changed.</value></data>
   <data name="Cancel"><value>Cancel</value></data>
   <data name="ToolGovernance"><value>Tool governance</value></data>
   <data name="FlowDefinition"><value>Flow definition</value></data>

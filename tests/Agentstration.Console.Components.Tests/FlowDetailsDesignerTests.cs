@@ -59,6 +59,42 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
+    public void FlowRunSummaryExplainsUnavailableModelProfile()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("profile-diagnostic");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        const string diagnostic = "Pinned ModelProfile 'default/default-reasoning' is unavailable in the execution context or no longer matches its published identity.";
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-profile-diagnostic",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Failed,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            Error = new("agent_model_profile_unavailable", diagnostic),
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0",
+                null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        var error = rendered.Find(".run-error");
+        StringAssert.Contains(error.TextContent, strings["Error.AgentModelProfileUnavailable"].Value);
+        StringAssert.Contains(error.TextContent, diagnostic);
+    }
+
+    [TestMethod]
     public void FlowRunGridUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
     {
         using var context = new BunitContext();

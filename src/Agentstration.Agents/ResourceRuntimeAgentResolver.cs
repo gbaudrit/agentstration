@@ -102,8 +102,11 @@ public sealed class ResourceRuntimeAgentResolver(
         var current = await store.GetExactAsync<T>(ScopedResourceAddress.Create(
             pin.ScopeRef, pin.Namespace, pin.Kind, pin.Name), cancellationToken);
         if (current is null || current.Value.Uid != pin.Uid || current.Value.Generation != pin.Generation)
-            throw new RuntimeAgentResolutionException("agent_dependency_stale",
-                $"Pinned {pin.Kind} '{pin.Namespace}/{pin.Name}' is stale.");
+            throw new RuntimeAgentResolutionException(
+                pin.Kind == ModelResourceKinds.ModelProfile
+                    ? "agent_model_profile_unavailable"
+                    : "agent_dependency_stale",
+                $"Pinned {pin.Kind} '{pin.Namespace}/{pin.Name}' is unavailable in the execution context or no longer matches its published identity.");
     }
 }
 

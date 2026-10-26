@@ -99,8 +99,12 @@ internal sealed class AwpAssignmentRunner(
         }
         catch (Exception exception) when (session.CanStartMutation())
         {
-            var code = exception is AwpExecutionNotSupportedException unsupported
-                ? unsupported.Code : "worker_execution_failed";
+            var code = exception switch
+            {
+                AwpExecutionNotSupportedException unsupported => unsupported.Code,
+                AwpClientException authorityFailure => authorityFailure.Code,
+                _ => "worker_execution_failed"
+            };
             activity?.SetStatus(ActivityStatusCode.Error, code);
             activity?.SetTag("error.type", exception.GetType().FullName);
             logger.LogError(exception, "Assignment {AssignmentId} execution failed with code {ErrorCode}",

@@ -8,6 +8,7 @@
   <data name="BackToRuns"><value>Retour aux exécutions de Flow</value></data>
   <data name="UnableToLoad"><value>Impossible de charger l’exécution de Flow</value></data>
   <data name="Loading"><value>Chargement de l’exécution de Flow…</value></data>
+  <data name="Error.AgentModelProfileUnavailable"><value>Un profil de modèle requis par un agent de ce Flow est indisponible dans le périmètre d’exécution. Vérifiez sa politique d’accès et republiez l’agent si sa révision épinglée a changé.</value></data>
   <data name="Cancel"><value>Annuler</value></data>
   <data name="ToolGovernance"><value>Gouvernance des outils</value></data>
   <data name="FlowDefinition"><value>Définition du Flow</value></data>
