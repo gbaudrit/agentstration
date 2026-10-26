@@ -103,12 +103,10 @@ else
         else if (activeTab == "Access")
         {
             <section class="panel form-section" data-testid="trigger-access-panel">
-                <div class="panel-header"><div><p class="eyebrow">@T("Security")</p><h2>@T("TriggerAccessModel")</h2><p>@T("TriggerAccessModelHelp")</p></div><StatusBadge Text="@T("WorkspaceIsolated")" Status="UiStatus.Info" /></div>
+                <div class="panel-header"><div><p class="eyebrow">@T("Access")</p><h2>@T("TriggerAccessModel")</h2><p>@T("TriggerAccessModelHelp")</p></div></div>
                 <dl class="resource-details">
-                    <dt>@T("DefinitionScope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd>
                     <dt>@T("Flow")</dt><dd><a class="text-button" href="@FlowAccessUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd>
-                    <dt>@T("Authorization")</dt><dd>@T("DiscoverUseReevaluated")</dd>
-                    <dt>@T("OperationalState")</dt><dd>@T("OperationalStateIsolated")</dd>
+                    <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd>
                 </dl>
                 <div class="form-actions"><a class="button-primary" href="@FlowAccessUrl(trigger)">@T("ManageFlowAccess")</a></div>
             </section>

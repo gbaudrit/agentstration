@@ -50,12 +50,9 @@
   <data name="TriggerYaml"><value>YAML du déclencheur</value></data>
   <data name="TriggerYamlHelp"><value>Consultez la ressource persistée complète du déclencheur au format YAML en lecture seule.</value></data>
   <data name="ReadOnly"><value>Lecture seule</value></data>
-  <data name="TriggerAccessModel"><value>Accès du déclencheur</value></data>
-  <data name="TriggerAccessModelHelp"><value>L’état du déclencheur reste isolé dans son Workspace opérationnel. L’accès au Flow ciblé est gouverné directement sur le Flow.</value></data>
-  <data name="WorkspaceIsolated"><value>Isolé au Workspace</value></data>
-  <data name="DiscoverUseReevaluated"><value>Les autorisations Découvrir et Utiliser du Flow sont réévaluées avant chaque exécution.</value></data>
-  <data name="OperationalState"><value>État opérationnel</value></data>
-  <data name="OperationalStateIsolated"><value>La planification, les occurrences, les Work et les Runs ne sont pas partagés avec les Workspaces descendants.</value></data>
+  <data name="Access"><value>Accès</value></data>
+  <data name="TriggerAccessModel"><value>Accès au Flow</value></data>
+  <data name="TriggerAccessModelHelp"><value>Ce déclencheur utilise les droits d’accès de son Flow cible.</value></data>
   <data name="ManageFlowAccess"><value>Gérer les accès du Flow</value></data>
   <data name="Error.OperationalWorkspaceUnavailable"><value>Le contexte sélectionné ne dispose d’aucun Workspace opérationnel pour les déclencheurs.</value></data>
   <data name="Error.TargetNotDiscoverable"><value>Ce Flow n’est plus visible depuis le contexte sélectionné. Choisissez un autre Flow publié.</value></data>
