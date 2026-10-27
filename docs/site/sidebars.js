@@ -109,6 +109,7 @@ const sidebars = {
             'architecture/implementation/current-state',
             'architecture/implementation/reconciliation-baseline-2026-09-28',
             'architecture/implementation/knowledge-reconciliation-2026-10-08',
+            'architecture/implementation/hierarchical-resource-access-reconciliation-2026-10-26',
             'architecture/migration-inventory',
           ],
         },
