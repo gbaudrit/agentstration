@@ -193,3 +193,71 @@
     .validation-summary{padding-inline:14px 8px}
     .validation-count{display:none}
 }
+
+.flow-node-settings{position:absolute;z-index:9;top:10px;right:10px;display:grid;width:30px;height:30px;padding:0;place-items:center;border:1px solid color-mix(in srgb,var(--border) 75%,transparent);border-radius:8px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--muted);box-shadow:0 3px 12px rgba(8,19,35,.08);cursor:pointer;opacity:.82;transition:opacity .15s ease,color .15s ease,border-color .15s ease,transform .15s ease}
+.flow-node-settings:hover,.flow-node-settings:focus-visible{border-color:var(--primary);color:var(--primary);opacity:1;transform:translateY(-1px)}
+.flow-node-settings .ui-icon{width:16px;height:16px}
+.flow-node-copy{padding-right:34px}
+.inspector-step-summary{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;margin-bottom:12px;padding:12px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+.inspector-step-summary-icon{display:grid;width:36px;height:36px;place-items:center;border-radius:9px;background:var(--primary-soft);color:var(--primary)}
+.inspector-step-summary-copy{display:grid;min-width:0;gap:2px}
+.inspector-step-summary-copy strong,.inspector-step-summary-copy code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inspector-step-summary-copy small{color:var(--muted)}
+.inspector-resource-summary-link{display:flex;min-width:0;align-items:center;gap:6px;color:var(--primary);text-decoration:none}
+.inspector-resource-summary-link strong{min-width:0}
+.inspector-resource-summary-link .ui-icon{flex:0 0 auto;width:14px;height:14px}
+.inspector-resource-summary-link:hover strong,.inspector-resource-summary-link:focus-visible strong{text-decoration:underline}
+.inspector-configure-step{display:flex;width:100%;align-items:center;justify-content:center;gap:7px}
+.step-settings-backdrop{position:fixed;z-index:120;inset:0;display:grid;padding:24px;place-items:center;background:rgba(8,19,35,.58);backdrop-filter:blur(2px)}
+.step-settings-dialog{display:grid;width:min(1180px,calc(100vw - 48px));height:min(900px,calc(100dvh - 48px));grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:0 28px 80px rgba(8,19,35,.35)}
+.step-settings-header,.step-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;border-bottom:1px solid var(--border)}
+.step-settings-header h2{margin:3px 0 4px;font-size:1.25rem}
+.step-settings-header .eyebrow{color:var(--primary);font-size:.7rem;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+.step-settings-close{display:grid;width:38px;height:38px;padding:0;place-items:center;border:1px solid var(--border);border-radius:9px;background:var(--surface-2);color:var(--text);cursor:pointer}
+.step-settings-tabs{display:flex;gap:4px;padding:0 22px;border-bottom:1px solid var(--border);background:var(--surface)}
+.step-settings-tabs button{position:relative;padding:14px 16px;border:0;background:transparent;color:var(--muted);font-weight:650;cursor:pointer}
+.step-settings-tabs button::after{position:absolute;right:10px;bottom:-1px;left:10px;height:2px;border-radius:2px;background:transparent;content:""}
+.step-settings-tabs button:hover,.step-settings-tabs button:focus-visible,.step-settings-tabs button.active{color:var(--text)}
+.step-settings-tabs button.active::after{background:var(--primary)}
+.step-settings-body{min-height:0;overflow:auto;padding:22px}
+.step-settings-form{width:100%;padding:0;background:transparent}
+.step-settings-form>label,.step-settings-form .inspector-details-group label,.step-settings-form .flow-mapping-editor label,.step-settings-form .router-editor label,.step-settings-form .step-contract-section>label{display:grid;gap:5px;margin-bottom:12px;color:var(--muted);font-size:.75rem;font-weight:650}
+.step-settings-form>label :is(input,select,textarea),.step-settings-form .inspector-details-group label :is(input,select,textarea),.step-settings-form .flow-mapping-editor label :is(input,select,textarea),.step-settings-form .router-editor label :is(input,select,textarea),.step-settings-form .step-contract-section>label :is(input,select,textarea),.step-settings-form .inspector-resource-field> :is(input,select){width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)}
+.step-settings-form .inspector-details-heading h3,.step-settings-form .inspector-resource-details>h3{margin:0;color:var(--muted);font-size:.7rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase}
+.step-settings-form .inspector-resource-details>h3{margin-bottom:12px}
+.step-settings-form .inspector-resource-heading label{display:block;margin:0;color:var(--muted);font-size:.75rem;font-weight:650}
+.step-settings-form .inspector-resource-heading>span{color:var(--muted);font-size:.75rem;font-weight:650}
+.step-settings-form>.button-danger{display:block;max-width:100%;margin-top:8px;white-space:normal}
+.step-settings-form .flow-checkbox-field{display:flex;align-items:center;gap:8px}
+.step-settings-form .flow-checkbox-field input[type="checkbox"]{flex:0 0 17px;width:17px;height:17px;min-height:17px;margin:0;padding:0;border:0;background:initial;box-shadow:none;accent-color:var(--primary)}
+.step-settings-form .tool-picker-search input{min-width:0;width:100%;padding:0;border:0;outline:0;background:transparent;color:var(--text);font-size:.75rem}
+.step-settings-form .flow-mapping-editor{margin:0;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}
+.step-settings-form .flow-mapping-editor legend{padding:0 6px;color:var(--text);font-size:.78rem;font-weight:700}
+.step-settings-form .schema-binding-editor{max-width:none}
+.step-settings-footer{justify-content:flex-end;border-top:1px solid var(--border);border-bottom:0}
+.step-contract-section{display:grid;gap:18px}
+.step-contract-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.step-contract-heading h3{margin:3px 0 0;font-size:1.05rem}
+.step-contract-heading .eyebrow{color:var(--primary);font-size:.68rem;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+.step-contract-source{padding:5px 9px;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-size:.72rem;font-weight:650}
+.output-passthrough{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}
+.output-passthrough-icon{display:grid;width:36px;height:36px;place-items:center;border-radius:50%;background:var(--primary-soft);color:var(--primary)}
+.output-passthrough-copy{display:grid;gap:3px}.output-passthrough-copy strong{color:var(--text);font-size:.86rem}.output-passthrough-copy small{color:var(--muted);font-size:.75rem;font-weight:400}
+.output-passthrough-technical{position:relative}.output-passthrough-technical summary{cursor:pointer;color:var(--primary);font-size:.75rem;font-weight:650;list-style:none}.output-passthrough-technical summary::-webkit-details-marker{display:none}.output-passthrough-technical code{display:block;margin-top:7px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);white-space:nowrap}
+.called-flow-outputs{display:grid;gap:14px}.called-flow-output{display:grid;gap:14px;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}.called-flow-output>header{display:flex;align-items:center;gap:10px}.called-flow-output>header code{color:var(--muted);font-size:.72rem}.called-flow-output>header .inspector-step-type{margin-left:auto}
+.step-contract-empty{margin:0;padding:18px;border:1px dashed var(--border);border-radius:9px;background:var(--surface-2)}
+.shared-contract-reuse{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;padding:14px;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:10px;background:var(--surface-2)}.shared-contract-reuse>div{display:grid;gap:5px;min-width:0}.shared-contract-reuse p{max-width:70ch;margin:0;color:var(--muted);font-size:.78rem;line-height:1.45}.shared-contract-reuse code{overflow:hidden;text-overflow:ellipsis;color:var(--primary);font-size:.72rem}.shared-contract-reuse button{flex:0 0 auto;white-space:nowrap}
+.dialog-backdrop.connection-contract-backdrop{z-index:140}.connection-contract-dialog{width:min(620px,calc(100vw - 40px));max-width:620px}.connection-contract-dialog h2{margin:7px 0 8px}.connection-contract-dialog>p{margin:0 0 18px;color:var(--muted)}.connection-contract-dialog>p.connection-contract-warning{padding:11px 13px;border:1px solid rgba(224,146,34,.35);border-radius:8px;background:rgba(224,146,34,.12);color:#9a6110;font-weight:650}.connection-contract-dialog .dialog-actions{flex-wrap:wrap}.connection-contract-choice{display:grid;gap:6px;padding:16px;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:10px;background:var(--surface-2)}.connection-contract-choice p{margin:0;color:var(--muted);line-height:1.45}.connection-contract-choice code{overflow-wrap:anywhere;color:var(--primary)}
+@media(max-width:760px){.shared-contract-reuse{align-items:stretch;flex-direction:column}.shared-contract-reuse button{width:100%;white-space:normal}}
+@media(max-width:540px){.connection-contract-dialog .dialog-actions{flex-direction:column-reverse}.connection-contract-dialog .dialog-actions button{width:100%}}
+.step-settings-empty{display:grid;max-width:520px;margin:32px auto;padding:28px;place-items:center;text-align:center;border:1px dashed var(--border);border-radius:12px;background:var(--surface-2)}
+.step-settings-empty .ui-icon{width:28px;height:28px;margin-bottom:8px;color:var(--muted)}
+.step-settings-empty h3,.step-settings-empty p{margin:4px 0}
+
+@media(max-width:800px){
+    .step-settings-backdrop{padding:0}
+    .step-settings-dialog{width:100vw;height:100dvh;border:0;border-radius:0}
+    .step-settings-header,.step-settings-body,.step-settings-footer{padding:16px}
+    .step-settings-tabs{padding:0 10px;overflow-x:auto}
+    .step-settings-tabs button{padding-inline:12px;white-space:nowrap}
+}

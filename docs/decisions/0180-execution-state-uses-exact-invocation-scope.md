@@ -1,4 +1,4 @@
-# ADR-0177: Execution state uses the exact invocation scope
+# ADR-0180: Execution state uses the exact invocation scope
 
 Status: Accepted — 2026-10-15
 
@@ -47,6 +47,6 @@ is queried at that exact scope and is not inherited by descendants.
 - Authorization, recovery, cancellation, idempotency, audit, and correlation operate on the same
   immutable execution scope.
 
-This decision supersedes ADR-0048, ADR-0171, ADR-0164, and ADR-0176 only where they require durable
+This decision supersedes ADR-0048, ADR-0176, ADR-0164, and ADR-0179 only where they require durable
 execution state to be Workspace-owned. Their definition-ownership, immutable-composition, and
 dependency-closure decisions remain in force.

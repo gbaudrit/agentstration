@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Tools;
 
@@ -25,8 +26,10 @@ public sealed record ToolDefinitionProperties
     public bool Enabled { get; init; } = true;
     public bool RequiresApproval { get; init; }
     public required JsonElement InputSchema { get; init; }
+    public SchemaBinding? InputSchemaBinding { get; init; }
     public JsonElement? FixedArguments { get; init; }
     public JsonElement? OutputSchema { get; init; }
+    public SchemaBinding? OutputSchemaBinding { get; init; }
     public required ToolDefinitionFlowTarget Flow { get; init; }
     public int InvocationTimeoutSeconds { get; init; } = 90;
 }
@@ -34,6 +37,8 @@ public sealed record ToolDefinitionProperties
 public sealed record ToolDefinitionResource : Resource
 {
     public ToolDefinitionProperties Definition { get; init; } = null!;
+    public IReadOnlyDictionary<string, SchemaBindingSnapshot> SchemaBindings { get; init; }
+        = new Dictionary<string, SchemaBindingSnapshot>(StringComparer.Ordinal);
 }
 
 public sealed record ResolvedToolDefinitionFlowContract(

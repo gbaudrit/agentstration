@@ -6,6 +6,7 @@ using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Declarative;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -21,6 +22,7 @@ public sealed partial class DeclarativeBootstrapTests
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
         services.AddSqliteFlowStorage($"Data Source={Path.Combine(directory.Path, "flow.db")};Pooling=False");
+        services.AddSingleton<ISchemaBindingResolver, TestSchemaBindingResolver>();
         services.AddSingleton<FlowService>();
         await using var provider = services.BuildServiceProvider();
         var flows = provider.GetRequiredService<FlowService>();
@@ -73,5 +75,15 @@ public sealed partial class DeclarativeBootstrapTests
             FlowGraphDefinition definition,
             FlowValidationContext context,
             CancellationToken cancellationToken) => ValueTask.FromResult(new FlowValidationResult([]));
+    }
+
+    private sealed class TestSchemaBindingResolver : ISchemaBindingResolver
+    {
+        public ValueTask<SchemaBindingSnapshot> ResolveAsync(
+            string path,
+            SchemaBinding binding,
+            SchemaBindingResolutionContext context,
+            CancellationToken cancellationToken) => throw new InvalidOperationException(
+                "The Flow bootstrap scope fixture does not define schema bindings.");
     }
 }

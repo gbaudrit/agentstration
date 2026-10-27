@@ -13,6 +13,7 @@ using Agentstration.Parameters.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Sources.Contracts;
 using Agentstration.Web.Components;
@@ -90,7 +91,18 @@ public sealed partial class ApiClientTests
             Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = @namespace },
             Definition = CreateAgentResource("web-agent").Definition with
             {
-                ModelProfile = new ResourceReference("reasoning-shared", ResourceScopeRef.Instance, new ResourceNamespace("shared.models"))
+                ModelProfile = new ResourceReference("reasoning-shared", ResourceScopeRef.Instance, new ResourceNamespace("shared.models")),
+                InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
+                InputSchemaBinding = new SchemaBinding
+                {
+                    Reference = new SchemaVersionReference
+                    {
+                        Name = "agent-request",
+                        Version = "1.0.0",
+                        Namespace = new("shared.schemas"),
+                        ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"))
+                    }
+                }
             }
         };
         var requestedPaths = new List<string>();
@@ -116,6 +128,8 @@ public sealed partial class ApiClientTests
         Assert.AreEqual(new ResourceNamespace("shared.models"), agents[0].ModelProfileNamespace);
         Assert.AreEqual(ResourceScopeRef.Instance, agents[0].ModelProfileScopeRef);
         Assert.AreEqual("/modelprofiles/reasoning-shared?namespace=shared.models&scopeRef=%2Finstance", ConsoleResourceUrls.ModelProfile(agents[0].ModelProfileAddress, agents[0].ModelProfileScopeRef));
+        Assert.AreEqual("object", agents[0].InputSchema?.GetProperty("type").GetString());
+        Assert.AreEqual(resource.Definition.InputSchemaBinding.Reference, agents[0].InputSchemaReference);
         Assert.AreEqual("/namespaces/agentstration.who-am-i/agents/web-agent", agents[0].DetailsUrl);
     }
 

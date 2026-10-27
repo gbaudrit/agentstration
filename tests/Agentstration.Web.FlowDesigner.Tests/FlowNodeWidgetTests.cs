@@ -4,6 +4,7 @@ using Agentstration.Web.FlowDesigner.Diagramming;
 using Agentstration.Web.FlowDesigner.State;
 using Blazor.Diagrams.Components.Renderers;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.FlowDesigner.Tests;
@@ -61,5 +62,28 @@ public sealed class FlowNodeWidgetTests
 
         CollectionAssert.AreEqual(new[] { "✓ approved", "! rejected" }, rendered.FindAll(".flow-port-label").Select(element => element.TextContent).ToArray());
         StringAssert.Contains(rendered.Find(".outcome-error").GetAttribute("aria-label")!, "rejected");
+    }
+
+    [TestMethod]
+    public void SettingsButtonRequestsConfigurationForItsStep()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.ComponentFactories.AddStub<PortRenderer>();
+        string? requestedStep = null;
+        var interactions = new FlowNodeInteractionContext(stepName =>
+        {
+            requestedStep = stepName;
+            return Task.CompletedTask;
+        });
+        var node = new FlowDiagramNode(new("analyze", "agent", "Analyze", new(0, 0), null, ["success"]));
+
+        var rendered = context.Render<CascadingValue<FlowNodeInteractionContext>>(parameters => parameters
+            .Add(component => component.Value, interactions)
+            .AddChildContent<FlowNodeWidget>(child => child.Add(component => component.Node, node)));
+
+        rendered.Find(".flow-node-settings").Click();
+
+        Assert.AreEqual("analyze", requestedStep);
     }
 }

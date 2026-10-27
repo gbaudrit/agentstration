@@ -1,4 +1,4 @@
-# ADR-0178: Managed resources record origin and management authority
+# ADR-0181: Managed resources record origin and management authority
 
 Status: Accepted — 2026-10-19
 

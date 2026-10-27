@@ -11,6 +11,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Triggers;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -317,6 +318,7 @@ public sealed class TriggerTests
                 .AddSqliteFlowStorage($"Data Source={Path.Combine(directory, "flow.db")};Pooling=False")
                 .AddSingleton<IFlowScopeHierarchy>(new TestFlowScopeHierarchy(tenantId))
                 .AddSingleton<IFlowDiscoveryPolicy>(new TestFlowDiscoveryPolicy(access))
+                .AddSingleton<ISchemaBindingResolver, TestSchemaBindingResolver>()
                 .AddSingleton<FlowService>()
                 .BuildServiceProvider();
             var fixture = new FlowTargetFixture(directory, services, context, access, tenantId);
@@ -346,6 +348,26 @@ public sealed class TriggerTests
         {
             await services.DisposeAsync();
             if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
+
+    private sealed class TestSchemaBindingResolver : ISchemaBindingResolver
+    {
+        public ValueTask<SchemaBindingSnapshot> ResolveAsync(
+            string path,
+            SchemaBinding binding,
+            SchemaBindingResolutionContext context,
+            CancellationToken cancellationToken)
+        {
+            var inline = binding.Inline ?? throw new SchemaBindingResolutionException(
+                "schema_reference_not_supported",
+                "This test fixture only supports inline bindings.");
+            return ValueTask.FromResult(new SchemaBindingSnapshot(
+                path,
+                inline.Format,
+                inline.Dialect,
+                inline.Content.Clone(),
+                $"test:{inline.Content.GetRawText()}"));
         }
     }
 

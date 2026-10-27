@@ -361,7 +361,7 @@ public sealed class ArtifactPlatformResourceProvisioner(
                     ArgumentsMapping = arguments
                 },
                 new OutputFlowStepDefinition { Name = "output", DisplayName = "Storage result", OutputMapping = JsonSerializer.SerializeToElement("${steps.storage.output}") },
-                new FailureFlowStepDefinition { Name = "failure", Code = "artifact_storage_failed", Message = "Artifact storage operation failed.", DetailsExpression = "${transition.output}" }
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error, Code = "artifact_storage_failed", Message = "Artifact storage operation failed.", DetailsExpression = "${transition.output}" }
             ],
             Transitions =
             [

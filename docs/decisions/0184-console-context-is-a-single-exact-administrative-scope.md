@@ -1,4 +1,4 @@
-# ADR-0181: Console context is one exact administrative scope
+# ADR-0184: Console context is one exact administrative scope
 
 Status: Accepted — 2026-10-22
 

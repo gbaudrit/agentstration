@@ -10,12 +10,12 @@ export interface NamedOutputAuthoring {
   name: string;
   displayName: string;
   outcome: 'Success' | 'Error';
-  mapping: string;
-  schema: string;
   code?: string;
   message?: string;
   details?: string;
 }
+
+export type FlowDesignerMode = 'designer' | 'definition' | 'split';
 
 export class FlowDesignerPage {
   public constructor(private readonly page: Page) {}
@@ -27,6 +27,41 @@ export class FlowDesignerPage {
     });
     expect(response.status(), await response.text()).toBe(201);
     await this.open(consoleUrl, 'default', name);
+    return name;
+  }
+
+  public async createResponsiveDraftAndOpen(consoleUrl: string): Promise<string> {
+    const name = `responsive-designer-${Date.now()}`;
+    const created = await this.createDraft(consoleUrl, name, 'Responsive designer journey');
+    const definition = {
+      entryStep: 'input',
+      steps: [
+        { type: 'input', name: 'input', displayName: 'Input' },
+        {
+          type: 'output', name: 'completed', displayName: 'Completed', outcome: 'success',
+          outputMapping: '${transition.output}',
+        },
+        {
+          type: 'output', name: 'error', displayName: 'Error', outcome: 'error',
+          code: 'FLOW_ERROR', message: 'The Flow failed.', outputMapping: '${transition.output}',
+        },
+      ],
+      transitions: [
+        { id: 'input-completed-completed', fromStep: 'input', event: 'completed', toStep: 'completed' },
+        { id: 'input-error-error', fromStep: 'input', event: 'error', toStep: 'error' },
+      ],
+      designer: {
+        preferredLayout: 'Horizontal',
+        nodePositions: {
+          input: { x: 80, y: 220 },
+          completed: { x: 520, y: 120 },
+          error: { x: 520, y: 360 },
+        },
+      },
+    };
+    await this.updateDraft(consoleUrl, name, created, definition);
+    await this.open(consoleUrl, 'default', name);
+    await expect(this.node('Input')).toBeVisible();
     return name;
   }
 
@@ -63,9 +98,11 @@ export class FlowDesignerPage {
     await this.open(consoleUrl, 'default', name);
     await expect(this.node('transform')).toBeVisible();
     await expect(async () => {
-      await this.node('transform').click();
+      await this.node('transform').locator('.flow-node-settings').click();
       await expect(this.page.getByRole('textbox', { name: 'Step ID' })).toHaveValue('transform', { timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
+    await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
     return name;
   }
 
@@ -77,23 +114,26 @@ export class FlowDesignerPage {
     const parentName = `aaa-named-output-parent-${suffix}`;
 
     const child = await this.createDraft(consoleUrl, childName, 'Named output child');
-    const legacyDefinition = {
+    const initialDefinition = {
       entryStep: 'input',
       steps: [
         { type: 'input', name: 'input', displayName: 'Input' },
         {
           type: 'output', name: 'historical-result', displayName: 'Historical result',
           outputMapping: '${transition.output}',
-          schema: { type: 'object', properties: { legacyValue: { type: 'string' } } },
+          schema: { type: 'object', properties: { historicalValue: { type: 'string' } } },
         },
-        { type: 'failure', name: 'legacy-failure', displayName: 'Legacy failure', code: 'LEGACY_FAILURE', message: 'Legacy failure.' },
+        {
+          type: 'output', name: 'historical-error', displayName: 'Historical error', outcome: 'error',
+          code: 'HISTORICAL_ERROR', message: 'Historical error.',
+        },
       ],
       transitions: [{ id: 'input-completed-historical', fromStep: 'input', event: 'completed', toStep: 'historical-result' }],
       designer: { preferredLayout: 'Horizontal', nodePositions: {
-        input: { x: 80, y: 220 }, 'historical-result': { x: 500, y: 120 }, 'legacy-failure': { x: 500, y: 360 },
+        input: { x: 80, y: 220 }, 'historical-result': { x: 500, y: 120 }, 'historical-error': { x: 500, y: 360 },
       } },
     };
-    let childEtag = await this.updateDraft(consoleUrl, childName, child, legacyDefinition);
+    let childEtag = await this.updateDraft(consoleUrl, childName, child, initialDefinition);
     await this.publishDraft(consoleUrl, childName, '1.0.0', false);
 
     const modernDefinition = {
@@ -171,18 +211,37 @@ export class FlowDesignerPage {
 
   public async selectStep(displayName: string): Promise<void> {
     await expect(async () => {
-      await this.node(displayName).locator('.flow-node-copy').click();
+      await this.node(displayName).locator('.flow-node-settings').click();
       await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
   }
 
+  public async expectTextSelectionKeepsStepSettingsOpen(): Promise<void> {
+    const dialog = this.page.locator('.step-settings-dialog');
+    const field = this.page.getByTestId(TestIds.flowObservability.stepDisplayName);
+    const dialogBox = await dialog.boundingBox();
+    const fieldBox = await field.boundingBox();
+    if (!dialogBox || !fieldBox) throw new Error('The step settings dialog is not measurable.');
+    await this.page.mouse.move(fieldBox.x + fieldBox.width - 10, fieldBox.y + fieldBox.height / 2);
+    await this.page.mouse.down();
+    await this.page.mouse.move(dialogBox.x - 4, fieldBox.y + fieldBox.height / 2, { steps: 8 });
+    await this.page.mouse.up();
+    await expect(dialog).toBeVisible();
+  }
+
   public async useFlowCallVersion(strategy: 'Active' | 'Exact', version?: string): Promise<void> {
+    if (!await this.page.locator('.step-settings-dialog').isVisible()) {
+      await this.page.getByTestId('configure-selected-step').click();
+    }
+    await this.page.getByTestId('step-settings-tab-configuration').click();
     await this.page.getByTestId(TestIds.flowObservability.flowCallVersionStrategy).selectOption(strategy);
     if (strategy === 'Exact') {
       const versionSelect = this.page.getByTestId(TestIds.flowObservability.flowCallExactVersion);
       await expect(versionSelect).toBeVisible();
       if (version) await versionSelect.selectOption(version);
     }
+    await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
     // Persist each version switch before the next authoring action so a slower autosave from the
     // previous strategy cannot restore stale ports while the scenario edits another node.
     await this.save();
@@ -192,21 +251,23 @@ export class FlowDesignerPage {
   public async addNamedOutput(output: NamedOutputAuthoring): Promise<void> {
     await this.ensurePaletteVisible();
     await this.page.getByTestId(TestIds.flowObservability.paletteOutput).click();
-    await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toHaveValue('Output');
     // Complete the add-step save before editing the new node. On a busy smoke run, letting that
     // request overlap the first field change can reapply the initial "Output" projection.
     await this.save();
     await this.expectAutosaved();
+    await this.page.getByTestId('configure-selected-step').click();
+    await expect(this.page.getByTestId(TestIds.flowObservability.stepDisplayName)).toHaveValue('Output');
     await this.changeField(TestIds.flowObservability.stepDisplayName, output.displayName);
     await this.changeField(TestIds.flowObservability.stepName, output.name);
+    await this.page.getByTestId('step-settings-tab-configuration').click();
     await this.page.getByTestId(TestIds.flowObservability.outputOutcome).selectOption(output.outcome);
-    await this.changeField(TestIds.flowObservability.outputMapping, output.mapping);
-    await this.changeField(TestIds.flowObservability.outputSchema, output.schema);
     if (output.outcome === 'Error') {
       if (output.code) await this.changeField(TestIds.flowObservability.outputErrorCode, output.code);
       if (output.message) await this.changeField(TestIds.flowObservability.outputErrorMessage, output.message);
       if (output.details) await this.changeField(TestIds.flowObservability.outputErrorDetails, output.details);
     }
+    await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
     await expect(this.node(output.displayName)).toBeVisible();
   }
 
@@ -232,6 +293,8 @@ export class FlowDesignerPage {
 
   public async renameSelectedOutput(name: string): Promise<void> {
     await this.changeField(TestIds.flowObservability.stepName, name);
+    await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
   }
 
   public async dragOutputToInput(sourceName: string, targetName: string): Promise<void> {
@@ -369,6 +432,109 @@ export class FlowDesignerPage {
     await this.page.getByTestId(TestIds.flowObservability.designerValidate).click();
   }
 
+  public async useDesktopViewport(): Promise<void> {
+    await this.page.setViewportSize({ width: 1920, height: 1080 });
+  }
+
+  public async useNarrowViewport(): Promise<void> {
+    await this.page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  public async expectPanels(paletteVisible: boolean, inspectorVisible: boolean): Promise<void> {
+    await expect(this.page.locator('.step-palette')).toBeVisible({ visible: paletteVisible });
+    await expect(this.page.locator('.flow-inspector')).toBeVisible({ visible: inspectorVisible });
+  }
+
+  public async toggleDesktopPalette(): Promise<void> {
+    await this.page.locator('.designer-view-controls .desktop-panel-toggle').nth(0).click();
+  }
+
+  public async toggleDesktopInspector(): Promise<void> {
+    await this.page.locator('.designer-view-controls .desktop-panel-toggle').nth(1).click();
+  }
+
+  public async openNarrowPalette(): Promise<void> {
+    await this.page.locator('.designer-view-controls .compact-panel-toggle').nth(0).click();
+    await this.expectPanels(true, false);
+  }
+
+  public async openNarrowInspector(): Promise<void> {
+    await this.page.locator('.designer-view-controls .compact-panel-toggle').nth(1).click();
+    await this.expectPanels(false, true);
+  }
+
+  public async enterFocusMode(): Promise<void> {
+    await this.page.locator('.designer-view-controls > button').last().click();
+    await expect(this.page.locator('.designer-focus-toolbar')).toBeVisible();
+    await expect(this.page.locator('.flow-editor-shell')).toHaveClass(/focus-mode/);
+  }
+
+  public async exitFocusModeWithToolbar(): Promise<void> {
+    await this.page.locator('.designer-focus-toolbar .focus-exit').click();
+    await this.expectFocusMode(false);
+  }
+
+  public async exitFocusModeWithEscape(): Promise<void> {
+    await this.page.keyboard.press('Escape');
+    await this.expectFocusMode(false);
+  }
+
+  public async selectFocusMode(mode: FlowDesignerMode): Promise<void> {
+    const index: Record<FlowDesignerMode, number> = { designer: 0, definition: 1, split: 2 };
+    await this.page.locator('.designer-focus-toolbar > button').nth(index[mode]).click();
+    await this.expectEditorMode(mode);
+  }
+
+  public async expectEditorMode(mode: FlowDesignerMode): Promise<void> {
+    await expect(this.page.locator('.flow-editor-shell')).toHaveClass(new RegExp(`\\b${mode}\\b`));
+    const canvas = this.page.locator('.flow-canvas-wrap');
+    const source = this.page.locator('.source-editor');
+    await expect(canvas).toBeVisible({ visible: mode !== 'definition' });
+    await expect(source).toBeVisible({ visible: mode !== 'designer' });
+  }
+
+  public async expectWorkspaceControlsWithinViewport(focusMode = false): Promise<void> {
+    const controls = focusMode
+      ? this.page.locator('.designer-focus-toolbar')
+      : this.page.locator('.designer-view-controls');
+    await expect(controls).toBeVisible();
+    const bounds = await controls.boundingBox();
+    const viewport = this.page.viewportSize();
+    expect(bounds).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport!.width + 1);
+    expect(bounds!.y).toBeGreaterThanOrEqual(0);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport!.height + 1);
+  }
+
+  public async runCollapsedVerificationExpecting(issueCount: number): Promise<void> {
+    const dock = this.page.locator('.validation-dock');
+    await expect(dock).not.toHaveClass(/expanded/);
+    await expect(this.page.getByTestId(TestIds.flowObservability.designerValidate)).toBeVisible();
+    await this.validate();
+    await expect(dock.locator('.validation-count')).toHaveText(new RegExp(`^${issueCount}\\b`));
+    await expect(dock).toHaveClass(/expanded/);
+  }
+
+  public async collapseValidation(): Promise<void> {
+    const dock = this.page.locator('.validation-dock');
+    await dock.locator('.validation-summary').click();
+    await expect(dock).not.toHaveClass(/expanded/);
+  }
+
+  public async addUnreachableTransform(): Promise<void> {
+    await this.ensurePaletteVisible();
+    await this.page.getByTestId(TestIds.flowObservability.paletteTransform).click();
+    await expect(this.node('Transform')).toBeVisible();
+  }
+
+  public async expectValidationIssue(code: string): Promise<void> {
+    const dock = this.page.locator('.validation-dock');
+    await expect(dock).toHaveClass(/expanded/);
+    await expect(dock.locator('li code').filter({ hasText: code })).toBeVisible();
+  }
+
   public async save(): Promise<void> {
     await this.page.getByTestId(TestIds.flowObservability.designerSave).click();
   }
@@ -411,6 +577,12 @@ export class FlowDesignerPage {
 
   public get designer() { return this.page.getByTestId(TestIds.flowObservability.designer); }
 
+  private async expectFocusMode(active: boolean): Promise<void> {
+    await expect(this.page.locator('.designer-focus-toolbar')).toBeVisible({ visible: active });
+    if (active) await expect(this.page.locator('.flow-editor-shell')).toHaveClass(/focus-mode/);
+    else await expect(this.page.locator('.flow-editor-shell')).not.toHaveClass(/focus-mode/);
+  }
+
   private node(name: string): Locator {
     return this.page.locator('.flow-node').filter({ has: this.page.locator('strong').filter({ hasText: new RegExp(`^${escapeRegExp(name)}$`, 'i') }) }).first();
   }
@@ -419,18 +591,24 @@ export class FlowDesignerPage {
     const palette = this.page.locator('.step-palette');
     if (await palette.isVisible()) return;
     const toggle = this.page.locator('.designer-view-controls .compact-panel-toggle').nth(0);
-    await expect(toggle).toBeVisible();
-    await toggle.click();
-    await expect(palette).toBeVisible();
+    await expect(async () => {
+      if (await palette.isVisible()) return;
+      await expect(toggle).toBeVisible({ timeout: 2_000 });
+      await toggle.click();
+      await expect(palette).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
   }
 
   private async ensureInspectorVisible(): Promise<void> {
     const inspector = this.page.locator('.flow-inspector');
     if (await inspector.isVisible()) return;
     const toggle = this.page.locator('.designer-view-controls .compact-panel-toggle').nth(1);
-    await expect(toggle).toBeVisible();
-    await toggle.click();
-    await expect(inspector).toBeVisible();
+    await expect(async () => {
+      if (await inspector.isVisible()) return;
+      await expect(toggle).toBeVisible({ timeout: 2_000 });
+      await toggle.click();
+      await expect(inspector).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
   }
 
   private async ensureHistoryActionsVisible(): Promise<void> {

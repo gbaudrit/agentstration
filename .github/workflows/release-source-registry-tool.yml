@@ -127,7 +127,7 @@ jobs:
           --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
       - name: Upload validated package artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: source-registry-tool-${{ steps.version.outputs.package-version }}
           path: |

@@ -79,7 +79,7 @@ V1 supports once, interval and Quartz cron schedules, strict IANA time zones, ET
 
 The Console exposes a searchable `/triggers` list, a guided schedule editor with Flow selection, IANA time zones and occurrence preview, plus a detail view for desired state, observed status, occurrence history, enable/disable and `Run now`. The Management API exposes `/api/triggers` and namespaced equivalents. A scheduled Work becomes an autonomous Task without a fabricated Entry or Interaction. Human input uses the existing task-scoped PendingAction panel and notification path directly from Task details.
 
-See [ADR-0068](../decisions/0068-triggers-submit-work-through-quartz-projection.md) for scheduling guarantees and V1 limits, and [ADR-0183](../decisions/0183-triggers-use-operational-workspaces-for-administrative-contexts.md) for administrative placement and target authorization.
+See [ADR-0068](../decisions/0068-triggers-submit-work-through-quartz-projection.md) for scheduling guarantees and V1 limits, and [ADR-0186](../decisions/0186-triggers-use-operational-workspaces-for-administrative-contexts.md) for administrative placement and target authorization.
 
 Packs are a Management/distribution concept above these planes: they install ordinary resources into deterministic `publisher.name` namespaces and retain provenance, but they are never run. Local ZIP installation, source/fork coexistence, installed-Pack inventory, compensating failure handling, modification-safe uninstall, and six resource handlers are implemented through the Management API. See [Pack format and lifecycle](packs.md).
 

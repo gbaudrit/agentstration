@@ -22,10 +22,11 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.activePorts, page: context.pages.page, target: designer.designer });
 
   await designer.selectStep('Child review');
+  await designer.expectTextSelectionKeepsStepSettingsOpen();
   await designer.useFlowCallVersion('Exact', '1.0.0');
   await designer.expectNamedPorts('Child review', [
     { event: 'historical-result', outcome: 'success' },
-    { event: 'legacy-failure', outcome: 'error' },
+    { event: 'historical-error', outcome: 'error' },
   ]);
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.historicalPorts, page: context.pages.page, target: designer.designer });
 
@@ -39,13 +40,9 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
 
   await designer.addNamedOutput({
     name: 'approved-parent', displayName: 'Approved parent', outcome: 'Success',
-    mapping: '"${transition.output}"',
-    schema: '{"type":"object","properties":{"decision":{"type":"string"}}}',
   });
   await designer.addNamedOutput({
     name: 'error-parent', displayName: 'Error parent', outcome: 'Error',
-    mapping: '"${transition.output}"',
-    schema: '{"type":"object","properties":{"retryable":{"type":"boolean"}}}',
     code: 'PARENT_PROVIDER_ERROR', message: 'The child provider failed.', details: '${transition.output.details}',
   });
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.outputsAuthored, page: context.pages.page, target: designer.designer });

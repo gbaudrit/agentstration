@@ -661,7 +661,7 @@ public sealed partial class FlowTests
         var draft = await createdResponse.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions);
         Assert.IsNotNull(draft);
         Assert.AreEqual(1L, draft.Value.Revision);
-        Assert.AreEqual(7, Enum.GetValues<FlowNodeKind>().Count(kind => kind is FlowNodeKind.Input or FlowNodeKind.Agent or FlowNodeKind.Router or FlowNodeKind.Condition or FlowNodeKind.Transform or FlowNodeKind.Output or FlowNodeKind.Failure));
+        Assert.AreEqual(6, Enum.GetValues<FlowNodeKind>().Count(kind => kind is FlowNodeKind.Input or FlowNodeKind.Agent or FlowNodeKind.Router or FlowNodeKind.Condition or FlowNodeKind.Transform or FlowNodeKind.Output));
 
         using var validationResponse = await client.PostAsync("/api/flows/designer-api-flow/validate", null);
         Assert.AreEqual(HttpStatusCode.OK, validationResponse.StatusCode);

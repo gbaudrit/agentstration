@@ -1,10 +1,10 @@
-# ADR-0183: Triggers use operational Workspaces for administrative contexts
+# ADR-0186: Triggers use operational Workspaces for administrative contexts
 
 Status: Accepted — 2026-10-25
 
 ## Context
 
-ADR-0068 made Trigger definitions and occurrence state Workspace-owned. ADR-0182 later introduced
+ADR-0068 made Trigger definitions and occurrence state Workspace-owned. ADR-0185 later introduced
 governed operational Workspaces so Instance and Tenant administration can reuse the durable execution
 plane without assigning administrative state to an arbitrary business Workspace.
 
@@ -33,7 +33,7 @@ second scheduler and occurrence ownership model.
 - Quartz job data includes the operational Workspace ID. Scheduler recovery and firing load the Trigger
   by its exact Workspace, namespace and name, so homonymous Triggers remain isolated.
 - Work and Flow Runs remain physically owned by the operational Workspace while their execution scope
-  retains the logical authorization scope established by ADR-0182.
+  retains the logical authorization scope established by ADR-0185.
 - Console surfaces present the Flow definition scope and operational Workspace separately. Operational
   Workspace ownership is informative and read-only, not a resource-scope selector.
 

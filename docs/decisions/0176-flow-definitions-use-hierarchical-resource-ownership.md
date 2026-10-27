@@ -1,4 +1,4 @@
-# ADR-0171: Flow definitions use hierarchical resource ownership
+# ADR-0176: Flow definitions use hierarchical resource ownership
 
 ## Status
 

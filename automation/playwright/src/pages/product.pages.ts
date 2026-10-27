@@ -31,6 +31,8 @@ import { ExecutionScopesPage } from './execution-scopes.page.js';
 import { HierarchicalContextPage } from './hierarchical-context.page.js';
 import { OperationalWorkspacesPage } from './operational-workspaces.page.js';
 import { OperationalTriggersPage } from './operational-triggers.page.js';
+import { SchemaContractsPage } from './schema-contracts.page.js';
+import { SchemaDrivenFlowInputsPage } from './schema-driven-flow-inputs.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -64,6 +66,8 @@ export class ProductPages {
   public readonly hierarchicalContext: HierarchicalContextPage;
   public readonly operationalWorkspaces: OperationalWorkspacesPage;
   public readonly operationalTriggers: OperationalTriggersPage;
+  public readonly schemaContracts: SchemaContractsPage;
+  public readonly schemaDrivenFlowInputs: SchemaDrivenFlowInputsPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -97,6 +101,8 @@ export class ProductPages {
     this.hierarchicalContext = new HierarchicalContextPage(page);
     this.operationalWorkspaces = new OperationalWorkspacesPage(page);
     this.operationalTriggers = new OperationalTriggersPage(page);
+    this.schemaContracts = new SchemaContractsPage(page);
+    this.schemaDrivenFlowInputs = new SchemaDrivenFlowInputsPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

@@ -10,6 +10,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Console;
 using Agentstration.Work;
@@ -77,6 +78,24 @@ public sealed partial class ApiClientTests
                     Version = "1.0.0"
                 }
             ],
+            InputSchema = JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new { prompt = new { type = "string" } }
+            }),
+            InputSchemaBinding = new SchemaBinding
+            {
+                Reference = new()
+                {
+                    Name = "agent-input",
+                    Version = "1.0.0"
+                }
+            },
+            OutputSchema = JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new { answer = new { type = "string" } }
+            }),
             Tags = "role=welcome"
         };
 
@@ -91,6 +110,10 @@ public sealed partial class ApiClientTests
         Assert.AreEqual(expected.Instructions, actual.Instructions);
         Assert.AreEqual(expected.ToolNames, actual.ToolNames);
         Assert.AreEqual("1.0.0", actual.ToolSets.Single().Version);
+        Assert.AreEqual("agent-input", actual.InputSchemaBinding?.Reference?.Name);
+        Assert.AreEqual("1.0.0", actual.InputSchemaBinding?.Reference?.Version);
+        Assert.AreEqual("string", actual.InputSchema?.GetProperty("properties").GetProperty("prompt").GetProperty("type").GetString());
+        Assert.AreEqual("string", actual.OutputSchema?.GetProperty("properties").GetProperty("answer").GetProperty("type").GetString());
         Assert.AreEqual(expected.Tags, actual.Tags);
         CollectionAssert.AreEqual(new[] { "handoff" }, roundTripped.Definition.Behaviors.ToArray());
         CollectionAssert.AreEqual(new[] { "audit" }, roundTripped.Definition.Middleware.ToArray());

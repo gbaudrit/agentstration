@@ -92,6 +92,12 @@ export const Checkpoints = {
     transitionsConnected: 'flow-named-outputs-transitions-connected',
     publishedReadOnly: 'flow-named-outputs-published-read-only',
   },
+  flowDesignerResponsive: {
+    desktopWorkspace: 'flow-designer-responsive-desktop-workspace',
+    narrowDrawers: 'flow-designer-responsive-narrow-drawers',
+    focusModes: 'flow-designer-responsive-focus-modes',
+    verificationFailure: 'flow-designer-responsive-verification-failure',
+  },
   consoleAdministration: {
     organization: 'console-admin-organization',
     member: 'console-admin-member',
@@ -185,6 +191,9 @@ export const Checkpoints = {
   },
   schemaDrivenSources: {
     completed: 'schema-driven-sources-completed',
+  },
+  schemaDrivenFlowInputs: {
+    completed: 'schema-driven-flow-inputs-completed',
   },
   schemaAdministration: {
     completed: 'schema-administration-completed',

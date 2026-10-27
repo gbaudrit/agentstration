@@ -28,7 +28,7 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         var page = contextScope is { } scope
             ? await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", scope, cancellationToken)
             : await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", cancellationToken);
-        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace, ScopeRef = item.ScopeRef, ActiveVersion = item.ActiveVersion }).ToArray();
+        return page.Value.Select(item => new FlowSummary(item.Id, item.DisplayName ?? item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace, ScopeRef = item.ScopeRef, ActiveVersion = item.ActiveVersion }).ToArray();
     }
 
     public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>

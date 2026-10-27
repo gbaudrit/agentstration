@@ -11,6 +11,7 @@ using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Core;
 using Agentstration.Security.Contracts;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Sources;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -142,6 +143,43 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual(new ResourceNamespace("agentstration.sample-pack"), first.ModelProfileNamespace);
         Assert.AreEqual("maf-builtin", first.RuntimeProfileName);
         Assert.AreEqual(ResourceNamespace.Default, first.RuntimeProfileNamespace);
+    }
+
+    [TestMethod]
+    public void CompilerIncludesEffectiveInvocationContractsInImmutableRevision()
+    {
+        var compiler = new AgentDefinitionCompiler();
+        var input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { prompt = new { type = "string" } } });
+        var output = JsonSerializer.SerializeToElement(new { type = "object", properties = new { answer = new { type = "string" } } });
+        var agent = Agent("contract-agent") with
+        {
+            Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Generation = 2,
+            Definition = Agent("contract-agent").Definition with
+            {
+                InputSchema = input,
+                InputSchemaBinding = new SchemaBinding
+                {
+                    Reference = new() { Name = "agent-input", Version = "1.0.0" }
+                },
+                OutputSchema = output
+            }
+        };
+
+        var resolved = compiler.Compile(agent, LocalSpec());
+        var withoutContract = compiler.Compile(agent with
+        {
+            Definition = agent.Definition with
+            {
+                InputSchema = null,
+                InputSchemaBinding = null,
+                OutputSchema = null
+            }
+        }, LocalSpec());
+
+        Assert.AreEqual("string", resolved.InputSchema?.GetProperty("properties").GetProperty("prompt").GetProperty("type").GetString());
+        Assert.AreEqual("string", resolved.OutputSchema?.GetProperty("properties").GetProperty("answer").GetProperty("type").GetString());
+        Assert.AreNotEqual(withoutContract.DefinitionHash, resolved.DefinitionHash);
     }
 
     [TestMethod]

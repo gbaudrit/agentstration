@@ -54,7 +54,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -97,7 +97,7 @@ jobs:
         run: npm run coverage:report > test-results/application-coverage.md
       - name: Upload browser quality evidence
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: browser-ux-evidence-${{ github.run_attempt }}
           path: |

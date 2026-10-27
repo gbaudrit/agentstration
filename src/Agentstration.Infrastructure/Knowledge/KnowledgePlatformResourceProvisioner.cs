@@ -372,7 +372,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                         }
                     })
                 },
-                new FailureFlowStepDefinition { Name = "failure", Code = "acquisition_failed", Message = "Data Source acquisition failed.", DetailsExpression = "${transition.output}" }
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error, Code = "acquisition_failed", Message = "Data Source acquisition failed.", DetailsExpression = "${transition.output}" }
             ],
             Transitions =
             [
@@ -415,7 +415,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                     DisplayName = "Acquisition manifest",
                     OutputMapping = JsonSerializer.SerializeToElement("${steps.import.output}")
                 },
-                new FailureFlowStepDefinition { Name = "failure", Code = "artifact_import_failed", Message = "Artifact import failed.", DetailsExpression = "${transition.output}" }
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error, Code = "artifact_import_failed", Message = "Artifact import failed.", DetailsExpression = "${transition.output}" }
             ],
             Transitions =
             [
@@ -458,7 +458,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 new OutputFlowStepDefinition { Name = "search-output", OutputMapping = JsonSerializer.SerializeToElement("${steps.search.output}") },
                 new OutputFlowStepDefinition { Name = "query-output", OutputMapping = JsonSerializer.SerializeToElement("${steps.query.output}") },
                 new OutputFlowStepDefinition { Name = "read-output", OutputMapping = JsonSerializer.SerializeToElement("${steps.read.output}") },
-                new FailureFlowStepDefinition { Name = "failure", Code = "knowledge_retrieval_failed", Message = "Knowledge retrieval failed.", DetailsExpression = "${transition.output}" }
+                new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error, Code = "knowledge_retrieval_failed", Message = "Knowledge retrieval failed.", DetailsExpression = "${transition.output}" }
             ],
             Transitions =
             [

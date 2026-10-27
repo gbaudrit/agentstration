@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
@@ -5,6 +6,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
 
@@ -49,8 +51,11 @@ public sealed class AgentManagementService(
     IEnumerable<IResourceDeletionGuard> deletionGuards,
     IAgentRevisionRunRetention revisionRunRetention,
     ISecurityAuditWriter audit,
-    AgentRevisionRetentionOptions revisionRetentionOptions)
+    AgentRevisionRetentionOptions revisionRetentionOptions,
+    ISchemaBindingResolver? schemaBindingResolver = null)
 {
+    private const string JsonSchemaFormat = "json-schema";
+
     public Task InitializeAsync(CancellationToken cancellationToken) => store.InitializeAsync(cancellationToken);
 
     public async Task ValidateForCreateAsync(AgentResource resource, CancellationToken cancellationToken)
@@ -59,6 +64,7 @@ public sealed class AgentManagementService(
         ValidateDefinition(resource.Definition);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(AgentResourceKinds.Agent);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
+        _ = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
         await ValidateReferencesAsync(resource, scopeRef, cancellationToken);
     }
 
@@ -70,9 +76,11 @@ public sealed class AgentManagementService(
         var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, AgentResourceKinds.Agent, resource.Name);
         var existing = await store.GetExactAsync<AgentResource>(address, cancellationToken);
         ValidatePreconditions(existing, ifMatch, ifNoneMatch);
-        if (existing is not null && DesiredStateEquals(existing.Value, resource)) return existing;
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
         await ValidateReferencesAsync(resource, scopeRef, cancellationToken);
+        var contracts = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
+        resource = resource with { Definition = contracts.Definition };
+        if (existing is not null && DesiredStateEquals(existing.Value, resource)) return existing;
 
         var desired = resource with
         {
@@ -181,21 +189,23 @@ public sealed class AgentManagementService(
     public async Task<StoredResource<AgentRevision>> CreateRevisionAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef? scopeRef, AgentDeploymentSpec spec, CancellationToken cancellationToken)
     {
         var agent = await GetAgentAsync(@namespace, agentName, scopeRef, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        var (toolSetTools, toolSetAssignments, toolSetPins) = await ResolveToolSetAssignmentsAsync(agent.Value, cancellationToken);
         var ownerScopeRef = agent.Value.ScopeRef
             ?? throw new AgentDefinitionValidationException("agent_scope_invalid", "The Agent has no ownership scope.");
-        var directToolPins = await ResolveToolPinsAsync(agent.Value, ownerScopeRef, cancellationToken);
+        var contracts = await ResolveContractsAsync(agent.Value.Definition, ownerScopeRef, agent.Value.Namespace, cancellationToken);
+        var resolvedAgent = agent.Value with { Definition = contracts.Definition };
+        var (toolSetTools, toolSetAssignments, toolSetPins) = await ResolveToolSetAssignmentsAsync(resolvedAgent, cancellationToken);
+        var directToolPins = await ResolveToolPinsAsync(resolvedAgent, ownerScopeRef, cancellationToken);
         var modelProfilePin = await modelProfiles.ResolveAsync(
-            agent.Value.Definition.ModelProfile, agent.Value.Namespace, ownerScopeRef, cancellationToken)
-            ?? await ResolveDependencyAsync(agent.Value.Definition.ModelProfile, agent.Value.Namespace,
+            resolvedAgent.Definition.ModelProfile, resolvedAgent.Namespace, ownerScopeRef, cancellationToken)
+            ?? await ResolveDependencyAsync(resolvedAgent.Definition.ModelProfile, resolvedAgent.Namespace,
                 ModelResourceKinds.ModelProfile, ownerScopeRef, cancellationToken);
         var runtimeReference = new ResourceReference(spec.RuntimeProfileName,
-            agent.Value.Definition.RuntimeProfile.ScopeRef, spec.RuntimeProfileNamespace);
-        var runtimeProfilePin = await ResolveDependencyAsync(runtimeReference, agent.Value.Namespace,
+            resolvedAgent.Definition.RuntimeProfile.ScopeRef, spec.RuntimeProfileNamespace);
+        var runtimeProfilePin = await ResolveDependencyAsync(runtimeReference, resolvedAgent.Namespace,
             RuntimeProfileResourceKinds.RuntimeProfile, ownerScopeRef, cancellationToken);
-        var resolved = compiler.Compile(agent.Value, spec, toolSetTools, toolSetAssignments,
+        var resolved = compiler.Compile(resolvedAgent, spec, toolSetTools, toolSetAssignments,
             [.. directToolPins, .. toolSetPins],
-            modelProfilePin, runtimeProfilePin);
+            modelProfilePin, runtimeProfilePin) with { SchemaBindings = contracts.Snapshots };
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
         var revisionAddress = ScopedResourceAddress.Create(ownerScopeRef, @namespace, AgentResourceKinds.AgentRevision, revisionName);
@@ -629,6 +639,56 @@ public sealed class AgentManagementService(
                 throw new AgentDefinitionValidationException("tool_set_version_required", "An exact ToolSet version is required.");
             foreach (var member in selection.Members)
                 ValidateName(member.Contains('/', StringComparison.Ordinal) ? member[(member.IndexOf('/', StringComparison.Ordinal) + 1)..] : member, "tool_set.member");
+        }
+        ValidateSchema(definition.InputSchema, definition.InputSchemaBinding, "input");
+        ValidateSchema(definition.OutputSchema, definition.OutputSchemaBinding, "output");
+    }
+
+    private static void ValidateSchema(JsonElement? schema, SchemaBinding? binding, string direction)
+    {
+        if (schema is { ValueKind: not JsonValueKind.Object })
+            throw new AgentDefinitionValidationException($"agent_{direction}_schema_invalid", $"The Agent {direction} schema must be a JSON object.");
+        if (binding is { Inline: null, Reference: null } or { Inline: not null, Reference: not null })
+            throw new AgentDefinitionValidationException("schema_binding_invalid", $"The Agent {direction} contract must select exactly one Schema binding form.");
+    }
+
+    private async ValueTask<(AgentProperties Definition, IReadOnlyDictionary<string, SchemaBindingSnapshot> Snapshots)> ResolveContractsAsync(
+        AgentProperties definition,
+        ResourceScopeRef scopeRef,
+        ResourceNamespace ownerNamespace,
+        CancellationToken cancellationToken)
+    {
+        var snapshots = new Dictionary<string, SchemaBindingSnapshot>(StringComparer.Ordinal);
+        var input = await ResolveContractAsync("$.inputSchema", definition.InputSchema, definition.InputSchemaBinding,
+            scopeRef, ownerNamespace, snapshots, cancellationToken);
+        var output = await ResolveContractAsync("$.outputSchema", definition.OutputSchema, definition.OutputSchemaBinding,
+            scopeRef, ownerNamespace, snapshots, cancellationToken);
+        return (definition with { InputSchema = input, OutputSchema = output }, snapshots);
+    }
+
+    private async ValueTask<JsonElement?> ResolveContractAsync(
+        string path,
+        JsonElement? legacy,
+        SchemaBinding? binding,
+        ResourceScopeRef scopeRef,
+        ResourceNamespace ownerNamespace,
+        Dictionary<string, SchemaBindingSnapshot> snapshots,
+        CancellationToken cancellationToken)
+    {
+        if (binding is null)
+            return legacy?.Clone();
+        if (schemaBindingResolver is null)
+            throw new AgentDefinitionValidationException("schema_binding_resolver_unavailable", "Schema bindings are not available in this composition.");
+        try
+        {
+            var snapshot = await schemaBindingResolver.ResolveAsync(path, binding,
+                new SchemaBindingResolutionContext(scopeRef, ownerNamespace, JsonSchemaFormat), cancellationToken);
+            snapshots[path] = snapshot;
+            return snapshot.Content.Clone();
+        }
+        catch (SchemaBindingResolutionException exception)
+        {
+            throw new AgentDefinitionValidationException(exception.Code, exception.Message);
         }
     }
 

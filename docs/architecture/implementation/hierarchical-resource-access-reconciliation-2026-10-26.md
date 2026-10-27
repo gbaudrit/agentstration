@@ -9,7 +9,7 @@ This transverse reconciliation compares `main` at `39f2aa4380d019a2a3ea694c62b4e
 - the Console's exact hierarchical context, resource-access administration, Flow Designer, direct execution, and Trigger journeys;
 - the shared LikeC4 model and its L1, L2, L3, and API-composition views;
 - DAT resource, tenancy, runtime dynamic, deployment, persistence, implementation, and dependency pages;
-- accepted ADR-0079, ADR-0119, and ADR-0171 through ADR-0183; and
+- accepted ADR-0079, ADR-0119, ADR-0172, and ADR-0176 through ADR-0186; and
 - architecture tests plus deterministic API, storage, Console component, and Playwright coverage delivered by the #789 child verticals.
 
 ## Implemented scope model
@@ -69,10 +69,10 @@ Publication and execution preserve exact scope, namespace, UID, generation or im
 
 Accepted ADRs are historical records and were not rewritten during this reconciliation.
 
-- ADR-0182 explicitly supersedes ADR-0177 where ADR-0177 requires direct Instance- or Tenant-owned durable execution state. The remaining ADR-0177 requirements for exact definition identity, authorization, immutable propagation, and non-rebinding still apply.
-- ADR-0176 records a transitional restriction that denied ancestor acquisition Flows until #751 exposed Flow identities to the access overlay. The implementation now satisfies that prerequisite through ADR-0171 and ADR-0172. The current DAT describes the delivered behavior, while ADR-0176 remains evidence of the transition.
-- ADR-0171 states both that Flow definitions and all exact operations preserve Instance/Tenant/Workspace ownership and that “Flow drafts remain Workspace-owned authoring state.” The implementation and the rest of the decision support exact-scope editable definitions. This internal wording conflict is intentionally recorded here for maintainer review rather than silently editing the accepted ADR.
-- No additional architectural choice lacking a decision record was found. ADR-0171 through ADR-0183 collectively cover ownership, access overlays, dependency closure, provenance, exact Console context, operational topology, and Trigger placement.
+- ADR-0185 explicitly supersedes ADR-0180 where ADR-0180 requires direct Instance- or Tenant-owned durable execution state. The remaining ADR-0180 requirements for exact definition identity, authorization, immutable propagation, and non-rebinding still apply.
+- ADR-0179 records a transitional restriction that denied ancestor acquisition Flows until #751 exposed Flow identities to the access overlay. The implementation now satisfies that prerequisite through ADR-0176 and ADR-0172. The current DAT describes the delivered behavior, while ADR-0179 remains evidence of the transition.
+- ADR-0176 states both that Flow definitions and all exact operations preserve Instance/Tenant/Workspace ownership and that “Flow drafts remain Workspace-owned authoring state.” The implementation and the rest of the decision support exact-scope editable definitions. This internal wording conflict is intentionally recorded here for maintainer review rather than silently editing the accepted ADR.
+- No additional architectural choice lacking a decision record was found. ADR-0172 and ADR-0176 through ADR-0186 collectively cover ownership, access overlays, dependency closure, provenance, exact Console context, operational topology, and Trigger placement.
 
 ## Validation
 

@@ -259,7 +259,7 @@ public sealed partial class FlowTests
                 InputMapping = JsonSerializer.SerializeToElement(new { article = "${input.article}" })
             },
             new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.analyze.output}") },
-            new FailureFlowStepDefinition { Name = "failure", Code = "CHILD_FLOW_FAILED", Message = "Child Flow failed." }
+            new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error, Code = "CHILD_FLOW_FAILED", Message = "Child Flow failed." }
         ],
         Transitions =
         [

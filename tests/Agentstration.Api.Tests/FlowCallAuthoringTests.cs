@@ -52,28 +52,6 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
-    public void LegacyOutputAndFailureRemainReadableWithTheirPreviousDefaults()
-    {
-        const string json = """
-            {"entryStep":"input","steps":[{"type":"input","name":"input"},{"type":"output","name":"output"},{"type":"failure","name":"failure"}],"transitions":[{"id":"done","fromStep":"input","event":"completed","toStep":"output"}]}
-            """;
-
-        var restored = JsonSerializer.Deserialize<FlowGraphDefinition>(json, JsonOptions)!;
-        var output = Assert.IsInstanceOfType<OutputFlowStepDefinition>(restored.Steps[1]);
-        var failure = Assert.IsInstanceOfType<FailureFlowStepDefinition>(restored.Steps[2]);
-
-        Assert.IsNull(output.Outcome);
-        Assert.AreEqual(FlowOutputOutcome.Success, restored.GetOutputs().Single(value => value.Name == "output").Outcome);
-        Assert.AreEqual("FLOW_FAILED", failure.Code);
-        using var serialized = JsonDocument.Parse(JsonSerializer.Serialize(restored, JsonOptions));
-        var legacyOutput = serialized.RootElement.GetProperty("steps")[1];
-        Assert.IsFalse(legacyOutput.TryGetProperty("outcome", out _));
-        Assert.IsFalse(legacyOutput.TryGetProperty("schema", out _));
-        Assert.IsFalse(legacyOutput.TryGetProperty("code", out _));
-        Assert.IsFalse(legacyOutput.TryGetProperty("message", out _));
-    }
-
-    [TestMethod]
     public async Task OutputSchemaInferenceRejectsIncompatibleIncomingContracts()
     {
         var firstSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { first = new { type = "string" } } });

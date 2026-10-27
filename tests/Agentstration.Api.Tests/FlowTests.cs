@@ -10,6 +10,7 @@ using Agentstration.Infrastructure.Flows;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -49,7 +50,8 @@ public sealed partial class FlowTests
             DbCommandInterceptor? commandInterceptor = null,
             TimeProvider? timeProvider = null,
             IFlowScopeHierarchy? scopeHierarchy = null,
-            IFlowDiscoveryPolicy? discoveryPolicy = null)
+            IFlowDiscoveryPolicy? discoveryPolicy = null,
+            IFlowResourceReferenceResolver? resourceReferenceResolver = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -68,6 +70,9 @@ public sealed partial class FlowTests
             }
             if (scopeHierarchy is not null) services.AddSingleton(scopeHierarchy);
             if (discoveryPolicy is not null) services.AddSingleton(discoveryPolicy);
+            services.AddSingleton<ISchemaBindingResolver, TestSchemaBindingResolver>();
+            if (resourceReferenceResolver is not null)
+                services.AddSingleton(resourceReferenceResolver);
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);
@@ -168,5 +173,17 @@ public sealed partial class FlowTests
     private sealed class ExistingResourceResolver : IFlowResourceReferenceResolver
     {
         public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) => Task.FromResult(true);
+    }
+
+    private sealed class TestSchemaBindingResolver : ISchemaBindingResolver
+    {
+        public ValueTask<SchemaBindingSnapshot> ResolveAsync(string path, SchemaBinding binding,
+            SchemaBindingResolutionContext context, CancellationToken cancellationToken)
+        {
+            var inline = binding.Inline ?? throw new SchemaBindingResolutionException(
+                "schema_reference_not_supported", "This test fixture only supports inline bindings.");
+            return ValueTask.FromResult(new SchemaBindingSnapshot(path, inline.Format, inline.Dialect,
+                inline.Content.Clone(), $"test:{inline.Content.GetRawText()}"));
+        }
     }
 }

@@ -27,7 +27,7 @@ public sealed record FlowReference(
 public enum FlowKind { Direct, Routing, Workflow, Orchestration, Composite }
 public enum FlowTargetKind { Agent, Flow }
 public enum FlowRoutingStrategy { Deterministic, Capabilities, Semantic, Llm, Hybrid, Custom }
-public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Failure, Flow, Function, ExternalCall, HumanApproval, Custom }
+public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Flow, Function, ExternalCall, HumanApproval, Custom }
 public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupChat, Magentic }
 public enum FlowCompositionMode { Sequential, Concurrent, Custom }
 public enum FlowRunStatus { Pending, Running, WaitingForInput, Succeeded, Failed, Cancelled, TimedOut, WaitingForChild }

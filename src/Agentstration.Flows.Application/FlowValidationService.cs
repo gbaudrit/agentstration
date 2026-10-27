@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Flows.Application;
 
@@ -56,6 +57,14 @@ public interface IFlowResourceReferenceResolver
 {
     Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken);
     Task<ResolvedFlowCall?> ResolveFlowAsync(
+        ResourceScopeRef ownerScopeRef,
+        ResourceNamespace ownerNamespace,
+        FlowCallReference reference,
+        CancellationToken cancellationToken) => ownerScopeRef.Kind == ResourceScopeKind.Workspace
+            ? ResolveFlowAsync(new WorkspaceId(ownerScopeRef.TargetId!.Value), ownerNamespace, reference, cancellationToken)
+            : Task.FromResult<ResolvedFlowCall?>(null);
+
+    Task<ResolvedFlowCall?> ResolveFlowAsync(
         WorkspaceId workspaceId,
         ResourceNamespace ownerNamespace,
         FlowCallReference reference,
@@ -68,10 +77,26 @@ public interface IFlowResourceReferenceResolver
         CancellationToken cancellationToken) => Task.FromResult(false);
 
     Task<ResolvedFlowTool?> ResolveToolAsync(
+        ResourceScopeRef ownerScopeRef,
+        ResourceNamespace ownerNamespace,
+        FlowToolReference reference,
+        CancellationToken cancellationToken) => ownerScopeRef.Kind == ResourceScopeKind.Workspace
+            ? ResolveToolAsync(new WorkspaceId(ownerScopeRef.TargetId!.Value), ownerNamespace, reference, cancellationToken)
+            : Task.FromResult<ResolvedFlowTool?>(null);
+
+    Task<ResolvedFlowTool?> ResolveToolAsync(
         WorkspaceId workspaceId,
         ResourceNamespace ownerNamespace,
         FlowToolReference reference,
         CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowTool?>(null);
+
+    Task<ResolvedFlowToolRoute?> ResolveToolRouteAsync(
+        ResourceScopeRef ownerScopeRef,
+        ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step,
+        CancellationToken cancellationToken) => ownerScopeRef.Kind == ResourceScopeKind.Workspace
+            ? ResolveToolRouteAsync(new WorkspaceId(ownerScopeRef.TargetId!.Value), ownerNamespace, step, cancellationToken)
+            : Task.FromResult<ResolvedFlowToolRoute?>(null);
 
     Task<ResolvedFlowToolRoute?> ResolveToolRouteAsync(
         WorkspaceId workspaceId,
@@ -92,6 +117,10 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
     {
         ArgumentNullException.ThrowIfNull(definition);
         var issues = new List<FlowValidationIssue>();
+        ValidateSchemaContract(definition.InputSchema, definition.InputSchemaBinding,
+            "inputSchema", null, issues);
+        ValidateSchemaContract(definition.OutputSchema, definition.OutputSchemaBinding,
+            "outputSchema", null, issues);
         var steps = new Dictionary<string, FlowStepDefinition>(StringComparer.Ordinal);
         foreach (var step in definition.Steps)
         {
@@ -109,7 +138,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
         if (definition.Steps.Count(step => step is InputFlowStepDefinition) != 1) issues.Add(Error("input_step_required", "A Flow requires exactly one Input step."));
-        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));
+        if (!definition.Steps.Any(step => step is OutputFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));
 
         var transitionIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var transition in definition.Transitions)
@@ -133,7 +162,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (HasCycle(definition.EntryStep, definition.Transitions)) issues.Add(Error("flow_cycle_not_supported", "Cycles are not supported in this execution increment."));
         }
 
-        foreach (var terminal in definition.Steps.Where(step => step is OutputFlowStepDefinition or FailureFlowStepDefinition))
+        foreach (var terminal in definition.Steps.OfType<OutputFlowStepDefinition>())
             if (definition.Transitions.Any(transition => transition.FromStep == terminal.Name)) issues.Add(Error("terminal_has_transition", $"Terminal step '{terminal.Name}' cannot have outgoing transitions.", terminal.Name));
 
         foreach (var output in definition.Steps.OfType<OutputFlowStepDefinition>())
@@ -156,6 +185,9 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         await ValidateArtifactOutputAsync(step, transitions, context, issues, token);
         switch (step)
         {
+            case InputFlowStepDefinition input:
+                ValidateSchemaContract(input.Schema, input.SchemaBinding, "schema", input.Name, issues);
+                break;
             case AgentFlowStepDefinition agent:
                 await ValidateResourceAsync(agent.Agent.ResourceId, agent.Agent.Namespace, step.Name, "agent.resourceId", context, issues, token);
                 ValidateJsonExpressions(agent.InputMapping, issues, step.Name, "inputMapping");
@@ -180,6 +212,9 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             case TransformFlowStepDefinition transform:
                 if (transform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)) ValidateExpression(transform.Expression, issues, step.Name, property: "expression");
                 else ValidateJsonExpressions(transform.Mapping, issues, step.Name, "mapping");
+                if (!ValidContractSchema(transform.Schema))
+                    issues.Add(Error("flow_transform_schema_invalid", "The transformed output has an invalid or unsupported schema.", step.Name, property: "schema"));
+                ValidateSchemaContract(transform.Schema, transform.SchemaBinding, "schema", transform.Name, issues);
                 break;
             case FlowCallStepDefinition flowCall:
                 await ValidateFlowCallAsync(flowCall, transitions, context, issues, token);
@@ -210,6 +245,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 ValidateJsonExpressions(output.DetailsExpression is null ? null : JsonSerializer.SerializeToElement(output.DetailsExpression), issues, step.Name, "detailsExpression");
                 if (!ValidContractSchema(output.Schema))
                     issues.Add(Error("flow_output_schema_invalid", "The named output has an invalid or unsupported schema.", step.Name, property: "schema"));
+                ValidateSchemaContract(output.Schema, output.SchemaBinding, "schema", output.Name, issues);
                 if (output.Outcome == FlowOutputOutcome.Error && output.Code is not null && string.IsNullOrWhiteSpace(output.Code))
                     issues.Add(Error("flow_output_error_code_invalid", "An error output code cannot be empty.", step.Name, property: "code"));
                 if (output.Outcome == FlowOutputOutcome.Error && output.Message is not null && string.IsNullOrWhiteSpace(output.Message))
@@ -336,7 +372,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             issues.Add(Error("tool_input_schema_invalid", "The selected Tool has an invalid or unsupported input schema.", step.Name, property: "tool.inputSchema"));
             return;
         }
-        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping, target.InputSchema, "tool_argument", issues);
+        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping, target.InputSchema, "tool_argument", issues,
+            allowCompleteObjectReference: true);
     }
 
     private async Task ValidateFlowCallAsync(
@@ -453,8 +490,14 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         JsonElement? candidate,
         JsonElement schema,
         string codePrefix,
-        List<FlowValidationIssue> issues)
+        List<FlowValidationIssue> issues,
+        bool allowCompleteObjectReference = false)
     {
+        if (allowCompleteObjectReference
+            && candidate is { ValueKind: JsonValueKind.String } expressionValue
+            && FlowExpressionParser.TryParse(expressionValue.GetString()!, out var expression, out _)
+            && IsCompleteObjectReference(expression.Body))
+            return;
         if (candidate is not { ValueKind: JsonValueKind.Object } mapping)
         {
             issues.Add(Error($"{codePrefix}_object_required", "The selected resource requires an object mapping.", stepName, property: propertyPath));
@@ -480,6 +523,37 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         if (schema.Value.TryGetProperty("type", out var type)
             && (type.ValueKind != JsonValueKind.String || !string.Equals(type.GetString(), "object", StringComparison.Ordinal))) return false;
         return !schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind == JsonValueKind.Object;
+    }
+
+    private static void ValidateSchemaContract(JsonElement? legacy, SchemaBinding? binding,
+        string property, string? stepName, List<FlowValidationIssue> issues)
+    {
+        if (legacy is not null && binding is not null)
+        {
+            issues.Add(Error("schema_binding_ambiguous",
+                "A Flow contract cannot declare both a legacy JSON schema and a Schema binding.",
+                stepName, property: property));
+            return;
+        }
+        if (binding is null) return;
+        var forms = (binding.Inline is null ? 0 : 1) + (binding.Reference is null ? 0 : 1);
+        if (forms != 1)
+        {
+            issues.Add(Error("schema_binding_invalid",
+                "A Schema binding must contain exactly one inline definition or version reference.",
+                stepName, property: property));
+            return;
+        }
+        if (binding.Inline is { } inline
+            && (string.IsNullOrWhiteSpace(inline.Format)
+                || inline.Content.ValueKind == JsonValueKind.Undefined))
+            issues.Add(Error("schema_binding_inline_invalid",
+                "An inline Schema binding requires a format and content.", stepName, property: property));
+        if (binding.Reference is { } reference
+            && (string.IsNullOrWhiteSpace(reference.Name) || string.IsNullOrWhiteSpace(reference.Version)))
+            issues.Add(Error("schema_binding_reference_invalid",
+                "A Schema reference requires a name and an exact published version.",
+                stepName, property: property));
     }
 
     private async Task ValidateResourceAsync(string resourceId, ResourceNamespace? @namespace, string step, string property, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)

@@ -1,4 +1,4 @@
-# ADR-0180: Knowledge Source definitions use hierarchical ownership
+# ADR-0183: Knowledge Source definitions use hierarchical ownership
 
 ## Status
 

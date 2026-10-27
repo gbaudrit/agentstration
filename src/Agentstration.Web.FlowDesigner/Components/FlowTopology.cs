@@ -205,7 +205,6 @@ public static class FlowTopologyProjector
 
     private static bool IsFailureTransition(FlowGraphDefinition graph, FlowTransitionDefinition transition) =>
         transition.Event is "error" or "failed" or "timedOut"
-        || graph.Steps.Single(step => step.Name == transition.ToStep) is FailureFlowStepDefinition
         || graph.Steps.Single(step => step.Name == transition.ToStep) is OutputFlowStepDefinition
         {
             Outcome: FlowOutputOutcome.Error
@@ -499,7 +498,6 @@ public static class FlowTopologyProjector
         FlowCallStepDefinition flow => flow.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? $"{flow.Flow.ResourceId} · {flow.Flow.Version}" : $"{flow.Flow.ResourceId} · active",
         RepeatFlowStepDefinition repeat => repeat.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? $"{repeat.Flow.ResourceId} · {repeat.Flow.Version} · ≤ {repeat.MaximumIterations}" : $"{repeat.Flow.ResourceId} · active · ≤ {repeat.MaximumIterations}",
         ToolFlowStepDefinition tool => tool.Tool.ResourceId,
-        FailureFlowStepDefinition failure => failure.Code,
         _ => null
     };
 

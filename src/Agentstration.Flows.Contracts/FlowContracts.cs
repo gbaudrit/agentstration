@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Flows.Contracts;
 
@@ -29,7 +30,7 @@ public sealed record FlowSummaryResponse(string Id, string Name, string? Descrip
     public string? DisplayName { get; init; }
     public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }
-public sealed record FlowVersionResponse(string FlowId, string Version, string? Description, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset PublishedAt, FlowGraphDefinition? Graph = null, string? DefinitionHash = null, string? ReleaseNotes = null)
+public sealed record FlowVersionResponse(string FlowId, string Version, string? Description, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset PublishedAt, FlowGraphDefinition? Graph = null, string? DefinitionHash = null, string? ReleaseNotes = null, IReadOnlyDictionary<string, SchemaBindingSnapshot>? SchemaBindings = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }

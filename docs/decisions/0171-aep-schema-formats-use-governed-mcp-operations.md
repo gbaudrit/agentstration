@@ -1,4 +1,4 @@
-# ADR-0175: AEP Schema formats use governed MCP operations
+# ADR-0171: AEP Schema formats use governed MCP operations
 
 ## Status
 

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Flows.Application;
 
@@ -34,12 +35,14 @@ public sealed class FlowService(
     IFlowRepository repository,
     TimeProvider timeProvider,
     IEnumerable<IFlowDeletionGuard> deletionGuards,
+    ISchemaBindingResolver schemaBindingResolver,
     IEnumerable<IFlowVersionActivationGuard>? activationGuards = null,
     IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null,
     IFlowAgentReferenceResolver? agentReferences = null,
     IFlowDiscoveryPolicy? discoveryPolicy = null,
     IResourceGovernanceContext? governanceContext = null,
-    ISecurityAuditWriter? audit = null)
+    ISecurityAuditWriter? audit = null,
+    IFlowResourceReferenceResolver? resourceReferenceResolver = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IResourceGovernanceContext effectiveGovernanceContext = governanceContext ?? new ResourceGovernanceContext();
@@ -225,8 +228,17 @@ public sealed class FlowService(
             throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
         var definition = await PinAgentsAsync(scopeRef, id.Namespace, stored.Value.Definition, cancellationToken);
         var graph = stored.Value.Graph is null ? null : await PinAgentsAsync(scopeRef, id.Namespace, stored.Value.Graph, cancellationToken);
+        IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaBindings = null;
+        if (graph is not null)
+        {
+            var resolved = await new FlowSchemaBindingSnapshotter(schemaBindingResolver)
+                .ResolveAsync(scopeRef, id, graph, cancellationToken);
+            graph = await new FlowOutputContractSnapshotter(resourceReferenceResolver)
+                .ResolveAsync(scopeRef, id, resolved.Graph, cancellationToken);
+            schemaBindings = resolved.Snapshots;
+        }
         var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, definition, stored.Value.Metadata, timeProvider.GetUtcNow(), graph,
-            graph is null ? FlowDefinitionHash.Compute(definition) : FlowDefinitionHash.Compute(graph), releaseNotes)
+            graph is null ? FlowDefinitionHash.Compute(definition) : FlowDefinitionHash.Compute(graph), releaseNotes, schemaBindings)
         {
             Governance = stored.Value.Governance
         };

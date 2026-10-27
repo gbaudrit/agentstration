@@ -16,6 +16,7 @@ export class FlowObservabilityPage {
   }
 
   public async exerciseDraftDefinitionAndSplit(consoleUrl: string, checkInvalidYaml: boolean): Promise<void> {
+    if (checkInvalidYaml) await this.page.setViewportSize({ width: 1920, height: 1080 });
     const flowName = `definition-editor-smoke-${Date.now()}`;
     const created = await this.page.request.post(`${consoleUrl}/api/flows/drafts`, {
       data: { name: flowName, displayName: 'Definition editor smoke', template: 'Empty' },

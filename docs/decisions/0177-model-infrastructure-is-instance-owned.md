@@ -1,4 +1,4 @@
-# ADR-0173: Model infrastructure is Instance-owned and Model Profiles are hierarchical
+# ADR-0177: Model infrastructure is Instance-owned and Model Profiles are hierarchical
 
 Status: Accepted — 2026-10-14
 

@@ -21,6 +21,7 @@ import { inspectArtifactContent, type InspectArtifactContentInput } from './insp
 import { exerciseToolExecution, type ExerciseToolExecutionInput } from './exercise-tool-execution.journey.js';
 import { exerciseFlowTransitionEditing, type ExerciseFlowTransitionEditingInput } from './exercise-flow-transition-editing.journey.js';
 import { exerciseFlowNamedOutputs, type ExerciseFlowNamedOutputsInput } from './exercise-flow-named-outputs.journey.js';
+import { exerciseFlowDesignerResponsive, type ExerciseFlowDesignerResponsiveInput } from './exercise-flow-designer-responsive.journey.js';
 import { inspectRuntimeWorkerObservability, type InspectRuntimeWorkerObservabilityInput } from './inspect-runtime-worker-observability.journey.js';
 import { inspectAgentInstanceObservability, type InspectAgentInstanceObservabilityInput } from './inspect-agent-instance-observability.journey.js';
 import { exerciseSchemaDrivenSources, type ExerciseSchemaDrivenSourcesInput } from './exercise-schema-driven-sources.journey.js';
@@ -30,6 +31,9 @@ import { exerciseExecutionScopes, type ExerciseExecutionScopesInput } from './ex
 import { exerciseHierarchicalContext, type ExerciseHierarchicalContextInput } from './exercise-hierarchical-context.journey.js';
 import { exerciseOperationalWorkspaces, type ExerciseOperationalWorkspacesInput } from './exercise-operational-workspaces.journey.js';
 import { exerciseOperationalTriggers, type ExerciseOperationalTriggersInput } from './exercise-operational-triggers.journey.js';
+import { exerciseSchemaContractBindings, type ExerciseSchemaContractBindingsInput } from './exercise-schema-contract-bindings.journey.js';
+import { exerciseFlowConnectionContracts, type ExerciseFlowConnectionContractsInput } from './exercise-flow-connection-contracts.journey.js';
+import { exerciseSchemaDrivenFlowInputs, type ExerciseSchemaDrivenFlowInputsInput } from './exercise-schema-driven-flow-inputs.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -56,6 +60,7 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-tool-execution': async (context, input) => { await exerciseToolExecution(context, input as unknown as ExerciseToolExecutionInput); },
   'exercise-flow-transition-editing': (context, input) => exerciseFlowTransitionEditing(context, input as unknown as ExerciseFlowTransitionEditingInput),
   'exercise-flow-named-outputs': (context, input) => exerciseFlowNamedOutputs(context, input as unknown as ExerciseFlowNamedOutputsInput),
+  'exercise-flow-designer-responsive': (context, input) => exerciseFlowDesignerResponsive(context, input as unknown as ExerciseFlowDesignerResponsiveInput),
   'inspect-runtime-worker-observability': (context, input) => inspectRuntimeWorkerObservability(context, input as unknown as InspectRuntimeWorkerObservabilityInput),
   'inspect-agent-instance-observability': (context, input) => inspectAgentInstanceObservability(context, input as unknown as InspectAgentInstanceObservabilityInput),
   'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),
@@ -65,4 +70,7 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-hierarchical-context': (context, input) => exerciseHierarchicalContext(context, input as unknown as ExerciseHierarchicalContextInput),
   'exercise-operational-workspaces': (context, input) => exerciseOperationalWorkspaces(context, input as unknown as ExerciseOperationalWorkspacesInput),
   'exercise-operational-triggers': (context, input) => exerciseOperationalTriggers(context, input as unknown as ExerciseOperationalTriggersInput),
+  'exercise-schema-contract-bindings': (context, input) => exerciseSchemaContractBindings(context, input as unknown as ExerciseSchemaContractBindingsInput),
+  'exercise-flow-connection-contracts': (context, input) => exerciseFlowConnectionContracts(context, input as unknown as ExerciseFlowConnectionContractsInput),
+  'exercise-schema-driven-flow-inputs': (context, input) => exerciseSchemaDrivenFlowInputs(context, input as unknown as ExerciseSchemaDrivenFlowInputsInput),
 };

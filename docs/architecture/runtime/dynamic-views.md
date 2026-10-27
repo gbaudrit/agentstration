@@ -27,7 +27,7 @@ sequenceDiagram
     API-->>Caller: 202 Accepted and durable references
 ```
 
-Structural anchors: **API transport**, **Identity and authorization**, **Work and Workplace application**, and **Flow engine** in the L3 view. Decisions: [ADR-0024](../../decisions/0024-entries-always-target-executable-flows.md), [ADR-0053](../../decisions/0053-workspace-scope-is-part-of-durable-identity.md), [ADR-0171](../../decisions/0171-flow-definitions-use-hierarchical-resource-ownership.md), [ADR-0181](../../decisions/0181-console-context-is-a-single-exact-administrative-scope.md), and [ADR-0182](../../decisions/0182-administrative-execution-uses-governed-operational-workspaces.md).
+Structural anchors: **API transport**, **Identity and authorization**, **Work and Workplace application**, and **Flow engine** in the L3 view. Decisions: [ADR-0024](../../decisions/0024-entries-always-target-executable-flows.md), [ADR-0053](../../decisions/0053-workspace-scope-is-part-of-durable-identity.md), [ADR-0176](../../decisions/0176-flow-definitions-use-hierarchical-resource-ownership.md), [ADR-0184](../../decisions/0184-console-context-is-a-single-exact-administrative-scope.md), and [ADR-0185](../../decisions/0185-administrative-execution-uses-governed-operational-workspaces.md).
 
 ## Execute Flow
 
@@ -93,7 +93,7 @@ sequenceDiagram
     Runtime-->>Caller: Durable status and result
 ```
 
-The invocation context never re-resolves a dependency by name. Direct administrative runs use the protected operational Workspace while preserving the exact owner scope and immutable identity of the Agent definition. Structural anchors: **Runtime execution**, **Resource-family services**, and **Runtime data**. Decisions: [ADR-0008](../../decisions/0008-reconstructible-maf-runtime.md), [ADR-0012](../../decisions/0012-runtime-run-resource.md), [ADR-0017](../../decisions/0017-canonical-runtime-model-options-and-capabilities.md), [ADR-0174](../../decisions/0174-agent-definitions-use-hierarchical-resource-ownership.md), and [ADR-0182](../../decisions/0182-administrative-execution-uses-governed-operational-workspaces.md).
+The invocation context never re-resolves a dependency by name. Direct administrative runs use the protected operational Workspace while preserving the exact owner scope and immutable identity of the Agent definition. Structural anchors: **Runtime execution**, **Resource-family services**, and **Runtime data**. Decisions: [ADR-0008](../../decisions/0008-reconstructible-maf-runtime.md), [ADR-0012](../../decisions/0012-runtime-run-resource.md), [ADR-0017](../../decisions/0017-canonical-runtime-model-options-and-capabilities.md), [ADR-0178](../../decisions/0178-agent-definitions-use-hierarchical-resource-ownership.md), and [ADR-0185](../../decisions/0185-administrative-execution-uses-governed-operational-workspaces.md).
 
 ## Execute Tool
 

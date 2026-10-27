@@ -29,15 +29,24 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
         return Contract(resolved);
     }
 
-    internal static ResolvedToolDefinitionFlowContract Contract(FlowVersion version) => new(
-        version.FlowId.Value,
-        version.FlowId.Namespace,
-        version.Version,
-        version.Graph?.InputSchema?.Clone(),
-        version.Graph?.OutputSchema?.Clone())
+    internal static ResolvedToolDefinitionFlowContract Contract(FlowVersion version)
     {
-        ScopeRef = version.ScopeRef
-    };
+        var ambiguous = false;
+        var output = version.Graph?.ResolveSingleSuccessOutputSchema(out ambiguous);
+        if (ambiguous)
+            throw new ToolDefinitionValidationException(
+                "tool_definition_flow_output_schema_ambiguous",
+                $"Flow version '{version.FlowId}:{version.Version}' exposes success outputs with different contracts.");
+        return new(
+            version.FlowId.Value,
+            version.FlowId.Namespace,
+            version.Version,
+            version.Graph?.ResolveInputSchema()?.Clone(),
+            output?.Clone())
+        {
+            ScopeRef = version.ScopeRef
+        };
+    }
 }
 
 public sealed class ToolDefinitionFlowActivationGuard(
@@ -48,14 +57,25 @@ public sealed class ToolDefinitionFlowActivationGuard(
     {
         using var requestScope = requestScopes.PushSystem();
         var definitions = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
-        var contract = ToolDefinitionFlowResolver.Contract(version);
-        foreach (var stored in definitions.Where(value =>
+        var matchingDefinitions = definitions.Where(value =>
                      value.Value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
                      && targetId == workspaceId.Value
                      && value.Value.Definition.Enabled
                      && value.Value.Definition.Flow.UseActiveVersion
                      && string.Equals(value.Value.Definition.Flow.Name, version.FlowId.Value, StringComparison.Ordinal)
-                     && (value.Value.Definition.Flow.Namespace ?? value.Value.Namespace) == version.FlowId.Namespace))
+                     && (value.Value.Definition.Flow.Namespace ?? value.Value.Namespace) == version.FlowId.Namespace)
+            .ToArray();
+        if (matchingDefinitions.Length == 0) return;
+
+        ResolvedToolDefinitionFlowContract contract;
+        try { contract = ToolDefinitionFlowResolver.Contract(version); }
+        catch (ToolDefinitionValidationException exception)
+        {
+            throw new FlowValidationException("flow_tool_definition_contract_incompatible",
+                $"Flow version '{version.FlowId}:{version.Version}' is incompatible with enabled ToolDefinition '{matchingDefinitions[0].Value.Address}': {exception.Message}");
+        }
+
+        foreach (var stored in matchingDefinitions)
         {
             try { ToolDefinitionService.ValidateContract(stored.Value.Definition, contract); }
             catch (ToolDefinitionValidationException exception)

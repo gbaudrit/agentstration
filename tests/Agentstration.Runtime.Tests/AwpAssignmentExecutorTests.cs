@@ -60,7 +60,7 @@ public sealed class AwpAssignmentExecutorTests
             [
                 new FlowCallStepDefinition { Name = "delegate", Flow = new("child") },
                 new OutputFlowStepDefinition { Name = "approved", Outcome = FlowOutputOutcome.Success },
-                new FailureFlowStepDefinition { Name = "unexpected", Code = "unexpected", Message = "Unexpected child output." }
+                new OutputFlowStepDefinition { Name = "unexpected", Outcome = FlowOutputOutcome.Error, Code = "unexpected", Message = "Unexpected child output." }
             ],
             Transitions =
             [
@@ -85,7 +85,7 @@ public sealed class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
-    public async Task FlowCallRoutesAChildFailureThroughTheExplicitFailedTransition()
+    public async Task FlowCallRoutesAChildNamedErrorOutput()
     {
         var graph = new FlowGraphDefinition
         {
@@ -93,14 +93,15 @@ public sealed class AwpAssignmentExecutorTests
             Steps =
             [
                 new FlowCallStepDefinition { Name = "delegate", Flow = new("child") },
-                new FailureFlowStepDefinition
+                new OutputFlowStepDefinition
                 {
                     Name = "failure",
+                    Outcome = FlowOutputOutcome.Error,
                     Code = "parent_failed",
                     Message = "The child Flow failed."
                 }
             ],
-            Transitions = [new("child-failed", "delegate", "failed", "failure")]
+            Transitions = [new("child-failure", "delegate", "failure", "failure")]
         };
         var handler = new GraphHandler(TestNow)
         {
@@ -109,9 +110,10 @@ public sealed class AwpAssignmentExecutorTests
                 EntryStep = "failure",
                 Steps =
                 [
-                    new FailureFlowStepDefinition
+                    new OutputFlowStepDefinition
                     {
                         Name = "failure",
+                        Outcome = FlowOutputOutcome.Error,
                         Code = "child_failed",
                         Message = "The delegated Flow failed."
                     }
@@ -127,7 +129,7 @@ public sealed class AwpAssignmentExecutorTests
         var delegated = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
             && value.Location.FlowStep?.StepDefinitionId == "delegate");
         Assert.AreEqual("failed", delegated.Payload?.GetProperty("status").GetString());
-        Assert.AreEqual("child-failed", delegated.Payload?.GetProperty("selectedTransition").GetString());
+        Assert.AreEqual("child-failure", delegated.Payload?.GetProperty("selectedTransition").GetString());
         Assert.AreEqual("child_failed", delegated.Payload?.GetProperty("errorCode").GetString());
     }
 
@@ -202,7 +204,7 @@ public sealed class AwpAssignmentExecutorTests
                     Outcome = FlowOutputOutcome.Success,
                     OutputMapping = JsonSerializer.SerializeToElement("${steps.normalize.output}")
                 },
-                new FailureFlowStepDefinition { Name = "rejected", Code = "rejected", Message = "Rejected." }
+                new OutputFlowStepDefinition { Name = "rejected", Outcome = FlowOutputOutcome.Error, Code = "rejected", Message = "Rejected." }
             ],
             Transitions =
             [
@@ -399,9 +401,10 @@ public sealed class AwpAssignmentExecutorTests
             Steps =
             [
                 new AgentFlowStepDefinition { Name = "agent", Agent = new("echo-agent") },
-                new FailureFlowStepDefinition
+                new OutputFlowStepDefinition
                 {
                     Name = "failure",
+                    Outcome = FlowOutputOutcome.Error,
                     Code = "HANDLED_AGENT_ERROR",
                     Message = "The agent failure was handled."
                 }
@@ -465,9 +468,10 @@ public sealed class AwpAssignmentExecutorTests
             Steps =
             [
                 new ToolFlowStepDefinition { Name = "fetch", Tool = new("rest.get") },
-                new FailureFlowStepDefinition
+                new OutputFlowStepDefinition
                 {
                     Name = "failure",
+                    Outcome = FlowOutputOutcome.Error,
                     Code = "acquisition_failed",
                     Message = "Data Source acquisition failed.",
                     DetailsExpression = "${transition.output}"
@@ -686,9 +690,10 @@ public sealed class AwpAssignmentExecutorTests
             Steps =
             [
                 new FlowCallStepDefinition { Name = "analyze", Flow = new("child") },
-                new FailureFlowStepDefinition
+                new OutputFlowStepDefinition
                 {
                     Name = "failure",
+                    Outcome = FlowOutputOutcome.Error,
                     Code = "CHILD_FLOW_FAILED",
                     Message = "Child Flow failed."
                 }
@@ -1038,9 +1043,10 @@ public sealed class AwpAssignmentExecutorTests
     public async Task ArtifactStorageFlowProducesDurableProjectionAndCleansTheStagedArtifact(bool failAfterStorage)
     {
         var terminal = failAfterStorage
-            ? (FlowStepDefinition)new FailureFlowStepDefinition
+            ? (FlowStepDefinition)new OutputFlowStepDefinition
             {
                 Name = "terminal",
+                Outcome = FlowOutputOutcome.Error,
                 Code = "after_storage_failed",
                 Message = "The parent failed after Artifact storage."
             }

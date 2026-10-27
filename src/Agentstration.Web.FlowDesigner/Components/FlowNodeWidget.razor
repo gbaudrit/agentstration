@@ -1,4 +1,8 @@
 <div class="flow-node @Node.Source.Type" aria-label="@Node.Source.DisplayName">
+    <button type="button" class="flow-node-settings" title="@Localizer["ConfigureStep"]" aria-label="@Localizer["ConfigureStepNamed", Node.Source.DisplayName]"
+            @onclick="OpenSettingsAsync" @onclick:stopPropagation="true" @onpointerdown:stopPropagation="true">
+        <UiIcon Name="settings" />
+    </button>
     <span class="flow-port-handle input @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@Localizer["InputConnectionHandle"]" aria-label="@Localizer["InputConnectionHandle"]">
         <PortRenderer Port="Node.Input" />
     </span>
@@ -21,7 +25,9 @@
 
 @code {
     [Inject] private IStringLocalizer<FlowDesignerStrings> Localizer { get; set; } = default!;
+    [CascadingParameter] private FlowNodeInteractionContext? Interactions { get; set; }
     [Parameter, EditorRequired] public FlowDiagramNode Node { get; set; } = default!;
+    private Task OpenSettingsAsync() => Interactions?.OpenSettingsAsync(Node.Source.Name) ?? Task.CompletedTask;
     private static string Short(string value) => value[(value.LastIndexOf('/') + 1)..];
     private string OutputLabel(FlowDiagramPort output) => output.Outcome is { } outcome
         ? Localizer["NamedOutputConnectionHandleWithOutcome", output.EventName!, Localizer[$"OutputOutcome.{outcome}"]]

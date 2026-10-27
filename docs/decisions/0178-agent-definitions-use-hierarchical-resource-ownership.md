@@ -1,4 +1,4 @@
-# ADR-0174: Agent definitions use hierarchical resource ownership
+# ADR-0178: Agent definitions use hierarchical resource ownership
 
 ## Status
 
@@ -26,4 +26,4 @@ Agent execution instances are transient projections assigned to Runtime Workers.
 - Updating or replacing a pinned dependency makes an older Agent revision fail closed when the exact identity no longer matches.
 - Console links include `scopeRef` so same-named Agents remain addressable, while access-policy administration stays in the shared hierarchical-resource UX.
 - The legacy `AgentDeployment` management resource remains Workspace-only for compatibility and is not used to persist local Microsoft Agent Framework instances.
-- This decision supersedes the Agent and AgentRevision Workspace-only portions of ADR-0080. ADR-0172 remains authoritative for descendant access, ADR-0173 for Model and Runtime ownership, and ADR-0168 for external Runtime assignment.
+- This decision supersedes the Agent and AgentRevision Workspace-only portions of ADR-0080. ADR-0172 remains authoritative for descendant access, ADR-0177 for Model and Runtime ownership, and ADR-0168 for external Runtime assignment.

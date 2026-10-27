@@ -1,4 +1,4 @@
-# ADR-0182: Administrative execution uses governed operational Workspaces
+# ADR-0185: Administrative execution uses governed operational Workspaces
 
 Status: Accepted — 2026-10-24
 
@@ -11,7 +11,7 @@ and recovery path to implement a second non-Workspace ownership model. Reusing t
 business Workspace instead makes administrative state depend on an arbitrary business boundary and
 can expose it to unrelated members.
 
-ADR-0177 selected exact Instance and Tenant execution-state ownership to avoid synthetic Workspaces.
+ADR-0180 selected exact Instance and Tenant execution-state ownership to avoid synthetic Workspaces.
 The Console context work later established that administrative scope and operational placement are
 separate. The required destinations are not aliases or synthetic identifiers: they are real,
 governed Workspaces with the same isolation and durable lifecycle as every other execution boundary.
@@ -52,7 +52,7 @@ governed Workspaces with the same isolation and durable lifecycle as every other
 - Every Tenant has one additional protected Workspace whose platform resources are provisioned by the
   same idempotent lifecycle as other Workspaces.
 - Operational topology must be reconciled before an Instance or Tenant Console context can be selected.
-- ADR-0177 is superseded where it requires direct durable Instance- or Tenant-owned execution state.
+- ADR-0180 is superseded where it requires direct durable Instance- or Tenant-owned execution state.
   Its exact definition identity, immutable scope propagation, authorization, and non-rebinding rules
-  remain accepted. ADR-0181's separation between administrative context and operational placement is
+  remain accepted. ADR-0184's separation between administrative context and operational placement is
   now concretely implemented by these Workspaces.
