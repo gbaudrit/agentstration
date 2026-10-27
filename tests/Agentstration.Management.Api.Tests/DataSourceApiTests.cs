@@ -709,10 +709,14 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             type = "object",
             properties = new
             {
-                dataSourceId = new { type = "string" }, dataSourceUid = new { type = "string" },
-                dataSourceGeneration = new { type = "integer" }, profile = new { type = "object" },
-                sourceConfiguration = new { type = "object" }, parameters = new { type = "object" },
-                caller = new { type = "object" }, correlationId = new { type = "string" },
+                dataSourceId = new { type = "string" },
+                dataSourceUid = new { type = "string" },
+                dataSourceGeneration = new { type = "integer" },
+                profile = new { type = "object" },
+                sourceConfiguration = new { type = "object" },
+                parameters = new { type = "object" },
+                caller = new { type = "object" },
+                correlationId = new { type = "string" },
                 discoveryId = new { type = "string" }
             },
             required = new[] { "dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile",
@@ -732,7 +736,9 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             new Dictionary<string, string> { [FlowMetadataKeys.Contract] = DataSourceFlowContracts.Discovery },
             new FlowGraphDefinition
             {
-                EntryStep = "input", InputSchema = inputSchema, OutputSchema = outputSchema,
+                EntryStep = "input",
+                InputSchema = inputSchema,
+                OutputSchema = outputSchema,
                 Steps = [new InputFlowStepDefinition { Name = "input", Schema = inputSchema },
                     new OutputFlowStepDefinition { Name = "output", OutputMapping = output }],
                 Transitions = [new("input-output", "input", "completed", "output")]

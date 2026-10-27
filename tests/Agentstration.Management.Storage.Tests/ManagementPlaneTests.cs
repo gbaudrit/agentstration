@@ -10,8 +10,8 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Core;
-using Agentstration.Security.Contracts;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Security.Contracts;
 using Agentstration.Sources;
 using Microsoft.Extensions.DependencyInjection;
 

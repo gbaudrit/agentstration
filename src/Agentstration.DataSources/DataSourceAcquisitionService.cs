@@ -231,7 +231,8 @@ public sealed class DataSourceAcquisitionService(
                 Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
                 CorrelationId = effectiveCorrelationId,
                 AcquisitionId = acquisitionId
-                ,Target = target
+                ,
+                Target = target
             });
             var resource = new DataSourceAcquisitionResource
             {
@@ -398,7 +399,8 @@ public sealed class DataSourceAcquisitionService(
                 Caller = new(value.CreatedBy, value.TenantId, workspaceId),
                 CorrelationId = value.CorrelationId,
                 AcquisitionId = value.Name
-                ,Target = value.Target
+                ,
+                Target = value.Target
             });
             try
             {

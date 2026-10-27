@@ -61,7 +61,10 @@ public sealed class DataSourceDiscoveryService(
                 source = new { source.Value.Uid, source.Value.Generation },
                 profile = new { profile.Uid, profile.Generation, profile.Version, profile.DefinitionHash },
                 flow = new { composition.Flow.Name, composition.Flow.Namespace, composition.Flow.Version },
-                composition.Tools, composition.Limits, composition.Policies, parameters
+                composition.Tools,
+                composition.Limits,
+                composition.Policies,
+                parameters
             }));
             var existing = await store.ListExactAsync<DataSourceDiscoveryResource>(executionScope,
                 DataSourceResourceKinds.DataSourceDiscovery, 0, 1_000, cancellationToken);
@@ -90,16 +93,29 @@ public sealed class DataSourceDiscoveryService(
             var input = Input(id, source.Value, profile, parameters, effectiveCorrelationId, context);
             var resource = new DataSourceDiscoveryResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceDiscovery,
-                Metadata = new() { Name = id, Namespace = source.Value.Namespace }, ScopeRef = executionScope,
-                Generation = 1, Status = Accepted(), DataSourceScopeRef = ownerScope, DataSourceUid = source.Value.Uid,
-                DataSourceName = source.Value.Name, DataSourceNamespace = source.Value.Namespace,
-                DataSourceGeneration = source.Value.Generation, Composition = composition, FlowRunId = runId,
-                State = DataSourceDiscoveryState.Pending, CorrelationId = effectiveCorrelationId,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = DataSourceResourceKinds.DataSourceDiscovery,
+                Metadata = new() { Name = id, Namespace = source.Value.Namespace },
+                ScopeRef = executionScope,
+                Generation = 1,
+                Status = Accepted(),
+                DataSourceScopeRef = ownerScope,
+                DataSourceUid = source.Value.Uid,
+                DataSourceName = source.Value.Name,
+                DataSourceNamespace = source.Value.Namespace,
+                DataSourceGeneration = source.Value.Generation,
+                Composition = composition,
+                FlowRunId = runId,
+                State = DataSourceDiscoveryState.Pending,
+                CorrelationId = effectiveCorrelationId,
                 IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
-                RequestHash = requestHash, SourceConfiguration = source.Value.Definition.Configuration.Clone(),
-                Parameters = parameters.Clone(), CreatedBy = context.PrincipalId, TenantId = context.TenantId,
-                WorkspaceId = context.WorkspaceId, CreatedAt = timeProvider.GetUtcNow()
+                RequestHash = requestHash,
+                SourceConfiguration = source.Value.Definition.Configuration.Clone(),
+                Parameters = parameters.Clone(),
+                CreatedBy = context.PrincipalId,
+                TenantId = context.TenantId,
+                WorkspaceId = context.WorkspaceId,
+                CreatedAt = timeProvider.GetUtcNow()
             };
             var stored = await scopeOperations.WriteAsync(resource, executionScope, AuthorizationPermissions.RunsExecute,
                 async token =>
@@ -114,9 +130,15 @@ public sealed class DataSourceDiscoveryService(
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
-                        var failed = resource with { Generation = 2, State = DataSourceDiscoveryState.Failed,
-                            CompletedAt = timeProvider.GetUtcNow(), ErrorCode = "data_source_discovery_start_failed",
-                            ErrorMessage = exception.Message, Status = Failed() };
+                        var failed = resource with
+                        {
+                            Generation = 2,
+                            State = DataSourceDiscoveryState.Failed,
+                            CompletedAt = timeProvider.GetUtcNow(),
+                            ErrorCode = "data_source_discovery_start_failed",
+                            ErrorMessage = exception.Message,
+                            Status = Failed()
+                        };
                         _ = await store.PutExactAsync(executionScope, failed, created.ETag, false, token);
                         throw;
                     }
@@ -181,20 +203,33 @@ public sealed class DataSourceDiscoveryService(
             if (await flowRuns.GetAsync(workspaceId, value.FlowRunId, value.TenantId, value.CreatedBy, cancellationToken) is not null) continue;
             var input = JsonSerializer.SerializeToElement(new DataSourceDiscoveryInput
             {
-                DataSourceId = $"{value.DataSourceNamespace}/{value.DataSourceName}", DataSourceUid = value.DataSourceUid,
-                DataSourceGeneration = value.DataSourceGeneration, Profile = value.Composition.Profile,
-                SourceConfiguration = value.SourceConfiguration.Clone(), Parameters = value.Parameters.Clone(),
-                Caller = new(value.CreatedBy, value.TenantId, workspaceId), CorrelationId = value.CorrelationId,
+                DataSourceId = $"{value.DataSourceNamespace}/{value.DataSourceName}",
+                DataSourceUid = value.DataSourceUid,
+                DataSourceGeneration = value.DataSourceGeneration,
+                Profile = value.Composition.Profile,
+                SourceConfiguration = value.SourceConfiguration.Clone(),
+                Parameters = value.Parameters.Clone(),
+                Caller = new(value.CreatedBy, value.TenantId, workspaceId),
+                CorrelationId = value.CorrelationId,
                 DiscoveryId = value.Name
             });
-            try { _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Composition.Flow, input,
+            try
+            {
+                _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Composition.Flow, input,
                 value.CreatedBy.ToString("D"), value.CorrelationId, value.IdempotencyKey, value.TenantId,
-                workspaceId, value.CreatedBy), cancellationToken); }
+                workspaceId, value.CreatedBy), cancellationToken);
+            }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                var failed = value with { Generation = checked(value.Generation + 1), State = DataSourceDiscoveryState.Failed,
-                    CompletedAt = timeProvider.GetUtcNow(), ErrorCode = "data_source_discovery_recovery_failed",
-                    ErrorMessage = exception.Message, Status = Failed() };
+                var failed = value with
+                {
+                    Generation = checked(value.Generation + 1),
+                    State = DataSourceDiscoveryState.Failed,
+                    CompletedAt = timeProvider.GetUtcNow(),
+                    ErrorCode = "data_source_discovery_recovery_failed",
+                    ErrorMessage = exception.Message,
+                    Status = Failed()
+                };
                 try { _ = await store.PutExactAsync(value.ScopeRef.Value, failed, stored.ETag, false, cancellationToken); }
                 catch (ResourceConcurrencyException) { }
             }
@@ -222,10 +257,16 @@ public sealed class DataSourceDiscoveryService(
             catch (DataSourceAcquisitionException exception)
             { state = DataSourceDiscoveryState.Failed; errorCode = exception.Code; errorMessage = exception.Message; }
         }
-        var updated = stored.Value with { Generation = checked(stored.Value.Generation + 1), State = state,
-            Manifest = manifest, ErrorCode = errorCode, ErrorMessage = errorMessage,
+        var updated = stored.Value with
+        {
+            Generation = checked(stored.Value.Generation + 1),
+            State = state,
+            Manifest = manifest,
+            ErrorCode = errorCode,
+            ErrorMessage = errorMessage,
             CompletedAt = IsTerminal(state) ? run.CompletedAt ?? timeProvider.GetUtcNow() : null,
-            Status = state == DataSourceDiscoveryState.Succeeded ? Succeeded() : IsTerminal(state) ? Failed() : Accepted() };
+            Status = state == DataSourceDiscoveryState.Succeeded ? Succeeded() : IsTerminal(state) ? Failed() : Accepted()
+        };
         try { return await store.PutExactAsync(updated.ScopeRef!.Value, updated, stored.ETag, false, cancellationToken); }
         catch (ResourceConcurrencyException)
         {
@@ -261,10 +302,17 @@ public sealed class DataSourceDiscoveryService(
                         throw Error("data_source_discovery_metadata_invalid", "Choice metadata keys and values are bounded strings.");
                     else metadata.Add(property.Name, property.Value.GetString()!);
             }
-            parsed.Add(new() { Id = id!, ParentId = OptionalString(value, "parentId"), DisplayName = displayName!,
-                Description = OptionalString(value, "description"), Selector = selector.Clone(), Metadata = metadata,
+            parsed.Add(new()
+            {
+                Id = id!,
+                ParentId = OptionalString(value, "parentId"),
+                DisplayName = displayName!,
+                Description = OptionalString(value, "description"),
+                Selector = selector.Clone(),
+                Metadata = metadata,
                 Eligible = !value.TryGetProperty("eligible", out var eligible) || eligible.ValueKind != JsonValueKind.False,
-                IneligibleReason = OptionalString(value, "ineligibleReason") });
+                IneligibleReason = OptionalString(value, "ineligibleReason")
+            });
         }
         ValidateHierarchy(parsed);
         var acquisitionManifest = DataSourceAcquisitionService.ParseArtifactManifest(output, artifactsOptional: true);
@@ -306,12 +354,17 @@ public sealed class DataSourceDiscoveryService(
 
     private static JsonElement Input(string id, DataSourceResource source, ResolvedDataSourceProfile profile,
         JsonElement parameters, string correlationId, RequestContext context) => JsonSerializer.SerializeToElement(new DataSourceDiscoveryInput
-    {
-        DataSourceId = $"{source.Namespace}/{source.Name}", DataSourceUid = source.Uid,
-        DataSourceGeneration = source.Generation, Profile = profile, SourceConfiguration = source.Definition.Configuration.Clone(),
-        Parameters = parameters.Clone(), Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
-        CorrelationId = correlationId, DiscoveryId = id
-    });
+        {
+            DataSourceId = $"{source.Namespace}/{source.Name}",
+            DataSourceUid = source.Uid,
+            DataSourceGeneration = source.Generation,
+            Profile = profile,
+            SourceConfiguration = source.Definition.Configuration.Clone(),
+            Parameters = parameters.Clone(),
+            Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
+            CorrelationId = correlationId,
+            DiscoveryId = id
+        });
     private RequestContext RequireContext() => requestContext.IsInitialized ? requestContext.Current
         : throw Error("data_source_discovery_context_required", "A Workspace request context is required.");
     private Task AuditAsync(string action, string reason, RequestContext context, CancellationToken token) =>
@@ -379,15 +432,28 @@ public sealed class DataSourceAcquisitionTargetService(
         if (!choice.Eligible) throw Error("data_source_discovery_choice_ineligible", choice.IneligibleReason ?? $"Choice '{choice.Id}' is not eligible.");
         var target = new DataSourceAcquisitionTargetResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
-            Metadata = new() { Name = request.Name, Namespace = ns }, ScopeRef = scope, Generation = 1,
-            Status = new() { ProvisioningState = ProvisioningState.Succeeded }, DisplayName = request.DisplayName ?? choice.DisplayName,
-            Description = request.Description ?? choice.Description, DataSourceScopeRef = discovery.Value.DataSourceScopeRef,
-            DataSourceUid = discovery.Value.DataSourceUid, DataSourceName = discovery.Value.DataSourceName,
-            DataSourceNamespace = discovery.Value.DataSourceNamespace, DataSourceGeneration = discovery.Value.DataSourceGeneration,
-            DiscoveryId = discovery.Value.Name, DiscoveryUid = discovery.Value.Uid, ChoiceId = choice.Id,
-            ChoiceDisplayName = choice.DisplayName, Selector = choice.Selector.Clone(), ChoiceMetadata = choice.Metadata,
-            Profile = discovery.Value.Composition.Profile, PromotedAt = timeProvider.GetUtcNow(), PromotedBy = context.PrincipalId
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
+            Metadata = new() { Name = request.Name, Namespace = ns },
+            ScopeRef = scope,
+            Generation = 1,
+            Status = new() { ProvisioningState = ProvisioningState.Succeeded },
+            DisplayName = request.DisplayName ?? choice.DisplayName,
+            Description = request.Description ?? choice.Description,
+            DataSourceScopeRef = discovery.Value.DataSourceScopeRef,
+            DataSourceUid = discovery.Value.DataSourceUid,
+            DataSourceName = discovery.Value.DataSourceName,
+            DataSourceNamespace = discovery.Value.DataSourceNamespace,
+            DataSourceGeneration = discovery.Value.DataSourceGeneration,
+            DiscoveryId = discovery.Value.Name,
+            DiscoveryUid = discovery.Value.Uid,
+            ChoiceId = choice.Id,
+            ChoiceDisplayName = choice.DisplayName,
+            Selector = choice.Selector.Clone(),
+            ChoiceMetadata = choice.Metadata,
+            Profile = discovery.Value.Composition.Profile,
+            PromotedAt = timeProvider.GetUtcNow(),
+            PromotedBy = context.PrincipalId
         };
         var stored = await scopeOperations.WriteAsync(target, scope, AuthorizationPermissions.ResourcesWrite,
             token => store.PutExactAsync(scope, target, null, true, token), cancellationToken);
@@ -406,8 +472,13 @@ public sealed class DataSourceAcquisitionTargetService(
             ?? throw Error("data_source_acquisition_target_not_found", $"Acquisition target '{name}' was not found.");
         if (string.IsNullOrWhiteSpace(request.DisplayName) || request.DisplayName.Length > 200 || request.Description?.Length > 2_000)
             throw Error("data_source_acquisition_target_metadata_invalid", "Target display name or description is invalid.");
-        var updated = existing.Value with { Generation = checked(existing.Value.Generation + 1), DisplayName = request.DisplayName,
-            Description = request.Description, Enabled = request.Enabled };
+        var updated = existing.Value with
+        {
+            Generation = checked(existing.Value.Generation + 1),
+            DisplayName = request.DisplayName,
+            Description = request.Description,
+            Enabled = request.Enabled
+        };
         return await scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
             token => store.PutExactAsync(scope, updated, ifMatch, false, token), cancellationToken);
     }
@@ -433,10 +504,17 @@ public sealed class DataSourceAcquisitionTargetService(
         if (!choice.Eligible) throw Error("data_source_discovery_choice_ineligible", choice.IneligibleReason ?? $"Choice '{choice.Id}' is not eligible.");
         var updated = existing.Value with
         {
-            Generation = checked(existing.Value.Generation + 1), DataSourceGeneration = discovery.Value.DataSourceGeneration,
-            DiscoveryId = discovery.Value.Name, DiscoveryUid = discovery.Value.Uid, ChoiceId = choice.Id,
-            ChoiceDisplayName = choice.DisplayName, Selector = choice.Selector.Clone(), ChoiceMetadata = choice.Metadata,
-            Profile = discovery.Value.Composition.Profile, PromotedAt = timeProvider.GetUtcNow(), PromotedBy = context.PrincipalId
+            Generation = checked(existing.Value.Generation + 1),
+            DataSourceGeneration = discovery.Value.DataSourceGeneration,
+            DiscoveryId = discovery.Value.Name,
+            DiscoveryUid = discovery.Value.Uid,
+            ChoiceId = choice.Id,
+            ChoiceDisplayName = choice.DisplayName,
+            Selector = choice.Selector.Clone(),
+            ChoiceMetadata = choice.Metadata,
+            Profile = discovery.Value.Composition.Profile,
+            PromotedAt = timeProvider.GetUtcNow(),
+            PromotedBy = context.PrincipalId
         };
         var stored = await scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
             token => store.PutExactAsync(scope, updated, ifMatch, false, token), cancellationToken);

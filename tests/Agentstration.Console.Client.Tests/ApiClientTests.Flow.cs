@@ -339,7 +339,8 @@ public sealed partial class ApiClientTests
             {
                 Content = JsonContent.Create(new FlowPageResponse([], null))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         _ = await new FlowApiClient(httpClient).GetFlowsAsync(scope, default);
 

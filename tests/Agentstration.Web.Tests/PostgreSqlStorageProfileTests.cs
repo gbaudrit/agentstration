@@ -178,21 +178,38 @@ public sealed class PostgreSqlStorageProfileTests
         var scope = ResourceScopeRef.Workspace(workspaceId);
         return new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
-            Metadata = new() { Name = "documents" }, ScopeRef = scope, DisplayName = "Documents",
-            DataSourceScopeRef = scope, DataSourceUid = Guid.NewGuid(), DataSourceName = "origin",
-            DataSourceNamespace = ResourceNamespace.Default, DataSourceGeneration = 1,
-            DiscoveryId = "discovery-1", DiscoveryUid = Guid.NewGuid(), ChoiceId = "documents",
-            ChoiceDisplayName = "Documents", Selector = JsonSerializer.SerializeToElement(new { collection = "documents" }),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
+            Metadata = new() { Name = "documents" },
+            ScopeRef = scope,
+            DisplayName = "Documents",
+            DataSourceScopeRef = scope,
+            DataSourceUid = Guid.NewGuid(),
+            DataSourceName = "origin",
+            DataSourceNamespace = ResourceNamespace.Default,
+            DataSourceGeneration = 1,
+            DiscoveryId = "discovery-1",
+            DiscoveryUid = Guid.NewGuid(),
+            ChoiceId = "documents",
+            ChoiceDisplayName = "Documents",
+            Selector = JsonSerializer.SerializeToElement(new { collection = "documents" }),
             Profile = new()
             {
-                Name = "profile", Namespace = ResourceNamespace.Default, ScopeRef = scope, Uid = Guid.NewGuid(),
-                Generation = 1, Version = "1.0.0", DefinitionHash = "hash", DependencyHash = "dependencies",
+                Name = "profile",
+                Namespace = ResourceNamespace.Default,
+                ScopeRef = scope,
+                Uid = Guid.NewGuid(),
+                Generation = 1,
+                Version = "1.0.0",
+                DefinitionHash = "hash",
+                DependencyHash = "dependencies",
                 Definition = new() { DisplayName = "Profile", AcquisitionFlow = new() { Name = "acquire" } },
                 AcquisitionFlow = new("acquire", ResourceNamespace.Default, "1.0.0", false,
-                    null, null, DataSourceFlowContracts.Acquisition, "sha256:acquire") { ScopeRef = scope }
+                    null, null, DataSourceFlowContracts.Acquisition, "sha256:acquire")
+                { ScopeRef = scope }
             },
-            PromotedAt = DateTimeOffset.UtcNow, PromotedBy = Guid.Empty
+            PromotedAt = DateTimeOffset.UtcNow,
+            PromotedBy = Guid.Empty
         };
     }
 

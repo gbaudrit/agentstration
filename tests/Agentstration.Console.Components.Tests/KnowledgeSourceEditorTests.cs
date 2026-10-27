@@ -698,7 +698,8 @@ public sealed class KnowledgeSourceEditorTests
             return Task.FromResult(new FlowResponse(flowId, flowId, null, "1.0.0", true, "1.0.0",
                 new WorkflowFlowDefinition("input", [], [], []),
                 new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract },
-                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow) { ScopeRef = WorkspaceScope });
+                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+            { ScopeRef = WorkspaceScope });
         }
         public Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();

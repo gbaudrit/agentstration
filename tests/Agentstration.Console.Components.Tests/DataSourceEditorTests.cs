@@ -168,7 +168,8 @@ public sealed class DataSourceEditorTests
         Definition = ProfileProperties,
         AcquisitionFlow = new("data-source-web-acquisition-builtin", ResourceNamespace.Default,
             "1.0.1", false, AcquisitionInputSchema, null, DataSourceFlowContracts.Acquisition,
-            "sha256:flow") { ScopeRef = Scope },
+            "sha256:flow")
+        { ScopeRef = Scope },
         ToolBindings = []
     };
 
@@ -187,7 +188,8 @@ public sealed class DataSourceEditorTests
         {
             Profile = ResolvedProfile,
             Flow = new("data-source-web-acquisition-builtin", ResourceNamespace.Default, "1.0.1", false,
-                null, null, DataSourceFlowContracts.Acquisition, "sha256:flow") { ScopeRef = Scope }
+                null, null, DataSourceFlowContracts.Acquisition, "sha256:flow")
+            { ScopeRef = Scope }
         },
         FlowRunId = "flowrun-data-source",
         State = DataSourceAcquisitionState.Succeeded,
@@ -209,9 +211,11 @@ public sealed class DataSourceEditorTests
         public Task<DataSourceReadiness> GetReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new DataSourceReadiness(true, true, ResolvedProfile, [],
             new ResolvedDataSourceFlowBinding("data-source-web-acquisition-builtin", ResourceNamespace.Default,
                 "1.0.1", false, AcquisitionInputSchema, null, DataSourceFlowContracts.Acquisition,
-                 "sha256:flow") { ScopeRef = Scope },
+                 "sha256:flow")
+            { ScopeRef = Scope },
             targeted ? new("discover", ResourceNamespace.Default, "1.0.0", false, null, null,
-                DataSourceFlowContracts.Discovery, "sha256:discovery") { ScopeRef = Scope } : null));
+                DataSourceFlowContracts.Discovery, "sha256:discovery")
+            { ScopeRef = Scope } : null));
         public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceAcquisitionResource>>([Acquisition]);
         public Task<ResourceSnapshot<DataSourceResource>> CreateAsync(CreateDataSourceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -227,25 +231,52 @@ public sealed class DataSourceEditorTests
 
     private static DataSourceDiscoveryResource Discovery => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceDiscovery,
-        Metadata = new() { Name = "discovery-1" }, ScopeRef = Scope, DataSourceScopeRef = Scope,
-        DataSourceUid = Source.Uid, DataSourceName = Source.Name, DataSourceNamespace = Source.Namespace,
-        DataSourceGeneration = Source.Generation, Composition = new() { Profile = ResolvedProfile,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = DataSourceResourceKinds.DataSourceDiscovery,
+        Metadata = new() { Name = "discovery-1" },
+        ScopeRef = Scope,
+        DataSourceScopeRef = Scope,
+        DataSourceUid = Source.Uid,
+        DataSourceName = Source.Name,
+        DataSourceNamespace = Source.Namespace,
+        DataSourceGeneration = Source.Generation,
+        Composition = new()
+        {
+            Profile = ResolvedProfile,
             Flow = new("discover", ResourceNamespace.Default, "1.0.0", false, null, null,
-                DataSourceFlowContracts.Discovery, "sha256:discovery") { ScopeRef = Scope } },
-        FlowRunId = "flowrun-discovery", State = DataSourceDiscoveryState.Succeeded, CorrelationId = "discovery-1",
-        RequestHash = "hash", CreatedBy = Guid.Empty, TenantId = Guid.Empty, WorkspaceId = Scope.TargetId!.Value,
-        CreatedAt = DateTimeOffset.UtcNow, CompletedAt = DateTimeOffset.UtcNow,
+                DataSourceFlowContracts.Discovery, "sha256:discovery")
+            { ScopeRef = Scope }
+        },
+        FlowRunId = "flowrun-discovery",
+        State = DataSourceDiscoveryState.Succeeded,
+        CorrelationId = "discovery-1",
+        RequestHash = "hash",
+        CreatedBy = Guid.Empty,
+        TenantId = Guid.Empty,
+        WorkspaceId = Scope.TargetId!.Value,
+        CreatedAt = DateTimeOffset.UtcNow,
+        CompletedAt = DateTimeOffset.UtcNow,
         Manifest = new() { Choices = [new() { Id = "documents", DisplayName = "Documents", Selector = JsonSerializer.SerializeToElement(new { collection = "documents" }) }] }
     };
     private static DataSourceAcquisitionTargetResource Target => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
-        Metadata = new() { Name = "documents" }, ScopeRef = Scope, DisplayName = "Documents", DataSourceScopeRef = Scope,
-        DataSourceUid = Source.Uid, DataSourceName = Source.Name, DataSourceNamespace = Source.Namespace,
-        DataSourceGeneration = Source.Generation, DiscoveryId = Discovery.Name, DiscoveryUid = Discovery.Uid,
-        ChoiceId = "documents", ChoiceDisplayName = "Documents", Profile = ResolvedProfile,
-        PromotedAt = DateTimeOffset.UtcNow, PromotedBy = Guid.Empty
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
+        Metadata = new() { Name = "documents" },
+        ScopeRef = Scope,
+        DisplayName = "Documents",
+        DataSourceScopeRef = Scope,
+        DataSourceUid = Source.Uid,
+        DataSourceName = Source.Name,
+        DataSourceNamespace = Source.Namespace,
+        DataSourceGeneration = Source.Generation,
+        DiscoveryId = Discovery.Name,
+        DiscoveryUid = Discovery.Uid,
+        ChoiceId = "documents",
+        ChoiceDisplayName = "Documents",
+        Profile = ResolvedProfile,
+        PromotedAt = DateTimeOffset.UtcNow,
+        PromotedBy = Guid.Empty
     };
 
     private sealed class ProfileClientStub : IDataSourceProfilesClient

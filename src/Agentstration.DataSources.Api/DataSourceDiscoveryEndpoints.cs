@@ -61,9 +61,11 @@ internal static class DataSourceDiscoveryEndpoints
 
     private static Task<IResult> PromoteAsync(string id, string? @namespace, PromoteDataSourceAcquisitionTargetRequest body,
         HttpResponse response, DataSourceAcquisitionTargetService service, CancellationToken token) => ExecuteAsync(async () =>
-    { var stored = await service.PromoteAsync(ResourceNamespace.Parse(@namespace), id, body, token); response.Headers.ETag = stored.ETag;
+    {
+        var stored = await service.PromoteAsync(ResourceNamespace.Parse(@namespace), id, body, token); response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/datasourceacquisitiontargets/{Uri.EscapeDataString(stored.Value.Name)}?namespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
-        return Results.Json(stored.Value, statusCode: StatusCodes.Status201Created); });
+        return Results.Json(stored.Value, statusCode: StatusCodes.Status201Created);
+    });
 
     private static Task<IResult> ListTargetsAsync(string name, string? @namespace, string? scopeRef,
         DataSourceAcquisitionTargetService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(
@@ -72,8 +74,10 @@ internal static class DataSourceDiscoveryEndpoints
 
     private static Task<IResult> PutTargetAsync(string name, string? @namespace, PutDataSourceAcquisitionTargetRequest body,
         HttpRequest request, HttpResponse response, DataSourceAcquisitionTargetService service, CancellationToken token) => ExecuteAsync(async () =>
-    { var stored = await service.PutAsync(ResourceNamespace.Parse(@namespace), name, body, request.Headers.IfMatch.FirstOrDefault(), token);
-        response.Headers.ETag = stored.ETag; return Results.Ok(stored.Value); });
+    {
+        var stored = await service.PutAsync(ResourceNamespace.Parse(@namespace), name, body, request.Headers.IfMatch.FirstOrDefault(), token);
+        response.Headers.ETag = stored.ETag; return Results.Ok(stored.Value);
+    });
 
     private static Task<IResult> DeleteTargetAsync(string name, string? @namespace, HttpRequest request,
         DataSourceAcquisitionTargetService service, CancellationToken token) => ExecuteAsync(async () =>
@@ -82,8 +86,10 @@ internal static class DataSourceDiscoveryEndpoints
     private static Task<IResult> ReconcileTargetAsync(string name, string? @namespace,
         ReconcileDataSourceAcquisitionTargetRequest body, HttpRequest request, HttpResponse response,
         DataSourceAcquisitionTargetService service, CancellationToken token) => ExecuteAsync(async () =>
-    { var stored = await service.ReconcileAsync(ResourceNamespace.Parse(@namespace), name, body,
-        request.Headers.IfMatch.FirstOrDefault(), token); response.Headers.ETag = stored.ETag; return Results.Ok(stored.Value); });
+    {
+        var stored = await service.ReconcileAsync(ResourceNamespace.Parse(@namespace), name, body,
+        request.Headers.IfMatch.FirstOrDefault(), token); response.Headers.ETag = stored.ETag; return Results.Ok(stored.Value);
+    });
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {

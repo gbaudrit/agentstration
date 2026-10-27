@@ -457,10 +457,13 @@ public sealed class SecretManagementService(
         StoredResource<VaultResource> stored, CancellationToken cancellationToken)
     {
         var policy = await accessPolicies.GetAsync(stored.Value.Uid, cancellationToken);
-        return stored with { Value = stored.Value with
+        return stored with
         {
-            Definition = stored.Value.Definition with { UsePolicy = LegacyPolicy(policy) }
-        } };
+            Value = stored.Value with
+            {
+                Definition = stored.Value.Definition with { UsePolicy = LegacyPolicy(policy) }
+            }
+        };
     }
 
     private async Task<StoredResource<SecretResource>?> HydrateSecretNullableAsync(
@@ -471,10 +474,13 @@ public sealed class SecretManagementService(
         StoredResource<SecretResource> stored, CancellationToken cancellationToken)
     {
         var policy = await accessPolicies.GetAsync(stored.Value.Uid, cancellationToken);
-        return stored with { Value = stored.Value with
+        return stored with
         {
-            Definition = stored.Value.Definition with { UsePolicy = LegacyPolicy(policy) }
-        } };
+            Value = stored.Value with
+            {
+                Definition = stored.Value.Definition with { UsePolicy = LegacyPolicy(policy) }
+            }
+        };
     }
 
     private async Task PersistLegacyPolicyAsync(Resource resource, DescendantUsePolicy legacy,

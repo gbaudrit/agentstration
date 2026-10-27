@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Sqlite;
@@ -6,8 +8,6 @@ using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Work;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 
 namespace Agentstration.Application.Tests;

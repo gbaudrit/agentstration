@@ -22,7 +22,8 @@ public sealed partial class ApiClientTests
             {
                 Content = JsonContent.Create(new Agentstration.Api.Contracts.ValueResponse<ToolResource>([]))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         _ = await new ToolsApiClient(httpClient).GetToolsAsync(scope, cancellationToken: default);
 

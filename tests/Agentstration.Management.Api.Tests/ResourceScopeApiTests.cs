@@ -643,7 +643,8 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                 Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.ModelProfilePin?.ScopeRef);
                 Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.RuntimeProfilePin?.ScopeRef);
                 var resolved = await runtimeAgents.ResolveAsync(new RuntimeAgentReference(stored.Value.Name,
-                    stored.Value.Generation) { ScopeRef = scopeRef }, default);
+                    stored.Value.Generation)
+                { ScopeRef = scopeRef }, default);
                 Assert.AreEqual(stored.Value.Uid, resolved.AgentId);
                 Assert.AreEqual(scopeRef, resolved.AgentScopeRef);
                 Assert.AreEqual(revision.Value.Uid, resolved.RevisionUid);

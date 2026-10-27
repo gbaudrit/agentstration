@@ -1,5 +1,5 @@
-using Agentstration.Triggers;
 using Agentstration.Resources;
+using Agentstration.Triggers;
 using Agentstration.Web.Console;
 using Microsoft.Extensions.Localization;
 

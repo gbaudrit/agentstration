@@ -147,7 +147,8 @@ public sealed partial class ApiClientTests
                     ? JsonContent.Create(new PagedResponse<AgentResource>([], null))
                     : JsonContent.Create(new PagedResponse<AgentDeployment>([], null))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         _ = await new ManagementApiClient(httpClient).GetAgentsAsync(scope, default);
 
