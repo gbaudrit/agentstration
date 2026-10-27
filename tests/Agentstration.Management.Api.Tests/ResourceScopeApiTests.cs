@@ -10,6 +10,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
+using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
@@ -481,15 +482,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             .GetExactAsync<ModelProviderResource>(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
                 ResourceNamespace.Default, ModelResourceKinds.ModelProvider, "ollama-local"), default);
         Assert.IsNotNull(provider);
-        var providerPolicy = await policies.GetAsync(provider.Value.Uid, default);
-        _ = await policies.PutAsync(new ResourceAccessPolicy(
-            new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
-                ModelResourceKinds.ModelProvider, provider.Value.Generation),
-            (providerPolicy?.Policy.Grants ?? []).Append(new ResourceAccessGrant(tenantScope,
-                [ResourceAccessAction.Discover, ResourceAccessAction.Use])).ToArray()),
-            providerPolicy?.ETag, default);
-
-        var profile = await profiles.CreateAsync(new ModelProfileResource
+        var tenantProfile = new ModelProfileResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ModelResourceKinds.ModelProfile,
@@ -501,7 +494,18 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                 Provider = new ResourceReference("ollama-local", ResourceScopeRef.Instance),
                 Model = new ModelSelection { Name = "test-model" }
             }
-        }, default);
+        };
+        await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
+            await profiles.CreateAsync(tenantProfile, default));
+        var providerPolicy = await policies.GetAsync(provider.Value.Uid, default);
+        _ = await policies.PutAsync(new ResourceAccessPolicy(
+            new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                ModelResourceKinds.ModelProvider, provider.Value.Generation),
+            (providerPolicy?.Policy.Grants ?? []).Append(new ResourceAccessGrant(tenantScope,
+                [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)).ToArray()),
+            providerPolicy?.ETag, default);
+
+        var profile = await profiles.CreateAsync(tenantProfile, default);
         var instanceProfile = await profiles.GetExactAsync(ResourceScopeRef.Instance,
             ResourceNamespace.Default, "reasoning-default", default);
         Assert.IsNotNull(instanceProfile);
@@ -581,6 +585,20 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         };
         await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
             await agents.PutAgentAsync(staleAgent, null, true, default));
+
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
+        {
+            var currentProviderPolicy = await policies.GetAsync(provider.Value.Uid, default);
+            Assert.IsNotNull(currentProviderPolicy);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                currentProviderPolicy.Policy.Resource,
+                currentProviderPolicy.Policy.Grants.Select(grant => grant.TargetScopeRef == tenantScope
+                    ? grant with { Actions = [ResourceAccessAction.Discover] }
+                    : grant).ToArray()), currentProviderPolicy.ETag, default);
+        }
+        var deployments = (IModelDeploymentStore)profiles;
+        await Assert.ThrowsExactlyAsync<ModelProviderAccessDeniedException>(async () =>
+            await deployments.GetRequiredAsync(tenantScope, profile.Value.Namespace, profile.Value.Name, default));
     }
 
     [TestMethod]

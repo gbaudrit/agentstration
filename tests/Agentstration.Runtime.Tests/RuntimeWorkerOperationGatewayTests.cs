@@ -88,6 +88,7 @@ public sealed class RuntimeWorkerOperationGatewayTests
             Guid.NewGuid()), default);
 
         Assert.AreEqual("OK", Assert.IsInstanceOfType<RuntimeGovernedModelText>(response.Contents.Single()).Text);
+        Assert.AreEqual(ResourceScopeRef.Instance, resolver.RequestedScope);
         Assert.AreEqual(ControlPlaneAccessMode.Unavailable, scopes.AccessMode);
     }
 
@@ -123,6 +124,8 @@ public sealed class RuntimeWorkerOperationGatewayTests
         ICurrentRequestContext context,
         ControlPlaneAccessMode expectedMode) : IChatClientResolver
     {
+        public ResourceScopeRef? RequestedScope { get; private set; }
+
         public ValueTask<IChatClient> ResolveAsync(string modelProfileName, CancellationToken cancellationToken = default) =>
             ResolveAsync(ResourceNamespace.Default, modelProfileName, cancellationToken);
 
@@ -133,6 +136,16 @@ public sealed class RuntimeWorkerOperationGatewayTests
         {
             Assert.AreEqual(expectedMode, context.AccessMode);
             return ValueTask.FromResult<IChatClient>(new StubChatClient(_ => { }));
+        }
+
+        public ValueTask<IChatClient> ResolveAsync(
+            ResourceScopeRef profileScopeRef,
+            ResourceNamespace @namespace,
+            string modelProfileName,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedScope = profileScopeRef;
+            return ResolveAsync(@namespace, modelProfileName, cancellationToken);
         }
     }
 

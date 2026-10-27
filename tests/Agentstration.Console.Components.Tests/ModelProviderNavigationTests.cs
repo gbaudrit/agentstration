@@ -48,7 +48,7 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(
                 "/models/ollama-local.qwen3-deadbeef?namespace=shared.models",
                 rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
-            CollectionAssert.AreEqual(new[] { "Overview", "Configuration" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
+            CollectionAssert.AreEqual(new[] { "Overview", "Configuration", "Access" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
             Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
         });
 
@@ -65,6 +65,9 @@ public sealed class ModelProviderNavigationTests
             StringAssert.Contains(rendered.Find("[data-testid='model-discovery-result']").TextContent, "1 updated");
             Assert.AreEqual(1, rendered.FindAll("[data-testid='open-model-details']").Count);
         });
+
+        rendered.Find("#model-provider-access-tab").Click();
+        rendered.WaitForElement("[data-testid='resource-access-panel']");
     }
 
     [TestMethod]
@@ -421,15 +424,36 @@ public sealed class ModelProviderNavigationTests
         context.Services.AddSingleton<IParametersClient>(new StubParametersClient());
         context.Services.AddSingleton<ISecretsClient>(new StubSecretsClient());
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new StubResourceScopeInventoryClient());
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(new StubResourceAccessPolicyClient());
         context.Services.AddSingleton(new NotificationState());
         return context;
     }
 
     private sealed class StubResourceScopeInventoryClient : IResourceScopeInventoryClient
     {
-        public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceScopeInventoryResponse([
+                new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", null, false,
+                    [new(Guid.Empty, ProviderNamespace, ModelResourceKinds.ModelProvider, "ollama/local", DateTimeOffset.UnixEpoch)]),
+                new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", ResourceScopeRef.Instance, true, [])
+            ]));
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string kind, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", true)]);
+            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([
+                new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true),
+                new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", true)
+            ]);
+    }
+
+    private sealed class StubResourceAccessPolicyClient : IResourceAccessPolicyClient
+    {
+        public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) =>
+            Task.FromResult<ResourceAccessPolicySnapshot?>(null);
+
+        public Task<ResourceAccessPolicySnapshot> PutAsync(
+            ResourceAccessPolicy policy,
+            string? etag,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessPolicySnapshot(policy, "\"provider-policy\""));
     }
 
     private sealed class StubModelProvidersClient : IModelProvidersClient

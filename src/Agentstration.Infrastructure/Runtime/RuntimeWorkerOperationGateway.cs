@@ -33,9 +33,9 @@ public sealed class RuntimeWorkerOperationGateway(
         RuntimeGovernedModelRequest request,
         CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.Agent.ModelProfileScopeRef ?? request.ExecutionScopeRef,
-            request.TenantId, request.PrincipalId);
-        var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
+        var profileScopeRef = request.Agent.ModelProfileScopeRef ?? request.ExecutionScopeRef;
+        using var requestScope = EnterScope(profileScopeRef, request.TenantId, request.PrincipalId);
+        var client = await chatClients.ResolveAsync(profileScopeRef, request.Agent.ModelProfileNamespace,
             request.Agent.ModelProfileName, cancellationToken);
         var messages = ToMessages(request.Messages);
         var options = ToOptions(request);
@@ -56,9 +56,9 @@ public sealed class RuntimeWorkerOperationGateway(
         RuntimeGovernedModelRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.Agent.ModelProfileScopeRef ?? request.ExecutionScopeRef,
-            request.TenantId, request.PrincipalId);
-        var client = await chatClients.ResolveAsync(request.Agent.ModelProfileNamespace,
+        var profileScopeRef = request.Agent.ModelProfileScopeRef ?? request.ExecutionScopeRef;
+        using var requestScope = EnterScope(profileScopeRef, request.TenantId, request.PrincipalId);
+        var client = await chatClients.ResolveAsync(profileScopeRef, request.Agent.ModelProfileNamespace,
             request.Agent.ModelProfileName, cancellationToken);
         var metadata = client.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
         await foreach (var update in client.GetStreamingResponseAsync(

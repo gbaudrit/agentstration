@@ -366,7 +366,8 @@ public sealed class ControlPlaneStoreHardeningTests
         }, default);
         var runtimeContext = new CurrentRequestContext();
         using var runtimeScope = runtimeContext.PushSystem();
-        var resolver = new ResourceRuntimeAgentResolver(fixture.Store, fixture.Queries, runtimeContext, runtimeContext);
+        var resolver = new ResourceRuntimeAgentResolver(fixture.Store, fixture.Queries,
+            new AllowAccessPolicies(), runtimeContext, runtimeContext);
         var resolved = await resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 3) { Namespace = packNamespace }, default);
 
         Assert.AreEqual(agent.Value.Uid, resolved.AgentId);
@@ -533,6 +534,27 @@ public sealed class ControlPlaneStoreHardeningTests
             Directory.Delete(directory, true);
         }
 
-        private ServiceProvider Provider { get; } = provider;
+        public ServiceProvider Provider { get; } = provider;
+    }
+
+    private sealed class AllowAccessPolicies : IResourceAccessPolicyService
+    {
+        public Task<IReadOnlyList<ResourceAccessPolicyResponse>> ListAsync(ResourceScopeRef ownerScopeRef,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResourceAccessPolicyResponse>>([]);
+
+        public Task<ResourceAccessPolicyResponse?> GetAsync(Guid resourceUid,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<ResourceAccessPolicyResponse?>(null);
+
+        public Task<ResourceAccessPolicyResponse> PutAsync(ResourceAccessPolicy policy, string? ifMatch,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DeleteAsync(Guid resourceUid, string? ifMatch,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ResourceAccessDecision> EvaluateAsync(ResourceAccessIdentity resource,
+            ResourceScopeRef consumerScopeRef, ResourceAccessAction action, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessDecision(true, ResourceAccessDecisionReasons.ExactGrant));
     }
 }
