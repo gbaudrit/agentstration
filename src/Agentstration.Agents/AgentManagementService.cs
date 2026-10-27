@@ -205,7 +205,8 @@ public sealed class AgentManagementService(
             RuntimeProfileResourceKinds.RuntimeProfile, ownerScopeRef, cancellationToken);
         var resolved = compiler.Compile(resolvedAgent, spec, toolSetTools, toolSetAssignments,
             [.. directToolPins, .. toolSetPins],
-            modelProfilePin, runtimeProfilePin) with { SchemaBindings = contracts.Snapshots };
+            modelProfilePin, runtimeProfilePin) with
+        { SchemaBindings = contracts.Snapshots };
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
         var revisionAddress = ScopedResourceAddress.Create(ownerScopeRef, @namespace, AgentResourceKinds.AgentRevision, revisionName);

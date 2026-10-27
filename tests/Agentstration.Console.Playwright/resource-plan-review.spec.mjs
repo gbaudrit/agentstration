@@ -12,14 +12,39 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   const providerName = `review-provider-${suffix}`;
   const modelName = `review-model-${suffix}`;
   const runtimeName = `review-runtime-${suffix}`;
+  const createdResources = new Map();
   for (const [path, data] of [
-    ['/api/extensionregistrations', { name: extensionName, properties: { displayName: 'Review fixture extension', endpoint: `http://127.0.0.1:5199/health/${suffix}` } }],
-    ['/api/modelproviders', { name: providerName, properties: { displayName: 'Review fixture provider', extension: { name: extensionName }, contributionId: 'ollama' } }],
-    ['/api/modelprofiles', { name: modelName, properties: { displayName: 'Review fixture model', provider: { name: providerName }, model: { name: 'fixture-model' } } }],
-    ['/api/runtimeprofiles', { name: runtimeName, properties: { displayName: 'Review fixture runtime', runtimeType: 'microsoft-agent-framework' } }],
+    ['/api/extensionregistrations', { name: extensionName, scopeRef: '/instance', properties: { displayName: 'Review fixture extension', endpoint: `http://127.0.0.1:5199/health/${suffix}` } }],
+    ['/api/modelproviders', { name: providerName, scopeRef: '/instance', properties: { displayName: 'Review fixture provider', extension: { name: extensionName, namespace: 'default', scopeRef: '/instance' }, contributionId: 'ollama' } }],
+    ['/api/modelprofiles', { name: modelName, scopeRef: '/instance', properties: { displayName: 'Review fixture model', provider: { name: providerName, namespace: 'default', scopeRef: '/instance' }, model: { name: 'fixture-model' } } }],
+    ['/api/runtimeprofiles', { name: runtimeName, scopeRef: '/instance', properties: { displayName: 'Review fixture runtime', runtimeType: 'microsoft-agent-framework' } }],
   ]) {
     const response = await page.request.post(path, { data });
-    expect(response.status(), await response.text()).toBe(201);
+    const body = await response.text();
+    expect(response.status(), body).toBe(201);
+    createdResources.set(path, JSON.parse(body));
+  }
+
+  const identityResponse = await page.request.get('/api/identity/context');
+  expect(identityResponse.status(), await identityResponse.text()).toBe(200);
+  const identity = await identityResponse.json();
+  const workspaceScope = `/workspaces/${identity.context.workspaceId}`;
+  for (const path of ['/api/modelprofiles', '/api/runtimeprofiles']) {
+    const resource = createdResources.get(path);
+    const accessResponse = await page.request.put(`/api/resource-access-policies/${resource.uid}`, {
+      headers: { 'X-Agentstration-Context': '/instance' },
+      data: {
+        resource: {
+          uid: resource.uid,
+          ownerScopeRef: '/instance',
+          namespace: resource.namespace,
+          kind: resource.kind,
+          generation: resource.generation,
+        },
+        grants: [{ targetScopeRef: workspaceScope, actions: ['discover', 'use'], includeDescendants: false }],
+      },
+    });
+    expect(accessResponse.status(), await accessResponse.text()).toBe(200);
   }
 
   const title = `Playwright review ${Date.now()}`;

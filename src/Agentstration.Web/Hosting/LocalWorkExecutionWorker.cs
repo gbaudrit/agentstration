@@ -62,7 +62,8 @@ public sealed class LocalWorkExecutionWorker(
                     timeProvider.GetUtcNow());
                 await workItems.ApplyExecutionEventAsync(new WorkExecutionCompleted(
                     Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
-                    timeProvider.GetUtcNow(), result) { ExecutionScopeRef = scope.ScopeRef }, stoppingToken);
+                    timeProvider.GetUtcNow(), result)
+                { ExecutionScopeRef = scope.ScopeRef }, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -96,7 +97,8 @@ public sealed class LocalWorkExecutionWorker(
         var selectedAgent = $"flow:{flow.FlowId.Value}";
         await workItems.ApplyExecutionEventAsync(new WorkExecutionStarted(
             Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
-            timeProvider.GetUtcNow(), selectedAgent) { ExecutionScopeRef = execution.Request.ExecutionScope!.ScopeRef }, cancellationToken);
+            timeProvider.GetUtcNow(), selectedAgent)
+        { ExecutionScopeRef = execution.Request.ExecutionScope!.ScopeRef }, cancellationToken);
         var input = execution.Request.Metadata.ContainsKey(RootFlowSubmissionService.RootRunIdMetadata)
             && execution.Request.Inputs.FirstOrDefault()?.Structured is { } rootInput
                 ? rootInput

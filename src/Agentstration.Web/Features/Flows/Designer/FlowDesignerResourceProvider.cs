@@ -19,11 +19,11 @@ public sealed class FlowDesignerResourceProvider(
         var agents = await client.GetAgentsAsync(contextScope, cancellationToken);
         return agents.Where(agent => agent.ScopeRef is not null)
             .Select(agent => new FlowDesignerAgent(agent.Id, agent.Name, agent.ScopeRef!.Value)
-        {
-            Namespace = agent.Namespace,
-            InputSchema = agent.InputSchema?.Clone(),
-            InputSchemaReference = agent.InputSchemaReference
-        }).ToArray();
+            {
+                Namespace = agent.Namespace,
+                InputSchema = agent.InputSchema?.Clone(),
+                InputSchemaReference = agent.InputSchemaReference
+            }).ToArray();
     }
 
     public async Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)

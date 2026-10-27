@@ -61,7 +61,8 @@ public static class InteractiveFlowDemoData
                         Extension = new ResourceReference(registrationName, providerScope, ResourceNamespace.Default)
                     }
                 }
-            } with { ScopeRef = providerScope }, null, true, cancellationToken);
+            } with
+            { ScopeRef = providerScope }, null, true, cancellationToken);
         }
 
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(InteractiveFlowDemoData));

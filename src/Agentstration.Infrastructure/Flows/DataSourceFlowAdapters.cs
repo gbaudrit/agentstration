@@ -62,7 +62,8 @@ public sealed class DataSourceAcquisitionCompositionResolver(
             resolvedFlow.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract),
             resolvedFlow.DefinitionHash ?? (resolvedFlow.Graph is null
                 ? FlowDefinitionHash.Compute(resolvedFlow.Definition)
-                : FlowDefinitionHash.Compute(resolvedFlow.Graph))) { ScopeRef = resolvedFlow.ScopeRef };
+                : FlowDefinitionHash.Compute(resolvedFlow.Graph)))
+        { ScopeRef = resolvedFlow.ScopeRef };
     }
 
     public async Task<ResolvedDataSourceProfileDependencies> ResolveDependenciesAsync(
