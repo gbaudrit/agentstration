@@ -116,6 +116,15 @@ export class ResourceAccessPage {
     await grant.getByTestId(TestIds.resourceAccess.remove).click();
     await grant.waitFor({ state: 'detached' });
     await this.save();
+    const identity = await this.identity();
+    const policyUrl = new URL(`/api/resource-access-policies/${identity.uid}`, this.page.url()).toString();
+    await expect(async () => {
+      const response = await this.page.request.get(policyUrl);
+      const body = await response.text();
+      expect(response.status(), body).toBe(200);
+      const policy = JSON.parse(body) as { grants?: Array<{ targetScopeRef?: string }> };
+      expect(policy.grants ?? []).not.toContainEqual(expect.objectContaining({ targetScopeRef: scopeRef }));
+    }).toPass();
   }
 
   public grant(scopeRef: string): Locator {

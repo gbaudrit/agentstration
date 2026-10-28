@@ -265,6 +265,7 @@ export const TestIds = {
   modelAdministration: {
     providerForm: 'model-provider-form',
     providerConfigurationTab: 'model-provider-configuration-tab',
+    providerAccessTab: 'model-provider-access-tab',
     providerName: 'model-provider-name',
     providerDisplayName: 'model-provider-display-name',
     providerExtension: 'model-provider-extension',
@@ -280,6 +281,7 @@ export const TestIds = {
     saveModelOverride: 'save-model-override',
     modelOverrideMessage: 'model-override-message',
     profileForm: 'model-profile-form',
+    profileAccessTab: 'model-profile-access-tab',
     profileName: 'model-profile-name',
     profileDisplayName: 'model-profile-display-name',
     profileProvider: 'model-profile-provider',

@@ -33,6 +33,7 @@ import { OperationalWorkspacesPage } from './operational-workspaces.page.js';
 import { OperationalTriggersPage } from './operational-triggers.page.js';
 import { SchemaContractsPage } from './schema-contracts.page.js';
 import { SchemaDrivenFlowInputsPage } from './schema-driven-flow-inputs.page.js';
+import { ModelProviderAccessPage } from './model-provider-access.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -68,6 +69,7 @@ export class ProductPages {
   public readonly operationalTriggers: OperationalTriggersPage;
   public readonly schemaContracts: SchemaContractsPage;
   public readonly schemaDrivenFlowInputs: SchemaDrivenFlowInputsPage;
+  public readonly modelProviderAccess: ModelProviderAccessPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -103,6 +105,7 @@ export class ProductPages {
     this.operationalTriggers = new OperationalTriggersPage(page);
     this.schemaContracts = new SchemaContractsPage(page);
     this.schemaDrivenFlowInputs = new SchemaDrivenFlowInputsPage(page);
+    this.modelProviderAccess = new ModelProviderAccessPage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

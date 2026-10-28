@@ -6,6 +6,7 @@ import { isActionableConsoleError, isActionableFirstPartyFailure } from '../heal
 interface AgentstrationWorkerFixtures {
   product: ProductHosts;
   authenticationMode: 'Development' | 'Local';
+  aiProvider: 'Deterministic' | 'Managed';
 }
 
 interface AgentstrationTestFixtures {
@@ -14,14 +15,15 @@ interface AgentstrationTestFixtures {
 
 export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFixtures>({
   authenticationMode: ['Development', { option: true, scope: 'worker' }],
-  product: [async ({ authenticationMode }, use) => {
+  aiProvider: ['Deterministic', { option: true, scope: 'worker' }],
+  product: [async ({ authenticationMode, aiProvider }, use) => {
     const external = resolveExternalProductAddresses(process.env);
     if (external) {
       await use({ ...external, stop: async () => {} });
       return;
     }
 
-    const product = await startProductHosts(authenticationMode);
+    const product = await startProductHosts(authenticationMode, aiProvider);
     try {
       await use(product);
     } finally {

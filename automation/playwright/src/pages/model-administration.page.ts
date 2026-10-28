@@ -65,12 +65,16 @@ export class ModelAdministrationPage {
     await this.page.getByTestId(TestIds.modelAdministration.modelOverrideMessage).waitFor({ state: 'visible' });
   }
 
-  public async createProfile(consoleUrl: string, definition: ModelAdministrationDefinition): Promise<Locator> {
+  public async createProfile(
+    consoleUrl: string,
+    definition: ModelAdministrationDefinition,
+    scopeRef = '/instance',
+  ): Promise<Locator> {
     await this.open(consoleUrl, '/modelprofiles/new', TestIds.resourceAdministration.modelProfileEditor);
     await this.waitForInteractive(TestIds.modelAdministration.profileForm);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileName), definition.profileName);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName), definition.profileDisplayName);
-    await this.page.getByTestId(TestIds.secretGrants.scopePicker).selectOption('/instance');
+    await this.page.getByTestId(TestIds.secretGrants.scopePicker).selectOption(scopeRef);
     await selectMatchingOption(this.page.getByTestId(TestIds.modelAdministration.profileProvider), definition.providerName);
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.profileModel));
     await this.page.getByTestId(TestIds.modelAdministration.profileSave).click();
@@ -122,6 +126,34 @@ export class ModelAdministrationPage {
   public async openProvider(consoleUrl: string, name: string): Promise<void> {
     await this.open(consoleUrl, `/modelproviders/${name}`, TestIds.resourceAdministration.modelProviderEditor);
     await this.openProviderConfiguration();
+  }
+
+  public async openProviderAccess(consoleUrl: string, name: string, scopeRef = '/instance'): Promise<void> {
+    await this.open(
+      consoleUrl,
+      `/modelproviders/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`,
+      TestIds.resourceAdministration.modelProviderEditor,
+    );
+    await this.page.locator(
+      `[data-testid="${TestIds.modelAdministration.providerConfigurationTab}"][data-interactive="true"]`,
+    ).waitFor({ state: 'visible' });
+    const tab = this.page.getByTestId(TestIds.modelAdministration.providerAccessTab);
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+    }).toPass();
+    await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
+  }
+
+  public async openProfileAccess(consoleUrl: string, name: string, scopeRef: string): Promise<void> {
+    await this.open(
+      consoleUrl,
+      `/modelprofiles/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`,
+      TestIds.resourceAdministration.modelProfileEditor,
+    );
+    await this.waitForPersisted(TestIds.modelAdministration.profileForm);
+    await this.page.getByTestId(TestIds.modelAdministration.profileAccessTab).click();
+    await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
   }
 
   public async deleteProvider(): Promise<void> {

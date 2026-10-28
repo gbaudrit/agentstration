@@ -45,6 +45,10 @@ internal static class ModelsApiHttp
         {
             return Problem(exception.Code, "Invalid model profile", 422, exception.Message, new Dictionary<string, object?> { ["errors"] = exception.Errors });
         }
+        catch (ModelProviderAccessDeniedException exception)
+        {
+            return Problem("model-provider-access-denied", "Model provider access denied", 403, exception.Message);
+        }
         catch (ModelProviderResolutionException exception) { return Problem("model-profile-invalid", "Invalid model configuration", 422, exception.Message); }
         catch (ArgumentException exception) { return Problem("validation-failed", "Invalid request", 400, exception.Message); }
     }

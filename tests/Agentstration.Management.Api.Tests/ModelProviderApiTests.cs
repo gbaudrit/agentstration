@@ -25,6 +25,45 @@ namespace Agentstration.Management.Tests;
 public sealed class ModelProviderApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task ExactTenantGrantExposesInstanceProviderOnlyInTenantContext()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var providers = factory.Services.GetRequiredService<ModelProviderManagementService>();
+        using (scopes.PushInstance(context))
+        {
+            var provider = await providers.GetExactAsync(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "ollama-local", default);
+            Assert.IsNotNull(provider);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                    ModelResourceKinds.ModelProvider, provider.Value.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId),
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: false)]),
+                null, default);
+        }
+
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
+        var tenantProviders = await client.GetFromJsonAsync<ValueResponse<ModelProviderResponse>>(
+            "/api/modelproviders");
+        Assert.IsTrue(tenantProviders!.Value.Any(value => value.Name == "ollama-local"));
+        using var tenantModels = await client.GetAsync("/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(HttpStatusCode.OK, tenantModels.StatusCode);
+
+        SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
+        var workspaceProviders = await client.GetFromJsonAsync<ValueResponse<ModelProviderResponse>>(
+            "/api/modelproviders");
+        Assert.IsFalse(workspaceProviders!.Value.Any(value => value.Name == "ollama-local"));
+        using var workspaceModels = await client.GetAsync("/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(HttpStatusCode.Forbidden, workspaceModels.StatusCode);
+        Assert.DoesNotContain("ollama-local", await workspaceModels.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public async Task AuthorizedInstanceProviderHealthIsEvaluatedInItsOwnerScopeFromAWorkspace()
     {
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
