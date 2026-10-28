@@ -67,7 +67,13 @@ public sealed class ModelProviderNavigationTests
         });
 
         rendered.Find("#model-provider-access-tab").Click();
-        rendered.WaitForElement("[data-testid='resource-access-panel']");
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(rendered.Find("[data-testid='resource-access-panel']"));
+            Assert.IsNotNull(rendered.Find(".access-identity"));
+            Assert.IsNotNull(rendered.Find("[data-testid='resource-access-target']"));
+            Assert.IsFalse(rendered.Markup.Contains("Resource identity unavailable", StringComparison.Ordinal));
+        });
     }
 
     [TestMethod]

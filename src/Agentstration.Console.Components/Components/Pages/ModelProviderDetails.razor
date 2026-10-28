@@ -84,7 +84,7 @@ else
     }
     @if (!IsNew && activeTab == ProviderTab.Access && resource is not null && resource.ScopeRef is { } ownerScope)
     {
-        <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@ModelResourceKinds.ModelProvider" Name="resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
+        <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@ModelResourceKinds.ModelProvider" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
     }
     </div>
 }
