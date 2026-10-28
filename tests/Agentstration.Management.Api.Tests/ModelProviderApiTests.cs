@@ -5,6 +5,7 @@ using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
@@ -23,6 +24,41 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ModelProviderApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task AuthorizedInstanceProviderHealthIsEvaluatedInItsOwnerScopeFromAWorkspace()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IModelProviderDiscovery>();
+            services.AddSingleton<IModelProviderDiscovery>(serviceProvider =>
+                new OwnerScopeModelDiscovery(serviceProvider.GetRequiredService<ICurrentRequestContext>()));
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var providers = factory.Services.GetRequiredService<ModelProviderManagementService>();
+        using (scopes.PushInstance(context))
+        {
+            var provider = await providers.GetExactAsync(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "ollama-local", default);
+            Assert.IsNotNull(provider);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                    ModelResourceKinds.ModelProvider, provider.Value.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId),
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
+                null, default);
+        }
+
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
+        var status = await client.GetFromJsonAsync<ModelProviderStatusResponse>(
+            "/api/modelproviders/ollama-local/status");
+
+        Assert.IsNotNull(status);
+        Assert.AreEqual("available", status.Status, status.Details);
+    }
+
     [TestMethod]
     public async Task ReadOnlyProviderApisExposeConfiguredProviderAndPersistedInventory()
     {
@@ -446,6 +482,22 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             var observation = observations[Math.Min(index++, observations.Length - 1)];
             return ValueTask.FromResult(observation());
         }
+    }
+
+    private sealed class OwnerScopeModelDiscovery(ICurrentRequestContext context) : IModelProviderDiscovery
+    {
+        public string ProviderType => "owner-scope";
+        public bool CanHandle(string providerType) => true;
+        public ValueTask<ModelProviderHealth> GetHealthAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(context.AccessMode == ControlPlaneAccessMode.Instance
+                ? new ModelProviderHealth("available")
+                : new ModelProviderHealth("unavailable", $"Resolved from '{context.AccessMode}' instead of Instance."));
+        public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult<IReadOnlyList<DiscoveredModel>>([]);
     }
 
     private sealed class PerProviderModelDiscovery : IModelProviderDiscovery

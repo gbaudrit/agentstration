@@ -2,6 +2,7 @@ using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
@@ -11,6 +12,7 @@ namespace Agentstration.Agents;
 public sealed class ResourceRuntimeAgentResolver(
     IResourceStore store,
     IAgentResourceQueries queries,
+    IResourceAccessPolicyService accessPolicies,
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes) : IRuntimeAgentResolver
 {
@@ -78,7 +80,19 @@ public sealed class ResourceRuntimeAgentResolver(
     private async Task ValidatePinnedDependenciesAsync(ResolvedAgentDefinition definition, CancellationToken cancellationToken)
     {
         if (definition.ModelProfilePin is { } model)
-            await ValidatePinAsync<ModelProfileResource>(model, cancellationToken);
+        {
+            var profile = await ValidatePinAsync<ModelProfileResource>(model, cancellationToken);
+            var consumerScopeRef = CurrentConsumerScopeRef();
+            if (consumerScopeRef is { } consumer && consumer != model.ScopeRef)
+            {
+                var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
+                    profile.Value.Uid, model.ScopeRef, profile.Value.Namespace, ModelResourceKinds.ModelProfile,
+                    profile.Value.Generation), consumer, ResourceAccessAction.Use, cancellationToken);
+                if (!access.Allowed)
+                    throw new RuntimeAgentResolutionException("agent_model_profile_unavailable",
+                        "The pinned Model Profile is unavailable in the execution context.");
+            }
+        }
         if (definition.RuntimeProfilePin is { } runtime)
             await ValidatePinAsync<RuntimeProfileResource>(runtime, cancellationToken);
         foreach (var tool in definition.ToolPins)
@@ -96,7 +110,8 @@ public sealed class ResourceRuntimeAgentResolver(
         }
     }
 
-    private async Task ValidatePinAsync<T>(ResolvedResourceDependency pin, CancellationToken cancellationToken)
+    private async Task<StoredResource<T>> ValidatePinAsync<T>(ResolvedResourceDependency pin,
+        CancellationToken cancellationToken)
         where T : Resource
     {
         var current = await store.GetExactAsync<T>(ScopedResourceAddress.Create(
@@ -107,7 +122,17 @@ public sealed class ResourceRuntimeAgentResolver(
                     ? "agent_model_profile_unavailable"
                     : "agent_dependency_stale",
                 $"Pinned {pin.Kind} '{pin.Namespace}/{pin.Name}' is unavailable in the execution context or no longer matches its published identity.");
+        return current;
     }
+
+    private ResourceScopeRef? CurrentConsumerScopeRef() => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+        ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration =>
+            ResourceScopeRef.Tenant(requestContext.Current.TenantId),
+        ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
+        _ => null
+    };
 }
 
 public static class RuntimeAgentDefinitionMapper

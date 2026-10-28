@@ -7,6 +7,7 @@ using Agentstration.Api.Contracts;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -608,6 +609,7 @@ public sealed class RuntimeRunTests
             services.AddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
             services.AddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
+            services.AddSingleton<IResourceAccessPolicyService, AllowAccessPolicies>();
             services.AddSingleton<IRuntimeAgentResolver, ResourceRuntimeAgentResolver>();
             services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");
             var queue = new TestRuntimeRunQueue();
@@ -703,6 +705,27 @@ public sealed class RuntimeRunTests
         {
             public void Dispose() { }
         }
+    }
+
+    private sealed class AllowAccessPolicies : IResourceAccessPolicyService
+    {
+        public Task<IReadOnlyList<ResourceAccessPolicyResponse>> ListAsync(ResourceScopeRef ownerScopeRef,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResourceAccessPolicyResponse>>([]);
+
+        public Task<ResourceAccessPolicyResponse?> GetAsync(Guid resourceUid,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<ResourceAccessPolicyResponse?>(null);
+
+        public Task<ResourceAccessPolicyResponse> PutAsync(ResourceAccessPolicy policy, string? ifMatch,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DeleteAsync(Guid resourceUid, string? ifMatch,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ResourceAccessDecision> EvaluateAsync(ResourceAccessIdentity resource,
+            ResourceScopeRef consumerScopeRef, ResourceAccessAction action, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessDecision(true, ResourceAccessDecisionReasons.ExactGrant));
     }
 
     private sealed class TestRuntimeAgentAccess : IRuntimeAgentAccessValidator

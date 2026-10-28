@@ -81,6 +81,33 @@ public sealed class ChatClientResolverTests
     }
 
     [TestMethod]
+    public async Task ScopedResolverPreservesProfileOwnerAndAuthorizesProviderForThatOwner()
+    {
+        var tenantScope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var providerNamespace = new ResourceNamespace("shared.providers");
+        using var chatClient = new StubChatClient();
+        var profiles = new StubProfileStore();
+        var deployments = new StubDeploymentStore(providerNamespace: providerNamespace);
+        var providers = new StubProviderStore(providerNamespace: providerNamespace);
+        var resolver = new ChatClientResolver(
+            profiles,
+            deployments,
+            providers,
+            new ModelProviderResolver([new RecordingProvider(chatClient)]),
+            new GenAiObservabilityOptions { Enabled = false },
+            NullLoggerFactory.Instance,
+            NullLogger<ChatClientResolver>.Instance);
+
+        _ = await resolver.ResolveAsync(tenantScope, ResourceNamespace.Default, ProfileId);
+
+        Assert.AreEqual(tenantScope, profiles.RequestedScope);
+        Assert.AreEqual(tenantScope, deployments.RequestedScope);
+        Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedProviderScope);
+        Assert.AreEqual(tenantScope, providers.RequestedConsumerScope);
+        Assert.AreEqual(providerNamespace, providers.RequestedNamespace);
+    }
+
+    [TestMethod]
     public async Task ResolverUsesGovernedEffectiveModelSpecificationForRuntimeCapabilities()
     {
         using var chatClient = new StubChatClient();
@@ -184,6 +211,7 @@ public sealed class ChatClientResolverTests
     private sealed class StubProfileStore(bool configured = true) : IModelProfileStore
     {
         public ResourceNamespace? RequestedNamespace { get; private set; }
+        public ResourceScopeRef? RequestedScope { get; private set; }
 
         public ValueTask<ModelProfileConfiguration> GetRequiredAsync(string resourceId, CancellationToken cancellationToken = default) =>
             GetRequiredAsync(ResourceNamespace.Default, resourceId, cancellationToken);
@@ -201,6 +229,16 @@ public sealed class ChatClientResolverTests
                 })
                 : ValueTask.FromException<ModelProfileConfiguration>(new ModelProfileNotFoundException(resourceId));
         }
+
+        public ValueTask<ModelProfileConfiguration> GetRequiredAsync(
+            ResourceScopeRef scopeRef,
+            ResourceNamespace @namespace,
+            string resourceId,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedScope = scopeRef;
+            return GetRequiredAsync(@namespace, resourceId, cancellationToken);
+        }
     }
 
     private sealed class StubDeploymentStore(
@@ -209,6 +247,7 @@ public sealed class ChatClientResolverTests
         ModelSpecification? effectiveSpecification = null) : IModelDeploymentStore
     {
         public ResourceNamespace? RequestedNamespace { get; private set; }
+        public ResourceScopeRef? RequestedScope { get; private set; }
 
         public ValueTask<ModelDeploymentConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default) =>
             GetRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
@@ -223,16 +262,29 @@ public sealed class ChatClientResolverTests
                     Name = ProfileId,
                     ProviderName = ProviderId,
                     ProviderNamespace = providerNamespace ?? ResourceNamespace.Default,
+                    ProviderScopeRef = ResourceScopeRef.Instance,
                     ModelName = "qwen3:1.7b",
                     EffectiveSpecification = effectiveSpecification
                 })
                 : ValueTask.FromException<ModelDeploymentConfiguration>(new ModelDeploymentNotFoundException(name));
+        }
+
+        public ValueTask<ModelDeploymentConfiguration> GetRequiredAsync(
+            ResourceScopeRef scopeRef,
+            ResourceNamespace @namespace,
+            string name,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedScope = scopeRef;
+            return GetRequiredAsync(@namespace, name, cancellationToken);
         }
     }
 
     private sealed class StubProviderStore(bool configured = true, ResourceNamespace? providerNamespace = null) : IModelProviderConfigurationStore
     {
         public ResourceNamespace? RequestedNamespace { get; private set; }
+        public ResourceScopeRef? RequestedProviderScope { get; private set; }
+        public ResourceScopeRef? RequestedConsumerScope { get; private set; }
 
         private ModelProviderConfiguration Provider => new()
         {
@@ -255,6 +307,18 @@ public sealed class ChatClientResolverTests
             configured && string.Equals(name, ProviderId, StringComparison.Ordinal)
                 ? ValueTask.FromResult(Provider)
                 : ValueTask.FromException<ModelProviderConfiguration>(new ModelProviderConfigurationNotFoundException(name));
+        }
+
+        public ValueTask<ModelProviderConfiguration> GetRequiredForConsumerAsync(
+            ResourceScopeRef providerScopeRef,
+            ResourceNamespace @namespace,
+            string name,
+            ResourceScopeRef consumerScopeRef,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedProviderScope = providerScopeRef;
+            RequestedConsumerScope = consumerScopeRef;
+            return GetRequiredAsync(@namespace, name, cancellationToken);
         }
 
         public ValueTask<IReadOnlyList<ModelProviderConfiguration>> ListAsync(CancellationToken cancellationToken = default) =>

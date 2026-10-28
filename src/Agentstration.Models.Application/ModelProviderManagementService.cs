@@ -6,6 +6,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets.Abstractions;
@@ -17,6 +18,7 @@ public sealed class ModelProviderManagementService(
     IResourceStore store,
     IResourceReferenceResolver references,
     ResourceScopeOperationService scopeOperations,
+    IResourceAccessPolicyService accessPolicies,
     IEnumerable<IModelProviderDiscovery> discoveries,
     IEnumerable<IExtensionInspector> inspectors,
     IParameterResolver parameters,
@@ -108,6 +110,7 @@ public sealed class ModelProviderManagementService(
     {
         var provider = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new ModelProviderResourceNotFoundException(name);
+        using var dependencyScope = EnterInstanceDependencyScope();
         return (await ListModelResourcesAsync(provider.Value, cancellationToken))
             .Select(value => ModelDiscoveryService.ToDiscoveredModel(
                 value.Value,
@@ -151,6 +154,7 @@ public sealed class ModelProviderManagementService(
 
     private async Task<ModelProviderView> InspectAsync(ModelProviderConfiguration provider, bool includeModels, CancellationToken cancellationToken)
     {
+        using var dependencyScope = EnterInstanceDependencyScope();
         var discovery = FindDiscovery(provider.AdapterType);
         if (discovery is null) return new(provider, new("unknown", "No discovery adapter is registered in this host."), [], timeProvider.GetUtcNow());
         var health = await discovery.GetHealthAsync(provider, cancellationToken);
@@ -204,15 +208,47 @@ public sealed class ModelProviderManagementService(
         ResourceNamespace ownerNamespace,
         ResourceScopeRef consumerScopeRef,
         CancellationToken cancellationToken)
+        => await GetAuthorizedConfigurationRequiredAsync(reference, ownerNamespace, consumerScopeRef,
+            requireDiscover: true, cancellationToken);
+
+    public async Task<ModelProviderConfiguration> GetAuthorizedConfigurationRequiredAsync(
+        ResourceReference reference,
+        ResourceNamespace ownerNamespace,
+        ResourceScopeRef consumerScopeRef,
+        bool requireDiscover,
+        CancellationToken cancellationToken)
     {
-        var resource = await references.ResolveAsync<ModelProviderResource>(
-            reference, ownerNamespace, ModelResourceKinds.ModelProvider, consumerScopeRef, cancellationToken)
+        ArgumentNullException.ThrowIfNull(reference);
+        var providerScopeRef = reference.ScopeRef
             ?? throw new ModelProviderConfigurationNotFoundException(reference.Name);
+        if (providerScopeRef != ResourceScopeRef.Instance)
+            throw new ModelProviderConfigurationNotFoundException(reference.Name);
+        var @namespace = reference.Namespace ?? ownerNamespace;
+        using var dependencyScope = EnterInstanceDependencyScope();
+        var resource = await store.GetExactAsync<ModelProviderResource>(ScopedResourceAddress.Create(
+                providerScopeRef, @namespace, ModelResourceKinds.ModelProvider, reference.Name), cancellationToken)
+            ?? throw new ModelProviderConfigurationNotFoundException(reference.Name);
+        var identity = new ResourceAccessIdentity(resource.Value.Uid, providerScopeRef,
+            resource.Value.Namespace, ModelResourceKinds.ModelProvider, resource.Value.Generation);
+        if (requireDiscover)
+        {
+            var discover = await accessPolicies.EvaluateAsync(identity, consumerScopeRef,
+                ResourceAccessAction.Discover, cancellationToken);
+            if (!discover.Allowed) throw new ModelProviderAccessDeniedException();
+        }
+        var use = await accessPolicies.EvaluateAsync(identity, consumerScopeRef,
+            ResourceAccessAction.Use, cancellationToken);
+        if (!use.Allowed) throw new ModelProviderAccessDeniedException();
         return await ToConfigurationAsync(resource.Value, cancellationToken);
     }
 
     ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(name, cancellationToken));
     ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(@namespace, name, cancellationToken));
+    ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredForConsumerAsync(
+        ResourceScopeRef providerScopeRef, ResourceNamespace @namespace, string name,
+        ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken) =>
+        new(GetAuthorizedConfigurationRequiredAsync(new ResourceReference(name, providerScopeRef, @namespace),
+            @namespace, consumerScopeRef, requireDiscover: false, cancellationToken));
 
     async ValueTask<IReadOnlyList<ModelProviderConfiguration>> IModelProviderConfigurationStore.ListAsync(CancellationToken cancellationToken) =>
         await Task.WhenAll((await store.ListAllAsync<ModelProviderResource>(ModelResourceKinds.ModelProvider, cancellationToken))
@@ -423,6 +459,13 @@ public sealed class ModelProviderManagementService(
             SpecificationOverrides = resource.Definition.SpecificationOverrides
         };
     }
+
+    private IDisposable? EnterInstanceDependencyScope() => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance => null,
+        _ when requestContext.IsInitialized => requestScopes.PushInstance(requestContext.Current),
+        _ => requestScopes.PushSystem()
+    };
 
     private static void ValidateIdentity(ModelProviderResource resource)
     {

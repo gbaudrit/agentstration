@@ -10,6 +10,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets.Abstractions;
@@ -23,6 +24,71 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ModelProfileApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task InstanceProfileResolutionRemainsAvailableFromAnAuthorizedWorkspace()
+    {
+        await using var factory = DiagnosticFactory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+
+        using var providerResponse = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
+            "workspace-visible-provider",
+            new ModelProviderProperties
+            {
+                DisplayName = "Workspace-visible provider",
+                Extension = new ResourceReference("ollama-extension"),
+                ContributionId = "diagnostic"
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode,
+            await providerResponse.Content.ReadAsStringAsync());
+        using var refreshResponse = await client.PostAsync(
+            "/api/modelproviders/workspace-visible-provider/models/refresh", null);
+        Assert.AreEqual(HttpStatusCode.OK, refreshResponse.StatusCode,
+            await refreshResponse.Content.ReadAsStringAsync());
+        using var profileResponse = await client.PostAsJsonAsync("/api/modelprofiles", new CreateModelProfileRequest(
+            "workspace-visible-profile",
+            new ModelProfileProperties
+            {
+                DisplayName = "Workspace-visible profile",
+                Provider = new ResourceReference("workspace-visible-provider", ResourceScopeRef.Instance),
+                Model = new ModelSelection { Name = "local-model" }
+            }, ScopeRef: ResourceScopeRef.Instance));
+        Assert.AreEqual(HttpStatusCode.Created, profileResponse.StatusCode,
+            await profileResponse.Content.ReadAsStringAsync());
+
+        using (scopes.PushInstance(context))
+        {
+            var profile = await profiles.GetExactAsync(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "workspace-visible-profile", default);
+            Assert.IsNotNull(profile);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(profile.Value.Uid, ResourceScopeRef.Instance, profile.Value.Namespace,
+                    ModelResourceKinds.ModelProfile, profile.Value.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId),
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
+                null, default);
+        }
+
+        SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
+        var resolution = await client.GetFromJsonAsync<ModelProfileResolutionResponse>(
+            "/api/modelprofiles/workspace-visible-profile/resolution?scopeRef=%2Finstance");
+
+        Assert.IsNotNull(resolution);
+        Assert.AreEqual("available", resolution.Status);
+        Assert.AreEqual("local-model", resolution.Model?.Name);
+
+        using (scopes.Push(context))
+        {
+            var deployment = await ((IModelDeploymentStore)profiles).GetRequiredAsync(
+                ResourceScopeRef.Instance, ResourceNamespace.Default, "workspace-visible-profile", default);
+            Assert.IsNotNull(deployment.EffectiveSpecification);
+        }
+    }
+
     [TestMethod]
     public async Task ProfileSecretBindingsPersistPerConsumerAndRejectUnknownRequirements()
     {

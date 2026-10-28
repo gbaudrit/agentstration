@@ -136,16 +136,27 @@ public sealed class ModelProfileManagementService(
         CancellationToken cancellationToken,
         bool includeCapabilityDiagnostics = false)
     {
+        using var dependencyScope = EnterInstanceDependencyScope();
         ModelProviderConfiguration provider;
         try
         {
-            provider = await providerConfigurations.GetConfigurationRequiredAsync(
+            provider = await providerConfigurations.GetAuthorizedConfigurationRequiredAsync(
             profile.Definition.Provider,
             profile.Namespace,
             profile.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope."),
+            requireDiscover: false,
             cancellationToken);
         }
-        catch (ModelProviderResolutionException) { return new(profile, null, new("unavailable", "Provider not found."), null, "unavailable", ["The referenced provider does not exist."]); }
+        catch (ModelProviderAccessDeniedException)
+        {
+            return new(profile, null, new("unavailable", "Provider dependency unavailable."), null,
+                "unavailable", ["The referenced provider is not available to this Model Profile."]);
+        }
+        catch (ModelProviderResolutionException)
+        {
+            return new(profile, null, new("unavailable", "Provider not found."), null,
+                "unavailable", ["The referenced provider does not exist."]);
+        }
         var discovery = discoveries.SingleOrDefault(candidate => candidate.CanHandle(provider.AdapterType));
         if (discovery is null) return new(profile, provider, new("unknown", "No discovery adapter."), null, "unknown", ["No provider discovery adapter is registered."]);
         var health = await discovery.GetHealthAsync(provider, cancellationToken);
@@ -174,6 +185,8 @@ public sealed class ModelProfileManagementService(
                 Namespace = profile.Namespace,
                 ScopeRef = profile.ScopeRef,
                 ProviderName = provider.Name,
+                ProviderNamespace = provider.Namespace,
+                ProviderScopeRef = provider.ScopeRef ?? ResourceScopeRef.Instance,
                 ModelName = profile.Definition.Model.Name,
                 EffectiveSpecification = model.Specification,
                 ProviderOptions = profile.Definition.ProviderOptions,
@@ -236,35 +249,62 @@ public sealed class ModelProfileManagementService(
         };
     }
 
+    public async ValueTask<ModelProfileConfiguration> GetRequiredAsync(ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
+    {
+        var profile = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
+            ?? throw new ModelProfileNotFoundException($"{scopeRef}:{@namespace}/{name}");
+        return ToConfiguration(profile.Value);
+    }
+
     async ValueTask<ModelDeploymentConfiguration> IModelDeploymentStore.GetRequiredAsync(string name, CancellationToken cancellationToken)
         => await ((IModelDeploymentStore)this).GetRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
 
     async ValueTask<ModelDeploymentConfiguration> IModelDeploymentStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
         var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelDeploymentNotFoundException($"{@namespace}/{name}");
-        var providerReference = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ModelResourceKinds.ModelProvider);
-        var provider = await providerConfigurations.GetConfigurationRequiredAsync(
-            profile.Value.Definition.Provider,
-            profile.Value.Namespace,
-            profile.Value.ScopeRef ?? throw new ModelDeploymentNotFoundException($"{@namespace}/{name}"),
+        return await ToDeploymentAsync(profile.Value, cancellationToken);
+    }
+
+    async ValueTask<ModelDeploymentConfiguration> IModelDeploymentStore.GetRequiredAsync(ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
+    {
+        var profile = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
+            ?? throw new ModelDeploymentNotFoundException($"{scopeRef}:{@namespace}/{name}");
+        return await ToDeploymentAsync(profile.Value, cancellationToken);
+    }
+
+    private async Task<ModelDeploymentConfiguration> ToDeploymentAsync(ModelProfileResource profile,
+        CancellationToken cancellationToken)
+    {
+        using var dependencyScope = EnterInstanceDependencyScope();
+        var profileScopeRef = profile.ScopeRef
+            ?? throw new ModelDeploymentNotFoundException($"{profile.Namespace}/{profile.Name}");
+        var providerReference = profile.Definition.Provider.Resolve(profile.Namespace, ModelResourceKinds.ModelProvider);
+        var provider = await providerConfigurations.GetAuthorizedConfigurationRequiredAsync(
+            profile.Definition.Provider,
+            profile.Namespace,
+            profileScopeRef,
+            requireDiscover: false,
             cancellationToken);
-        var model = await modelDiscovery.FindAsync(provider.Uid, profile.Value.Definition.Model.Name, cancellationToken);
+        var model = await modelDiscovery.FindAsync(provider.Uid, profile.Definition.Model.Name, cancellationToken);
         var effectiveSpecification = model is null
             ? null
             : EffectiveModelSpecificationResolver.Resolve(
                 model.Value.Definition.Specification,
-                provider.SpecificationOverrides.GetValueOrDefault(profile.Value.Definition.Model.Name));
+                provider.SpecificationOverrides.GetValueOrDefault(profile.Definition.Model.Name));
         return new()
         {
-            Name = profile.Value.Metadata.Name,
-            Namespace = profile.Value.Namespace,
-            ScopeRef = profile.Value.ScopeRef,
+            Name = profile.Metadata.Name,
+            Namespace = profile.Namespace,
+            ScopeRef = profileScopeRef,
             ProviderName = providerReference.Name,
             ProviderNamespace = providerReference.Namespace,
-            ModelName = profile.Value.Definition.Model.Name,
+            ProviderScopeRef = profile.Definition.Provider.ScopeRef ?? ResourceScopeRef.Instance,
+            ModelName = profile.Definition.Model.Name,
             EffectiveSpecification = effectiveSpecification,
-            ProviderOptions = profile.Value.Definition.ProviderOptions,
-            SecretBindings = profile.Value.Definition.SecretBindings
+            ProviderOptions = profile.Definition.ProviderOptions,
+            SecretBindings = profile.Definition.SecretBindings
         };
     }
 
@@ -321,43 +361,25 @@ public sealed class ModelProfileManagementService(
 
     private async Task ValidateDefinitionAsync(ResourceNamespace ownerNamespace, ModelProfileProperties definition, ResourceScopeRef ownerScopeRef, CancellationToken cancellationToken)
     {
+        using var dependencyScope = EnterInstanceDependencyScope();
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
         if (definition.Provider.ScopeRef != ResourceScopeRef.Instance)
             throw Invalid("definition.provider.scopeRef", "A model profile requires an exact Instance Model Provider reference.");
-        StoredResource<ModelProviderResource>? providerResource;
         ModelProviderConfiguration provider;
-        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
-            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId)
-            : null;
-        if (ownerScopeRef == ResourceScopeRef.Instance)
+        try
         {
-            using var systemScope = requestScopes.PushSystem();
-            providerResource = await references.ResolveAsync<ModelProviderResource>(
-                definition.Provider, ownerNamespace, ModelResourceKinds.ModelProvider, ownerScopeRef, cancellationToken);
-            try { provider = await providerConfigurations.GetConfigurationRequiredAsync(definition.Provider, ownerNamespace, ownerScopeRef, cancellationToken); }
-            catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
+            provider = await providerConfigurations.GetAuthorizedConfigurationRequiredAsync(
+                definition.Provider, ownerNamespace, ownerScopeRef, requireDiscover: true, cancellationToken);
         }
-        else
+        catch (ModelProviderAccessDeniedException)
         {
-            providerResource = await references.ResolveAsync<ModelProviderResource>(
-                definition.Provider, ownerNamespace, ModelResourceKinds.ModelProvider, ownerScopeRef, cancellationToken);
-            try { provider = await providerConfigurations.GetConfigurationRequiredAsync(definition.Provider, ownerNamespace, ownerScopeRef, cancellationToken); }
-            catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
+            throw Invalid("definition.provider.scopeRef",
+                "The selected Model Provider is not available to the Model Profile owner scope.");
         }
-        if (providerResource is null)
+        catch (ModelProviderResolutionException)
+        {
             throw Invalid("definition.provider.name", "The referenced model provider does not exist.");
-        if (ownerScopeRef != ResourceScopeRef.Instance)
-        {
-            var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
-                providerResource.Value.Uid,
-                ResourceScopeRef.Instance,
-                providerResource.Value.Namespace,
-                ModelResourceKinds.ModelProvider,
-                providerResource.Value.Generation), ownerScopeRef, ResourceAccessAction.Use, cancellationToken);
-            if (!access.Allowed)
-                throw Invalid("definition.provider.scopeRef",
-                    $"The Instance Model Provider does not authorize use from '{ownerScopeRef}' ({access.ReasonCode}).");
         }
         if (string.IsNullOrWhiteSpace(definition.Model.Name)) throw Invalid("definition.model.name", "A model name is required.");
         if (definition.SecretBindings is null) throw Invalid("definition.secretBindings", "Secret bindings must be an array.");
@@ -397,7 +419,24 @@ public sealed class ModelProfileManagementService(
             throw Invalid($"{path}.values", "Extension option values must be a JSON object.");
     }
 
+    private static ModelProfileConfiguration ToConfiguration(ModelProfileResource profile) => new()
+    {
+        Name = profile.Metadata.Name,
+        DeploymentName = profile.Metadata.Name,
+        Generation = profile.Definition.Generation,
+        Reasoning = profile.Definition.Reasoning,
+        Output = profile.Definition.Output,
+        ProviderOptions = profile.Definition.ProviderOptions
+    };
+
     private static ModelProfileValidationException Invalid(string field, string message) => new("model_profile_invalid", message, new Dictionary<string, string[]> { [field] = [message] });
+
+    private IDisposable? EnterInstanceDependencyScope() => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance => null,
+        _ when requestContext.IsInitialized => requestScopes.PushInstance(requestContext.Current),
+        _ => requestScopes.PushSystem()
+    };
 
     private static void ValidateIdentity(ModelProfileResource resource)
     {
