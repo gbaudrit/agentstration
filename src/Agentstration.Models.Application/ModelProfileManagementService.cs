@@ -136,6 +136,7 @@ public sealed class ModelProfileManagementService(
         CancellationToken cancellationToken,
         bool includeCapabilityDiagnostics = false)
     {
+        using var dependencyScope = EnterInstanceDependencyScope();
         ModelProviderConfiguration provider;
         try
         {
@@ -276,6 +277,7 @@ public sealed class ModelProfileManagementService(
     private async Task<ModelDeploymentConfiguration> ToDeploymentAsync(ModelProfileResource profile,
         CancellationToken cancellationToken)
     {
+        using var dependencyScope = EnterInstanceDependencyScope();
         var profileScopeRef = profile.ScopeRef
             ?? throw new ModelDeploymentNotFoundException($"{profile.Namespace}/{profile.Name}");
         var providerReference = profile.Definition.Provider.Resolve(profile.Namespace, ModelResourceKinds.ModelProvider);
@@ -359,6 +361,7 @@ public sealed class ModelProfileManagementService(
 
     private async Task ValidateDefinitionAsync(ResourceNamespace ownerNamespace, ModelProfileProperties definition, ResourceScopeRef ownerScopeRef, CancellationToken cancellationToken)
     {
+        using var dependencyScope = EnterInstanceDependencyScope();
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
         if (definition.Provider.ScopeRef != ResourceScopeRef.Instance)
@@ -427,6 +430,13 @@ public sealed class ModelProfileManagementService(
     };
 
     private static ModelProfileValidationException Invalid(string field, string message) => new("model_profile_invalid", message, new Dictionary<string, string[]> { [field] = [message] });
+
+    private IDisposable? EnterInstanceDependencyScope() => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance => null,
+        _ when requestContext.IsInitialized => requestScopes.PushInstance(requestContext.Current),
+        _ => requestScopes.PushSystem()
+    };
 
     private static void ValidateIdentity(ModelProfileResource resource)
     {

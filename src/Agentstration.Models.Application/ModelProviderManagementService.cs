@@ -110,6 +110,7 @@ public sealed class ModelProviderManagementService(
     {
         var provider = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new ModelProviderResourceNotFoundException(name);
+        using var dependencyScope = EnterInstanceDependencyScope();
         return (await ListModelResourcesAsync(provider.Value, cancellationToken))
             .Select(value => ModelDiscoveryService.ToDiscoveredModel(
                 value.Value,
@@ -153,6 +154,7 @@ public sealed class ModelProviderManagementService(
 
     private async Task<ModelProviderView> InspectAsync(ModelProviderConfiguration provider, bool includeModels, CancellationToken cancellationToken)
     {
+        using var dependencyScope = EnterInstanceDependencyScope();
         var discovery = FindDiscovery(provider.AdapterType);
         if (discovery is null) return new(provider, new("unknown", "No discovery adapter is registered in this host."), [], timeProvider.GetUtcNow());
         var health = await discovery.GetHealthAsync(provider, cancellationToken);
