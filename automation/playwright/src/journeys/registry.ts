@@ -34,6 +34,7 @@ import { exerciseOperationalTriggers, type ExerciseOperationalTriggersInput } fr
 import { exerciseSchemaContractBindings, type ExerciseSchemaContractBindingsInput } from './exercise-schema-contract-bindings.journey.js';
 import { exerciseFlowConnectionContracts, type ExerciseFlowConnectionContractsInput } from './exercise-flow-connection-contracts.journey.js';
 import { exerciseSchemaDrivenFlowInputs, type ExerciseSchemaDrivenFlowInputsInput } from './exercise-schema-driven-flow-inputs.journey.js';
+import { exerciseModelProviderAccess, type ExerciseModelProviderAccessInput } from './exercise-model-provider-access.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -73,4 +74,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-schema-contract-bindings': (context, input) => exerciseSchemaContractBindings(context, input as unknown as ExerciseSchemaContractBindingsInput),
   'exercise-flow-connection-contracts': (context, input) => exerciseFlowConnectionContracts(context, input as unknown as ExerciseFlowConnectionContractsInput),
   'exercise-schema-driven-flow-inputs': (context, input) => exerciseSchemaDrivenFlowInputs(context, input as unknown as ExerciseSchemaDrivenFlowInputsInput),
+  'exercise-model-provider-access': (context, input) => exerciseModelProviderAccess(context, input as unknown as ExerciseModelProviderAccessInput),
 };

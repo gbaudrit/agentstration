@@ -64,7 +64,10 @@ interface ControlledWorkerAuthorityProxy {
 
 const startupTimeoutMilliseconds = 180_000;
 
-export async function startProductHosts(authenticationMode: 'Development' | 'Local' = 'Development'): Promise<ProductHosts> {
+export async function startProductHosts(
+  authenticationMode: 'Development' | 'Local' = 'Development',
+  aiProvider: 'Deterministic' | 'Managed' = 'Deterministic',
+): Promise<ProductHosts> {
   const runId = `${Date.now()}-${process.pid}`;
   const workDirectory = path.join(automationRoot, '.work', runId);
   const dataDirectory = path.join(workDirectory, 'data');
@@ -144,7 +147,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     Data__WorkPlanePath: path.join(dataDirectory, 'work-plane.db'),
     Data__FlowPath: path.join(dataDirectory, 'flow-plane.db'),
     Data__RuntimePath: path.join(dataDirectory, 'runtime-plane.db'),
-    AI__Provider: 'Deterministic',
+    AI__Provider: aiProvider,
     Agentstration__Authentication__Mode: authenticationMode,
     Agentstration__Authentication__DevelopmentGrantPlatformAdministrator: 'true',
     Agentstration__Bootstrap__Path: bootstrapPath,
@@ -420,7 +423,7 @@ async function startControlledRuntimeProxy(targetBaseUrl: string): Promise<Contr
 }
 
 async function startFakeOllama(): Promise<FakeOllama> {
-  const server = createServer((request, response) => {
+  const server = createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/') {
       response.setHeader('Content-Type', 'text/plain');
       response.end('Ollama is running');
@@ -441,6 +444,25 @@ async function startFakeOllama(): Promise<FakeOllama> {
           digest: `sha256:browser-fixture-${name}`,
           details: { parameter_size: 'test', quantization_level: 'test' },
         })),
+      }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/api/chat') {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+        model?: string;
+        messages?: Array<{ role?: string; content?: string }>;
+      };
+      const prompt = body.messages?.at(-1)?.content ?? '';
+      response.end(JSON.stringify({
+        model: body.model ?? 'deterministic',
+        created_at: '2026-01-01T00:00:00Z',
+        message: { role: 'assistant', content: `User ${prompt}` },
+        done: true,
+        done_reason: 'stop',
+        prompt_eval_count: 1,
+        eval_count: 1,
       }));
       return;
     }

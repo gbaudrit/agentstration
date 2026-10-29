@@ -126,6 +126,12 @@ The local Ollama extension backs a fully offline create/update/delete journey fo
 npm run capture -- --plan examples/exercise-model-administration.capture-plan.json --output .work/model-administration
 ```
 
+The hierarchical Model Provider access journey requires two prepared sibling Workspaces. It grants an Instance Provider to their Tenant without propagating Provider discovery, authors a Tenant Profile, grants that Profile to one Workspace, verifies deterministic execution and sibling denial, then revokes the Provider grant and verifies fail-closed execution:
+
+```powershell
+npm run capture -- --plan examples/exercise-model-provider-access.capture-plan.json --output .work/model-provider-access
+```
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell

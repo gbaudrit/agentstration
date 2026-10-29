@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit, selectFirstAvailable, type ControlSelection } from './controls.js';
 
@@ -57,6 +57,12 @@ export class AgentEditorPage {
     ]);
     await this.page.getByTestId(TestIds.agentEditor.form).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.agentEditor.name).waitFor({ state: 'visible' });
+  }
+
+  public async expectModelProfileUnavailable(value: string): Promise<void> {
+    const option = this.page.getByTestId(TestIds.agentEditor.modelProfile).locator(`option[value="${value}"]`);
+    if (await option.count() === 0) return;
+    await expect(option).toBeDisabled();
   }
 
   public get form(): Locator { return this.page.getByTestId(TestIds.agentEditor.form); }

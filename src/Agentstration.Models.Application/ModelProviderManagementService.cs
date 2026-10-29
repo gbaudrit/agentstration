@@ -89,8 +89,29 @@ public sealed class ModelProviderManagementService(
 
     public async Task<IReadOnlyList<ModelProviderView>> ListAsync(CancellationToken cancellationToken)
     {
+        var consumerScopeRef = CurrentConsumerScopeRef();
+        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId,
+                requestContext.Current.Restriction)
+            : null;
         var resources = await store.ListAllAsync<ModelProviderResource>(ModelResourceKinds.ModelProvider, cancellationToken);
-        return await Task.WhenAll(resources.Select(async resource =>
+        var discoverable = new List<StoredResource<ModelProviderResource>>(resources.Count);
+        foreach (var resource in resources)
+        {
+            var scopeRef = resource.Value.ScopeRef
+                ?? throw new ModelProviderValidationException("The model provider has no ownership scope.");
+            var decision = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
+                    resource.Value.Uid,
+                    scopeRef,
+                    resource.Value.Namespace,
+                    ModelResourceKinds.ModelProvider,
+                    resource.Value.Generation),
+                consumerScopeRef,
+                ResourceAccessAction.Discover,
+                cancellationToken);
+            if (decision.Allowed) discoverable.Add(resource);
+        }
+        return await Task.WhenAll(discoverable.Select(async resource =>
             await InspectAsync(await ToConfigurationAsync(resource.Value, cancellationToken), true, cancellationToken)));
     }
 
@@ -108,13 +129,17 @@ public sealed class ModelProviderManagementService(
 
     public async Task<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var provider = await GetAsync(@namespace, name, cancellationToken)
-            ?? throw new ModelProviderResourceNotFoundException(name);
+        var provider = await GetAuthorizedConfigurationRequiredAsync(
+            new ResourceReference(name, ResourceScopeRef.Instance, @namespace),
+            @namespace,
+            CurrentConsumerScopeRef(),
+            requireDiscover: true,
+            cancellationToken);
         using var dependencyScope = EnterInstanceDependencyScope();
-        return (await ListModelResourcesAsync(provider.Value, cancellationToken))
+        return (await ListModelResourcesAsync(provider, cancellationToken))
             .Select(value => ModelDiscoveryService.ToDiscoveredModel(
                 value.Value,
-                provider.Value.Definition.SpecificationOverrides.GetValueOrDefault(value.Value.Definition.ExternalId)))
+                provider.SpecificationOverrides.GetValueOrDefault(value.Value.Definition.ExternalId)))
             .ToArray();
     }
 
@@ -465,6 +490,15 @@ public sealed class ModelProviderManagementService(
         ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance => null,
         _ when requestContext.IsInitialized => requestScopes.PushInstance(requestContext.Current),
         _ => requestScopes.PushSystem()
+    };
+
+    private ResourceScopeRef CurrentConsumerScopeRef() => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+        ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration =>
+            ResourceScopeRef.Tenant(requestContext.Current.TenantId),
+        ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
+        _ => throw new InvalidOperationException("Model Provider discovery requires an explicit instance, tenant, or workspace context.")
     };
 
     private static void ValidateIdentity(ModelProviderResource resource)
