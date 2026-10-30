@@ -65,6 +65,8 @@ public sealed class ConsoleContextStateTests
         await context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default);
 
         var navigationContext = context.Services.GetRequiredService<IConsoleNavigationContext>();
+        navigationContext.SetSelectedScopeRef(
+            context.Services.GetRequiredService<ConsoleContextState>().Current?.SelectedScopeRef);
 
         Assert.AreEqual(ResourceScopeRef.Instance.Value, navigationContext.ScopeRef);
     }

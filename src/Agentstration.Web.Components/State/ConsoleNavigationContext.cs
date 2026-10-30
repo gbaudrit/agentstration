@@ -6,13 +6,23 @@ namespace Agentstration.Web.Components.State;
 public interface IConsoleNavigationContext
 {
     string? ScopeRef { get; }
+    void SetSelectedScopeRef(string? scopeRef) { }
 }
 
-internal sealed class ConsoleNavigationContext(
-    NavigationManager navigation,
-    ConsoleContextState contextState) : IConsoleNavigationContext
+internal sealed class ConsoleNavigationContext(NavigationManager navigation) : IConsoleNavigationContext
 {
-    public string? ScopeRef => GetScopeRef(navigation.Uri) ?? contextState.Current?.SelectedScopeRef;
+    private string? selectedScopeRef;
+
+    public string? ScopeRef
+    {
+        get
+        {
+            try { return GetScopeRef(navigation.Uri) ?? selectedScopeRef; }
+            catch (InvalidOperationException) { return selectedScopeRef; }
+        }
+    }
+
+    public void SetSelectedScopeRef(string? scopeRef) => selectedScopeRef = scopeRef;
 
     internal static string? GetScopeRef(string uri)
     {

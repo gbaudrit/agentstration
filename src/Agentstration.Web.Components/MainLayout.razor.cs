@@ -196,6 +196,7 @@ public partial class MainLayout
         await Task.WhenAll(
             ContextState.LoadAsync(lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
+        NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -374,7 +375,11 @@ public partial class MainLayout
         catch (JSDisconnectedException) { }
         catch (InvalidOperationException) { }
     });
-    private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnContextChanged()
+    {
+        NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        _ = InvokeAsync(StateHasChanged);
+    }
     private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
