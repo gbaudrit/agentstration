@@ -362,8 +362,7 @@ public partial class MainLayout
             && ContextState.Current is { } current
             && !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal))
         {
-            NavigationManager.NavigateTo(args.Location, forceLoad: true);
-            return;
+            await ContextState.LoadAsync(lifetimeCancellation.Token);
         }
         StateHasChanged();
         try

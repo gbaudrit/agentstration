@@ -17,6 +17,7 @@ using Agentstration.Schemas.Contracts;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Sources.Contracts;
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -25,6 +26,34 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class ApiClientTests
 {
+    [TestMethod]
+    public async Task ConsoleContextHandlerReadsNavigationContextForEveryRequest()
+    {
+        var contexts = new List<string?>();
+        var navigationContext = new MutableConsoleNavigationContext { ScopeRef = ResourceScopeRef.Instance.Value };
+        using var client = new HttpClient(new ConsoleNavigationContextHandler(navigationContext)
+        {
+            InnerHandler = new StubHandler(request =>
+            {
+                contexts.Add(request.Headers.TryGetValues(ConsoleContextHeaders.Name, out var values)
+                    ? values.Single()
+                    : null);
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            })
+        }) { BaseAddress = new Uri("http://localhost/") };
+
+        using var instanceResponse = await client.GetAsync("api/agents");
+        navigationContext.ScopeRef = ResourceScopeRef.Workspace(Guid.Parse(
+            "cccccccc-cccc-cccc-cccc-cccccccccccc")).Value;
+        using var workspaceResponse = await client.GetAsync("api/agents");
+
+        CollectionAssert.AreEqual(new[]
+        {
+            ResourceScopeRef.Instance.Value,
+            "/workspaces/cccccccc-cccc-cccc-cccc-cccccccccccc"
+        }, contexts);
+    }
+
     [TestMethod]
     public async Task ParametersClientPreservesExactScopeAndConcurrencyToken()
     {
@@ -509,6 +538,11 @@ public sealed partial class ApiClientTests
         Assert.HasCount(1, ModelManagementUi.FilterProfiles([ready, invalid], "remote-provider"));
         Assert.IsFalse(ModelManagementUi.IsInvalid(ready));
         Assert.IsTrue(ModelManagementUi.IsInvalid(invalid));
+    }
+
+    private sealed class MutableConsoleNavigationContext : IConsoleNavigationContext
+    {
+        public string? ScopeRef { get; set; }
     }
 
     [TestMethod]

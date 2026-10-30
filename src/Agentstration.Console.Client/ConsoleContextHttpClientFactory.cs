@@ -1,4 +1,6 @@
 using Agentstration.Web.Components.State;
+using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Web.Console;
 
@@ -8,14 +10,46 @@ public interface IConsoleContextHttpClientFactory
 }
 
 public sealed class ConsoleContextHttpClientFactory(
-    IHttpClientFactory clients,
+    IHttpMessageHandlerFactory handlers,
+    IOptionsMonitor<HttpClientFactoryOptions> options,
     IConsoleNavigationContext navigationContext) : IConsoleContextHttpClientFactory
 {
     public HttpClient CreateClient(string name)
     {
-        var client = clients.CreateClient(name);
-        ConsoleContextHeaders.Apply(client, navigationContext.ScopeRef);
+        var pooledHandler = handlers.CreateHandler(name);
+        var client = new HttpClient(new ConsoleNavigationContextHandler(navigationContext)
+        {
+            InnerHandler = new PooledHandlerLease(pooledHandler)
+        }, disposeHandler: true);
+        foreach (var configure in options.Get(name).HttpClientActions) configure(client);
         return client;
+    }
+
+    private sealed class PooledHandlerLease(HttpMessageHandler handler) : HttpMessageHandler
+    {
+        private readonly HttpMessageInvoker invoker = new(handler, disposeHandler: false);
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) =>
+            invoker.SendAsync(request, cancellationToken);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) invoker.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+}
+
+public sealed class ConsoleNavigationContextHandler(IConsoleNavigationContext navigationContext) : DelegatingHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (!request.Headers.Contains(ConsoleContextHeaders.Name)
+            && navigationContext.ScopeRef is { Length: > 0 } scopeRef)
+            request.Headers.TryAddWithoutValidation(ConsoleContextHeaders.Name, scopeRef);
+        return base.SendAsync(request, cancellationToken);
     }
 }
 
