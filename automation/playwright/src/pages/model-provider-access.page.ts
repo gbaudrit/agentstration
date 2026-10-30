@@ -10,16 +10,21 @@ export class ModelProviderAccessPage {
   }
 
   public async expectProviderHidden(consoleUrl: string, providerName: string): Promise<void> {
+    const headers = await this.contextHeaders();
     const response = await this.page.request.get(
       `${consoleUrl}/api/modelproviders/${encodeURIComponent(providerName)}?scopeRef=${encodeURIComponent('/instance')}`,
+      { headers },
     );
     const body = await response.text();
     expect(response.status(), body).toBe(404);
   }
 
   public async runAgent(consoleUrl: string, agentName: string, prompt: string): Promise<string> {
+    const target = new URL(`/agents/${encodeURIComponent(agentName)}/run`, consoleUrl);
+    const scopeRef = await this.selectedScopeRef();
+    if (scopeRef) target.searchParams.set('context', scopeRef);
     const response = await this.page.goto(
-      `${consoleUrl}/agents/${encodeURIComponent(agentName)}/run`,
+      target.toString(),
       { waitUntil: 'domcontentloaded' },
     );
     if (!response?.ok()) throw new Error(`Agent runner returned HTTP ${response?.status() ?? 'no response'}.`);
@@ -37,11 +42,16 @@ export class ModelProviderAccessPage {
   }
 
   public async expectAgentRunRejected(consoleUrl: string, agentName: string): Promise<void> {
-    const agent = await this.page.request.get(`${consoleUrl}/api/agents/${encodeURIComponent(agentName)}`);
+    const headers = await this.contextHeaders();
+    const agent = await this.page.request.get(
+      `${consoleUrl}/api/agents/${encodeURIComponent(agentName)}`,
+      { headers },
+    );
     const agentBody = await agent.text();
     expect(agent.status(), agentBody).toBe(200);
     const resource = JSON.parse(agentBody) as { uid: string; generation: number; scopeRef: string; namespace: string };
     const response = await this.page.request.post(`${consoleUrl}/api/runtime/runs`, {
+      headers,
       data: {
         executionScopeRef: resource.scopeRef,
         agent: {
@@ -61,6 +71,7 @@ export class ModelProviderAccessPage {
     await expect.poll(async () => {
       const current = await this.page.request.get(
         `${consoleUrl}/api/runtime/runs/${encodeURIComponent(run.id)}?scopeRef=${encodeURIComponent(resource.scopeRef)}`,
+        { headers },
       );
       const currentBody = await current.text();
       expect(current.status(), currentBody).toBe(200);
@@ -68,6 +79,17 @@ export class ModelProviderAccessPage {
       return run.status.state;
     }, { timeout: 90_000 }).toBe('Failed');
     expect(JSON.stringify(run.status)).not.toContain('ollama');
+  }
+
+  private async selectedScopeRef(): Promise<string | null> {
+    return await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
+  }
+
+  private async contextHeaders(): Promise<Record<string, string>> {
+    const scopeRef = await this.selectedScopeRef();
+    return scopeRef ? { 'X-Agentstration-Context': scopeRef } : {};
   }
 }
 

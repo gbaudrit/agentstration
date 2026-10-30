@@ -17,13 +17,19 @@ export class AgentEditorPage {
   public constructor(private readonly page: Page) {}
 
   public async openNew(consoleUrl: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/agents/new`, { waitUntil: 'domcontentloaded' });
+    const response = await this.page.goto(
+      await this.contextualUrl(`${consoleUrl}/agents/new`),
+      { waitUntil: 'domcontentloaded' },
+    );
     if (!response?.ok()) throw new Error(`New agent page returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.locator(`[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`).waitFor({ state: 'visible' });
   }
 
   public async open(consoleUrl: string, namespace: string, name: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/agents/${encodeURIComponent(name)}?namespace=${encodeURIComponent(namespace)}`, { waitUntil: 'domcontentloaded' });
+    const response = await this.page.goto(
+      await this.contextualUrl(`${consoleUrl}/agents/${encodeURIComponent(name)}?namespace=${encodeURIComponent(namespace)}`),
+      { waitUntil: 'domcontentloaded' },
+    );
     if (!response?.ok()) throw new Error(`Agent page returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.form.waitFor({ state: 'visible' });
   }
@@ -68,4 +74,13 @@ export class AgentEditorPage {
   public get form(): Locator { return this.page.getByTestId(TestIds.agentEditor.form); }
   public get identitySection(): Locator { return this.page.getByTestId(TestIds.agentEditor.identitySection); }
   public get behaviorSection(): Locator { return this.page.getByTestId(TestIds.agentEditor.behaviorSection); }
+
+  private async contextualUrl(url: string): Promise<string> {
+    const target = new URL(url);
+    const scopeRef = await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
+    if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
+    return target.toString();
+  }
 }

@@ -599,6 +599,7 @@ public sealed partial class ApiClientTests
     private sealed class MutableConsoleNavigationContext : IConsoleNavigationContext
     {
         public string? ScopeRef { get; set; }
+        public string AddToUri(string uri) => uri;
     }
 
     [TestMethod]

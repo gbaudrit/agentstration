@@ -47,8 +47,10 @@ export class ModelAdministrationPage {
   }
 
   public async refreshProviderModels(consoleUrl: string, providerName: string): Promise<void> {
+    const scopeRef = await this.selectedScopeRef();
     const response = await this.page.request.post(
       `${consoleUrl}/api/modelproviders/${encodeURIComponent(providerName)}/models/refresh`,
+      scopeRef ? { headers: { 'X-Agentstration-Context': scopeRef } } : undefined,
     );
     if (!response.ok()) {
       throw new Error(`Model discovery refresh returned HTTP ${response.status()}.`);
@@ -196,9 +198,18 @@ export class ModelAdministrationPage {
   }
 
   private async open(consoleUrl: string, path: string, marker: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}${path}`, { waitUntil: 'domcontentloaded' });
+    const target = new URL(path, consoleUrl);
+    const scopeRef = await this.selectedScopeRef();
+    if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
+    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Model administration route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
+  }
+
+  private async selectedScopeRef(): Promise<string | null> {
+    return await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
   }
 }
 

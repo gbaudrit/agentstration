@@ -86,10 +86,12 @@ export class ResourceAccessPage {
   }
 
   public async openManagedTool(consoleUrl: string, name: string, scopeRef = '/instance'): Promise<ResourceAccessIdentity> {
-    const route = `${consoleUrl}/tools/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`;
+    const route = new URL(`/tools/${encodeURIComponent(name)}`, consoleUrl);
+    route.searchParams.set('scopeRef', scopeRef);
+    route.searchParams.set('context', scopeRef);
     await expect(async () => {
-      const response = await this.page.goto(route, { waitUntil: 'domcontentloaded' });
-      expect(response?.status(), `Managed Tool route '${route}'`).toBe(200);
+      const response = await this.page.goto(route.toString(), { waitUntil: 'domcontentloaded' });
+      expect(response?.status(), `Managed Tool route '${route.toString()}'`).toBe(200);
       await this.page.getByTestId(TestIds.resourceAdministration.toolDetails).waitFor({ state: 'visible' });
     }).toPass({ timeout: 30_000 });
     await expect(this.page.getByTestId(TestIds.toolExecution.enabledToggle)).toBeDisabled();
@@ -118,8 +120,12 @@ export class ResourceAccessPage {
     await this.save();
     const identity = await this.identity();
     const policyUrl = new URL(`/api/resource-access-policies/${identity.uid}`, this.page.url()).toString();
+    const context = new URL(this.page.url()).searchParams.get('context');
     await expect(async () => {
-      const response = await this.page.request.get(policyUrl);
+      const response = await this.page.request.get(
+        policyUrl,
+        context ? { headers: { 'X-Agentstration-Context': context } } : undefined,
+      );
       const body = await response.text();
       expect(response.status(), body).toBe(200);
       const policy = JSON.parse(body) as { grants?: Array<{ targetScopeRef?: string }> };

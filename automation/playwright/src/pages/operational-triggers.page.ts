@@ -83,6 +83,8 @@ const triggerName = 'instance-flow-schedule';
 const triggerDisplayName = 'Instance Flow schedule';
 
 export class OperationalTriggersPage {
+  private selectedScopeRef: string | undefined;
+
   public constructor(private readonly page: Page) {}
 
   public get editor(): Locator { return this.page.getByTestId(TestIds.resourceAdministration.triggerEditor); }
@@ -115,7 +117,7 @@ export class OperationalTriggersPage {
       `${fixture.execution.scopes.instance}|default|${fixture.execution.flowName}`,
     );
     await Promise.all([
-      this.page.waitForURL(new RegExp(`/triggers/${fixture.triggerName}$`), { timeout: 30_000 }),
+      this.page.waitForURL(new RegExp(`/triggers/${fixture.triggerName}(?:\\?.*)?$`), { timeout: 30_000 }),
       this.page.getByTestId(TestIds.triggers.create).click(),
     ]);
     await this.details.waitFor({ state: 'visible' });
@@ -160,9 +162,8 @@ export class OperationalTriggersPage {
     fixture: OperationalTriggerFixture,
     operationalWorkspaceId: string,
   ): Promise<OperationalTriggerEvidence> {
-    await this.page.getByTestId(TestIds.triggers.enable).click();
+    await this.openEnableDialog();
     const dialog = this.page.getByTestId(TestIds.triggers.enableDialog);
-    await dialog.waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.triggers.enableConfirm).click();
     let enabled: TriggerWire | undefined;
     await expect.poll(async () => {
@@ -172,7 +173,9 @@ export class OperationalTriggersPage {
     if (!enabled) throw new Error('The Trigger did not become enabled.');
     expect(enabled.definition.executionScope?.workspaceId).toBe(operationalWorkspaceId);
     expect(enabled.definition.executionScope?.logicalScopeRef).toBe(fixture.execution.scopes.instance);
-    const fired = await this.page.request.post(this.triggerUrl(consoleUrl, fixture, '/run'));
+    const fired = await this.page.request.post(this.triggerUrl(consoleUrl, fixture, '/run'), {
+      headers: this.contextHeaders(),
+    });
     const firedBody = await fired.text();
     expect(fired.status(), firedBody).toBe(202);
     const occurrence = JSON.parse(firedBody) as TriggerOccurrenceWire;
@@ -225,13 +228,18 @@ export class OperationalTriggersPage {
     await this.selectContext(consoleUrl, fixture.execution.scopes.workspace);
     await this.open(`${consoleUrl}/triggers`, TestIds.resourceAdministration.triggers);
     await expect(this.triggerRow(fixture.triggerName)).toHaveCount(0);
-    const direct = await this.page.request.get(this.triggerUrl(consoleUrl, fixture));
+    const direct = await this.page.request.get(this.triggerUrl(consoleUrl, fixture), {
+      headers: this.contextHeaders(),
+    });
     expect(direct.status(), await direct.text()).toBe(404);
     const work = await this.page.request.get(
       `${consoleUrl}/api/work/workitems/${encodeURIComponent(evidence.workItemId)}`,
+      { headers: this.contextHeaders() },
     );
     expect(work.status(), await work.text()).toBe(404);
-    const run = await this.page.request.get(`${consoleUrl}/api/flowRuns/${encodeURIComponent(evidence.flowRunId)}`);
+    const run = await this.page.request.get(`${consoleUrl}/api/flowRuns/${encodeURIComponent(evidence.flowRunId)}`, {
+      headers: this.contextHeaders(),
+    });
     expect(run.status(), await run.text()).toBe(404);
     await this.open(`${consoleUrl}/flow-runs`, TestIds.flowObservability.runs);
     await expect(this.page.locator(`a[href^="/flow-runs/${evidence.flowRunId}?"]`)).toHaveCount(0);
@@ -245,11 +253,10 @@ export class OperationalTriggersPage {
       await this.fillEditor(fixture, 'tenant-use-denied-trigger', 'Tenant use denied Trigger');
       await this.setFlowAccess(consoleUrl, fixture, flow, ['discover']);
       await Promise.all([
-        this.page.waitForURL(/\/triggers\/tenant-use-denied-trigger$/, { timeout: 30_000 }),
+        this.page.waitForURL(/\/triggers\/tenant-use-denied-trigger(?:\?.*)?$/, { timeout: 30_000 }),
         this.page.getByTestId(TestIds.triggers.create).click(),
       ]);
-      await this.page.getByTestId(TestIds.triggers.enable).click();
-      await this.page.getByTestId(TestIds.triggers.enableDialog).waitFor({ state: 'visible' });
+      await this.openEnableDialog();
       await this.page.getByTestId(TestIds.triggers.enableConfirm).click();
       await expect(this.page.getByTestId(TestIds.triggers.error)).toContainText(
         'This context is not authorized to use the selected Flow.',
@@ -266,6 +273,20 @@ export class OperationalTriggersPage {
     } finally {
       await this.setFlowAccess(consoleUrl, fixture, flow, ['discover', 'use']);
     }
+  }
+
+  private async openEnableDialog(): Promise<void> {
+    const enable = this.page.getByTestId(TestIds.triggers.enable);
+    const dialog = this.page.getByTestId(TestIds.triggers.enableDialog);
+
+    // The details page is server-rendered before its Blazor circuit is interactive.
+    // Retry the user action so a click received during that short hydration window
+    // cannot leave the journey waiting forever for a dialog that was never opened.
+    await expect(async () => {
+      await expect(enable).toBeEnabled();
+      await enable.click();
+      await expect(dialog).toBeVisible();
+    }).toPass({ timeout: 30_000 });
   }
 
   public async assertResponsiveDetails(): Promise<void> {
@@ -376,23 +397,28 @@ export class OperationalTriggersPage {
   }
 
   private async selectContext(consoleUrl: string, scopeRef: string): Promise<void> {
-    const selected = await this.page.request.post(`${consoleUrl}/bff/identity/context/selection`, {
-      data: { scopeRef },
-    });
-    expect(selected.status(), await selected.text()).toBe(200);
+    this.selectedScopeRef = scopeRef;
+    const context = await this.read<IdentityContextWire>(`${consoleUrl}/api/identity/context`);
+    expect(context.selectedScopeRef).toBe(scopeRef);
   }
 
   private async read<T>(url: string): Promise<T> {
-    const response = await this.page.request.get(url);
+    const response = await this.page.request.get(url, { headers: this.contextHeaders() });
     const body = await response.text();
     expect(response.status(), body).toBe(200);
     return JSON.parse(body) as T;
   }
 
   private async open(url: string, marker: string): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    const contextualUrl = new URL(url);
+    if (this.selectedScopeRef) contextualUrl.searchParams.set('context', this.selectedScopeRef);
+    const response = await this.page.goto(contextualUrl.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Operational Trigger route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
+  }
+
+  private contextHeaders(): Record<string, string> {
+    return this.selectedScopeRef ? { 'X-Agentstration-Context': this.selectedScopeRef } : {};
   }
 }
 

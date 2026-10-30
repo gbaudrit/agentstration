@@ -96,6 +96,7 @@ public partial class MainLayout
     private IJSObjectReference? navigationTooltipModule;
     private IJSObjectReference? commandRegistration;
     private IJSObjectReference? navigationTooltipRegistration;
+    private IDisposable? locationChangingRegistration;
     private DotNetObjectReference<MainLayout>? selfReference;
     private ElementReference shellElement;
     private ElementReference commandInput;
@@ -197,6 +198,7 @@ public partial class MainLayout
             ContextState.LoadAsync(lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
         NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        locationChangingRegistration = NavigationManager.RegisterLocationChangingHandler(PreserveConsoleContextAsync);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -313,6 +315,16 @@ public partial class MainLayout
         NavigationManager.NavigateTo(command.Url);
     }
 
+    private ValueTask PreserveConsoleContextAsync(LocationChangingContext context)
+    {
+        var contextualUri = NavigationContext.AddToUri(context.TargetLocation);
+        if (string.Equals(contextualUri, context.TargetLocation, StringComparison.Ordinal))
+            return ValueTask.CompletedTask;
+        context.PreventNavigation();
+        _ = InvokeAsync(() => NavigationManager.NavigateTo(contextualUri));
+        return ValueTask.CompletedTask;
+    }
+
     private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);
 
     private void ToggleContextSelector()
@@ -390,6 +402,7 @@ public partial class MainLayout
         PlatformStatus.Changed -= OnPlatformStatusChanged;
         ContextState.Changed -= OnContextChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
+        locationChangingRegistration?.Dispose();
         lifetimeCancellation.Cancel();
         if (platformStatusRefresh is not null)
         {

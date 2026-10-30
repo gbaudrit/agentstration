@@ -25,12 +25,13 @@ export class FlowObservabilityPage {
     await this.open(consoleUrl, `/flows/${flowName}/designer`, 'designer');
 
     const shell = this.page.locator('.flow-editor-shell.definition');
+    const source = shell.locator('.source-editor');
+    const lines = source.locator('.view-lines');
     await expect(async () => {
       await this.page.getByRole('button', { name: 'Definition', exact: true }).click();
       await expect(shell).toBeVisible({ timeout: 2_000 });
+      await expect(lines).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    const source = shell.locator('.source-editor');
-    const lines = source.locator('.view-lines');
     await expect(lines).toContainText('entryStep');
     await expect(lines).not.toContainText('sourceText');
     await expect(source.locator('.error-panel')).toHaveCount(0);

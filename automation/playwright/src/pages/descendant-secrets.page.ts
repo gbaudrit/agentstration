@@ -132,7 +132,14 @@ export class DescendantSecretsPage {
   }
 
   private async open(url: string, marker: Locator): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    const selectedScopeRef = await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
+    const target = new URL(url);
+    if (selectedScopeRef && !target.searchParams.has('context')) {
+      target.searchParams.set('context', selectedScopeRef);
+    }
+    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Secret management route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await marker.waitFor({ state: 'visible' });
     await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });

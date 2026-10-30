@@ -71,6 +71,28 @@ public sealed class ConsoleContextStateTests
         Assert.AreEqual(ResourceScopeRef.Instance.Value, navigationContext.ScopeRef);
     }
 
+    [TestMethod]
+    public void NavigationContextAddsTheSelectedScopeToInternalNavigation()
+    {
+        using var context = new BunitContext();
+        context.Services.AddAgentstrationWebComponents();
+        var navigationContext = context.Services.GetRequiredService<IConsoleNavigationContext>();
+        navigationContext.SetSelectedScopeRef(ResourceScopeRef.Instance.Value);
+
+        var contextualUri = navigationContext.AddToUri("/triggers/instance-flow-schedule");
+
+        Assert.AreEqual("/triggers/instance-flow-schedule?context=%2Finstance", contextualUri);
+        Assert.AreEqual(
+            "/agents/demo?context=%2Ftenants%2Ftenant-id",
+            navigationContext.AddToUri("/agents/demo?context=%2Ftenants%2Ftenant-id"));
+        Assert.AreEqual(
+            "/_culture?culture=fr-FR&returnUrl=%2Fsettings%2Fprofile",
+            navigationContext.AddToUri("/_culture?culture=fr-FR&returnUrl=%2Fsettings%2Fprofile"));
+        Assert.AreEqual(
+            "https://example.test/agents/demo",
+            navigationContext.AddToUri("https://example.test/agents/demo"));
+    }
+
     private sealed class StubProvider(ConsoleContextSnapshot snapshot) : IConsoleContextProvider
     {
         public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(snapshot);
