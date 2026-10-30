@@ -12,6 +12,8 @@
   <data name="UnableToSave"><value>Unable to save</value></data>
   <data name="ReloadCurrentVersion"><value>Reload current version</value></data>
   <data name="ChangingProfileAffects"><value>Changing this profile will affect {0}.</value></data>
+  <data name="ImpactBannerDescription"><value>Review these dependencies before changing the provider, model, or generation settings.</value></data>
+  <data name="ReviewUsages"><value>Review usages</value></data>
   <data name="AgentCount.One"><value>{0} agent</value></data>
   <data name="AgentCount.Many"><value>{0} agents</value></data>
   <data name="Identity"><value>Identity</value></data>
@@ -91,7 +93,7 @@
   <data name="Usages"><value>Usages</value></data>
   <data name="Impact"><value>Impact</value></data>
   <data name="AgentUsages"><value>Agents using this profile</value></data>
-  <data name="AgentUsagesDescription"><value>Direct Agent references visible in the profile scope and its authorized descendants. This list is also used to calculate the change impact shown above.</value></data>
+  <data name="AgentUsagesDescription"><value>Agents that directly reference this profile in scopes you can inspect.</value></data>
   <data name="NoUsages"><value>No usages</value></data>
   <data name="Agents"><value>Agents</value></data>
   <data name="NoAgentReferences"><value>No agent references this profile.</value></data>

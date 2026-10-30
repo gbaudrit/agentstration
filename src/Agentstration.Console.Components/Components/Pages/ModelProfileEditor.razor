@@ -21,7 +21,14 @@ else
 {
     @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@(error.IsConcurrencyConflict ? T("ConcurrencyConflict") : T("UnableToSave"))</strong><span>@error.Message</span>@if (error.IsConcurrencyConflict) { <button class="text-button" @onclick="LoadAsync">@T("ReloadCurrentVersion")</button> }</div> }
     @if (!string.IsNullOrWhiteSpace(warning)) { <div class="form-alert form-alert-warning" role="status">@warning</div> }
-    @if (!IsNew && usages.Count > 0) { <div class="form-alert form-alert-warning" role="status">@T("ChangingProfileAffects", AgentCount(usages.Count))</div> }
+    @if (!IsNew && usages.Count > 0)
+    {
+        <div class="model-profile-impact-banner" role="status" data-testid="model-profile-impact-banner">
+            <span class="model-profile-impact-icon" aria-hidden="true"><TablerIcon Name="alert-triangle" /></span>
+            <span class="model-profile-impact-copy"><strong>@T("ChangingProfileAffects", AgentCount(usages.Count))</strong><span>@T("ImpactBannerDescription")</span></span>
+            <button type="button" class="model-profile-impact-action" data-testid="model-profile-review-usages" @onclick="() => activeTab = ModelProfileTab.Usages">@T("ReviewUsages") <span aria-hidden="true">→</span></button>
+        </div>
+    }
 
     @if (!IsNew)
     {
@@ -34,22 +41,26 @@ else
     }
     else if (activeTab == ModelProfileTab.Usages)
     {
-        <section class="panel resource-section" data-testid="model-profile-usages-panel">
-            <div class="panel-header"><div><p class="eyebrow">@T("Impact")</p><h2>@T("AgentUsages")</h2></div><span>@AgentCount(usages.Count)</span></div>
-            <p>@T("AgentUsagesDescription")</p>
+        <section class="panel resource-section model-profile-usages-panel" data-testid="model-profile-usages-panel">
+            <div class="model-profile-usages-heading">
+                <div><p class="eyebrow">@T("Impact")</p><h2>@T("AgentUsages")</h2><p>@T("AgentUsagesDescription")</p></div>
+                <span class="model-profile-usage-count">@AgentCount(usages.Count)</span>
+            </div>
             @if (usages.Count == 0)
             {
                 <EmptyState Title="@T("NoUsages")" Message="@T("NoAgentReferences")" />
             }
             else
             {
-                <ul class="resource-links" data-testid="model-profile-usages-list">
+                <ul class="model-profile-usage-list" data-testid="model-profile-usages-list">
                     @foreach (var usage in usages)
                     {
-                        <li data-testid="model-profile-usage">
+                        <li class="model-profile-usage-card" data-testid="model-profile-usage">
                             <a href="@AgentUrl(usage)">
-                                <span class="resource-name-with-scope"><strong>@usage.DisplayName</strong><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact /></span>
-                                <span class="resource-secondary"><code>@usage.Namespace/@usage.Name</code>@if (!string.IsNullOrWhiteSpace(usage.ScopeDisplayName)) { <text> · @usage.ScopeDisplayName</text> }</span>
+                                <span class="model-profile-usage-icon" aria-hidden="true"><TablerIcon Name="robot" /></span>
+                                <span class="model-profile-usage-identity"><strong>@usage.DisplayName</strong><code>@usage.Namespace/@usage.Name</code></span>
+                                <span class="model-profile-usage-scope"><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact />@if (!string.IsNullOrWhiteSpace(usage.ScopeDisplayName)) { <small>@usage.ScopeDisplayName</small> }</span>
+                                <span class="model-profile-usage-arrow" aria-hidden="true">→</span>
                             </a>
                         </li>
                     }

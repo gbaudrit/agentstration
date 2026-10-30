@@ -433,13 +433,18 @@ public sealed class ModelProviderNavigationTests
             .Add(value => value.Name, "shared-reasoning"));
 
         rendered.WaitForAssertion(() =>
+        {
             Assert.IsTrue(rendered.Markup.Contains("Changing this profile will affect 2 agents.",
-                StringComparison.Ordinal), rendered.Markup));
-        rendered.Find("[data-testid='model-profile-usages-tab']").Click();
+                StringComparison.Ordinal), rendered.Markup);
+            Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-impact-banner']"));
+            Assert.IsTrue(rendered.Markup.Contains("Review these dependencies", StringComparison.Ordinal));
+        });
+        rendered.Find("[data-testid='model-profile-review-usages']").Click();
 
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(2, rendered.FindAll("[data-testid='model-profile-usage']"));
+            Assert.HasCount(2, rendered.FindAll(".model-profile-usage-card"));
             Assert.IsTrue(rendered.Markup.Contains("Instance assistant", StringComparison.Ordinal));
             Assert.IsTrue(rendered.Markup.Contains("Workspace assistant", StringComparison.Ordinal));
             Assert.IsTrue(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
