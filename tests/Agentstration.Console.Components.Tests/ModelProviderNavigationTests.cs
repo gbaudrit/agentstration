@@ -490,6 +490,13 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(WorkspaceScope, profiles.RequestedUsageContextScope);
             Assert.AreEqual(WorkspaceScope, profiles.RequestedResolutionContextScope);
             Assert.IsEmpty(rendered.FindAll(".form-alert-warning"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-delete']"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-save']"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-access-tab']"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-impact-banner']"));
+            Assert.IsTrue(rendered.Find("[data-testid='model-profile-definition-fields']")
+                .HasAttribute("disabled"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-usages-tab']"));
         });
     }
 
@@ -527,8 +534,14 @@ public sealed class ModelProviderNavigationTests
         context.Services.AddSingleton<ISecretsClient>(new StubSecretsClient());
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new StubResourceScopeInventoryClient());
         context.Services.AddSingleton<IResourceAccessPolicyClient>(new StubResourceAccessPolicyClient());
+        context.Services.AddSingleton<IConsoleNavigationContext>(new StubConsoleNavigationContext());
         context.Services.AddSingleton(new NotificationState());
         return context;
+    }
+
+    private sealed class StubConsoleNavigationContext : IConsoleNavigationContext
+    {
+        public string? ScopeRef => null;
     }
 
     private sealed class StubResourceScopeInventoryClient : IResourceScopeInventoryClient

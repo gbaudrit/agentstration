@@ -5,12 +5,13 @@
 @inject IModelProvidersClient ProvidersClient
 @inject IExtensionsClient ExtensionsClient
 @inject NavigationManager Navigation
+@inject IConsoleNavigationContext NavigationContext
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfileEditorStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateModelProfile") : $"{Name} · {T("ModelProfile")}") · Agentstration</PageTitle>
 <PageHeader Title="@(IsNew ? T("CreateModelProfile") : model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-model-profile-editor">
-    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="/modelprofiles">@T("Back")</a></Actions>
+    <Actions>@if (!IsNew && CanManage) { <button class="button-danger" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="/modelprofiles">@T("Back")</a></Actions>
 </PageHeader>
 
 @if (loading || model is null)
@@ -21,7 +22,7 @@ else
 {
     @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@(error.IsConcurrencyConflict ? T("ConcurrencyConflict") : T("UnableToSave"))</strong><span>@error.Message</span>@if (error.IsConcurrencyConflict) { <button class="text-button" @onclick="LoadAsync">@T("ReloadCurrentVersion")</button> }</div> }
     @if (!string.IsNullOrWhiteSpace(warning)) { <div class="form-alert form-alert-warning" role="status">@warning</div> }
-    @if (!IsNew && usages.Count > 0)
+    @if (!IsNew && CanManage && usages.Count > 0)
     {
         <div class="model-profile-impact-banner" role="status" data-testid="model-profile-impact-banner">
             <span class="model-profile-impact-icon" aria-hidden="true"><TablerIcon Name="alert-triangle" /></span>
@@ -32,10 +33,10 @@ else
 
     @if (!IsNew)
     {
-        <ResourceTabs Label="@T("ModelProfile")"><button type="button" class="@(activeTab == ModelProfileTab.Definition ? "active" : null)" @onclick="() => SelectTab(ModelProfileTab.Definition)">@T("Definition")</button><button type="button" class="@(activeTab == ModelProfileTab.Access ? "active" : null)" data-testid="model-profile-access-tab" @onclick="() => SelectTab(ModelProfileTab.Access)">@T("Access")</button><button type="button" class="@(activeTab == ModelProfileTab.Usages ? "active" : null)" data-testid="model-profile-usages-tab" @onclick="() => SelectTab(ModelProfileTab.Usages)">@T("Usages")</button></ResourceTabs>
+        <ResourceTabs Label="@T("ModelProfile")"><button type="button" class="@(activeTab == ModelProfileTab.Definition ? "active" : null)" @onclick="() => SelectTab(ModelProfileTab.Definition)">@T("Definition")</button>@if (CanManage) { <button type="button" class="@(activeTab == ModelProfileTab.Access ? "active" : null)" data-testid="model-profile-access-tab" @onclick="() => SelectTab(ModelProfileTab.Access)">@T("Access")</button> }<button type="button" class="@(activeTab == ModelProfileTab.Usages ? "active" : null)" data-testid="model-profile-usages-tab" @onclick="() => SelectTab(ModelProfileTab.Usages)">@T("Usages")</button></ResourceTabs>
     }
 
-    @if (activeTab == ModelProfileTab.Access && resource is not null && selectedScope is { } ownerScope)
+    @if (CanManage && activeTab == ModelProfileTab.Access && resource is not null && selectedScope is { } ownerScope)
     {
         <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@ModelResourceKinds.ModelProfile" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
     }
@@ -72,6 +73,7 @@ else
     {
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form" data-testid="model-profile-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
         <DataAnnotationsValidator /><ValidationSummary />
+        <fieldset class="model-profile-definition-fields" disabled="@(!CanManage)" data-testid="model-profile-definition-fields">
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
             <div class="form-grid">
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="model-profile-display-name" TechnicalNameTestId="model-profile-name" />
@@ -150,8 +152,12 @@ else
                 @if (optionEditor?.CanGuide == true) { <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseGuidedOptions">@T("ReturnToGuidedEditor")</button></div> }
             }
         </section>
+        </fieldset>
 
-        <div class="form-actions"><a class="button-secondary" href="/modelprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-profile-save">@(saving ? T("Saving") : IsNew ? T("CreateProfile") : T("SaveChanges"))</button></div>
+        @if (CanManage)
+        {
+            <div class="form-actions"><a class="button-secondary" href="/modelprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-profile-save">@(saving ? T("Saving") : IsNew ? T("CreateProfile") : T("SaveChanges"))</button></div>
+        }
     </EditForm>
 
     @if (!IsNew)
@@ -208,6 +214,9 @@ else
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
     private ResourceScopeRef? RequestedScope => string.IsNullOrWhiteSpace(ScopeRef) ? null : ResourceScopeRef.Parse(ScopeRef);
     private ResourceScopeRef? RequestedContext => string.IsNullOrWhiteSpace(Context) ? null : ResourceScopeRef.Parse(Context);
+    private ResourceScopeRef? CurrentContext => RequestedContext ??
+        (string.IsNullOrWhiteSpace(NavigationContext.ScopeRef) ? null : ResourceScopeRef.Parse(NavigationContext.ScopeRef));
+    private bool CanManage => IsNew || (selectedScope is { } ownerScope && CurrentContext is { } currentContext && ownerScope == currentContext);
     private string SelectedProvider => model is null || string.IsNullOrWhiteSpace(model.ProviderName) ? string.Empty : $"{model.ProviderNamespace}:{model.ProviderName}";
     private string Definition
     {
@@ -252,6 +261,7 @@ else
                     ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, exactScope, cancellation.Token)
                     : await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
                 resource = snapshot.Value; model = ModelProfileEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag;
+                if (activeTab == ModelProfileTab.Access && !CanManage) activeTab = ModelProfileTab.Definition;
                 usages = selectedScope is { } ownerScope && RequestedContext is { } usageContext
                     ? (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, ownerScope, usageContext, cancellation.Token)).Value
                     : selectedScope is { } exactUsageScope
@@ -301,7 +311,7 @@ else
     }
     private async Task SaveAsync()
     {
-        if (model is null || saving) return; saving = true; error = null;
+        if (!CanManage || model is null || saving) return; saving = true; error = null;
         try
         {
             if (!rawOptions && optionEditor?.CanGuide == true) model.ProviderOptionsJson = optionEditor.ToProviderOptionsJson();
@@ -320,17 +330,19 @@ else
         if (IsNew || diagnosing) return; diagnosing = true; error = null;
         try
         {
-            resolution = selectedScope is { } scope
-                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, scope, cancellation.Token)
+            resolution = selectedScope is { } scope && CurrentContext is { } currentContext
+                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, scope, currentContext, cancellation.Token)
+                : selectedScope is { } exactScope
+                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, exactScope, cancellation.Token)
                 : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { diagnosing = false; }
     }
-    private void RequestDelete() { if (usages.Count > 0) { warning = T("CannotDeleteUsedProfile", AgentCount(usages.Count), string.Join(", ", usages.Select(item => item.DisplayName))); return; } confirmDelete = true; }
+    private void RequestDelete() { if (!CanManage) return; if (usages.Count > 0) { warning = T("CannotDeleteUsedProfile", AgentCount(usages.Count), string.Join(", ", usages.Select(item => item.DisplayName))); return; } confirmDelete = true; }
     private async Task DeleteAsync()
     {
-        if (model is null || etag is null) return; confirmDelete = false;
+        if (!CanManage || model is null || etag is null) return; confirmDelete = false;
         try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
         catch (AgentstrationApiException exception) { error = exception; }
     }
