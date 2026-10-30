@@ -6,6 +6,8 @@
 @inject IExtensionsClient ExtensionsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
+@inject ConsoleContextState ContextState
+@inject IConsoleNavigationContext NavigationContext
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfileEditorStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateModelProfile") : $"{Name} · {T("ModelProfile")}") · Agentstration</PageTitle>
@@ -232,6 +234,7 @@ else
         loading = true; error = null; warning = null;
         try
         {
+            await EnsureNavigationContextAsync();
             providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
             extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
             if (IsNew)
@@ -262,6 +265,15 @@ else
         }
         catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProfileEditorModel(); }
         finally { loading = false; }
+    }
+    private async Task EnsureNavigationContextAsync()
+    {
+        var requestedScope = NavigationContext.ScopeRef;
+        if (string.IsNullOrWhiteSpace(requestedScope)) return;
+        for (var attempt = 0; attempt < 2
+            && !string.Equals(requestedScope, ContextState.Current?.SelectedScopeRef, StringComparison.Ordinal);
+            attempt++)
+            await ContextState.LoadAsync(cancellation.Token);
     }
     private async Task ProviderChangedAsync(ChangeEventArgs args)
     {
