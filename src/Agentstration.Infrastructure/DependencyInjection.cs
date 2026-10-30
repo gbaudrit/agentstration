@@ -93,6 +93,7 @@ public static class DependencyInjection
         services.TryAddSingleton<ITriggerExecutionContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
         services.TryAddSingleton<ResourceScopeOperationService>();
+        services.TryAddSingleton<ReadableResourceScopeService>();
         services.TryAddSingleton<IResourceScopeOperations>(provider => provider.GetRequiredService<ResourceScopeOperationService>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();

@@ -22,7 +22,9 @@ public sealed class ModelProfileManagementService(
     IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers,
     IEnumerable<IExtensionInspector> inspectors,
     ICurrentRequestContext requestContext,
-    IRequestContextScopeFactory requestScopes) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
+    IRequestContextScopeFactory requestScopes,
+    ReadableResourceScopeService readableScopes,
+    IIdentityStore identities) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
     public static string ProfileId(string name) => name;
     public async Task ValidateForCreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
@@ -106,29 +108,120 @@ public sealed class ModelProfileManagementService(
             cancellationToken);
 
     public async Task<IReadOnlyList<ModelProfileUsage>> GetUsagesAsync(ModelProfileResource profile, CancellationToken cancellationToken)
+        => (await GetUsagesAsync([profile], cancellationToken))[profile.Uid];
+
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<ModelProfileUsage>>> GetUsagesAsync(
+        IReadOnlyCollection<ModelProfileResource> profiles,
+        CancellationToken cancellationToken)
     {
-        var usages = new List<ModelProfileUsage>();
-        foreach (var agent in await store.ListAllAsync<AgentResource>(AgentResourceKinds.Agent, cancellationToken))
+        var profilesByUid = profiles.ToDictionary(value => value.Uid);
+        if (profilesByUid.Count == 0)
+            return new Dictionary<Guid, IReadOnlyList<ModelProfileUsage>>();
+        var profileScopes = profiles.ToDictionary(
+            value => value.Uid,
+            value => value.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope."));
+        var usages = profilesByUid.Keys.ToDictionary(value => value, _ => new List<ModelProfileUsage>());
+        foreach (var scope in await readableScopes.GetAsync(cancellationToken))
         {
-            if (agent.Value.ScopeRef is not { } agentScopeRef) continue;
-            StoredResource<ModelProfileResource>? resolved;
-            try
-            {
-                resolved = await references.ResolveAsync<ModelProfileResource>(
-                    agent.Value.Definition.ModelProfile,
-                    agent.Value.Namespace,
-                    ModelResourceKinds.ModelProfile,
-                    agentScopeRef,
-                    cancellationToken);
-            }
-            catch (ResourceReferenceAmbiguousException)
-            {
+            var candidateProfileUids = profileScopes
+                .Where(value => IsSameOrDescendant(value.Value, scope))
+                .Select(value => value.Key)
+                .ToHashSet();
+            if (candidateProfileUids.Count == 0)
                 continue;
+            var targetContext = await GetUsageScopeContextAsync(scope.ScopeRef, cancellationToken);
+            using var targetScope = EnterUsageScope(scope.ScopeRef, targetContext);
+            foreach (var agent in await ListExactAgentsAsync(scope.ScopeRef, cancellationToken))
+            {
+                if (agent.Value.ScopeRef is not { } agentScopeRef) continue;
+                StoredResource<ModelProfileResource>? resolved;
+                try
+                {
+                    resolved = await references.ResolveAsync<ModelProfileResource>(
+                        agent.Value.Definition.ModelProfile,
+                        agent.Value.Namespace,
+                        ModelResourceKinds.ModelProfile,
+                        agentScopeRef,
+                        cancellationToken);
+                }
+                catch (ResourceReferenceAmbiguousException)
+                {
+                    continue;
+                }
+                if (resolved is not null && candidateProfileUids.Contains(resolved.Value.Uid))
+                    usages[resolved.Value.Uid].Add(new(
+                        agent.Value.Kind,
+                        agent.Value.Namespace,
+                        agent.Value.Metadata.Name,
+                        agent.Value.Definition.DisplayName,
+                        agentScopeRef,
+                        scope.DisplayName));
             }
-            if (resolved?.Value.Uid == profile.Uid)
-                usages.Add(new(agent.Value.Kind, agent.Value.Metadata.Name, agent.Value.Definition.DisplayName));
         }
-        return usages;
+        return usages.ToDictionary(
+            value => value.Key,
+            value => (IReadOnlyList<ModelProfileUsage>)value.Value
+                .OrderBy(usage => usage.ScopeRef.Kind)
+                .ThenBy(usage => usage.ScopeDisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(usage => usage.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(usage => usage.Namespace.Value, StringComparer.Ordinal)
+                .ThenBy(usage => usage.Name, StringComparer.Ordinal)
+                .ToArray());
+    }
+
+    private async Task<IReadOnlyList<StoredResource<AgentResource>>> ListExactAgentsAsync(
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken)
+    {
+        const int pageSize = 500;
+        var result = new List<StoredResource<AgentResource>>();
+        while (true)
+        {
+            var page = await store.ListExactAsync<AgentResource>(
+                scopeRef, AgentResourceKinds.Agent, result.Count, pageSize, cancellationToken);
+            result.AddRange(page);
+            if (page.Count < pageSize) return result;
+        }
+    }
+
+    private static bool IsSameOrDescendant(ResourceScopeRef ownerScope, ReadableResourceScope targetScope) =>
+        ownerScope == targetScope.ScopeRef
+        || ownerScope == ResourceScopeRef.Instance
+        || ownerScope.Kind == ResourceScopeKind.Tenant
+            && ownerScope.TargetId == targetScope.TenantId;
+
+    private async Task<RequestContext?> GetUsageScopeContextAsync(
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken)
+    {
+        if (scopeRef == ResourceScopeRef.Instance)
+            return null;
+        if (scopeRef.Kind == ResourceScopeKind.Tenant)
+            return new RequestContext(
+                requestContext.Current.PrincipalId,
+                scopeRef.TargetId!.Value,
+                Guid.Empty,
+                requestContext.Current.Restriction);
+        var workspace = await identities.GetWorkspaceAsync(scopeRef.TargetId!.Value, cancellationToken)
+            ?? throw new InvalidOperationException($"Workspace scope '{scopeRef}' no longer exists.");
+        return new RequestContext(
+            requestContext.Current.PrincipalId,
+            workspace.TenantId,
+            workspace.Id,
+            requestContext.Current.Restriction);
+    }
+
+    private IDisposable? EnterUsageScope(ResourceScopeRef scopeRef, RequestContext? targetContext)
+    {
+        if (scopeRef == ResourceScopeRef.Instance)
+            return requestContext.AccessMode is ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance
+                ? null
+                : throw new ResourceScopeAccessDeniedException(scopeRef);
+        var context = targetContext
+            ?? throw new InvalidOperationException($"Resource scope '{scopeRef}' has no request context.");
+        return scopeRef.Kind == ResourceScopeKind.Tenant
+            ? requestScopes.PushTenant(context.PrincipalId, context.TenantId, context.Restriction)
+            : requestScopes.Push(context);
     }
 
     public async Task<ModelProfileResolution> ResolveAsync(

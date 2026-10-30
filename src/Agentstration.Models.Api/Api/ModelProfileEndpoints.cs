@@ -19,11 +19,12 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
         CancellationToken cancellationToken) => ModelsApiHttp.ExecuteAsync(async () =>
         {
             var profiles = await service.ListAsync(cancellationToken);
+            var usagesByProfile = await service.GetUsagesAsync(
+                profiles.Select(value => value.Value).ToArray(), cancellationToken);
             var responses = new List<ModelProfileSummaryResponse>(profiles.Count);
             foreach (var profile in profiles)
             {
                 var resolution = await service.ResolveAsync(profile.Value, cancellationToken);
-                var usages = await service.GetUsagesAsync(profile.Value, cancellationToken);
                 responses.Add(new ModelProfileSummaryResponse(
                     profile.Value.Metadata.Name,
                     profile.Value.Metadata.Name,
@@ -39,7 +40,7 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
                         profile.Value.Definition.Reasoning,
                         profile.Value.Definition.Output,
                         resolution.Status,
-                        usages.Count),
+                        usagesByProfile[profile.Value.Uid].Count),
                     profile.Value.Namespace.Value,
                     profile.Value.ScopeRef));
             }
@@ -116,7 +117,14 @@ internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
             var profile = await service.GetAsync(@namespace, profileName, ModelProfileScope.Parse(scopeRef), cancellationToken)
                 ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
             var usages = await service.GetUsagesAsync(profile.Value, cancellationToken);
-            var values = usages.Select(value => new ModelProfileUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
+            var values = usages.Select(value => new ModelProfileUsageResponse(
+                value.Kind,
+                value.Name,
+                value.Name,
+                value.DisplayName,
+                value.Namespace.Value,
+                value.ScopeRef,
+                value.ScopeDisplayName)).ToArray();
             return Results.Ok(new ModelProfileUsagesResponse(values, values.Length));
         });
 }

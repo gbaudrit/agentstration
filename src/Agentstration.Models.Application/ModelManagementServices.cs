@@ -7,7 +7,13 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Models;
 
 public sealed record ModelProviderView(ModelProviderConfiguration Configuration, ModelProviderHealth Health, IReadOnlyList<DiscoveredModel> Models, DateTimeOffset CheckedAt);
-public sealed record ModelProfileUsage(string Kind, string Name, string DisplayName);
+public sealed record ModelProfileUsage(
+    string Kind,
+    ResourceNamespace Namespace,
+    string Name,
+    string DisplayName,
+    ResourceScopeRef ScopeRef,
+    string ScopeDisplayName);
 public sealed record ModelProviderUsage(string Kind, string Name, string DisplayName);
 public sealed record ModelProfileResolution(
     ModelProfileResource Profile,

@@ -12,6 +12,8 @@
   <data name="UnableToSave"><value>Impossible d’enregistrer</value></data>
   <data name="ReloadCurrentVersion"><value>Recharger la version actuelle</value></data>
   <data name="ChangingProfileAffects"><value>La modification de ce profil affectera {0}.</value></data>
+  <data name="ImpactBannerDescription"><value>Vérifiez ces dépendances avant de modifier le fournisseur, le modèle ou les paramètres de génération.</value></data>
+  <data name="ReviewUsages"><value>Voir les utilisations</value></data>
   <data name="AgentCount.One"><value>{0} agent</value></data>
   <data name="AgentCount.Many"><value>{0} agents</value></data>
   <data name="Identity"><value>Identité</value></data>
@@ -89,6 +91,10 @@
   <data name="ModelStatus"><value>État du modèle</value></data>
   <data name="ProfileStatus"><value>État du profil</value></data>
   <data name="Usages"><value>Utilisations</value></data>
+  <data name="Impact"><value>Impact</value></data>
+  <data name="AgentUsages"><value>Agents utilisant ce profil</value></data>
+  <data name="AgentUsagesDescription"><value>Agents qui référencent directement ce profil dans les périmètres que vous pouvez consulter.</value></data>
+  <data name="NoUsages"><value>Aucune utilisation</value></data>
   <data name="Agents"><value>Agents</value></data>
   <data name="NoAgentReferences"><value>Aucun agent ne référence ce profil.</value></data>
   <data name="Compatibility"><value>Compatibilité</value></data>
