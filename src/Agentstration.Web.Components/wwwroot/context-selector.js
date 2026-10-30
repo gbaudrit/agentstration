@@ -16,16 +16,6 @@ export async function selectContext(scopeRef, confirmationMessage) {
     if (document.querySelector('.unsaved-changes-bar') && !window.confirm(confirmationMessage)) {
         return false;
     }
-    const response = await fetch('/bff/identity/context/selection', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scopeRef })
-    });
-    if (!response.ok) {
-        const problem = await response.json().catch(() => null);
-        throw new Error(problem?.detail ?? 'The Console context could not be selected.');
-    }
     const url = new URL('/', window.location.origin);
     url.searchParams.set('context', scopeRef);
     window.location.assign(url.toString());

@@ -80,14 +80,28 @@ public static class IdentityEndpoints
     {
         ResourceScopeRef? selected = null;
         var rawScopeRef = request.Headers[RequestContextMiddleware.ConsoleContextHeader].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(rawScopeRef))
-            request.Cookies.TryGetValue(RequestContextMiddleware.ConsoleContextCookie, out rawScopeRef);
         if (!string.IsNullOrWhiteSpace(rawScopeRef))
         {
             try { selected = ResourceScopeRef.Parse(rawScopeRef); }
-            catch (ArgumentException) { }
+            catch (ArgumentException)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "console_context_access_denied",
+                    detail: "The requested Console context is invalid or unavailable.");
+            }
         }
-        return Results.Ok(ToResponse(await service.GetContextAsync(selected, cancellationToken)));
+        try
+        {
+            return Results.Ok(ToResponse(await service.GetContextAsync(selected, cancellationToken)));
+        }
+        catch (AuthorizationDeniedException)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "console_context_access_denied",
+                detail: "The requested Console context is invalid or unavailable.");
+        }
     }
 
     private static async Task<IResult> ListPersonalAccessTokensAsync(
@@ -326,8 +340,6 @@ public static class IdentityEndpoints
         Agentstration.Identity.Contracts.SelectConsoleContextRequest request,
         IdentityExperienceService service,
         HttpContext context,
-        HttpRequest httpRequest,
-        HttpResponse response,
         CancellationToken cancellationToken)
     {
         var principalId = context.Features.Get<ResolvedPrincipalFeature>()?.PrincipalId;
@@ -337,18 +349,6 @@ public static class IdentityEndpoints
             var scopeRef = ResourceScopeRef.Parse(request.ScopeRef);
             var selected = await service.ValidateConsoleContextSelectionAsync(
                 principalId.Value, scopeRef, cancellationToken);
-            var options = new CookieOptions
-            {
-                HttpOnly = true,
-                IsEssential = true,
-                Path = "/",
-                SameSite = SameSiteMode.Strict,
-                Secure = httpRequest.IsHttps,
-                MaxAge = TimeSpan.FromDays(30)
-            };
-            response.Cookies.Append(RequestContextMiddleware.ConsoleContextCookie, scopeRef.Value, options);
-            response.Cookies.Append(RequestContextMiddleware.WorkspaceCookie,
-                selected.OperationalContext.WorkspaceId.ToString("D"), options);
             return Results.Ok(new SelectConsoleContextResponse(
                 scopeRef.Value,
                 selected.Kind,

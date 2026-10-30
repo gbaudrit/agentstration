@@ -31,7 +31,7 @@ else
     {
         <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
             <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
-            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button></Actions>
+            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button>@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
         </ResourceHeader>
         <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode && !accessMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(accessMode ? "active" : null)" data-testid="agent-access-tab" @onclick="ShowAccess">@T("Access")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
@@ -166,6 +166,7 @@ else
     [Parameter] public string? Name { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? AgentNamespace { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
@@ -202,6 +203,7 @@ else
     private ResourceScopeRef? selectedScope;
     private ResourceGovernance governance = ResourceGovernance.User;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string? SafeReturnUrl => ConsoleResourceUrls.LocalReturnUrl(ReturnUrl);
     private ResourceNamespace AgentResourceNamespace => string.IsNullOrWhiteSpace(AgentNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(AgentNamespace);
     private string OverviewUrl => AgentResourceNamespace.IsDefault
         ? $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}"

@@ -6,6 +6,7 @@
   <data name="Agent"><value>Agent</value></data>
   <data name="Generation"><value>Generation {0}</value></data>
   <data name="BackToAgents"><value>Back to agents</value></data>
+  <data name="ReturnToSource"><value>Return to source</value></data>
   <data name="AgentDetails"><value>Agent details</value></data>
   <data name="Tab.Overview"><value>Overview</value></data>
   <data name="Tab.Model"><value>Model</value></data>

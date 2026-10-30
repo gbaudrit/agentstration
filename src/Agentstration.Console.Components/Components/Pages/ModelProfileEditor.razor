@@ -26,13 +26,13 @@ else
         <div class="model-profile-impact-banner" role="status" data-testid="model-profile-impact-banner">
             <span class="model-profile-impact-icon" aria-hidden="true"><TablerIcon Name="alert-triangle" /></span>
             <span class="model-profile-impact-copy"><strong>@T("ChangingProfileAffects", AgentCount(usages.Count))</strong><span>@T("ImpactBannerDescription")</span></span>
-            <button type="button" class="model-profile-impact-action" data-testid="model-profile-review-usages" @onclick="() => activeTab = ModelProfileTab.Usages">@T("ReviewUsages") <span aria-hidden="true">→</span></button>
+            <button type="button" class="model-profile-impact-action" data-testid="model-profile-review-usages" @onclick="() => SelectTab(ModelProfileTab.Usages)">@T("ReviewUsages") <span aria-hidden="true">→</span></button>
         </div>
     }
 
     @if (!IsNew)
     {
-        <ResourceTabs Label="@T("ModelProfile")"><button type="button" class="@(activeTab == ModelProfileTab.Definition ? "active" : null)" @onclick="() => activeTab = ModelProfileTab.Definition">@T("Definition")</button><button type="button" class="@(activeTab == ModelProfileTab.Access ? "active" : null)" data-testid="model-profile-access-tab" @onclick="() => activeTab = ModelProfileTab.Access">@T("Access")</button><button type="button" class="@(activeTab == ModelProfileTab.Usages ? "active" : null)" data-testid="model-profile-usages-tab" @onclick="() => activeTab = ModelProfileTab.Usages">@T("Usages")</button></ResourceTabs>
+        <ResourceTabs Label="@T("ModelProfile")"><button type="button" class="@(activeTab == ModelProfileTab.Definition ? "active" : null)" @onclick="() => SelectTab(ModelProfileTab.Definition)">@T("Definition")</button><button type="button" class="@(activeTab == ModelProfileTab.Access ? "active" : null)" data-testid="model-profile-access-tab" @onclick="() => SelectTab(ModelProfileTab.Access)">@T("Access")</button><button type="button" class="@(activeTab == ModelProfileTab.Usages ? "active" : null)" data-testid="model-profile-usages-tab" @onclick="() => SelectTab(ModelProfileTab.Usages)">@T("Usages")</button></ResourceTabs>
     }
 
     @if (activeTab == ModelProfileTab.Access && resource is not null && selectedScope is { } ownerScope)
@@ -193,6 +193,7 @@ else
     [SupplyParameterFromQuery(Name = "provider")] public string? SuggestedProvider { get; set; }
     [SupplyParameterFromQuery(Name = "providerNamespace")] public string? SuggestedProviderNamespace { get; set; }
     [SupplyParameterFromQuery(Name = "model")] public string? SuggestedModel { get; set; }
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
     private readonly CancellationTokenSource cancellation = new();
@@ -215,7 +216,16 @@ else
             catch (ArgumentException) { return T("DeclarativeDefinitionUnavailable"); }
         }
     }
-    protected override Task OnParametersSetAsync() => LoadAsync();
+    protected override Task OnParametersSetAsync()
+    {
+        activeTab = Tab?.ToLowerInvariant() switch
+        {
+            "access" => ModelProfileTab.Access,
+            "usages" => ModelProfileTab.Usages,
+            _ => ModelProfileTab.Definition
+        };
+        return LoadAsync();
+    }
     protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
     private async Task LoadAsync()
     {
@@ -360,8 +370,29 @@ else
         "failed" => "Failed",
         _ => "Unknown"
     }}"];
-    private static string AgentUrl(ModelProfileUsageResponse usage) =>
-        ConsoleResourceUrls.Agent(ResourceNamespace.Parse(usage.Namespace), usage.Name, usage.ScopeRef);
+    private string AgentUrl(ModelProfileUsageResponse usage) =>
+        ConsoleResourceUrls.Agent(
+            ResourceNamespace.Parse(usage.Namespace),
+            usage.Name,
+            usage.ScopeRef,
+            usage.ScopeRef,
+            CurrentReturnUrl());
+    private string CurrentReturnUrl()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        return $"/{relative}";
+    }
+    private void SelectTab(ModelProfileTab tab)
+    {
+        activeTab = tab;
+        var value = tab switch
+        {
+            ModelProfileTab.Access => "access",
+            ModelProfileTab.Usages => "usages",
+            _ => null
+        };
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("tab", value), replace: true);
+    }
     private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
     private static string DetailsUrl(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef) =>
         ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(@namespace, ModelResourceKinds.ModelProfile, name), scopeRef);

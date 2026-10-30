@@ -44,7 +44,7 @@ public interface ICleanupApiClient
     Task DeleteAsync(CleanupCandidate candidate, CleanupDeletionOptions options, CancellationToken cancellationToken);
 }
 
-public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICleanupApiClient
+public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClientFactory) : ICleanupApiClient
 {
     public const string ManagementClient = "Agentstration.Cleanup.Management";
     public const string RuntimeClient = "Agentstration.Cleanup.Runtime";

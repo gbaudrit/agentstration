@@ -486,6 +486,17 @@ public sealed partial class ApiClientTests
         Assert.AreEqual(
             "/modelprofiles/reasoning?namespace=shared.models&scopeRef=%2Fworkspaces%2Fcccccccc-cccc-cccc-cccc-cccccccccccc",
             ConsoleResourceUrls.ModelProfile(profile.Address, scopeRef));
+        Assert.AreEqual(
+            "/namespaces/shared.models/agents/assistant?scopeRef=%2Fworkspaces%2Fcccccccc-cccc-cccc-cccc-cccccccccccc&context=%2Fworkspaces%2Fcccccccc-cccc-cccc-cccc-cccccccccccc",
+            ConsoleResourceUrls.Agent(new ResourceNamespace("shared.models"), "assistant", scopeRef, scopeRef));
+        Assert.AreEqual("/modelprofiles/reasoning?context=%2Finstance&tab=usages",
+            ConsoleResourceUrls.LocalReturnUrl("/modelprofiles/reasoning?context=%2Finstance&tab=usages"));
+        Assert.IsNull(ConsoleResourceUrls.LocalReturnUrl("https://example.test/redirect"));
+        Assert.IsNull(ConsoleResourceUrls.LocalReturnUrl("//example.test/redirect"));
+        using var contextClient = new HttpClient();
+        ConsoleContextHeaders.Apply(contextClient, scopeRef.Value);
+        Assert.AreEqual(scopeRef.Value,
+            contextClient.DefaultRequestHeaders.GetValues(ConsoleContextHeaders.Name).Single());
     }
 
     [TestMethod]

@@ -59,20 +59,9 @@ app.MapAgentstrationCultureEndpoint().AllowAnonymous();
 app.MapPost("/bff/identity/context/selection", async (
     SelectConsoleContextRequest request,
     IIdentityAdministrationApiClient identity,
-    HttpRequest httpRequest,
-    HttpResponse response,
     CancellationToken cancellationToken) =>
 {
     await identity.SelectConsoleContextAsync(request.ScopeRef, cancellationToken);
-    response.Cookies.Append("agentstration.context", request.ScopeRef, new CookieOptions
-    {
-        HttpOnly = true,
-        IsEssential = true,
-        Path = "/",
-        SameSite = SameSiteMode.Strict,
-        Secure = httpRequest.IsHttps,
-        MaxAge = TimeSpan.FromDays(30)
-    });
     return Results.Ok();
 }).RequireAuthorization().DisableAntiforgery();
 app.MapStaticAssets();

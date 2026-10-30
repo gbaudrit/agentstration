@@ -357,8 +357,21 @@ public partial class MainLayout
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
     {
+        var requestedContext = ConsoleNavigationContext.GetScopeRef(args.Location);
+        if (requestedContext is not null
+            && ContextState.Current is { } current
+            && !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal))
+        {
+            NavigationManager.NavigateTo(args.Location, forceLoad: true);
+            return;
+        }
         StateHasChanged();
-        try { await JS.InvokeVoidAsync("window.scrollTo", 0, 0); }
+        try
+        {
+            await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+            if (contextModule is not null && ContextState.Current is { } context)
+                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
+        }
         catch (JSDisconnectedException) { }
         catch (InvalidOperationException) { }
     });

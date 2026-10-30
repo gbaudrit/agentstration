@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
+using Agentstration.Web.Console;
 
 namespace Agentstration.Console.Web.Security;
 
@@ -9,7 +10,8 @@ public sealed class BffDelegatingHttpClientFactory(
     IHttpMessageHandlerFactory handlers,
     IOptionsMonitor<HttpClientFactoryOptions> options,
     IEnumerable<BffDelegationTarget> targets,
-    IServiceProvider services) : IHttpClientFactory
+    IServiceProvider services,
+    IHttpContextAccessor httpContextAccessor) : IHttpClientFactory, IConsoleContextHttpClientFactory
 {
     private readonly IReadOnlyDictionary<string, BffDelegationTarget> targetsByName =
         targets.ToDictionary(value => value.Name, StringComparer.Ordinal);
@@ -21,11 +23,14 @@ public sealed class BffDelegatingHttpClientFactory(
         if (targetsByName.TryGetValue(name, out var target))
             handler = new BffDelegationHandler(
                 services.GetRequiredService<BffDelegationTokenProvider>(),
-                services.GetRequiredService<IHttpContextAccessor>(),
                 target.Audience, target.Origin)
             { InnerHandler = handler };
         var client = new HttpClient(handler, disposeHandler: true);
         foreach (var configure in options.Get(name).HttpClientActions) configure(client);
+        var request = httpContextAccessor.HttpContext?.Request;
+        var scopeRef = request?.Headers[ConsoleContextHeaders.Name].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(scopeRef)) scopeRef = request?.Query["context"].FirstOrDefault();
+        ConsoleContextHeaders.Apply(client, scopeRef);
         return client;
     }
 

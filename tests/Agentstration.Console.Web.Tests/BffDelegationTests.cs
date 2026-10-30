@@ -84,10 +84,11 @@ public sealed class BffDelegationTests
             Options.Create(new BffWorkloadClientOptions { Enabled = true }));
         var downstream = new CaptureHandler();
         using var client = new HttpClient(new BffDelegationHandler(
-            provider, accessor, InternalDelegationAudiences.Management, new Uri("https://api.example.test/"))
+            provider, InternalDelegationAudiences.Management, new Uri("https://api.example.test/"))
         {
             InnerHandler = downstream
         });
+        client.DefaultRequestHeaders.TryAddWithoutValidation("X-Agentstration-Context", "/instance");
 
         using var allowed = await client.GetAsync("https://api.example.test/api/identity/context");
         using var denied = await client.GetAsync("https://other.example.test/api/identity/context");

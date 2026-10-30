@@ -453,8 +453,9 @@ public sealed class ModelProviderNavigationTests
             Assert.IsTrue(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
             var workspaceLink = rendered.FindAll("[data-testid='model-profile-usage'] a")
                 .Single(value => value.TextContent.Contains("Workspace assistant", StringComparison.Ordinal));
+            var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&tab=usages";
             Assert.AreEqual(
-                $"/agents/workspace-assistant?scopeRef={Uri.EscapeDataString(WorkspaceScope.Value)}",
+                $"/agents/workspace-assistant?scopeRef={Uri.EscapeDataString(WorkspaceScope.Value)}&context={Uri.EscapeDataString(WorkspaceScope.Value)}&returnUrl={Uri.EscapeDataString(returnUrl)}",
                 workspaceLink.GetAttribute("href"));
         });
     }
