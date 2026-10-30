@@ -56,7 +56,7 @@ else
                     @foreach (var usage in usages)
                     {
                         <li class="model-profile-usage-card" data-testid="model-profile-usage">
-                            <a href="@AgentUrl(usage)" target="_blank" rel="noopener noreferrer">
+                            <a href="@AgentUrl(usage)">
                                 <span class="model-profile-usage-icon" aria-hidden="true"><TablerIcon Name="robot" /></span>
                                 <span class="model-profile-usage-identity"><strong>@usage.DisplayName</strong><code>@usage.Namespace/@usage.Name</code></span>
                                 <span class="model-profile-usage-scope"><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact />@if (!string.IsNullOrWhiteSpace(usage.ScopeDisplayName)) { <small>@usage.ScopeDisplayName</small> }</span>
