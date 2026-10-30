@@ -40,7 +40,7 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
-    public async Task WorkClientSelectsTheExplicitWorkspaceForTaskSummary()
+    public async Task WorkClientKeepsNavigationContextWhenSelectingTaskSummaryWorkspace()
     {
         var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         string? contextHeader = null;
@@ -56,10 +56,11 @@ public sealed partial class ApiClientTests
         }))
         { BaseAddress = new Uri("http://localhost/") };
 
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         _ = await new WorkApiClient(httpClient).GetTaskSummaryAsync(workspaceId.ToString("D"), default);
 
         Assert.AreEqual($"/api/tasks/summary?workspaceId={workspaceId:D}", requested);
-        Assert.AreEqual($"/workspaces/{workspaceId:D}", contextHeader);
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, contextHeader);
     }
 
     [TestMethod]

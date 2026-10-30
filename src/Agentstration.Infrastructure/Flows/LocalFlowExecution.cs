@@ -96,7 +96,9 @@ public sealed class WorkspaceFlowRunExecutionScope(
 
 public sealed class CurrentWorkExecutionScopeAccessor(ICurrentRequestContext requestContext) : IWorkExecutionScopeAccessor
 {
-    public FlowRunScope? Current => requestContext.IsInitialized
+    public FlowRunScope? Current => requestContext.AccessMode is ControlPlaneAccessMode.Workspace
+        or ControlPlaneAccessMode.Instance
+        or ControlPlaneAccessMode.TenantAdministration
         ? new FlowRunScope(requestContext.Current.TenantId, new WorkspaceId(requestContext.Current.WorkspaceId), requestContext.Current.PrincipalId)
         : null;
 }

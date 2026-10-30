@@ -37,7 +37,6 @@ public sealed class WorkApiClient(HttpClient httpClient) : IWorkApiClient
             string.IsNullOrWhiteSpace(workspaceId)
                 ? "api/tasks/summary"
                 : $"api/tasks/summary?workspaceId={Uri.EscapeDataString(workspaceId)}");
-        AddWorkspaceContext(request, workspaceId);
         using var response = await httpClient.SendAsync(request, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<WorkTaskOperationsCountersResponse>(cancellationToken)
@@ -61,11 +60,6 @@ public sealed class WorkApiClient(HttpClient httpClient) : IWorkApiClient
     {
         using var response = await httpClient.PostAsync($"api/tasks/{taskId}/{command}", null, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
-    }
-    private static void AddWorkspaceContext(HttpRequestMessage request, string? workspaceId)
-    {
-        if (Guid.TryParse(workspaceId, out var parsed))
-            request.Headers.TryAddWithoutValidation("X-Agentstration-Context", $"/workspaces/{parsed:D}");
     }
     private static string WorkspaceName(string id) => id[(id.LastIndexOf('/') + 1)..];
 }
