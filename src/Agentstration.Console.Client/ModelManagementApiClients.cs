@@ -19,6 +19,8 @@ internal sealed record AssignAepEnrollmentRequest(ResourceScopeRef ScopeRef);
 public interface IModelProvidersClient
 {
     Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        GetModelProvidersAsync(cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetModelProviderAsync(providerName, cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken);
@@ -30,6 +32,8 @@ public interface IModelProvidersClient
     Task<ModelProviderUsagesResponse> GetModelProviderUsagesAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetModelProviderUsagesAsync(providerName, cancellationToken);
     Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken);
     Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetProviderModelsAsync(providerName, cancellationToken);
+    Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        GetProviderModelsAsync(@namespace, providerName, cancellationToken);
     Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
         Task.FromException<ModelDiscoveryDiffResponse>(new NotSupportedException("This client does not support model discovery refresh."));
     Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken);
@@ -266,6 +270,11 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
     public async Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ModelProviderResponse>>(httpClient, "api/modelproviders", cancellationToken)).Value;
 
+    public Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(
+        ResourceScopeRef contextScope,
+        CancellationToken cancellationToken) =>
+        ReadValuesAsync<ModelProviderResponse>("api/modelproviders", contextScope, cancellationToken);
+
     public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
         GetModelProviderAsync(ResourceNamespace.Default, providerName, cancellationToken);
 
@@ -303,6 +312,13 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
 
     public async Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<AvailableModelResponse>>(httpClient, ChildPath(@namespace, providerName, "models"), cancellationToken)).Value;
+
+    public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(
+        ResourceNamespace @namespace,
+        string providerName,
+        ResourceScopeRef contextScope,
+        CancellationToken cancellationToken) =>
+        ReadValuesAsync<AvailableModelResponse>(ChildPath(@namespace, providerName, "models"), contextScope, cancellationToken);
 
     public async Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(
         ResourceNamespace @namespace,
@@ -344,6 +360,13 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
         if (string.IsNullOrWhiteSpace(responseEtag)) throw new AgentstrationApiException("Agentstration API did not return the provider ETag.", Guid.NewGuid().ToString("N"));
         return new ResourceSnapshot<ModelProviderResource>(value, responseEtag);
     }
+
+    private async Task<IReadOnlyList<T>> ReadValuesAsync<T>(
+        string path,
+        ResourceScopeRef contextScope,
+        CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<T>>(
+            httpClient, path, contextScope, cancellationToken)).Value;
 
     private static string Path(ResourceNamespace @namespace, string providerName) => $"api/modelproviders/{Escape(providerName)}?resourceNamespace={Escape(@namespace.Value)}";
     private static string ChildPath(ResourceNamespace @namespace, string providerName, string child) => $"api/modelproviders/{Escape(providerName)}/{child}?resourceNamespace={Escape(@namespace.Value)}";

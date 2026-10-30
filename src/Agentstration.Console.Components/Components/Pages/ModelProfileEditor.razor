@@ -6,8 +6,6 @@
 @inject IExtensionsClient ExtensionsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
-@inject ConsoleContextState ContextState
-@inject IConsoleNavigationContext NavigationContext
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfileEditorStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateModelProfile") : $"{Name} · {T("ModelProfile")}") · Agentstration</PageTitle>
@@ -196,6 +194,7 @@ else
     [SupplyParameterFromQuery(Name = "providerNamespace")] public string? SuggestedProviderNamespace { get; set; }
     [SupplyParameterFromQuery(Name = "model")] public string? SuggestedModel { get; set; }
     [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
+    [SupplyParameterFromQuery(Name = "context")] public string? Context { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
     private readonly CancellationTokenSource cancellation = new();
@@ -208,6 +207,7 @@ else
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
     private ResourceScopeRef? RequestedScope => string.IsNullOrWhiteSpace(ScopeRef) ? null : ResourceScopeRef.Parse(ScopeRef);
+    private ResourceScopeRef? RequestedContext => string.IsNullOrWhiteSpace(Context) ? null : ResourceScopeRef.Parse(Context);
     private string SelectedProvider => model is null || string.IsNullOrWhiteSpace(model.ProviderName) ? string.Empty : $"{model.ProviderNamespace}:{model.ProviderName}";
     private string Definition
     {
@@ -234,8 +234,9 @@ else
         loading = true; error = null; warning = null;
         try
         {
-            await EnsureNavigationContextAsync();
-            providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
+            providers = RequestedContext is { } contextScope
+                ? await ProvidersClient.GetModelProvidersAsync(contextScope, cancellation.Token)
+                : await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
             extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
             if (IsNew)
             {
@@ -266,15 +267,6 @@ else
         catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProfileEditorModel(); }
         finally { loading = false; }
     }
-    private async Task EnsureNavigationContextAsync()
-    {
-        var requestedScope = NavigationContext.ScopeRef;
-        if (string.IsNullOrWhiteSpace(requestedScope)) return;
-        for (var attempt = 0; attempt < 2
-            && !string.Equals(requestedScope, ContextState.Current?.SelectedScopeRef, StringComparison.Ordinal);
-            attempt++)
-            await ContextState.LoadAsync(cancellation.Token);
-    }
     private async Task ProviderChangedAsync(ChangeEventArgs args)
     {
         if (model is null) return;
@@ -290,7 +282,12 @@ else
         if (model is null) return; if (clearSelection) model.ModelName = string.Empty; models = []; warning = null;
         if (string.IsNullOrWhiteSpace(model.ProviderName)) return;
         loadingModels = true;
-        try { models = await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, cancellation.Token); }
+        try
+        {
+            models = RequestedContext is { } contextScope
+                ? await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, contextScope, cancellation.Token)
+                : await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, cancellation.Token);
+        }
         catch (AgentstrationApiException exception) { warning = T("ModelsCannotBeDiscovered", exception.Message); }
         finally { loadingModels = false; }
     }

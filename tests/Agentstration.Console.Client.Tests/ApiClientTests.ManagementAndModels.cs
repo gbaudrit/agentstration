@@ -325,6 +325,34 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ModelProvidersClientUsesTheExplicitPageContextForCatalogAndDiscovery()
+    {
+        var contexts = new List<string?>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            contexts.Add(request.Headers.TryGetValues(ConsoleContextHeaders.Name, out var values)
+                ? values.Single()
+                : null);
+            object value = request.RequestUri!.AbsolutePath.EndsWith("/models", StringComparison.Ordinal)
+                ? new ValueResponse<AvailableModelResponse>([])
+                : new ValueResponse<ModelProviderResponse>([]);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
+        })) { BaseAddress = new Uri("http://localhost/") };
+        var client = new ModelProvidersApiClient(httpClient);
+
+        _ = await client.GetModelProvidersAsync(ResourceScopeRef.Instance, CancellationToken.None);
+        _ = await client.GetProviderModelsAsync(
+            ResourceNamespace.Default,
+            "ollama",
+            ResourceScopeRef.Instance,
+            CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { ResourceScopeRef.Instance.Value, ResourceScopeRef.Instance.Value },
+            contexts);
+    }
+
+    [TestMethod]
     public async Task ModelProvidersClientRefreshesExactNamespacedProvider()
     {
         string? path = null;

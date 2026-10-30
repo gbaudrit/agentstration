@@ -424,10 +424,10 @@ public sealed class ModelProviderNavigationTests
     public void ExistingModelProfileShowsTheSameCrossScopeImpactAndUsageList()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = CreateContext(out _);
+        using var context = CreateContext(out var providers);
         context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(
-            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance");
+            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance");
 
         var rendered = context.Render<ModelProfileEditor>(parameters => parameters
             .Add(value => value.Name, "shared-reasoning"));
@@ -452,9 +452,11 @@ public sealed class ModelProviderNavigationTests
             Assert.IsTrue(rendered.Markup.Contains("Instance assistant", StringComparison.Ordinal));
             Assert.IsTrue(rendered.Markup.Contains("Workspace assistant", StringComparison.Ordinal));
             Assert.IsTrue(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedContextScope);
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedModelContextScope);
             var workspaceLink = rendered.FindAll("[data-testid='model-profile-usage'] a")
                 .Single(value => value.TextContent.Contains("Workspace assistant", StringComparison.Ordinal));
-            var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&tab=usages";
+            var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance&tab=usages";
             Assert.AreEqual(
                 $"/agents/workspace-assistant?scopeRef={Uri.EscapeDataString(WorkspaceScope.Value)}&context={Uri.EscapeDataString(WorkspaceScope.Value)}&returnUrl={Uri.EscapeDataString(returnUrl)}",
                 workspaceLink.GetAttribute("href"));
@@ -483,36 +485,6 @@ public sealed class ModelProviderNavigationTests
         });
     }
 
-    [TestMethod]
-    public async Task ExistingModelProfileWaitsForTheUrlContextBeforeLoadingDependencies()
-    {
-        using var culture = new TestCultureScope("en-US");
-        using var context = CreateContext(out _);
-        var contextProvider = new TrackingConsoleContextProvider();
-        context.Services.AddSingleton<IConsoleContextProvider>(contextProvider);
-        context.Services.AddSingleton<IConsoleNavigationContext>(
-            new FixedConsoleNavigationContext(ResourceScopeRef.Instance.Value));
-        context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
-        var providers = new ContextAwareModelProvidersClient(context.Services, contextProvider);
-        context.Services.AddSingleton<IModelProvidersClient>(providers);
-        await context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(CancellationToken.None);
-        Assert.AreEqual(ConsoleContextKind.Workspace,
-            context.Services.GetRequiredService<ConsoleContextState>().Current?.SelectedKind);
-        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
-            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance");
-
-        var rendered = context.Render<ModelProfileEditor>(parameters => parameters
-            .Add(value => value.Name, "shared-reasoning"));
-
-        rendered.WaitForAssertion(() =>
-        {
-            Assert.AreEqual(2, contextProvider.CallCount);
-            Assert.IsTrue(providers.LoadedAfterContext);
-            Assert.IsFalse(rendered.Markup.Contains("dependency is unavailable", StringComparison.Ordinal));
-        });
-        await rendered.InvokeAsync(() => Task.CompletedTask);
-    }
-
     private static BunitContext CreateContext(out StubModelProvidersClient providers,
         IReadOnlyList<ExtensionResponse>? extensions = null)
     {
@@ -526,81 +498,7 @@ public sealed class ModelProviderNavigationTests
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new StubResourceScopeInventoryClient());
         context.Services.AddSingleton<IResourceAccessPolicyClient>(new StubResourceAccessPolicyClient());
         context.Services.AddSingleton(new NotificationState());
-        context.Services.AddSingleton<IConsoleNavigationContext>(new FixedConsoleNavigationContext(null));
-        context.Services.AddSingleton<IConsoleContextProvider>(new FixedConsoleContextProvider());
-        context.Services.AddScoped<ConsoleContextState>();
         return context;
-    }
-
-    private sealed class FixedConsoleNavigationContext(string? scopeRef) : IConsoleNavigationContext
-    {
-        public string? ScopeRef { get; } = scopeRef;
-    }
-
-    private sealed class FixedConsoleContextProvider : IConsoleContextProvider
-    {
-        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(new ConsoleContextSnapshot(
-                Guid.Empty,
-                "Test user",
-                ResourceScopeRef.Instance.Value,
-                ConsoleContextKind.Instance,
-                Guid.Empty,
-                "test",
-                "Test tenant",
-                Guid.Empty,
-                "default",
-                "Default workspace",
-                new HashSet<string>(StringComparer.Ordinal),
-                [],
-                [new(ResourceScopeRef.Instance.Value, ConsoleContextKind.Instance,
-                    null, null, null, null, null, "Instance")]));
-    }
-
-    private sealed class TrackingConsoleContextProvider : IConsoleContextProvider
-    {
-        public int CallCount { get; private set; }
-
-        public async Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken)
-        {
-            await Task.Yield();
-            CallCount++;
-            var selectedKind = CallCount == 1 ? ConsoleContextKind.Workspace : ConsoleContextKind.Instance;
-            var selectedScope = selectedKind == ConsoleContextKind.Workspace
-                ? WorkspaceScope.Value
-                : ResourceScopeRef.Instance.Value;
-            return new ConsoleContextSnapshot(
-                Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                "Test user",
-                selectedScope,
-                selectedKind,
-                Guid.Parse("22222222-2222-2222-2222-222222222222"),
-                "test",
-                "Test tenant",
-                Guid.Parse("b07e7249-b525-4c32-a7bb-5e805fc768e7"),
-                "default",
-                "Default workspace",
-                new HashSet<string>(StringComparer.Ordinal),
-                [],
-                [new(ResourceScopeRef.Instance.Value, ConsoleContextKind.Instance,
-                    null, null, null, null, null, "Instance")]);
-        }
-    }
-
-    private sealed class ContextAwareModelProvidersClient(
-        IServiceProvider services,
-        TrackingConsoleContextProvider contextProvider) : StubModelProvidersClient
-    {
-        public bool LoadedAfterContext { get; private set; }
-
-        public override Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(
-            CancellationToken cancellationToken)
-        {
-            LoadedAfterContext = contextProvider.CallCount == 2
-                && services.GetRequiredService<ConsoleContextState>().Current?.SelectedKind
-                    == ConsoleContextKind.Instance;
-            return base.GetModelProvidersAsync(cancellationToken);
-        }
     }
 
     private sealed class StubResourceScopeInventoryClient : IResourceScopeInventoryClient
@@ -630,10 +528,12 @@ public sealed class ModelProviderNavigationTests
             Task.FromResult(new ResourceAccessPolicySnapshot(policy, "\"provider-policy\""));
     }
 
-    private class StubModelProvidersClient : IModelProvidersClient
+    private sealed class StubModelProvidersClient : IModelProvidersClient
     {
         public ResourceNamespace? RequestedModelNamespace { get; private set; }
         public string? RequestedModelProvider { get; private set; }
+        public ResourceScopeRef? RequestedContextScope { get; private set; }
+        public ResourceScopeRef? RequestedModelContextScope { get; private set; }
         public int RefreshCalls { get; private set; }
         public string? RefreshedProvider { get; private set; }
         public bool FailRefresh { get; set; }
@@ -645,12 +545,20 @@ public sealed class ModelProviderNavigationTests
         public void CompleteUsages() =>
             usagesCompletion!.SetResult(new ModelProviderUsagesResponse([], 0));
 
-        public virtual Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ModelProviderResponse>>([
                 new("shared.models/modelproviders/ollama/local", "ollama/local", new(
                     "Local Ollama", "ollama", "ollama", "ollama-extension", ProviderNamespace.Value,
                     "configuration", "available", "Local Ollama", 1), ProviderNamespace.Value)
             ]);
+
+        public Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedContextScope = contextScope;
+            return GetModelProvidersAsync(cancellationToken);
+        }
 
         public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceSnapshot<ModelProviderResource>(ProviderResource(providerName), "\"provider-etag\""));
@@ -668,6 +576,16 @@ public sealed class ModelProviderNavigationTests
             return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([
                 new("qwen3", "Qwen 3", "available", new ModelSpecification(), ResourceName: "ollama-local.qwen3-deadbeef")
             ]);
+        }
+
+        public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(
+            ResourceNamespace @namespace,
+            string providerName,
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedModelContextScope = contextScope;
+            return GetProviderModelsAsync(@namespace, providerName, cancellationToken);
         }
 
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) =>
