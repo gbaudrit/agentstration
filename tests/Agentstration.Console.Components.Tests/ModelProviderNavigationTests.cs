@@ -464,6 +464,26 @@ public sealed class ModelProviderNavigationTests
     }
 
     [TestMethod]
+    public void ExistingModelProfileResolvesProviderDependenciesFromItsOwnerScope()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(out var providers);
+        context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}");
+
+        var rendered = context.Render<ModelProfileEditor>(parameters => parameters
+            .Add(value => value.Name, "shared-reasoning"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedContextScope);
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedModelContextScope);
+            Assert.IsEmpty(rendered.FindAll(".form-alert-warning"));
+        });
+    }
+
+    [TestMethod]
     public void ExistingModelProfileShowsLocalizedEmptyUsages()
     {
         using var culture = new TestCultureScope("fr-FR");

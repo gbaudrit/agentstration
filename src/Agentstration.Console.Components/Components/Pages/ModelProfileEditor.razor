@@ -234,10 +234,6 @@ else
         loading = true; error = null; warning = null;
         try
         {
-            providers = RequestedContext is { } contextScope
-                ? await ProvidersClient.GetModelProvidersAsync(contextScope, cancellation.Token)
-                : await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
-            extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
             if (IsNew)
             {
                 model = new ModelProfileEditorModel
@@ -261,6 +257,11 @@ else
                     ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, resolutionScope, cancellation.Token)
                     : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
             }
+            var dependencyScope = selectedScope ?? RequestedContext;
+            providers = dependencyScope is { } consumerScope
+                ? await ProvidersClient.GetModelProvidersAsync(consumerScope, cancellation.Token)
+                : await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
+            extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
             if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
             ConfigureOptionEditor();
         }
@@ -284,8 +285,9 @@ else
         loadingModels = true;
         try
         {
-            models = RequestedContext is { } contextScope
-                ? await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, contextScope, cancellation.Token)
+            var dependencyScope = selectedScope ?? RequestedContext;
+            models = dependencyScope is { } consumerScope
+                ? await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, consumerScope, cancellation.Token)
                 : await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, cancellation.Token);
         }
         catch (AgentstrationApiException exception) { warning = T("ModelsCannotBeDiscovered", exception.Message); }
