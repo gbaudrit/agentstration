@@ -446,7 +446,9 @@ public sealed class ModelProviderNavigationTests
             Assert.HasCount(2, rendered.FindAll("[data-testid='model-profile-usage']"));
             Assert.HasCount(2, rendered.FindAll(".model-profile-usage-card"));
             Assert.IsTrue(rendered.FindAll(".model-profile-usage-card a").All(link =>
-                link.GetAttribute("target") is null && link.GetAttribute("rel") is null));
+                link.GetAttribute("target") is null
+                && link.GetAttribute("rel") is null
+                && string.Equals(link.GetAttribute("data-enhance-nav"), "false", StringComparison.Ordinal)));
             Assert.IsTrue(rendered.Markup.Contains("Instance assistant", StringComparison.Ordinal));
             Assert.IsTrue(rendered.Markup.Contains("Workspace assistant", StringComparison.Ordinal));
             Assert.IsTrue(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
