@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
@@ -419,6 +420,59 @@ public sealed class ModelProviderNavigationTests
         });
     }
 
+    [TestMethod]
+    public void ExistingModelProfileShowsTheSameCrossScopeImpactAndUsageList()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(out _);
+        context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance");
+
+        var rendered = context.Render<ModelProfileEditor>(parameters => parameters
+            .Add(value => value.Name, "shared-reasoning"));
+
+        rendered.WaitForAssertion(() =>
+            Assert.IsTrue(rendered.Markup.Contains("Changing this profile will affect 2 agents.",
+                StringComparison.Ordinal), rendered.Markup));
+        rendered.Find("[data-testid='model-profile-usages-tab']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(2, rendered.FindAll("[data-testid='model-profile-usage']"));
+            Assert.IsTrue(rendered.Markup.Contains("Instance assistant", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.Markup.Contains("Workspace assistant", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
+            var workspaceLink = rendered.FindAll("[data-testid='model-profile-usage'] a")
+                .Single(value => value.TextContent.Contains("Workspace assistant", StringComparison.Ordinal));
+            Assert.AreEqual(
+                $"/agents/workspace-assistant?scopeRef={Uri.EscapeDataString(WorkspaceScope.Value)}",
+                workspaceLink.GetAttribute("href"));
+        });
+    }
+
+    [TestMethod]
+    public void ExistingModelProfileShowsLocalizedEmptyUsages()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = CreateContext(out _);
+        context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient(hasUsages: false));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance");
+
+        var rendered = context.Render<ModelProfileEditor>(parameters => parameters
+            .Add(value => value.Name, "shared-reasoning"));
+        rendered.Find("[data-testid='model-profile-usages-tab']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(0, rendered.FindAll("[data-testid='model-profile-usage']"));
+            Assert.IsTrue(rendered.Markup.Contains("Agents utilisant ce profil", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.Markup.Contains("Aucune utilisation", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.Markup.Contains("Aucun agent ne référence ce profil.", StringComparison.Ordinal));
+        });
+    }
+
     private static BunitContext CreateContext(out StubModelProvidersClient providers,
         IReadOnlyList<ExtensionResponse>? extensions = null)
     {
@@ -630,6 +684,60 @@ public sealed class ModelProviderNavigationTests
         public Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class ExistingModelProfilesClient(bool hasUsages = true) : IModelProfilesClient
+    {
+        private static readonly ModelProfileResource Profile = new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProfile,
+            Metadata = new ResourceMetadata { Name = "shared-reasoning" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new ModelProfileProperties
+            {
+                DisplayName = "Shared reasoning",
+                Provider = new ResourceReference("ollama/local", ResourceScopeRef.Instance, ProviderNamespace),
+                Model = new ModelSelection { Name = "qwen3" }
+            }
+        };
+
+        private static readonly ModelProfileUsagesResponse Usages = new([
+            new(AgentResourceKinds.Agent, "instance-assistant", "instance-assistant", "Instance assistant",
+                ResourceNamespace.DefaultValue, ResourceScopeRef.Instance, "Instance"),
+            new(AgentResourceKinds.Agent, "workspace-assistant", "workspace-assistant", "Workspace assistant",
+                ResourceNamespace.DefaultValue, WorkspaceScope, "Default workspace")
+        ], 2);
+
+        public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(
+            string profileName,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, "\"profile-etag\""));
+
+        public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
+            string profileName,
+            CancellationToken cancellationToken) => Task.FromResult(hasUsages
+                ? Usages
+                : new ModelProfileUsagesResponse([], 0));
+
+        public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(
+            string profileName,
+            CancellationToken cancellationToken) => Task.FromResult(new ModelProfileResolutionResponse(
+                new(Profile.Name, Profile.Name, Profile.Definition.DisplayName,
+                    Profile.Namespace.Value, Profile.ScopeRef),
+                new("ollama/local", "ollama/local", "Local Ollama", "ollama", "available",
+                    ProviderNamespace.Value),
+                new("qwen3", "available"),
+                new(Profile.Definition.Generation, Profile.Definition.Reasoning, Profile.Definition.Output),
+                "available",
+                []));
+
+        public Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }

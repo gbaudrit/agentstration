@@ -89,6 +89,10 @@
   <data name="ModelStatus"><value>État du modèle</value></data>
   <data name="ProfileStatus"><value>État du profil</value></data>
   <data name="Usages"><value>Utilisations</value></data>
+  <data name="Impact"><value>Impact</value></data>
+  <data name="AgentUsages"><value>Agents utilisant ce profil</value></data>
+  <data name="AgentUsagesDescription"><value>Références directes des Agents visibles dans le périmètre du profil et ses descendants autorisés. Cette liste sert aussi à calculer l'impact de modification affiché ci-dessus.</value></data>
+  <data name="NoUsages"><value>Aucune utilisation</value></data>
   <data name="Agents"><value>Agents</value></data>
   <data name="NoAgentReferences"><value>Aucun agent ne référence ce profil.</value></data>
   <data name="Compatibility"><value>Compatibilité</value></data>

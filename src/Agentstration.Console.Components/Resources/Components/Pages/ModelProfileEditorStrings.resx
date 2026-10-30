@@ -89,6 +89,10 @@
   <data name="ModelStatus"><value>Model status</value></data>
   <data name="ProfileStatus"><value>Profile status</value></data>
   <data name="Usages"><value>Usages</value></data>
+  <data name="Impact"><value>Impact</value></data>
+  <data name="AgentUsages"><value>Agents using this profile</value></data>
+  <data name="AgentUsagesDescription"><value>Direct Agent references visible in the profile scope and its authorized descendants. This list is also used to calculate the change impact shown above.</value></data>
+  <data name="NoUsages"><value>No usages</value></data>
   <data name="Agents"><value>Agents</value></data>
   <data name="NoAgentReferences"><value>No agent references this profile.</value></data>
   <data name="Compatibility"><value>Compatibility</value></data>

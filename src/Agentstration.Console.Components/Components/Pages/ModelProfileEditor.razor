@@ -25,12 +25,37 @@ else
 
     @if (!IsNew)
     {
-        <ResourceTabs Label="@T("ModelProfile")"><button type="button" class="@(!accessMode ? "active" : null)" @onclick="() => accessMode = false">@T("Definition")</button><button type="button" class="@(accessMode ? "active" : null)" data-testid="model-profile-access-tab" @onclick="() => accessMode = true">@T("Access")</button></ResourceTabs>
+        <ResourceTabs Label="@T("ModelProfile")"><button type="button" class="@(activeTab == ModelProfileTab.Definition ? "active" : null)" @onclick="() => activeTab = ModelProfileTab.Definition">@T("Definition")</button><button type="button" class="@(activeTab == ModelProfileTab.Access ? "active" : null)" data-testid="model-profile-access-tab" @onclick="() => activeTab = ModelProfileTab.Access">@T("Access")</button><button type="button" class="@(activeTab == ModelProfileTab.Usages ? "active" : null)" data-testid="model-profile-usages-tab" @onclick="() => activeTab = ModelProfileTab.Usages">@T("Usages")</button></ResourceTabs>
     }
 
-    @if (accessMode && resource is not null && selectedScope is { } ownerScope)
+    @if (activeTab == ModelProfileTab.Access && resource is not null && selectedScope is { } ownerScope)
     {
         <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@ModelResourceKinds.ModelProfile" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
+    }
+    else if (activeTab == ModelProfileTab.Usages)
+    {
+        <section class="panel resource-section" data-testid="model-profile-usages-panel">
+            <div class="panel-header"><div><p class="eyebrow">@T("Impact")</p><h2>@T("AgentUsages")</h2></div><span>@AgentCount(usages.Count)</span></div>
+            <p>@T("AgentUsagesDescription")</p>
+            @if (usages.Count == 0)
+            {
+                <EmptyState Title="@T("NoUsages")" Message="@T("NoAgentReferences")" />
+            }
+            else
+            {
+                <ul class="resource-links" data-testid="model-profile-usages-list">
+                    @foreach (var usage in usages)
+                    {
+                        <li data-testid="model-profile-usage">
+                            <a href="@AgentUrl(usage)">
+                                <span class="resource-name-with-scope"><strong>@usage.DisplayName</strong><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact /></span>
+                                <span class="resource-secondary"><code>@usage.Namespace/@usage.Name</code>@if (!string.IsNullOrWhiteSpace(usage.ScopeDisplayName)) { <text> · @usage.ScopeDisplayName</text> }</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
     }
     else
     {
@@ -120,12 +145,9 @@ else
 
     @if (!IsNew)
     {
-        <section class="details-grid resource-section">
+        <section class="resource-section">
             <article class="panel"><div class="panel-header"><div><p class="eyebrow">@T("Overview")</p><h2>@T("EffectiveResolution")</h2></div><button class="button-secondary" type="button" @onclick="RefreshResolutionAsync" disabled="@diagnosing">@(diagnosing ? T("Checking") : T("RefreshDiagnosis"))</button></div>
                 @if (resolution is null) { <p>@T("ResolutionUnavailable")</p> } else { <dl class="resource-details"><dt>@T("DeclaredProfile")</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>@T("ResolvedProvider")</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("ProviderConnection")</dt><dd>@StatusLabel(resolution.Provider?.Status)</dd><dt>@T("ResolvedModel")</dt><dd>@resolution.Model.Name</dd><dt>@T("ModelStatus")</dt><dd>@StatusLabel(resolution.Model.Status)</dd><dt>@T("ProfileStatus")</dt><dd>@StatusLabel(resolution.Status)</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
-            </article>
-            <article class="panel" id="agents"><div class="panel-header"><div><p class="eyebrow">@T("Usages")</p><h2>@T("Agents")</h2></div><span>@usages.Count</span></div>
-                @if (usages.Count == 0) { <p>@T("NoAgentReferences")</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@AgentUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul> }
             </article>
         </section>
         <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Compatibility")</p><h2>@T("EffectiveCapabilities")</h2></div><span>@T("CapabilitySources")</span></div>
@@ -166,7 +188,8 @@ else
     private ModelProfileEditorModel? model; private ModelProfileResource? resource; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
     private ExtensionOptionsEditorModel? optionEditor; private bool rawOptions;
-    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete; private bool interactive; private bool accessMode;
+    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete; private bool interactive;
+    private ModelProfileTab activeTab;
     private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
@@ -326,9 +349,12 @@ else
         "failed" => "Failed",
         _ => "Unknown"
     }}"];
-    private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
+    private static string AgentUrl(ModelProfileUsageResponse usage) =>
+        ConsoleResourceUrls.Agent(ResourceNamespace.Parse(usage.Namespace), usage.Name, usage.ScopeRef);
     private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
     private static string DetailsUrl(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef) =>
         ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(@namespace, ModelResourceKinds.ModelProfile, name), scopeRef);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+
+    private enum ModelProfileTab { Definition, Access, Usages }
 }

@@ -10,6 +10,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -318,6 +319,248 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
+    public async Task InstanceProfileUsagesIncludeAuthorizedDescendantAgentsAndExactScopeIdentity()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        ModelProfileResource instanceProfile;
+        StoredResource<AgentResource> instanceAgent;
+        StoredResource<AgentResource> workspaceAgent;
+        StoredResource<ModelProfileResource> homonym;
+
+        using (scopes.PushInstance(context))
+        {
+            instanceProfile = (await profiles.CreateAsync(Profile("cross-scope-profile", ResourceScopeRef.Instance), default)).Value;
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(instanceProfile.Uid, ResourceScopeRef.Instance, instanceProfile.Namespace,
+                    ModelResourceKinds.ModelProfile, instanceProfile.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId),
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
+                null,
+                default);
+            instanceAgent = await agents.PutAgentAsync(
+                Agent("instance-profile-consumer", ResourceScopeRef.Instance,
+                    new ResourceReference(instanceProfile.Name, ResourceScopeRef.Instance)),
+                null,
+                true,
+                default);
+        }
+
+        using (scopes.Push(context))
+        {
+            workspaceAgent = await agents.PutAgentAsync(
+                Agent("workspace-profile-consumer", workspaceScope,
+                    new ResourceReference(instanceProfile.Name, ResourceScopeRef.Instance)),
+                null,
+                true,
+                default);
+            homonym = await profiles.CreateAsync(Profile(instanceProfile.Name, workspaceScope), default);
+            _ = await agents.PutAgentAsync(
+                Agent("homonymous-profile-consumer", workspaceScope,
+                    new ResourceReference(homonym.Value.Name, workspaceScope)),
+                null,
+                true,
+                default);
+        }
+
+        IReadOnlyList<ModelProfileUsage> usages;
+        using (scopes.PushInstance(context))
+            usages = await profiles.GetUsagesAsync(instanceProfile, default);
+
+        Assert.HasCount(2, usages);
+        Assert.IsTrue(usages.Any(value => value.Name == "instance-profile-consumer"
+            && value.ScopeRef == ResourceScopeRef.Instance));
+        Assert.IsTrue(usages.Any(value => value.Name == "workspace-profile-consumer"
+            && value.ScopeRef == workspaceScope));
+        Assert.IsFalse(usages.Any(value => value.Name == "homonymous-profile-consumer"));
+        Assert.IsTrue(usages.All(value => value.Namespace == ResourceNamespace.Default));
+
+        using (scopes.Push(context))
+            workspaceAgent = await store.PutExactAsync(workspaceScope, workspaceAgent.Value with
+            {
+                Generation = checked(workspaceAgent.Value.Generation + 1),
+                Definition = workspaceAgent.Value.Definition with
+                {
+                    ModelProfile = new ResourceReference(homonym.Value.Name, workspaceScope)
+                }
+            }, workspaceAgent.ETag, false, default);
+        using (scopes.PushInstance(context))
+        {
+            usages = await profiles.GetUsagesAsync(instanceProfile, default);
+            Assert.HasCount(1, usages);
+            Assert.AreEqual("instance-profile-consumer", usages.Single().Name);
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
+                instanceAgent.Value.Namespace, instanceAgent.Value.Kind, instanceAgent.Value.Name),
+                instanceAgent.ETag, default);
+            usages = await profiles.GetUsagesAsync(instanceProfile, default);
+        }
+        Assert.HasCount(0, usages);
+    }
+
+    [TestMethod]
+    public async Task TenantProfileUsagesStayInsideTheTenantHierarchy()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var identities = factory.Services.GetRequiredService<IIdentityStore>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var now = factory.Services.GetRequiredService<TimeProvider>().GetUtcNow();
+        var tenantScope = ResourceScopeRef.Tenant(context.TenantId);
+        var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var siblingWorkspace = new Workspace(Guid.NewGuid(), context.TenantId, "sibling", "Sibling workspace",
+            WorkspaceStatus.Active, now);
+        var foreignTenant = new Tenant(Guid.NewGuid(), "foreign", "Foreign tenant", TenantStatus.Active, now);
+        var foreignWorkspace = new Workspace(Guid.NewGuid(), foreignTenant.Id, "foreign-workspace",
+            "Foreign workspace", WorkspaceStatus.Active, now);
+        await identities.AddWorkspaceAsync(siblingWorkspace, default);
+        await identities.AddTenantAsync(foreignTenant, default);
+        await identities.AddWorkspaceAsync(foreignWorkspace, default);
+
+        StoredResource<ModelProfileResource> tenantProfile;
+        using (scopes.PushTenantAdministration(context))
+        {
+            tenantProfile = await store.PutExactAsync(tenantScope, Profile("tenant-impact", tenantScope),
+                null, true, default);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(tenantProfile.Value.Uid, tenantScope, tenantProfile.Value.Namespace,
+                    tenantProfile.Value.Kind, tenantProfile.Value.Generation),
+                [
+                    new(workspaceScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use]),
+                    new(ResourceScopeRef.Workspace(siblingWorkspace.Id),
+                        [ResourceAccessAction.Discover, ResourceAccessAction.Use])
+                ]), null, default);
+            _ = await PutAgentAsync(store, tenantScope, "tenant-consumer", tenantProfile.Value);
+        }
+        using (scopes.Push(context))
+            _ = await PutAgentAsync(store, workspaceScope, "workspace-consumer", tenantProfile.Value);
+        using (scopes.Push(new RequestContext(context.PrincipalId, context.TenantId, siblingWorkspace.Id)))
+            _ = await PutAgentAsync(store, ResourceScopeRef.Workspace(siblingWorkspace.Id),
+                "sibling-workspace-consumer", tenantProfile.Value);
+
+        using (scopes.PushTenant(context.PrincipalId, foreignTenant.Id))
+        {
+            var foreignScope = ResourceScopeRef.Tenant(foreignTenant.Id);
+            var foreignProfile = await store.PutExactAsync(foreignScope, Profile(tenantProfile.Value.Name, foreignScope),
+                null, true, default);
+            _ = await PutAgentAsync(store, foreignScope, "foreign-consumer", foreignProfile.Value);
+        }
+
+        IReadOnlyList<ModelProfileUsage> usages;
+        using (scopes.PushTenantAdministration(context))
+            usages = await profiles.GetUsagesAsync(tenantProfile.Value, default);
+
+        Assert.HasCount(3, usages);
+        CollectionAssert.AreEquivalent(
+            new[] { "tenant-consumer", "workspace-consumer", "sibling-workspace-consumer" },
+            usages.Select(value => value.Name).ToArray());
+        Assert.IsFalse(usages.Any(value => value.Name == "foreign-consumer"));
+    }
+
+    [TestMethod]
+    public async Task WorkspaceProfileUsagesExcludeHomonymsInSiblingWorkspaces()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var identities = factory.Services.GetRequiredService<IIdentityStore>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var now = factory.Services.GetRequiredService<TimeProvider>().GetUtcNow();
+        var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var siblingWorkspace = new Workspace(Guid.NewGuid(), context.TenantId, "usage-sibling",
+            "Usage sibling", WorkspaceStatus.Active, now);
+        await identities.AddWorkspaceAsync(siblingWorkspace, default);
+
+        StoredResource<ModelProfileResource> profile;
+        using (scopes.Push(context))
+        {
+            profile = await store.PutExactAsync(workspaceScope, Profile("workspace-impact", workspaceScope),
+                null, true, default);
+            _ = await PutAgentAsync(store, workspaceScope, "workspace-owner-consumer", profile.Value);
+        }
+        using (scopes.Push(new RequestContext(context.PrincipalId, context.TenantId, siblingWorkspace.Id)))
+        {
+            var siblingScope = ResourceScopeRef.Workspace(siblingWorkspace.Id);
+            var homonym = await store.PutExactAsync(siblingScope, Profile(profile.Value.Name, siblingScope),
+                null, true, default);
+            _ = await PutAgentAsync(store, siblingScope, "sibling-homonym-consumer", homonym.Value);
+        }
+
+        IReadOnlyList<ModelProfileUsage> usages;
+        using (scopes.Push(context))
+            usages = await profiles.GetUsagesAsync(profile.Value, default);
+
+        Assert.HasCount(1, usages);
+        Assert.AreEqual("workspace-owner-consumer", usages.Single().Name);
+    }
+
+    [TestMethod]
+    public async Task UsageQueryDoesNotDiscloseScopesTheCallerCannotInspect()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var identities = factory.Services.GetRequiredService<IIdentityStore>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var now = factory.Services.GetRequiredService<TimeProvider>().GetUtcNow();
+        var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var siblingWorkspace = new Workspace(Guid.NewGuid(), context.TenantId, "hidden-sibling",
+            "Hidden sibling", WorkspaceStatus.Active, now);
+        await identities.AddWorkspaceAsync(siblingWorkspace, default);
+
+        StoredResource<ModelProfileResource> profile;
+        using (scopes.PushInstance(context))
+        {
+            profile = await store.PutExactAsync(ResourceScopeRef.Instance,
+                Profile("restricted-impact", ResourceScopeRef.Instance), null, true, default);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(profile.Value.Uid, ResourceScopeRef.Instance, profile.Value.Namespace,
+                    profile.Value.Kind, profile.Value.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId),
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
+                null, default);
+            _ = await PutAgentAsync(store, ResourceScopeRef.Instance, "hidden-instance-consumer", profile.Value);
+        }
+        using (scopes.Push(context))
+            _ = await PutAgentAsync(store, workspaceScope, "visible-workspace-consumer", profile.Value);
+        using (scopes.Push(new RequestContext(context.PrincipalId, context.TenantId, siblingWorkspace.Id)))
+            _ = await PutAgentAsync(store, ResourceScopeRef.Workspace(siblingWorkspace.Id),
+                "hidden-sibling-consumer", profile.Value);
+
+        var role = new RoleDefinition(Guid.NewGuid(), "usage-reader", "Usage reader",
+            [AuthorizationPermissions.WorkspacesRead, AuthorizationPermissions.ResourcesRead], false);
+        var reader = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Usage reader", null,
+            PrincipalStatus.Active, now);
+        await identities.AddRoleDefinitionAsync(role, default);
+        await identities.AddPrincipalAsync(reader, default);
+        await identities.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, reader.Id,
+            MembershipStatus.Active, now), default);
+        await identities.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), context.WorkspaceId,
+            reader.Id, MembershipStatus.Active, now), default);
+        await identities.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), context.TenantId, reader.Id,
+            PrincipalType.User, role.Id, AuthorizationScopes.Workspace(context.WorkspaceId)), default);
+
+        IReadOnlyList<ModelProfileUsage> usages;
+        using (scopes.Push(new RequestContext(reader.Id, context.TenantId, context.WorkspaceId)))
+            usages = await profiles.GetUsagesAsync(profile.Value, default);
+
+        Assert.HasCount(1, usages);
+        Assert.AreEqual("visible-workspace-consumer", usages.Single().Name);
+        Assert.IsFalse(usages.Any(value => value.Name.Contains("hidden", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public async Task NamespacedAgentModelResolutionUsesItsExplicitProfileNamespace()
     {
         await using var factory = Factory();
@@ -358,6 +601,48 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         Assert.AreEqual("shared-reasoning", resolution.Declared.ModelProfile.Name);
         Assert.AreEqual(profileNamespace.Value, resolution.Declared.ModelProfile.Namespace);
     }
+
+    private static ModelProfileResource Profile(string name, ResourceScopeRef scopeRef) => new()
+    {
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ModelResourceKinds.ModelProfile,
+        Metadata = new ResourceMetadata { Name = name },
+        ScopeRef = scopeRef,
+        Definition = new ModelProfileProperties
+        {
+            DisplayName = name,
+            Provider = new ResourceReference("ollama-local", ResourceScopeRef.Instance),
+            Model = new ModelSelection { Name = "test-model" }
+        }
+    };
+
+    private static AgentResource Agent(
+        string name,
+        ResourceScopeRef scopeRef,
+        ResourceReference modelProfile) => new()
+    {
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = AgentResourceKinds.Agent,
+        Metadata = new ResourceMetadata { Name = name },
+        ScopeRef = scopeRef,
+        Definition = new AgentProperties
+        {
+            DisplayName = name,
+            Instructions = "Use the selected model profile.",
+            ModelProfile = modelProfile,
+            RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance)
+        }
+    };
+
+    private static Task<StoredResource<AgentResource>> PutAgentAsync(
+        IResourceStore store,
+        ResourceScopeRef scopeRef,
+        string name,
+        ModelProfileResource profile,
+        CancellationToken cancellationToken = default) =>
+        store.PutExactAsync(scopeRef, Agent(name, scopeRef,
+            new ResourceReference(profile.Name, profile.ScopeRef, profile.Namespace)),
+            null, true, cancellationToken);
 
     [TestMethod]
     public async Task AgentUpdateRejectsUnknownModelProfileWithUnprocessableEntity()
