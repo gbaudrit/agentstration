@@ -445,6 +445,9 @@ public sealed class ModelProviderNavigationTests
         {
             Assert.HasCount(2, rendered.FindAll("[data-testid='model-profile-usage']"));
             Assert.HasCount(2, rendered.FindAll(".model-profile-usage-card"));
+            Assert.IsTrue(rendered.FindAll(".model-profile-usage-card a").All(link =>
+                string.Equals(link.GetAttribute("target"), "_blank", StringComparison.Ordinal)
+                && string.Equals(link.GetAttribute("rel"), "noopener noreferrer", StringComparison.Ordinal)));
             Assert.IsTrue(rendered.Markup.Contains("Instance assistant", StringComparison.Ordinal));
             Assert.IsTrue(rendered.Markup.Contains("Workspace assistant", StringComparison.Ordinal));
             Assert.IsTrue(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
