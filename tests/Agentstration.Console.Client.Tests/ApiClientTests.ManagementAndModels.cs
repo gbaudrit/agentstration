@@ -484,6 +484,34 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ModelProfileUsagesPreserveOwnerScopeAndExplicitConsultationContext()
+    {
+        var workspaceScope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        string? path = null;
+        string? context = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            path = request.RequestUri!.PathAndQuery;
+            context = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new ModelProfileUsagesResponse([], 0))
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new ModelProfilesApiClient(httpClient).GetModelProfileUsagesAsync(
+            ResourceNamespace.Default,
+            "shared",
+            ResourceScopeRef.Instance,
+            workspaceScope,
+            default);
+
+        Assert.AreEqual("/api/modelprofiles/shared/usages?resourceNamespace=default&scopeRef=%2Finstance", path);
+        Assert.AreEqual(workspaceScope.Value, context);
+    }
+
+    [TestMethod]
     public async Task ModelProfilesClientPreservesETagForUpdateAndDelete()
     {
         var profile = CreateModelProfile("reasoning-default");

@@ -454,6 +454,11 @@ public sealed class ModelProviderNavigationTests
             Assert.IsTrue(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
             Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedContextScope);
             Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedModelContextScope);
+            var profiles = context.Services.GetRequiredService<IModelProfilesClient>() as ExistingModelProfilesClient;
+            Assert.IsNotNull(profiles);
+            Assert.AreEqual(ResourceScopeRef.Instance, profiles.RequestedProfileContextScope);
+            Assert.AreEqual(ResourceScopeRef.Instance, profiles.RequestedUsageContextScope);
+            Assert.AreEqual(ResourceScopeRef.Instance, profiles.RequestedResolutionContextScope);
             var workspaceLink = rendered.FindAll("[data-testid='model-profile-usage'] a")
                 .Single(value => value.TextContent.Contains("Workspace assistant", StringComparison.Ordinal));
             var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance&tab=usages";
@@ -479,6 +484,11 @@ public sealed class ModelProviderNavigationTests
         {
             Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedContextScope);
             Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedModelContextScope);
+            var profiles = context.Services.GetRequiredService<IModelProfilesClient>() as ExistingModelProfilesClient;
+            Assert.IsNotNull(profiles);
+            Assert.AreEqual(WorkspaceScope, profiles.RequestedProfileContextScope);
+            Assert.AreEqual(WorkspaceScope, profiles.RequestedUsageContextScope);
+            Assert.AreEqual(WorkspaceScope, profiles.RequestedResolutionContextScope);
             Assert.IsEmpty(rendered.FindAll(".form-alert-warning"));
         });
     }
@@ -742,6 +752,10 @@ public sealed class ModelProviderNavigationTests
 
     private sealed class ExistingModelProfilesClient(bool hasUsages = true) : IModelProfilesClient
     {
+        public ResourceScopeRef? RequestedProfileContextScope { get; private set; }
+        public ResourceScopeRef? RequestedUsageContextScope { get; private set; }
+        public ResourceScopeRef? RequestedResolutionContextScope { get; private set; }
+
         private static readonly ModelProfileResource Profile = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -768,11 +782,33 @@ public sealed class ModelProviderNavigationTests
             CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, "\"profile-etag\""));
 
+        public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(
+            ResourceNamespace @namespace,
+            string profileName,
+            ResourceScopeRef scopeRef,
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedProfileContextScope = contextScope;
+            return GetModelProfileAsync(profileName, cancellationToken);
+        }
+
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
             string profileName,
             CancellationToken cancellationToken) => Task.FromResult(hasUsages
                 ? Usages
                 : new ModelProfileUsagesResponse([], 0));
+
+        public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
+            ResourceNamespace @namespace,
+            string profileName,
+            ResourceScopeRef scopeRef,
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedUsageContextScope = contextScope;
+            return GetModelProfileUsagesAsync(profileName, cancellationToken);
+        }
 
         public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(
             string profileName,
@@ -785,6 +821,17 @@ public sealed class ModelProviderNavigationTests
                 new(Profile.Definition.Generation, Profile.Definition.Reasoning, Profile.Definition.Output),
                 "available",
                 []));
+
+        public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(
+            ResourceNamespace @namespace,
+            string profileName,
+            ResourceScopeRef scopeRef,
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedResolutionContextScope = contextScope;
+            return GetModelProfileResolutionAsync(profileName, cancellationToken);
+        }
 
         public Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();

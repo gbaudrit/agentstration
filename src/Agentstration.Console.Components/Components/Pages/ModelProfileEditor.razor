@@ -246,15 +246,21 @@ else
             }
             else
             {
-                var snapshot = RequestedScope is { } requestedScope
-                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, requestedScope, cancellation.Token)
+                var snapshot = RequestedScope is { } requestedScope && RequestedContext is { } requestedContext
+                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, requestedScope, requestedContext, cancellation.Token)
+                    : RequestedScope is { } exactScope
+                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, exactScope, cancellation.Token)
                     : await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
                 resource = snapshot.Value; model = ModelProfileEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag;
-                usages = selectedScope is { } ownerScope
-                    ? (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, ownerScope, cancellation.Token)).Value
+                usages = selectedScope is { } ownerScope && RequestedContext is { } usageContext
+                    ? (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, ownerScope, usageContext, cancellation.Token)).Value
+                    : selectedScope is { } exactUsageScope
+                    ? (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, exactUsageScope, cancellation.Token)).Value
                     : (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
-                resolution = selectedScope is { } resolutionScope
-                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, resolutionScope, cancellation.Token)
+                resolution = selectedScope is { } resolutionScope && RequestedContext is { } resolutionContext
+                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, resolutionScope, resolutionContext, cancellation.Token)
+                    : selectedScope is { } exactResolutionScope
+                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, exactResolutionScope, cancellation.Token)
                     : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
             }
             var dependencyScope = selectedScope ?? RequestedContext;
