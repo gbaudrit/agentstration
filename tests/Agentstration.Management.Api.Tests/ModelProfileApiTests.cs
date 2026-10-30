@@ -381,6 +381,19 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         Assert.IsFalse(usages.Any(value => value.Name == "homonymous-profile-consumer"));
         Assert.IsTrue(usages.All(value => value.Namespace == ResourceNamespace.Default));
 
+        using (var client = factory.CreateClient())
+        {
+            SelectConsoleContext(client, ResourceScopeRef.Instance);
+            var response = await client.GetFromJsonAsync<ModelProfileUsagesResponse>(
+                "/api/modelprofiles/cross-scope-profile/usages?scopeRef=%2Finstance");
+            Assert.IsNotNull(response);
+            Assert.HasCount(2, response.Value);
+            Assert.IsTrue(response.Value.Any(value => value.Name == "instance-profile-consumer"
+                && value.ScopeRef == ResourceScopeRef.Instance));
+            Assert.IsTrue(response.Value.Any(value => value.Name == "workspace-profile-consumer"
+                && value.ScopeRef == workspaceScope));
+        }
+
         using (scopes.Push(context))
             workspaceAgent = await store.PutExactAsync(workspaceScope, workspaceAgent.Value with
             {

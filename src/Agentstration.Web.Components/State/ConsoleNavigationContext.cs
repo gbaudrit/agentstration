@@ -8,9 +8,11 @@ public interface IConsoleNavigationContext
     string? ScopeRef { get; }
 }
 
-internal sealed class ConsoleNavigationContext(NavigationManager navigation) : IConsoleNavigationContext
+internal sealed class ConsoleNavigationContext(
+    NavigationManager navigation,
+    ConsoleContextState contextState) : IConsoleNavigationContext
 {
-    public string? ScopeRef => GetScopeRef(navigation.Uri);
+    public string? ScopeRef => GetScopeRef(navigation.Uri) ?? contextState.Current?.SelectedScopeRef;
 
     internal static string? GetScopeRef(string uri)
     {
