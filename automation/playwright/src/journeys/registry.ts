@@ -36,6 +36,7 @@ import { exerciseFlowConnectionContracts, type ExerciseFlowConnectionContractsIn
 import { exerciseSchemaDrivenFlowInputs, type ExerciseSchemaDrivenFlowInputsInput } from './exercise-schema-driven-flow-inputs.journey.js';
 import { exerciseModelProviderAccess, type ExerciseModelProviderAccessInput } from './exercise-model-provider-access.journey.js';
 import { exerciseInheritedResourceReadOnly, type ExerciseInheritedResourceReadOnlyInput } from './exercise-inherited-resource-readonly.journey.js';
+import { exerciseModelProfileCrossScope, type ExerciseModelProfileCrossScopeInput } from './exercise-model-profile-cross-scope.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -77,4 +78,5 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-schema-driven-flow-inputs': (context, input) => exerciseSchemaDrivenFlowInputs(context, input as unknown as ExerciseSchemaDrivenFlowInputsInput),
   'exercise-model-provider-access': (context, input) => exerciseModelProviderAccess(context, input as unknown as ExerciseModelProviderAccessInput),
   'exercise-inherited-resource-readonly': (context, input) => exerciseInheritedResourceReadOnly(context, input as unknown as ExerciseInheritedResourceReadOnlyInput),
+  'exercise-model-profile-cross-scope': (context, input) => exerciseModelProfileCrossScope(context, input as unknown as ExerciseModelProfileCrossScopeInput),
 };

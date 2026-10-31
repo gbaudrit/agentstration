@@ -162,6 +162,13 @@ export const Checkpoints = {
     tenantAgent: 'inherited-resource-read-only-tenant-agent',
     ownerAdministration: 'inherited-resource-read-only-owner-administration',
   },
+  modelProfileCrossScope: {
+    usages: 'model-profile-cross-scope-usages',
+    workspaceAgent: 'model-profile-cross-scope-workspace-agent',
+    restored: 'model-profile-cross-scope-restored',
+    isolated: 'model-profile-cross-scope-isolated',
+    updated: 'model-profile-cross-scope-updated',
+  },
   operationalWorkspaces: {
     topology: 'operational-workspaces-topology',
     instanceRun: 'operational-workspaces-instance-run',

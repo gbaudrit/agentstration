@@ -132,6 +132,12 @@ The hierarchical Model Provider access journey requires two prepared sibling Wor
 npm run capture -- --plan examples/exercise-model-provider-access.capture-plan.json --output .work/model-provider-access
 ```
 
+The Model Profile cross-scope journey verifies complete authorized usage impact, navigation from an Instance profile to a consuming Workspace Agent and back, refresh and browser-history consistency, independent new-tab context, dynamic usage updates, and non-disclosure of inaccessible consumers:
+
+```powershell
+npm exec playwright test tests/model-profile-cross-scope.spec.ts
+```
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell
