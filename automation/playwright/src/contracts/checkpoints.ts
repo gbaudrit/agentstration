@@ -156,6 +156,12 @@ export const Checkpoints = {
     unauthorized: 'hierarchical-context-unauthorized',
     dirtyGuard: 'hierarchical-context-dirty-guard',
   },
+  inheritedResourceReadOnly: {
+    instanceAgent: 'inherited-resource-read-only-instance-agent',
+    instanceModelProfile: 'inherited-resource-read-only-instance-model-profile',
+    tenantAgent: 'inherited-resource-read-only-tenant-agent',
+    ownerAdministration: 'inherited-resource-read-only-owner-administration',
+  },
   operationalWorkspaces: {
     topology: 'operational-workspaces-topology',
     instanceRun: 'operational-workspaces-instance-run',

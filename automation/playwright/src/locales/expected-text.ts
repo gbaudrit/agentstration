@@ -60,6 +60,11 @@ export interface ExpectedText {
     tenantAdministration: string;
     confirmDiscard: string;
   };
+  inheritedResource: {
+    title: string;
+    message: string;
+    changeScope: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -130,6 +135,11 @@ export const ExpectedTextByLocale = {
       tenantAdministration: 'Tenant administration',
       confirmDiscard: 'You have unsaved changes. Discard them and change context?',
     },
+    inheritedResource: {
+      title: 'View only',
+      message: 'To modify this resource, go to its owner scope.',
+      changeScope: 'Change scope',
+    },
   },
   'fr-FR': {
     navigation: {
@@ -197,6 +207,11 @@ export const ExpectedTextByLocale = {
       globalAdministration: 'Administration globale',
       tenantAdministration: 'Administration du Tenant',
       confirmDiscard: 'Des modifications ne sont pas enregistrées. Les abandonner et changer de contexte ?',
+    },
+    inheritedResource: {
+      title: 'Consultation uniquement',
+      message: 'Pour modifier cette ressource, acc\u00e9dez \u00e0 son p\u00e9rim\u00e8tre propri\u00e9taire.',
+      changeScope: 'Changer de p\u00e9rim\u00e8tre',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;

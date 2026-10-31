@@ -44,6 +44,7 @@ interface WorkItemWire {
 
 export interface ExecutionScopeFixture {
   agentName: string;
+  modelProfileName: string;
   flowName: string;
   agentUid: string;
   agentGeneration: number;
@@ -96,6 +97,7 @@ export class ExecutionScopesPage {
 
     return {
       agentName,
+      modelProfileName,
       flowName,
       agentUid: agent.uid,
       agentGeneration: agent.generation,
