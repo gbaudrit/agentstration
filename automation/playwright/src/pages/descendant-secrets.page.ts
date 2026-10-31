@@ -58,13 +58,12 @@ export class DescendantSecretsPage {
   }
 
   public async createSecret(name: string, displayName: string, vaultName: string, vaultScopeRef: string): Promise<void> {
+    const option = await this.waitForVaultOption(vaultName, vaultScopeRef);
     const displayNameInput = this.page.getByTestId(TestIds.secretGrants.secretDisplayName);
     await displayNameInput.fill(displayName);
     await displayNameInput.press('Tab');
     await expect(this.page.getByTestId(TestIds.secretGrants.secretName)).toHaveValue(name);
     await expect(this.page.getByTestId(TestIds.secretGrants.secretVaultKey)).toHaveValue(name);
-    const option = await this.vaultOption(vaultName, vaultScopeRef);
-    if (!option) throw new Error(`Vault '${vaultName}' at '${vaultScopeRef}' is not offered to this Secret.`);
     await this.page.getByTestId(TestIds.secretGrants.secretVault).selectOption(option);
     await this.saveNew('secrets', name);
   }
@@ -116,6 +115,18 @@ export class DescendantSecretsPage {
     const options = await this.page.getByTestId(TestIds.secretGrants.secretVault).locator('option').evaluateAll(elements =>
       elements.map(element => (element as HTMLOptionElement).value));
     return options.find(value => value === `${scopeRef}|default|${name}`);
+  }
+
+  private async waitForVaultOption(name: string, scopeRef: string): Promise<string> {
+    const expected = `${scopeRef}|default|${name}`;
+    await expect.poll(
+      () => this.vaultOption(name, scopeRef),
+      {
+        message: `Vault '${name}' at '${scopeRef}' should be offered to this Secret.`,
+        timeout: 15_000,
+      },
+    ).toBe(expected);
+    return expected;
   }
 
   private async openAccessTab(): Promise<void> {

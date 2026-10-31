@@ -4,6 +4,8 @@ export const TestIds = {
     schemaInputEditor: 'schema-input-editor',
     schemaFormMode: 'schema-form-mode',
     schemaRawMode: 'schema-raw-mode',
+    inheritedResourceNotice: 'inherited-resource-notice',
+    switchToOwnerContext: 'switch-to-owner-context',
   },
   console: {
     shell: 'console-shell',
@@ -281,6 +283,7 @@ export const TestIds = {
     saveModelOverride: 'save-model-override',
     modelOverrideMessage: 'model-override-message',
     profileForm: 'model-profile-form',
+    profileImpactBanner: 'model-profile-impact-banner',
     profileAccessTab: 'model-profile-access-tab',
     profileName: 'model-profile-name',
     profileDisplayName: 'model-profile-display-name',
@@ -302,6 +305,7 @@ export const TestIds = {
     submit: 'login-submit',
   },
   agentEditor: {
+    accessTab: 'agent-access-tab',
     form: 'agent-editor-form',
     identitySection: 'agent-identity-section',
     behaviorSection: 'agent-behavior-section',

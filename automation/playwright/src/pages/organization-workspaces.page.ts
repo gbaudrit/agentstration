@@ -48,7 +48,10 @@ export class OrganizationWorkspacesPage {
     await exactOption.waitFor({ state: 'visible' });
     const scopeRef = await exactOption.getAttribute('data-context-scope-ref');
     if (!scopeRef) throw new Error(`Workspace '${workspaceId}' does not expose its Console context scope.`);
-    await exactOption.click();
+    await Promise.all([
+      this.waitForContextNavigation(scopeRef),
+      exactOption.click(),
+    ]);
     await expect(shell).toHaveAttribute('data-context-kind', 'Workspace');
     await expect(shell).toHaveAttribute('data-context-scope', scopeRef);
   }
@@ -83,7 +86,10 @@ export class OrganizationWorkspacesPage {
     if (await shell.getAttribute('data-context-kind') === 'Instance'
       && await shell.getAttribute('data-context-scope') === '/instance') return;
     await this.openContextSelector();
-    await this.page.getByTestId(TestIds.console.contextOptionInstance).click();
+    await Promise.all([
+      this.waitForContextNavigation('/instance'),
+      this.page.getByTestId(TestIds.console.contextOptionInstance).click(),
+    ]);
     await expect(shell).toHaveAttribute('data-context-kind', 'Instance');
     await expect(shell).toHaveAttribute('data-context-scope', '/instance');
   }
@@ -106,7 +112,10 @@ export class OrganizationWorkspacesPage {
     const tenant = this.page.locator(`[data-testid="${TestIds.console.contextOptionTenant}"][data-context-tenant-id="${tenantId}"]`);
     const scopeRef = await tenant.getAttribute('data-context-scope-ref');
     if (!scopeRef) throw new Error(`Tenant context '${tenantId}' does not expose its scope.`);
-    await tenant.click();
+    await Promise.all([
+      this.waitForContextNavigation(scopeRef),
+      tenant.click(),
+    ]);
     const shell = this.page.getByTestId(TestIds.console.shell);
     await expect(shell).toHaveAttribute('data-context-kind', 'Tenant');
     await expect(shell).toHaveAttribute('data-context-scope', scopeRef);
@@ -137,5 +146,10 @@ export class OrganizationWorkspacesPage {
       }
       await expect(selector).toBeVisible();
     }).toPass({ timeout: 30_000 });
+  }
+
+  private async waitForContextNavigation(scopeRef: string): Promise<void> {
+    await this.page.waitForURL(url => url.searchParams.get('context') === scopeRef, { waitUntil: 'domcontentloaded' });
+    await this.page.getByTestId(TestIds.console.shell).waitFor({ state: 'visible' });
   }
 }

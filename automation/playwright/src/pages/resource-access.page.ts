@@ -24,12 +24,13 @@ export class ResourceAccessPage {
   }
 
   public async ensureManagedUtilitiesTool(consoleUrl: string): Promise<string> {
+    const instanceHeaders = { 'X-Agentstration-Context': '/instance' };
     let requestId = '';
     let pairingUri = '';
     let registrationName = '';
     let available = false;
     await expect(async () => {
-      const response = await this.page.request.get(`${consoleUrl}/api/aep/enrollments`);
+      const response = await this.page.request.get(`${consoleUrl}/api/aep/enrollments`, { headers: instanceHeaders });
       const body = await response.text();
       expect(response.status(), body).toBe(200);
       const enrollments = JSON.parse(body) as Array<{
@@ -47,11 +48,15 @@ export class ResourceAccessPage {
 
     if (!available) {
       const assigned = await this.page.request.post(`${consoleUrl}/api/aep/enrollments/${requestId}/assign`, {
+        headers: instanceHeaders,
         data: { scopeRef: '/instance' },
       });
       expect(assigned.status(), await assigned.text()).toBe(204);
 
-      const rotated = await this.page.request.post(`${consoleUrl}/api/aep/enrollments/${requestId}/rotate`);
+      const rotated = await this.page.request.post(
+        `${consoleUrl}/api/aep/enrollments/${requestId}/rotate`,
+        { headers: instanceHeaders },
+      );
       const rotationBody = await rotated.text();
       expect(rotated.status(), rotationBody).toBe(200);
       const rotation = JSON.parse(rotationBody) as { code?: string };
@@ -61,7 +66,7 @@ export class ResourceAccessPage {
       expect(paired.status(), await paired.text()).toBe(200);
 
       await expect(async () => {
-        const response = await this.page.request.get(`${consoleUrl}/api/aep/enrollments`);
+        const response = await this.page.request.get(`${consoleUrl}/api/aep/enrollments`, { headers: instanceHeaders });
         const body = await response.text();
         expect(response.status(), body).toBe(200);
         const enrollments = JSON.parse(body) as Array<{
@@ -111,6 +116,7 @@ export class ResourceAccessPage {
     await this.page.getByTestId(TestIds.resourceAccess.add).click();
     await this.grant(scopeRef).waitFor({ state: 'visible' });
     await this.save();
+    await this.expectPersistedGrant(scopeRef, true);
   }
 
   public async removeGrant(scopeRef: string): Promise<void> {
@@ -118,6 +124,10 @@ export class ResourceAccessPage {
     await grant.getByTestId(TestIds.resourceAccess.remove).click();
     await grant.waitFor({ state: 'detached' });
     await this.save();
+    await this.expectPersistedGrant(scopeRef, false);
+  }
+
+  private async expectPersistedGrant(scopeRef: string, expected: boolean): Promise<void> {
     const identity = await this.identity();
     const policyUrl = new URL(`/api/resource-access-policies/${identity.uid}`, this.page.url()).toString();
     const context = new URL(this.page.url()).searchParams.get('context');
@@ -129,7 +139,8 @@ export class ResourceAccessPage {
       const body = await response.text();
       expect(response.status(), body).toBe(200);
       const policy = JSON.parse(body) as { grants?: Array<{ targetScopeRef?: string }> };
-      expect(policy.grants ?? []).not.toContainEqual(expect.objectContaining({ targetScopeRef: scopeRef }));
+      const containsGrant = (policy.grants ?? []).some(grant => grant.targetScopeRef === scopeRef);
+      expect(containsGrant).toBe(expected);
     }).toPass();
   }
 

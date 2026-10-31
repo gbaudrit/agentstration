@@ -332,14 +332,23 @@ export class RuntimeWorkerObservabilityPage {
   }
 
   private async ensureModelProfile(consoleUrl: string, workspaceScopeRef: string): Promise<void> {
-    const profile = await this.page.request.get(`${consoleUrl}/api/modelprofiles/${observabilityProfileName}`);
+    const instanceHeaders = { 'X-Agentstration-Context': '/instance' };
+    const workspaceHeaders = { 'X-Agentstration-Context': workspaceScopeRef };
+    const profile = await this.page.request.get(
+      `${consoleUrl}/api/modelprofiles/${observabilityProfileName}`,
+      { headers: workspaceHeaders },
+    );
     if (profile.status() === 200) return;
     expect(profile.status(), await profile.text()).toBe(404);
 
-    const provider = await this.page.request.get(`${consoleUrl}/api/modelproviders/${observabilityProviderName}`);
+    const provider = await this.page.request.get(
+      `${consoleUrl}/api/modelproviders/${observabilityProviderName}`,
+      { headers: instanceHeaders },
+    );
     let providerResource: ScopedResourceWire;
     if (provider.status() === 404) {
       const created = await this.page.request.post(`${consoleUrl}/api/modelproviders`, {
+        headers: instanceHeaders,
         data: {
           name: observabilityProviderName,
           namespace: 'default',
@@ -359,7 +368,7 @@ export class RuntimeWorkerObservabilityPage {
       providerResource = await provider.json() as ScopedResourceWire;
     }
     const policy = await this.page.request.put(`${consoleUrl}/api/resource-access-policies/${providerResource.uid}`, {
-      headers: { 'X-Agentstration-Context': '/instance' },
+      headers: instanceHeaders,
       data: {
         resource: {
           uid: providerResource.uid,
@@ -374,9 +383,11 @@ export class RuntimeWorkerObservabilityPage {
     expect(policy.status(), await policy.text()).toBe(200);
     const refreshed = await this.page.request.post(
       `${consoleUrl}/api/modelproviders/${observabilityProviderName}/models/refresh`,
+      { headers: instanceHeaders },
     );
     expect(refreshed.status(), await refreshed.text()).toBe(200);
     const created = await this.page.request.post(`${consoleUrl}/api/modelprofiles`, {
+      headers: workspaceHeaders,
       data: {
         name: observabilityProfileName,
         namespace: 'default',
@@ -400,6 +411,7 @@ export class RuntimeWorkerObservabilityPage {
   private async ensureRuntimeProfileAccess(consoleUrl: string, workspaceScopeRef: string): Promise<void> {
     const response = await this.page.request.get(
       `${consoleUrl}/api/runtimeprofiles/maf-builtin?resourceNamespace=default`,
+      { headers: { 'X-Agentstration-Context': '/instance' } },
     );
     expect(response.status(), await response.text()).toBe(200);
     const runtimeProfile = await response.json() as ScopedResourceWire;
