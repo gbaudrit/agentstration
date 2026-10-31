@@ -57,7 +57,10 @@ public sealed partial class ApiClientTests
                     : null);
                 return new HttpResponseMessage(HttpStatusCode.OK);
             })
-        }) { BaseAddress = new Uri("http://localhost/") };
+        })
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
 
         using var instanceResponse = await client.GetAsync("api/agents");
         navigationContext.ScopeRef = ResourceScopeRef.Workspace(Guid.Parse(
@@ -408,7 +411,10 @@ public sealed partial class ApiClientTests
                 ? new ValueResponse<AvailableModelResponse>([])
                 : new ValueResponse<ModelProviderResponse>([]);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
         var client = new ModelProvidersApiClient(httpClient);
 
         _ = await client.GetModelProvidersAsync(ResourceScopeRef.Instance, CancellationToken.None);
