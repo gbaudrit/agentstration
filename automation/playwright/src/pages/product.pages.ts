@@ -35,6 +35,7 @@ import { SchemaContractsPage } from './schema-contracts.page.js';
 import { SchemaDrivenFlowInputsPage } from './schema-driven-flow-inputs.page.js';
 import { ModelProviderAccessPage } from './model-provider-access.page.js';
 import { InheritedResourceReadOnlyPage } from './inherited-resource-readonly.page.js';
+import { ModelProfileCrossScopePage } from './model-profile-cross-scope.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -72,6 +73,7 @@ export class ProductPages {
   public readonly schemaDrivenFlowInputs: SchemaDrivenFlowInputsPage;
   public readonly modelProviderAccess: ModelProviderAccessPage;
   public readonly inheritedResourceReadOnly: InheritedResourceReadOnlyPage;
+  public readonly modelProfileCrossScope: ModelProfileCrossScopePage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -109,6 +111,7 @@ export class ProductPages {
     this.schemaDrivenFlowInputs = new SchemaDrivenFlowInputsPage(page);
     this.modelProviderAccess = new ModelProviderAccessPage(page);
     this.inheritedResourceReadOnly = new InheritedResourceReadOnlyPage(page);
+    this.modelProfileCrossScope = new ModelProfileCrossScopePage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {
