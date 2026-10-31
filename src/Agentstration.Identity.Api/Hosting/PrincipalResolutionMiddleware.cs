@@ -193,6 +193,10 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         if (context.Request.RouteValues.TryGetValue("workspaceName", out routeValue)
             && Guid.TryParse(routeValue?.ToString(), out routeWorkspace)) return routeWorkspace;
         if (Guid.TryParse(context.Request.Headers[WorkspaceHeader].FirstOrDefault(), out var headerWorkspace)) return headerWorkspace;
+        if (RequestContextMiddleware.HasExplicitConsoleScope(context.Request)
+            || !context.Request.Path.StartsWithSegments("/api")
+            && context.Request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            return null;
         if (Guid.TryParse(context.Request.Cookies[RequestContextMiddleware.WorkspaceCookie], out var cookieWorkspace)) return cookieWorkspace;
         return null;
     }

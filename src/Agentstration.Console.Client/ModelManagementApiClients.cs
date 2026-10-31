@@ -19,6 +19,8 @@ internal sealed record AssignAepEnrollmentRequest(ResourceScopeRef ScopeRef);
 public interface IModelProvidersClient
 {
     Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        GetModelProvidersAsync(cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetModelProviderAsync(providerName, cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken);
@@ -30,6 +32,8 @@ public interface IModelProvidersClient
     Task<ModelProviderUsagesResponse> GetModelProviderUsagesAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetModelProviderUsagesAsync(providerName, cancellationToken);
     Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken);
     Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetProviderModelsAsync(providerName, cancellationToken);
+    Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        GetProviderModelsAsync(@namespace, providerName, cancellationToken);
     Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
         Task.FromException<ModelDiscoveryDiffResponse>(new NotSupportedException("This client does not support model discovery refresh."));
     Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken);
@@ -223,6 +227,7 @@ public interface IModelProfilesClient
     Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(string profileName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileAsync(profileName, cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetModelProfileAsync(@namespace, profileName, cancellationToken);
+    Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) => GetModelProfileAsync(@namespace, profileName, scopeRef, cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(ResourceNamespace @namespace, string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken) => UpdateModelProfileAsync(profileName, request, etag, cancellationToken);
@@ -233,9 +238,11 @@ public interface IModelProfilesClient
     Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(string profileName, CancellationToken cancellationToken);
     Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileUsagesAsync(profileName, cancellationToken);
     Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetModelProfileUsagesAsync(@namespace, profileName, cancellationToken);
+    Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) => GetModelProfileUsagesAsync(@namespace, profileName, scopeRef, cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileResolutionAsync(profileName, cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetModelProfileResolutionAsync(@namespace, profileName, cancellationToken);
+    Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) => GetModelProfileResolutionAsync(@namespace, profileName, scopeRef, cancellationToken);
     Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken);
 }
@@ -265,6 +272,11 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
 {
     public async Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ModelProviderResponse>>(httpClient, "api/modelproviders", cancellationToken)).Value;
+
+    public Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(
+        ResourceScopeRef contextScope,
+        CancellationToken cancellationToken) =>
+        ReadValuesAsync<ModelProviderResponse>("api/modelproviders", contextScope, cancellationToken);
 
     public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
         GetModelProviderAsync(ResourceNamespace.Default, providerName, cancellationToken);
@@ -303,6 +315,13 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
 
     public async Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<AvailableModelResponse>>(httpClient, ChildPath(@namespace, providerName, "models"), cancellationToken)).Value;
+
+    public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(
+        ResourceNamespace @namespace,
+        string providerName,
+        ResourceScopeRef contextScope,
+        CancellationToken cancellationToken) =>
+        ReadValuesAsync<AvailableModelResponse>(ChildPath(@namespace, providerName, "models"), contextScope, cancellationToken);
 
     public async Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(
         ResourceNamespace @namespace,
@@ -344,6 +363,13 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
         if (string.IsNullOrWhiteSpace(responseEtag)) throw new AgentstrationApiException("Agentstration API did not return the provider ETag.", Guid.NewGuid().ToString("N"));
         return new ResourceSnapshot<ModelProviderResource>(value, responseEtag);
     }
+
+    private async Task<IReadOnlyList<T>> ReadValuesAsync<T>(
+        string path,
+        ResourceScopeRef contextScope,
+        CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<T>>(
+            httpClient, path, contextScope, cancellationToken)).Value;
 
     private static string Path(ResourceNamespace @namespace, string providerName) => $"api/modelproviders/{Escape(providerName)}?resourceNamespace={Escape(@namespace.Value)}";
     private static string ChildPath(ResourceNamespace @namespace, string providerName, string child) => $"api/modelproviders/{Escape(providerName)}/{child}?resourceNamespace={Escape(@namespace.Value)}";
@@ -395,6 +421,14 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
     public async Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
     {
         using var response = await httpClient.GetAsync(ProfilePath(@namespace, profileName, scopeRef: scopeRef), cancellationToken);
+        return await ReadResourceAsync(response, cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, ProfilePath(@namespace, profileName, scopeRef: scopeRef));
+        request.Headers.TryAddWithoutValidation("X-Agentstration-Context", contextScope.Value);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
         return await ReadResourceAsync(response, cancellationToken);
     }
 
@@ -451,6 +485,9 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
     public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<ModelProfileUsagesResponse>(httpClient, ProfilePath(@namespace, profileName, "usages", scopeRef), cancellationToken);
 
+    public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<ModelProfileUsagesResponse>(httpClient, ProfilePath(@namespace, profileName, "usages", scopeRef), contextScope, cancellationToken);
+
     public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken) =>
         GetModelProfileResolutionAsync(ResourceNamespace.Default, profileName, cancellationToken);
 
@@ -459,6 +496,9 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
 
     public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<ModelProfileResolutionResponse>(httpClient, ProfilePath(@namespace, profileName, "resolution", scopeRef), cancellationToken);
+
+    public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<ModelProfileResolutionResponse>(httpClient, ProfilePath(@namespace, profileName, "resolution", scopeRef), contextScope, cancellationToken);
 
     public async Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(
         ResourceNamespace @namespace,

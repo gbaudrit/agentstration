@@ -6,6 +6,7 @@
   <data name="CreateAgent"><value>Créer un agent</value></data>
   <data name="CreateDescription"><value>Définissez l’état souhaité d’une nouvelle ressource d’agent spécialisé.</value></data>
   <data name="BackToAgents"><value>Retour aux agents</value></data>
+  <data name="ReturnToSource"><value>Retour à la source</value></data>
   <data name="Loading"><value>Chargement de la ressource d’agent…</value></data>
   <data name="Generation"><value>Génération {0}</value></data>
   <data name="Run"><value>Exécuter</value></data>

@@ -232,7 +232,7 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
-    public async Task RuntimeClientListsRunsAndAgentInstancesInTheExplicitExecutionScope()
+    public async Task RuntimeClientKeepsNavigationContextWhenReadingAnExplicitExecutionScope()
     {
         var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         var requested = new List<string>();
@@ -249,6 +249,7 @@ public sealed partial class ApiClientTests
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) };
         }))
         { BaseAddress = new Uri("http://localhost/") };
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         var client = new RuntimeApiClient(httpClient);
         var scope = ResourceScopeRef.Workspace(workspaceId);
 
@@ -262,8 +263,8 @@ public sealed partial class ApiClientTests
         }, requested);
         CollectionAssert.AreEqual(new[]
         {
-            $"/workspaces/{workspaceId:D}",
-            $"/workspaces/{workspaceId:D}"
+            ResourceScopeRef.Instance.Value,
+            ResourceScopeRef.Instance.Value
         }, contexts);
     }
 

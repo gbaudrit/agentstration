@@ -6,6 +6,7 @@
   <data name="CreateAgent"><value>Create agent</value></data>
   <data name="CreateDescription"><value>Define the desired state for a new specialized agent resource.</value></data>
   <data name="BackToAgents"><value>Back to agents</value></data>
+  <data name="ReturnToSource"><value>Return to source</value></data>
   <data name="Loading"><value>Loading agent resource…</value></data>
   <data name="Generation"><value>Generation {0}</value></data>
   <data name="Run"><value>Run</value></data>

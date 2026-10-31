@@ -339,7 +339,8 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode);
         Assert.IsNull(await resolver.ResolveAsync(firstIssuer, "same-subject", default));
 
-        using var details = await administrator.GetAsync($"/settings/organization/members/{first.PrincipalId:D}");
+        using var details = await administrator.GetAsync(
+            $"/settings/organization/members/{first.PrincipalId:D}?context={Uri.EscapeDataString(context.SelectedScopeRef.Value)}");
         Assert.AreEqual(HttpStatusCode.OK, details.StatusCode);
         StringAssert.Contains(await details.Content.ReadAsStringAsync(), "External authentication");
         var auditEvents = await administrator.GetFromJsonAsync<SecurityAuditEvent[]>("/api/identity/audit-events");

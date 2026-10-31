@@ -96,6 +96,7 @@ public partial class MainLayout
     private IJSObjectReference? navigationTooltipModule;
     private IJSObjectReference? commandRegistration;
     private IJSObjectReference? navigationTooltipRegistration;
+    private IDisposable? locationChangingRegistration;
     private DotNetObjectReference<MainLayout>? selfReference;
     private ElementReference shellElement;
     private ElementReference commandInput;
@@ -196,6 +197,8 @@ public partial class MainLayout
         await Task.WhenAll(
             ContextState.LoadAsync(lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
+        NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        locationChangingRegistration = NavigationManager.RegisterLocationChangingHandler(PreserveConsoleContextAsync);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -312,6 +315,16 @@ public partial class MainLayout
         NavigationManager.NavigateTo(command.Url);
     }
 
+    private ValueTask PreserveConsoleContextAsync(LocationChangingContext context)
+    {
+        var contextualUri = NavigationContext.AddToUri(context.TargetLocation);
+        if (string.Equals(contextualUri, context.TargetLocation, StringComparison.Ordinal))
+            return ValueTask.CompletedTask;
+        context.PreventNavigation();
+        _ = InvokeAsync(() => NavigationManager.NavigateTo(contextualUri));
+        return ValueTask.CompletedTask;
+    }
+
     private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);
 
     private void ToggleContextSelector()
@@ -357,12 +370,28 @@ public partial class MainLayout
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
     {
+        var requestedContext = ConsoleNavigationContext.GetScopeRef(args.Location);
+        if (requestedContext is not null
+            && ContextState.Current is { } current
+            && !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal))
+        {
+            await ContextState.LoadAsync(lifetimeCancellation.Token);
+        }
         StateHasChanged();
-        try { await JS.InvokeVoidAsync("window.scrollTo", 0, 0); }
+        try
+        {
+            await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+            if (contextModule is not null && ContextState.Current is { } context)
+                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
+        }
         catch (JSDisconnectedException) { }
         catch (InvalidOperationException) { }
     });
-    private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnContextChanged()
+    {
+        NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        _ = InvokeAsync(StateHasChanged);
+    }
     private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
@@ -373,6 +402,7 @@ public partial class MainLayout
         PlatformStatus.Changed -= OnPlatformStatusChanged;
         ContextState.Changed -= OnContextChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
+        locationChangingRegistration?.Dispose();
         lifetimeCancellation.Cancel();
         if (platformStatusRefresh is not null)
         {

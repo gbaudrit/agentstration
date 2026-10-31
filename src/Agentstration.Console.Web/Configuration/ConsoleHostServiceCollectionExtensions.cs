@@ -106,7 +106,9 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<ResourceAccessPolicyApiClient, IResourceAccessPolicyClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
-        services.AddScoped<IHttpClientFactory, BffDelegatingHttpClientFactory>();
+        services.AddScoped<BffDelegatingHttpClientFactory>();
+        services.AddScoped<IHttpClientFactory>(provider => provider.GetRequiredService<BffDelegatingHttpClientFactory>());
+        services.AddScoped<IConsoleContextHttpClientFactory>(provider => provider.GetRequiredService<BffDelegatingHttpClientFactory>());
         return services;
     }
 

@@ -5,7 +5,6 @@ namespace Agentstration.Console.Web.Security;
 
 public sealed class BffDelegationHandler(
     BffDelegationTokenProvider tokens,
-    IHttpContextAccessor httpContextAccessor,
     string audience,
     Uri expectedOrigin) : DelegatingHandler
 {
@@ -20,10 +19,6 @@ public sealed class BffDelegationHandler(
         var token = await tokens.GetAsync(audience, cancellationToken);
         if (token is null) return new HttpResponseMessage(HttpStatusCode.Unauthorized);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        if (httpContextAccessor.HttpContext?.Request.Cookies.TryGetValue(
-                "agentstration.context", out var scopeRef) == true
-            && !string.IsNullOrWhiteSpace(scopeRef))
-            request.Headers.TryAddWithoutValidation("X-Agentstration-Context", scopeRef);
         return await base.SendAsync(request, cancellationToken);
     }
 }

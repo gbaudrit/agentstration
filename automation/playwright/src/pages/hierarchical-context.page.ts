@@ -43,12 +43,14 @@ export class HierarchicalContextPage {
 
   public async openSelector(): Promise<void> {
     await expect(this.shell).toHaveAttribute('data-preferences-ready', 'true');
-    if (await this.selector.count() === 0) {
-      const trigger = this.page.getByTestId(TestIds.console.contextSelectorTrigger);
-      await trigger.focus();
-      await trigger.press('Enter');
-    }
-    await this.selector.waitFor({ state: 'visible' });
+    const trigger = this.page.getByTestId(TestIds.console.contextSelectorTrigger);
+    await expect(async () => {
+      if (await this.selector.count() === 0) {
+        await trigger.focus();
+        await trigger.press('Enter');
+      }
+      await expect(this.selector).toBeVisible();
+    }).toPass({ timeout: 30_000 });
   }
 
   public async assertHierarchy(fixture: HierarchicalContextFixture): Promise<void> {
@@ -94,19 +96,23 @@ export class HierarchicalContextPage {
   }
 
   public async assertContextSurvivesNavigation(consoleUrl: string, scopeRef: string): Promise<void> {
-    await this.page.goto(`${consoleUrl}/agents`, { waitUntil: 'domcontentloaded' });
+    await this.page.goto(this.contextUrl(`${consoleUrl}/agents`, scopeRef), { waitUntil: 'domcontentloaded' });
     await this.agents.waitFor({ state: 'visible' });
     await expect(this.shell).toHaveAttribute('data-context-scope', scopeRef);
     await expect(this.page).toHaveURL(new RegExp(`context=${encodeURIComponent(scopeRef)}`));
     await this.page.reload({ waitUntil: 'domcontentloaded' });
     await expect(this.shell).toHaveAttribute('data-context-scope', scopeRef);
-    await this.page.goto(`${consoleUrl}/flows`, { waitUntil: 'domcontentloaded' });
+    await this.page.goto(this.contextUrl(`${consoleUrl}/flows`, scopeRef), { waitUntil: 'domcontentloaded' });
     await this.page.goBack({ waitUntil: 'domcontentloaded' });
     await expect(this.shell).toHaveAttribute('data-context-scope', scopeRef);
   }
 
   public async openAgents(consoleUrl: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/agents`, { waitUntil: 'domcontentloaded' });
+    const scopeRef = await this.shell.getAttribute('data-context-scope');
+    const response = await this.page.goto(
+      this.contextUrl(`${consoleUrl}/agents`, scopeRef),
+      { waitUntil: 'domcontentloaded' },
+    );
     expect(response?.status()).toBe(200);
     await this.agents.waitFor({ state: 'visible' });
   }
@@ -150,6 +156,7 @@ export class HierarchicalContextPage {
 
   public async expectAgentUseDenied(consoleUrl: string, fixture: HierarchicalContextFixture): Promise<void> {
     const response = await this.page.request.post(`${consoleUrl}/api/runtime/runs`, {
+      headers: { 'X-Agentstration-Context': fixture.scopes.workspace },
       data: this.runtimeRequest(fixture),
     });
     const body = await response.text();
@@ -159,6 +166,7 @@ export class HierarchicalContextPage {
 
   public async expectAgentUseAccepted(consoleUrl: string, fixture: HierarchicalContextFixture): Promise<void> {
     const response = await this.page.request.post(`${consoleUrl}/api/runtime/runs`, {
+      headers: { 'X-Agentstration-Context': fixture.scopes.workspace },
       data: this.runtimeRequest(fixture),
     });
     expect(response.status(), await response.text()).toBe(202);
@@ -171,7 +179,10 @@ export class HierarchicalContextPage {
   ): Promise<void> {
     await this.selectInstance();
     const response = await this.page.goto(
-      `${consoleUrl}/agents/${encodeURIComponent(fixture.agentName)}?scopeRef=${encodeURIComponent(fixture.scopes.instance)}`,
+      this.contextUrl(
+        `${consoleUrl}/agents/${encodeURIComponent(fixture.agentName)}?scopeRef=${encodeURIComponent(fixture.scopes.instance)}`,
+        fixture.scopes.instance,
+      ),
       { waitUntil: 'domcontentloaded' },
     );
     expect(response?.status()).toBe(200);
@@ -252,7 +263,12 @@ export class HierarchicalContextPage {
         `${consoleUrl}/?context=${encodeURIComponent(fixture.scopes.instance)}`,
         { waitUntil: 'domcontentloaded' },
       );
-      expect(direct?.status()).toBe(200);
+      expect(direct?.status()).toBe(403);
+      const workspace = await memberPage.goto(
+        `${consoleUrl}/?context=${encodeURIComponent(fixture.scopes.workspace)}`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      expect(workspace?.status()).toBe(200);
       await expect(memberShell).toHaveAttribute('data-context-kind', 'Workspace');
       await expect(memberShell).toHaveAttribute('data-workspace-id', fixture.workspaceId);
     } finally {
@@ -263,7 +279,7 @@ export class HierarchicalContextPage {
   public async assertLocalized(expected: ExpectedText['contextSelector']): Promise<void> {
     const trigger = this.page.getByTestId(TestIds.console.contextSelectorTrigger);
     await expect(trigger).toHaveAttribute('aria-label', expected.change);
-    await trigger.click();
+    await this.openSelector();
     await expect(this.selector).toHaveAttribute('aria-label', expected.choose);
     await expect(this.page.getByTestId(TestIds.console.contextSearch)).toHaveAttribute('placeholder', expected.search);
     await expect(this.selector.getByText(expected.globalAdministration, { exact: true })).toBeVisible();
@@ -297,6 +313,13 @@ export class HierarchicalContextPage {
     return this.selector.locator(
       `[data-testid="${TestIds.console.contextOptionWorkspace}"][data-context-workspace-id="${workspaceId}"]`,
     );
+  }
+
+  private contextUrl(url: string, scopeRef: string | null): string {
+    if (!scopeRef) return url;
+    const contextualUrl = new URL(url);
+    contextualUrl.searchParams.set('context', scopeRef);
+    return contextualUrl.toString();
   }
 
   private runtimeRequest(fixture: HierarchicalContextFixture): object {

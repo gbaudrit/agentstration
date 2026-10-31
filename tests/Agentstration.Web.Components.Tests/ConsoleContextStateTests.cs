@@ -1,4 +1,8 @@
+using Agentstration.Resources;
 using Agentstration.Web.Components.State;
+using Bunit;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Components.Tests;
 
@@ -43,6 +47,50 @@ public sealed class ConsoleContextStateTests
 
         Assert.AreEqual(1, provider.CallCount);
         Assert.AreSame(snapshot, state.Current);
+    }
+
+    [TestMethod]
+    public async Task NavigationContextFallsBackToTheLoadedSelectionBeforeUrlCanonicalization()
+    {
+        var snapshot = new ConsoleContextSnapshot(
+            Guid.NewGuid(), "Alice", ResourceScopeRef.Instance.Value, ConsoleContextKind.Instance,
+            Guid.NewGuid(), "system", "System", Guid.NewGuid(), "operations", "Operations",
+            new HashSet<string>(StringComparer.Ordinal), [],
+            [new(ResourceScopeRef.Instance.Value, ConsoleContextKind.Instance, null, null, null, null, null, "Instance")]);
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IConsoleContextProvider>(new StubProvider(snapshot));
+        context.Services.AddAgentstrationWebComponents();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelprofiles/default-reasoning?scopeRef=%2Finstance");
+        await context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default);
+
+        var navigationContext = context.Services.GetRequiredService<IConsoleNavigationContext>();
+        navigationContext.SetSelectedScopeRef(
+            context.Services.GetRequiredService<ConsoleContextState>().Current?.SelectedScopeRef);
+
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, navigationContext.ScopeRef);
+    }
+
+    [TestMethod]
+    public void NavigationContextAddsTheSelectedScopeToInternalNavigation()
+    {
+        using var context = new BunitContext();
+        context.Services.AddAgentstrationWebComponents();
+        var navigationContext = context.Services.GetRequiredService<IConsoleNavigationContext>();
+        navigationContext.SetSelectedScopeRef(ResourceScopeRef.Instance.Value);
+
+        var contextualUri = navigationContext.AddToUri("/triggers/instance-flow-schedule");
+
+        Assert.AreEqual("/triggers/instance-flow-schedule?context=%2Finstance", contextualUri);
+        Assert.AreEqual(
+            "/agents/demo?context=%2Ftenants%2Ftenant-id",
+            navigationContext.AddToUri("/agents/demo?context=%2Ftenants%2Ftenant-id"));
+        Assert.AreEqual(
+            "/_culture?culture=fr-FR&returnUrl=%2Fsettings%2Fprofile",
+            navigationContext.AddToUri("/_culture?culture=fr-FR&returnUrl=%2Fsettings%2Fprofile"));
+        Assert.AreEqual(
+            "https://example.test/agents/demo",
+            navigationContext.AddToUri("https://example.test/agents/demo"));
     }
 
     private sealed class StubProvider(ConsoleContextSnapshot snapshot) : IConsoleContextProvider

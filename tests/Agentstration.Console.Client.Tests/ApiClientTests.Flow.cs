@@ -399,7 +399,7 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
-    public async Task FlowClientListsRunsInTheExplicitExecutionScope()
+    public async Task FlowClientKeepsNavigationContextWhenListingRunsInAnExplicitExecutionScope()
     {
         var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         string? requested = null;
@@ -415,17 +415,18 @@ public sealed partial class ApiClientTests
         }))
         { BaseAddress = new Uri("http://localhost/") };
 
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         _ = await new FlowApiClient(httpClient).GetFlowRunsAsync(
             null, ResourceScopeRef.Workspace(workspaceId), default);
 
         Assert.AreEqual(
             $"/api/flowRuns?top=200&scopeRef=%2Fworkspaces%2F{workspaceId:D}",
             requested);
-        Assert.AreEqual($"/workspaces/{workspaceId:D}", contextHeader);
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, contextHeader);
     }
 
     [TestMethod]
-    public async Task FlowClientListsDefinitionRunsUsingTheOperationalWorkspaceContext()
+    public async Task FlowClientUsesTheOperationalWorkspaceAsDataScopeForDefinitionRuns()
     {
         var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         string? requested = null;
@@ -441,6 +442,7 @@ public sealed partial class ApiClientTests
         }))
         { BaseAddress = new Uri("http://localhost/") };
 
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         _ = await new FlowApiClient(httpClient).GetFlowRunsAsync(
             ResourceNamespace.Default,
             "instance-flow",
@@ -448,8 +450,8 @@ public sealed partial class ApiClientTests
             ResourceScopeRef.Workspace(workspaceId),
             default);
 
-        Assert.AreEqual("/api/flows/instance-flow/runs?top=200", requested);
-        Assert.AreEqual($"/workspaces/{workspaceId:D}", contextHeader);
+        Assert.AreEqual($"/api/flows/instance-flow/runs?top=200&scopeRef=%2Fworkspaces%2F{workspaceId:D}", requested);
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, contextHeader);
     }
 
     [TestMethod]

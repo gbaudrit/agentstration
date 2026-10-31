@@ -55,6 +55,8 @@ const tenantFlowName = 'tenant-operational-flow';
 const instanceModelProfileName = 'execution-scope-reasoning';
 
 export class OperationalWorkspacesPage {
+  private selectedScopeRef: string | undefined;
+
   public constructor(private readonly page: Page) {}
 
   public get runDetails(): Locator { return this.page.getByTestId(TestIds.flowObservability.runDetails); }
@@ -174,7 +176,10 @@ export class OperationalWorkspacesPage {
     await this.open(`${consoleUrl}/flow-runs`, TestIds.flowObservability.runs);
     for (const run of evidence) {
       await expect(this.page.locator(`a[href^="/flow-runs/${run.flowRunId}?"]`)).toHaveCount(0);
-      const response = await this.page.request.get(`${consoleUrl}/api/flowRuns/${encodeURIComponent(run.flowRunId)}`);
+      const response = await this.page.request.get(
+        `${consoleUrl}/api/flowRuns/${encodeURIComponent(run.flowRunId)}`,
+        { headers: this.contextHeaders() },
+      );
       expect(response.status(), await response.text()).toBe(404);
     }
   }
@@ -271,26 +276,29 @@ export class OperationalWorkspacesPage {
   }
 
   private async selectContext(consoleUrl: string, scopeRef: string): Promise<IdentityContextWire> {
-    const selected = await this.page.request.post(`${consoleUrl}/bff/identity/context/selection`, {
-      data: { scopeRef },
-    });
-    expect(selected.status(), await selected.text()).toBe(200);
+    this.selectedScopeRef = scopeRef;
     const context = await this.read<IdentityContextWire>(`${consoleUrl}/api/identity/context`);
     expect(context.selectedScopeRef).toBe(scopeRef);
     return context;
   }
 
   private async read<T>(url: string): Promise<T> {
-    const response = await this.page.request.get(url);
+    const response = await this.page.request.get(url, { headers: this.contextHeaders() });
     const body = await response.text();
     expect(response.status(), body).toBe(200);
     return JSON.parse(body) as T;
   }
 
   private async open(url: string, marker: string): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    const contextualUrl = new URL(url);
+    if (this.selectedScopeRef) contextualUrl.searchParams.set('context', this.selectedScopeRef);
+    const response = await this.page.goto(contextualUrl.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Operational Workspace route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
+  }
+
+  private contextHeaders(): Record<string, string> {
+    return this.selectedScopeRef ? { 'X-Agentstration-Context': this.selectedScopeRef } : {};
   }
 }
 

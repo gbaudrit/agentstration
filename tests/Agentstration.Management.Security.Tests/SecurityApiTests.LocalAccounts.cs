@@ -300,7 +300,8 @@ public sealed partial class SecurityApiTests
         Assert.IsNotNull(localAccounts);
         Assert.HasCount(1, localAccounts);
 
-        using var membersPage = await client.GetAsync("/settings/organization/members");
+        using var membersPage = await client.GetAsync(
+            $"/settings/organization/members?context={Uri.EscapeDataString(tenant.ScopeRef)}");
         Assert.AreEqual(HttpStatusCode.OK, membersPage.StatusCode);
     }
 

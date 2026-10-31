@@ -212,3 +212,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 184. [ADR-0184 — Console context is one exact administrative scope](0184-console-context-is-a-single-exact-administrative-scope.md)
 185. [ADR-0185 — Administrative execution uses governed operational Workspaces](0185-administrative-execution-uses-governed-operational-workspaces.md)
 186. [ADR-0186 — Triggers use operational Workspaces for administrative contexts](0186-triggers-use-operational-workspaces-for-administrative-contexts.md)
+187. [ADR-0187 - Console navigation context is URL-authoritative](0187-console-navigation-context-is-url-authoritative.md)

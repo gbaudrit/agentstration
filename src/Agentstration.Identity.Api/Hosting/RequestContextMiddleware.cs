@@ -26,7 +26,8 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
         IDisposable? workspaceScope = null;
         try
         {
-            if (httpContext.Request.Cookies.TryGetValue(WorkspaceCookie, out var rawWorkspace)
+            if (!HasExplicitConsoleScope(httpContext.Request)
+                && httpContext.Request.Cookies.TryGetValue(WorkspaceCookie, out var rawWorkspace)
                 && Guid.TryParse(rawWorkspace, out var workspaceId)
                 && workspaceId != current.Current.WorkspaceId)
             {
@@ -37,8 +38,7 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
 
             if (httpContext.Request.Path.StartsWithSegments("/api/identity/context")
                 || httpContext.Request.Path.StartsWithSegments("/bff/identity/context")
-                || !TryGetConsoleScope(httpContext.Request, out var rawScopeRef, out var persistSelection,
-                    out var clearInvalidSelection))
+                || !TryGetConsoleScope(httpContext.Request, out var rawScopeRef))
             {
                 await next(httpContext);
                 return;
@@ -60,31 +60,12 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
             }
             catch (Exception exception) when (exception is AuthorizationDeniedException or ArgumentException)
             {
-                if (clearInvalidSelection)
-                {
-                    httpContext.Response.Cookies.Delete(ConsoleContextCookie);
-                    httpContext.Response.Cookies.Delete(WorkspaceCookie);
-                }
-                await next(httpContext);
+                await Results.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "console_context_access_denied",
+                    detail: "The requested Console context is invalid or unavailable.")
+                    .ExecuteAsync(httpContext);
                 return;
-            }
-
-            if (persistSelection
-                && !string.Equals(httpContext.Request.Cookies[ConsoleContextCookie], scopeRef.Value,
-                    StringComparison.Ordinal))
-            {
-                var options = new CookieOptions
-                {
-                    HttpOnly = true,
-                    IsEssential = true,
-                    Path = "/",
-                    SameSite = SameSiteMode.Strict,
-                    Secure = httpContext.Request.IsHttps,
-                    MaxAge = TimeSpan.FromDays(30)
-                };
-                httpContext.Response.Cookies.Append(ConsoleContextCookie, scopeRef.Value, options);
-                httpContext.Response.Cookies.Append(WorkspaceCookie,
-                    selection.OperationalContext.WorkspaceId.ToString("D"), options);
             }
 
             using var consoleScope = selection.Kind switch
@@ -102,28 +83,15 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
         }
     }
 
-    private static bool TryGetConsoleScope(
-        HttpRequest request,
-        out string scopeRef,
-        out bool persistSelection,
-        out bool clearInvalidSelection)
+    private static bool TryGetConsoleScope(HttpRequest request, out string scopeRef)
     {
         scopeRef = request.Headers[ConsoleContextHeader].FirstOrDefault() ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(scopeRef))
-        {
-            persistSelection = false;
-            clearInvalidSelection = false;
-            return true;
-        }
+        if (!string.IsNullOrWhiteSpace(scopeRef)) return true;
         scopeRef = request.Query["context"].FirstOrDefault() ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(scopeRef))
-        {
-            persistSelection = true;
-            clearInvalidSelection = true;
-            return true;
-        }
-        persistSelection = false;
-        clearInvalidSelection = true;
-        return request.Cookies.TryGetValue(ConsoleContextCookie, out scopeRef!);
+        return !string.IsNullOrWhiteSpace(scopeRef);
     }
+
+    internal static bool HasExplicitConsoleScope(HttpRequest request) =>
+        !string.IsNullOrWhiteSpace(request.Headers[ConsoleContextHeader].FirstOrDefault())
+        || !string.IsNullOrWhiteSpace(request.Query["context"].FirstOrDefault());
 }

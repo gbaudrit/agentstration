@@ -46,6 +46,10 @@ public sealed class NamespacedAgentDetailsTests
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         context.Services.AddSingleton<IAgentRunnerRuntimeClient>(runtime);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo(navigation.GetUriWithQueryParameter(
+            "returnUrl",
+            "/modelprofiles/reasoning?context=/instance&tab=usages"));
 
         var rendered = context.Render<NamespacedAgentDetails>(parameters => parameters
             .Add(component => component.AgentNamespace, FakeManagementClient.PackNamespace.Value)
@@ -62,6 +66,9 @@ public sealed class NamespacedAgentDetailsTests
         Assert.IsTrue(rendered.FindAll(".namespaced-agent-metrics .metric-tooltip").Any(tooltip => tooltip.TextContent.Contains("logical requirement", StringComparison.Ordinal)));
         Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("Not ready", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("agent_deployment_not_found", StringComparison.Ordinal));
+        Assert.AreEqual(
+            "/modelprofiles/reasoning?context=/instance&tab=usages",
+            rendered.Find("[data-testid='namespaced-agent-context-return']").GetAttribute("href"));
         Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("local-runtime", StringComparison.Ordinal));
         Assert.IsFalse(rendered.FindAll("button:not([role='tab'])").Any(button => button.TextContent.Trim() == "Definition"));
@@ -80,6 +87,7 @@ public sealed class NamespacedAgentDetailsTests
         Assert.AreEqual("true", rendered.Find("#agent-model-tab").GetAttribute("aria-selected"));
         var profileLinks = rendered.FindAll("a")
             .Where(link => link.GetAttribute("href")?.Contains("modelprofiles", StringComparison.Ordinal) == true)
+            .Where(link => link.GetAttribute("data-testid") != "namespaced-agent-context-return")
             .ToArray();
         Assert.IsTrue(profileLinks.All(link => link.GetAttribute("href") == "/modelprofiles/reasoning?namespace=shared.models"));
         Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));

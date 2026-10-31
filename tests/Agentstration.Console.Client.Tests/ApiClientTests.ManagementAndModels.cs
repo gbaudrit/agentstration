@@ -17,6 +17,7 @@ using Agentstration.Schemas.Contracts;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Sources.Contracts;
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -25,6 +26,34 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class ApiClientTests
 {
+    [TestMethod]
+    public async Task ConsoleContextHandlerReadsNavigationContextForEveryRequest()
+    {
+        var contexts = new List<string?>();
+        var navigationContext = new MutableConsoleNavigationContext { ScopeRef = ResourceScopeRef.Instance.Value };
+        using var client = new HttpClient(new ConsoleNavigationContextHandler(navigationContext)
+        {
+            InnerHandler = new StubHandler(request =>
+            {
+                contexts.Add(request.Headers.TryGetValues(ConsoleContextHeaders.Name, out var values)
+                    ? values.Single()
+                    : null);
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            })
+        }) { BaseAddress = new Uri("http://localhost/") };
+
+        using var instanceResponse = await client.GetAsync("api/agents");
+        navigationContext.ScopeRef = ResourceScopeRef.Workspace(Guid.Parse(
+            "cccccccc-cccc-cccc-cccc-cccccccccccc")).Value;
+        using var workspaceResponse = await client.GetAsync("api/agents");
+
+        CollectionAssert.AreEqual(new[]
+        {
+            ResourceScopeRef.Instance.Value,
+            "/workspaces/cccccccc-cccc-cccc-cccc-cccccccccccc"
+        }, contexts);
+    }
+
     [TestMethod]
     public async Task ParametersClientPreservesExactScopeAndConcurrencyToken()
     {
@@ -296,6 +325,34 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ModelProvidersClientUsesTheExplicitPageContextForCatalogAndDiscovery()
+    {
+        var contexts = new List<string?>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            contexts.Add(request.Headers.TryGetValues(ConsoleContextHeaders.Name, out var values)
+                ? values.Single()
+                : null);
+            object value = request.RequestUri!.AbsolutePath.EndsWith("/models", StringComparison.Ordinal)
+                ? new ValueResponse<AvailableModelResponse>([])
+                : new ValueResponse<ModelProviderResponse>([]);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
+        })) { BaseAddress = new Uri("http://localhost/") };
+        var client = new ModelProvidersApiClient(httpClient);
+
+        _ = await client.GetModelProvidersAsync(ResourceScopeRef.Instance, CancellationToken.None);
+        _ = await client.GetProviderModelsAsync(
+            ResourceNamespace.Default,
+            "ollama",
+            ResourceScopeRef.Instance,
+            CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { ResourceScopeRef.Instance.Value, ResourceScopeRef.Instance.Value },
+            contexts);
+    }
+
+    [TestMethod]
     public async Task ModelProvidersClientRefreshesExactNamespacedProvider()
     {
         string? path = null;
@@ -427,6 +484,34 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ModelProfileUsagesPreserveOwnerScopeAndExplicitConsultationContext()
+    {
+        var workspaceScope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        string? path = null;
+        string? context = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            path = request.RequestUri!.PathAndQuery;
+            context = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new ModelProfileUsagesResponse([], 0))
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new ModelProfilesApiClient(httpClient).GetModelProfileUsagesAsync(
+            ResourceNamespace.Default,
+            "shared",
+            ResourceScopeRef.Instance,
+            workspaceScope,
+            default);
+
+        Assert.AreEqual("/api/modelprofiles/shared/usages?resourceNamespace=default&scopeRef=%2Finstance", path);
+        Assert.AreEqual(workspaceScope.Value, context);
+    }
+
+    [TestMethod]
     public async Task ModelProfilesClientPreservesETagForUpdateAndDelete()
     {
         var profile = CreateModelProfile("reasoning-default");
@@ -486,6 +571,17 @@ public sealed partial class ApiClientTests
         Assert.AreEqual(
             "/modelprofiles/reasoning?namespace=shared.models&scopeRef=%2Fworkspaces%2Fcccccccc-cccc-cccc-cccc-cccccccccccc",
             ConsoleResourceUrls.ModelProfile(profile.Address, scopeRef));
+        Assert.AreEqual(
+            "/namespaces/shared.models/agents/assistant?scopeRef=%2Fworkspaces%2Fcccccccc-cccc-cccc-cccc-cccccccccccc&context=%2Fworkspaces%2Fcccccccc-cccc-cccc-cccc-cccccccccccc",
+            ConsoleResourceUrls.Agent(new ResourceNamespace("shared.models"), "assistant", scopeRef, scopeRef));
+        Assert.AreEqual("/modelprofiles/reasoning?context=%2Finstance&tab=usages",
+            ConsoleResourceUrls.LocalReturnUrl("/modelprofiles/reasoning?context=%2Finstance&tab=usages"));
+        Assert.IsNull(ConsoleResourceUrls.LocalReturnUrl("https://example.test/redirect"));
+        Assert.IsNull(ConsoleResourceUrls.LocalReturnUrl("//example.test/redirect"));
+        using var contextClient = new HttpClient();
+        ConsoleContextHeaders.Apply(contextClient, scopeRef.Value);
+        Assert.AreEqual(scopeRef.Value,
+            contextClient.DefaultRequestHeaders.GetValues(ConsoleContextHeaders.Name).Single());
     }
 
     [TestMethod]
@@ -498,6 +594,12 @@ public sealed partial class ApiClientTests
         Assert.HasCount(1, ModelManagementUi.FilterProfiles([ready, invalid], "remote-provider"));
         Assert.IsFalse(ModelManagementUi.IsInvalid(ready));
         Assert.IsTrue(ModelManagementUi.IsInvalid(invalid));
+    }
+
+    private sealed class MutableConsoleNavigationContext : IConsoleNavigationContext
+    {
+        public string? ScopeRef { get; set; }
+        public string AddToUri(string uri) => uri;
     }
 
     [TestMethod]

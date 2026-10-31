@@ -14,7 +14,7 @@ public sealed class ConsoleApiSessionHandlerTests
     private static readonly Uri TrustedOrigin = new("http://agentstration-console:5100/");
 
     [TestMethod]
-    public async Task AuthenticatedSessionAndWorkspaceAreForwardedToTrustedApi()
+    public async Task AuthenticatedSessionAndWorkspaceAreForwardedWithoutNavigationCookies()
     {
         var workspaceId = Guid.NewGuid();
         var httpContext = AuthenticatedContext($"{SessionCookie}=chunks-2; {SessionCookie}C1=part-one; {SessionCookie}C2=part-two; {RequestContextMiddleware.ConsoleContextCookie}=%2Finstance; unrelated=secret");
@@ -32,14 +32,14 @@ public sealed class ConsoleApiSessionHandlerTests
         Assert.AreEqual("chunks-2", Cookie(terminal.Request!, SessionCookie));
         Assert.AreEqual("part-one", Cookie(terminal.Request!, $"{SessionCookie}C1"));
         Assert.AreEqual("part-two", Cookie(terminal.Request!, $"{SessionCookie}C2"));
-        Assert.AreEqual("/instance", Cookie(terminal.Request!, RequestContextMiddleware.ConsoleContextCookie));
+        Assert.IsNull(Cookie(terminal.Request!, RequestContextMiddleware.ConsoleContextCookie));
         Assert.IsNull(Cookie(terminal.Request!, "unrelated"));
-        Assert.AreEqual("/instance", terminal.Request!.Headers.GetValues(RequestContextMiddleware.ConsoleContextHeader).Single());
+        Assert.IsFalse(terminal.Request!.Headers.Contains(RequestContextMiddleware.ConsoleContextHeader));
         Assert.AreEqual(workspaceId.ToString("D"), terminal.Request!.Headers.GetValues(PrincipalResolutionMiddleware.WorkspaceHeader).Single());
     }
 
     [TestMethod]
-    public async Task DevelopmentSessionForwardsWorkspaceWithoutApplicationCookie()
+    public async Task DevelopmentSessionForwardsRequestContextWithoutNavigationCookies()
     {
         var workspaceId = Guid.NewGuid();
         var terminal = new CaptureHandler();
@@ -57,9 +57,9 @@ public sealed class ConsoleApiSessionHandlerTests
 
         using var response = await client.GetAsync(new Uri(TrustedOrigin, "/api/identity/context"));
 
-        Assert.AreEqual(workspaceId.ToString("D"), Cookie(terminal.Request!, RequestContextMiddleware.WorkspaceCookie));
-        Assert.AreEqual("/instance", Cookie(terminal.Request!, RequestContextMiddleware.ConsoleContextCookie));
-        Assert.AreEqual("/instance", terminal.Request!.Headers.GetValues(RequestContextMiddleware.ConsoleContextHeader).Single());
+        Assert.IsNull(Cookie(terminal.Request!, RequestContextMiddleware.WorkspaceCookie));
+        Assert.IsNull(Cookie(terminal.Request!, RequestContextMiddleware.ConsoleContextCookie));
+        Assert.IsFalse(terminal.Request!.Headers.Contains(RequestContextMiddleware.ConsoleContextHeader));
         Assert.AreEqual(workspaceId.ToString("D"), terminal.Request.Headers.GetValues(PrincipalResolutionMiddleware.WorkspaceHeader).Single());
     }
 

@@ -21,7 +21,7 @@ else if (agent is not null)
 {
     <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())" TestId="resource-namespaced-agent-details">
         <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>@T("Generation", agent.Generation)</span></Metadata>
-        <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
+        <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button>@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="namespaced-agent-context-return">@T("ReturnToSource")</a> }<a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
     </ResourceHeader>
     <nav class="section-tabs namespaced-agent-tabs" role="tablist" aria-label="@T("AgentDetails")">
         @foreach (var tab in Enum.GetValues<PageTab>())
@@ -140,6 +140,7 @@ else if (agent is not null)
     [Parameter] public string Name { get; set; } = string.Empty;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private AgentResource? agent;
     private InstalledPackResource? ownerPack;
@@ -154,6 +155,7 @@ else if (agent is not null)
     private bool deploying;
     private PageTab activeTab;
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Parse(AgentNamespace);
+    private string? SafeReturnUrl => ConsoleResourceUrls.LocalReturnUrl(ReturnUrl);
     private ResourceAddress ModelProfileAddress => agent?.Definition.ModelProfile.Resolve(AgentResourceNamespace, ModelResourceKinds.ModelProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, ModelResourceKinds.ModelProfile, "unavailable");
     private string ModelProfileUrl => ConsoleResourceUrls.ModelProfile(ModelProfileAddress, agent?.Definition.ModelProfile.ScopeRef);

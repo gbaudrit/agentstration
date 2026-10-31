@@ -11,7 +11,12 @@ export class OrganizationWorkspacesPage {
   public constructor(private readonly page: Page) {}
 
   public async open(consoleUrl: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/settings/organization/workspaces`, { waitUntil: 'domcontentloaded' });
+    const target = new URL('/settings/organization/workspaces', consoleUrl);
+    const scopeRef = await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
+    if (scopeRef) target.searchParams.set('context', scopeRef);
+    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Organization workspaces page returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.locator(`[data-testid="${TestIds.organizationWorkspaces.createForm}"][data-interactive="true"]`).waitFor({ state: 'visible' });
   }
@@ -75,10 +80,12 @@ export class OrganizationWorkspacesPage {
 
   public async selectInstance(): Promise<void> {
     const shell = this.page.getByTestId(TestIds.console.shell);
-    if (await shell.getAttribute('data-context-kind') === 'Instance') return;
+    if (await shell.getAttribute('data-context-kind') === 'Instance'
+      && await shell.getAttribute('data-context-scope') === '/instance') return;
     await this.openContextSelector();
     await this.page.getByTestId(TestIds.console.contextOptionInstance).click();
     await expect(shell).toHaveAttribute('data-context-kind', 'Instance');
+    await expect(shell).toHaveAttribute('data-context-scope', '/instance');
   }
 
   public async selectTenantForWorkspace(name: string): Promise<string> {
@@ -100,7 +107,9 @@ export class OrganizationWorkspacesPage {
     const scopeRef = await tenant.getAttribute('data-context-scope-ref');
     if (!scopeRef) throw new Error(`Tenant context '${tenantId}' does not expose its scope.`);
     await tenant.click();
-    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-context-kind', 'Tenant');
+    const shell = this.page.getByTestId(TestIds.console.shell);
+    await expect(shell).toHaveAttribute('data-context-kind', 'Tenant');
+    await expect(shell).toHaveAttribute('data-context-scope', scopeRef);
     return scopeRef;
   }
 
@@ -120,11 +129,13 @@ export class OrganizationWorkspacesPage {
   private async openContextSelector(): Promise<void> {
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     const selector = this.page.getByTestId(TestIds.console.contextSelector);
-    if (await selector.count() === 0) {
-      const trigger = this.page.getByTestId(TestIds.console.contextSelectorTrigger);
-      await expect(trigger).toBeEnabled();
-      await trigger.click();
-    }
-    await selector.waitFor({ state: 'visible' });
+    const trigger = this.page.getByTestId(TestIds.console.contextSelectorTrigger);
+    await expect(async () => {
+      if (await selector.count() === 0) {
+        await expect(trigger).toBeEnabled();
+        await trigger.click();
+      }
+      await expect(selector).toBeVisible();
+    }).toPass({ timeout: 30_000 });
   }
 }

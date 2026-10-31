@@ -549,7 +549,12 @@ export class ExecutionScopesPage {
   }
 
   private async open(url: string, marker: string): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    const target = new URL(url);
+    const scopeRef = await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
+    if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
+    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Execution-scope route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
   }

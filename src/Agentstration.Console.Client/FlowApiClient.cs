@@ -126,7 +126,7 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         var path = flowId is null
             ? $"api/flowRuns?top=200&scopeRef={scope}"
             : $"api/flows/{Uri.EscapeDataString(flowId)}/runs?top=200&scopeRef={scope}";
-        return await GetAllFlowRunPagesAsync(path, scopeRef, cancellationToken);
+        return await GetAllFlowRunPagesAsync(path, cancellationToken);
     }
 
     public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
@@ -143,16 +143,14 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         ResourceScopeRef? definitionScopeRef,
         ResourceScopeRef executionScopeRef,
         CancellationToken cancellationToken) =>
-        (await GetAllFlowRunPagesAsync($"{FlowPath(@namespace, flowId)}/runs?top=200", executionScopeRef, cancellationToken))
+        (await GetAllFlowRunPagesAsync(
+            $"{FlowPath(@namespace, flowId)}/runs?top=200&scopeRef={Uri.EscapeDataString(executionScopeRef.Value)}",
+            cancellationToken))
             .Where(run => definitionScopeRef is null || run.DefinitionScopeRef == definitionScopeRef)
             .ToArray();
 
-    private async Task<IReadOnlyList<FlowRun>> GetAllFlowRunPagesAsync(string initialPath, CancellationToken cancellationToken)
-        => await GetAllFlowRunPagesAsync(initialPath, null, cancellationToken);
-
     private async Task<IReadOnlyList<FlowRun>> GetAllFlowRunPagesAsync(
         string initialPath,
-        ResourceScopeRef? contextScope,
         CancellationToken cancellationToken)
     {
         var runs = new List<FlowRun>();
@@ -163,9 +161,7 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
             path = NormalizeFlowRunPageLink(path);
             if (!visited.Add(path))
                 throw new AgentstrationApiException("Flow API returned a repeated pagination link.", Guid.NewGuid().ToString("N"));
-            var page = contextScope is null
-                ? await ApiResponse.ReadAsync<FlowRunPageResponse>(httpClient, path, cancellationToken)
-                : await ApiResponse.ReadAsync<FlowRunPageResponse>(httpClient, path, contextScope.Value, cancellationToken);
+            var page = await ApiResponse.ReadAsync<FlowRunPageResponse>(httpClient, path, cancellationToken);
             runs.AddRange(page.Value);
             path = string.IsNullOrWhiteSpace(page.NextLink) ? null : page.NextLink;
         }
@@ -224,7 +220,7 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         await ApiResponse.ReadAsync<FlowRunEvent[]>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}/eventHistory?afterSequence={Math.Max(0, afterSequence)}", cancellationToken);
 
     public async Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, ResourceScopeRef scopeRef, long afterSequence, CancellationToken cancellationToken) =>
-        await ApiResponse.ReadAsync<FlowRunEvent[]>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}/eventHistory?afterSequence={Math.Max(0, afterSequence)}{ScopeParameter(scopeRef)}", scopeRef, cancellationToken);
+        await ApiResponse.ReadAsync<FlowRunEvent[]>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}/eventHistory?afterSequence={Math.Max(0, afterSequence)}{ScopeParameter(scopeRef)}", cancellationToken);
 
     public async Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<InputRequest[]>(httpClient,

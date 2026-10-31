@@ -165,12 +165,18 @@ public sealed class IdentityExperienceService(
             }
         }
         var contexts = BuildAvailableContexts(activeTenants, available, tenantPermissions, isPlatformAdministrator);
-        var selected = selectedScopeRef is { } requested
-            ? contexts.SingleOrDefault(value => value.ScopeRef == requested)
-            : null;
-        selected ??= ResolveCurrentSelection(context, contexts, workspaces);
-        selected ??= contexts.FirstOrDefault()
-            ?? throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
+        ConsoleContextOptionView? selected;
+        if (selectedScopeRef is { } requested)
+        {
+            selected = contexts.SingleOrDefault(value => value.ScopeRef == requested)
+                ?? throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
+        }
+        else
+        {
+            selected = ResolveCurrentSelection(context, contexts, workspaces);
+            selected ??= contexts.FirstOrDefault()
+                ?? throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
+        }
         var operationalWorkspaceResource = selected.Kind switch
         {
             IdentityConsoleContextKind.Instance => await operationalTopology.GetInstanceOperationsWorkspaceAsync(cancellationToken),

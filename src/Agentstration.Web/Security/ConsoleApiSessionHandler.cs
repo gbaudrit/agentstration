@@ -28,14 +28,6 @@ public sealed class ConsoleApiSessionHandler(
                         .OrderBy(cookie => cookie.Key, StringComparer.Ordinal)
                         .Select(cookie => $"{cookie.Key}={cookie.Value}"));
             }
-            if (incoming.Request.Cookies.TryGetValue(RequestContextMiddleware.WorkspaceCookie, out var workspaceCookie))
-                cookieValues.Add($"{RequestContextMiddleware.WorkspaceCookie}={workspaceCookie}");
-            if (incoming.Request.Cookies.TryGetValue(RequestContextMiddleware.ConsoleContextCookie, out var contextCookie))
-            {
-                cookieValues.Add($"{RequestContextMiddleware.ConsoleContextCookie}={contextCookie}");
-                if (!request.Headers.Contains(RequestContextMiddleware.ConsoleContextHeader))
-                    request.Headers.TryAddWithoutValidation(RequestContextMiddleware.ConsoleContextHeader, contextCookie);
-            }
             if (cookieValues.Count > 0)
                 request.Headers.TryAddWithoutValidation(HeaderNames.Cookie, string.Join("; ", cookieValues));
             if (requestContext.IsInitialized && !request.Headers.Contains(PrincipalResolutionMiddleware.WorkspaceHeader))

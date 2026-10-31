@@ -491,7 +491,7 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
-    public async Task ConsoleContextSelectionPersistsExactAuthorizedHierarchyAndRejectsUnknownTenant()
+    public async Task ConsoleContextSelectionValidatesExactAuthorizedHierarchyWithoutPersistingNavigationCookies()
     {
         await using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -509,9 +509,11 @@ public sealed class IdentityFoundationTests
         var selectedInstance = await client.PostAsJsonAsync("/api/identity/context/selection",
             new SelectConsoleContextRequest(instance.ScopeRef));
         Assert.AreEqual(HttpStatusCode.OK, selectedInstance.StatusCode);
-        Assert.IsTrue(selectedInstance.Headers.GetValues("Set-Cookie")
-            .All(value => value.Contains("path=/", StringComparison.OrdinalIgnoreCase)));
-        var instanceContext = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.IsFalse(selectedInstance.Headers.TryGetValues("Set-Cookie", out _));
+        using var instanceContextRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        instanceContextRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, instance.ScopeRef);
+        using var instanceContextResponse = await client.SendAsync(instanceContextRequest);
+        var instanceContext = await instanceContextResponse.Content.ReadFromJsonAsync<IdentityConsoleContextResponse>();
         Assert.AreEqual(IdentityConsoleContextKind.Instance, instanceContext?.SelectedKind);
         Assert.AreEqual("/instance", instanceContext?.SelectedScopeRef);
         var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
@@ -521,7 +523,10 @@ public sealed class IdentityFoundationTests
         var selectedTenant = await client.PostAsJsonAsync("/api/identity/context/selection",
             new SelectConsoleContextRequest(tenant.ScopeRef));
         Assert.AreEqual(HttpStatusCode.OK, selectedTenant.StatusCode);
-        var tenantContext = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        using var tenantContextRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        tenantContextRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, tenant.ScopeRef);
+        using var tenantContextResponse = await client.SendAsync(tenantContextRequest);
+        var tenantContext = await tenantContextResponse.Content.ReadFromJsonAsync<IdentityConsoleContextResponse>();
         Assert.AreEqual(IdentityConsoleContextKind.Tenant, tenantContext?.SelectedKind);
         Assert.AreEqual(tenant.ScopeRef, tenantContext?.SelectedScopeRef);
         var tenantOperations = await topology.GetTenantOperationsWorkspaceAsync(tenant.TenantId!.Value, default);
@@ -552,6 +557,13 @@ public sealed class IdentityFoundationTests
         var denied = await client.PostAsJsonAsync("/api/identity/context/selection",
             new SelectConsoleContextRequest(ResourceScopeRef.Tenant(Guid.NewGuid()).Value));
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        using var unavailableRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        unavailableRequest.Headers.Add(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Tenant(Guid.NewGuid()).Value);
+        using var unavailableResponse = await client.SendAsync(unavailableRequest);
+        Assert.AreEqual(HttpStatusCode.Forbidden, unavailableResponse.StatusCode);
     }
 
     [TestMethod]
@@ -567,7 +579,10 @@ public sealed class IdentityFoundationTests
         using var selected = await client.PostAsJsonAsync("/api/identity/context/selection",
             new SelectConsoleContextRequest(tenant.ScopeRef));
         selected.EnsureSuccessStatusCode();
-        var revalidated = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        using var revalidatedRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        revalidatedRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, tenant.ScopeRef);
+        using var revalidatedResponse = await client.SendAsync(revalidatedRequest);
+        var revalidated = await revalidatedResponse.Content.ReadFromJsonAsync<IdentityConsoleContextResponse>();
 
         Assert.AreEqual(IdentityConsoleContextKind.Tenant, revalidated?.SelectedKind);
         Assert.AreEqual(tenant.ScopeRef, revalidated?.SelectedScopeRef);

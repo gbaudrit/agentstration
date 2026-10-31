@@ -117,6 +117,7 @@ else
     }
     private static string DetailsUrl(ModelProfileSummaryResponse profile) =>
         ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(profile.Namespace), ModelResourceKinds.ModelProfile, profile.Name), profile.ScopeRef);
-    private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
+    private static string AgentUrl(ModelProfileUsageResponse usage) =>
+        ConsoleResourceUrls.Agent(ResourceNamespace.Parse(usage.Namespace), usage.Name, usage.ScopeRef, usage.ScopeRef);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
