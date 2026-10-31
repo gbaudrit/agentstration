@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Agentstration.Agents;
 using Agentstration.Flows.Application;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
@@ -20,6 +21,60 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class IdentityFoundationTests
 {
+    [TestMethod]
+    public async Task ResourceWritesRequireTheExactOwnerContext()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync(grantPlatformAdministrator: true);
+        var operations = fixture.Services.GetRequiredService<ResourceScopeOperationService>();
+        var executed = 0;
+
+        using (fixture.OpenScope())
+        {
+            await Assert.ThrowsAsync<ResourceScopeAccessDeniedException>(() => operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Instance,
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default));
+            await Assert.ThrowsAsync<ResourceScopeAccessDeniedException>(() => operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Tenant(fixture.InitialContext.TenantId),
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default));
+
+            var workspaceResult = await operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Workspace(fixture.InitialContext.WorkspaceId),
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default);
+            Assert.AreEqual(1, workspaceResult);
+        }
+
+        using (fixture.Context.PushTenantAdministration(fixture.InitialContext))
+        {
+            var tenantResult = await operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Tenant(fixture.InitialContext.TenantId),
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default);
+            Assert.AreEqual(2, tenantResult);
+        }
+
+        using (fixture.Context.PushInstance(fixture.InitialContext))
+        {
+            var instanceResult = await operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Instance,
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default);
+            Assert.AreEqual(3, instanceResult);
+        }
+    }
+
     [TestMethod]
     public async Task BootstrapReturnsOwnerContextWithoutPublishingItGlobally()
     {

@@ -33,19 +33,21 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var tenantScope = ResourceScopeRef.Tenant(context.TenantId);
         var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
         var dataSources = factory.Services.GetRequiredService<DataSourceManagementService>();
-        var source = await dataSources.CreateAsync(new DataSourceResource
-        {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = DataSourceResourceKinds.DataSource,
-            Metadata = new() { Name = "shared-artifact-origin" },
-            ScopeRef = instanceScope,
-            Definition = new()
+        StoredResource<DataSourceResource> source;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
+            source = await dataSources.CreateAsync(new DataSourceResource
             {
-                DisplayName = "Shared artifact origin",
-                Profile = new("artifact-import-builtin", instanceScope),
-                Configuration = JsonSerializer.SerializeToElement(new { artifactIds = Array.Empty<string>() })
-            }
-        }, default);
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = DataSourceResourceKinds.DataSource,
+                Metadata = new() { Name = "shared-artifact-origin" },
+                ScopeRef = instanceScope,
+                Definition = new()
+                {
+                    DisplayName = "Shared artifact origin",
+                    Profile = new("artifact-import-builtin", instanceScope),
+                    Configuration = JsonSerializer.SerializeToElement(new { artifactIds = Array.Empty<string>() })
+                }
+            }, default);
         var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
             _ = await policies.PutAsync(new(new(source.Value.Uid, instanceScope, source.Value.Namespace,
@@ -53,8 +55,16 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                 [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
 
         var knowledge = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
-        async Task<StoredResource<KnowledgeSourceResource>> CreateAsync(ResourceScopeRef scope, string name) =>
-            await knowledge.CreateAsync(new KnowledgeSourceResource
+        async Task<StoredResource<KnowledgeSourceResource>> CreateAsync(ResourceScopeRef scope, string name)
+        {
+            using var ownerScope = scope.Kind switch
+            {
+                ResourceScopeKind.Instance => factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context),
+                ResourceScopeKind.Tenant => factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenant(context.PrincipalId, context.TenantId),
+                ResourceScopeKind.Workspace => factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context),
+                _ => throw new InvalidOperationException($"Unsupported scope '{scope}'.")
+            };
+            return await knowledge.CreateAsync(new KnowledgeSourceResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = KnowledgeResourceKinds.KnowledgeSource,
@@ -83,16 +93,21 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
                     }
                 }
             }, default);
+        }
 
         var instance = await CreateAsync(instanceScope, "instance-knowledge");
         var tenant = await CreateAsync(tenantScope, "tenant-knowledge");
         var workspace = await CreateAsync(workspaceScope, "workspace-knowledge");
 
         using (var client = factory.CreateClient())
-        using (var response = await client.PostAsJsonAsync("/api/knowledgesources",
-                   new CreateKnowledgeSourceRequest("api-instance-knowledge", instance.Value.Definition,
-                       ScopeRef: instanceScope)))
+        using (var request = new HttpRequestMessage(HttpMethod.Post, "/api/knowledgesources")
         {
+            Content = JsonContent.Create(new CreateKnowledgeSourceRequest(
+                "api-instance-knowledge", instance.Value.Definition, ScopeRef: instanceScope))
+        })
+        {
+            request.Headers.TryAddWithoutValidation("X-Agentstration-Context", instanceScope.Value);
+            using var response = await client.SendAsync(request);
             Assert.AreEqual(HttpStatusCode.Created, response.StatusCode,
                 await response.Content.ReadAsStringAsync());
             var apiCreated = await response.Content.ReadFromJsonAsync<KnowledgeSourceResource>();

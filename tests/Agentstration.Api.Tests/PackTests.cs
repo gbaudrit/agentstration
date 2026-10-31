@@ -65,6 +65,11 @@ public sealed class PackTests
                 """
         });
         using var content = ArchiveContent(archive.ToArray(), "tenant-pack.zip");
+        var environment = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>()
+            .EnsureInitializedAsync(default);
+        client.DefaultRequestHeaders.Add(
+            "X-Agentstration-Context",
+            ResourceScopeRef.Tenant(environment.TenantId).Value);
 
         using var response = await client.PostAsync("/api/packs", content);
 

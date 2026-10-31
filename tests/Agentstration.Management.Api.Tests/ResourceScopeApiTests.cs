@@ -91,6 +91,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         var workspace = targets.Single(value => value.Kind == ResourceScopeKind.Workspace);
         Assert.IsTrue(tenant.CanWrite);
         Assert.IsTrue(workspace.CanWrite);
+        SelectConsoleContext(client, tenant.ScopeRef);
 
         using var invalidGrant = await client.PostAsJsonAsync("/api/vaults", new CreateVaultRequest(
             "invalid-grant-vault", new VaultProperties
@@ -115,6 +116,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                     [new(workspace.ScopeRef, [ResourceAccessAction.Discover])]), null, default);
         }
 
+        SelectConsoleContext(client, workspace.ScopeRef);
         using var rejected = await client.PostAsJsonAsync(
             "/api/secrets",
             new CreateSecretRequest("invalid-workspace-secret", new SecretProperties
@@ -125,6 +127,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             }, workspace.ScopeRef));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, rejected.StatusCode);
 
+        SelectConsoleContext(client, tenant.ScopeRef);
         using var tenantVaultRead = await client.GetAsync($"/api/vaults/tenant-vault?scopeRef={Uri.EscapeDataString(tenant.ScopeRef.Value)}");
         Assert.AreEqual(HttpStatusCode.OK, tenantVaultRead.StatusCode);
         using var grantRequest = new HttpRequestMessage(HttpMethod.Put,
@@ -144,6 +147,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         var savedVault = await savedVaultResponse.Content.ReadFromJsonAsync<VaultResponse>();
         Assert.AreEqual(workspace.ScopeRef, savedVault?.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
 
+        SelectConsoleContext(client, workspace.ScopeRef);
         using var allowed = await client.PostAsJsonAsync("/api/secrets",
             new CreateSecretRequest("granted-workspace-secret", new SecretProperties
             {
@@ -153,12 +157,14 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             }, workspace.ScopeRef));
         Assert.AreEqual(HttpStatusCode.Created, allowed.StatusCode);
 
+        SelectConsoleContext(client, tenant.ScopeRef);
         using var deleteVault = new HttpRequestMessage(HttpMethod.Delete,
             $"/api/vaults/tenant-vault?scopeRef={Uri.EscapeDataString(tenant.ScopeRef.Value)}");
         deleteVault.Headers.IfMatch.ParseAdd(grantResponse.Headers.ETag!.ToString());
         using var inUse = await client.SendAsync(deleteVault);
         Assert.AreEqual(HttpStatusCode.Conflict, inUse.StatusCode);
 
+        SelectConsoleContext(client, workspace.ScopeRef);
         using var workspaceVaultResponse = await client.PostAsJsonAsync(
             "/api/vaults",
             new CreateVaultRequest("workspace-vault", new VaultProperties { DisplayName = "Workspace Vault", ProviderType = "local" }, workspace.ScopeRef));
@@ -379,6 +385,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.IsNotNull(targets);
         var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant);
         var workspace = targets.Single(value => value.Kind == ResourceScopeKind.Workspace);
+        SelectConsoleContext(client, tenant.ScopeRef);
 
         using var created = await client.PostAsJsonAsync(
             "/api/vaults",
@@ -389,7 +396,6 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             }, tenant.ScopeRef));
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
 
-        client.DefaultRequestHeaders.Add("X-Agentstration-Context", tenant.ScopeRef.Value);
         var inventory = await client.GetFromJsonAsync<ResourceScopeInventoryResponse>("/api/resource-scopes");
         Assert.IsNotNull(inventory);
         var tenantNode = inventory.Scopes.Single(value => value.ScopeRef == tenant.ScopeRef);
@@ -453,6 +459,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
             $"/api/resource-scopes/targets?kind={RuntimeProfileResourceKinds.RuntimeProfile}");
         var instance = targets!.Single();
         Assert.IsTrue(instance.CanWrite);
+        SelectConsoleContext(client, instance.ScopeRef);
 
         using var created = await client.PostAsJsonAsync(
             "/api/runtimeprofiles",
@@ -495,17 +502,23 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
                 Model = new ModelSelection { Name = "test-model" }
             }
         };
-        await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
-            await profiles.CreateAsync(tenantProfile, default));
-        var providerPolicy = await policies.GetAsync(provider.Value.Uid, default);
-        _ = await policies.PutAsync(new ResourceAccessPolicy(
-            new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
-                ModelResourceKinds.ModelProvider, provider.Value.Generation),
-            (providerPolicy?.Policy.Grants ?? []).Append(new ResourceAccessGrant(tenantScope,
-                [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)).ToArray()),
-            providerPolicy?.ETag, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
+            await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
+                await profiles.CreateAsync(tenantProfile, default));
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
+        {
+            var providerPolicy = await policies.GetAsync(provider.Value.Uid, default);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                    ModelResourceKinds.ModelProvider, provider.Value.Generation),
+                (providerPolicy?.Policy.Grants ?? []).Append(new ResourceAccessGrant(tenantScope,
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)).ToArray()),
+                providerPolicy?.ETag, default);
+        }
 
-        var profile = await profiles.CreateAsync(tenantProfile, default);
+        StoredResource<ModelProfileResource> profile;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
+            profile = await profiles.CreateAsync(tenantProfile, default);
         var instanceProfile = await profiles.GetExactAsync(ResourceScopeRef.Instance,
             ResourceNamespace.Default, "reasoning-default", default);
         Assert.IsNotNull(instanceProfile);

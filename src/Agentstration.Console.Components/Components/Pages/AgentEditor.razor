@@ -9,6 +9,7 @@
 @inject IToolCategoriesClient ToolCategoriesClient
 @inject IToolSetsClient ToolSetsClient
 @inject NavigationManager Navigation
+@inject IServiceProvider Services
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 
@@ -31,11 +32,12 @@ else
     {
         <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
             <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
-            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button>@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
+            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
         </ResourceHeader>
-        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode && !accessMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(accessMode ? "active" : null)" data-testid="agent-access-tab" @onclick="ShowAccess">@T("Access")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        @if (selectedScope is { } inheritedOwner) { <InheritedResourceNotice OwnerScopeRef="inheritedOwner" /> }
+        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode && !accessMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span>@if (CanManage) { <button type="button" class="@(accessMode ? "active" : null)" data-testid="agent-access-tab" @onclick="ShowAccess">@T("Access")</button> }<button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
-                <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
+                <Actions>@if (CanManage && !IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
         @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
         {
@@ -59,13 +61,12 @@ else
     {
         <div class="form-alert form-alert-success" role="status">@successMessage</div>
     }
-
     @if (IsNew)
     {
         <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
     }
 
-    @if (accessMode && selectedScope is { } ownerScope)
+    @if (CanManage && accessMode && selectedScope is { } ownerScope)
     {
         <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="AgentResourceNamespace" Kind="@AgentResourceKinds.Agent" Name="@model.Name" Generation="generation" Governance="governance" />
     }
@@ -74,8 +75,8 @@ else
         <section class="panel form-section" data-testid="agent-yaml-editor">
             <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("AgentYaml")</h2><p>@T("AgentYamlHelp")</p></div></div>
             @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-            <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
-            <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div>
+            <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanManage)"></textarea></label>
+            @if (CanManage) { <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div> }
         </section>
 
     }
@@ -84,6 +85,7 @@ else
     <EditForm Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
         <DataAnnotationsValidator />
         <ValidationSummary />
+        <fieldset class="resource-definition-fields" disabled="@(!CanManage)" data-testid="agent-definition-fields">
 
         @if (toolsMode)
         {
@@ -148,11 +150,12 @@ else
         </section>
         }
 
-        @if (IsNew)
+        </fieldset>
+        @if (CanManage && IsNew)
         {
             <div class="form-actions"><a class="button-secondary" href="/agents">@T("Cancel")</a><button class="button-primary" type="submit" data-testid="agent-create-and-deploy" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Creating") : T("CreateAndDeploy"))</button></div>
         }
-        else
+        else if (CanManage)
         {
             <UnsavedChangesBar IsVisible="@isDirty">
                 <Actions><button class="button-secondary" type="button" @onclick="DiscardAsync" disabled="@saving">@T("Discard")</button><button class="button-secondary" type="submit" data-testid="agent-save-draft" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">@T("SaveDraft")</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Applying") : T("SaveAndApply"))</button></Actions>
@@ -203,6 +206,7 @@ else
     private ResourceScopeRef? selectedScope;
     private ResourceGovernance governance = ResourceGovernance.User;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool CanManage => IsNew || ResourceOwnershipContext.CanManage(selectedScope, Services);
     private string? SafeReturnUrl => ConsoleResourceUrls.LocalReturnUrl(ReturnUrl);
     private ResourceNamespace AgentResourceNamespace => string.IsNullOrWhiteSpace(AgentNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(AgentNamespace);
     private string OverviewUrl => AgentResourceNamespace.IsDefault
@@ -306,7 +310,7 @@ else
         return Task.CompletedTask;
     }
 
-    private void MarkDirty(EventArgs _) => isDirty = true;
+    private void MarkDirty(EventArgs _) { if (CanManage) isDirty = true; }
     private void ShowDefinition() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, false, false);
     private void ShowContracts() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, true, false);
     private void ShowTools() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, true, false, false);
@@ -322,7 +326,7 @@ else
 
     private bool ApplyRawYaml()
     {
-        if (model is null) return false;
+        if (!CanManage || model is null) return false;
         rawError = null;
         try
         {
@@ -457,7 +461,7 @@ else
 
     private void RuntimeProfileChanged(ChangeEventArgs args)
     {
-        if (model is null) return;
+        if (!CanManage || model is null) return;
         var parts = args.Value?.ToString()?.Split('|', 3);
         if (parts is not { Length: 3 }) return;
         model.RuntimeProfileScopeRef = string.IsNullOrWhiteSpace(parts[0]) ? null : ResourceScopeRef.Parse(parts[0]);
@@ -503,7 +507,7 @@ else
 
     private async Task SaveAsync(bool applyRuntime)
     {
-        if (model is null) return;
+        if (!CanManage || model is null) return;
         saving = true;
         errorMessage = null;
         errorId = null;
@@ -558,7 +562,7 @@ else
 
     private async Task ReconcileAsync()
     {
-        if (model is null || IsNew || isDirty) return;
+        if (!CanManage || model is null || IsNew || isDirty) return;
         saving = true;
         errorMessage = null;
         try

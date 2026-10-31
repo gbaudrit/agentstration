@@ -7,6 +7,7 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
@@ -256,6 +257,15 @@ public sealed class AepEnrollmentTests
 
             var unassigned = await Assert.ThrowsAsync<AepEnrollmentException>(() => service.RotateAsync(context, instanceId, default));
             Assert.AreEqual("scope_required", unassigned.Code);
+            if (target.Kind != ResourceScopeKind.Workspace)
+            {
+                using var workspaceScope = factory.Services
+                    .GetRequiredService<IRequestContextScopeFactory>()
+                    .Push(context);
+                await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+                    service.AssignAsync(context, instanceId, target, default));
+            }
+            using var ownerScope = PushOwnerScope(factory, context, target);
             await service.AssignAsync(context, instanceId, target, default);
             var code = await service.RotateAsync(context, instanceId, default);
             var credential = await service.ClaimAsync(new(instanceId, instanceId, code.Code), default);
@@ -298,6 +308,7 @@ public sealed class AepEnrollmentTests
             new AepExtensionIdentity("extension.tools-test", "Tools test", "1.0.0"),
             new Uri("https://tools.example/"),
             new Uri("https://tools.example/aep/enrollment/pair")), default);
+        using var ownerScope = PushOwnerScope(factory, context, target);
         await service.AssignAsync(context, instanceId, target, default);
         var code = await service.RotateAsync(context, instanceId, default);
         var credential = await service.ClaimAsync(new(instanceId, instanceId, code.Code), default);
@@ -332,12 +343,12 @@ public sealed class AepEnrollmentTests
             new AepExtensionIdentity("extension.instance-inventory", "Instance inventory", "1.0.0"),
             endpoint,
             new Uri(endpoint, AepEnrollmentProtocol.PairingPath)), default);
+        using var ownerScope = PushOwnerScope(factory, context, ResourceScopeRef.Instance);
         await enrollment.AssignAsync(context, instanceId, ResourceScopeRef.Instance, default);
         var code = await enrollment.RotateAsync(context, instanceId, default);
         var credential = await enrollment.ClaimAsync(new(instanceId, instanceId, code.Code), default);
         _ = await enrollment.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default);
 
-        using var instanceScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
         var item = (await factory.Services.GetRequiredService<ExtensionInventoryService>().ListAsync(context, default))
             .Single(value => value.EnrollmentInstanceId == instanceId);
 
@@ -368,6 +379,7 @@ public sealed class AepEnrollmentTests
             new AepExtensionIdentity("extension.tools-failure", "Tools failure", "1.0.0"),
             new Uri("https://tools-failure.example/"),
             new Uri("https://tools-failure.example/aep/enrollment/pair")), default);
+        using var ownerScope = PushOwnerScope(factory, context, ResourceScopeRef.Instance);
         await service.AssignAsync(context, instanceId, ResourceScopeRef.Instance, default);
         var code = await service.RotateAsync(context, instanceId, default);
         var credential = await service.ClaimAsync(new(instanceId, instanceId, code.Code), default);
@@ -489,13 +501,17 @@ public sealed class AepEnrollmentTests
             new AepExtensionIdentity("extension.reenrollment-test", "Re-enrollment test", "1.0.0"),
             new Uri("https://reenrollment.example/"),
             new Uri("https://reenrollment.example/aep/enrollment/pair")), default);
-        await service.AssignAsync(context, instanceId, initialTarget, default);
-        var firstCode = await service.RotateAsync(context, instanceId, default);
-        var firstCredential = await service.ClaimAsync(new(instanceId, instanceId, firstCode.Code), default);
-        _ = await service.ReadyAsync(new(instanceId, instanceId, firstCredential.CompletionToken), default);
+        AepEnrollmentCredential firstCredential;
+        using (PushOwnerScope(factory, context, initialTarget))
+        {
+            await service.AssignAsync(context, instanceId, initialTarget, default);
+            var firstCode = await service.RotateAsync(context, instanceId, default);
+            firstCredential = await service.ClaimAsync(new(instanceId, instanceId, firstCode.Code), default);
+            _ = await service.ReadyAsync(new(instanceId, instanceId, firstCredential.CompletionToken), default);
 
-        await service.UnenrollAsync(context, instanceId, default);
-        await service.UnenrollAsync(context, instanceId, default);
+            await service.UnenrollAsync(context, instanceId, default);
+            await service.UnenrollAsync(context, instanceId, default);
+        }
 
         var unenrolled = (await service.ListAsync(context, default)).Single(value => value.Definition.InstanceId == instanceId);
         Assert.AreEqual(AepEnrollmentState.Unpaired, unenrolled.Definition.State);
@@ -508,10 +524,14 @@ public sealed class AepEnrollmentTests
             Assert.IsFalse(disabled.Value.Definition.Enabled);
         }
 
-        await service.AssignAsync(context, instanceId, reenrollmentTarget, default);
-        var secondCode = await service.RotateAsync(context, instanceId, default);
-        var secondCredential = await service.ClaimAsync(new(instanceId, instanceId, secondCode.Code), default);
-        _ = await service.ReadyAsync(new(instanceId, instanceId, secondCredential.CompletionToken), default);
+        AepEnrollmentCredential secondCredential;
+        using (PushOwnerScope(factory, context, reenrollmentTarget))
+        {
+            await service.AssignAsync(context, instanceId, reenrollmentTarget, default);
+            var secondCode = await service.RotateAsync(context, instanceId, default);
+            secondCredential = await service.ClaimAsync(new(instanceId, instanceId, secondCode.Code), default);
+            _ = await service.ReadyAsync(new(instanceId, instanceId, secondCredential.CompletionToken), default);
+        }
 
         Assert.AreNotEqual(firstCredential.AccessToken, secondCredential.AccessToken);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
@@ -678,6 +698,21 @@ public sealed class AepEnrollmentTests
     private sealed class EnrollmentHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+    }
+
+    private static IDisposable PushOwnerScope(
+        WebApplicationFactory<Program> factory,
+        RequestContext context,
+        ResourceScopeRef target)
+    {
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        return target.Kind switch
+        {
+            ResourceScopeKind.Instance => scopes.PushInstance(context),
+            ResourceScopeKind.Tenant => scopes.PushTenant(context.PrincipalId, context.TenantId),
+            ResourceScopeKind.Workspace => scopes.Push(context),
+            _ => throw new InvalidOperationException($"Unsupported resource scope '{target}'.")
+        };
     }
 
     private sealed class AllowEnrollmentPlatformAdministrator : IPlatformAuthorizationService
