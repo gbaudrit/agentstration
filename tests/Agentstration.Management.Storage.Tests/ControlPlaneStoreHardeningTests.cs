@@ -279,6 +279,11 @@ public sealed class ControlPlaneStoreHardeningTests
         CollectionAssert.AreEquivalent(
             new[] { sharedTenant.Value.Name, tenantOnly.Value.Name },
             tenantVisible.Select(value => value.Value.Name).ToArray());
+        var tenantDesignerVisible = await fixture.Store.ListVisibleAsync<ExtensionResource>(
+            ResourceScopeRef.Tenant(tenantId), "MemoryProvider", 0, 20, default);
+        CollectionAssert.AreEquivalent(
+            new[] { sharedInstance.Value.Name, sharedTenant.Value.Name, tenantOnly.Value.Name },
+            tenantDesignerVisible.Select(value => value.Value.Name).ToArray());
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(workspaceOwned.Value.Uid, default));
     }

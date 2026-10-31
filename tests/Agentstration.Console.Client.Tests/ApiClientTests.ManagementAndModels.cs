@@ -233,9 +233,11 @@ public sealed partial class ApiClientTests
     {
         var scope = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         var contexts = new List<string>();
+        var paths = new List<string>();
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
             contexts.Add(request.Headers.GetValues("X-Agentstration-Context").Single());
+            paths.Add(request.RequestUri!.PathAndQuery);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = request.RequestUri!.AbsolutePath == "/api/agents"
@@ -248,6 +250,9 @@ public sealed partial class ApiClientTests
         _ = await new ManagementApiClient(httpClient).GetAgentsAsync(scope, default);
 
         CollectionAssert.AreEqual(new[] { scope.Value }, contexts);
+        CollectionAssert.AreEqual(
+            new[] { $"/api/agents?allNamespaces=true&top=1000&scopeRef={Uri.EscapeDataString(scope.Value)}" },
+            paths);
     }
 
     [TestMethod]

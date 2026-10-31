@@ -518,7 +518,7 @@ public sealed class PostgreSqlResourceStore(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var target = await RequireScopeAsync(context, targetScopeRef, cancellationToken);
         await EnsureCanReadAsync(context, target, cancellationToken);
-        var scopeIds = visible ? await EffectiveVisibleScopeIdsAsync(context, target, cancellationToken) : [target.Id];
+        var scopeIds = visible ? await VisibleScopeIdsAsync(context, target, cancellationToken) : [target.Id];
         var query = context.Documents.AsNoTracking().Where(value => value.Kind == kind);
         query = query.Where(value => scopeIds.Contains(value.ScopeId));
         var candidates = await query.Include(value => value.Scope).OrderBy(value => value.ScopeId).ThenBy(value => value.Namespace).ThenBy(value => value.Name).ToArrayAsync(cancellationToken);
@@ -559,24 +559,31 @@ public sealed class PostgreSqlResourceStore(
         IEnumerable<ControlPlaneDocument> documents, CancellationToken cancellationToken)
     {
         var candidates = documents.ToArray();
-        if (requestContext.AccessMode != ControlPlaneAccessMode.Workspace || candidates.Length == 0)
+        if (candidates.Length == 0)
             return candidates;
-        var workspaceRef = ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId);
+        var targetRef = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.TenantAdministration =>
+                ResourceScopeRef.Tenant(requestContext.Current.TenantId),
+            ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
+            _ => default
+        };
+        if (targetRef == default) return candidates;
         var tenantRef = ResourceScopeRef.Tenant(requestContext.Current.TenantId);
-        var ancestorUids = candidates.Where(value => value.Scope.Ref != workspaceRef.Value)
+        var ancestorUids = candidates.Where(value => value.Scope.Ref != targetRef.Value)
             .Select(value => value.Uid).Distinct().ToArray();
         var policies = await context.ResourceAccessPolicies.AsNoTracking()
             .Where(value => ancestorUids.Contains(value.ResourceUid))
             .ToDictionaryAsync(value => value.ResourceUid, cancellationToken);
-        return candidates.Where(value => value.Scope.Ref == workspaceRef.Value
+        return candidates.Where(value => value.Scope.Ref == targetRef.Value
             || policies.TryGetValue(value.Uid, out var policy)
-            && GrantsDiscover(policy.GrantsJson, workspaceRef, tenantRef)).ToArray();
+            && GrantsDiscover(policy.GrantsJson, targetRef, tenantRef)).ToArray();
     }
 
-    private static bool GrantsDiscover(string grantsJson, ResourceScopeRef workspaceRef, ResourceScopeRef tenantRef) =>
+    private static bool GrantsDiscover(string grantsJson, ResourceScopeRef targetRef, ResourceScopeRef tenantRef) =>
         (JsonSerializer.Deserialize<ResourceAccessGrant[]>(grantsJson, JsonOptions) ?? []).Any(grant =>
             grant.Actions.Contains(ResourceAccessAction.Discover)
-            && (grant.TargetScopeRef == workspaceRef
+            && (grant.TargetScopeRef == targetRef
                 || grant.TargetScopeRef == tenantRef && grant.IncludeDescendants));
 
     private async Task EnsureCanReadAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken)

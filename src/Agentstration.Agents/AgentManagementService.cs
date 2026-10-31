@@ -173,6 +173,13 @@ public sealed class AgentManagementService(
     public Task<IReadOnlyList<StoredResource<AgentResource>>> ListAllAgentsAsync(int skip, int take, CancellationToken cancellationToken) =>
         store.ListAsync<AgentResource>(AgentResourceKinds.Agent, skip, take, cancellationToken);
 
+    public Task<IReadOnlyList<StoredResource<AgentResource>>> ListVisibleAgentsAsync(
+        ResourceScopeRef targetScopeRef,
+        int skip,
+        int take,
+        CancellationToken cancellationToken) =>
+        store.ListVisibleAsync<AgentResource>(targetScopeRef, AgentResourceKinds.Agent, skip, take, cancellationToken);
+
     public async Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsAsync(int skip, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
