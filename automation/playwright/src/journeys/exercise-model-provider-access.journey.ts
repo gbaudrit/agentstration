@@ -66,6 +66,11 @@ export const exerciseModelProviderAccess: Journey<ExerciseModelProviderAccessInp
     input.agentName,
     'Verify delegated Provider execution through the Tenant model profile.',
   );
+  const agentResource = await context.pages.modelProviderAccess.readAgent(
+    context.consoleUrl,
+    input.agentName,
+    authorizedScope,
+  );
   await context.checkpoint({
     name: Checkpoints.modelProviderAccess.workspaceExecuted,
     page: context.pages.page,
@@ -85,7 +90,7 @@ export const exerciseModelProviderAccess: Journey<ExerciseModelProviderAccessInp
   await models.openProviderAccess(context.consoleUrl, input.providerName);
   await access.removeGrant(tenantScope);
   await workspaces.select(authorizedWorkspaceId);
-  await context.pages.modelProviderAccess.expectAgentRunRejected(context.consoleUrl, input.agentName);
+  await context.pages.modelProviderAccess.expectAgentRunRejected(context.consoleUrl, agentResource);
   await context.checkpoint({
     name: Checkpoints.modelProviderAccess.revoked,
     page: context.pages.page,

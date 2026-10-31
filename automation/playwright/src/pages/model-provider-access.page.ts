@@ -41,21 +41,32 @@ export class ModelProviderAccessPage {
     return runId;
   }
 
-  public async expectAgentRunRejected(consoleUrl: string, agentName: string): Promise<void> {
-    const headers = await this.contextHeaders();
+  public async readAgent(
+    consoleUrl: string,
+    agentName: string,
+    scopeRef: string,
+  ): Promise<AgentExecutionResource> {
+    const headers = { 'X-Agentstration-Context': scopeRef };
     const agent = await this.page.request.get(
       `${consoleUrl}/api/agents/${encodeURIComponent(agentName)}`,
       { headers },
     );
     const agentBody = await agent.text();
     expect(agent.status(), agentBody).toBe(200);
-    const resource = JSON.parse(agentBody) as { uid: string; generation: number; scopeRef: string; namespace: string };
+    return {
+      ...(JSON.parse(agentBody) as Omit<AgentExecutionResource, 'name'>),
+      name: agentName,
+    };
+  }
+
+  public async expectAgentRunRejected(consoleUrl: string, resource: AgentExecutionResource): Promise<void> {
+    const headers = { 'X-Agentstration-Context': resource.scopeRef };
     const response = await this.page.request.post(`${consoleUrl}/api/runtime/runs`, {
       headers,
       data: {
         executionScopeRef: resource.scopeRef,
         agent: {
-          resourceId: agentName,
+          resourceId: resource.name,
           version: resource.generation,
           namespace: resource.namespace,
           scopeRef: resource.scopeRef,
@@ -100,4 +111,12 @@ interface RuntimeRunWire {
     error?: string | null;
     errorCode?: string | null;
   };
+}
+
+interface AgentExecutionResource {
+  uid: string;
+  name: string;
+  generation: number;
+  scopeRef: string;
+  namespace: string;
 }
