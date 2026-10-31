@@ -108,6 +108,7 @@ public sealed class ParameterApiTests : ModelManagementApiTestBase
         var targets = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
             $"/api/resource-scopes/targets?kind={ParameterResourceKinds.Parameter}"))!;
         var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        SelectConsoleContext(client, tenant);
 
         using var wrongType = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
             "wrong-type", new()

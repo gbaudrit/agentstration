@@ -27,6 +27,23 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ApiClientTests
 {
     [TestMethod]
+    public async Task EnrollmentAssignmentUsesTheSelectedOwnerContext()
+    {
+        var target = ResourceScopeRef.Instance;
+        string? context = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            context = request.Headers.GetValues(ConsoleContextHeaders.Name).Single();
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        await new ExtensionsApiClient(httpClient).AssignEnrollmentAsync(Guid.NewGuid(), target, default);
+
+        Assert.AreEqual(target.Value, context);
+    }
+
+    [TestMethod]
     public async Task ConsoleContextHandlerReadsNavigationContextForEveryRequest()
     {
         var contexts = new List<string?>();

@@ -366,6 +366,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         var invalid = new CreateModelProviderRequest(
             "invalid-provider",
             new ModelProviderProperties

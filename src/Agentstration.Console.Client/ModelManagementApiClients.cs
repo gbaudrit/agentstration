@@ -150,10 +150,14 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
 
     public async Task AssignEnrollmentAsync(Guid requestId, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsJsonAsync(
-            $"api/aep/enrollments/{requestId:D}/assign",
-            new AssignAepEnrollmentRequest(scopeRef),
-            cancellationToken);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"api/aep/enrollments/{requestId:D}/assign")
+        {
+            Content = JsonContent.Create(new AssignAepEnrollmentRequest(scopeRef))
+        };
+        request.Headers.TryAddWithoutValidation(ConsoleContextHeaders.Name, scopeRef.Value);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
 

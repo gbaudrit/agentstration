@@ -541,7 +541,7 @@ public sealed class ModelProviderNavigationTests
 
     private sealed class StubConsoleNavigationContext : IConsoleNavigationContext
     {
-        public string? ScopeRef => null;
+        public string? ScopeRef => ResourceScopeRef.Instance.Value;
         public string AddToUri(string uri) => uri;
     }
 

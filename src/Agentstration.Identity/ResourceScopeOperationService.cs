@@ -145,6 +145,7 @@ public sealed class ResourceScopeOperationService(
             await authorization.EnsurePermissionAsync(current, permission, cancellationToken);
             return await operation(cancellationToken);
         }
+        if (RequiresOwnerContext(permission)) throw new ResourceScopeAccessDeniedException(scopeRef);
         if (scopeRef == ResourceScopeRef.Tenant(current.TenantId))
         {
             await authorization.EnsurePermissionAsync(current, permission, cancellationToken);
@@ -159,6 +160,9 @@ public sealed class ResourceScopeOperationService(
         }
         throw new ResourceScopeAccessDeniedException(scopeRef);
     }
+
+    private static bool RequiresOwnerContext(string permission) =>
+        permission is AuthorizationPermissions.ResourcesWrite or AuthorizationPermissions.ResourcesDelete;
 
     private RequestContext RequireInteractiveContext()
     {

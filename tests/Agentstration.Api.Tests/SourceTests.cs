@@ -1241,9 +1241,14 @@ public sealed class SourceTests
         Assert.AreEqual("agentstration", verification.DeclaredPublisher.Name);
         Assert.IsNull(verification.VerifiedPublisher);
 
-        var instanceResponse = await client.PostAsJsonAsync(
-            "/api/sources/imports/yaml",
-            new ImportSourceYamlRequest(manifest, ResourceScopeRef.Instance));
+        using var instanceRequest = new HttpRequestMessage(HttpMethod.Post, "/api/sources/imports/yaml")
+        {
+            Content = JsonContent.Create(new ImportSourceYamlRequest(manifest, ResourceScopeRef.Instance))
+        };
+        instanceRequest.Headers.TryAddWithoutValidation(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
+        var instanceResponse = await client.SendAsync(instanceRequest);
         Assert.AreEqual(HttpStatusCode.Created, instanceResponse.StatusCode);
         var instance = await instanceResponse.Content.ReadFromJsonAsync<SourceImportResult>();
         Assert.IsNotNull(instance);

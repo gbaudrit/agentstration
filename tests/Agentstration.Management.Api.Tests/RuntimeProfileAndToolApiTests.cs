@@ -213,17 +213,19 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         const string runtimeName = "runtime-cleanup-profile";
         const string deploymentName = "runtime-cleanup-test--g000001";
 
-        var runtime = await runtimes.CreateAsync(new RuntimeProfileResource
-        {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
-            Metadata = new ResourceMetadata { Name = runtimeName },
-            Definition = new RuntimeProfileProperties
+        StoredResource<RuntimeProfileResource> runtime;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext))
+            runtime = await runtimes.CreateAsync(new RuntimeProfileResource
             {
-                DisplayName = "Runtime cleanup test",
-                RuntimeType = "microsoft-agent-framework"
-            }
-        }, default);
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+                Metadata = new ResourceMetadata { Name = runtimeName },
+                Definition = new RuntimeProfileProperties
+                {
+                    DisplayName = "Runtime cleanup test",
+                    RuntimeType = "microsoft-agent-framework"
+                }
+            }, default);
         await GrantRuntimeUseAsync(factory, requestContext, runtime.Value);
         var agent = await agents.PutAgentAsync(new AgentResource
         {
@@ -253,7 +255,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 
         Assert.IsNull(await agents.GetDeploymentAsync(deploymentName, default));
         Assert.IsEmpty(await runtimes.GetUsagesAsync(runtimeName, default));
-        await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext))
+            await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
         Assert.IsNull(await store.GetAsync<RuntimeProfileResource>(new(RuntimeProfileResourceKinds.RuntimeProfile, runtimeName), default));
     }
 
@@ -314,13 +317,15 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         const string runtimeName = "orphan-cleanup-profile";
         const string deploymentName = "orphan-cleanup-test--g000001";
 
-        var runtime = await runtimes.CreateAsync(new RuntimeProfileResource
-        {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
-            Metadata = new ResourceMetadata { Name = runtimeName },
-            Definition = new RuntimeProfileProperties { DisplayName = "Orphan cleanup test", RuntimeType = "microsoft-agent-framework" }
-        }, default);
+        StoredResource<RuntimeProfileResource> runtime;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext))
+            runtime = await runtimes.CreateAsync(new RuntimeProfileResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+                Metadata = new ResourceMetadata { Name = runtimeName },
+                Definition = new RuntimeProfileProperties { DisplayName = "Orphan cleanup test", RuntimeType = "microsoft-agent-framework" }
+            }, default);
         await GrantRuntimeUseAsync(factory, requestContext, runtime.Value);
         var agent = await agents.PutAgentAsync(new AgentResource
         {
@@ -347,7 +352,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         await store.DeleteAsync(new(AgentResourceKinds.Agent, agentName), agent.ETag, default);
 
         Assert.IsEmpty(await runtimes.GetUsagesAsync(runtimeName, default));
-        await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext))
+            await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
 
         Assert.IsNull(await agents.GetDeploymentAsync(deploymentName, default));
         Assert.IsNull(await runtimes.GetAsync(runtimeName, default));

@@ -413,6 +413,7 @@ public sealed class RuntimeRunTests
         using var client = factory.CreateClient();
         var template = await client.GetFromJsonAsync<AgentResource>("/api/agents/sql-expert");
         Assert.IsNotNull(template);
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         var agentRequest = new AgentResourceRequest
         {
             ApiVersion = template.ApiVersion,
@@ -426,7 +427,6 @@ public sealed class RuntimeRunTests
         var agent = await agentResponse.Content.ReadFromJsonAsync<AgentResource>();
         Assert.IsNotNull(agent);
 
-        client.DefaultRequestHeaders.Add("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
         using var runResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
         {
             Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation)

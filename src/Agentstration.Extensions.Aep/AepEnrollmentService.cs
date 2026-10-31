@@ -118,7 +118,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<IReadOnlyList<AepEnrollmentRequestResource>> ListAsync(RequestContext context, CancellationToken cancellationToken)
     {
-        using var scopeContext = RequestScopes().Push(context);
+        using var scopeContext = PushFallbackContext(context);
         await AuthorizeAsync(context, cancellationToken);
         var isPlatformAdministrator = await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken);
         return (await store.ListExactAsync<AepEnrollmentRequestResource>(
@@ -137,8 +137,10 @@ public sealed class AepEnrollmentService(
         ResourceScopeRef targetScopeRef,
         CancellationToken cancellationToken)
     {
-        using var scopeContext = RequestScopes().Push(context);
-        var stored = await GetAsync(requestId, cancellationToken);
+        using var scopeContext = PushFallbackContext(context);
+        StoredResource<AepEnrollmentRequestResource> stored;
+        using (RequestScopes().PushInstance(context))
+            stored = await GetAsync(requestId, cancellationToken);
         if (!await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken))
             throw new ResourceScopeAccessDeniedException(ResourceScopeRef.Instance);
         if (stored.Value.Definition.TargetScopeRef is { } existing)
@@ -187,7 +189,7 @@ public sealed class AepEnrollmentService(
     public async Task<AepPairingCodeResult> RotateAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
     {
         await EnsurePairingCodeEnabledAsync(cancellationToken);
-        using var scopeContext = RequestScopes().Push(context);
+        using var scopeContext = PushFallbackContext(context);
         await AuthorizeAsync(context, cancellationToken);
         var stored = await GetAssignedAsync(context, requestId, cancellationToken);
         if (stored.Value.Definition.State is AepEnrollmentState.Available or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying)
@@ -215,7 +217,7 @@ public sealed class AepEnrollmentService(
 
     public async Task CloseAsync(RequestContext context, Guid requestId, AepEnrollmentState state, CancellationToken cancellationToken)
     {
-        using var scopeContext = RequestScopes().Push(context);
+        using var scopeContext = PushFallbackContext(context);
         await AuthorizeAsync(context, cancellationToken);
         if (state is not (AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled))
             throw new ArgumentOutOfRangeException(nameof(state));
@@ -352,7 +354,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepCredentialLifecycleResponse> RotateCredentialAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
     {
-        using var scopeContext = RequestScopes().Push(context);
+        using var scopeContext = PushFallbackContext(context);
         await AuthorizeAsync(context, cancellationToken);
         var stored = await GetAssignedAsync(context, requestId, cancellationToken);
         if (stored.Value.Definition.State != AepEnrollmentState.Available)
@@ -383,7 +385,7 @@ public sealed class AepEnrollmentService(
 
     public async Task RevokeCredentialAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
     {
-        using var scopeContext = RequestScopes().Push(context);
+        using var scopeContext = PushFallbackContext(context);
         await AuthorizeAsync(context, cancellationToken);
         var stored = await GetAssignedAsync(context, requestId, cancellationToken);
         if (stored.Value.Definition.State == AepEnrollmentState.Revoked) return;
@@ -398,7 +400,7 @@ public sealed class AepEnrollmentService(
 
     public async Task UnenrollAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
     {
-        using var scopeContext = RequestScopes().Push(context);
+        using var scopeContext = PushFallbackContext(context);
         await AuthorizeAsync(context, cancellationToken);
         var stored = await GetAssignedAsync(context, requestId, cancellationToken);
         if (stored.Value.Definition.State == AepEnrollmentState.Unpaired) return;
@@ -691,6 +693,9 @@ public sealed class AepEnrollmentService(
 
     private IRequestContextScopeFactory RequestScopes() => requestContext as IRequestContextScopeFactory
         ?? throw new InvalidOperationException("AEP enrollment requires a mutable Control Plane request context.");
+
+    private IDisposable? PushFallbackContext(RequestContext context) =>
+        requestContext.AccessMode == ControlPlaneAccessMode.Unavailable ? RequestScopes().Push(context) : null;
 
     private async Task EnsurePairingCodeEnabledAsync(CancellationToken cancellationToken)
     {

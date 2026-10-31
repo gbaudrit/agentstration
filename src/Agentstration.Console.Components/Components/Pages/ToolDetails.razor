@@ -1,5 +1,6 @@
 @page "/tools/{Name}"
 @inject IToolsClient Client
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolDetailsStrings> Localizer
 
 @if (tool is null)
@@ -13,13 +14,15 @@ else
                     StatusText="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)"
                     Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)"
                     TestId="resource-tool-details">
-        <Actions><button class="button-primary" data-testid="tool-enabled-toggle" disabled="@tool.Governance.IsManaged" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button></Actions>
+        <Actions>@if (CanManage) { <button class="button-primary" data-testid="tool-enabled-toggle" disabled="@tool.Governance.IsManaged" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button> }</Actions>
     </ResourceHeader>
+
+    <InheritedResourceNotice OwnerScopeRef="@(tool.ScopeRef ?? ResourceScopeRef.Instance)" />
 
     <nav class="section-tabs tool-detail-tabs" role="tablist" aria-label="@T("DetailViews")">
         <button id="tool-overview-tab" type="button" role="tab" aria-selected="@(activeTab == ToolDetailTab.Overview ? "true" : "false")" aria-controls="tool-detail-panel" class="@(activeTab == ToolDetailTab.Overview ? "active" : null)" data-testid="tool-overview-tab" @onclick="() => activeTab = ToolDetailTab.Overview">@T("TabOverview")</button>
         <button id="tool-execution-tab" type="button" role="tab" aria-selected="@(activeTab == ToolDetailTab.Execution ? "true" : "false")" aria-controls="tool-detail-panel" class="@(activeTab == ToolDetailTab.Execution ? "active" : null)" data-testid="tool-execution-tab" @onclick="() => activeTab = ToolDetailTab.Execution">@T("TabExecution")</button>
-        <button id="tool-access-tab" type="button" role="tab" aria-selected="@(activeTab == ToolDetailTab.Access ? "true" : "false")" aria-controls="tool-detail-panel" class="@(activeTab == ToolDetailTab.Access ? "active" : null)" data-testid="tool-access-tab" @onclick="() => activeTab = ToolDetailTab.Access">@T("TabAccess")</button>
+        @if (CanManage) { <button id="tool-access-tab" type="button" role="tab" aria-selected="@(activeTab == ToolDetailTab.Access ? "true" : "false")" aria-controls="tool-detail-panel" class="@(activeTab == ToolDetailTab.Access ? "active" : null)" data-testid="tool-access-tab" @onclick="() => activeTab = ToolDetailTab.Access">@T("TabAccess")</button> }
     </nav>
 
     <div id="tool-detail-panel" role="tabpanel" aria-labelledby="@ActiveTabId">
@@ -139,7 +142,7 @@ else
                 </section>
             }
         }
-        else
+        else if (CanManage)
         {
             <ResourceAccessPanel OwnerScopeRef="@(tool.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="tool.Namespace" Kind="@ToolResourceKinds.Tool" Name="@tool.Name" Generation="tool.Generation" Governance="tool.Governance" />
         }
@@ -168,6 +171,7 @@ else
     private RunToolResponse? runResult;
     private ResourceNamespace ToolNamespace => ResourceNamespace.Parse(NamespaceValue);
     private bool CanSimulate => ToolDryRunContract.IsSupported(tool?.Definition.Schema?.Input);
+    private bool CanManage => tool is not null && ResourceOwnershipContext.CanManage(tool.ScopeRef ?? ResourceScopeRef.Instance, Services);
     private IReadOnlyDictionary<string, JsonElement>? ManagedRunValues => runMode == ToolRunMode.Simulate ? DryRunEnabled : null;
     private bool CanSubmit => tool is { Definition.Enabled: true }
         && tool.Definition.Discovery?.Available == true
@@ -212,6 +216,7 @@ else
 
     private async Task ToggleAsync()
     {
+        if (!CanManage) return;
         var value = await Client.SetEnabledAsync(ToolNamespace, Name, !tool!.Definition.Enabled, etag, default);
         tool = value.Value;
         etag = value.ETag;

@@ -257,6 +257,8 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        var context = await GetBootstrapContextAsync(factory);
+        SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
         var unsafeProperties = new ExtensionRegistrationProperties
         {
             DisplayName = "Unsafe",
@@ -294,6 +296,8 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        var context = await GetBootstrapContextAsync(factory);
+        SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
         var properties = new ExtensionRegistrationProperties
         {
             DisplayName = "Authenticated extension",

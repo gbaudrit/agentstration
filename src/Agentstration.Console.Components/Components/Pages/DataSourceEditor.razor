@@ -4,17 +4,19 @@
 @inject IDataSourcesClient Client
 @inject IDataSourceProfilesClient Profiles
 @inject NavigationManager Navigation
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
 
 <PageTitle>@(source?.Definition.DisplayName ?? T(IsNew ? "CreateSource" : "DataSources")) · Agentstration</PageTitle>
 <PageHeader Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@T("DataSourcesHelp")" TestId="data-source-editor">
-    <Actions>@if (!IsNew) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-sources">@T("Back")</a></Actions>
+    <Actions>@if (!IsNew && CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-sources">@T("Back")</a></Actions>
 </PageHeader>
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else
 {
     @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
-    @if (!IsNew) { <ResourceTabs Label="@T("DataSources")">@foreach (var value in Enum.GetValues<Tab>()) { <button type="button" role="tab" class="@(tab == value ? "active" : null)" @onclick="() => SelectTab(value)">@T(value.ToString())</button> }</ResourceTabs> }
+    @if (!IsNew && selectedScope is not null) { <InheritedResourceNotice OwnerScopeRef="selectedScope.Value" /> }
+    @if (!IsNew) { <ResourceTabs Label="@T("DataSources")">@foreach (var value in Enum.GetValues<Tab>().Where(value => CanManage || value is not Tab.Access)) { <button type="button" role="tab" class="@(tab == value ? "active" : null)" @onclick="() => SelectTab(value)">@T(value.ToString())</button> }</ResourceTabs> }
     @if (tab == Tab.Overview && !IsNew)
     {
         <section class="metric-grid"><MetricCard Label="@T("State")" Value="@T(readiness?.Ready == true ? "Ready" : "NotReady")" Detail="@T(source!.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /><MetricCard Label="@T("Profile")" Value="@(readiness?.Profile?.Definition.DisplayName ?? source!.Definition.Profile.Name)" Detail="@(readiness?.Profile?.Version ?? "—")" Status="@UiStatus.Info" Url="@ProfileUrl" /><MetricCard Label="@T("Generation")" Value="@source.Generation.ToString()" Detail="@($"{source.Namespace}/{source.Name}")" Status="@UiStatus.Info" /><MetricCard Label="@T("LastAcquisition")" Value="@(LatestAcquisition is null ? T("None") : AcquisitionStateLabel(LatestAcquisition.State))" Detail="@(LatestAcquisition is null ? T("AcquisitionCount", acquisitions.Count) : $"{T("AcquisitionCount", acquisitions.Count)} · {LatestAcquisition.CreatedAt.ToLocalTime():g}")" Status="@AcquisitionTone(LatestAcquisition?.State)" Url="@AcquisitionsUrl" /></section>
@@ -29,7 +31,7 @@ else
     }
     else if (tab == Tab.Definition || IsNew)
     {
-        <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section"><div class="form-grid">
+        <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)"><div class="form-grid">
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="data-source-display-name" TechnicalNameTestId="data-source-name" />
             <label><span>@T("Namespace")</span><input @bind="sourceNamespace" disabled="@(!IsNew)" /></label>
             @if (IsNew) { <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSource" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
@@ -37,7 +39,7 @@ else
             <label class="data-source-choice form-span-2" data-testid="data-source-enabled-option"><input type="checkbox" @bind="enabled" /><span class="data-source-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
             <label class="form-field-wide"><span>@T("Profile")</span><select value="@profileKey" @onchange="ChangeProfile" required data-testid="data-source-profile"><option value="">@T("Select")</option>@foreach (var item in profiles) { <option value="@ProfileKey(item)">@item.Definition.DisplayName · @item.ActiveVersion · @item.ScopeRef</option> }</select></label>
             <div class="form-field-wide schema-backed-input" data-testid="data-source-configuration"><span>@T("Configuration")</span><JsonSchemaInputEditor Schema="ConfigurationSchema" Value="configuration" ValueChanged="value => configuration = value" ValidationChanged="state => configurationValid = state.IsValid" Disabled="busy" /></div>
-        </div><div class="form-actions"><button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !configurationValid)">@(busy ? T("Saving") : T("Save"))</button></div></EditForm>
+        </div>@if (CanManage) { <div class="form-actions"><button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !configurationValid)">@(busy ? T("Saving") : T("Save"))</button></div> }</fieldset></EditForm>
     }
     else if (tab == Tab.Acquisitions)
     {
@@ -52,7 +54,7 @@ else
         @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <DataGrid TItem="DataSourceDiscoveryChoice" Items="manifest.Choices"><Header><tr><th>@T("Choice")</th><th>@T("Parent")</th><th>@T("State")</th><th>@T("TargetName")</th></tr></Header><Row Context="choice"><tr data-testid="data-source-discovery-choice"><td><strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></td><td>@(choice.ParentId ?? "—")</td><td>@(choice.Eligible ? T("Eligible") : T("Ineligible"))</td><td><input value="@PromotionName(choice)" @oninput="args => promotionNames[choice.Id] = args.Value?.ToString() ?? string.Empty" aria-label="@T("TargetName")" /><button class="button-secondary" type="button" disabled="@(busy || !choice.Eligible || string.IsNullOrWhiteSpace(PromotionName(choice)) || targets.Any(value => value.Target.DiscoveryUid == LatestDiscovery.Uid && value.Target.ChoiceId == choice.Id))" @onclick="() => PromoteAsync(choice)">@T("Promote")</button></td></tr></Row></DataGrid> }
         @if (targets.Count > 0) { <h3>@T("AcquisitionTargets")</h3><DataGrid TItem="DataSourceAcquisitionTargetView" Items="targets"><Header><tr><th>@T("Name")</th><th>@T("Choice")</th><th>@T("State")</th></tr></Header><Row Context="item"><tr><td>@item.Target.DisplayName<br/><code>@item.Target.Name</code></td><td>@item.Target.ChoiceDisplayName</td><td><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></td></tr></Row></DataGrid> }</section>
     }
-    else if (tab == Tab.Access)
+    else if (tab == Tab.Access && CanManage)
     {
         <ResourceAccessPanel OwnerScopeRef="selectedScope!.Value" Namespace="source!.Namespace" Kind="@DataSourceResourceKinds.DataSource" Name="@source.Name" Generation="source.Generation" Governance="source.Governance" />
     }
@@ -60,8 +62,8 @@ else
     {
         <section class="panel form-section" data-testid="data-source-yaml-editor">
             <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("DataSourceYaml")</h2><p>@T("DataSourceYamlHelp")</p></div></div>
-            <label class="data-source-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" aria-label="@T("ResourceManifest")" @bind="rawYaml" @bind:event="oninput"></textarea></label>
-            <div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@(busy ? T("Saving") : T("SaveYaml"))</button></div>
+            <label class="data-source-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" aria-label="@T("ResourceManifest")" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanManage)"></textarea></label>
+            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@(busy ? T("Saving") : T("SaveYaml"))</button></div> }
         </section>
     }
 }
@@ -88,6 +90,7 @@ else
     private bool enabled = true, loading = true, busy, confirmDelete, configurationValid = true, parametersValid = true;
     private Tab tab = Tab.Definition;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool CanManage => IsNew || selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
     private DataSourceAcquisitionResource? LatestAcquisition => acquisitions.OrderByDescending(value => value.CreatedAt).FirstOrDefault();
     private DataSourceDiscoveryResource? LatestDiscovery => discoveries.OrderByDescending(value => value.CreatedAt).FirstOrDefault();
     private string? ProfileUrl => readiness?.Profile is not { } profile ? null

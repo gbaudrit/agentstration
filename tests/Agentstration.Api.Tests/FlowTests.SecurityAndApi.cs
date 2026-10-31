@@ -134,8 +134,16 @@ public sealed partial class FlowTests
         Assert.AreEqual(HttpStatusCode.Created, workspaceResponse.StatusCode);
 
         var service = factory.Services.GetRequiredService<FlowService>();
-        using var instanceResponse = await client.PostAsJsonAsync("/api/flows",
-            request with { Description = "Instance", ScopeRef = ResourceScopeRef.Instance }, JsonOptions);
+        using var instanceRequest = new HttpRequestMessage(HttpMethod.Post, "/api/flows")
+        {
+            Content = JsonContent.Create(
+                request with { Description = "Instance", ScopeRef = ResourceScopeRef.Instance },
+                options: JsonOptions)
+        };
+        instanceRequest.Headers.TryAddWithoutValidation(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
+        using var instanceResponse = await client.SendAsync(instanceRequest);
         Assert.AreEqual(HttpStatusCode.Created, instanceResponse.StatusCode, await instanceResponse.Content.ReadAsStringAsync());
         var instanceFlow = await instanceResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
         Assert.AreEqual(ResourceScopeRef.Instance, instanceFlow?.ScopeRef);

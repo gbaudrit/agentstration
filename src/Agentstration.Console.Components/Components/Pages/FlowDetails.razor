@@ -5,6 +5,7 @@
 @inject IFlowApiClient Client
 @inject NavigationManager Navigation
 @inject ConsoleContextState ContextState
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings> Localizer
 <PageTitle>@(flow?.Name ?? T("Flow")) · Agentstration</PageTitle>
 <div data-testid="flow-observability-flow-details">
@@ -15,6 +16,7 @@ else
         <Status><StatusBadge Text="@StatusLabel" Status="@PlatformDashboardService.ToStatus(Status)" /></Status>
         <Actions>@if (!IsOrchestration && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@EditorLabel</a> }</Actions>
     </PageHeader>
+    <InheritedResourceNotice OwnerScopeRef="FlowScopeRef" />
     <nav class="section-tabs" aria-label="@T("DetailsAriaLabel")">
         @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" data-testid="@(tab == "Access" ? "flow-access-tab" : tab == "Runs" ? "flow-runs-tab" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button> }
     </nav>
@@ -80,7 +82,7 @@ else
     {
         <DataGrid TItem="FlowVersionResponse" Items="versions"><Header><tr><th>@T("Deployment")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Published")</th></tr></Header><Row Context="version"><tr><td><code>local</code></td><td>@version.Version</td><td><StatusBadge Text="@(version.Version == flow.ActiveVersion ? T("Active") : T("Published"))" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></td><td>@version.PublishedAt.LocalDateTime.ToString("g")</td></tr></Row></DataGrid>
     }
-    else if (activeTab == "Access")
+    else if (activeTab == "Access" && IsOwnerContext)
     {
         <ResourceAccessPanel OwnerScopeRef="FlowScopeRef" Namespace="FlowResourceNamespace" Kind="@FlowResourceKinds.Flow" Name="@flow.Id" Version="@(flow.ActiveVersion ?? flow.Version)" Governance="flow.Governance" />
     }
@@ -121,8 +123,9 @@ else
     private string StatusLabel => T($"Status.{Status}");
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
     private ResourceScopeRef FlowScopeRef => flow?.ScopeRef ?? (string.IsNullOrWhiteSpace(ScopeRefValue) ? ResourceScopeRef.Workspace(Guid.Empty) : ResourceScopeRef.Parse(ScopeRefValue));
-    private bool IsEditable => flow?.Governance.IsManaged is false;
-    private IReadOnlyList<string> AvailableTabs => Tabs;
+    private bool IsOwnerContext => ResourceOwnershipContext.CanManage(flow?.ScopeRef, Services);
+    private bool IsEditable => flow?.Governance.IsManaged is false && IsOwnerContext;
+    private IReadOnlyList<string> AvailableTabs => IsOwnerContext ? Tabs : Tabs.Where(tab => tab != "Access").ToArray();
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
     private bool IsOrchestration => Orchestration is not null;
     private string FlowYaml => flow?.Graph is { } graph ? FlowYamlPresentation.ToYaml(graph) : flow is null ? string.Empty : ResourceManifestSerializer.ToYaml(flow.Definition);
@@ -166,6 +169,7 @@ else
         if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = "Definition";
         else if (string.Equals(View, "access", StringComparison.OrdinalIgnoreCase)) activeTab = "Access";
         else if (string.Equals(View, "yaml", StringComparison.OrdinalIgnoreCase)) activeTab = "YAML";
+        if (!IsOwnerContext && activeTab == "Access") activeTab = "Overview";
         if (activeTab == "Definition" && !IsOrchestration) await LoadDefinitionAsync();
     }
 
