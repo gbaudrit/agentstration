@@ -72,6 +72,55 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ConsoleContextsRemainIndependentAcrossSameHostnameDifferentPorts()
+    {
+        var requests = new List<(int Port, string? ScopeRef)>();
+        var firstWorkspace = ResourceScopeRef.Workspace(Guid.Parse(
+            "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")).Value;
+        var secondWorkspace = ResourceScopeRef.Workspace(Guid.Parse(
+            "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")).Value;
+        var firstContext = new MutableConsoleNavigationContext { ScopeRef = firstWorkspace };
+        var secondContext = new MutableConsoleNavigationContext { ScopeRef = secondWorkspace };
+
+        using var firstClient = CreateContextClient(7100, firstContext, requests);
+        using var secondClient = CreateContextClient(7200, secondContext, requests);
+
+        using var firstResponse = await firstClient.GetAsync("api/agents");
+        using var secondResponse = await secondClient.GetAsync("api/agents");
+        firstContext.ScopeRef = ResourceScopeRef.Instance.Value;
+        using var updatedFirstResponse = await firstClient.GetAsync("api/agents");
+        using var unchangedSecondResponse = await secondClient.GetAsync("api/agents");
+
+        CollectionAssert.AreEqual(new[]
+        {
+            (7100, firstWorkspace),
+            (7200, secondWorkspace),
+            (7100, ResourceScopeRef.Instance.Value),
+            (7200, secondWorkspace)
+        }, requests);
+
+        static HttpClient CreateContextClient(
+            int port,
+            IConsoleNavigationContext navigationContext,
+            ICollection<(int Port, string? ScopeRef)> requests)
+            => new(new ConsoleNavigationContextHandler(navigationContext)
+            {
+                InnerHandler = new StubHandler(request =>
+                {
+                    requests.Add((
+                        request.RequestUri!.Port,
+                        request.Headers.TryGetValues(ConsoleContextHeaders.Name, out var values)
+                            ? values.Single()
+                            : null));
+                    return new HttpResponseMessage(HttpStatusCode.OK);
+                })
+            })
+            {
+                BaseAddress = new Uri($"http://localhost:{port}/")
+            };
+    }
+
+    [TestMethod]
     public async Task ParametersClientPreservesExactScopeAndConcurrencyToken()
     {
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
