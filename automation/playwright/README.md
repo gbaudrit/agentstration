@@ -102,10 +102,40 @@ The descendant Secret and Vault journey checks that a Tenant Vault is unavailabl
 npm run capture -- --plan examples/exercise-descendant-secrets.capture-plan.json --output .work/descendant-secrets --console-url https://agentstration.example.com
 ```
 
+The hierarchical Resource Access journey covers `/vaults/{name}`, `/secrets/new`, `/tools/{name}`, and the shared Access tab. It requires two prepared sibling Workspaces and Platform-administrator access. Its deterministic local fixture enrolls `Agentstration.Extensions.Utilities` at Instance scope through the Pairing Code protocol. It verifies default denial, exact descendant grant and use, sibling denial, localized invalid-target feedback, governed definition immutability, independent policy revocation, and stable governed identity:
+
+```powershell
+npm run capture -- --plan examples/exercise-resource-access.capture-plan.json --output .work/resource-access --console-url https://agentstration.example.com
+```
+
+The exact execution-scope journey creates an Instance-owned Agent and Flow, grants their use to one Tenant and its descendants, then invokes both definitions from the Console in the selected Workspace. It verifies Workspace-owned Runtime Run, Flow Run, and root WorkItem state, recovery through the Workspace run list after navigation, sibling isolation, stable denial from an unrelated Tenant, and distinct localized definition/invocation scope labels:
+
+```powershell
+npm run capture -- --plan examples/exercise-execution-scopes.capture-plan.json --output .work/execution-scopes
+```
+
+The operational Workspace journey verifies that Instance and Tenant administration route Flow execution into their dedicated protected Workspaces. It checks that those Workspaces never appear as business choices, that definition and storage scopes remain distinct, that Runs survive navigation in the matching administrative context, and that business and unrelated Tenant contexts cannot discover them:
+
+```powershell
+npm run capture -- --plan examples/exercise-operational-workspaces.capture-plan.json --output .work/operational-workspaces
+```
+
 The local Ollama extension backs a fully offline create/update/delete journey for a model provider, model profile, and runtime profile:
 
 ```powershell
 npm run capture -- --plan examples/exercise-model-administration.capture-plan.json --output .work/model-administration
+```
+
+The hierarchical Model Provider access journey requires two prepared sibling Workspaces. It grants an Instance Provider to their Tenant without propagating Provider discovery, authors a Tenant Profile, grants that Profile to one Workspace, verifies deterministic execution and sibling denial, then revokes the Provider grant and verifies fail-closed execution:
+
+```powershell
+npm run capture -- --plan examples/exercise-model-provider-access.capture-plan.json --output .work/model-provider-access
+```
+
+The Model Profile cross-scope journey verifies complete authorized usage impact, navigation from an Instance profile to a consuming Workspace Agent and back, refresh and browser-history consistency, independent new-tab context, dynamic usage updates, and non-disclosure of inaccessible consumers:
+
+```powershell
+npm exec playwright test tests/model-profile-cross-scope.spec.ts
 ```
 
 The solution-discovery video Flow and Entry are captured with:

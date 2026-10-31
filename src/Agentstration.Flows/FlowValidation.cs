@@ -47,6 +47,7 @@ public static class FlowValidator
     public static void ValidateReference(FlowReference reference)
     {
         ValidateName(reference.FlowId.Value, "flow_reference_invalid");
+        if (reference.ScopeRef is { } scopeRef) _ = scopeRef.Value;
         if (reference.Version is not null) ValidateVersion(reference.Version);
         if (reference.Version is null && !reference.UseActiveVersion)
             throw new FlowValidationException("flow_reference_unresolved", "A Flow reference must select a version or the active version.");
@@ -181,9 +182,18 @@ public static class FlowValidator
     private static void ValidateTarget(FlowTargetReference? target)
     {
         if (target is null || string.IsNullOrWhiteSpace(target.Id)) throw new FlowValidationException("flow_target_required", "A Flow target identifier is required.");
-        if (target.Kind != FlowTargetKind.Flow && target.Version is not null)
-            throw new FlowValidationException("flow_target_version_invalid", "Only a Flow target can select a Flow version.");
-        if (target.Version is not null) ValidateVersion(target.Version);
+        if (target.Version is null) return;
+        if (target.Kind == FlowTargetKind.Flow)
+        {
+            ValidateVersion(target.Version);
+            return;
+        }
+        if (target.Kind == FlowTargetKind.Agent
+            && long.TryParse(target.Version, out var generation)
+            && generation > 0)
+            return;
+        throw new FlowValidationException("flow_target_version_invalid",
+            "Only a Flow version or a positive Agent generation can be selected.");
     }
 
     private static void ValidateName(string value, string code)

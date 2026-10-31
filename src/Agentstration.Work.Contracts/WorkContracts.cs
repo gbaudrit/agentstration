@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Flows;
+using Agentstration.Resources;
 using Agentstration.Work;
 
 namespace Agentstration.Work.Contracts;
@@ -15,7 +16,10 @@ public sealed record CreateWorkItemRequest(
     IReadOnlyDictionary<string, string>? Metadata = null,
     IReadOnlyList<WorkInputRequest>? Inputs = null,
     IReadOnlyList<WorkAttachmentRequest>? Attachments = null,
-    FlowReference? Flow = null);
+    FlowReference? Flow = null)
+{
+    public ResourceScopeRef? ExecutionScopeRef { get; init; }
+}
 
 public sealed record WorkInputRequest(string? Text = null, JsonElement? Structured = null, IReadOnlyDictionary<string, string>? Metadata = null);
 public sealed record WorkAttachmentRequest(string Name, string Uri, string? MediaType = null, long? Size = null, IReadOnlyDictionary<string, string>? Metadata = null);
@@ -45,9 +49,10 @@ public sealed record WorkItemResponse(
     IReadOnlyList<WorkInteraction> Interactions,
     WorkResultResponse? Result,
     WorkErrorResponse? Error,
-    long Version);
+    long Version,
+    ResourceScopeRef? ExecutionScopeRef = null);
 
-public sealed record WorkItemSummaryResponse(Guid Id, string Type, string? Title, WorkItemStatus Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string? RequesterIdentity, string? SelectedAgentId, long Version);
+public sealed record WorkItemSummaryResponse(Guid Id, string Type, string? Title, WorkItemStatus Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string? RequesterIdentity, string? SelectedAgentId, long Version, ResourceScopeRef? ExecutionScopeRef = null);
 public sealed record WorkResultResponse(IReadOnlyList<WorkResultContent> Contents, IReadOnlyList<WorkArtifact> Artifacts, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt);
 public sealed record WorkErrorResponse(string Code, string Message, WorkErrorCategory Category, bool IsRecoverable, DateTimeOffset OccurredAt, Guid? ExecutionId);
 public sealed record WorkEventResponse(Guid EventId, long Sequence, string Type, WorkInteractionOrigin Origin, DateTimeOffset OccurredAt, IReadOnlyDictionary<string, string>? Metadata);

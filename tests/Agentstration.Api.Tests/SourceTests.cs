@@ -1241,9 +1241,14 @@ public sealed class SourceTests
         Assert.AreEqual("agentstration", verification.DeclaredPublisher.Name);
         Assert.IsNull(verification.VerifiedPublisher);
 
-        var instanceResponse = await client.PostAsJsonAsync(
-            "/api/sources/imports/yaml",
-            new ImportSourceYamlRequest(manifest, ResourceScopeRef.Instance));
+        using var instanceRequest = new HttpRequestMessage(HttpMethod.Post, "/api/sources/imports/yaml")
+        {
+            Content = JsonContent.Create(new ImportSourceYamlRequest(manifest, ResourceScopeRef.Instance))
+        };
+        instanceRequest.Headers.TryAddWithoutValidation(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
+        var instanceResponse = await client.SendAsync(instanceRequest);
         Assert.AreEqual(HttpStatusCode.Created, instanceResponse.StatusCode);
         var instance = await instanceResponse.Content.ReadFromJsonAsync<SourceImportResult>();
         Assert.IsNotNull(instance);
@@ -1302,7 +1307,7 @@ public sealed class SourceTests
                     Source = ExtensionRegistrationSource.Configuration
                 }
             }, default);
-            await factory.Services.GetRequiredService<SourceProviderManagementService>().CreateAsync(new SourceProviderResource
+            var provider = await factory.Services.GetRequiredService<SourceProviderManagementService>().CreateAsync(new SourceProviderResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = SourceResourceKinds.SourceProvider,
@@ -1315,6 +1320,13 @@ public sealed class SourceTests
                     ContributionId = "git"
                 }
             }, default);
+            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+                new ResourceAccessPolicy(
+                    new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                        provider.Value.Kind, provider.Value.Generation),
+                    [new(workspaceScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+                null,
+                default);
         }
 
         using var configure = new HttpRequestMessage(

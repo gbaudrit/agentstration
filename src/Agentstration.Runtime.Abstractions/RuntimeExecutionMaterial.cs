@@ -18,7 +18,15 @@ public sealed record RuntimeExecutionToolMaterial(
     bool RequiresApproval,
     string? ProviderId,
     ResourceNamespace? ProviderNamespace,
-    string? ExternalId);
+    string? ExternalId)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public Guid? Uid { get; init; }
+    public long? Generation { get; init; }
+    public ResourceScopeRef? ProviderScopeRef { get; init; }
+    public Guid? ProviderUid { get; init; }
+    public long? ProviderGeneration { get; init; }
+}
 
 public sealed record RuntimeExecutionAgentMaterial(
     string MaterialId,
@@ -37,6 +45,9 @@ public sealed record RuntimeExecutionAgentMaterial(
     IReadOnlyList<RuntimeExecutionToolMaterial> Tools)
 {
     public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? AgentScopeRef { get; init; }
+    public ResourceScopeRef? ModelProfileScopeRef { get; init; }
+    public Guid RevisionUid { get; init; }
     public string RuntimeProfileName { get; init; } = string.Empty;
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
 }
@@ -49,7 +60,12 @@ public abstract record RuntimeExecutionMaterial(
     WorkspaceId WorkspaceId,
     Guid TenantId,
     Guid PrincipalId,
-    string RunId);
+    string RunId)
+{
+    public ResourceScopeRef ScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
+        ? ResourceScopeRef.Instance
+        : ResourceScopeRef.Workspace(WorkspaceId.Value);
+}
 
 public sealed record RuntimeDirectAgentExecutionMaterial(
     string MaterialId,
@@ -84,7 +100,10 @@ public sealed record RuntimeRootFlowExecutionMaterial(
     string? ParentFlowRunId = null,
     string? CorrelationId = null,
     TimeSpan OrchestrationTimeout = default)
-    : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId);
+    : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId)
+{
+    public string? FlowScopeRef { get; init; }
+}
 
 public sealed record RuntimeFlowResumeMaterial(
     string RuntimeType,

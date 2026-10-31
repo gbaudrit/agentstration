@@ -16,7 +16,10 @@ public sealed record ResolvedFlowCall(
     string Version,
     JsonElement? InputSchema,
     JsonElement? OutputSchema,
-    IReadOnlyList<FlowOutputDefinition>? Outputs = null);
+    IReadOnlyList<FlowOutputDefinition>? Outputs = null)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 
 public sealed record ResolvedFlowTool(
     string ResourceId,
@@ -33,10 +36,14 @@ public sealed record ResolvedFlowToolRoute(
     string ToolSetVersion,
     string Capability,
     string Route,
+    ResourceScopeRef ToolScopeRef,
     Guid ToolUid,
     long ToolGeneration,
     string ProviderName,
     ResourceNamespace ProviderNamespace,
+    ResourceScopeRef ProviderScopeRef,
+    Guid ProviderUid,
+    long ProviderGeneration,
     JsonElement InputSchema,
     JsonElement? OutputSchema,
     bool RequiresApproval);
@@ -50,6 +57,14 @@ public interface IFlowResourceReferenceResolver
 {
     Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken);
     Task<ResolvedFlowCall?> ResolveFlowAsync(
+        ResourceScopeRef ownerScopeRef,
+        ResourceNamespace ownerNamespace,
+        FlowCallReference reference,
+        CancellationToken cancellationToken) => ownerScopeRef.Kind == ResourceScopeKind.Workspace
+            ? ResolveFlowAsync(new WorkspaceId(ownerScopeRef.TargetId!.Value), ownerNamespace, reference, cancellationToken)
+            : Task.FromResult<ResolvedFlowCall?>(null);
+
+    Task<ResolvedFlowCall?> ResolveFlowAsync(
         WorkspaceId workspaceId,
         ResourceNamespace ownerNamespace,
         FlowCallReference reference,
@@ -62,10 +77,26 @@ public interface IFlowResourceReferenceResolver
         CancellationToken cancellationToken) => Task.FromResult(false);
 
     Task<ResolvedFlowTool?> ResolveToolAsync(
+        ResourceScopeRef ownerScopeRef,
+        ResourceNamespace ownerNamespace,
+        FlowToolReference reference,
+        CancellationToken cancellationToken) => ownerScopeRef.Kind == ResourceScopeKind.Workspace
+            ? ResolveToolAsync(new WorkspaceId(ownerScopeRef.TargetId!.Value), ownerNamespace, reference, cancellationToken)
+            : Task.FromResult<ResolvedFlowTool?>(null);
+
+    Task<ResolvedFlowTool?> ResolveToolAsync(
         WorkspaceId workspaceId,
         ResourceNamespace ownerNamespace,
         FlowToolReference reference,
         CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowTool?>(null);
+
+    Task<ResolvedFlowToolRoute?> ResolveToolRouteAsync(
+        ResourceScopeRef ownerScopeRef,
+        ResourceNamespace ownerNamespace,
+        ToolRouteFlowStepDefinition step,
+        CancellationToken cancellationToken) => ownerScopeRef.Kind == ResourceScopeKind.Workspace
+            ? ResolveToolRouteAsync(new WorkspaceId(ownerScopeRef.TargetId!.Value), ownerNamespace, step, cancellationToken)
+            : Task.FromResult<ResolvedFlowToolRoute?>(null);
 
     Task<ResolvedFlowToolRoute?> ResolveToolRouteAsync(
         WorkspaceId workspaceId,

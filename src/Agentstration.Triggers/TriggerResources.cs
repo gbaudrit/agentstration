@@ -54,7 +54,10 @@ public sealed record TriggerFlowTarget
 {
     public required string Name { get; init; }
     public ResourceNamespace? Namespace { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? Version { get; init; }
+    public Guid? Uid { get; init; }
+    public string? DefinitionHash { get; init; }
 }
 
 public sealed record TriggerTarget
@@ -63,7 +66,31 @@ public sealed record TriggerTarget
     public TriggerFlowTarget? Flow { get; init; }
 }
 
-public sealed record TriggerExecutionScope(Guid TenantId, Guid WorkspaceId, Guid PrincipalId);
+public sealed record TriggerExecutionScope(Guid TenantId, Guid WorkspaceId, Guid PrincipalId)
+{
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
+    public ResourceScopeRef AccessScopeRef => LogicalScopeRef ?? ResourceScopeRef.Workspace(WorkspaceId);
+}
+
+public sealed record TriggerOperationalContext(
+    Guid TenantId,
+    Guid WorkspaceId,
+    Guid PrincipalId,
+    ResourceScopeRef LogicalScopeRef)
+{
+    public ResourceScopeRef WorkspaceScopeRef => ResourceScopeRef.Workspace(WorkspaceId);
+    public TriggerExecutionScope ExecutionScope => new(TenantId, WorkspaceId, PrincipalId)
+    {
+        LogicalScopeRef = LogicalScopeRef.Kind == ResourceScopeKind.Workspace ? null : LogicalScopeRef
+    };
+}
+
+public interface ITriggerOperationalContext
+{
+    TriggerOperationalContext Current { get; }
+    IDisposable EnterWorkspace();
+    IDisposable EnterWorkspace(TriggerExecutionScope executionScope);
+}
 
 public sealed record TriggerProperties
 {
@@ -144,7 +171,12 @@ public interface ITriggerScheduleCalculator
 
 public interface ITriggerTargetValidator
 {
-    Task ValidateAsync(ResourceNamespace ownerNamespace, TriggerTarget target, CancellationToken cancellationToken);
+    Task<TriggerFlowTarget> ResolveAsync(
+        ResourceNamespace ownerNamespace,
+        TriggerFlowTarget target,
+        ResourceScopeRef consumerScopeRef,
+        bool requireUse,
+        CancellationToken cancellationToken);
 }
 
 public interface ITriggerSchedulerProjection

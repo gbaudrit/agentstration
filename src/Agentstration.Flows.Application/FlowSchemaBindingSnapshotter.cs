@@ -14,13 +14,12 @@ internal sealed class FlowSchemaBindingSnapshotter(ISchemaBindingResolver resolv
     private const string JsonSchemaDialect = "https://json-schema.org/draft/2020-12/schema";
 
     public async ValueTask<ResolvedFlowSchemaBindings> ResolveAsync(
-        WorkspaceId workspaceId,
+        ResourceScopeRef ownerScopeRef,
         FlowId flowId,
         FlowGraphDefinition graph,
         CancellationToken cancellationToken)
     {
-        var context = new SchemaBindingResolutionContext(ResourceScopeRef.Workspace(workspaceId.Value),
-            flowId.Namespace, JsonSchemaFormat);
+        var context = new SchemaBindingResolutionContext(ownerScopeRef, flowId.Namespace, JsonSchemaFormat);
         var snapshots = new Dictionary<string, SchemaBindingSnapshot>(StringComparer.Ordinal);
         var input = await ResolveAsync("$.inputSchema", graph.InputSchema, graph.InputSchemaBinding,
             context, snapshots, cancellationToken);

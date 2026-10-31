@@ -26,9 +26,17 @@ import { inspectRuntimeWorkerObservability, type InspectRuntimeWorkerObservabili
 import { inspectAgentInstanceObservability, type InspectAgentInstanceObservabilityInput } from './inspect-agent-instance-observability.journey.js';
 import { exerciseSchemaDrivenSources, type ExerciseSchemaDrivenSourcesInput } from './exercise-schema-driven-sources.journey.js';
 import { exerciseSchemaAdministration, type ExerciseSchemaAdministrationInput } from './exercise-schema-administration.journey.js';
+import { exerciseResourceAccess, type ExerciseResourceAccessInput } from './exercise-resource-access.journey.js';
+import { exerciseExecutionScopes, type ExerciseExecutionScopesInput } from './exercise-execution-scopes.journey.js';
+import { exerciseHierarchicalContext, type ExerciseHierarchicalContextInput } from './exercise-hierarchical-context.journey.js';
+import { exerciseOperationalWorkspaces, type ExerciseOperationalWorkspacesInput } from './exercise-operational-workspaces.journey.js';
+import { exerciseOperationalTriggers, type ExerciseOperationalTriggersInput } from './exercise-operational-triggers.journey.js';
 import { exerciseSchemaContractBindings, type ExerciseSchemaContractBindingsInput } from './exercise-schema-contract-bindings.journey.js';
 import { exerciseFlowConnectionContracts, type ExerciseFlowConnectionContractsInput } from './exercise-flow-connection-contracts.journey.js';
 import { exerciseSchemaDrivenFlowInputs, type ExerciseSchemaDrivenFlowInputsInput } from './exercise-schema-driven-flow-inputs.journey.js';
+import { exerciseModelProviderAccess, type ExerciseModelProviderAccessInput } from './exercise-model-provider-access.journey.js';
+import { exerciseInheritedResourceReadOnly, type ExerciseInheritedResourceReadOnlyInput } from './exercise-inherited-resource-readonly.journey.js';
+import { exerciseModelProfileCrossScope, type ExerciseModelProfileCrossScopeInput } from './exercise-model-profile-cross-scope.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -60,7 +68,15 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'inspect-agent-instance-observability': (context, input) => inspectAgentInstanceObservability(context, input as unknown as InspectAgentInstanceObservabilityInput),
   'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),
   'exercise-schema-administration': (context, input) => exerciseSchemaAdministration(context, input as unknown as ExerciseSchemaAdministrationInput),
+  'exercise-resource-access': (context, input) => exerciseResourceAccess(context, input as unknown as ExerciseResourceAccessInput),
+  'exercise-execution-scopes': (context, input) => exerciseExecutionScopes(context, input as unknown as ExerciseExecutionScopesInput),
+  'exercise-hierarchical-context': (context, input) => exerciseHierarchicalContext(context, input as unknown as ExerciseHierarchicalContextInput),
+  'exercise-operational-workspaces': (context, input) => exerciseOperationalWorkspaces(context, input as unknown as ExerciseOperationalWorkspacesInput),
+  'exercise-operational-triggers': (context, input) => exerciseOperationalTriggers(context, input as unknown as ExerciseOperationalTriggersInput),
   'exercise-schema-contract-bindings': (context, input) => exerciseSchemaContractBindings(context, input as unknown as ExerciseSchemaContractBindingsInput),
   'exercise-flow-connection-contracts': (context, input) => exerciseFlowConnectionContracts(context, input as unknown as ExerciseFlowConnectionContractsInput),
   'exercise-schema-driven-flow-inputs': (context, input) => exerciseSchemaDrivenFlowInputs(context, input as unknown as ExerciseSchemaDrivenFlowInputsInput),
+  'exercise-model-provider-access': (context, input) => exerciseModelProviderAccess(context, input as unknown as ExerciseModelProviderAccessInput),
+  'exercise-inherited-resource-readonly': (context, input) => exerciseInheritedResourceReadOnly(context, input as unknown as ExerciseInheritedResourceReadOnlyInput),
+  'exercise-model-profile-cross-scope': (context, input) => exerciseModelProfileCrossScope(context, input as unknown as ExerciseModelProfileCrossScopeInput),
 };

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
@@ -48,7 +49,7 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(
                 "/models/ollama-local.qwen3-deadbeef?namespace=shared.models",
                 rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
-            CollectionAssert.AreEqual(new[] { "Overview", "Configuration" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
+            CollectionAssert.AreEqual(new[] { "Overview", "Configuration", "Access" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
             Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
         });
 
@@ -64,6 +65,15 @@ public sealed class ModelProviderNavigationTests
             Assert.AreEqual(1, context.Services.GetRequiredService<IModelProvidersClient>() is StubModelProvidersClient stub ? stub.RefreshCalls : -1);
             StringAssert.Contains(rendered.Find("[data-testid='model-discovery-result']").TextContent, "1 updated");
             Assert.AreEqual(1, rendered.FindAll("[data-testid='open-model-details']").Count);
+        });
+
+        rendered.Find("#model-provider-access-tab").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(rendered.Find("[data-testid='resource-access-panel']"));
+            Assert.IsNotNull(rendered.Find(".access-identity"));
+            Assert.IsNotNull(rendered.Find("[data-testid='resource-access-target']"));
+            Assert.IsFalse(rendered.Markup.Contains("Resource identity unavailable", StringComparison.Ordinal));
         });
     }
 
@@ -410,6 +420,108 @@ public sealed class ModelProviderNavigationTests
         });
     }
 
+    [TestMethod]
+    public void ExistingModelProfileShowsTheSameCrossScopeImpactAndUsageList()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(out var providers);
+        context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance");
+
+        var rendered = context.Render<ModelProfileEditor>(parameters => parameters
+            .Add(value => value.Name, "shared-reasoning"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsTrue(rendered.Markup.Contains("Changing this profile will affect 2 agents.",
+                StringComparison.Ordinal), rendered.Markup);
+            Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-impact-banner']"));
+            Assert.IsTrue(rendered.Markup.Contains("Review these dependencies", StringComparison.Ordinal));
+        });
+        rendered.Find("[data-testid='model-profile-review-usages']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(2, rendered.FindAll("[data-testid='model-profile-usage']"));
+            Assert.HasCount(2, rendered.FindAll(".model-profile-usage-card"));
+            Assert.IsTrue(rendered.FindAll(".model-profile-usage-card a").All(link =>
+                link.GetAttribute("target") is null
+                && link.GetAttribute("rel") is null
+                && link.GetAttribute("data-enhance-nav") is null));
+            Assert.IsTrue(rendered.Markup.Contains("Instance assistant", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.Markup.Contains("Workspace assistant", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.Markup.Contains("Default workspace", StringComparison.Ordinal));
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedContextScope);
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedModelContextScope);
+            var profiles = context.Services.GetRequiredService<IModelProfilesClient>() as ExistingModelProfilesClient;
+            Assert.IsNotNull(profiles);
+            Assert.AreEqual(ResourceScopeRef.Instance, profiles.RequestedProfileContextScope);
+            Assert.AreEqual(ResourceScopeRef.Instance, profiles.RequestedUsageContextScope);
+            Assert.AreEqual(ResourceScopeRef.Instance, profiles.RequestedResolutionContextScope);
+            var workspaceLink = rendered.FindAll("[data-testid='model-profile-usage'] a")
+                .Single(value => value.TextContent.Contains("Workspace assistant", StringComparison.Ordinal));
+            var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance&tab=usages";
+            Assert.AreEqual(
+                $"/agents/workspace-assistant?scopeRef={Uri.EscapeDataString(WorkspaceScope.Value)}&context={Uri.EscapeDataString(WorkspaceScope.Value)}&returnUrl={Uri.EscapeDataString(returnUrl)}",
+                workspaceLink.GetAttribute("href"));
+        });
+    }
+
+    [TestMethod]
+    public void ExistingModelProfileResolvesProviderDependenciesFromItsOwnerScope()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(out var providers);
+        context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}");
+
+        var rendered = context.Render<ModelProfileEditor>(parameters => parameters
+            .Add(value => value.Name, "shared-reasoning"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedContextScope);
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.RequestedModelContextScope);
+            var profiles = context.Services.GetRequiredService<IModelProfilesClient>() as ExistingModelProfilesClient;
+            Assert.IsNotNull(profiles);
+            Assert.AreEqual(WorkspaceScope, profiles.RequestedProfileContextScope);
+            Assert.AreEqual(WorkspaceScope, profiles.RequestedUsageContextScope);
+            Assert.AreEqual(WorkspaceScope, profiles.RequestedResolutionContextScope);
+            Assert.IsEmpty(rendered.FindAll(".form-alert-warning"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-delete']"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-save']"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-access-tab']"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-impact-banner']"));
+            Assert.IsTrue(rendered.Find("[data-testid='model-profile-definition-fields']")
+                .HasAttribute("disabled"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-usages-tab']"));
+        });
+    }
+
+    [TestMethod]
+    public void ExistingModelProfileShowsLocalizedEmptyUsages()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = CreateContext(out _);
+        context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient(hasUsages: false));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance");
+
+        var rendered = context.Render<ModelProfileEditor>(parameters => parameters
+            .Add(value => value.Name, "shared-reasoning"));
+        rendered.Find("[data-testid='model-profile-usages-tab']").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(0, rendered.FindAll("[data-testid='model-profile-usage']"));
+            Assert.IsTrue(rendered.Markup.Contains("Agents utilisant ce profil", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.Markup.Contains("Aucune utilisation", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.Markup.Contains("Aucun agent ne référence ce profil.", StringComparison.Ordinal));
+        });
+    }
+
     private static BunitContext CreateContext(out StubModelProvidersClient providers,
         IReadOnlyList<ExtensionResponse>? extensions = null)
     {
@@ -421,21 +533,51 @@ public sealed class ModelProviderNavigationTests
         context.Services.AddSingleton<IParametersClient>(new StubParametersClient());
         context.Services.AddSingleton<ISecretsClient>(new StubSecretsClient());
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new StubResourceScopeInventoryClient());
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(new StubResourceAccessPolicyClient());
+        context.Services.AddSingleton<IConsoleNavigationContext>(new StubConsoleNavigationContext());
         context.Services.AddSingleton(new NotificationState());
         return context;
     }
 
+    private sealed class StubConsoleNavigationContext : IConsoleNavigationContext
+    {
+        public string? ScopeRef => ResourceScopeRef.Instance.Value;
+        public string AddToUri(string uri) => uri;
+    }
+
     private sealed class StubResourceScopeInventoryClient : IResourceScopeInventoryClient
     {
-        public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceScopeInventoryResponse([
+                new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", null, false,
+                    [new(Guid.Empty, ProviderNamespace, ModelResourceKinds.ModelProvider, "ollama/local", DateTimeOffset.UnixEpoch)]),
+                new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", ResourceScopeRef.Instance, true, [])
+            ]));
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string kind, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", true)]);
+            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([
+                new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true),
+                new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", true)
+            ]);
+    }
+
+    private sealed class StubResourceAccessPolicyClient : IResourceAccessPolicyClient
+    {
+        public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) =>
+            Task.FromResult<ResourceAccessPolicySnapshot?>(null);
+
+        public Task<ResourceAccessPolicySnapshot> PutAsync(
+            ResourceAccessPolicy policy,
+            string? etag,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessPolicySnapshot(policy, "\"provider-policy\""));
     }
 
     private sealed class StubModelProvidersClient : IModelProvidersClient
     {
         public ResourceNamespace? RequestedModelNamespace { get; private set; }
         public string? RequestedModelProvider { get; private set; }
+        public ResourceScopeRef? RequestedContextScope { get; private set; }
+        public ResourceScopeRef? RequestedModelContextScope { get; private set; }
         public int RefreshCalls { get; private set; }
         public string? RefreshedProvider { get; private set; }
         public bool FailRefresh { get; set; }
@@ -454,6 +596,14 @@ public sealed class ModelProviderNavigationTests
                     "configuration", "available", "Local Ollama", 1), ProviderNamespace.Value)
             ]);
 
+        public Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedContextScope = contextScope;
+            return GetModelProvidersAsync(cancellationToken);
+        }
+
         public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceSnapshot<ModelProviderResource>(ProviderResource(providerName), "\"provider-etag\""));
 
@@ -470,6 +620,16 @@ public sealed class ModelProviderNavigationTests
             return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([
                 new("qwen3", "Qwen 3", "available", new ModelSpecification(), ResourceName: "ollama-local.qwen3-deadbeef")
             ]);
+        }
+
+        public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(
+            ResourceNamespace @namespace,
+            string providerName,
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedModelContextScope = contextScope;
+            return GetProviderModelsAsync(@namespace, providerName, cancellationToken);
         }
 
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) =>
@@ -504,6 +664,7 @@ public sealed class ModelProviderNavigationTests
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ModelResourceKinds.ModelProvider,
             Metadata = new ResourceMetadata { Name = name, Namespace = ProviderNamespace },
+            ScopeRef = ResourceScopeRef.Instance,
             Definition = new ModelProviderProperties
             {
                 DisplayName = "Local Ollama",
@@ -599,6 +760,97 @@ public sealed class ModelProviderNavigationTests
         public Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class ExistingModelProfilesClient(bool hasUsages = true) : IModelProfilesClient
+    {
+        public ResourceScopeRef? RequestedProfileContextScope { get; private set; }
+        public ResourceScopeRef? RequestedUsageContextScope { get; private set; }
+        public ResourceScopeRef? RequestedResolutionContextScope { get; private set; }
+
+        private static readonly ModelProfileResource Profile = new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ModelResourceKinds.ModelProfile,
+            Metadata = new ResourceMetadata { Name = "shared-reasoning" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new ModelProfileProperties
+            {
+                DisplayName = "Shared reasoning",
+                Provider = new ResourceReference("ollama/local", ResourceScopeRef.Instance, ProviderNamespace),
+                Model = new ModelSelection { Name = "qwen3" }
+            }
+        };
+
+        private static readonly ModelProfileUsagesResponse Usages = new([
+            new(AgentResourceKinds.Agent, "instance-assistant", "instance-assistant", "Instance assistant",
+                ResourceNamespace.DefaultValue, ResourceScopeRef.Instance, "Instance"),
+            new(AgentResourceKinds.Agent, "workspace-assistant", "workspace-assistant", "Workspace assistant",
+                ResourceNamespace.DefaultValue, WorkspaceScope, "Default workspace")
+        ], 2);
+
+        public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(
+            string profileName,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, "\"profile-etag\""));
+
+        public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(
+            ResourceNamespace @namespace,
+            string profileName,
+            ResourceScopeRef scopeRef,
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedProfileContextScope = contextScope;
+            return GetModelProfileAsync(profileName, cancellationToken);
+        }
+
+        public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
+            string profileName,
+            CancellationToken cancellationToken) => Task.FromResult(hasUsages
+                ? Usages
+                : new ModelProfileUsagesResponse([], 0));
+
+        public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
+            ResourceNamespace @namespace,
+            string profileName,
+            ResourceScopeRef scopeRef,
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedUsageContextScope = contextScope;
+            return GetModelProfileUsagesAsync(profileName, cancellationToken);
+        }
+
+        public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(
+            string profileName,
+            CancellationToken cancellationToken) => Task.FromResult(new ModelProfileResolutionResponse(
+                new(Profile.Name, Profile.Name, Profile.Definition.DisplayName,
+                    Profile.Namespace.Value, Profile.ScopeRef),
+                new("ollama/local", "ollama/local", "Local Ollama", "ollama", "available",
+                    ProviderNamespace.Value),
+                new("qwen3", "available"),
+                new(Profile.Definition.Generation, Profile.Definition.Reasoning, Profile.Definition.Output),
+                "available",
+                []));
+
+        public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(
+            ResourceNamespace @namespace,
+            string profileName,
+            ResourceScopeRef scopeRef,
+            ResourceScopeRef contextScope,
+            CancellationToken cancellationToken)
+        {
+            RequestedResolutionContextScope = contextScope;
+            return GetModelProfileResolutionAsync(profileName, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }

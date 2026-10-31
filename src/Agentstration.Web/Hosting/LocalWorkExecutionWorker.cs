@@ -3,6 +3,7 @@ using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Infrastructure;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Local;
 using Agentstration.Work;
@@ -26,7 +27,7 @@ public sealed class LocalWorkExecutionWorker(
             try
             {
                 var scope = execution.Request.ExecutionScope
-                    ?? throw new WorkValidationException("work_execution_scope_required", "Work execution requires a durable Workspace scope.");
+                    ?? throw new WorkValidationException("work_execution_scope_required", "Work execution requires a durable exact scope.");
                 await executionScopes.ValidateAsync(scope, stoppingToken);
                 using var activeExecutionScope = executionScopes.Enter(scope);
                 if (execution.Request.Flow is not null)
@@ -37,7 +38,10 @@ public sealed class LocalWorkExecutionWorker(
                 var selected = await agentExecution.SelectAgentAsync(execution.Request.Instruction, execution.Request.RequestedAgentId, stoppingToken);
                 var started = new WorkExecutionStarted(
                     Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
-                    timeProvider.GetUtcNow(), selected.Route.AgentId);
+                    timeProvider.GetUtcNow(), selected.Route.AgentId)
+                {
+                    ExecutionScopeRef = scope.ScopeRef
+                };
                 await workItems.ApplyExecutionEventAsync(started, stoppingToken);
                 var runtimeScope = new RuntimeRunScope(scope.TenantId, scope.WorkspaceId, scope.PrincipalId);
                 var routed = await agentExecution.ExecuteSelectedAsync(
@@ -58,7 +62,8 @@ public sealed class LocalWorkExecutionWorker(
                     timeProvider.GetUtcNow());
                 await workItems.ApplyExecutionEventAsync(new WorkExecutionCompleted(
                     Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
-                    timeProvider.GetUtcNow(), result), stoppingToken);
+                    timeProvider.GetUtcNow(), result)
+                { ExecutionScopeRef = scope.ScopeRef }, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -72,7 +77,11 @@ public sealed class LocalWorkExecutionWorker(
                     var error = new WorkError("runtime_execution_failed", "The runtime could not complete the work.", WorkErrorCategory.Execution, true, timeProvider.GetUtcNow(), execution.Accepted.ExecutionId, exception.Message);
                     await workItems.ApplyExecutionEventAsync(new WorkExecutionFailed(
                         Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
-                        timeProvider.GetUtcNow(), error), stoppingToken);
+                        timeProvider.GetUtcNow(), error)
+                    {
+                        ExecutionScopeRef = execution.Request.ExecutionScope?.ScopeRef
+                            ?? ResourceScopeRef.Workspace(execution.Request.WorkspaceId.Value)
+                    }, stoppingToken);
                 }
                 catch (Exception persistenceException) when (persistenceException is not OperationCanceledException)
                 {
@@ -88,7 +97,8 @@ public sealed class LocalWorkExecutionWorker(
         var selectedAgent = $"flow:{flow.FlowId.Value}";
         await workItems.ApplyExecutionEventAsync(new WorkExecutionStarted(
             Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId,
-            timeProvider.GetUtcNow(), selectedAgent), cancellationToken);
+            timeProvider.GetUtcNow(), selectedAgent)
+        { ExecutionScopeRef = execution.Request.ExecutionScope!.ScopeRef }, cancellationToken);
         var input = execution.Request.Metadata.ContainsKey(RootFlowSubmissionService.RootRunIdMetadata)
             && execution.Request.Inputs.FirstOrDefault()?.Structured is { } rootInput
                 ? rootInput
@@ -142,14 +152,17 @@ public sealed class LocalWorkExecutionWorker(
         }
         FlowRun current = created;
         await foreach (var observed in flowRuns.ObserveAsync(created.Id, scope, cancellationToken)) current = observed;
-        if (!await WaitUntilTaskCanCompleteAsync(execution.Request.WorkspaceId, execution.Request.WorkItemId, cancellationToken)) return;
+        if (!await WaitUntilTaskCanCompleteAsync(scope.ScopeRef, execution.Request.WorkItemId, cancellationToken)) return;
         if (current.Status != FlowRunStatus.Succeeded)
         {
             var error = new WorkError(
                 current.Error?.Code ?? "flow_run_failed", current.Error?.Message ?? "The Flow Run failed.",
                 WorkErrorCategory.Execution, true, timeProvider.GetUtcNow(), execution.Accepted.ExecutionId, current.Error?.Details);
             await workItems.ApplyExecutionEventAsync(new WorkExecutionFailed(
-                Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId, timeProvider.GetUtcNow(), error), cancellationToken);
+                Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId, timeProvider.GetUtcNow(), error)
+            {
+                ExecutionScopeRef = scope.ScopeRef
+            }, cancellationToken);
             return;
         }
 
@@ -162,7 +175,10 @@ public sealed class LocalWorkExecutionWorker(
             new Dictionary<string, string> { ["flowRunId"] = current.Id, ["flowId"] = current.FlowId.Value },
             timeProvider.GetUtcNow());
         await workItems.ApplyExecutionEventAsync(new WorkExecutionCompleted(
-            Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId, timeProvider.GetUtcNow(), result), cancellationToken);
+            Guid.NewGuid(), execution.Request.WorkspaceId, execution.Request.WorkItemId, execution.Accepted.ExecutionId, timeProvider.GetUtcNow(), result)
+        {
+            ExecutionScopeRef = scope.ScopeRef
+        }, cancellationToken);
     }
 
     private static IReadOnlyList<WorkArtifact> DurableArtifactReferences(JsonElement? output)
@@ -197,11 +213,11 @@ public sealed class LocalWorkExecutionWorker(
         _ => FlowRunTrigger.WorkItem
     };
 
-    private async Task<bool> WaitUntilTaskCanCompleteAsync(Agentstration.Resources.WorkspaceId workspaceId, WorkItemId workItemId, CancellationToken cancellationToken)
+    private async Task<bool> WaitUntilTaskCanCompleteAsync(ResourceScopeRef scopeRef, WorkItemId workItemId, CancellationToken cancellationToken)
     {
         while (true)
         {
-            var stored = await workItems.GetAsync(workspaceId, workItemId, cancellationToken);
+            var stored = await workItems.GetExactAsync(scopeRef, workItemId, cancellationToken);
             if (stored is null || stored.Value.Status is WorkItemStatus.Cancelled or WorkItemStatus.Completed or WorkItemStatus.Failed) return false;
             if (stored.Value.Status is not (WorkItemStatus.Paused or WorkItemStatus.WaitingForInput or WorkItemStatus.WaitingForApproval)) return true;
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);

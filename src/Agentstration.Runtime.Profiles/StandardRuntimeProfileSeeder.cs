@@ -6,30 +6,30 @@ namespace Agentstration.Runtime.Profiles;
 
 public sealed class StandardRuntimeProfileSeeder(
     RuntimeProfileManagementService runtimes,
-    ICurrentRequestContext requestContext)
+    ICurrentRequestContext requestContext,
+    IResourceGovernanceContext governance)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
-    private readonly HashSet<Guid> initializedTenants = [];
+    private bool initialized;
 
     public async Task EnsureAsync(CancellationToken cancellationToken)
     {
         if (!requestContext.IsInitialized) return;
-        await EnsureAsync(ResourceScopeRef.Tenant(requestContext.Current.TenantId), cancellationToken);
+        await EnsureAsync(ResourceScopeRef.Instance, cancellationToken);
     }
 
-    public async Task EnsureAsync(ResourceScopeRef tenantScope, CancellationToken cancellationToken)
+    public async Task EnsureAsync(ResourceScopeRef instanceScope, CancellationToken cancellationToken)
     {
-        if (tenantScope.Kind != ResourceScopeKind.Tenant)
-            throw new ArgumentException("The standard RuntimeProfile requires a Tenant scope.", nameof(tenantScope));
-        var tenantId = tenantScope.TargetId
-            ?? throw new ArgumentException("The Tenant scope has no target ID.", nameof(tenantScope));
+        if (instanceScope != ResourceScopeRef.Instance)
+            throw new ArgumentException("The standard RuntimeProfile requires the Instance scope.", nameof(instanceScope));
 
         await gate.WaitAsync(cancellationToken);
         try
         {
-            if (initializedTenants.Contains(tenantId)) return;
+            if (initialized) return;
+            using var governanceScope = governance.Push(ResourceGovernance.Core("runtime.standard-profile"));
 
-            if (await runtimes.GetExactAsync(tenantScope, ResourceNamespace.Default, "maf-builtin", cancellationToken) is null)
+            if (await runtimes.GetExactAsync(instanceScope, ResourceNamespace.Default, "maf-builtin", cancellationToken) is null)
             {
                 await runtimes.CreateAsync(new RuntimeProfileResource
                 {
@@ -54,13 +54,13 @@ public sealed class StandardRuntimeProfileSeeder(
                             Streaming = StreamingMode.Automatic
                         }
                     },
-                    ScopeRef = tenantScope,
+                    ScopeRef = instanceScope,
                     Generation = 1,
                     Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
                 }, cancellationToken);
             }
 
-            initializedTenants.Add(tenantId);
+            initialized = true;
         }
         finally
         {

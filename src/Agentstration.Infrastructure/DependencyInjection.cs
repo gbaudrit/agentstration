@@ -3,6 +3,7 @@ using Agentstration.Application.Work;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.DataSources;
+using Agentstration.Extensions.Aep;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.PostgreSql;
 using Agentstration.Flows.Storage.Sqlite;
@@ -29,6 +30,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Packs;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.ResourcePlanning;
@@ -91,6 +93,7 @@ public static class DependencyInjection
         services.TryAddSingleton<ITriggerExecutionContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
         services.TryAddSingleton<ResourceScopeOperationService>();
+        services.TryAddSingleton<ReadableResourceScopeService>();
         services.TryAddSingleton<IResourceScopeOperations>(provider => provider.GetRequiredService<ResourceScopeOperationService>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
@@ -149,10 +152,16 @@ public static class DependencyInjection
             provider.GetRequiredService<IMasterKeyProvider>()));
         services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<DescendantResourceUseAuthorizer>();
+        services.AddSingleton<IResourceIdentityContributor, FlowResourceIdentityContributor>();
+        services.AddSingleton<IResourceIdentityCatalog, ResourceIdentityCatalog>();
+        services.AddSingleton<ResourceAccessPolicyService>();
+        services.AddSingleton<IResourceAccessPolicyService>(provider => provider.GetRequiredService<ResourceAccessPolicyService>());
         services.AddSingleton<ParameterManagementService>();
         services.AddSingleton<DataSourceProfileService>();
         services.AddSingleton<DataSourceManagementService>();
         services.AddSingleton<DataSourceAcquisitionService>();
+        services.AddSingleton<DataSourceDiscoveryService>();
+        services.AddSingleton<DataSourceAcquisitionTargetService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
         services.AddSingleton<KnowledgeProjectionService>();
         services.AddSingleton<KnowledgeRetrievalService>();
@@ -164,6 +173,7 @@ public static class DependencyInjection
         services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();
         services.AddSingleton<IInitialPrincipalProvisioner, InitialPrincipalProvisioner>();
         services.AddSingleton<IInitialTopologyProvisioner, InitialTopologyProvisioner>();
+        services.AddSingleton<IOperationalTopologyProvisioner, OperationalTopologyProvisioner>();
         services.AddSingleton<ILocalPrincipalProvisioner, LocalPrincipalProvisioner>();
         services.AddSingleton<IPlatformAuthorizationService, PlatformAuthorizationService>();
         services.AddSingleton<PlatformAdministratorLifecycleLock>();
@@ -198,6 +208,7 @@ public static class DependencyInjection
         services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
         services.AddSingleton<IRuntimeAgentResolver, ResourceRuntimeAgentResolver>();
+        services.AddSingleton<IRuntimeAgentAccessValidator, RuntimeAgentAccessValidator>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
         if (!useManagedProfileResolver)
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
@@ -289,6 +300,7 @@ public static class DependencyInjection
         services.AddSingleton<SourceRegistryDiscoveryService>();
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentToolProvisioner>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ISchemaFormatHandler, BuiltinJsonSchemaFormatHandler>();
@@ -302,6 +314,7 @@ public static class DependencyInjection
         services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();
         services.AddSingleton<RuntimeProfileManagementService>();
         services.AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>();
+        services.AddSingleton<ITriggerOperationalContext, TriggerOperationalContextAdapter>();
         services.AddSingleton<ITriggerTargetValidator, FlowTriggerTargetValidator>();
         services.AddSingleton<ITriggerExecutionAuthorizer, WorkspaceTriggerExecutionAuthorizer>();
         services.AddSingleton<ITriggerWorkSubmitter, TriggerWorkSubmitter>();
@@ -452,6 +465,9 @@ public static class DependencyInjection
             flowConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "flow-plane.db")}";
             services.AddSqliteFlowStorage(flowConnectionString);
         }
+        services.AddSingleton<IFlowScopeHierarchy, ResourceFlowScopeHierarchy>();
+        services.AddSingleton<IFlowDiscoveryPolicy, FlowDiscoveryPolicy>();
+        services.AddSingleton<IFlowAgentReferenceResolver, FlowAgentReferenceResolver>();
         services.AddSingleton<FlowService>();
         services.AddSingleton<IEntryExecutionResolver, EntryExecutionResolver>();
         services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
@@ -484,8 +500,10 @@ public static class DependencyInjection
         services.AddSingleton<DashboardAdministrationService>();
         services.AddSingleton<IFlowRunQueue, AwpFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
-        services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
+        services.AddSingleton<WorkspaceFlowRunExecutionScope>();
+        services.AddSingleton<IFlowRunExecutionScope>(provider => provider.GetRequiredService<WorkspaceFlowRunExecutionScope>());
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
+        services.AddSingleton<IWorkExecutionScopeAccessor>(provider => provider.GetRequiredService<WorkspaceFlowRunExecutionScope>());
         services.AddSingleton<IRootFlowTargetResolver, RootFlowTargetResolver>();
         services.AddSingleton<IRootFlowRunGateway, RootFlowRunGateway>();
         services.AddSingleton<IRootFlowSubmissionAuthorizer, RootFlowSubmissionAuthorizer>();

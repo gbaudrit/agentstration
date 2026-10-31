@@ -16,6 +16,7 @@ public sealed class WorkItem
     {
         Id = snapshot.Id;
         WorkspaceId = snapshot.WorkspaceId;
+        ExecutionScopeRef = snapshot.ScopeRef ?? ResourceScopeRef.Workspace(snapshot.WorkspaceId.Value);
         OwnerPrincipalId = snapshot.OwnerPrincipalId;
         Type = snapshot.Type;
         Title = snapshot.Title;
@@ -44,6 +45,7 @@ public sealed class WorkItem
 
     public WorkItemId Id { get; }
     public WorkspaceId WorkspaceId { get; }
+    public ResourceScopeRef ExecutionScopeRef { get; }
     public Guid OwnerPrincipalId { get; }
     public string Type { get; }
     public string? Title { get; }
@@ -84,9 +86,48 @@ public sealed class WorkItem
         IReadOnlyList<WorkInput>? inputs = null,
         IReadOnlyList<WorkAttachment>? attachments = null,
         FlowReference? flow = null)
+        => CreateCore(id, ResourceScopeRef.Workspace(workspaceId.Value), workspaceId, ownerPrincipalId, type,
+            instruction, now, title, description, requesterIdentity, correlationId, metadata, requestedAgentId,
+            inputs, attachments, flow);
+
+    public static WorkItem Create(
+        WorkItemId id,
+        ExactExecutionScope executionScope,
+        string type,
+        string instruction,
+        DateTimeOffset now,
+        string? title = null,
+        string? description = null,
+        string? requesterIdentity = null,
+        WorkCorrelationId? correlationId = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        string? requestedAgentId = null,
+        IReadOnlyList<WorkInput>? inputs = null,
+        IReadOnlyList<WorkAttachment>? attachments = null,
+        FlowReference? flow = null)
+        => CreateCore(id, executionScope.ScopeRef, executionScope.WorkspaceId ?? default,
+            executionScope.PrincipalId, type, instruction, now, title, description, requesterIdentity,
+            correlationId, metadata, requestedAgentId, inputs, attachments, flow);
+
+    private static WorkItem CreateCore(
+        WorkItemId id,
+        ResourceScopeRef scopeRef,
+        WorkspaceId workspaceId,
+        Guid ownerPrincipalId,
+        string type,
+        string instruction,
+        DateTimeOffset now,
+        string? title,
+        string? description,
+        string? requesterIdentity,
+        WorkCorrelationId? correlationId,
+        IReadOnlyDictionary<string, string>? metadata,
+        string? requestedAgentId,
+        IReadOnlyList<WorkInput>? inputs,
+        IReadOnlyList<WorkAttachment>? attachments,
+        FlowReference? flow)
     {
         if (id.Value == Guid.Empty) throw new WorkValidationException("workitem_id_required", "A work item identifier is required.");
-        if (workspaceId.Value == Guid.Empty) throw new WorkValidationException("workspace_id_required", "A workspace identifier is required.");
         if (ownerPrincipalId == Guid.Empty) throw new WorkValidationException("owner_principal_id_required", "An owner principal identifier is required.");
         if (string.IsNullOrWhiteSpace(type)) throw new WorkValidationException("workitem_type_required", "A work item type is required.");
         if (string.IsNullOrWhiteSpace(instruction)) throw new WorkValidationException("workitem_instruction_required", "A work item instruction is required.");
@@ -119,7 +160,8 @@ public sealed class WorkItem
             [new WorkHistoryEvent(submittedId, 1, "WorkItemSubmitted", WorkInteractionOrigin.Requester, now)],
             null,
             null,
-            1));
+            1,
+            scopeRef));
     }
 
     public static WorkItem Restore(WorkItemSnapshot snapshot) => new(snapshot);
@@ -127,12 +169,12 @@ public sealed class WorkItem
     public WorkItemSnapshot ToSnapshot() => new(
         Id, WorkspaceId, OwnerPrincipalId, Type, Title, Instruction, Description, Status, CreatedAt, UpdatedAt, RequesterIdentity, CorrelationId,
         Metadata, RequestedAgentId, Flow, SelectedAgentId, CurrentExecutionId, [.. _inputs], [.. _attachments], [.. _messages],
-        [.. _interactions], [.. _history], Result, Error, Version);
+        [.. _interactions], [.. _history], Result, Error, Version, ExecutionScopeRef);
 
     public bool ApplyRuntimeEvent(WorkExecutionEvent executionEvent)
     {
         ArgumentNullException.ThrowIfNull(executionEvent);
-        if (executionEvent.WorkspaceId != WorkspaceId) throw new WorkTransitionException("workspace_mismatch", "The runtime event belongs to another workspace.");
+        if (executionEvent.ExecutionScopeRef != ExecutionScopeRef) throw new WorkTransitionException("execution_scope_mismatch", "The runtime event belongs to another execution scope.");
         if (executionEvent.WorkItemId != Id) throw new WorkTransitionException("workitem_mismatch", "The runtime event belongs to another work item.");
         if (_appliedRuntimeEvents.Contains(executionEvent.EventId)) return false;
         if (CurrentExecutionId is not null && executionEvent.ExecutionId != CurrentExecutionId)

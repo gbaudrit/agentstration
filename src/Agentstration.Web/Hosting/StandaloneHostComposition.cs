@@ -283,10 +283,12 @@ internal static class StandaloneHostCompositionExtensions
                     await app.Services.GetRequiredService<SourceRegistryManagementService>().EnsureOfficialAsync(token);
                     if (string.Equals(composition.Authentication.Mode, ApiAuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
                         bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(token);
+                    await app.Services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(token);
                     await app.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token);
                     if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
                         await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);
                     await app.Services.ApplyDeclarativeBootstrapAsync(token);
+                    await app.Services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(token);
                     if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
                         await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);
                     await app.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token);

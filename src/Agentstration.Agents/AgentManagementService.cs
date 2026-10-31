@@ -3,6 +3,7 @@ using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Schemas.Contracts;
@@ -41,8 +42,11 @@ public sealed class AgentManagementService(
     IManagementEventPublisher eventBus,
     IModelProfileReferenceValidator modelProfiles,
     IResourceReferenceResolver references,
+    IResourceAccessPolicyService accessPolicies,
     ToolSetService toolSets,
     IResourceScopeOperations scopeOperations,
+    ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
     IEnumerable<IResourceDeletionGuard> deletionGuards,
     IAgentRevisionRunRetention revisionRunRetention,
@@ -68,10 +72,10 @@ public sealed class AgentManagementService(
     {
         ValidateResource(resource, AgentResourceKinds.Agent);
         ValidateDefinition(resource.Definition);
-        var key = ResourceKey.Create(AgentResourceKinds.Agent, resource.Metadata.Name, resource.Namespace);
-        var existing = await store.GetAsync<AgentResource>(key, cancellationToken);
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(AgentResourceKinds.Agent);
+        var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, AgentResourceKinds.Agent, resource.Name);
+        var existing = await store.GetExactAsync<AgentResource>(address, cancellationToken);
         ValidatePreconditions(existing, ifMatch, ifNoneMatch);
-        var scopeRef = existing?.Value.ScopeRef ?? resource.ScopeRef ?? scopeOperations.DefaultScopeRef(AgentResourceKinds.Agent);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
         await ValidateReferencesAsync(resource, scopeRef, cancellationToken);
         var contracts = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
@@ -99,6 +103,8 @@ public sealed class AgentManagementService(
         store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, name), cancellationToken);
     public Task<StoredResource<AgentResource>?> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, name, @namespace), cancellationToken);
+    public Task<StoredResource<AgentResource>?> GetAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
+        scopeRef is { } exact ? GetAgentExactAsync(exact, @namespace, name, cancellationToken) : GetAgentAsync(@namespace, name, cancellationToken);
     public Task<StoredResource<AgentResource>?> GetAgentExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         store.GetExactAsync<AgentResource>(ScopedResourceAddress.Create(scopeRef, @namespace, AgentResourceKinds.Agent, name), cancellationToken);
 
@@ -178,26 +184,39 @@ public sealed class AgentManagementService(
         => await CreateRevisionAsync(ResourceNamespace.Default, agentName, spec, cancellationToken);
 
     public async Task<StoredResource<AgentRevision>> CreateRevisionAsync(ResourceNamespace @namespace, string agentName, AgentDeploymentSpec spec, CancellationToken cancellationToken)
+        => await CreateRevisionAsync(@namespace, agentName, null, spec, cancellationToken);
+
+    public async Task<StoredResource<AgentRevision>> CreateRevisionAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef? scopeRef, AgentDeploymentSpec spec, CancellationToken cancellationToken)
     {
-        await ValidateRuntimeProfileAsync(spec.RuntimeProfileNamespace, spec.RuntimeProfileName, cancellationToken);
-        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        var (toolSetTools, toolSetAssignments) = await ResolveToolSetAssignmentsAsync(agent.Value, cancellationToken);
-        var contracts = await ResolveContractsAsync(
-            agent.Value.Definition,
-            agent.Value.ScopeRef ?? scopeOperations.DefaultScopeRef(AgentResourceKinds.Agent),
-            agent.Value.Namespace,
-            cancellationToken);
-        var resolved = compiler.Compile(agent.Value with { Definition = contracts.Definition }, spec, toolSetTools, toolSetAssignments)
-            with
+        var agent = await GetAgentAsync(@namespace, agentName, scopeRef, cancellationToken) ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
+        var ownerScopeRef = agent.Value.ScopeRef
+            ?? throw new AgentDefinitionValidationException("agent_scope_invalid", "The Agent has no ownership scope.");
+        var contracts = await ResolveContractsAsync(agent.Value.Definition, ownerScopeRef, agent.Value.Namespace, cancellationToken);
+        var resolvedAgent = agent.Value with { Definition = contracts.Definition };
+        var (toolSetTools, toolSetAssignments, toolSetPins) = await ResolveToolSetAssignmentsAsync(resolvedAgent, cancellationToken);
+        var directToolPins = await ResolveToolPinsAsync(resolvedAgent, ownerScopeRef, cancellationToken);
+        var modelProfilePin = await modelProfiles.ResolveAsync(
+            resolvedAgent.Definition.ModelProfile, resolvedAgent.Namespace, ownerScopeRef, cancellationToken)
+            ?? await ResolveDependencyAsync(resolvedAgent.Definition.ModelProfile, resolvedAgent.Namespace,
+                ModelResourceKinds.ModelProfile, ownerScopeRef, cancellationToken);
+        var runtimeReference = new ResourceReference(spec.RuntimeProfileName,
+            resolvedAgent.Definition.RuntimeProfile.ScopeRef, spec.RuntimeProfileNamespace);
+        var runtimeProfilePin = await ResolveDependencyAsync(runtimeReference, resolvedAgent.Namespace,
+            RuntimeProfileResourceKinds.RuntimeProfile, ownerScopeRef, cancellationToken);
+        var resolved = compiler.Compile(resolvedAgent, spec, toolSetTools, toolSetAssignments,
+            [.. directToolPins, .. toolSetPins],
+            modelProfilePin, runtimeProfilePin) with
         { SchemaBindings = contracts.Snapshots };
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
-        var existing = await store.GetAsync<AgentRevision>(new(AgentResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
+        var revisionAddress = ScopedResourceAddress.Create(ownerScopeRef, @namespace, AgentResourceKinds.AgentRevision, revisionName);
+        var existing = await GetRevisionInternalAsync(revisionAddress, cancellationToken);
         if (existing is not null)
         {
             if (Matches(existing.Value, agent.Value, resolved)) return existing;
             revisionName = $"{revisionName}--{agent.Value.Uid:N}";
-            existing = await store.GetAsync<AgentRevision>(new(AgentResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
+            revisionAddress = ScopedResourceAddress.Create(ownerScopeRef, @namespace, AgentResourceKinds.AgentRevision, revisionName);
+            existing = await GetRevisionInternalAsync(revisionAddress, cancellationToken);
             if (existing is not null)
             {
                 if (Matches(existing.Value, agent.Value, resolved)) return existing;
@@ -216,6 +235,7 @@ public sealed class AgentManagementService(
                 Tags = agent.Value.Metadata.Tags,
                 Annotations = agent.Value.Metadata.Annotations
             },
+            ScopeRef = ownerScopeRef,
             AgentUid = agent.Value.Uid,
             AgentNamespace = @namespace,
             AgentName = agentName,
@@ -227,11 +247,12 @@ public sealed class AgentManagementService(
         };
         try
         {
-            return await store.CreateImmutableAsync(revision, cancellationToken);
+            return await scopeOperations.WriteAsync(revision, ownerScopeRef, AuthorizationPermissions.ResourcesWrite,
+                token => store.CreateImmutableAsync(revision, token), cancellationToken);
         }
         catch (ResourceConcurrencyException)
         {
-            existing = await store.GetAsync<AgentRevision>(new(AgentResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
+            existing = await GetRevisionInternalAsync(revisionAddress, cancellationToken);
             if (existing is not null && Matches(existing.Value, agent.Value, resolved)) return existing;
             throw;
         }
@@ -242,16 +263,24 @@ public sealed class AgentManagementService(
         string agentName,
         long generation,
         CancellationToken cancellationToken)
+        => await EnsureExecutionRevisionAsync(@namespace, agentName, null, generation, cancellationToken);
+
+    public async Task<StoredResource<AgentRevision>> EnsureExecutionRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        ResourceScopeRef? scopeRef,
+        long generation,
+        CancellationToken cancellationToken)
     {
-        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken)
+        var agent = await GetAgentAsync(@namespace, agentName, scopeRef, cancellationToken)
             ?? throw new ResourceNotFoundException(new(AgentResourceKinds.Agent, agentName, @namespace));
-        var existing = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken);
+        var existing = await FindRevisionInternalAsync(agent.Value.Uid, generation, cancellationToken);
         if (existing is not null) return existing;
         if (agent.Value.Generation != generation)
             throw new ArgumentException($"Agent generation '{generation}' has no immutable revision.", nameof(generation));
         var runtimeProfile = agent.Value.Definition.RuntimeProfile.Resolve(
             agent.Value.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
-        return await CreateRevisionAsync(@namespace, agentName, new AgentDeploymentSpec
+        return await CreateRevisionAsync(@namespace, agentName, agent.Value.ScopeRef, new AgentDeploymentSpec
         {
             Environment = "worker",
             RuntimeProfileName = runtimeProfile.Name,
@@ -265,14 +294,42 @@ public sealed class AgentManagementService(
         && revision.AgentVersion == agent.Generation
         && string.Equals(revision.DefinitionHash, definition.DefinitionHash, StringComparison.Ordinal);
 
+    private async Task<StoredResource<AgentRevision>?> FindRevisionInternalAsync(
+        Guid agentUid,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        using var systemScope = requestScopes.PushSystem();
+        return await agentQueries.FindRevisionAsync(agentUid, generation, cancellationToken);
+    }
+
+    private async Task<StoredResource<AgentRevision>?> GetRevisionInternalAsync(
+        ScopedResourceAddress address,
+        CancellationToken cancellationToken)
+    {
+        using var systemScope = requestScopes.PushSystem();
+        return await store.GetExactAsync<AgentRevision>(address, cancellationToken);
+    }
+
     public async Task<StoredResource<AgentRevision>> GetRevisionAsync(
         ResourceNamespace @namespace,
         string agentName,
         string revisionName,
         CancellationToken cancellationToken)
+        => await GetRevisionAsync(@namespace, agentName, revisionName, null, cancellationToken);
+
+    public async Task<StoredResource<AgentRevision>> GetRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        ResourceScopeRef? scopeRef,
+        CancellationToken cancellationToken)
     {
         var key = new ResourceKey(AgentResourceKinds.AgentRevision, revisionName, @namespace);
-        var revision = await store.GetAsync<AgentRevision>(key, cancellationToken)
+        var revision = scopeRef is { } exact
+            ? await store.GetExactAsync<AgentRevision>(ScopedResourceAddress.Create(exact, @namespace, AgentResourceKinds.AgentRevision, revisionName), cancellationToken)
+            : await store.GetAsync<AgentRevision>(key, cancellationToken);
+        revision = revision
             ?? throw new ResourceNotFoundException(key);
         if (!string.Equals(revision.Value.AgentName, agentName, StringComparison.Ordinal))
             throw new ResourceNotFoundException(key);
@@ -410,25 +467,78 @@ public sealed class AgentManagementService(
 
     private async Task ValidateReferencesAsync(AgentResource resource, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
     {
+        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId)
+            : null;
         await modelProfiles.ValidateAsync(resource.Definition.ModelProfile, resource.Namespace, scopeRef, cancellationToken);
-        if (await references.ResolveAsync<RuntimeProfileResource>(
-                resource.Definition.RuntimeProfile,
-                resource.Namespace,
-                RuntimeProfileResourceKinds.RuntimeProfile,
-                scopeRef,
-                cancellationToken) is null)
-        {
-            var runtime = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
-            throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, runtime.Name, runtime.Namespace));
-        }
+        _ = await ResolveDependencyAsync(resource.Definition.RuntimeProfile, resource.Namespace,
+            RuntimeProfileResourceKinds.RuntimeProfile, scopeRef, cancellationToken);
+        _ = await ResolveToolPinsAsync(resource, scopeRef, cancellationToken);
         _ = await ResolveToolSetAssignmentsAsync(resource with { ScopeRef = scopeRef }, cancellationToken);
     }
 
-    private async Task<(IReadOnlyCollection<ResourceReference> Tools, IReadOnlyCollection<ResolvedAgentToolSetAssignment> Assignments)>
+    private async Task<ResolvedResourceDependency> ResolveDependencyAsync(ResourceReference reference,
+        ResourceNamespace ownerNamespace, string kind, ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken)
+    {
+        using var tenantResolutionScope = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId)
+            : null;
+        Resource? stored;
+        try
+        {
+            stored = kind switch
+            {
+                ModelResourceKinds.ModelProfile => (await references.ResolveAsync<ModelProfileResource>(reference, ownerNamespace, kind, consumerScopeRef, cancellationToken))?.Value,
+                RuntimeProfileResourceKinds.RuntimeProfile => (await references.ResolveAsync<RuntimeProfileResource>(reference, ownerNamespace, kind, consumerScopeRef, cancellationToken))?.Value,
+                ToolResourceKinds.Tool => (await references.ResolveAsync<ToolResource>(reference, ownerNamespace, kind, consumerScopeRef, cancellationToken))?.Value,
+                _ => throw new AgentDefinitionValidationException("dependency_kind_unsupported", $"Agent dependency kind '{kind}' is not supported.")
+            };
+        }
+        catch (ResourceReferenceAmbiguousException exception)
+        {
+            throw new AgentDefinitionValidationException("dependency_reference_ambiguous", exception.Message);
+        }
+        catch (ResourceReferenceOutsideScopeException exception)
+        {
+            throw new AgentDefinitionValidationException("dependency_scope_invalid", exception.Message);
+        }
+        if (stored is null)
+        {
+            var address = reference.Resolve(ownerNamespace, kind);
+            throw new ResourceNotFoundException(new(kind, address.Name, address.Namespace));
+        }
+        var storedScopeRef = stored.ScopeRef
+            ?? throw new AgentDefinitionValidationException("dependency_scope_invalid",
+                $"Referenced {kind} '{stored.Address}' has no ownership scope.");
+        if (storedScopeRef != consumerScopeRef)
+        {
+            var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
+                stored.Uid, storedScopeRef, stored.Namespace, kind, stored.Generation),
+                consumerScopeRef, ResourceAccessAction.Use, cancellationToken);
+            if (!access.Allowed)
+                throw new AgentDefinitionValidationException("resource_access_denied",
+                    $"Referenced {kind} '{stored.Address}' does not authorize use from '{consumerScopeRef}' ({access.ReasonCode}).");
+        }
+        return new(stored.Uid, storedScopeRef, stored.Namespace, kind,
+            stored.Name, stored.Generation);
+    }
+
+    private async Task<IReadOnlyCollection<ResolvedResourceDependency>> ResolveToolPinsAsync(
+        AgentResource resource, ResourceScopeRef ownerScopeRef, CancellationToken cancellationToken)
+    {
+        var pins = new List<ResolvedResourceDependency>(resource.Definition.Tools.Count);
+        foreach (var tool in resource.Definition.Tools)
+            pins.Add(await ResolveDependencyAsync(tool, resource.Namespace, ToolResourceKinds.Tool, ownerScopeRef, cancellationToken));
+        return pins;
+    }
+
+    private async Task<(IReadOnlyCollection<ResourceReference> Tools, IReadOnlyCollection<ResolvedAgentToolSetAssignment> Assignments, IReadOnlyCollection<ResolvedResourceDependency> ToolPins)>
         ResolveToolSetAssignmentsAsync(AgentResource resource, CancellationToken cancellationToken)
     {
         var tools = new List<ResourceReference>();
         var assignments = new List<ResolvedAgentToolSetAssignment>();
+        var toolPins = new List<ResolvedResourceDependency>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var selection in resource.Definition.ToolSets)
         {
@@ -440,7 +550,21 @@ public sealed class AgentManagementService(
                 throw new AgentDefinitionValidationException("tool_set_version_required", "An Agent ToolSet assignment requires an exact published version.");
             var scopeRef = resource.ScopeRef
                 ?? throw new AgentDefinitionValidationException("agent_scope_invalid", "An Agent ToolSet assignment requires an Agent ownership scope.");
-            var published = await toolSets.GetVersionExactAsync(scopeRef, toolSetNamespace, selection.ToolSet.Name, selection.Version, cancellationToken)
+            var source = await references.ResolveAsync<ToolSetResource>(selection.ToolSet, resource.Namespace,
+                ToolResourceKinds.ToolSet, scopeRef, cancellationToken)
+                ?? throw new AgentDefinitionValidationException("tool_set_version_not_found", $"ToolSet '{identity}' was not found.");
+            var sourceScopeRef = source.Value.ScopeRef
+                ?? throw new AgentDefinitionValidationException("dependency_scope_invalid", $"ToolSet '{identity}' has no ownership scope.");
+            if (sourceScopeRef != scopeRef)
+            {
+                var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(
+                    source.Value.Uid, sourceScopeRef, source.Value.Namespace, ToolResourceKinds.ToolSet,
+                    source.Value.Generation), scopeRef, ResourceAccessAction.Use, cancellationToken);
+                if (!access.Allowed)
+                    throw new AgentDefinitionValidationException("resource_access_denied",
+                        $"Referenced ToolSet '{source.Value.Address}' does not authorize use from '{scopeRef}' ({access.ReasonCode}).");
+            }
+            var published = await toolSets.GetVersionExactAsync(sourceScopeRef, toolSetNamespace, selection.ToolSet.Name, selection.Version, cancellationToken)
                 ?? throw new AgentDefinitionValidationException("tool_set_version_not_found", $"Published ToolSet '{identity}' was not found.");
 
             var requested = selection.Members.ToHashSet(StringComparer.Ordinal);
@@ -462,16 +586,23 @@ public sealed class AgentManagementService(
                     ? new ResourceReference(member)
                     : new ResourceReference(member[(separator + 1)..], @namespace: ResourceNamespace.Parse(member[..separator]));
             }));
+            foreach (var member in published.Value.Members.Where(member => selected.Contains(
+                         ToolResourceIdentity.CatalogId(member.ToolNamespace, member.ToolName), StringComparer.Ordinal)))
+                toolPins.Add(new(member.ToolUid, member.ToolScopeRef, member.ToolNamespace,
+                    ToolResourceKinds.Tool, member.ToolName, member.ToolGeneration));
             assignments.Add(new ResolvedAgentToolSetAssignment
             {
+                ToolSetUid = published.Value.Uid,
+                ToolSetScopeRef = sourceScopeRef,
                 ToolSetName = selection.ToolSet.Name,
                 ToolSetNamespace = toolSetNamespace,
+                ToolSetGeneration = published.Value.Generation,
                 Version = selection.Version,
                 DefinitionHash = published.Value.DefinitionHash,
                 Members = selected
             });
         }
-        return (tools, assignments);
+        return (tools, assignments, toolPins);
     }
 
     private async Task<StoredResource<AgentDeployment>> SetDesiredStateAsync(StoredResource<AgentDeployment> stored, DesiredAgentState state, CancellationToken cancellationToken) =>

@@ -14,11 +14,8 @@ using Agentstration.Work.Contracts;
 
 namespace Agentstration.Web.Console;
 
-public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpClientFactory httpClientFactory) : IEntryAdministrationApiClient
+public sealed class EntryAdministrationApiClient(HttpClient httpClient) : IEntryAdministrationApiClient
 {
-    public const string AgentResourceCatalogClient = "EntryAdministration.AgentResources";
-    public const string FlowResourceCatalogClient = "EntryAdministration.FlowResources";
-
     public async Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<EntryDraftResponse[]>(httpClient, "api/management/entries", cancellationToken);
 
@@ -68,8 +65,7 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
     public async Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken)
     {
         var resourceKind = kind == EntryBindingKind.Agent ? AgentResourceKinds.Agent : FlowResourceKinds.Flow;
-        var catalogClient = httpClientFactory.CreateClient(kind == EntryBindingKind.Agent ? AgentResourceCatalogClient : FlowResourceCatalogClient);
-        return await ApiResponse.ReadAsync<ResourcePickerItem[]>(catalogClient, $"api/resources?kind={Uri.EscapeDataString(resourceKind)}", cancellationToken);
+        return await ApiResponse.ReadAsync<ResourcePickerItem[]>(httpClient, $"api/resources?kind={Uri.EscapeDataString(resourceKind)}", cancellationToken);
     }
 
     public async Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken) =>

@@ -21,7 +21,7 @@ public sealed class SecurityAuditService(
             Guid.NewGuid(),
             entry.Action,
             entry.Outcome,
-            entry.ActorPrincipalId ?? context?.PrincipalId,
+            entry.ActorPrincipalId ?? requestContext.ActorPrincipalId,
             entry.TargetPrincipalId,
             entry.TargetAccountId,
             entry.TenantId ?? context?.TenantId,
@@ -33,8 +33,8 @@ public sealed class SecurityAuditService(
 
     public async Task<IReadOnlyList<SecurityAuditEvent>> ListLatestAsync(int limit, CancellationToken cancellationToken)
     {
-        if (!requestContext.IsInitialized
-            || !await platformAuthorization.IsPlatformAdministratorAsync(requestContext.Current.PrincipalId, cancellationToken))
+        if (requestContext.ActorPrincipalId is not Guid actorPrincipalId
+            || !await platformAuthorization.IsPlatformAdministratorAsync(actorPrincipalId, cancellationToken))
             throw new AuthorizationDeniedException("platform/admin");
         return await store.ListLatestAsync(Math.Clamp(limit, 1, 200), cancellationToken);
     }

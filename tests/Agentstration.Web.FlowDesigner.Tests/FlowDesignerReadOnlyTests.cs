@@ -458,7 +458,7 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
-    public void PublishVersionStartsAfterTheLatestPublishedVersionAndSurvivesSave()
+    public async Task PublishVersionStartsAfterTheLatestPublishedVersionAndSurvivesSave()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
@@ -480,9 +480,12 @@ public sealed class FlowDesignerReadOnlyTests
         rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Save").Click();
         Assert.AreEqual("1.0.11", rendered.Find("input[aria-label='Publish version']").GetAttribute("value"));
 
-        rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Publish").Click();
-        Assert.AreEqual("1.0.11", backend.LastPublishVersion);
-        Assert.AreEqual("1.0.12", rendered.Find("input[aria-label='Publish version']").GetAttribute("value"));
+        await rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Publish").ClickAsync(new());
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("1.0.11", backend.LastPublishVersion);
+            StringAssert.Contains(rendered.Find("[data-testid='flow-designer-publication-success']").TextContent, "Version 1.0.11 was published and activated.");
+        });
     }
 
     [TestMethod]
@@ -544,7 +547,7 @@ public sealed class FlowDesignerReadOnlyTests
         cards[0].Click();
         var flowSummaryLink = rendered.Find(".inspector-resource-summary-link");
         StringAssert.Contains(flowSummaryLink.TextContent, "News analysis");
-        Assert.AreEqual("/namespaces/pack.news/flows/analysis", flowSummaryLink.GetAttribute("href"));
+        Assert.AreEqual($"/namespaces/pack.news/flows/analysis?scopeRef={Uri.EscapeDataString(TestScope.Value)}", flowSummaryLink.GetAttribute("href"));
         Assert.AreEqual("_blank", flowSummaryLink.GetAttribute("target"));
         rendered.Find("[data-testid='configure-selected-step']").Click();
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
@@ -553,7 +556,7 @@ public sealed class FlowDesignerReadOnlyTests
             StringAssert.Contains(rendered.Markup, "Called Flow");
             StringAssert.Contains(rendered.Markup, "summary");
         });
-        Assert.AreEqual("/namespaces/pack.news/flows/analysis", rendered.Find(".inspector-resource-link").GetAttribute("href"));
+        Assert.AreEqual($"/namespaces/pack.news/flows/analysis?scopeRef={Uri.EscapeDataString(TestScope.Value)}", rendered.Find(".inspector-resource-link").GetAttribute("href"));
         Assert.AreEqual("_blank", rendered.Find(".inspector-resource-link").GetAttribute("target"));
         Assert.HasCount(1, rendered.FindAll(".inspector-resource-heading .inspector-resource-link"));
         StringAssert.Contains(rendered.Find(".inspector-resource-id").TextContent, "Flow ID");
@@ -646,8 +649,8 @@ public sealed class FlowDesignerReadOnlyTests
         {
             Agents =
             [
-                new("welcome-agent", "Welcome Agent"),
-                new("packed-agent", "Pack Agent") { Namespace = new("pack.demo") }
+                new("welcome-agent", "Welcome Agent", TestScope),
+                new("packed-agent", "Pack Agent", TestScope) { Namespace = new("pack.demo") }
             ]
         });
         context.Services.AddSingleton<FlowEditorStore>();
@@ -668,17 +671,106 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.AreEqual("welcome-agent", step.Agent.ResourceId);
         StringAssert.Contains(rendered.Find(".inspector-details-group").TextContent, "Step ID");
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
-        Assert.AreEqual("/agents/welcome-agent", rendered.Find(".inspector-resource-link").GetAttribute("href"));
+        Assert.AreEqual($"/agents/welcome-agent?scopeRef={Uri.EscapeDataString(TestScope.Value)}", rendered.Find(".inspector-resource-link").GetAttribute("href"));
         Assert.AreEqual("_blank", rendered.Find(".inspector-resource-link").GetAttribute("target"));
         Assert.HasCount(1, rendered.FindAll(".inspector-resource-heading .inspector-resource-link"));
         StringAssert.Contains(rendered.Find(".inspector-resource-id").TextContent, "Agent ID");
 
-        rendered.Find(".flow-inspector select").Change("pack.demo|packed-agent");
+        rendered.Find(".flow-inspector select").Change($"{TestScope.Value}|pack.demo|packed-agent");
         rendered.WaitForAssertion(() => Assert.AreEqual("Pack Agent", store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single().DisplayName));
         step = store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single();
         Assert.AreEqual("packed-agent", step.Agent.ResourceId);
         Assert.AreEqual(new ResourceNamespace("pack.demo"), step.Agent.Namespace);
-        Assert.AreEqual("/namespaces/pack.demo/agents/packed-agent", rendered.Find(".inspector-resource-link").GetAttribute("href"));
+        Assert.AreEqual($"/namespaces/pack.demo/agents/packed-agent?scopeRef={Uri.EscapeDataString(TestScope.Value)}", rendered.Find(".inspector-resource-link").GetAttribute("href"));
+    }
+
+    [TestMethod]
+    public void DesignerUsesTheLoadedFlowOwnerScopeForEveryCatalog()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var resources = new ResourceProviderStub();
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(resources);
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        _ = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+
+        Assert.AreEqual(TestScope, resources.AgentContextScope);
+        Assert.AreEqual(TestScope, resources.FlowContextScope);
+        Assert.AreEqual(TestScope, resources.ToolContextScope);
+    }
+
+    [TestMethod]
+    public void SelectingAnAgentWithADuplicateNamePersistsItsExactScope()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            Agents =
+            [
+                new("shared-agent", "Instance agent", ResourceScopeRef.Instance),
+                new("shared-agent", "Workspace agent", TestScope)
+            ]
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+        rendered.FindAll(".step-palette button").Single(button => button.TextContent.Trim() == "Agent").Click();
+        rendered.Find("[data-testid='configure-selected-step']").Click();
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
+        rendered.Find("#flow-agent-reference").Change($"{TestScope.Value}|default|shared-agent");
+
+        var reference = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<AgentFlowStepDefinition>().Single().Agent;
+        Assert.AreEqual("shared-agent", reference.ResourceId);
+        Assert.AreEqual(TestScope, reference.ScopeRef);
+    }
+
+    [TestMethod]
+    public void SelectingARouterCandidateWithADuplicateNamePersistsItsExactScope()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
+        {
+            Agents =
+            [
+                new("shared-agent", "Instance agent", ResourceScopeRef.Instance),
+                new("shared-agent", "Workspace agent", TestScope)
+            ]
+        });
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+        rendered.Find("[data-testid='flow-palette-router']").Click();
+        rendered.Find("[data-testid='configure-selected-step']").Click();
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
+        rendered.FindAll("button").Single(button => button.TextContent.Contains("Add route", StringComparison.Ordinal)).Click();
+        rendered.Find(".route-card select").Change($"{TestScope.Value}|default|shared-agent");
+
+        var reference = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<RouterFlowStepDefinition>().Single().Candidates.Single().Agent;
+        Assert.AreEqual("shared-agent", reference.ResourceId);
+        Assert.AreEqual(TestScope, reference.ScopeRef);
     }
 
     [TestMethod]
@@ -707,8 +799,8 @@ public sealed class FlowDesignerReadOnlyTests
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
         {
-            Agents = [new("same-agent", "same-agent")],
-            Flows = [new("same-flow", "same-flow", ResourceNamespace.Default, "1.0.0")]
+            Agents = [new("same-agent", "same-agent", TestScope)],
+            Flows = [new("same-flow", "same-flow", ResourceNamespace.Default, TestScope, "1.0.0")]
         });
         context.Services.AddSingleton<FlowEditorStore>();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -746,14 +838,14 @@ public sealed class FlowDesignerReadOnlyTests
             Steps =
             [
                 new InputFlowStepDefinition { Name = "input" },
-                new AgentFlowStepDefinition { Name = "agent", DisplayName = "Agent", Agent = new("welcome-agent") }
+                new AgentFlowStepDefinition { Name = "agent", DisplayName = "Agent", Agent = new("welcome-agent", ScopeRef: TestScope) }
             ],
             Transitions = [new("input-agent", "input", "completed", "agent")]
         };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub
         {
-            Agents = [new("welcome-agent", "Welcome Agent")]
+            Agents = [new("welcome-agent", "Welcome Agent", TestScope)]
         });
         context.Services.AddSingleton<FlowEditorStore>();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -795,7 +887,7 @@ public sealed class FlowDesignerReadOnlyTests
         cards[0].Click();
         var toolLink = rendered.Find(".inspector-resource-summary-link");
         StringAssert.Contains(toolLink.TextContent, "Send notification");
-        Assert.AreEqual("/tools/notification.send", toolLink.GetAttribute("href"));
+        Assert.AreEqual($"/tools/notification.send?scopeRef={Uri.EscapeDataString(TestScope.Value)}", toolLink.GetAttribute("href"));
         Assert.AreEqual("_blank", toolLink.GetAttribute("target"));
         rendered.Find("[data-testid='configure-selected-step']").Click();
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
@@ -1039,8 +1131,8 @@ public sealed class FlowDesignerReadOnlyTests
         {
             Flows =
             [
-                new("analysis", "Analysis", new("pack.news"), "1.0.0"),
-                new("summary", "Summary", new("pack.news"), "1.0.0")
+                new("analysis", "Analysis", new("pack.news"), TestScope, "1.0.0"),
+                new("summary", "Summary", new("pack.news"), TestScope, "1.0.0")
             ],
             FlowVersions = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal)
             {
@@ -1058,7 +1150,7 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
 
-        rendered.Find("[data-testid='flow-call-reference']").Change("pack.news|summary");
+        rendered.Find("[data-testid='flow-call-reference']").Change($"{TestScope.Value}|pack.news|summary");
 
         rendered.WaitForAssertion(() =>
         {
@@ -1107,7 +1199,7 @@ public sealed class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("child"));
         var flowLink = rendered.Find(".inspector-resource-summary-link");
         StringAssert.Contains(flowLink.TextContent, "News analysis");
-        Assert.AreEqual("/namespaces/pack.news/flows/analysis", flowLink.GetAttribute("href"));
+        Assert.AreEqual($"/namespaces/pack.news/flows/analysis?scopeRef={Uri.EscapeDataString(TestScope.Value)}", flowLink.GetAttribute("href"));
         Assert.AreEqual("_blank", flowLink.GetAttribute("target"));
         rendered.Find("[data-testid='step-settings-tab-input']").Click();
         Assert.AreEqual("string", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
@@ -1312,7 +1404,7 @@ public sealed class FlowDesignerReadOnlyTests
         {
             Agents =
             [
-                new FlowDesignerAgent("writer", "Editorial writer")
+                new FlowDesignerAgent("writer", "Editorial writer", TestScope)
                 {
                     Namespace = new("pack.agents"),
                     InputSchema = schema,
@@ -1411,7 +1503,7 @@ public sealed class FlowDesignerReadOnlyTests
         {
             Agents =
             [
-                new FlowDesignerAgent("writer", "Writer")
+                new FlowDesignerAgent("writer", "Writer", TestScope)
                 {
                     InputSchema = JsonSerializer.SerializeToElement(new { type = "object" })
                 }
@@ -1679,6 +1771,8 @@ public sealed class FlowDesignerReadOnlyTests
         return context;
     }
 
+    private static readonly ResourceScopeRef TestScope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+
     private static BlazorDiagram GetDiagram(FlowCanvas canvas) =>
         (BlazorDiagram)typeof(FlowCanvas).GetField("diagram", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(canvas)!;
 
@@ -1695,8 +1789,11 @@ public sealed class FlowDesignerReadOnlyTests
     {
         private readonly IReadOnlyList<string> publishedVersions;
         public IReadOnlyList<FlowDesignerAgent> Agents { get; init; } = [];
-        public IReadOnlyList<FlowDesignerFlow> Flows { get; init; } = [new("analysis", "News analysis", new("pack.news"), "2.0.0")];
+        public IReadOnlyList<FlowDesignerFlow> Flows { get; init; } = [new("analysis", "News analysis", new("pack.news"), TestScope, "2.0.0")];
         public IReadOnlyDictionary<string, IReadOnlyList<FlowDesignerFlowVersion>> FlowVersions { get; init; } = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal);
+        public ResourceScopeRef? AgentContextScope { get; private set; }
+        public ResourceScopeRef? FlowContextScope { get; private set; }
+        public ResourceScopeRef? ToolContextScope { get; private set; }
         public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; init; } = [];
         public IReadOnlyList<FlowDesignerTool> Tools { get; init; } =
         [
@@ -1708,7 +1805,8 @@ public sealed class FlowDesignerReadOnlyTests
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { deliveryId = new { type = "string" } } }),
                 Enabled: true,
                 Available: true,
-                RequiresApproval: false),
+                RequiresApproval: false,
+                TestScope),
             new(
                 "warehouse.lookup",
                 "Look up warehouse",
@@ -1717,16 +1815,23 @@ public sealed class FlowDesignerReadOnlyTests
                 null,
                 Enabled: true,
                 Available: true,
-                RequiresApproval: false)
+                RequiresApproval: false,
+                TestScope)
         ];
 
         public ResourceProviderStub(params string[] publishedVersions) => this.publishedVersions = publishedVersions;
 
-        public Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(Agents);
-        public Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(Flows);
-        public Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
+        {
+            AgentContextScope = contextScope;
+            return Task.FromResult(Agents);
+        }
+        public Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
+        {
+            FlowContextScope = contextScope;
+            return Task.FromResult<IReadOnlyList<FlowDesignerFlow>>(Flows.Select(flow => flow with { ScopeRef = contextScope }).ToArray());
+        }
+        public Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
             FlowVersions.TryGetValue($"{@namespace.Value}|{name}", out var configured)
                 ? Task.FromResult(configured)
                 : name == "sample" && @namespace.IsDefault
@@ -1735,8 +1840,11 @@ public sealed class FlowDesignerReadOnlyTests
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { article = new { type = "string" } } }),
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { summary = new { type = "string" } } }),
                 [new("approved", "Approved", FlowOutputOutcome.Success, null), new("rejected", "Rejected", FlowOutputOutcome.Error, null)])]);
-        public Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(Tools);
+        public Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
+        {
+            ToolContextScope = contextScope;
+            return Task.FromResult<IReadOnlyList<FlowDesignerTool>>(Tools.Select(tool => tool with { ScopeRef = contextScope }).ToArray());
+        }
         public Task<IReadOnlyList<FlowDesignerSchemaVersion>> GetSchemaVersionsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(SchemaVersions);
     }
@@ -1764,7 +1872,7 @@ public sealed class FlowDesignerReadOnlyTests
         {
             LoadedTarget = target;
             var value = draft.Value;
-            return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition), source, ETag: readOnly ? null : draft.ETag, PublishedVersion: readOnly ? "2.1.0" : null));
+            return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition) { ScopeRef = value.ScopeRef }, source, ETag: readOnly ? null : draft.ETag, PublishedVersion: readOnly ? "2.1.0" : null));
         }
         public Task<FlowSourceResponse> GetSourceAsync(FlowDesignerTarget target, CancellationToken cancellationToken) =>
             Task.FromResult(new FlowSourceResponse(source, "yaml", draft.Value.Revision));
@@ -1803,7 +1911,7 @@ public sealed class FlowDesignerReadOnlyTests
         {
             var now = DateTimeOffset.Parse("2026-08-05T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
             definition ??= new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
-            return new(new FlowDraft { WorkspaceId = WorkspaceId, Id = "draft", FlowId = new("sample"), DisplayName = "Sample", Definition = definition, CreatedAt = now, UpdatedAt = now }, "\"etag\"");
+            return new(new FlowDraft { WorkspaceId = WorkspaceId, ScopeRef = ResourceScopeRef.Workspace(WorkspaceId.Value), Id = "draft", FlowId = new("sample"), DisplayName = "Sample", Definition = definition, CreatedAt = now, UpdatedAt = now }, "\"etag\"");
         }
 
         private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));

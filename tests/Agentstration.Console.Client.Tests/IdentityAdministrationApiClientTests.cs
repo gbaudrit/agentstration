@@ -33,18 +33,26 @@ public sealed class IdentityAdministrationApiClientTests
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(context) };
             }
 
+            if (request.RequestUri!.AbsolutePath.EndsWith("/selection", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK);
             var workspace = new Workspace(workspaceId, tenantId, "support", "Support", WorkspaceStatus.Active, now);
             return new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(workspace) };
         });
         var client = new IdentityAdministrationApiClient(new HttpClient(handler) { BaseAddress = new Uri("https://console.test/") });
 
         var contextResponse = await client.GetContextAsync(default);
+        await client.SelectConsoleContextAsync("/instance", default);
         var workspaceResponse = await client.CreateWorkspaceAsync("support", "Support", default);
 
         Assert.AreEqual(principalId, contextResponse.Context.PrincipalId);
         Assert.AreEqual(workspaceId, workspaceResponse.Id);
         CollectionAssert.AreEqual(
-            new[] { (HttpMethod.Get, "/api/identity/context"), (HttpMethod.Post, "/api/identity/workspaces") },
+            new[]
+            {
+                (HttpMethod.Get, "/api/identity/context"),
+                (HttpMethod.Post, "/api/identity/context/selection"),
+                (HttpMethod.Post, "/api/identity/workspaces")
+            },
             requests);
     }
 

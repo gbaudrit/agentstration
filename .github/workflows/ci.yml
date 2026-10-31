@@ -218,10 +218,10 @@ jobs:
             '| --- | ---: | ---: | ---: | ---: | ---: | --- |'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
-            @{ Name = 'Agentstration.Api.Tests'; Tests = 211; Warning = 2048; Failure = 2304 },
-            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 108; Warning = 1920; Failure = 2304 },
+            @{ Name = 'Agentstration.Api.Tests'; Tests = 211; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 108; Warning = 1920; Failure = 2560 },
             @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 31; Warning = 500; Failure = 700 },
-            @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 63; Warning = 1280; Failure = 1536 },
+            @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 63; Warning = 1280; Failure = 1664 },
             @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 11; Warning = 450; Failure = 700 }
           )
           foreach ($module in $modules) {

@@ -25,12 +25,13 @@ export class FlowObservabilityPage {
     await this.open(consoleUrl, `/flows/${flowName}/designer`, 'designer');
 
     const shell = this.page.locator('.flow-editor-shell.definition');
+    const source = shell.locator('.source-editor');
+    const lines = source.locator('.view-lines');
     await expect(async () => {
       await this.page.getByRole('button', { name: 'Definition', exact: true }).click();
       await expect(shell).toBeVisible({ timeout: 2_000 });
+      await expect(lines).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    const source = shell.locator('.source-editor');
-    const lines = source.locator('.view-lines');
     await expect(lines).toContainText('entryStep');
     await expect(lines).not.toContainText('sourceText');
     await expect(source.locator('.error-panel')).toHaveCount(0);
@@ -66,12 +67,12 @@ export class FlowObservabilityPage {
 
   public async openManualRunDialog(consoleUrl: string, expectWide: boolean): Promise<void> {
     await this.open(consoleUrl, '/flows/universal-router', 'flowDetails');
-    const runOpen = this.page.getByTestId(TestIds.flowObservability.runOpen);
+    const openRun = this.page.getByTestId(TestIds.flowObservability.runOpen);
     await expect(async () => {
       await this.page.getByRole('button', { name: 'Runs', exact: true }).click();
-      await expect(runOpen).toBeVisible({ timeout: 2_000 });
+      await expect(openRun).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    await runOpen.click();
+    await openRun.click();
     const dialog = this.page.getByTestId(TestIds.flowObservability.runDialog);
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('select')).toHaveCount(1);

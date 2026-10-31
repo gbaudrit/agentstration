@@ -20,6 +20,7 @@ public static class WebConsoleServiceCollectionExtensions
             .Bind(configuration.GetSection(AgentstrationWebOptions.SectionName))
             .Validate(Validate, "API base addresses must be absolute HTTP(S) URIs and timeouts must be between 1 and 120 seconds.")
             .ValidateOnStart();
+        services.AddHttpContextAccessor();
         services.AddSingleton(TimeProvider.System);
         services.AddAgentstrationWebComponents();
         services.AddSingleton<ConsoleRealtimeSession>();
@@ -44,8 +45,6 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
         AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi);
         AddClient<ConsoleEntryInteractionApiClient, IConsoleEntryInteractionApiClient>(services, configured.WorkApi);
-        AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi);
-        AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
             new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
             provider.GetRequiredService<ConsoleRealtimeSession>(),
@@ -80,21 +79,37 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi);
         AddClient<SchemasApiClient, ISchemasClient>(services, configured.ManagementApi);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
+        AddClient<ResourceAccessPolicyApiClient, IResourceAccessPolicyClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);
+        services.AddScoped<IConsoleContextHttpClientFactory, ConsoleContextHttpClientFactory>();
         return services;
     }
 
     private static void AddClient<TImplementation, TContract>(IServiceCollection services, ApiEndpointOptions options)
         where TImplementation : class, TContract
-        where TContract : class => Configure(services.AddHttpClient<TContract, TImplementation>(), options);
+        where TContract : class
+    {
+        var name = typeof(TContract).Name;
+        Configure(services.AddHttpClient(name), options);
+        services.AddScoped<TContract>(provider => ActivatorUtilities.CreateInstance<TImplementation>(
+            provider,
+            provider.GetRequiredService<IConsoleContextHttpClientFactory>().CreateClient(name)));
+    }
 
     private static void AddClient(IServiceCollection services, string name, ApiEndpointOptions options) =>
         Configure(services.AddHttpClient(name), options);
 
     private static void AddSensitiveClient<TImplementation, TContract>(IServiceCollection services, ApiEndpointOptions options)
         where TImplementation : class, TContract
-        where TContract : class => ConfigureClient(services.AddHttpClient<TContract, TImplementation>(), options);
+        where TContract : class
+    {
+        var name = typeof(TContract).Name;
+        ConfigureClient(services.AddHttpClient(name), options);
+        services.AddScoped<TContract>(provider => ActivatorUtilities.CreateInstance<TImplementation>(
+            provider,
+            provider.GetRequiredService<IConsoleContextHttpClientFactory>().CreateClient(name)));
+    }
 
     private static void Configure(IHttpClientBuilder builder, ApiEndpointOptions options)
     {
@@ -117,7 +132,11 @@ public static class WebConsoleServiceCollectionExtensions
         });
         if (options.ForwardSessionCookie)
         {
-            builder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+            builder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false
+            });
             builder.AddHttpMessageHandler(provider => new ConsoleApiSessionHandler(
                 provider.GetRequiredService<IHttpContextAccessor>(),
                 provider.GetRequiredService<ICurrentRequestContext>(),

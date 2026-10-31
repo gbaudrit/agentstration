@@ -1,6 +1,8 @@
 using Agentstration.Agents;
+using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -234,6 +236,54 @@ public sealed class ControlPlaneStoreHardeningTests
     }
 
     [TestMethod]
+    public async Task WorkspaceDiscoveryIsDefaultDenyWhileTenantAdministrationIsExactScoped()
+    {
+        var principalId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var context = new TestRequestContext();
+        context.UseSystem();
+        await using var fixture = await StoreFixture.CreateAsync(context);
+        await fixture.EnsureWorkspaceAsync(tenantId, workspaceId);
+        var sharedInstance = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance,
+            Resource("shared-instance"), null, true, default);
+        var hiddenInstance = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance,
+            Resource("hidden-instance"), null, true, default);
+        var sharedTenant = await fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantId),
+            Resource("shared-tenant"), null, true, default);
+        var tenantOnly = await fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantId),
+            Resource("tenant-only"), null, true, default);
+        var workspaceOwned = await fixture.Store.PutExactAsync(ResourceScopeRef.Workspace(workspaceId),
+            Resource("workspace-owned"), null, true, default);
+        await fixture.PolicyStore.PutAsync(new(new(sharedInstance.Value.Uid, ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "MemoryProvider"),
+            [new(ResourceScopeRef.Tenant(tenantId), [ResourceAccessAction.Discover], true)]), null, default);
+        await fixture.PolicyStore.PutAsync(new(new(sharedTenant.Value.Uid, ResourceScopeRef.Tenant(tenantId),
+                ResourceNamespace.Default, "MemoryProvider"),
+            [new(ResourceScopeRef.Workspace(workspaceId), [ResourceAccessAction.Discover])]), null, default);
+
+        context.UseWorkspace(new RequestContext(principalId, tenantId, workspaceId));
+        var workspaceVisible = await fixture.Store.ListAsync<ExtensionResource>("MemoryProvider", 0, 20, default);
+
+        CollectionAssert.AreEquivalent(
+            new[] { "shared-instance", "shared-tenant", "workspace-owned" },
+            workspaceVisible.Select(value => value.Value.Name).ToArray());
+        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(hiddenInstance.Value.Uid, default));
+        Assert.IsNotNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
+        Assert.IsFalse((await fixture.PolicyStore.GetAsync(sharedInstance.Value.Uid,
+            ResourceScopeRef.Instance, default))!.Policy.Grants.Single().Actions.Contains(ResourceAccessAction.Use),
+            "Discover must not implicitly grant Use.");
+
+        context.UseTenantAdministration(principalId, tenantId);
+        var tenantVisible = await fixture.Store.ListAsync<ExtensionResource>("MemoryProvider", 0, 20, default);
+        CollectionAssert.AreEquivalent(
+            new[] { sharedTenant.Value.Name, tenantOnly.Value.Name },
+            tenantVisible.Select(value => value.Value.Name).ToArray());
+        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
+        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(workspaceOwned.Value.Uid, default));
+    }
+
+    [TestMethod]
     public async Task ExistingUidCannotMoveToAnotherOwnershipScope()
     {
         var tenantId = Guid.NewGuid();
@@ -247,6 +297,40 @@ public sealed class ControlPlaneStoreHardeningTests
             stored.ETag,
             false,
             default));
+    }
+
+    [TestMethod]
+    public async Task ResourceAccessPoliciesPersistOutsideResourcesAndEnforceTheirOwnConcurrency()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        await fixture.EnsureTenantAsync(tenantId);
+        var resource = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance,
+            Resource("shared") with { Generation = 3 }, null, true, default);
+        var identity = await fixture.Store.GetIdentityByUidAsync(resource.Value.Uid, default);
+
+        Assert.IsNotNull(identity);
+        Assert.AreEqual(3, identity.Generation);
+        var policy = new ResourceAccessPolicy(
+            new(resource.Value.Uid, ResourceScopeRef.Instance, ResourceNamespace.Default, "MemoryProvider", 3),
+            [new(ResourceScopeRef.Tenant(tenantId), [ResourceAccessAction.Discover, ResourceAccessAction.Use])]);
+        var created = await fixture.PolicyStore.PutAsync(policy, null, default);
+        var loaded = await fixture.PolicyStore.GetAsync(resource.Value.Uid, ResourceScopeRef.Instance, default);
+
+        Assert.IsNotNull(loaded);
+        Assert.AreEqual(created.ETag, loaded.ETag);
+        Assert.AreEqual(resource.ETag, (await fixture.Store.GetByUidAsync<ExtensionResource>(resource.Value.Uid, default))?.ETag,
+            "Changing the access overlay must not mutate the governed resource.");
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => fixture.PolicyStore.PutAsync(
+            policy with { Grants = [] }, "\"stale\"", default));
+        var updated = await fixture.PolicyStore.PutAsync(policy with { Grants = [] }, created.ETag, default);
+        Assert.AreNotEqual(created.ETag, updated.ETag);
+        Assert.IsEmpty(updated.Policy.Grants);
+
+        await fixture.Store.DeleteExactAsync(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, "MemoryProvider", "shared"), resource.ETag, default);
+        Assert.IsNull(await fixture.PolicyStore.GetAsync(resource.Value.Uid, ResourceScopeRef.Instance, default),
+            "Deleting a resource must atomically remove its access overlay.");
     }
 
     [TestMethod]
@@ -280,7 +364,10 @@ public sealed class ControlPlaneStoreHardeningTests
             ProvisioningState = ProvisioningState.Succeeded,
             Definition = Definition(agent.Value.Uid)
         }, default);
-        var resolver = new ResourceRuntimeAgentResolver(fixture.Store, fixture.Queries);
+        var runtimeContext = new CurrentRequestContext();
+        using var runtimeScope = runtimeContext.PushSystem();
+        var resolver = new ResourceRuntimeAgentResolver(fixture.Store, fixture.Queries,
+            new AllowAccessPolicies(), runtimeContext, runtimeContext);
         var resolved = await resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 3) { Namespace = packNamespace }, default);
 
         Assert.AreEqual(agent.Value.Uid, resolved.AgentId);
@@ -395,6 +482,7 @@ public sealed class ControlPlaneStoreHardeningTests
         public RequestContext Current => current ?? throw new InvalidOperationException("No workspace context is active.");
         public void UseSystem() { current = null; AccessMode = ControlPlaneAccessMode.System; }
         public void UseTenant(Guid principalId, Guid tenantId) { current = new RequestContext(principalId, tenantId, Guid.Empty); AccessMode = ControlPlaneAccessMode.Tenant; }
+        public void UseTenantAdministration(Guid principalId, Guid tenantId) { current = new RequestContext(principalId, tenantId, Guid.Empty); AccessMode = ControlPlaneAccessMode.TenantAdministration; }
         public void UseWorkspace(RequestContext value) { current = value; AccessMode = ControlPlaneAccessMode.Workspace; }
     }
 
@@ -407,6 +495,7 @@ public sealed class ControlPlaneStoreHardeningTests
         public IResourceStore Store { get; } = store;
         public IAgentResourceQueries Queries { get; } = queries;
         public IResourceScopeResolver ScopeResolver => Provider.GetRequiredService<IResourceScopeResolver>();
+        public IResourceAccessPolicyStore PolicyStore => Provider.GetRequiredService<IResourceAccessPolicyStore>();
         public ICurrentRequestContext RequestContext => Provider.GetRequiredService<ICurrentRequestContext>();
 
         public async Task EnsureTenantAsync(Guid tenantId)
@@ -445,6 +534,27 @@ public sealed class ControlPlaneStoreHardeningTests
             Directory.Delete(directory, true);
         }
 
-        private ServiceProvider Provider { get; } = provider;
+        public ServiceProvider Provider { get; } = provider;
+    }
+
+    private sealed class AllowAccessPolicies : IResourceAccessPolicyService
+    {
+        public Task<IReadOnlyList<ResourceAccessPolicyResponse>> ListAsync(ResourceScopeRef ownerScopeRef,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResourceAccessPolicyResponse>>([]);
+
+        public Task<ResourceAccessPolicyResponse?> GetAsync(Guid resourceUid,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<ResourceAccessPolicyResponse?>(null);
+
+        public Task<ResourceAccessPolicyResponse> PutAsync(ResourceAccessPolicy policy, string? ifMatch,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DeleteAsync(Guid resourceUid, string? ifMatch,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ResourceAccessDecision> EvaluateAsync(ResourceAccessIdentity resource,
+            ResourceScopeRef consumerScopeRef, ResourceAccessAction action, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessDecision(true, ResourceAccessDecisionReasons.ExactGrant));
     }
 }

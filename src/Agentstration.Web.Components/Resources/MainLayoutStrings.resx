@@ -22,4 +22,18 @@
   <data name="Nav.DataSourceProfiles" xml:space="preserve"><value>Data Source Profiles</value></data>
   <data name="Nav.Schemas" xml:space="preserve"><value>Schemas</value></data>
   <data name="Command.CreateSchema" xml:space="preserve"><value>Create Schema</value></data>
+  <data name="CurrentContext" xml:space="preserve"><value>Current Console context</value></data>
+  <data name="ChangeContext" xml:space="preserve"><value>Change Console context</value></data>
+  <data name="ChooseContext" xml:space="preserve"><value>Choose a context</value></data>
+  <data name="CloseContextSelector" xml:space="preserve"><value>Close context selector</value></data>
+  <data name="SearchContexts" xml:space="preserve"><value>Search Instances, Tenants or Workspaces…</value></data>
+  <data name="NoContextMatch" xml:space="preserve"><value>No accessible context matches this search.</value></data>
+  <data name="ContextKind.Instance" xml:space="preserve"><value>Instance</value></data>
+  <data name="ContextKind.Tenant" xml:space="preserve"><value>Tenant</value></data>
+  <data name="ContextKind.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="InstanceAdministration" xml:space="preserve"><value>Instance administration</value></data>
+  <data name="GlobalAdministration" xml:space="preserve"><value>Global administration</value></data>
+  <data name="TenantAdministration" xml:space="preserve"><value>Tenant administration</value></data>
+  <data name="ConfirmContextChange" xml:space="preserve"><value>You have unsaved changes. Discard them and change context?</value></data>
+  <data name="ContextChangeFailed" xml:space="preserve"><value>Context change failed</value></data>
 </root>

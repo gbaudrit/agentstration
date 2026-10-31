@@ -113,9 +113,9 @@ public static partial class WorkplaceEndpoints
         }
         if (string.Equals(kind, FlowResourceKinds.Flow, StringComparison.Ordinal))
         {
-            var page = await flows.ListAsync(workplaceContext.WorkspaceId, 0, 500, token);
+            var page = await flows.ListVisibleAsync(ResourceScopeRef.Workspace(workplaceContext.WorkspaceId.Value), null, 0, 200, token);
             return Results.Ok(page.Items.Where(value => !value.Value.Metadata.TryGetValue("systemManaged", out var system) || !bool.TryParse(system, out var hidden) || !hidden)
-                .Select(value => new ResourcePickerItem(value.Value.Id.Value, value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", kind) { Namespace = value.Value.Id.Namespace }));
+                .Select(value => new ResourcePickerItem(value.Value.Id.Value, value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", kind) { Namespace = value.Value.Id.Namespace, ScopeRef = value.Value.ScopeRef }));
         }
         return Results.Problem(statusCode: 400, title: "resource_kind_not_supported", detail: "Only Agent and Flow resources can be selected for an Entry.");
     }

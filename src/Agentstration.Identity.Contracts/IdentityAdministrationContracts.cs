@@ -1,4 +1,23 @@
+using System.Text.Json.Serialization;
+
 namespace Agentstration.Identity.Contracts;
+
+public enum IdentityConsoleContextKind
+{
+    Instance,
+    Tenant,
+    Workspace
+}
+
+public sealed record IdentityConsoleContextOptionResponse(
+    string ScopeRef,
+    IdentityConsoleContextKind Kind,
+    Guid? TenantId,
+    string? TenantName,
+    string? TenantDisplayName,
+    Guid? WorkspaceId,
+    string? WorkspaceName,
+    string DisplayName);
 
 public sealed record IdentityConsoleWorkspaceResponse(
     Guid Id,
@@ -10,15 +29,38 @@ public sealed record IdentityConsoleWorkspaceResponse(
     WorkspaceStatus Status,
     IReadOnlyList<string> Permissions);
 
+[method: JsonConstructor]
 public sealed record IdentityConsoleContextResponse(
     RequestContext Context,
+    string SelectedScopeRef,
+    IdentityConsoleContextKind SelectedKind,
     string UserDisplayName,
     string TenantName,
     string TenantDisplayName,
     string WorkspaceName,
     string WorkspaceDisplayName,
     IReadOnlyList<string> Permissions,
-    IReadOnlyList<IdentityConsoleWorkspaceResponse> AvailableWorkspaces);
+    IReadOnlyList<IdentityConsoleWorkspaceResponse> AvailableWorkspaces,
+    IReadOnlyList<IdentityConsoleContextOptionResponse> AvailableContexts)
+{
+    public IdentityConsoleContextResponse(
+        RequestContext context,
+        string userDisplayName,
+        string tenantName,
+        string tenantDisplayName,
+        string workspaceName,
+        string workspaceDisplayName,
+        IReadOnlyList<string> permissions,
+        IReadOnlyList<IdentityConsoleWorkspaceResponse> availableWorkspaces)
+        : this(context, $"/workspaces/{context.WorkspaceId:D}", IdentityConsoleContextKind.Workspace,
+            userDisplayName, tenantName, tenantDisplayName, workspaceName, workspaceDisplayName,
+            permissions, availableWorkspaces,
+            [new($"/workspaces/{context.WorkspaceId:D}", IdentityConsoleContextKind.Workspace,
+                context.TenantId, tenantName, tenantDisplayName, context.WorkspaceId, workspaceName,
+                workspaceDisplayName)])
+    {
+    }
+}
 
 public sealed record OrganizationAdministrationResponse(
     Tenant Tenant,
@@ -60,6 +102,11 @@ public sealed record LocalAccountResponse(
 
 public sealed record CreateWorkspaceRequest(string Name, string DisplayName);
 public sealed record SelectWorkspaceRequest(Guid WorkspaceId);
+public sealed record SelectConsoleContextRequest(string ScopeRef);
+public sealed record SelectConsoleContextResponse(
+    string ScopeRef,
+    IdentityConsoleContextKind Kind,
+    Guid OperationalWorkspaceId);
 public sealed record SetWorkspaceMembershipRequest(string Role);
 public sealed record LinkExternalIdentityRequest(string Issuer, string Subject);
 public sealed record CreateLocalAccountRequest(

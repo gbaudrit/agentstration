@@ -55,8 +55,6 @@ public static class ConsoleHostServiceCollectionExtensions
         services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi, InternalDelegationAudiences.Work);
         AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi, InternalDelegationAudiences.Work);
-        AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi, InternalDelegationAudiences.Management);
-        AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi, InternalDelegationAudiences.Flow);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
             new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
             provider.GetRequiredService<IConsoleRealtimeConnectionConfigurator>(),
@@ -105,9 +103,12 @@ public static class ConsoleHostServiceCollectionExtensions
             configured.ManagementApi,
             resilient: false);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
+        AddClient<ResourceAccessPolicyApiClient, IResourceAccessPolicyClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
-        services.AddScoped<IHttpClientFactory, BffDelegatingHttpClientFactory>();
+        services.AddScoped<BffDelegatingHttpClientFactory>();
+        services.AddScoped<IHttpClientFactory>(provider => provider.GetRequiredService<BffDelegatingHttpClientFactory>());
+        services.AddScoped<IConsoleContextHttpClientFactory>(provider => provider.GetRequiredService<BffDelegatingHttpClientFactory>());
         return services;
     }
 

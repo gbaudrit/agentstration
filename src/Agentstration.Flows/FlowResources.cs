@@ -11,7 +11,7 @@ public static class FlowResourceKinds
 }
 
 public sealed record FlowResource(
-    WorkspaceId WorkspaceId,
+    ResourceScopeRef ScopeRef,
     FlowId Id,
     string Name,
     string? Description,
@@ -23,10 +23,14 @@ public sealed record FlowResource(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string? DisplayName = null,
-    FlowGraphDefinition? Graph = null);
+    FlowGraphDefinition? Graph = null)
+{
+    public Guid Uid { get; init; } = Guid.NewGuid();
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
+}
 
 public sealed record FlowVersion(
-    WorkspaceId WorkspaceId,
+    ResourceScopeRef ScopeRef,
     FlowId FlowId,
     string Version,
     string? Description,
@@ -36,4 +40,7 @@ public sealed record FlowVersion(
     FlowGraphDefinition? Graph = null,
     string? DefinitionHash = null,
     string? ReleaseNotes = null,
-    IReadOnlyDictionary<string, SchemaBindingSnapshot>? SchemaBindings = null);
+    IReadOnlyDictionary<string, SchemaBindingSnapshot>? SchemaBindings = null)
+{
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
+}

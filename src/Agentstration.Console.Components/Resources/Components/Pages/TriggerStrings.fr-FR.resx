@@ -36,4 +36,27 @@
   <data name="RunCompleted"><value>L’exécution immédiate s’est terminée avec le résultat {0}.</value></data><data name="WorkSubmitted"><value>Work {0} soumis.</value></data><data name="EnabledSuccess"><value>Déclencheur activé. Les occurrences futures seront planifiées.</value></data><data name="DisabledSuccess"><value>Déclencheur désactivé. Aucune autre occurrence planifiée ne sera exécutée.</value></data>
 <data name="Flow"><value>Flow</value></data><data name="Uid"><value>UID</value></data>
   <data name="Scope"><value>Périmètre</value></data>
+  <data name="DefinitionScope"><value>Périmètre de définition</value></data>
+  <data name="ExecutionScope"><value>Périmètre d’exécution</value></data>
+  <data name="Instance"><value>Instance</value></data>
+  <data name="Tenant"><value>Tenant</value></data>
+  <data name="TriggerDetailsTabs"><value>Détails du déclencheur</value></data>
+  <data name="Tab.Overview"><value>Vue d’ensemble</value></data>
+  <data name="Tab.Definition"><value>Définition</value></data>
+  <data name="Tab.Access"><value>Accès</value></data>
+  <data name="Tab.YAML"><value>YAML</value></data>
+  <data name="Overview"><value>Vue d’ensemble du déclencheur</value></data>
+  <data name="RawDefinition"><value>Ressource brute</value></data>
+  <data name="TriggerYaml"><value>YAML du déclencheur</value></data>
+  <data name="TriggerYamlHelp"><value>Consultez la ressource persistée complète du déclencheur au format YAML en lecture seule.</value></data>
+  <data name="ReadOnly"><value>Lecture seule</value></data>
+  <data name="Access"><value>Accès</value></data>
+  <data name="TriggerAccessModel"><value>Accès au Flow</value></data>
+  <data name="TriggerAccessModelHelp"><value>Ce déclencheur utilise les droits d’accès de son Flow cible.</value></data>
+  <data name="ManageFlowAccess"><value>Gérer les accès du Flow</value></data>
+  <data name="Error.OperationalWorkspaceUnavailable"><value>Le contexte sélectionné ne dispose d’aucun Workspace opérationnel pour les déclencheurs.</value></data>
+  <data name="Error.TargetNotDiscoverable"><value>Ce Flow n’est plus visible depuis le contexte sélectionné. Choisissez un autre Flow publié.</value></data>
+  <data name="Error.TargetAmbiguous"><value>Plusieurs Flows visibles ont cette identité. Sélectionnez un périmètre de Flow exact.</value></data>
+  <data name="Error.TargetUseDenied"><value>Ce contexte n’est pas autorisé à utiliser le Flow sélectionné. Modifiez sa politique d’accès avant d’activer le déclencheur.</value></data>
+  <data name="Error.TargetStale"><value>L’identité du Flow ou sa version publiée a changé. Rouvrez le déclencheur et sélectionnez de nouveau le Flow.</value></data>
 </root>

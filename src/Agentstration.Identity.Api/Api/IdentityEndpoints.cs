@@ -1,6 +1,7 @@
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
@@ -14,13 +15,14 @@ public static class IdentityEndpoints
     public static IEndpointRouteBuilder MapAgentstrationIdentityApi(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/identity").RequireAuthorization(AgentstrationPolicies.Authenticated);
-        group.MapGet("/context", async (IdentityExperienceService service, CancellationToken token) => Results.Ok(ToResponse(await service.GetContextAsync(token))))
+        group.MapGet("/context", GetConsoleContextAsync)
             .RequireAuthorization(AgentstrationPolicies.WorkspaceReader);
         group.MapGet("/administration-capabilities", GetAdministrationCapabilitiesAsync)
             .RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapGet("/preferences", GetPreferencesAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapPut("/preferences", UpdatePreferencesAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapPost("/context/workspace", SelectWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        group.MapPost("/context/selection", SelectConsoleContextAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapGet("/pat", ListPersonalAccessTokensAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapPost("/pat", CreatePersonalAccessTokenAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapDelete("/pat", RevokeAllPersonalAccessTokensAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
@@ -66,7 +68,40 @@ public static class IdentityEndpoints
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         endpoints.MapPost("/bff/identity/context/workspace", SelectWorkspaceAsync)
             .RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        endpoints.MapPost("/bff/identity/context/selection", SelectConsoleContextAsync)
+            .RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         return endpoints;
+    }
+
+    private static async Task<IResult> GetConsoleContextAsync(
+        HttpRequest request,
+        IdentityExperienceService service,
+        CancellationToken cancellationToken)
+    {
+        ResourceScopeRef? selected = null;
+        var rawScopeRef = request.Headers[RequestContextMiddleware.ConsoleContextHeader].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(rawScopeRef))
+        {
+            try { selected = ResourceScopeRef.Parse(rawScopeRef); }
+            catch (ArgumentException)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "console_context_access_denied",
+                    detail: "The requested Console context is invalid or unavailable.");
+            }
+        }
+        try
+        {
+            return Results.Ok(ToResponse(await service.GetContextAsync(selected, cancellationToken)));
+        }
+        catch (AuthorizationDeniedException)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "console_context_access_denied",
+                detail: "The requested Console context is invalid or unavailable.");
+        }
     }
 
     private static async Task<IResult> ListPersonalAccessTokensAsync(
@@ -78,6 +113,8 @@ public static class IdentityEndpoints
     private static Agentstration.Identity.Contracts.IdentityConsoleContextResponse ToResponse(ConsoleContextView view) =>
         new(
             view.Context,
+            view.SelectedScopeRef.Value,
+            view.SelectedKind,
             view.UserDisplayName,
             view.TenantName,
             view.TenantDisplayName,
@@ -92,7 +129,16 @@ public static class IdentityEndpoints
                 workspace.Name,
                 workspace.DisplayName,
                 workspace.Status,
-                workspace.Permissions)).ToArray());
+                workspace.Permissions)).ToArray(),
+            view.AvailableContexts.Select(context => new IdentityConsoleContextOptionResponse(
+                context.ScopeRef.Value,
+                context.Kind,
+                context.TenantId,
+                context.TenantName,
+                context.TenantDisplayName,
+                context.WorkspaceId,
+                context.WorkspaceName,
+                context.DisplayName)).ToArray());
 
     private static Agentstration.Identity.Contracts.OrganizationAdministrationResponse ToResponse(TenantAdministrationView view) =>
         new(view.Tenant, view.Workspaces, view.Members.Select(ToResponse).ToArray());
@@ -277,6 +323,7 @@ public static class IdentityEndpoints
             {
                 HttpOnly = true,
                 IsEssential = true,
+                Path = "/",
                 SameSite = SameSiteMode.Strict,
                 Secure = httpRequest.IsHttps,
                 MaxAge = TimeSpan.FromDays(30)
@@ -286,6 +333,31 @@ public static class IdentityEndpoints
         catch (AuthorizationDeniedException exception)
         {
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "workspace_access_denied", detail: exception.Message);
+        }
+    }
+
+    private static async Task<IResult> SelectConsoleContextAsync(
+        Agentstration.Identity.Contracts.SelectConsoleContextRequest request,
+        IdentityExperienceService service,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        var principalId = context.Features.Get<ResolvedPrincipalFeature>()?.PrincipalId;
+        if (principalId is null) return Results.Forbid();
+        try
+        {
+            var scopeRef = ResourceScopeRef.Parse(request.ScopeRef);
+            var selected = await service.ValidateConsoleContextSelectionAsync(
+                principalId.Value, scopeRef, cancellationToken);
+            return Results.Ok(new SelectConsoleContextResponse(
+                scopeRef.Value,
+                selected.Kind,
+                selected.OperationalContext.WorkspaceId));
+        }
+        catch (Exception exception) when (exception is ArgumentException or AuthorizationDeniedException)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden,
+                title: "console_context_access_denied", detail: exception.Message);
         }
     }
 

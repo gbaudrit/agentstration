@@ -6,13 +6,13 @@ using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Web.FlowDesigner.Backend;
 
-public sealed record FlowDesignerAgent(string Name, string DisplayName)
+public sealed record FlowDesignerAgent(string Name, string DisplayName, ResourceScopeRef ScopeRef)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public JsonElement? InputSchema { get; init; }
     public SchemaVersionReference? InputSchemaReference { get; init; }
 }
-public sealed record FlowDesignerFlow(string Name, string DisplayName, ResourceNamespace Namespace, string? ActiveVersion);
+public sealed record FlowDesignerFlow(string Name, string DisplayName, ResourceNamespace Namespace, ResourceScopeRef ScopeRef, string? ActiveVersion);
 public sealed record FlowDesignerOutput(string Name, string? DisplayName, FlowOutputOutcome Outcome, JsonElement? Schema);
 public sealed record FlowDesignerFlowVersion(string Version, JsonElement? InputSchema, JsonElement? OutputSchema, IReadOnlyList<FlowDesignerOutput>? Outputs = null, SchemaVersionReference? InputSchemaReference = null)
 {
@@ -26,7 +26,8 @@ public sealed record FlowDesignerTool(
     JsonElement? OutputSchema,
     bool Enabled,
     bool Available,
-    bool RequiresApproval)
+    bool RequiresApproval,
+    ResourceScopeRef ScopeRef)
 {
     public SchemaVersionReference? InputSchemaReference { get; init; }
 }
@@ -42,12 +43,12 @@ public sealed record FlowDesignerSchemaVersion(
 
 public interface IFlowDesignerResourceProvider
 {
-    Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken);
-    Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken) =>
+    Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<FlowDesignerFlow>>([]);
-    Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+    Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<FlowDesignerFlowVersion>>([]);
-    Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken) =>
+    Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<FlowDesignerTool>>([]);
     Task<IReadOnlyList<FlowDesignerSchemaVersion>> GetSchemaVersionsAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<FlowDesignerSchemaVersion>>([]);

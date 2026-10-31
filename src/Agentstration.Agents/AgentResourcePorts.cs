@@ -33,4 +33,11 @@ public interface IAgentResourceQueries
 public interface IModelProfileReferenceValidator
 {
     Task ValidateAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken);
+
+    async Task<ResolvedResourceDependency?> ResolveAsync(ResourceReference profileReference,
+        ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken)
+    {
+        await ValidateAsync(profileReference, ownerNamespace, consumerScopeRef, cancellationToken);
+        return null;
+    }
 }

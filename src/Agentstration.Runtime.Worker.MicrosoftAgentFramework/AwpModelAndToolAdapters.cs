@@ -194,6 +194,12 @@ internal sealed record AwpAgentTool(AwpExecutionToolMaterial Material) : IAgentT
     public JsonElement InputSchema => Material.InputSchema;
     public JsonElement? OutputSchema => Material.OutputSchema;
     public bool RequiresApproval => Material.RequiresApproval;
+    public ResourceScopeRef? ScopeRef => Material.ScopeRef is null ? null : ResourceScopeRef.Parse(Material.ScopeRef);
+    public Guid? Uid => Material.Uid;
+    public long? Generation => Material.Generation;
+    public ResourceScopeRef? ProviderScopeRef => Material.ProviderScopeRef is null ? null : ResourceScopeRef.Parse(Material.ProviderScopeRef);
+    public Guid? ProviderUid => Material.ProviderUid;
+    public long? ProviderGeneration => Material.ProviderGeneration;
 }
 
 internal sealed class AwpToolCatalog(IReadOnlyList<AwpExecutionToolMaterial> tools) : IToolCatalog

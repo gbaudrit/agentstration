@@ -48,6 +48,23 @@ export interface ExpectedText {
     formMode: string;
     rawMode: string;
   };
+  contextSelector: {
+    change: string;
+    choose: string;
+    close: string;
+    search: string;
+    instance: string;
+    tenant: string;
+    workspace: string;
+    globalAdministration: string;
+    tenantAdministration: string;
+    confirmDiscard: string;
+  };
+  inheritedResource: {
+    title: string;
+    message: string;
+    changeScope: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -106,6 +123,23 @@ export const ExpectedTextByLocale = {
       formMode: 'Form',
       rawMode: 'Raw JSON',
     },
+    contextSelector: {
+      change: 'Change Console context',
+      choose: 'Choose a context',
+      close: 'Close context selector',
+      search: 'Search Instances, Tenants or Workspaces…',
+      instance: 'Instance',
+      tenant: 'Tenant',
+      workspace: 'Workspace',
+      globalAdministration: 'Global administration',
+      tenantAdministration: 'Tenant administration',
+      confirmDiscard: 'You have unsaved changes. Discard them and change context?',
+    },
+    inheritedResource: {
+      title: 'View only',
+      message: 'To modify this resource, go to its owner scope.',
+      changeScope: 'Change scope',
+    },
   },
   'fr-FR': {
     navigation: {
@@ -161,6 +195,23 @@ export const ExpectedTextByLocale = {
     schemaDrivenSources: {
       formMode: 'Formulaire',
       rawMode: 'JSON brut',
+    },
+    contextSelector: {
+      change: 'Changer de contexte Console',
+      choose: 'Choisir un contexte',
+      close: 'Fermer le sélecteur de contexte',
+      search: 'Rechercher une Instance, un Tenant ou un Workspace…',
+      instance: 'Instance',
+      tenant: 'Tenant',
+      workspace: 'Workspace',
+      globalAdministration: 'Administration globale',
+      tenantAdministration: 'Administration du Tenant',
+      confirmDiscard: 'Des modifications ne sont pas enregistrées. Les abandonner et changer de contexte ?',
+    },
+    inheritedResource: {
+      title: 'Consultation uniquement',
+      message: 'Pour modifier cette ressource, acc\u00e9dez \u00e0 son p\u00e9rim\u00e8tre propri\u00e9taire.',
+      changeScope: 'Changer de p\u00e9rim\u00e8tre',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;

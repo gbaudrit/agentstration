@@ -12,24 +12,68 @@ namespace Agentstration.Infrastructure.Flows;
 
 public sealed class KnowledgeProjectionInputResolver(
     IResourceReferenceResolver references,
+    DataSourceManagementService dataSources,
     DataSourceAcquisitionService acquisitions,
+    DataSourceAcquisitionTargetService targets,
     TimeProvider timeProvider) : IKnowledgeProjectionInputResolver
 {
-    public async Task<KnowledgeDataSourceBindingReadiness> GetReadinessAsync(
-        ResourceScopeRef executionScope,
+    public async Task<ResolvedKnowledgeDataSourceBinding> ResolveDependencyAsync(
+        ResourceScopeRef ownerScope,
         ResourceNamespace ownerNamespace,
         KnowledgeDataSourceBinding binding,
         CancellationToken cancellationToken)
     {
+        var ns = binding.DataSource.Namespace ?? ownerNamespace;
+        var source = await dataSources.ResolveForUseAsync(ns, binding.DataSource.Name,
+            binding.DataSource.ScopeRef, ownerScope, cancellationToken);
+        var sourceScope = source.Value.ScopeRef
+            ?? throw Error("knowledge_projection_data_source_scope_missing",
+                $"Data Source '{source.Value.Address}' has no ownership scope.");
+        var readiness = await dataSources.GetReadinessAsync(source.Value.Namespace, source.Value.Name,
+            sourceScope, cancellationToken);
+        var profile = readiness.Profile
+            ?? throw Error("knowledge_projection_data_source_profile_missing",
+                $"Data Source '{source.Value.Address}' has no resolved profile.");
+        if (!readiness.Ready)
+            throw Error("knowledge_projection_data_source_not_ready",
+                $"Data Source '{source.Value.Address}' is not ready: {string.Join(' ', readiness.Issues)}");
+        return new()
+        {
+            BindingName = binding.Name,
+            DataSourceScopeRef = sourceScope,
+            DataSourceNamespace = source.Value.Namespace,
+            DataSourceName = source.Value.Name,
+            DataSourceUid = source.Value.Uid,
+            DataSourceGeneration = source.Value.Generation,
+            ProfileScopeRef = profile.ScopeRef,
+            ProfileNamespace = profile.Namespace,
+            ProfileName = profile.Name,
+            ProfileUid = profile.Uid,
+            ProfileGeneration = profile.Generation,
+            ProfileVersion = profile.Version,
+            ProfileDefinitionHash = profile.DefinitionHash,
+            ProfileDependencyHash = profile.DependencyHash
+        };
+    }
+
+    public async Task<KnowledgeDataSourceBindingReadiness> GetReadinessAsync(
+        ResourceScopeRef executionScope,
+        ResourceNamespace ownerNamespace,
+        KnowledgeDataSourceBinding binding,
+        ResolvedKnowledgeDataSourceBinding dependency,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            var source = await ResolveSourceAsync(executionScope, ownerNamespace, binding, cancellationToken);
+            var source = await ResolveSourceAsync(executionScope, ownerNamespace, binding, dependency, cancellationToken);
             if (!source.Value.Definition.Enabled)
                 return new(binding.Name, source.Value.ScopeRef, source.Value.Uid, false,
                     $"Data Source '{source.Value.Address}' is disabled.", null);
             var values = await acquisitions.ListAsync(source.Value.Namespace, source.Value.Name,
                 source.Value.ScopeRef, cancellationToken);
-            var latest = values.FirstOrDefault(value => value.State == DataSourceAcquisitionState.Succeeded
+            var target = await ResolveTargetAsync(executionScope, ownerNamespace, source.Value, binding, cancellationToken);
+            var latest = values.FirstOrDefault(value => value.Target?.Uid == target?.Uid
+                && value.State == DataSourceAcquisitionState.Succeeded
                 && value.Manifest is not null && value.Manifest.Artifacts.Count != 0);
             if (latest is null)
                 return new(binding.Name, source.Value.ScopeRef, source.Value.Uid, false,
@@ -50,14 +94,17 @@ public sealed class KnowledgeProjectionInputResolver(
         ResourceScopeRef executionScope,
         ResourceNamespace ownerNamespace,
         KnowledgeDataSourceBinding binding,
+        ResolvedKnowledgeDataSourceBinding dependency,
         string? acquisitionId,
         CancellationToken cancellationToken)
     {
-        var source = await ResolveSourceAsync(executionScope, ownerNamespace, binding, cancellationToken);
+        var source = await ResolveSourceAsync(executionScope, ownerNamespace, binding, dependency, cancellationToken);
         if (!source.Value.Definition.Enabled)
             throw Error("knowledge_projection_data_source_disabled", $"Data Source '{source.Value.Address}' is disabled.");
         var available = await acquisitions.ListAsync(source.Value.Namespace, source.Value.Name,
             source.Value.ScopeRef, cancellationToken);
+        var target = await ResolveTargetAsync(executionScope, ownerNamespace, source.Value, binding, cancellationToken);
+        available = available.Where(value => value.Target?.Uid == target?.Uid).ToArray();
         var acquisition = string.IsNullOrWhiteSpace(acquisitionId)
             ? available.FirstOrDefault(value => value.State == DataSourceAcquisitionState.Succeeded
                 && value.Manifest is not null && value.Manifest.Artifacts.Count != 0)
@@ -95,6 +142,10 @@ public sealed class KnowledgeProjectionInputResolver(
             DataSourceName = source.Value.Name,
             DataSourceNamespace = source.Value.Namespace,
             DataSourceGeneration = source.Value.Generation,
+            AcquisitionTargetName = target?.Name,
+            AcquisitionTargetUid = target?.Uid,
+            DiscoveryId = target?.DiscoveryId,
+            ChoiceId = target?.ChoiceId,
             AcquisitionId = acquisition.Name,
             AcquisitionUid = acquisition.Uid,
             AcquisitionFlowRunId = acquisition.FlowRunId,
@@ -113,10 +164,52 @@ public sealed class KnowledgeProjectionInputResolver(
         ResourceScopeRef executionScope,
         ResourceNamespace ownerNamespace,
         KnowledgeDataSourceBinding binding,
-        CancellationToken cancellationToken) => await references.ResolveAsync<DataSourceResource>(binding.DataSource,
-        ownerNamespace, DataSourceResourceKinds.DataSource, executionScope, cancellationToken)
-        ?? throw Error("knowledge_projection_data_source_missing",
-            $"Binding '{binding.Name}' cannot resolve Data Source '{binding.DataSource.Name}'.");
+        ResolvedKnowledgeDataSourceBinding dependency,
+        CancellationToken cancellationToken)
+    {
+        var source = await dataSources.ResolveForUseAsync(dependency.DataSourceNamespace,
+            dependency.DataSourceName, dependency.DataSourceScopeRef, executionScope, cancellationToken);
+        if (source.Value.Uid != dependency.DataSourceUid
+            || source.Value.Generation != dependency.DataSourceGeneration)
+            throw Error("knowledge_projection_data_source_stale",
+                $"Pinned Data Source dependency for binding '{binding.Name}' is stale.");
+        var readiness = await dataSources.GetReadinessAsync(source.Value.Namespace, source.Value.Name,
+            dependency.DataSourceScopeRef, cancellationToken);
+        var profile = readiness.Profile;
+        if (profile is null
+            || profile.ScopeRef != dependency.ProfileScopeRef
+            || profile.Namespace != dependency.ProfileNamespace
+            || !string.Equals(profile.Name, dependency.ProfileName, StringComparison.Ordinal)
+            || profile.Uid != dependency.ProfileUid
+            || profile.Generation != dependency.ProfileGeneration
+            || !string.Equals(profile.Version, dependency.ProfileVersion, StringComparison.Ordinal)
+            || !string.Equals(profile.DefinitionHash, dependency.ProfileDefinitionHash, StringComparison.Ordinal)
+            || !string.Equals(profile.DependencyHash, dependency.ProfileDependencyHash, StringComparison.Ordinal))
+            throw Error("knowledge_projection_data_source_profile_stale",
+                $"Pinned Data Source Profile dependency for binding '{binding.Name}' is stale.");
+        return source;
+    }
+
+    private async Task<DataSourceAcquisitionTargetResource?> ResolveTargetAsync(
+        ResourceScopeRef executionScope, ResourceNamespace ownerNamespace, DataSourceResource source,
+        KnowledgeDataSourceBinding binding, CancellationToken cancellationToken)
+    {
+        if (binding.AcquisitionTarget is null) return null;
+        var stored = await references.ResolveAsync<DataSourceAcquisitionTargetResource>(binding.AcquisitionTarget,
+            ownerNamespace, DataSourceResourceKinds.DataSourceAcquisitionTarget, executionScope, cancellationToken)
+            ?? throw Error("knowledge_projection_acquisition_target_missing",
+                $"Binding '{binding.Name}' cannot resolve acquisition target '{binding.AcquisitionTarget.Name}'.");
+        if (stored.Value.DataSourceUid != source.Uid || stored.Value.DataSourceScopeRef != source.ScopeRef)
+            throw Error("knowledge_projection_acquisition_target_mismatch",
+                $"Acquisition target '{stored.Value.Name}' belongs to another Data Source.");
+        if (!stored.Value.Enabled)
+            throw Error("knowledge_projection_acquisition_target_disabled", $"Acquisition target '{stored.Value.Name}' is disabled.");
+        var views = await targets.ListAsync(source.Namespace, source.Name, source.ScopeRef, cancellationToken);
+        var view = views.Single(value => value.Target.Uid == stored.Value.Uid);
+        if (view.Stale)
+            throw Error("knowledge_projection_acquisition_target_stale", string.Join(' ', view.StalenessReasons));
+        return stored.Value;
+    }
 
     private static KnowledgeProjectionException Error(string code, string message) => new(code, message);
 }
@@ -148,7 +241,10 @@ public sealed class KnowledgeProjectionFlowGateway(FlowRunService runs) : IKnowl
                 null,
                 null,
                 null,
-                scope), cancellationToken);
+                scope)
+            {
+                DefinitionScopeRef = request.Flow.ScopeRef
+            }, cancellationToken);
             var completed = await AwaitCompletionAsync(stored.Value.Id, scope, cancellationToken);
             return Snapshot(completed.Value);
         }

@@ -127,8 +127,13 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.AreEqual(ResourceScopeRef.Workspace(requestContext.WorkspaceId), created.ScopeRef);
 
         var store = factory.Services.GetRequiredService<IResourceStore>();
-        var provider = await store.GetAsync<ToolProviderResource>(new(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name), default);
-        var tool = await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("notification.send")), default);
+        var workspaceScope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var providerAddress = ScopedResourceAddress.Create(workspaceScope, ResourceNamespace.Default,
+            ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name);
+        var toolAddress = ScopedResourceAddress.Create(workspaceScope, ResourceNamespace.Default,
+            ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("notification.send"));
+        var provider = await store.GetExactAsync<ToolProviderResource>(providerAddress, default);
+        var tool = await store.GetExactAsync<ToolResource>(toolAddress, default);
         Assert.IsNotNull(provider);
         Assert.IsTrue(provider.Value.Definition.Mcp?.Internal);
         Assert.IsNotNull(tool);
@@ -155,7 +160,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, disabledResponse.StatusCode);
         var disabled = await disabledResponse.Content.ReadFromJsonAsync<ToolDefinitionResource>();
         Assert.IsFalse(disabled!.Definition.Enabled);
-        tool = await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("notification.send")), default);
+        tool = await store.GetExactAsync<ToolResource>(toolAddress, default);
         Assert.IsFalse(tool!.Value.Definition.Enabled);
 
         using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/tooldefinitions/notification.send?namespace=default");
@@ -163,7 +168,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         using var deleted = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.IsNull(await store.GetAsync<ToolDefinitionResource>(new(ToolResourceKinds.ToolDefinition, "notification.send"), default));
-        Assert.IsNull(await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("notification.send")), default));
+        Assert.IsNull(await store.GetExactAsync<ToolResource>(toolAddress, default));
     }
 
     [TestMethod]
@@ -349,7 +354,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             null,
             "1.0.0",
             true,
-            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            GraphOnlyDefinition(),
             Graph: graph), ResourceNamespace.Default, default);
 
         var published = await flows.PublishVersionAsync(workspaceId,
@@ -508,11 +513,16 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             null,
             "1.0.0",
             true,
-            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            GraphOnlyDefinition(),
             Graph: Graph(input, output)), ns, default);
         await flows.PublishVersionAsync(workspaceId, new FlowId(name, ns), "1.0.0", true, default);
         return (input, output);
     }
+
+    private static WorkflowFlowDefinition GraphOnlyDefinition() => new(
+        "input",
+        [new FlowNode("input", FlowNodeKind.Input)],
+        []);
 
     private static FlowGraphDefinition Graph(JsonElement input, JsonElement output) => new()
     {

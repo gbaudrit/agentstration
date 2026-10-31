@@ -105,8 +105,13 @@ else
         pendingDelete = null;
         try
         {
-            var snapshot = await Client.GetAgentAsync(deleted.Id, cancellation.Token);
-            await Client.DeleteAgentAsync(deleted.Id, snapshot.ETag, cancellation.Token);
+            var snapshot = deleted.ScopeRef is { } scopeRef
+                ? await Client.GetAgentAsync(deleted.Namespace, deleted.Id, scopeRef, cancellation.Token)
+                : await Client.GetAgentAsync(deleted.Namespace, deleted.Id, cancellation.Token);
+            if (deleted.ScopeRef is { } exactScopeRef)
+                await Client.DeleteAgentAsync(deleted.Namespace, deleted.Id, exactScopeRef, snapshot.ETag, cancellation.Token);
+            else
+                await Client.DeleteAgentAsync(deleted.Id, snapshot.ETag, cancellation.Token);
             Notifications.Add(new NotificationItem(Guid.NewGuid(), T("AgentDeleted"), deleted.Name, DateTimeOffset.Now, UiStatus.Success));
             await LoadAsync();
         }
@@ -119,7 +124,7 @@ else
 
     private static string EditUrl(AgentSummary item) => item.DetailsUrl;
     private static string RunUrl(AgentSummary item) => $"{EditUrl(item)}/run";
-    private static string ModelProfileUrl(AgentSummary item) => ConsoleResourceUrls.ModelProfile(item.ModelProfileAddress);
+    private static string ModelProfileUrl(AgentSummary item) => ConsoleResourceUrls.ModelProfile(item.ModelProfileAddress, item.ModelProfileScopeRef);
     private static string TechnicalName(AgentSummary item) => item.Id;
     private static string ResourceName(string resourceId) => resourceId;
     private string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("NoActivityReported") : value.LocalDateTime.ToString("g");

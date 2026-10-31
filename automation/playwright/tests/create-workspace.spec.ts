@@ -18,13 +18,13 @@ test('an administrator can create and select a campaign workspace @smoke', async
     checkpoint: ignoreCheckpoints,
   }, workspace);
 
-  const row = page.getByTestId(TestIds.organizationWorkspaces.row)
-    .filter({ has: page.locator('code').getByText(workspace.name, { exact: true }) });
-  const workspaceId = await row.getAttribute('data-workspace-id');
+  const shell = page.getByTestId(TestIds.console.shell);
+  const workspaceId = await shell.getAttribute('data-workspace-id');
   expect(workspaceId).not.toBeNull();
-  await expect(page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-workspace-id', workspaceId!);
-  await expect(page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-workspace-name', workspace.name);
-  await pages.organizationWorkspaces.selectByName(workspace.name);
+  await expect(shell).toHaveAttribute('data-workspace-id', workspaceId!);
+  await expect(shell).toHaveAttribute('data-workspace-name', workspace.name);
+  await pages.organizationWorkspaces.selectTenantForWorkspace(workspace.name);
+  await pages.organizationWorkspaces.open(product.consoleUrl);
   await expect(page.getByTestId(TestIds.organizationWorkspaces.create)).toHaveAccessibleName(
     ExpectedTextByLocale['en-US'].organizationWorkspaces.createWorkspace,
   );

@@ -13,14 +13,13 @@ public sealed record AgentSummary(string Id, string Name, string Type, string Ve
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ModelProfileScopeRef { get; init; }
     public string? DeploymentId { get; init; }
     public JsonElement? InputSchema { get; init; }
     public SchemaVersionReference? InputSchemaReference { get; init; }
     public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, ModelResourceKinds.ModelProfile, ModelProfile);
     public string? DeploymentUrl => DeploymentId is null ? null : ConsoleResourceUrls.Deployment(Namespace, DeploymentId);
-    public string DetailsUrl => Namespace.IsDefault
-        ? $"/agents/{Uri.EscapeDataString(Id)}"
-        : $"/namespaces/{Uri.EscapeDataString(Namespace.Value)}/agents/{Uri.EscapeDataString(Id)}";
+    public string DetailsUrl => ConsoleResourceUrls.Agent(Namespace, Id, ScopeRef);
 }
 public sealed record ResourceSnapshot<T>(T Value, string ETag);
 public sealed record DeploymentSummary(
@@ -40,29 +39,63 @@ public sealed record WorkSummary(Guid Id, string Title, string Type, string Stat
 public sealed record FlowSummary(string Id, string Name, string Kind, string Version, string Status, int Steps, int ActiveExecutions, DateTimeOffset UpdatedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? ActiveVersion { get; init; }
-    public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace));
+    public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace), ScopeRef);
 }
 
 public static class ConsoleResourceUrls
 {
+    public static string Agent(
+        ResourceNamespace @namespace,
+        string name,
+        ResourceScopeRef? scopeRef = null,
+        ResourceScopeRef? contextScopeRef = null,
+        string? returnUrl = null)
+    {
+        var path = @namespace.IsDefault
+            ? $"/agents/{Uri.EscapeDataString(name)}"
+            : $"/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(name)}";
+        var query = new List<string>();
+        if (scopeRef is not null) query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}");
+        if (contextScopeRef is not null) query.Add($"context={Uri.EscapeDataString(contextScopeRef.Value.Value)}");
+        if (!string.IsNullOrWhiteSpace(returnUrl)) query.Add($"returnUrl={Uri.EscapeDataString(returnUrl)}");
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
+    }
+
+    public static string? LocalReturnUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || !Uri.TryCreate(value, UriKind.Relative, out _)
+            || !value.StartsWith('/')
+            || value.StartsWith("//", StringComparison.Ordinal)
+            || value.Contains('\\'))
+            return null;
+        return value;
+    }
+
     public static string Deployment(ResourceNamespace @namespace, string name) =>
         $"/deployments#deployment-{Uri.EscapeDataString(@namespace.Value)}-{Uri.EscapeDataString(name)}";
 
-    public static string Flow(FlowId id) => id.Namespace.IsDefault
-        ? $"/flows/{Uri.EscapeDataString(id.Value)}"
-        : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/flows/{Uri.EscapeDataString(id.Value)}";
+    public static string Flow(FlowId id, ResourceScopeRef? scopeRef = null)
+    {
+        var path = id.Namespace.IsDefault
+            ? $"/flows/{Uri.EscapeDataString(id.Value)}"
+            : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/flows/{Uri.EscapeDataString(id.Value)}";
+        return scopeRef is null ? path : $"{path}?scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}";
+    }
 
     public static string Entry(EntryId id) => id.Namespace.IsDefault
         ? $"/entries/{Uri.EscapeDataString(id.Value)}"
         : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/entries/{Uri.EscapeDataString(id.Value)}";
 
-    public static string ModelProfile(ResourceAddress address)
+    public static string ModelProfile(ResourceAddress address, ResourceScopeRef? scopeRef = null)
     {
         var path = $"/modelprofiles/{Uri.EscapeDataString(address.Name)}";
-        return address.Namespace.IsDefault
-            ? path
-            : $"{path}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+        var query = new List<string>();
+        if (!address.Namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(address.Namespace.Value)}");
+        if (scopeRef is not null) query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value.Value)}");
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
     }
 
     public static string Model(ResourceAddress address)

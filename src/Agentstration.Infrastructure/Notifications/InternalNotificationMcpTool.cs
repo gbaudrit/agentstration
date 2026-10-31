@@ -102,16 +102,29 @@ public sealed class WorkNotificationMcpTool(
 public sealed class InternalMcpToolProjectionService(
     IResourceStore store,
     IEnumerable<IInternalMcpToolDefinitionProvider> definitions,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IResourceGovernanceContext governance)
 {
-    public async Task EnsureAsync(ResourceScopeRef workspaceScope, ResourceNamespace @namespace, CancellationToken cancellationToken)
+    public async Task EnsureAsync(ResourceScopeRef scope, ResourceNamespace @namespace, CancellationToken cancellationToken)
     {
-        if (workspaceScope.Kind != ResourceScopeKind.Workspace)
-            throw new ToolResourceValidationException("Internal MCP Tools require a Workspace scope.");
+        if (scope.Kind is not ResourceScopeKind.Instance and not ResourceScopeKind.Workspace)
+            throw new ToolResourceValidationException("Internal MCP Tools require an Instance or Workspace scope.");
+        var initialCategories = await EnsureManagedResourcesAsync(scope, @namespace, cancellationToken);
+        foreach (var (category, toolName) in initialCategories)
+            await EnsureInitialCategoryAsync(category, toolName, scope, @namespace, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<(InitialToolCategory Category, string ToolName)>> EnsureManagedResourcesAsync(
+        ResourceScopeRef scope,
+        ResourceNamespace @namespace,
+        CancellationToken cancellationToken)
+    {
+        using var governanceScope = governance.Push(ResourceGovernance.Core("tools.internal-mcp"));
+        var initialCategories = new List<(InitialToolCategory Category, string ToolName)>();
         var providerKey = new ResourceKey(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name, @namespace);
-        var provider = await store.GetExactAsync<ToolProviderResource>(providerKey.AtScope(workspaceScope), cancellationToken)
-            ?? await CreateOrReadAsync(Provider(workspaceScope, @namespace), workspaceScope, cancellationToken);
-        if (provider.Value.Definition.Mcp?.Internal != true || provider.Value.ScopeRef != workspaceScope)
+        var provider = await store.GetExactAsync<ToolProviderResource>(providerKey.AtScope(scope), cancellationToken)
+            ?? await CreateOrReadAsync(Provider(scope, @namespace), scope, cancellationToken);
+        if (provider.Value.Definition.Mcp?.Internal != true || provider.Value.ScopeRef != scope)
             throw new ToolResourceValidationException("The reserved Agentstration ToolProvider identity is already in use.");
 
         var now = timeProvider.GetUtcNow();
@@ -119,7 +132,7 @@ public sealed class InternalMcpToolProjectionService(
         {
             var name = AgentstrationToolProvider.ToolResourceName(definition.Name);
             var key = new ResourceKey(ToolResourceKinds.Tool, name, @namespace);
-            var existing = await store.GetExactAsync<ToolResource>(key.AtScope(workspaceScope), cancellationToken);
+            var existing = await store.GetExactAsync<ToolResource>(key.AtScope(scope), cancellationToken);
             if (existing is null)
             {
                 existing = await CreateOrReadAsync(new ToolResource
@@ -127,7 +140,7 @@ public sealed class InternalMcpToolProjectionService(
                     ApiVersion = ResourceApiVersions.CoreV1,
                     Kind = ToolResourceKinds.Tool,
                     Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
-                    ScopeRef = workspaceScope,
+                    ScopeRef = scope,
                     Generation = 1,
                     Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
                     Definition = new ToolResourceProperties
@@ -136,7 +149,7 @@ public sealed class InternalMcpToolProjectionService(
                         Description = definition.Description,
                         Enabled = true,
                         RequiresApproval = definition.RequiresApproval,
-                        Provider = new ResourceReference(AgentstrationToolProvider.Name, workspaceScope, @namespace),
+                        Provider = new ResourceReference(AgentstrationToolProvider.Name, scope, @namespace),
                         ExternalId = definition.Name,
                         Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },
                         Schema = new ToolSchema { Input = definition.InputSchema.Clone(), Output = definition.OutputSchema?.Clone() },
@@ -145,21 +158,21 @@ public sealed class InternalMcpToolProjectionService(
                             ["agentstration.implementation"] = JsonSerializer.SerializeToElement("internal")
                         }
                     }
-                }, workspaceScope, cancellationToken);
+                }, scope, cancellationToken);
 
                 if (definition.InitialCategory is { } category)
-                    await EnsureInitialCategoryAsync(category, name, workspaceScope, @namespace, cancellationToken);
+                    initialCategories.Add((category, name));
             }
 
             if (existing.Value.Definition.ExternalId != definition.Name
                 || existing.Value.Definition.Provider?.Name != AgentstrationToolProvider.Name
-                || existing.Value.ScopeRef != workspaceScope)
+                || existing.Value.ScopeRef != scope)
                 throw new ToolResourceValidationException($"The reserved internal Tool identity '{name}' is already in use.");
             if (existing.Value.Definition.Description != definition.Description
                 || !ToolDefinitionService.SameSchema(existing.Value.Definition.Schema?.Input, definition.InputSchema)
                 || !ToolDefinitionService.SameSchema(existing.Value.Definition.Schema?.Output, definition.OutputSchema))
             {
-                await store.PutExactAsync(workspaceScope, existing.Value with
+                await store.PutExactAsync(scope, existing.Value with
                 {
                     Generation = checked(existing.Value.Generation + 1),
                     Definition = existing.Value.Definition with
@@ -170,6 +183,8 @@ public sealed class InternalMcpToolProjectionService(
                 }, existing.ETag, false, cancellationToken);
             }
         }
+
+        return initialCategories;
     }
 
     private async Task EnsureInitialCategoryAsync(

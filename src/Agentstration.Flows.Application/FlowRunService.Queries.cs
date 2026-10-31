@@ -15,6 +15,9 @@ public sealed partial class FlowRunService
     /// </summary>
     public Task<StoredFlowRun?> GetAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) => repository.GetRunAsync(workspaceId, runId, cancellationToken);
 
+    public Task<StoredFlowRun?> GetExactAsync(ResourceScopeRef executionScopeRef, string runId, CancellationToken cancellationToken) =>
+        repository.GetRunExactAsync(executionScopeRef, runId, cancellationToken);
+
     public async Task<StoredFlowRun?> GetAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
     {
         return await repository.GetRunAsync(scope, runId, cancellationToken);
@@ -28,8 +31,8 @@ public sealed partial class FlowRunService
         var stored = await RequiredAsync(runId, scope, cancellationToken);
         if (!stored.Value.Status.IsTerminal()) throw new FlowRunNotTerminalException(runId, stored.Value.Status);
         foreach (var guard in runDeletionGuards)
-            await guard.ValidateDeleteAsync(scope.WorkspaceId, runId, cancellationToken);
-        await repository.DeleteRunAsync(scope.WorkspaceId, runId, expectedETag, cancellationToken);
+            await guard.ValidateDeleteAsync(scope.ScopeRef, runId, cancellationToken);
+        await repository.DeleteRunExactAsync(scope.ScopeRef, runId, expectedETag, cancellationToken);
     }
 
     public async Task<IReadOnlyList<StoredInputRequest>> ListInputsAsync(
@@ -39,7 +42,7 @@ public sealed partial class FlowRunService
         CancellationToken cancellationToken)
     {
         _ = await RequiredAsync(runId, scope, cancellationToken);
-        return await repository.ListInputRequestsAsync(scope.WorkspaceId, runId, status, cancellationToken);
+        return await repository.ListInputRequestsExactAsync(scope.ScopeRef, runId, status, cancellationToken);
     }
 
     public async Task<StoredInputRequest?> GetInputAsync(
@@ -49,7 +52,7 @@ public sealed partial class FlowRunService
         CancellationToken cancellationToken)
     {
         _ = await RequiredAsync(runId, scope, cancellationToken);
-        return await repository.GetInputRequestAsync(scope.WorkspaceId, runId, requestId, cancellationToken);
+        return await repository.GetInputRequestExactAsync(scope.ScopeRef, runId, requestId, cancellationToken);
     }
 
     public async IAsyncEnumerable<FlowRun> ObserveAsync(string runId, FlowRunScope scope, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -71,10 +74,13 @@ public sealed partial class FlowRunService
     public async Task<IReadOnlyList<FlowRunEvent>> ListEventsAsync(FlowRunScope scope, string runId, long afterSequence, CancellationToken cancellationToken)
     {
         _ = await RequiredAsync(runId, scope, cancellationToken);
-        return await repository.ListRunEventsAsync(scope.WorkspaceId, runId, afterSequence, cancellationToken);
+        return await repository.ListRunEventsExactAsync(scope.ScopeRef, runId, afterSequence, cancellationToken);
     }
 
     private async Task<StoredFlowRun> RequiredAsync(WorkspaceId workspaceId, string id, CancellationToken token) => await repository.GetRunAsync(workspaceId, id, token) ?? throw new FlowRunNotFoundException(id);
+
+    private async Task<StoredFlowRun> RequiredExactAsync(ResourceScopeRef executionScopeRef, string id, CancellationToken token) =>
+        await repository.GetRunExactAsync(executionScopeRef, id, token) ?? throw new FlowRunNotFoundException(id);
 
     private async Task<StoredFlowRun> RequiredAsync(string id, FlowRunScope scope, CancellationToken token) =>
         await GetAsync(id, scope, token) ?? throw new FlowRunNotFoundException(id);

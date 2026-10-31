@@ -7,6 +7,7 @@ namespace Agentstration.Infrastructure.Flows;
 
 public sealed class DataSourceAcquisitionRecoveryWorker(
     DataSourceAcquisitionService acquisitions,
+    DataSourceDiscoveryService discoveries,
     IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
     ILogger<DataSourceAcquisitionRecoveryWorker> logger) : BackgroundService
@@ -24,11 +25,12 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
         {
             using var scope = requestScopes.PushSystem();
             await acquisitions.RecoverPendingAsync(cancellationToken);
+            await discoveries.RecoverPendingAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Data Source acquisition recovery scan failed");
+            logger.LogError(exception, "Data Source acquisition and discovery recovery scan failed");
         }
     }
 }

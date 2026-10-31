@@ -68,6 +68,10 @@ public static class SecurityAuditActions
     public const string DataSourceAcquisitionStarted = "data-source-acquisition.started";
     public const string DataSourceAcquisitionCancelled = "data-source-acquisition.cancelled";
     public const string DataSourceAcquisitionRetried = "data-source-acquisition.retried";
+    public const string DataSourceDiscoveryStarted = "data-source-discovery.started";
+    public const string DataSourceDiscoveryCancelled = "data-source-discovery.cancelled";
+    public const string DataSourceAcquisitionTargetPromoted = "data-source-acquisition-target.promoted";
+    public const string DataSourceAcquisitionTargetReconciled = "data-source-acquisition-target.reconciled";
     public const string KnowledgeSourceCreated = "knowledge-source.created";
     public const string KnowledgeSourceToolExposurePublished = "knowledge-source.tool-exposure-published";
     public const string KnowledgeSourceUpdated = "knowledge-source.updated";
@@ -85,6 +89,11 @@ public static class SecurityAuditActions
     public const string SchemaCreated = "schema.created";
     public const string SchemaUpdated = "schema.updated";
     public const string SchemaVersionPublished = "schema.version-published";
+    public const string ResourceAccessPolicySet = "resource-access.policy-set";
+    public const string ResourceAccessPolicyDeleted = "resource-access.policy-deleted";
+    public const string ResourceAccessEvaluated = "resource-access.evaluated";
+    public const string ManagedResourceReconciled = "managed-resource.reconciled";
+    public const string ManagedResourceMutationDenied = "managed-resource.mutation-denied";
 }
 
 public sealed record SecurityAuditEvent(

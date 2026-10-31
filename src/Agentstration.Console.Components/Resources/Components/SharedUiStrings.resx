@@ -9,4 +9,7 @@
   <data name="ResourceScope.Workspace" xml:space="preserve"><value>Workspace</value></data>
   <data name="ResourceScope.Loading" xml:space="preserve"><value>Loading scopes…</value></data>
   <data name="ResourceScope.Unavailable" xml:space="preserve"><value>No available scope</value></data>
+  <data name="InheritedResource.ReadOnlyTitle" xml:space="preserve"><value>View only</value></data>
+  <data name="InheritedResource.ReadOnlyMessage" xml:space="preserve"><value>To modify this resource, go to its owner scope.</value></data>
+  <data name="InheritedResource.SwitchToOwner" xml:space="preserve"><value>Change scope</value></data>
 </root>

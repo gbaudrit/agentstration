@@ -9,4 +9,7 @@
   <data name="ResourceScope.Workspace" xml:space="preserve"><value>Workspace</value></data>
   <data name="ResourceScope.Loading" xml:space="preserve"><value>Chargement des périmètres…</value></data>
   <data name="ResourceScope.Unavailable" xml:space="preserve"><value>Aucun périmètre disponible</value></data>
+  <data name="InheritedResource.ReadOnlyTitle" xml:space="preserve"><value>Consultation uniquement</value></data>
+  <data name="InheritedResource.ReadOnlyMessage" xml:space="preserve"><value>Pour modifier cette ressource, accédez à son périmètre propriétaire.</value></data>
+  <data name="InheritedResource.SwitchToOwner" xml:space="preserve"><value>Changer de périmètre</value></data>
 </root>

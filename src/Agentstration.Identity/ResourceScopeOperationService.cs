@@ -15,12 +15,12 @@ public sealed class ResourceScopeOperationService(
     public ResourceScopeRef DefaultScopeRef(string kind)
     {
         var allowed = ResourceScopePolicy.AllowedScopes(kind);
-        if (requestContext.AccessMode == ControlPlaneAccessMode.Tenant)
+        if (requestContext.AccessMode is ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration)
         {
             ResourceScopePolicy.EnsureAllowed(kind, ResourceScopeKind.Tenant);
             return ResourceScopeRef.Tenant(requestContext.Current.TenantId);
         }
-        if (requestContext.AccessMode == ControlPlaneAccessMode.System)
+        if (requestContext.AccessMode is ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance)
         {
             ResourceScopePolicy.EnsureAllowed(kind, ResourceScopeKind.Instance);
             return ResourceScopeRef.Instance;
@@ -35,13 +35,13 @@ public sealed class ResourceScopeOperationService(
     public ResourceScopeRef TargetScopeRef(ResourceScopeKind kind)
     {
         if (kind == ResourceScopeKind.Instance) return ResourceScopeRef.Instance;
-        if (requestContext.AccessMode == ControlPlaneAccessMode.Tenant)
+        if (requestContext.AccessMode is ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration)
         {
             if (kind == ResourceScopeKind.Tenant)
                 return ResourceScopeRef.Tenant(requestContext.Current.TenantId);
             throw new ResourceScopePolicyException($"A tenant Control Plane context cannot target a {kind.ToString().ToLowerInvariant()} scope.");
         }
-        if (requestContext.AccessMode == ControlPlaneAccessMode.System)
+        if (requestContext.AccessMode is ControlPlaneAccessMode.System or ControlPlaneAccessMode.Instance)
             throw new ResourceScopePolicyException($"A system Control Plane context cannot infer a {kind.ToString().ToLowerInvariant()} scope.");
         var current = RequireInteractiveContext();
         return kind switch
@@ -57,6 +57,18 @@ public sealed class ResourceScopeOperationService(
         string permission,
         CancellationToken cancellationToken)
     {
+        if (requestContext.AccessMode == ControlPlaneAccessMode.Instance)
+        {
+            ResourceScopePolicy.EnsureAllowed(kind, ResourceScopeKind.Instance);
+            return [new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true)];
+        }
+        if (requestContext.AccessMode is ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration)
+        {
+            ResourceScopePolicy.EnsureAllowed(kind, ResourceScopeKind.Tenant);
+            var tenant = await identities.GetTenantAsync(requestContext.Current.TenantId, cancellationToken)
+                ?? throw new InvalidOperationException("The selected Tenant no longer exists.");
+            return [new(ResourceScopeRef.Tenant(tenant.Id), ResourceScopeKind.Tenant, tenant.DisplayName, true)];
+        }
         var current = RequireInteractiveContext();
         var allowed = ResourceScopePolicy.AllowedScopes(kind);
         var canWriteTenantOrWorkspace = current.Restriction is null
@@ -116,7 +128,13 @@ public sealed class ResourceScopeOperationService(
     {
         if (requestContext.AccessMode == ControlPlaneAccessMode.System)
             return await operation(cancellationToken);
+        if (requestContext.AccessMode == ControlPlaneAccessMode.Instance
+            && scopeRef == ResourceScopeRef.Instance)
+            return await operation(cancellationToken);
         if (requestContext.AccessMode == ControlPlaneAccessMode.Tenant
+            && scopeRef == ResourceScopeRef.Tenant(requestContext.Current.TenantId))
+            return await operation(cancellationToken);
+        if (requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
             && scopeRef == ResourceScopeRef.Tenant(requestContext.Current.TenantId))
             return await operation(cancellationToken);
 
@@ -127,6 +145,7 @@ public sealed class ResourceScopeOperationService(
             await authorization.EnsurePermissionAsync(current, permission, cancellationToken);
             return await operation(cancellationToken);
         }
+        if (RequiresOwnerContext(permission)) throw new ResourceScopeAccessDeniedException(scopeRef);
         if (scopeRef == ResourceScopeRef.Tenant(current.TenantId))
         {
             await authorization.EnsurePermissionAsync(current, permission, cancellationToken);
@@ -141,6 +160,9 @@ public sealed class ResourceScopeOperationService(
         }
         throw new ResourceScopeAccessDeniedException(scopeRef);
     }
+
+    private static bool RequiresOwnerContext(string permission) =>
+        permission is AuthorizationPermissions.ResourcesWrite or AuthorizationPermissions.ResourcesDelete;
 
     private RequestContext RequireInteractiveContext()
     {

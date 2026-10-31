@@ -10,11 +10,13 @@ public sealed record FlowToolExecutionRequest(
     FlowRunScope Scope,
     string RunId,
     FlowId OwnerFlowId,
+    ResourceScopeRef DefinitionScopeRef,
     string StepName,
     int Attempt,
     string CorrelationId,
     FlowToolReference Tool,
-    JsonElement Arguments);
+    JsonElement Arguments,
+    ResolvedFlowToolRoute? Route = null);
 
 public sealed record FlowToolExecutionResult(
     JsonElement? Output,
@@ -36,6 +38,7 @@ public interface IFlowToolSetResolver
 {
     Task<ResolvedFlowToolRoute> ResolveAsync(
         WorkspaceId workspaceId,
+        ResourceScopeRef ownerScopeRef,
         ResourceNamespace ownerNamespace,
         ToolRouteFlowStepDefinition step,
         CancellationToken cancellationToken);
@@ -87,7 +90,8 @@ public sealed class UnsupportedFlowToolSetResolver : IFlowToolSetResolver
 {
     public static UnsupportedFlowToolSetResolver Instance { get; } = new();
     private UnsupportedFlowToolSetResolver() { }
-    public Task<ResolvedFlowToolRoute> ResolveAsync(WorkspaceId workspaceId, ResourceNamespace ownerNamespace,
+    public Task<ResolvedFlowToolRoute> ResolveAsync(WorkspaceId workspaceId, ResourceScopeRef ownerScopeRef,
+        ResourceNamespace ownerNamespace,
         ToolRouteFlowStepDefinition step, CancellationToken cancellationToken) =>
         Task.FromException<ResolvedFlowToolRoute>(new FlowValidationException("flow_tool_set_resolver_unavailable", "No ToolSet resolver is configured for Flow Runs."));
 }
@@ -123,7 +127,7 @@ public interface IFlowRunCancellationRegistry
 
 public interface IFlowRunDeletionGuard
 {
-    Task ValidateDeleteAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken);
+    Task ValidateDeleteAsync(ResourceScopeRef executionScopeRef, string runId, CancellationToken cancellationToken);
 }
 
 public interface IFlowRunEventSink
@@ -168,7 +172,7 @@ public sealed record FlowRevisionUsage(
     IReadOnlyList<FlowRevisionRunImpact> ActiveRuns);
 
 public sealed record FlowRevisionRunImpact(
-    WorkspaceId WorkspaceId,
+    ResourceScopeRef ScopeRef,
     string RunId,
     FlowRunStatus Status,
     int PendingInputRequestCount);
@@ -186,6 +190,7 @@ public sealed partial class FlowRunService(
     IFlowInputRequestSink? inputRequestSink = null,
     IEnumerable<IFlowRunDeletionGuard>? configuredRunDeletionGuards = null,
     IFlowStepArtifactCapture? configuredArtifactCapture = null,
+    FlowService? flowDefinitions = null,
     FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -202,11 +207,15 @@ public sealed partial class FlowRunService(
         configuredRunDeletionGuards?.ToArray() ?? [];
     private readonly IFlowStepArtifactCapture artifactCapture =
         configuredArtifactCapture ?? UnsupportedFlowStepArtifactCapture.Instance;
+    private readonly FlowService? flowDefinitions = flowDefinitions;
     private readonly FlowRunTokenUsageConsolidator tokenUsageConsolidator =
         configuredTokenUsageConsolidator ?? new(repository);
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flows");
     public static readonly Meter Meter = new("Agentstration.Flows");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");
+
+    private static string DefinitionSnapshotIdentity(FlowVersion version) =>
+        $"{version.ScopeRef.Value}:{version.FlowId.Namespace.Value}:{version.FlowId.Value}:{version.Version}:{version.DefinitionHash ?? "legacy"}";
 
 
 

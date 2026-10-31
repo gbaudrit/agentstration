@@ -140,6 +140,7 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
             services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector(requirements));
         }));
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
 
         var response = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
         var projected = response!.Value.Single(value => value.RegistrationName == "ollama-extension").ValueRequirements!;
@@ -203,6 +204,8 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
                 services.AddSingleton<IExtensionInspector, ConfiguredEndpointInspector>();
             }));
         using var client = factory.CreateClient();
+        var context = await GetBootstrapContextAsync(factory);
+        SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
         var properties = new ExtensionRegistrationProperties
         {
             DisplayName = "Registered extension",
@@ -254,6 +257,8 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        var context = await GetBootstrapContextAsync(factory);
+        SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
         var unsafeProperties = new ExtensionRegistrationProperties
         {
             DisplayName = "Unsafe",
@@ -291,6 +296,8 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        var context = await GetBootstrapContextAsync(factory);
+        SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
         var properties = new ExtensionRegistrationProperties
         {
             DisplayName = "Authenticated extension",
@@ -319,20 +326,21 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         using var registrationResponse = await client.PostAsJsonAsync(
             "/api/extensionregistrations",
             new CreateExtensionRegistrationRequest("bound-extension", new ExtensionRegistrationProperties
             {
                 DisplayName = "Bound extension",
                 Endpoint = new Uri("http://127.0.0.1:6792")
-            }));
+            }, ScopeRef: ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, registrationResponse.StatusCode);
         using var providerResponse = await client.PostAsJsonAsync(
             "/api/modelproviders",
             new CreateModelProviderRequest("bound-provider", new ModelProviderProperties
             {
                 DisplayName = "Bound provider",
-                Extension = new ResourceReference("bound-extension"),
+                Extension = new ResourceReference("bound-extension", ResourceScopeRef.Instance),
                 ContributionId = "ollama"
             }));
         Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
@@ -350,18 +358,19 @@ public sealed class ExtensionRegistrationApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         using var registrationResponse = await client.PostAsJsonAsync(
             "/api/extensionregistrations",
             new CreateExtensionRegistrationRequest("ollama-lab-extension", new ExtensionRegistrationProperties
             {
                 DisplayName = "Ollama lab extension",
                 Endpoint = new Uri("http://127.0.0.1:11435")
-            }));
+            }, ScopeRef: ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, registrationResponse.StatusCode);
         var properties = new ModelProviderProperties
         {
             DisplayName = "Ollama lab",
-            Extension = new ResourceReference("ollama-lab-extension"),
+            Extension = new ResourceReference("ollama-lab-extension", ResourceScopeRef.Instance),
             ContributionId = "ollama"
         };
 

@@ -9,8 +9,8 @@ const agent: CreateAgentInput = {
   displayName: 'Playwright welcome agent',
   description: 'Welcomes users during the browser journey.',
   instructions: 'Welcome the user and answer concisely.',
-  modelProfile: ['default:missing-profile', 'default:reasoning-default'],
-  runtimeProfile: 'default:maf-builtin',
+  modelProfile: ['/instance|default|missing-profile', '/instance|default|reasoning-default'],
+  runtimeProfile: '/instance|default|maf-builtin',
 };
 
 test('an administrator can create and deploy an agent @smoke', async ({ page, product }) => {
@@ -20,7 +20,10 @@ test('an administrator can create and deploy an agent @smoke', async ({ page, pr
     checkpoint: ignoreCheckpoints,
   }, agent);
 
-  await expect(page).toHaveURL(new RegExp(`/agents/${agent.name}$`));
+  await expect(page).toHaveURL(url =>
+    url.pathname === `/agents/${agent.name}` && url.searchParams.has('scopeRef'));
   await expect(page.getByTestId(TestIds.agentEditor.name)).toHaveValue(agent.name);
   await expect(page.getByTestId(TestIds.agentEditor.name)).toBeDisabled();
+  await new ProductPages(page).agentEditor.openTools();
+  await expect(page.getByTestId(TestIds.agentEditor.toolConfiguration)).toBeVisible();
 });

@@ -19,6 +19,7 @@ public partial class InitialPostgreSql : Migration
             schema: "runtime",
             columns: table => new
             {
+                ScopeRef = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                 WorkspaceId = table.Column<Guid>(type: "uuid", nullable: false),
                 RunId = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: false),
                 RuntimeType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
@@ -29,7 +30,7 @@ public partial class InitialPostgreSql : Migration
             },
             constraints: table =>
             {
-                table.PrimaryKey("PK_RuntimeExecutionStates", x => new { x.WorkspaceId, x.RunId, x.RuntimeType, x.StateId });
+                table.PrimaryKey("PK_RuntimeExecutionStates", x => new { x.ScopeRef, x.RunId, x.RuntimeType, x.StateId });
             });
 
         migrationBuilder.CreateTable(
@@ -37,6 +38,7 @@ public partial class InitialPostgreSql : Migration
             schema: "runtime",
             columns: table => new
             {
+                ScopeRef = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                 WorkspaceId = table.Column<Guid>(type: "uuid", nullable: false),
                 RunId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                 Sequence = table.Column<long>(type: "bigint", nullable: false),
@@ -45,7 +47,7 @@ public partial class InitialPostgreSql : Migration
             },
             constraints: table =>
             {
-                table.PrimaryKey("PK_RuntimeRunEvents", x => new { x.WorkspaceId, x.RunId, x.Sequence });
+                table.PrimaryKey("PK_RuntimeRunEvents", x => new { x.ScopeRef, x.RunId, x.Sequence });
             });
 
         migrationBuilder.CreateTable(
@@ -53,6 +55,7 @@ public partial class InitialPostgreSql : Migration
             schema: "runtime",
             columns: table => new
             {
+                ScopeRef = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                 WorkspaceId = table.Column<Guid>(type: "uuid", nullable: false),
                 RunId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                 AgentResourceId = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
@@ -64,7 +67,7 @@ public partial class InitialPostgreSql : Migration
             },
             constraints: table =>
             {
-                table.PrimaryKey("PK_RuntimeRuns", x => new { x.WorkspaceId, x.RunId });
+                table.PrimaryKey("PK_RuntimeRuns", x => new { x.ScopeRef, x.RunId });
             });
 
         migrationBuilder.CreateTable(
@@ -72,6 +75,7 @@ public partial class InitialPostgreSql : Migration
             schema: "runtime",
             columns: table => new
             {
+                ScopeRef = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                 WorkspaceId = table.Column<Guid>(type: "uuid", nullable: false),
                 AssignmentId = table.Column<Guid>(type: "uuid", nullable: false),
                 TargetKind = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
@@ -92,26 +96,26 @@ public partial class InitialPostgreSql : Migration
             },
             constraints: table =>
             {
-                table.PrimaryKey("PK_RuntimeWorkerAssignments", x => new { x.WorkspaceId, x.AssignmentId });
+                table.PrimaryKey("PK_RuntimeWorkerAssignments", x => new { x.ScopeRef, x.AssignmentId });
             });
 
         migrationBuilder.CreateIndex(
-            name: "IX_RuntimeExecutionStates_WorkspaceId_RunId_RuntimeType_Create~",
+            name: "IX_RuntimeExecutionStates_ScopeRef_RunId_RuntimeType_CreatedAt",
             schema: "runtime",
             table: "RuntimeExecutionStates",
-            columns: new[] { "WorkspaceId", "RunId", "RuntimeType", "CreatedAt" });
+            columns: new[] { "ScopeRef", "RunId", "RuntimeType", "CreatedAt" });
 
         migrationBuilder.CreateIndex(
-            name: "IX_RuntimeRunEvents_WorkspaceId_RunId_Sequence",
+            name: "IX_RuntimeRunEvents_ScopeRef_RunId_Sequence",
             schema: "runtime",
             table: "RuntimeRunEvents",
-            columns: new[] { "WorkspaceId", "RunId", "Sequence" });
+            columns: new[] { "ScopeRef", "RunId", "Sequence" });
 
         migrationBuilder.CreateIndex(
-            name: "IX_RuntimeRuns_WorkspaceId_AgentResourceId_CreatedAt",
+            name: "IX_RuntimeRuns_ScopeRef_AgentResourceId_CreatedAt",
             schema: "runtime",
             table: "RuntimeRuns",
-            columns: new[] { "WorkspaceId", "AgentResourceId", "CreatedAt" });
+            columns: new[] { "ScopeRef", "AgentResourceId", "CreatedAt" });
 
         migrationBuilder.CreateIndex(
             name: "IX_RuntimeWorkerAssignments_State_ActiveWorkerId_ActiveWorkerSessionId",
@@ -132,10 +136,10 @@ public partial class InitialPostgreSql : Migration
             columns: new[] { "State", "RuntimeCapability", "CreatedAt" });
 
         migrationBuilder.CreateIndex(
-            name: "IX_RuntimeWorkerAssignments_WorkspaceId_TargetKind_TargetRunId",
+            name: "IX_RuntimeWorkerAssignments_ScopeRef_TargetKind_TargetRunId",
             schema: "runtime",
             table: "RuntimeWorkerAssignments",
-            columns: new[] { "WorkspaceId", "TargetKind", "TargetRunId" },
+            columns: new[] { "ScopeRef", "TargetKind", "TargetRunId" },
             unique: true);
     }
 

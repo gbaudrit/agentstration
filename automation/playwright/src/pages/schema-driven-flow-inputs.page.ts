@@ -11,6 +11,11 @@ interface FlowRunWire {
   input: Record<string, unknown>;
 }
 
+interface FlowRunLocation {
+  id: string;
+  scopeRef?: string;
+}
+
 export interface SchemaDrivenFlowInputFixture {
   flowName: string;
 }
@@ -57,8 +62,8 @@ export class SchemaDrivenFlowInputsPage {
     await this.openRunDialog(consoleUrl, flowName, false);
     await this.exerciseGeneratedEditor();
     await this.exerciseVersionChangeAndFallback();
-    const runId = await this.submit();
-    await this.assertSubmittedInput(consoleUrl, runId, { count: 2 });
+    const run = await this.submit();
+    await this.assertSubmittedInput(consoleUrl, run, { count: 2 });
 
     await this.openRunDialog(consoleUrl, flowName, true);
     await expect(this.editor.getByTestId(TestIds.common.schemaFormMode)).toBeVisible();
@@ -165,19 +170,24 @@ export class SchemaDrivenFlowInputsPage {
     await expect(submit).toBeEnabled();
   }
 
-  private async submit(): Promise<string> {
+  private async submit(): Promise<FlowRunLocation> {
     await this.page.getByTestId(TestIds.flowObservability.runSubmit).click();
     await this.page.waitForURL(url => /\/flow-runs\/[^/]+$/.test(url.pathname), { timeout: 30_000 });
-    const runId = this.page.url().split('/').at(-1);
+    const location = new URL(this.page.url());
+    const runId = location.pathname.split('/').at(-1);
     if (!runId) throw new Error('The submitted Flow Run did not expose its identifier.');
-    return decodeURIComponent(runId);
+    return {
+      id: decodeURIComponent(runId),
+      scopeRef: location.searchParams.get('scopeRef') ?? undefined,
+    };
   }
 
-  private async assertSubmittedInput(consoleUrl: string, runId: string, expectedInput: Record<string, unknown>): Promise<void> {
-    const response = await this.page.request.get(`${consoleUrl}/api/flowRuns/${encodeURIComponent(runId)}`);
+  private async assertSubmittedInput(consoleUrl: string, run: FlowRunLocation, expectedInput: Record<string, unknown>): Promise<void> {
+    const query = run.scopeRef ? `?scopeRef=${encodeURIComponent(run.scopeRef)}` : '';
+    const response = await this.page.request.get(`${consoleUrl}/api/flowRuns/${encodeURIComponent(run.id)}${query}`);
     expect(response.status(), await response.text()).toBe(200);
-    const run = await response.json() as FlowRunWire;
-    expect(run.input).toEqual(expectedInput);
+    const flowRun = await response.json() as FlowRunWire;
+    expect(flowRun.input).toEqual(expectedInput);
   }
 
   private async openRunDialog(consoleUrl: string, flowName: string, namespaced: boolean): Promise<void> {

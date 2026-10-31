@@ -26,8 +26,16 @@ import { RuntimeWorkerObservabilityPage } from './runtime-worker-observability.p
 import { AgentInstanceObservabilityPage } from './agent-instance-observability.page.js';
 import { SchemaDrivenSourcesPage } from './schema-driven-sources.page.js';
 import { SchemaAdministrationPage } from './schema-administration.page.js';
+import { ResourceAccessPage } from './resource-access.page.js';
+import { ExecutionScopesPage } from './execution-scopes.page.js';
+import { HierarchicalContextPage } from './hierarchical-context.page.js';
+import { OperationalWorkspacesPage } from './operational-workspaces.page.js';
+import { OperationalTriggersPage } from './operational-triggers.page.js';
 import { SchemaContractsPage } from './schema-contracts.page.js';
 import { SchemaDrivenFlowInputsPage } from './schema-driven-flow-inputs.page.js';
+import { ModelProviderAccessPage } from './model-provider-access.page.js';
+import { InheritedResourceReadOnlyPage } from './inherited-resource-readonly.page.js';
+import { ModelProfileCrossScopePage } from './model-profile-cross-scope.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
@@ -56,8 +64,16 @@ export class ProductPages {
   public readonly agentInstanceObservability: AgentInstanceObservabilityPage;
   public readonly schemaDrivenSources: SchemaDrivenSourcesPage;
   public readonly schemaAdministration: SchemaAdministrationPage;
+  public readonly resourceAccess: ResourceAccessPage;
+  public readonly executionScopes: ExecutionScopesPage;
+  public readonly hierarchicalContext: HierarchicalContextPage;
+  public readonly operationalWorkspaces: OperationalWorkspacesPage;
+  public readonly operationalTriggers: OperationalTriggersPage;
   public readonly schemaContracts: SchemaContractsPage;
   public readonly schemaDrivenFlowInputs: SchemaDrivenFlowInputsPage;
+  public readonly modelProviderAccess: ModelProviderAccessPage;
+  public readonly inheritedResourceReadOnly: InheritedResourceReadOnlyPage;
+  public readonly modelProfileCrossScope: ModelProfileCrossScopePage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
@@ -86,8 +102,16 @@ export class ProductPages {
     this.agentInstanceObservability = new AgentInstanceObservabilityPage(page);
     this.schemaDrivenSources = new SchemaDrivenSourcesPage(page);
     this.schemaAdministration = new SchemaAdministrationPage(page);
+    this.resourceAccess = new ResourceAccessPage(page);
+    this.executionScopes = new ExecutionScopesPage(page);
+    this.hierarchicalContext = new HierarchicalContextPage(page);
+    this.operationalWorkspaces = new OperationalWorkspacesPage(page);
+    this.operationalTriggers = new OperationalTriggersPage(page);
     this.schemaContracts = new SchemaContractsPage(page);
     this.schemaDrivenFlowInputs = new SchemaDrivenFlowInputsPage(page);
+    this.modelProviderAccess = new ModelProviderAccessPage(page);
+    this.inheritedResourceReadOnly = new InheritedResourceReadOnlyPage(page);
+    this.modelProfileCrossScope = new ModelProfileCrossScopePage(page);
   }
 
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {

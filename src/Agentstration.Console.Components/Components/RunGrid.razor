@@ -1,10 +1,11 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.FlowRunsStrings> Localizer
-<DataGrid TItem="FlowRun" Items="Runs"><Header><tr><th>@T("Flow")</th><th>@T("Started")</th><th>@T("Status")</th><th>@T("Duration")</th><th>@T("Version")</th><th>@T("Deployment")</th><th>@T("Trigger")</th><th>@T("StartedBy")</th></tr></Header><Row Context="run"><tr><td><strong><a class="resource-name-link" href="/flow-runs/@Uri.EscapeDataString(run.Id)">@run.FlowId.Value</a></strong><br/><code>@ShortId(run.Id)</code></td><td>@(run.StartedAt?.LocalDateTime.ToString("g") ?? T("Pending"))</td><td><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></td><td>@Duration(run)</td><td>@run.FlowVersion</td><td>@(run.DeploymentResourceId ?? "—")</td><td>@TriggerLabel(run.Trigger)</td><td>@(run.StartedBy ?? "—")</td></tr></Row></DataGrid>
+<DataGrid TItem="FlowRun" Items="Runs"><Header><tr><th>@T("Flow")</th><th>@T("Started")</th><th>@T("Status")</th><th>@T("Duration")</th><th>@T("Version")</th><th>@T("Deployment")</th><th>@T("Trigger")</th><th>@T("StartedBy")</th></tr></Header><Row Context="run"><tr><td><strong><a class="resource-name-link" href="@RunUrl(run)">@run.FlowId.Value</a></strong><br/><code>@ShortId(run.Id)</code></td><td>@(run.StartedAt?.LocalDateTime.ToString("g") ?? T("Pending"))</td><td><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></td><td>@Duration(run)</td><td>@run.FlowVersion</td><td>@(run.DeploymentResourceId ?? "—")</td><td>@TriggerLabel(run.Trigger)</td><td>@(run.StartedBy ?? "—")</td></tr></Row></DataGrid>
 @code {
     [Parameter,EditorRequired] public IReadOnlyList<FlowRun> Runs {get;set;}=[];
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string StatusLabel(FlowRunStatus value) => Localizer[$"Status.{value}"];
     private string TriggerLabel(FlowRunTrigger value) => Localizer[$"Trigger.{value}"];
     private static string ShortId(string id)=>id.Length>18?$"{id[..18]}…":id;
+    private static string RunUrl(FlowRun run) => $"/flow-runs/{Uri.EscapeDataString(run.Id)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}";
     private static string Duration(FlowRun run){if(run.StartedAt is null)return "—";var end=run.CompletedAt??DateTimeOffset.UtcNow;var value=end-run.StartedAt.Value;return value.TotalSeconds>=1?$"{value.TotalSeconds:0.##} s":$"{value.TotalMilliseconds:0} ms";}
 }

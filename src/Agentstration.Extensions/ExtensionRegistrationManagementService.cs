@@ -23,7 +23,8 @@ public sealed class ExtensionRegistrationManagementService(
     IResourceStore store,
     IResourceReferenceResolver references,
     ResourceScopeOperationService scopeOperations,
-    Agentstration.Aep.Client.AepTransportSecurityOptions? transportOptions = null)
+    Agentstration.Aep.Client.AepTransportSecurityOptions? transportOptions = null,
+    IRequestContextScopeFactory? requestScopes = null)
 {
     public Task<StoredResource<ExtensionRegistrationResource>?> GetAsync(
         ResourceNamespace @namespace,
@@ -141,14 +142,25 @@ public sealed class ExtensionRegistrationManagementService(
         var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken);
         if (existing is null)
         {
-            return await CreateAsync(new ExtensionRegistrationResource
+            try
             {
-                ApiVersion = ResourceApiVersions.CoreV1,
-                Kind = ExtensionKinds.ExtensionRegistration,
-                Metadata = new ResourceMetadata { Name = name },
-                ScopeRef = scopeRef,
-                Definition = validated
-            }, cancellationToken);
+                return await CreateAsync(new ExtensionRegistrationResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ExtensionKinds.ExtensionRegistration,
+                    Metadata = new ResourceMetadata { Name = name },
+                    ScopeRef = scopeRef,
+                    Definition = validated
+                }, cancellationToken);
+            }
+            catch (ResourceConcurrencyException)
+            {
+                using var recoveryScope = scopeRef == ResourceScopeRef.Instance
+                    ? requestScopes?.PushSystem()
+                    : null;
+                existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken);
+                if (existing is null) throw;
+            }
         }
         if (existing.Value.Definition == validated) return existing;
         return await store.PutExactAsync(scopeRef, existing.Value with

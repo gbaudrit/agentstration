@@ -4,8 +4,10 @@ using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
 using Agentstration.Api.Contracts;
+using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -71,6 +73,7 @@ public sealed class RuntimeRunTests
     public async Task CreatePreservesPayloadAndRequiresExactAgentVersion()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
+        using var requestScope = fixture.PushSystem();
         var input = Input("Optimize this query.", "{\"engine\":\"sqlserver\"}");
 
         var created = await fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 3), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Console, "operator", default);
@@ -89,9 +92,39 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task CreatePreparesTheAgentAtItsDefinitionScope()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        using var requestScope = fixture.PushSystem();
+        var reference = new RuntimeAgentReference(fixture.AgentId, 3)
+        {
+            ScopeRef = fixture.AgentScopeRef,
+        };
+
+        _ = await fixture.Service.CreateAsync(TestScope, reference, Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Console, "operator", default);
+
+        Assert.AreEqual(fixture.AgentScopeRef, fixture.Preparation.PreparedScopeRef);
+    }
+
+    [TestMethod]
+    public async Task CreateRequiresAgentUseAccessAtTheExactExecutionScope()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        using var requestScope = fixture.PushSystem();
+        fixture.AgentAccess.Allow = false;
+
+        var exception = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.CreateRunAsync());
+
+        Assert.AreEqual("agent_not_found", exception.Code);
+        Assert.AreEqual(TestScope.ScopeRef, fixture.AgentAccess.ConsumerScopeRef);
+        Assert.IsEmpty(fixture.Queue.Enqueued);
+    }
+
+    [TestMethod]
     public async Task RuntimeRunScopeIsImmutable()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
+        using var requestScope = fixture.PushSystem();
         var created = await fixture.CreateRunAsync();
         var changedScope = TestScope with { WorkspaceId = new(Guid.NewGuid()) };
 
@@ -106,6 +139,7 @@ public sealed class RuntimeRunTests
     public async Task UnsupportedRuntimeParameterIsRejectedBeforeRunCreation()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
+        using var requestScope = fixture.PushSystem();
         var options = new RuntimeExecutionOptions
         {
             Parameters = new Dictionary<string, JsonElement> { ["model"] = JsonSerializer.SerializeToElement("other-model") }
@@ -148,6 +182,7 @@ public sealed class RuntimeRunTests
     public async Task InitializationReenqueuesPendingAndRunningButNotTerminalRuns()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
+        using var requestScope = fixture.PushSystem();
         var pending = await fixture.CreateRunAsync();
         var running = await fixture.CreateRunAsync();
         var succeeded = await fixture.CreateRunAsync();
@@ -176,6 +211,7 @@ public sealed class RuntimeRunTests
     public async Task RetryCreatesNewRunAndTerminalEventStreamCloses()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
+        using var requestScope = fixture.PushSystem();
         var original = await fixture.Service.CreateAsync(
             TestScope,
             new RuntimeAgentReference(fixture.AgentId, 3),
@@ -201,6 +237,7 @@ public sealed class RuntimeRunTests
     public async Task DeleteRequiresTerminalStateAndRemovesRuntimeHistory()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
+        using var requestScope = fixture.PushSystem();
         var created = await fixture.CreateRunAsync();
 
         await Assert.ThrowsExactlyAsync<RuntimeRunNotTerminalException>(() =>
@@ -277,7 +314,7 @@ public sealed class RuntimeRunTests
             };
             RuntimeRunEvent Event(Agentstration.Resources.WorkspaceId workspaceId) => new()
             {
-                WorkspaceId = workspaceId,
+                ScopeRef = ResourceScopeRef.Workspace(workspaceId.Value),
                 EventId = Guid.NewGuid(),
                 RunId = "shared-run",
                 Kind = RuntimeRunEventKind.RunCreated,
@@ -361,6 +398,65 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(claim.Ownership.WorkerId.Value, activeInstances[0].WorkerId);
         Assert.IsFalse(eventHistory.Any(item => item.Kind is RuntimeRunEventKind.ResponseDelta or RuntimeRunEventKind.RunCompleted));
         Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
+    }
+
+    [TestMethod]
+    public async Task AwpWorkerCanClaimAnInstanceScopedRuntimeRun()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+            builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
+            AwpTestWorker.Configure(builder);
+        });
+        using var client = factory.CreateClient();
+        var template = await client.GetFromJsonAsync<AgentResource>("/api/agents/sql-expert");
+        Assert.IsNotNull(template);
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
+        var agentRequest = new AgentResourceRequest
+        {
+            ApiVersion = template.ApiVersion,
+            Kind = template.Kind,
+            Metadata = new ResourceMetadata { Name = "awp-instance-claim" },
+            Definition = template.Definition with { DisplayName = "AWP instance claim" },
+            ScopeRef = ResourceScopeRef.Instance
+        };
+        using var agentResponse = await client.PutAsJsonAsync("/api/agents/awp-instance-claim", agentRequest);
+        Assert.AreEqual(HttpStatusCode.OK, agentResponse.StatusCode, await agentResponse.Content.ReadAsStringAsync());
+        var agent = await agentResponse.Content.ReadFromJsonAsync<AgentResource>();
+        Assert.IsNotNull(agent);
+
+        using var runResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
+        {
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation)
+            {
+                ScopeRef = ResourceScopeRef.Instance,
+                ResourceUid = agent.Uid
+            },
+            ExecutionScopeRef = ResourceScopeRef.Instance,
+            Input = Input("instance claim"),
+            Origin = RuntimeRunOrigin.Api
+        });
+        Assert.AreEqual(HttpStatusCode.Accepted, runResponse.StatusCode, await runResponse.Content.ReadAsStringAsync());
+
+        await using var worker = await AwpTestWorker.StartAsync(factory, processAssignments: false);
+        var claim = await worker.ClaimAsync();
+
+        Assert.IsNotNull(claim.Assignment);
+        var operationalWorkspace = await factory.Services.GetRequiredService<IOperationalTopologyProvisioner>()
+            .GetInstanceOperationsWorkspaceAsync(default);
+        Assert.AreEqual(ResourceScopeRef.Workspace(operationalWorkspace.Id).Value, claim.Assignment.Scope.ScopeRef);
+        Assert.AreEqual(operationalWorkspace.TenantId, claim.Assignment.Scope.TenantId);
+        Assert.AreEqual(operationalWorkspace.Id.ToString("D"), claim.Assignment.Scope.WorkspaceId);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await worker.RunAsync(claim.Assignment, claim.ServerTime, timeout.Token);
+        var run = await runResponse.Content.ReadFromJsonAsync<RuntimeRun>();
+        Assert.IsNotNull(run);
+        var completed = await client.GetFromJsonAsync<RuntimeRun>(
+            $"/api/runtime/runs/{run.Id}?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}");
+        Assert.IsNotNull(completed);
+        Assert.AreEqual(RuntimeRunState.Succeeded, completed.Status.State, completed.Status.Error);
     }
 
     [TestMethod]
@@ -453,12 +549,25 @@ public sealed class RuntimeRunTests
 
     private sealed class TestAgentRuntimePreparationService : IAgentRuntimePreparationService
     {
+        public ResourceScopeRef? PreparedScopeRef { get; private set; }
+
         public Task<PreparedAgentRuntime> PrepareAsync(
             ResourceNamespace resourceNamespace,
             string agentName,
             long generation,
             CancellationToken cancellationToken) =>
             Task.FromResult(new PreparedAgentRuntime(string.Empty, $"{agentName}--{generation:000000}", "Ready"));
+
+        public Task<PreparedAgentRuntime> PrepareAsync(
+            ResourceNamespace resourceNamespace,
+            string agentName,
+            ResourceScopeRef? scopeRef,
+            long generation,
+            CancellationToken cancellationToken)
+        {
+            PreparedScopeRef = scopeRef;
+            return PrepareAsync(resourceNamespace, agentName, generation, cancellationToken);
+        }
     }
 
     private sealed class RuntimeFixture : IAsyncDisposable
@@ -469,16 +578,24 @@ public sealed class RuntimeRunTests
         public IRuntimeRunStore Store { get; }
         public IRuntimeExecutionStateStore ExecutionStates => provider.GetRequiredService<IRuntimeExecutionStateStore>();
         public TestRuntimeRunQueue Queue { get; }
+        public TestRuntimeAgentAccess AgentAccess { get; }
+        public TestAgentRuntimePreparationService Preparation { get; }
         public string AgentId { get; }
+        public ResourceScopeRef AgentScopeRef { get; }
 
-        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, TestRuntimeRunQueue queue, string agentId)
+        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store,
+            TestRuntimeRunQueue queue, TestRuntimeAgentAccess agentAccess, TestAgentRuntimePreparationService preparation,
+            string agentId, ResourceScopeRef agentScopeRef)
         {
             this.directory = directory;
             this.provider = provider;
             Service = service;
             Store = store;
             Queue = queue;
+            AgentAccess = agentAccess;
+            Preparation = preparation;
             AgentId = agentId;
+            AgentScopeRef = agentScopeRef;
         }
 
         public static async Task<RuntimeFixture> CreateAsync()
@@ -488,18 +605,25 @@ public sealed class RuntimeRunTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddSingleton(TimeProvider.System);
-            services.AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>();
+            services.AddSingleton<CurrentRequestContext>();
+            services.AddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
+            services.AddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
+            services.AddSingleton<IResourceAccessPolicyService, AllowAccessPolicies>();
             services.AddSingleton<IRuntimeAgentResolver, ResourceRuntimeAgentResolver>();
             services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");
             var queue = new TestRuntimeRunQueue();
             services.AddSingleton(queue);
             services.AddSingleton<IRuntimeRunQueue>(queue);
             services.AddSingleton<IRuntimeRunExecutionScope, TestRuntimeRunExecutionScope>();
-            services.AddSingleton<IAgentRuntimePreparationService, TestAgentRuntimePreparationService>();
+            var preparation = new TestAgentRuntimePreparationService();
+            services.AddSingleton<IAgentRuntimePreparationService>(preparation);
+            var agentAccess = new TestRuntimeAgentAccess();
+            services.AddSingleton<IRuntimeAgentAccessValidator>(agentAccess);
             services.AddSingleton<RuntimeRunStateManager>();
             services.AddSingleton<RuntimeRunService>();
             var provider = services.BuildServiceProvider();
+            using var requestScope = provider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
             var management = provider.GetRequiredService<IResourceStore>();
             var store = provider.GetRequiredService<IRuntimeRunStore>();
             await management.InitializeAsync(default);
@@ -509,8 +633,13 @@ public sealed class RuntimeRunTests
             const string revisionId = "sql-expert--000001";
             var agent = await management.PutAsync(Agent(agentId), null, true, default);
             await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid), default);
-            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, queue, agentId);
+            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store,
+                queue, agentAccess, preparation, agentId,
+                agent.Value.ScopeRef ?? throw new InvalidOperationException("The test Agent must have an owner scope."));
         }
+
+        public IDisposable PushSystem() =>
+            provider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
 
         public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(TestScope, new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
 
@@ -575,6 +704,41 @@ public sealed class RuntimeRunTests
         private sealed class EmptyScope : IDisposable
         {
             public void Dispose() { }
+        }
+    }
+
+    private sealed class AllowAccessPolicies : IResourceAccessPolicyService
+    {
+        public Task<IReadOnlyList<ResourceAccessPolicyResponse>> ListAsync(ResourceScopeRef ownerScopeRef,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResourceAccessPolicyResponse>>([]);
+
+        public Task<ResourceAccessPolicyResponse?> GetAsync(Guid resourceUid,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<ResourceAccessPolicyResponse?>(null);
+
+        public Task<ResourceAccessPolicyResponse> PutAsync(ResourceAccessPolicy policy, string? ifMatch,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DeleteAsync(Guid resourceUid, string? ifMatch,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ResourceAccessDecision> EvaluateAsync(ResourceAccessIdentity resource,
+            ResourceScopeRef consumerScopeRef, ResourceAccessAction action, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessDecision(true, ResourceAccessDecisionReasons.ExactGrant));
+    }
+
+    private sealed class TestRuntimeAgentAccess : IRuntimeAgentAccessValidator
+    {
+        public bool Allow { get; set; } = true;
+        public ResourceScopeRef? ConsumerScopeRef { get; private set; }
+
+        public Task ValidateUseAsync(ResolvedRuntimeAgent agent, ResourceScopeRef consumerScopeRef,
+            CancellationToken cancellationToken)
+        {
+            ConsumerScopeRef = consumerScopeRef;
+            if (!Allow) throw new RuntimeAgentResolutionException("agent_not_found", "Agent was not found.");
+            return Task.CompletedTask;
         }
     }
 

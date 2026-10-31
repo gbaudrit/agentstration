@@ -741,14 +741,14 @@ public sealed class RuntimeWorkerAssignmentTests
                 RuntimeGovernedModelRequest request,
                 CancellationToken cancellationToken) => throw new AssertFailedException("Unexpected operation.");
             public Task<System.Text.Json.JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken) => Unexpected<System.Text.Json.JsonElement?>();
-            public Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(WorkspaceId workspaceId,
+            public Task<RuntimeGovernedFlowToolResult> InvokeFlowToolAsync(ResourceScopeRef executionScopeRef, WorkspaceId workspaceId,
                 string flowRunId, string stepDefinitionId, System.Text.Json.JsonElement arguments,
                 CancellationToken cancellationToken) => Unexpected<RuntimeGovernedFlowToolResult>();
-            public Task<RuntimeGovernedFlowArtifact> CaptureFlowArtifactAsync(WorkspaceId workspaceId,
+            public Task<RuntimeGovernedFlowArtifact> CaptureFlowArtifactAsync(ResourceScopeRef executionScopeRef, WorkspaceId workspaceId,
                 string flowRunId, string stepDefinitionId, string? fileName, string mediaType,
                 System.Text.Json.JsonElement content, IReadOnlyDictionary<string, string> provenance,
                 CancellationToken cancellationToken) => Unexpected<RuntimeGovernedFlowArtifact>();
-            public Task CleanupFlowArtifactAsync(WorkspaceId workspaceId, string flowRunId,
+            public Task CleanupFlowArtifactAsync(ResourceScopeRef executionScopeRef, WorkspaceId workspaceId, string flowRunId,
                 string stepDefinitionId, RuntimeGovernedFlowArtifact artifact,
                 CancellationToken cancellationToken) =>
                 Task.FromException(new AssertFailedException("A governed operation was not expected."));
@@ -761,7 +761,7 @@ public sealed class RuntimeWorkerAssignmentTests
                 return new(Guid.NewGuid(), name, contentType, content.LongLength, content);
             }
             public Task<RuntimeGovernedArtifact?> GetArtifactAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, Guid artifactId, CancellationToken cancellationToken) => Unexpected<RuntimeGovernedArtifact?>();
-            public Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(WorkspaceId workspaceId, string parentRunId,
+            public Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(ResourceScopeRef executionScopeRef, WorkspaceId workspaceId, string parentRunId,
                 string stepDefinitionId, System.Text.Json.JsonElement input, string purpose, int? iteration,
                 CancellationToken cancellationToken) => Unexpected<RuntimeGovernedChildFlow>();
 

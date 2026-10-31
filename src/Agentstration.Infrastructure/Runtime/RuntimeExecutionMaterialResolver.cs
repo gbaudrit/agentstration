@@ -40,7 +40,7 @@ public sealed class RuntimeExecutionMaterialResolver(
     {
         if (assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this assignment.");
-        var stored = await flowRuns.GetRunAsync(assignment.WorkspaceId, flowRunId, cancellationToken)
+        var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
         if (!BelongsToAssignment(assignment, run))
@@ -71,7 +71,7 @@ public sealed class RuntimeExecutionMaterialResolver(
         RuntimeWorkerAssignment assignment,
         CancellationToken cancellationToken)
     {
-        var stored = await runtimeRuns.GetAsync(assignment.WorkspaceId, assignment.TargetRunId, cancellationToken)
+        var stored = await runtimeRuns.GetExactAsync(assignment.ExecutionScopeRef, assignment.TargetRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Runtime Run was not found.");
         await runtimeScopes.ValidateAsync(stored.Value.Scope, cancellationToken);
         using var scope = runtimeScopes.Enter(stored.Value.Scope);
@@ -86,7 +86,10 @@ public sealed class RuntimeExecutionMaterialResolver(
             assignment.TargetRunId,
             stored.Value.Properties.Input,
             stored.Value.Properties.Execution,
-            agent);
+            agent)
+        {
+            ScopeRef = stored.Value.ExecutionScopeRef
+        };
     }
 
     public async Task<RuntimeRootFlowExecutionMaterial> ResolveFlowRunAsync(
@@ -96,7 +99,7 @@ public sealed class RuntimeExecutionMaterialResolver(
     {
         if (assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "Only a Flow assignment can resolve Flow material.");
-        var stored = await flowRuns.GetRunAsync(assignment.WorkspaceId, flowRunId, cancellationToken)
+        var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
         if (!BelongsToAssignment(assignment, run))
@@ -105,7 +108,9 @@ public sealed class RuntimeExecutionMaterialResolver(
         using var scope = flowScopes.Enter(run.Scope);
         if (!string.Equals(run.FlowVersion, run.DefinitionSnapshot.Version, StringComparison.Ordinal)
             || run.DefinitionHash is not null
-            && !string.Equals(run.DefinitionHash, run.DefinitionSnapshot.DefinitionHash, StringComparison.Ordinal))
+            && !string.Equals(run.DefinitionHash, run.DefinitionSnapshot.DefinitionHash, StringComparison.Ordinal)
+            || run.DefinitionScopeRef is { } definitionScopeRef
+            && definitionScopeRef != run.DefinitionSnapshot.ScopeRef)
             throw new RuntimeExecutionMaterialException("execution_material_drift", "The Flow Run snapshot no longer matches its immutable version and hash pins.");
 
         var references = ExecutionAgentReferences(run.DefinitionSnapshot);
@@ -117,9 +122,19 @@ public sealed class RuntimeExecutionMaterialResolver(
             var material = binding is null
                 ? await ResolveAgentAsync(reference.ParticipantId, reference.Target, cancellationToken)
                 : await ResolveAgentAsync(reference.ParticipantId,
-                    new RuntimeAgentReference(binding.AgentResourceId, binding.AgentGeneration) { Namespace = binding.AgentNamespace },
+                    new RuntimeAgentReference(binding.AgentResourceId, binding.AgentGeneration)
+                    {
+                        Namespace = binding.AgentNamespace,
+                        ScopeRef = binding.AgentScopeRef,
+                        ResourceUid = binding.AgentUid,
+                        RevisionUid = binding.RevisionUid,
+                        DefinitionHash = binding.DefinitionHash
+                    },
                     cancellationToken);
-            if (binding is not null && !string.Equals(material.RevisionId, binding.RevisionId, StringComparison.Ordinal))
+            if (binding is not null && (!string.Equals(material.RevisionId, binding.RevisionId, StringComparison.Ordinal)
+                || binding.AgentUid != Guid.Empty && material.AgentId != binding.AgentUid
+                || binding.RevisionUid != Guid.Empty && material.RevisionUid != binding.RevisionUid
+                || binding.DefinitionHash is not null && !string.Equals(material.DefinitionHash, binding.DefinitionHash, StringComparison.Ordinal)))
                 throw new RuntimeExecutionMaterialException("execution_material_drift", $"Participant '{binding.ParticipantId}' no longer resolves to its pinned revision.");
             resolvedAgents.Add(material);
         }
@@ -127,7 +142,7 @@ public sealed class RuntimeExecutionMaterialResolver(
         RuntimeFlowResumeMaterial? resume = null;
         if (run.RuntimeState is not null)
         {
-            var answered = (await flowRuns.ListInputRequestsAsync(run.WorkspaceId, run.Id,
+            var answered = (await flowRuns.ListInputRequestsExactAsync(run.ExecutionScopeRef, run.Id,
                 InputRequestStatus.Answered, cancellationToken)).LastOrDefault();
             if (answered?.Value.Response is { } response)
                 resume = new(run.RuntimeState.RuntimeType, run.RuntimeState.StateId,
@@ -156,7 +171,11 @@ public sealed class RuntimeExecutionMaterialResolver(
             run.RootFlowRunId ?? run.Id,
             run.ParentFlowRunId,
             run.CorrelationId,
-            flowOptions.Value.OrchestrationTimeout);
+            flowOptions.Value.OrchestrationTimeout)
+        {
+            ScopeRef = run.ExecutionScopeRef,
+            FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value
+        };
     }
 
     private static bool BelongsToAssignment(RuntimeWorkerAssignment assignment, FlowRun run) =>
@@ -198,15 +217,20 @@ public sealed class RuntimeExecutionMaterialResolver(
             .Select(step => (step.Name, new FlowTargetReference(FlowTargetKind.Agent,
                 step.Agent.ResourceId,
                 step.Agent.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                step.Agent.Namespace)));
+                step.Agent.Namespace,
+                step.Agent.ScopeRef,
+                step.Agent.ResourceUid,
+                step.Agent.RevisionUid,
+                step.Agent.DefinitionHash)));
         var routedAgents = graph.Steps.OfType<RouterFlowStepDefinition>()
             .SelectMany(router => router.Candidates.Select(candidate => candidate.Agent)
                 .Append(router.Fallback).Where(target => target is not null).Cast<FlowResourceReference>())
             .Select(target => ($"Agent:{target.ResourceId}", new FlowTargetReference(
                 FlowTargetKind.Agent, target.ResourceId,
-                target.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture), target.Namespace)));
+                target.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture), target.Namespace, target.ScopeRef,
+                target.ResourceUid, target.RevisionUid, target.DefinitionHash)));
         return staticAgents.Concat(routedAgents)
-            .GroupBy(value => new { value.Item2.Id, value.Item2.Version, value.Item2.Namespace })
+            .GroupBy(value => new { value.Item2.Id, value.Item2.Version, value.Item2.Namespace, value.Item2.ScopeRef })
             .Select(group => group.First());
     }
 
@@ -239,8 +263,8 @@ public sealed class RuntimeExecutionMaterialResolver(
         CancellationToken cancellationToken)
     {
         _ = await agentManagement.EnsureExecutionRevisionAsync(
-            reference.Namespace, reference.ResourceId, reference.Version, cancellationToken);
-        var resolved = await agents.ResolveAsync(reference, cancellationToken);
+            reference.Namespace, reference.ResourceId, reference.ScopeRef, reference.Version, cancellationToken);
+        var resolved = await ResolveRuntimeAgentAsync(reference, cancellationToken);
         return await CreateAgentMaterialAsync(participantId, resolved, cancellationToken);
     }
 
@@ -250,7 +274,7 @@ public sealed class RuntimeExecutionMaterialResolver(
         CancellationToken cancellationToken)
     {
         var @namespace = reference.Namespace ?? ResourceNamespace.Default;
-        var agent = await agentManagement.GetAgentAsync(@namespace, reference.Id, cancellationToken)
+        var agent = await agentManagement.GetAgentAsync(@namespace, reference.Id, reference.ScopeRef, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("agent_not_found",
                 $"Agent '{@namespace}/{reference.Id}' was not found.");
         var generation = agent.Value.Generation;
@@ -258,13 +282,37 @@ public sealed class RuntimeExecutionMaterialResolver(
             && (!long.TryParse(reference.Version, out generation) || generation < 1))
             throw new RuntimeExecutionMaterialException("agent_version_invalid",
                 $"Agent version '{reference.Version}' is not a positive generation number.");
-        _ = await agentManagement.EnsureExecutionRevisionAsync(
-            @namespace, agent.Value.Metadata.Name, generation, cancellationToken);
-        var resolved = await agents.ResolveAsync(new RuntimeAgentReference(reference.Id, generation)
+        var revision = await agentManagement.EnsureExecutionRevisionAsync(
+            @namespace, agent.Value.Metadata.Name, agent.Value.ScopeRef, generation, cancellationToken);
+        if (reference.ResourceUid is { } resourceUid && agent.Value.Uid != resourceUid
+            || reference.RevisionUid is { } revisionUid && revision.Value.Uid != revisionUid
+            || reference.DefinitionHash is { } definitionHash
+                && !string.Equals(revision.Value.DefinitionHash, definitionHash, StringComparison.Ordinal))
+            throw new RuntimeExecutionMaterialException("agent_reference_stale",
+                $"Agent reference '{@namespace}/{reference.Id}' no longer matches its published identity.");
+        var resolved = await ResolveRuntimeAgentAsync(new RuntimeAgentReference(reference.Id, generation)
         {
-            Namespace = @namespace
+            Namespace = @namespace,
+            ScopeRef = agent.Value.ScopeRef,
+            ResourceUid = reference.ResourceUid,
+            RevisionUid = reference.RevisionUid,
+            DefinitionHash = reference.DefinitionHash
         }, cancellationToken);
         return await CreateAgentMaterialAsync(participantId, resolved, cancellationToken);
+    }
+
+    private async Task<ResolvedRuntimeAgent> ResolveRuntimeAgentAsync(
+        RuntimeAgentReference reference,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await agents.ResolveAsync(reference, cancellationToken);
+        }
+        catch (RuntimeAgentResolutionException exception)
+        {
+            throw new RuntimeExecutionMaterialException(exception.Code, exception.Message);
+        }
     }
 
     private async Task<RuntimeExecutionAgentMaterial> CreateAgentMaterialAsync(
@@ -274,7 +322,9 @@ public sealed class RuntimeExecutionMaterialResolver(
     {
         if (!resolved.Ready)
             throw new RuntimeExecutionMaterialException("agent_not_ready", resolved.Error ?? $"Agent '{resolved.AgentName}' is not ready.");
-        var resolvedTools = await tools.ResolveAsync(resolved.Definition.EffectiveToolNames, cancellationToken);
+        var resolvedTools = resolved.Definition.ToolReferences.Count > 0
+            ? await tools.ResolveAsync(resolved.Definition.ToolReferences, cancellationToken)
+            : await tools.ResolveAsync(resolved.Definition.EffectiveToolNames, cancellationToken);
         var toolMaterials = resolvedTools.Select(tool => new RuntimeExecutionToolMaterial(
             tool.Id,
             tool.Namespace ?? default,
@@ -285,7 +335,15 @@ public sealed class RuntimeExecutionMaterialResolver(
             tool.RequiresApproval,
             tool.ProviderId,
             tool.ProviderNamespace,
-            tool.ExternalId)).ToArray();
+            tool.ExternalId)
+        {
+            ScopeRef = tool.ScopeRef,
+            Uid = tool.Uid,
+            Generation = tool.Generation,
+            ProviderScopeRef = tool.ProviderScopeRef,
+            ProviderUid = tool.ProviderUid,
+            ProviderGeneration = tool.ProviderGeneration
+        }).ToArray();
         return new RuntimeExecutionAgentMaterial(
             $"agent:{resolved.AgentId:N}:{resolved.Generation}",
             participantId,
@@ -303,6 +361,9 @@ public sealed class RuntimeExecutionMaterialResolver(
             toolMaterials)
         {
             AgentNamespace = resolved.AgentNamespace,
+            AgentScopeRef = resolved.AgentScopeRef,
+            ModelProfileScopeRef = resolved.ModelProfileScopeRef,
+            RevisionUid = resolved.RevisionUid,
             RuntimeProfileName = resolved.RuntimeProfileName,
             RuntimeProfileNamespace = resolved.RuntimeProfileNamespace
         };

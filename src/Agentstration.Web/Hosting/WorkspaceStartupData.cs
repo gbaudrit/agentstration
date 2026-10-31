@@ -1,5 +1,6 @@
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Profiles;
 
@@ -20,11 +21,8 @@ public static class WorkspaceStartupData
             .Where(workspace => workspace.Status == WorkspaceStatus.Active)
             .ToArray();
 
-        foreach (var workspace in activeWorkspaces)
-        {
-            using var workspaceScope = scopeFactory.Push(bootstrapContext with { WorkspaceId = workspace.Id });
-            await standardData.EnsureAsync(cancellationToken);
-        }
+        using (scopeFactory.PushSystem())
+            await standardData.EnsureAsync(ResourceScopeRef.Instance, cancellationToken);
 
         if (!activeWorkspaces.Any(workspace => workspace.Id == bootstrapContext.WorkspaceId)) return;
 

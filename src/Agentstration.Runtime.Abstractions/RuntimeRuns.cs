@@ -28,10 +28,46 @@ public enum RuntimeRunEventKind { RunCreated, StatusChanged, StepStarted, StepCo
 public sealed record RuntimeAgentReference(string ResourceId, long Version)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public Guid? ResourceUid { get; init; }
+    public Guid? RevisionUid { get; init; }
+    public string? DefinitionHash { get; init; }
 }
 public sealed record RuntimeRunMessage(RuntimeMessageRole Role, string Content);
-public sealed record RuntimeRunScope(Guid TenantId, WorkspaceId WorkspaceId, Guid PrincipalId);
-public readonly record struct RuntimeRunKey(WorkspaceId WorkspaceId, string RunId);
+public sealed record RuntimeRunScope(
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] Guid TenantId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] WorkspaceId WorkspaceId,
+    Guid PrincipalId)
+{
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
+    public ResourceScopeRef ScopeRef => WorkspaceId.Value != Guid.Empty
+        ? ResourceScopeRef.Workspace(WorkspaceId.Value)
+        : TenantId != Guid.Empty
+            ? ResourceScopeRef.Tenant(TenantId)
+            : ResourceScopeRef.Instance;
+    [JsonIgnore]
+    public ResourceScopeRef AccessScopeRef => LogicalScopeRef ?? ScopeRef;
+    [JsonIgnore]
+    public ExactExecutionScope Exact => ExactExecutionScope.Create(
+        ScopeRef,
+        PrincipalId,
+        TenantId == Guid.Empty ? null : TenantId,
+        WorkspaceId.Value == Guid.Empty ? null : WorkspaceId.Value);
+    public static RuntimeRunScope Instance(Guid principalId) =>
+        new(Guid.Empty, default, principalId);
+    public static RuntimeRunScope Tenant(Guid tenantId, Guid principalId) =>
+        new(tenantId, default, principalId);
+    public static RuntimeRunScope Workspace(Guid tenantId, WorkspaceId workspaceId, Guid principalId) =>
+        new(tenantId, workspaceId, principalId);
+}
+public readonly record struct RuntimeRunKey(ResourceScopeRef ScopeRef, string RunId)
+{
+    public RuntimeRunKey(WorkspaceId workspaceId, string runId) : this(ResourceScopeRef.Workspace(workspaceId.Value), runId) { }
+    [JsonIgnore]
+    public WorkspaceId WorkspaceId => ScopeRef.Kind == ResourceScopeKind.Workspace
+        ? new WorkspaceId(ScopeRef.TargetId!.Value)
+        : default;
+}
 public sealed record RuntimeRunQueueItem(RuntimeRunScope Scope, string RunId);
 
 public sealed record RuntimeRunInput
@@ -103,7 +139,8 @@ public sealed record RuntimeRunStatus
 
 public sealed record RuntimeRun
 {
-    public required WorkspaceId WorkspaceId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public WorkspaceId WorkspaceId { get; init; }
     public required RuntimeRunScope Scope { get; init; }
     public required string Id { get; init; }
     public required string Name { get; init; }
@@ -112,11 +149,16 @@ public sealed record RuntimeRun
     public required RuntimeRunProperties Properties { get; init; }
     public required RuntimeRunStatus Status { get; init; }
     public string? ETag { get; init; }
+    public ResourceScopeRef ExecutionScopeRef => Scope.ScopeRef;
 }
 
 public sealed record RuntimeRunEvent
 {
-    public required WorkspaceId WorkspaceId { get; init; }
+    public required ResourceScopeRef ScopeRef { get; init; }
+    [JsonIgnore]
+    public WorkspaceId WorkspaceId => ScopeRef.Kind == ResourceScopeKind.Workspace
+        ? new WorkspaceId(ScopeRef.TargetId!.Value)
+        : default;
     public long Sequence { get; init; }
     public required Guid EventId { get; init; }
     public required string RunId { get; init; }
@@ -142,16 +184,45 @@ public interface IRuntimeRunStore
     Task DeleteAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken);
     Task<RuntimeRunEvent> AppendEventAsync(RuntimeRunEvent runEvent, CancellationToken cancellationToken);
     Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<StoredRuntimeRun?> GetExactAsync(ResourceScopeRef scopeRef, string runId, CancellationToken cancellationToken) =>
+        GetAsync(RequiredWorkspace(scopeRef), runId, cancellationToken);
+    Task<IReadOnlyList<StoredRuntimeRun>> ListExactAsync(ResourceScopeRef scopeRef, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) =>
+        ListAsync(RequiredWorkspace(scopeRef), agentResourceId, skip, take, cancellationToken);
+    Task DeleteExactAsync(ResourceScopeRef scopeRef, string runId, string expectedETag, CancellationToken cancellationToken) =>
+        DeleteAsync(RequiredWorkspace(scopeRef), runId, expectedETag, cancellationToken);
+    Task<IReadOnlyList<RuntimeRunEvent>> ListEventsExactAsync(ResourceScopeRef scopeRef, string runId, long afterSequence, CancellationToken cancellationToken) =>
+        ListEventsAsync(RequiredWorkspace(scopeRef), runId, afterSequence, cancellationToken);
+
+    private static WorkspaceId RequiredWorkspace(ResourceScopeRef scopeRef) =>
+        scopeRef.Kind == ResourceScopeKind.Workspace && scopeRef.TargetId is { } workspaceId
+            ? new WorkspaceId(workspaceId)
+            : throw new RuntimeRunValidationException("execution_scope_not_supported", $"Execution scope '{scopeRef}' is not supported by this store.");
 }
 
 public sealed record RuntimeExecutionState(
-    WorkspaceId WorkspaceId,
+    ResourceScopeRef ScopeRef,
     string RunId,
     string RuntimeType,
     string StateId,
     JsonElement Payload,
     DateTimeOffset CreatedAt,
-    string? ParentStateId = null);
+    string? ParentStateId = null)
+{
+    public RuntimeExecutionState(
+        WorkspaceId workspaceId,
+        string runId,
+        string runtimeType,
+        string stateId,
+        JsonElement payload,
+        DateTimeOffset createdAt,
+        string? parentStateId = null)
+        : this(ResourceScopeRef.Workspace(workspaceId.Value), runId, runtimeType, stateId, payload, createdAt, parentStateId) { }
+
+    [JsonIgnore]
+    public WorkspaceId WorkspaceId => ScopeRef.Kind == ResourceScopeKind.Workspace
+        ? new WorkspaceId(ScopeRef.TargetId!.Value)
+        : default;
+}
 
 public interface IRuntimeExecutionStateStore
 {
@@ -159,6 +230,17 @@ public interface IRuntimeExecutionStateStore
     Task<RuntimeExecutionState?> GetAsync(WorkspaceId workspaceId, string runId, string runtimeType, string stateId, CancellationToken cancellationToken);
     Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(WorkspaceId workspaceId, string runId, string runtimeType, string? parentStateId, CancellationToken cancellationToken);
     Task DeleteAsync(WorkspaceId workspaceId, string runId, string? runtimeType, CancellationToken cancellationToken);
+    Task<RuntimeExecutionState?> GetExactAsync(ResourceScopeRef scopeRef, string runId, string runtimeType, string stateId, CancellationToken cancellationToken) =>
+        GetAsync(RequiredWorkspace(scopeRef), runId, runtimeType, stateId, cancellationToken);
+    Task<IReadOnlyList<RuntimeExecutionState>> ListExactAsync(ResourceScopeRef scopeRef, string runId, string runtimeType, string? parentStateId, CancellationToken cancellationToken) =>
+        ListAsync(RequiredWorkspace(scopeRef), runId, runtimeType, parentStateId, cancellationToken);
+    Task DeleteExactAsync(ResourceScopeRef scopeRef, string runId, string? runtimeType, CancellationToken cancellationToken) =>
+        DeleteAsync(RequiredWorkspace(scopeRef), runId, runtimeType, cancellationToken);
+
+    private static WorkspaceId RequiredWorkspace(ResourceScopeRef scopeRef) =>
+        scopeRef.Kind == ResourceScopeKind.Workspace && scopeRef.TargetId is { } workspaceId
+            ? new WorkspaceId(workspaceId)
+            : throw new RuntimeRunValidationException("execution_scope_not_supported", $"Execution scope '{scopeRef}' is not supported by this store.");
 }
 
 public interface IRuntimeRunQueue
@@ -171,6 +253,8 @@ public interface IRuntimeRunQueue
 public interface IRuntimeRunExecutionScope
 {
     ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken);
+    ValueTask ValidateReadAsync(RuntimeRunScope scope, CancellationToken cancellationToken) =>
+        ValidateAsync(scope, cancellationToken);
     IDisposable Enter(RuntimeRunScope scope);
 }
 

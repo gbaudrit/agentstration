@@ -96,8 +96,10 @@ public sealed class WorkspaceMembershipAdministrationService(
         if (!requestContext.IsInitialized || requestContext.Current.WorkspaceId != workspaceId)
             throw new AuthorizationDeniedException(permission);
         await authorization.EnsurePermissionAsync(requestContext.Current, permission, cancellationToken);
-        return await store.GetWorkspaceAsync(requestContext.Current.TenantId, workspaceId, cancellationToken)
-            ?? throw new ArgumentException("The Workspace does not exist.", nameof(workspaceId));
+        var workspace = await store.GetWorkspaceAsync(requestContext.Current.TenantId, workspaceId, cancellationToken);
+        if (workspace is null || OperationalTopologyIdentities.IsOperationalWorkspace(workspace))
+            throw new ArgumentException("The Workspace does not exist.", nameof(workspaceId));
+        return workspace;
     }
 
     private async Task<(RoleDefinition? Role, bool Inherited)> EffectiveRoleAsync(Workspace workspace, Guid principalId, CancellationToken cancellationToken)

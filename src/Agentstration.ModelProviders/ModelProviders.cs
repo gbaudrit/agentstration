@@ -34,9 +34,11 @@ public sealed record ModelProviderConfiguration
 public sealed record ModelDeploymentConfiguration
 {
     public required string Name { get; init; }
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public required string ProviderName { get; init; }
     public ResourceNamespace ProviderNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef ProviderScopeRef { get; init; } = ResourceScopeRef.Instance;
     public required string ModelName { get; init; }
     public ModelSpecification? EffectiveSpecification { get; init; }
     public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
@@ -151,6 +153,9 @@ public interface IModelProfileStore
         @namespace.IsDefault
             ? GetRequiredAsync(name, cancellationToken)
             : ValueTask.FromException<ModelProfileConfiguration>(new ModelProfileNotFoundException($"{@namespace}/{name}"));
+    ValueTask<ModelProfileConfiguration> GetRequiredAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace,
+        string name, CancellationToken cancellationToken = default) =>
+        GetRequiredAsync(@namespace, name, cancellationToken);
 }
 
 public interface IModelDeploymentStore
@@ -160,6 +165,9 @@ public interface IModelDeploymentStore
         @namespace.IsDefault
             ? GetRequiredAsync(name, cancellationToken)
             : ValueTask.FromException<ModelDeploymentConfiguration>(new ModelDeploymentNotFoundException($"{@namespace}/{name}"));
+    ValueTask<ModelDeploymentConfiguration> GetRequiredAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace,
+        string name, CancellationToken cancellationToken = default) =>
+        GetRequiredAsync(@namespace, name, cancellationToken);
 }
 
 public interface IModelProviderConfigurationStore
@@ -169,6 +177,10 @@ public interface IModelProviderConfigurationStore
         @namespace.IsDefault
             ? GetRequiredAsync(name, cancellationToken)
             : ValueTask.FromException<ModelProviderConfiguration>(new ModelProviderConfigurationNotFoundException($"{@namespace}/{name}"));
+    ValueTask<ModelProviderConfiguration> GetRequiredForConsumerAsync(ResourceScopeRef providerScopeRef,
+        ResourceNamespace @namespace, string name, ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken = default) =>
+        GetRequiredAsync(@namespace, name, cancellationToken);
     ValueTask<IReadOnlyList<ModelProviderConfiguration>> ListAsync(CancellationToken cancellationToken = default);
 }
 
@@ -187,6 +199,9 @@ public interface IChatClientResolver
         @namespace.IsDefault
             ? ResolveAsync(modelProfileName, cancellationToken)
             : ValueTask.FromException<IChatClient>(new ModelProfileNotFoundException($"{@namespace}/{modelProfileName}"));
+    ValueTask<IChatClient> ResolveAsync(ResourceScopeRef profileScopeRef, ResourceNamespace @namespace,
+        string modelProfileName, CancellationToken cancellationToken = default) =>
+        ResolveAsync(@namespace, modelProfileName, cancellationToken);
 }
 
 public sealed class ModelProviderResolver(IEnumerable<IModelProvider> providers) : IModelProviderResolver
@@ -208,5 +223,7 @@ public abstract class ModelProviderResolutionException(string message) : Excepti
 public sealed class ModelProfileNotFoundException(string name) : ModelProviderResolutionException($"Model profile '{name}' was not found.");
 public sealed class ModelDeploymentNotFoundException(string name) : ModelProviderResolutionException($"Model deployment '{name}' was not found.");
 public sealed class ModelProviderConfigurationNotFoundException(string name) : ModelProviderResolutionException($"Model provider configuration '{name}' was not found.");
+public sealed class ModelProviderAccessDeniedException()
+    : ModelProviderResolutionException("The model provider dependency is unavailable in this context.");
 public sealed class ModelProviderNotFoundException(string providerType) : ModelProviderResolutionException($"Model provider implementation '{providerType}' is not registered.");
 public sealed class ModelProviderConfigurationException(string message) : ModelProviderResolutionException(message);

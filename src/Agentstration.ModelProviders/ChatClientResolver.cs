@@ -22,6 +22,27 @@ public sealed class ChatClientResolver(
         var profile = await profiles.GetRequiredAsync(@namespace, modelProfileResourceId, cancellationToken);
         var deployment = await deployments.GetRequiredAsync(@namespace, profile.DeploymentName, cancellationToken);
         var providerConfiguration = await providerConfigurations.GetRequiredAsync(deployment.ProviderNamespace, deployment.ProviderName, cancellationToken);
+        return await CreateAsync(profile, deployment, providerConfiguration, cancellationToken);
+    }
+
+    public async ValueTask<IChatClient> ResolveAsync(ResourceScopeRef profileScopeRef, ResourceNamespace @namespace,
+        string modelProfileResourceId, CancellationToken cancellationToken = default)
+    {
+        var profile = await profiles.GetRequiredAsync(profileScopeRef, @namespace, modelProfileResourceId, cancellationToken);
+        var deployment = await deployments.GetRequiredAsync(profileScopeRef, @namespace, profile.DeploymentName, cancellationToken);
+        var providerConfiguration = await providerConfigurations.GetRequiredForConsumerAsync(
+            deployment.ProviderScopeRef,
+            deployment.ProviderNamespace,
+            deployment.ProviderName,
+            profileScopeRef,
+            cancellationToken);
+        return await CreateAsync(profile, deployment, providerConfiguration, cancellationToken);
+    }
+
+    private async ValueTask<IChatClient> CreateAsync(ModelProfileConfiguration profile,
+        ModelDeploymentConfiguration deployment, ModelProviderConfiguration providerConfiguration,
+        CancellationToken cancellationToken)
+    {
         var provider = providers.GetRequiredProvider(providerConfiguration.AdapterType);
         var capabilityResolver = capabilityResolvers?.SingleOrDefault(value => value.CanHandle(providerConfiguration.AdapterType));
         var capabilities = capabilityResolver is null

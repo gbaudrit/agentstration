@@ -36,6 +36,7 @@ public sealed class PlatformAdministratorHandler(
 public sealed class WorkspacePermissionHandler(
     ICurrentRequestContext requestContext,
     Agentstration.Identity.Contracts.IAuthorizationService permissions,
+    IPlatformAuthorizationService platformAuthorization,
     IHttpContextAccessor httpContextAccessor)
     : AuthorizationHandler<WorkspacePermissionRequirement>
 {
@@ -45,8 +46,31 @@ public sealed class WorkspacePermissionHandler(
     {
         if (context.Resource is Workspace) return;
         var feature = httpContextAccessor.HttpContext?.Features.Get<ResolvedPrincipalFeature>();
-        if (feature is null || !requestContext.IsInitialized || requestContext.Current.PrincipalId != feature.PrincipalId) return;
-        if (await permissions.HasPermissionAsync(requestContext.Current, requirement.Permission, httpContextAccessor.HttpContext!.RequestAborted))
+        if (feature is null) return;
+        if (requestContext.AccessMode == ControlPlaneAccessMode.Instance)
+        {
+            var administrativePermission = requirement.Permission is
+                AuthorizationPermissions.TenantsRead or
+                AuthorizationPermissions.ResourcesRead or
+                AuthorizationPermissions.ResourcesWrite or
+                AuthorizationPermissions.ResourcesDelete or
+                AuthorizationPermissions.AuthorizationRead or
+                AuthorizationPermissions.AuthorizationWrite or
+                AuthorizationPermissions.RunsRead or
+                AuthorizationPermissions.RunsExecute or
+                AuthorizationPermissions.RunsDelete;
+            if (administrativePermission
+                && await platformAuthorization.IsPlatformAdministratorAsync(
+                    feature.PrincipalId, httpContextAccessor.HttpContext!.RequestAborted))
+                context.Succeed(requirement);
+            return;
+        }
+        if (requestContext.AccessMode is not (ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration)
+            || requestContext.Current.PrincipalId != feature.PrincipalId) return;
+        var authorizationContext = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestContext.Current with { WorkspaceId = Guid.Empty }
+            : requestContext.Current;
+        if (await permissions.HasPermissionAsync(authorizationContext, requirement.Permission, httpContextAccessor.HttpContext!.RequestAborted))
             context.Succeed(requirement);
     }
 }

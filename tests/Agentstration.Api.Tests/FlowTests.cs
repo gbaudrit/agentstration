@@ -35,7 +35,7 @@ public sealed partial class FlowTests
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static FlowResource Definition(string name, FlowDefinition definition) => new(TestScope.WorkspaceId, new FlowId(name), name, null, "1.0.0", true, null, definition, new Dictionary<string, string>(), Now, Now);
+    private static FlowResource Definition(string name, FlowDefinition definition) => new(ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value), new FlowId(name), name, null, "1.0.0", true, null, definition, new Dictionary<string, string>(), Now, Now);
 
     private sealed class FlowFixture : IAsyncDisposable
     {
@@ -43,16 +43,21 @@ public sealed partial class FlowTests
         private readonly ServiceProvider _provider;
         public FlowService Service => _provider.GetRequiredService<FlowService>();
         public IFlowRepository Repository => _provider.GetRequiredService<IFlowRepository>();
+        public IResourceGovernanceContext Governance => _provider.GetRequiredService<IResourceGovernanceContext>();
+        public IDbContextFactory<FlowDbContext> ContextFactory => _provider.GetRequiredService<IDbContextFactory<FlowDbContext>>();
         private FlowFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
         public static async Task<FlowFixture> CreateAsync(
             DbCommandInterceptor? commandInterceptor = null,
             TimeProvider? timeProvider = null,
+            IFlowScopeHierarchy? scopeHierarchy = null,
+            IFlowDiscoveryPolicy? discoveryPolicy = null,
             IFlowResourceReferenceResolver? resourceReferenceResolver = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
             var services = new ServiceCollection();
             services.AddSingleton(timeProvider ?? TimeProvider.System);
+            services.AddSingleton<IResourceGovernanceContext, ResourceGovernanceContext>();
             var connectionString = $"Data Source={Path.Combine(directory, "flow.db")};Pooling=False";
             if (commandInterceptor is null)
             {
@@ -63,6 +68,8 @@ public sealed partial class FlowTests
                 services.AddDbContextFactory<FlowDbContext>(options => options.UseSqlite(connectionString).AddInterceptors(commandInterceptor));
                 services.AddSingleton<IFlowRepository, SqliteFlowRepository>();
             }
+            if (scopeHierarchy is not null) services.AddSingleton(scopeHierarchy);
+            if (discoveryPolicy is not null) services.AddSingleton(discoveryPolicy);
             services.AddSingleton<ISchemaBindingResolver, TestSchemaBindingResolver>();
             if (resourceReferenceResolver is not null)
                 services.AddSingleton(resourceReferenceResolver);
@@ -77,6 +84,12 @@ public sealed partial class FlowTests
             await _provider.DisposeAsync();
             if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
         }
+    }
+
+    private sealed class AllowFlowDiscoveryPolicy : IFlowDiscoveryPolicy
+    {
+        public Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef,
+            CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private sealed class TestFlowRunQueue : IFlowRunQueue

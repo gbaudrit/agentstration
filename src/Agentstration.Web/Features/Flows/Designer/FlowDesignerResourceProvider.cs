@@ -1,4 +1,5 @@
 using Agentstration.Flows;
+using Agentstration.Resources;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Console;
@@ -13,29 +14,32 @@ public sealed class FlowDesignerResourceProvider(
     IToolDefinitionsClient toolDefinitionsClient,
     ISchemasClient schemasClient) : IFlowDesignerResourceProvider
 {
-    public async Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
     {
-        var agents = await client.GetAgentsAsync(cancellationToken);
-        return agents.Select(agent => new FlowDesignerAgent(agent.Id, agent.Name)
-        {
-            Namespace = agent.Namespace,
-            InputSchema = agent.InputSchema?.Clone(),
-            InputSchemaReference = agent.InputSchemaReference
-        }).ToArray();
+        var agents = await client.GetAgentsAsync(contextScope, cancellationToken);
+        return agents.Where(agent => agent.ScopeRef is not null)
+            .Select(agent => new FlowDesignerAgent(agent.Id, agent.Name, agent.ScopeRef!.Value)
+            {
+                Namespace = agent.Namespace,
+                InputSchema = agent.InputSchema?.Clone(),
+                InputSchemaReference = agent.InputSchemaReference
+            }).ToArray();
     }
 
-    public async Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
     {
-        var flows = await flowClient.GetFlowsAsync(cancellationToken);
-        return flows.Select(flow => new FlowDesignerFlow(flow.Id, flow.Name, flow.Namespace, flow.ActiveVersion)).ToArray();
+        var flows = await flowClient.GetFlowsAsync(contextScope, cancellationToken);
+        return flows.Where(flow => flow.ScopeRef is not null)
+            .Select(flow => new FlowDesignerFlow(flow.Id, flow.Name, flow.Namespace, flow.ScopeRef!.Value, flow.ActiveVersion)).ToArray();
     }
 
     public async Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(
+        ResourceScopeRef scopeRef,
         Agentstration.Resources.ResourceNamespace @namespace,
         string name,
         CancellationToken cancellationToken)
     {
-        var versions = await flowClient.GetFlowVersionsAsync(@namespace, name, cancellationToken);
+        var versions = await flowClient.GetFlowVersionsAsync(@namespace, name, scopeRef, cancellationToken);
         return versions.Select(version =>
         {
             var input = version.Graph?.Steps.OfType<InputFlowStepDefinition>().SingleOrDefault();
@@ -50,15 +54,15 @@ public sealed class FlowDesignerResourceProvider(
         }).ToArray();
     }
 
-    public async Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
     {
-        var toolsTask = toolsClient.GetToolsAsync(cancellationToken: cancellationToken);
+        var toolsTask = toolsClient.GetToolsAsync(contextScope, cancellationToken: cancellationToken);
         var definitionsTask = toolDefinitionsClient.GetAsync(cancellationToken);
         await Task.WhenAll(toolsTask, definitionsTask);
         var tools = await toolsTask;
         var definitions = (await definitionsTask).ToDictionary(
             definition => (definition.Namespace, definition.Name));
-        return tools.Where(tool => tool.Definition.Schema is not null).Select(tool => new FlowDesignerTool(
+        return tools.Where(tool => tool.Definition.Schema is not null && tool.ScopeRef is not null).Select(tool => new FlowDesignerTool(
             tool.Metadata.Name,
             tool.Definition.DisplayName,
             tool.Metadata.Namespace,
@@ -66,7 +70,8 @@ public sealed class FlowDesignerResourceProvider(
             tool.Definition.Schema.Output?.Clone(),
             tool.Definition.Enabled,
             tool.Definition.Discovery?.Available == true,
-            tool.Definition.RequiresApproval)
+            tool.Definition.RequiresApproval,
+            tool.ScopeRef!.Value)
         {
             InputSchemaReference = ToolInputSchemaReference(tool, definitions)
         }).ToArray();

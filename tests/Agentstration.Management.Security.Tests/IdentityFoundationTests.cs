@@ -1,12 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
+using Agentstration.Agents;
 using Agentstration.Flows.Application;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Profiles;
 using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -18,6 +21,60 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class IdentityFoundationTests
 {
+    [TestMethod]
+    public async Task ResourceWritesRequireTheExactOwnerContext()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync(grantPlatformAdministrator: true);
+        var operations = fixture.Services.GetRequiredService<ResourceScopeOperationService>();
+        var executed = 0;
+
+        using (fixture.OpenScope())
+        {
+            await Assert.ThrowsAsync<ResourceScopeAccessDeniedException>(() => operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Instance,
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default));
+            await Assert.ThrowsAsync<ResourceScopeAccessDeniedException>(() => operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Tenant(fixture.InitialContext.TenantId),
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default));
+
+            var workspaceResult = await operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Workspace(fixture.InitialContext.WorkspaceId),
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default);
+            Assert.AreEqual(1, workspaceResult);
+        }
+
+        using (fixture.Context.PushTenantAdministration(fixture.InitialContext))
+        {
+            var tenantResult = await operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Tenant(fixture.InitialContext.TenantId),
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default);
+            Assert.AreEqual(2, tenantResult);
+        }
+
+        using (fixture.Context.PushInstance(fixture.InitialContext))
+        {
+            var instanceResult = await operations.WriteAsync(
+                AgentResourceKinds.Agent,
+                ResourceScopeRef.Instance,
+                AuthorizationPermissions.ResourcesWrite,
+                _ => Task.FromResult(++executed),
+                default);
+            Assert.AreEqual(3, instanceResult);
+        }
+    }
+
     [TestMethod]
     public async Task BootstrapReturnsOwnerContextWithoutPublishingItGlobally()
     {
@@ -45,7 +102,9 @@ public sealed class IdentityFoundationTests
 
         Assert.AreEqual(first, fixture.Context.Current);
         Assert.AreEqual(1, (await store.ListTenantsAsync(default)).Count);
-        Assert.AreEqual(1, (await store.ListWorkspacesAsync(first.TenantId, default)).Count);
+        var workspaces = await store.ListWorkspacesAsync(first.TenantId, default);
+        Assert.AreEqual(2, workspaces.Count);
+        Assert.IsTrue(workspaces.Any(value => value.Kind == WorkspaceKind.TenantOperations));
         Assert.IsNotNull(await store.FindMembershipAsync(first.TenantId, first.UserId, default));
         Assert.IsNotNull(await store.FindWorkspaceMembershipAsync(first.WorkspaceId, first.PrincipalId, default));
         Assert.AreEqual(1, (await store.ListRoleAssignmentsAsync(first.TenantId, first.UserId, default)).Count);
@@ -61,6 +120,93 @@ public sealed class IdentityFoundationTests
 
         await fixture.Bootstrap.EnsureInitializedAsync(default);
         Assert.AreEqual(1, (await store.ListPlatformAdministratorsAsync(default)).Count);
+    }
+
+    [TestMethod]
+    public async Task OperationalTopologyIsStableIdempotentAndBackfillsEveryTenant()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var topology = fixture.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var now = DateTimeOffset.UtcNow;
+        var secondTenant = new Tenant(Guid.NewGuid(), "customer", "Customer", TenantStatus.Active, now);
+        await store.AddTenantAsync(secondTenant, default);
+
+        await topology.EnsureAllAsync(default);
+        await topology.EnsureAllAsync(default);
+
+        var systemTenant = (await store.ListTenantsAsync(default)).Single(value => value.Kind == TenantKind.System);
+        Assert.IsNotNull(systemTenant);
+        Assert.AreEqual(OperationalTopologyIdentities.SystemTenantName, systemTenant.Name);
+        var instanceOperations = await topology.GetInstanceOperationsWorkspaceAsync(default);
+        Assert.AreEqual(systemTenant.Id, instanceOperations.TenantId);
+        Assert.AreEqual(WorkspaceKind.InstanceOperations, instanceOperations.Kind);
+        var firstTenantOperations = await topology.GetTenantOperationsWorkspaceAsync(
+            fixture.InitialContext.TenantId, default);
+        var secondTenantOperations = await topology.GetTenantOperationsWorkspaceAsync(secondTenant.Id, default);
+        Assert.AreEqual(WorkspaceKind.TenantOperations, firstTenantOperations.Kind);
+        Assert.AreEqual(WorkspaceKind.TenantOperations, secondTenantOperations.Kind);
+        Assert.AreNotEqual(firstTenantOperations.Id, secondTenantOperations.Id);
+        var secondTenantWorkspaces = await store.ListWorkspacesAsync(secondTenant.Id, default);
+        Assert.HasCount(1, secondTenantWorkspaces);
+        Assert.IsTrue(OperationalTopologyIdentities.IsOperationalWorkspace(secondTenantWorkspaces[0]));
+        using var systemScope = fixture.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var runtimeProfile = await fixture.Services.GetRequiredService<IResourceStore>()
+            .GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(
+                ResourceScopeRef.Instance,
+                ResourceNamespace.Default,
+                RuntimeProfileResourceKinds.RuntimeProfile,
+                "maf-builtin"), default);
+        Assert.IsNotNull(runtimeProfile);
+        var runtimePolicy = await fixture.Services.GetRequiredService<IResourceAccessPolicyService>()
+            .GetAsync(runtimeProfile.Value.Uid, default);
+        Assert.IsNotNull(runtimePolicy);
+        Assert.IsFalse(runtimePolicy.Policy.Grants.Any(grant =>
+            grant.TargetScopeRef == ResourceScopeRef.Workspace(instanceOperations.Id)
+            || grant.TargetScopeRef == ResourceScopeRef.Workspace(firstTenantOperations.Id)
+            || grant.TargetScopeRef == ResourceScopeRef.Workspace(secondTenantOperations.Id)));
+        Assert.IsTrue(runtimePolicy.Policy.Grants.Any(grant =>
+            grant.TargetScopeRef == ResourceScopeRef.Workspace(fixture.InitialContext.WorkspaceId)));
+    }
+
+    [TestMethod]
+    public async Task ConsoleContextDiscoversAndSelectsEveryAuthorizedTenantWithoutPlatformAdministration()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var experience = fixture.Services.GetRequiredService<IdentityExperienceService>();
+        var now = DateTimeOffset.UtcNow;
+        var tenant = new Tenant(Guid.NewGuid(), "customer", "Customer", TenantStatus.Active, now);
+        var workspace = new Workspace(Guid.NewGuid(), tenant.Id, "operations", "Operations", WorkspaceStatus.Active, now);
+        await store.AddTenantAsync(tenant, default);
+        await store.AddWorkspaceAsync(workspace, default);
+        await store.AddMembershipAsync(new TenantMembership(
+            Guid.NewGuid(), tenant.Id, fixture.InitialContext.PrincipalId, MembershipStatus.Active, now), default);
+        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(
+            Guid.NewGuid(), workspace.Id, fixture.InitialContext.PrincipalId, MembershipStatus.Active, now), default);
+        await store.AddRoleAssignmentAsync(new RoleAssignment(
+            Guid.NewGuid(), tenant.Id, fixture.InitialContext.PrincipalId, PrincipalType.User,
+            LocalEnvironmentBootstrapper.OwnerRoleId, AuthorizationScopes.Tenant(tenant.Id)), default);
+        _ = await fixture.Services.GetRequiredService<IOperationalTopologyProvisioner>()
+            .EnsureTenantAsync(tenant, default);
+
+        var context = await experience.GetContextAsync(default);
+        var selected = await experience.ValidateConsoleContextSelectionAsync(
+            fixture.InitialContext.PrincipalId, ResourceScopeRef.Tenant(tenant.Id), default);
+
+        Assert.IsTrue(context.AvailableContexts.Any(value =>
+            value.Kind == IdentityConsoleContextKind.Tenant && value.TenantId == tenant.Id));
+        Assert.IsTrue(context.AvailableContexts.Any(value =>
+            value.Kind == IdentityConsoleContextKind.Workspace && value.WorkspaceId == workspace.Id));
+        Assert.AreEqual(IdentityConsoleContextKind.Tenant, selected.Kind);
+        Assert.AreEqual(tenant.Id, selected.OperationalContext.TenantId);
+        var tenantOperations = await fixture.Services.GetRequiredService<IOperationalTopologyProvisioner>()
+            .GetTenantOperationsWorkspaceAsync(tenant.Id, default);
+        Assert.AreEqual(tenantOperations.Id, selected.OperationalContext.WorkspaceId);
+        Assert.IsFalse(context.AvailableContexts.Any(value =>
+            value.Kind == IdentityConsoleContextKind.Workspace
+            && value.WorkspaceId == selected.OperationalContext.WorkspaceId));
     }
 
     [TestMethod]
@@ -290,10 +436,36 @@ public sealed class IdentityFoundationTests
     {
         var accessor = new CurrentRequestContext();
         var selected = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        using (accessor.Push(selected)) Assert.AreEqual(selected, accessor.Current);
+        using (accessor.Push(selected))
+        {
+            Assert.AreEqual(selected, accessor.Current);
+            Assert.AreEqual(selected.PrincipalId, accessor.ActorPrincipalId);
+        }
         Assert.AreEqual(ControlPlaneAccessMode.Unavailable, accessor.AccessMode);
         Assert.IsFalse(accessor.IsInitialized);
+        Assert.IsNull(accessor.ActorPrincipalId);
         Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
+    }
+
+    [TestMethod]
+    public void AdministrativeRequestContextsKeepTheActorWithoutBecomingWorkspaceContexts()
+    {
+        var accessor = new CurrentRequestContext();
+        var operational = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        using (accessor.PushInstance(operational))
+        {
+            Assert.AreEqual(ControlPlaneAccessMode.Instance, accessor.AccessMode);
+            Assert.IsFalse(accessor.IsInitialized);
+            Assert.AreEqual(operational.PrincipalId, accessor.ActorPrincipalId);
+        }
+
+        using (accessor.PushTenantAdministration(operational))
+        {
+            Assert.AreEqual(ControlPlaneAccessMode.TenantAdministration, accessor.AccessMode);
+            Assert.IsFalse(accessor.IsInitialized);
+            Assert.AreEqual(operational.PrincipalId, accessor.ActorPrincipalId);
+        }
     }
 
     [TestMethod]
@@ -327,6 +499,25 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public async Task ReservedOperationalWorkspaceCannotBeCreatedOrSelectedAsBusinessWorkspace()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync(grantPlatformAdministrator: true);
+        using var requestScope = fixture.OpenScope();
+        var administration = fixture.Services.GetRequiredService<IdentityAdministrationService>();
+        var experience = fixture.Services.GetRequiredService<IdentityExperienceService>();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => administration.CreateWorkspaceAsync(
+            OperationalTopologyIdentities.TenantOperationsWorkspaceName,
+            "Reserved collision",
+            default));
+        var tenantOperations = await fixture.Services.GetRequiredService<IOperationalTopologyProvisioner>()
+            .GetTenantOperationsWorkspaceAsync(fixture.InitialContext.TenantId, default);
+        await Assert.ThrowsAsync<AuthorizationDeniedException>(() => experience.ValidateWorkspaceSelectionAsync(
+            tenantOperations.Id,
+            default));
+    }
+
+    [TestMethod]
     public async Task ContextApiSelectsAnAuthorizedWorkspaceAndRejectsAnUnknownOne()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
@@ -352,6 +543,107 @@ public sealed class IdentityFoundationTests
 
         var denied = await client.PostAsJsonAsync("/api/identity/context/workspace", new { workspaceId = Guid.NewGuid() });
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ConsoleContextSelectionValidatesExactAuthorizedHierarchyWithoutPersistingNavigationCookies()
+    {
+        await using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
+            });
+        using var client = factory.CreateClient();
+        var initial = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.IsNotNull(initial);
+        var instance = initial.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Instance);
+        var tenant = initial.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Tenant);
+        Assert.IsTrue(initial.AvailableContexts.Any(value => value.Kind == IdentityConsoleContextKind.Workspace));
+
+        var selectedInstance = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(instance.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.OK, selectedInstance.StatusCode);
+        Assert.IsFalse(selectedInstance.Headers.TryGetValues("Set-Cookie", out _));
+        using var instanceContextRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        instanceContextRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, instance.ScopeRef);
+        using var instanceContextResponse = await client.SendAsync(instanceContextRequest);
+        var instanceContext = await instanceContextResponse.Content.ReadFromJsonAsync<IdentityConsoleContextResponse>();
+        Assert.AreEqual(IdentityConsoleContextKind.Instance, instanceContext?.SelectedKind);
+        Assert.AreEqual("/instance", instanceContext?.SelectedScopeRef);
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var instanceOperations = await topology.GetInstanceOperationsWorkspaceAsync(default);
+        Assert.AreEqual(instanceOperations.Id, instanceContext?.Context.WorkspaceId);
+
+        var selectedTenant = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(tenant.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.OK, selectedTenant.StatusCode);
+        using var tenantContextRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        tenantContextRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, tenant.ScopeRef);
+        using var tenantContextResponse = await client.SendAsync(tenantContextRequest);
+        var tenantContext = await tenantContextResponse.Content.ReadFromJsonAsync<IdentityConsoleContextResponse>();
+        Assert.AreEqual(IdentityConsoleContextKind.Tenant, tenantContext?.SelectedKind);
+        Assert.AreEqual(tenant.ScopeRef, tenantContext?.SelectedScopeRef);
+        var tenantOperations = await topology.GetTenantOperationsWorkspaceAsync(tenant.TenantId!.Value, default);
+        Assert.AreEqual(tenantOperations.Id, tenantContext?.Context.WorkspaceId);
+        Assert.IsFalse(initial.AvailableContexts.Any(value =>
+            value.Kind == IdentityConsoleContextKind.Workspace
+            && (value.WorkspaceId == instanceOperations.Id
+                || value.WorkspaceId == tenantOperations.Id)));
+
+        using var delegatedContextRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        delegatedContextRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, instance.ScopeRef);
+        using var delegatedContextResponse = await client.SendAsync(delegatedContextRequest);
+        delegatedContextResponse.EnsureSuccessStatusCode();
+        var delegatedContext = await delegatedContextResponse.Content
+            .ReadFromJsonAsync<IdentityConsoleContextResponse>();
+        Assert.AreEqual(IdentityConsoleContextKind.Instance, delegatedContext?.SelectedKind);
+        Assert.AreEqual(instance.ScopeRef, delegatedContext?.SelectedScopeRef);
+
+        using var requestScopedContext = new HttpRequestMessage(
+            HttpMethod.Get, "/api/identity/administration-capabilities");
+        requestScopedContext.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, instance.ScopeRef);
+        using var requestScopedResponse = await client.SendAsync(requestScopedContext);
+        requestScopedResponse.EnsureSuccessStatusCode();
+        Assert.IsFalse(requestScopedResponse.Headers.TryGetValues("Set-Cookie", out var requestScopedCookies)
+            && requestScopedCookies.Any(value => value.StartsWith(
+                $"{RequestContextMiddleware.ConsoleContextCookie}=", StringComparison.OrdinalIgnoreCase)));
+
+        var denied = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(ResourceScopeRef.Tenant(Guid.NewGuid()).Value));
+        Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        using var unavailableRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        unavailableRequest.Headers.Add(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Tenant(Guid.NewGuid()).Value);
+        using var unavailableResponse = await client.SendAsync(unavailableRequest);
+        Assert.AreEqual(HttpStatusCode.Forbidden, unavailableResponse.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task TenantAdministratorSessionRevalidatesThroughItsOperationalWorkspace()
+    {
+        await using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var initial = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.IsNotNull(initial);
+        var tenant = initial.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Tenant);
+
+        using var selected = await client.PostAsJsonAsync("/api/identity/context/selection",
+            new SelectConsoleContextRequest(tenant.ScopeRef));
+        selected.EnsureSuccessStatusCode();
+        using var revalidatedRequest = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        revalidatedRequest.Headers.Add(RequestContextMiddleware.ConsoleContextHeader, tenant.ScopeRef);
+        using var revalidatedResponse = await client.SendAsync(revalidatedRequest);
+        var revalidated = await revalidatedResponse.Content.ReadFromJsonAsync<IdentityConsoleContextResponse>();
+
+        Assert.AreEqual(IdentityConsoleContextKind.Tenant, revalidated?.SelectedKind);
+        Assert.AreEqual(tenant.ScopeRef, revalidated?.SelectedScopeRef);
+        var tenantOperations = await factory.Services.GetRequiredService<IOperationalTopologyProvisioner>()
+            .GetTenantOperationsWorkspaceAsync(tenant.TenantId!.Value, default);
+        Assert.AreEqual(tenantOperations.Id, revalidated?.Context.WorkspaceId);
     }
 
     [TestMethod]

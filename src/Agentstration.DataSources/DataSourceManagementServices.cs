@@ -4,6 +4,7 @@ using System.Text.Json;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
 
@@ -17,8 +18,11 @@ public sealed class DataSourceValidationException(string code, string message) :
 public sealed class DataSourceProfileService(
     IResourceStore store,
     IResourceReferenceResolver references,
+    IResourceAccessPolicyService accessPolicies,
     IResourceScopeOperations scopeOperations,
+    IDataSourceAcquisitionCompositionResolver compositions,
     ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider)
 {
@@ -120,6 +124,12 @@ public sealed class DataSourceProfileService(
         var exact = RequireScope(profile.Value);
         var definition = profile.Value.Definition with { Version = request.Version };
         var hash = Hash(definition);
+        var dependencies = await compositions.ResolveDependenciesAsync(exact, profile.Value.Namespace,
+            definition, cancellationToken);
+        ValidateAcquisitionFlow(dependencies.AcquisitionFlow);
+        if (dependencies.DiscoveryFlow is { } discoveryFlow)
+            ValidateDiscoveryFlow(discoveryFlow);
+        var dependencyHash = Hash(dependencies);
         var revision = new DataSourceProfileRevisionResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -139,9 +149,14 @@ public sealed class DataSourceProfileService(
             ProfileGeneration = profile.Value.Generation,
             Version = request.Version,
             DefinitionHash = hash,
+            DependencyHash = dependencyHash,
             PublishedAt = timeProvider.GetUtcNow(),
             PublishedBy = requestContext.IsInitialized ? requestContext.Current.PrincipalId : Guid.Empty,
-            Definition = definition
+            Definition = definition,
+            AcquisitionFlow = dependencies.AcquisitionFlow,
+            ToolBindings = dependencies.ToolBindings,
+            DiscoveryFlow = dependencies.DiscoveryFlow,
+            DiscoveryToolBindings = dependencies.DiscoveryToolBindings
         };
         var stored = await scopeOperations.WriteAsync(profile.Value, exact, AuthorizationPermissions.ResourcesWrite,
             async token =>
@@ -149,7 +164,8 @@ public sealed class DataSourceProfileService(
                 var existing = await GetRevisionCoreAsync(profile.Value, request.Version, token);
                 if (existing is not null)
                 {
-                    if (!string.Equals(existing.Value.DefinitionHash, hash, StringComparison.Ordinal))
+                    if (!string.Equals(existing.Value.DefinitionHash, hash, StringComparison.Ordinal)
+                        || !string.Equals(existing.Value.DependencyHash, dependencyHash, StringComparison.Ordinal))
                         throw Error("data_source_profile_revision_conflict",
                             $"Profile revision '{name}:{request.Version}' already exists with another definition.");
                     return existing;
@@ -162,7 +178,8 @@ public sealed class DataSourceProfileService(
                 {
                     var concurrent = await GetRevisionCoreAsync(profile.Value, request.Version, token);
                     if (concurrent is not null
-                        && string.Equals(concurrent.Value.DefinitionHash, hash, StringComparison.Ordinal))
+                        && string.Equals(concurrent.Value.DefinitionHash, hash, StringComparison.Ordinal)
+                        && string.Equals(concurrent.Value.DependencyHash, dependencyHash, StringComparison.Ordinal))
                         return concurrent;
                     throw Error("data_source_profile_revision_conflict",
                         $"Profile revision '{name}:{request.Version}' was published concurrently with another definition.");
@@ -206,6 +223,14 @@ public sealed class DataSourceProfileService(
         ResourceScopeRef consumerScope,
         ResourceNamespace ownerNamespace,
         ResourceReference reference,
+        CancellationToken cancellationToken) =>
+        await ResolveActiveAsync(consumerScope, ownerNamespace, reference, null, cancellationToken);
+
+    public async Task<ResolvedDataSourceProfile> ResolveActiveAsync(
+        ResourceScopeRef consumerScope,
+        ResourceNamespace ownerNamespace,
+        ResourceReference reference,
+        Guid? expectedProfileUid,
         CancellationToken cancellationToken)
     {
         var profile = await references.ResolveAsync<DataSourceProfileResource>(reference, ownerNamespace,
@@ -213,6 +238,18 @@ public sealed class DataSourceProfileService(
             ?? throw Error("data_source_profile_not_found", $"Data Source Profile '{reference.Name}' was not found.");
         if (!profile.Value.Definition.Enabled)
             throw Error("data_source_profile_disabled", $"Data Source Profile '{profile.Value.Address}' is disabled.");
+        var profileScope = RequireScope(profile.Value);
+        if (expectedProfileUid is { } expected && profile.Value.Uid != expected)
+            throw Error("data_source_profile_stale", $"Data Source Profile '{profile.Value.Address}' no longer matches the pinned identity.");
+        if (profileScope != consumerScope)
+        {
+            var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(profile.Value.Uid,
+                profileScope, profile.Value.Namespace, DataSourceResourceKinds.DataSourceProfile,
+                profile.Value.Generation), consumerScope, ResourceAccessAction.Use, cancellationToken);
+            if (!access.Allowed)
+                throw Error("data_source_profile_access_denied",
+                    $"Data Source Profile '{profile.Value.Address}' does not authorize use from '{consumerScope}' ({access.ReasonCode}).");
+        }
         var version = profile.Value.ActiveVersion
             ?? throw Error("data_source_profile_not_published", $"Data Source Profile '{profile.Value.Address}' has no active revision.");
         var revision = await GetRevisionCoreAsync(profile.Value, version, cancellationToken)
@@ -222,12 +259,17 @@ public sealed class DataSourceProfileService(
         {
             Name = profile.Value.Name,
             Namespace = profile.Value.Namespace,
-            ScopeRef = RequireScope(profile.Value),
+            ScopeRef = profileScope,
             Uid = profile.Value.Uid,
             Generation = profile.Value.Generation,
             Version = revision.Value.Version,
             DefinitionHash = revision.Value.DefinitionHash,
-            Definition = revision.Value.Definition
+            DependencyHash = revision.Value.DependencyHash,
+            Definition = revision.Value.Definition,
+            AcquisitionFlow = revision.Value.AcquisitionFlow,
+            ToolBindings = revision.Value.ToolBindings,
+            DiscoveryFlow = revision.Value.DiscoveryFlow,
+            DiscoveryToolBindings = revision.Value.DiscoveryToolBindings
         };
     }
 
@@ -268,9 +310,15 @@ public sealed class DataSourceProfileService(
             throw Error("data_source_profile_description_too_long", "Profile descriptions cannot exceed 2000 characters.");
         ValidateVersion(resource.Definition.Version);
         ValidateSchema(resource.Definition.ConfigurationSchema);
-        ValidateFlow(resource.Definition.AcquisitionFlow);
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var binding in resource.Definition.ToolBindings)
+        ValidateFlow(resource.Definition.AcquisitionFlow, "acquisition");
+        if (resource.Definition.DiscoveryFlow is { } discoveryFlow) ValidateFlow(discoveryFlow, "discovery");
+        ValidateBindings(resource.Definition.ToolBindings, new(StringComparer.Ordinal));
+        ValidateBindings(resource.Definition.DiscoveryToolBindings, new(StringComparer.Ordinal));
+    }
+
+    private static void ValidateBindings(IReadOnlyList<DataSourceProfileToolBinding> bindings, HashSet<string> names)
+    {
+        foreach (var binding in bindings)
         {
             ValidateToken(binding.Name, "Tool binding name");
             ValidateToken(binding.Capability, "Tool binding capability");
@@ -285,9 +333,21 @@ public sealed class DataSourceProfileService(
     private async Task<StoredResource<DataSourceProfileRevisionResource>?> GetRevisionCoreAsync(
         DataSourceProfileResource profile,
         string version,
-        CancellationToken cancellationToken) =>
-        await store.GetExactAsync<DataSourceProfileRevisionResource>(Address(RequireScope(profile), profile.Namespace,
+        CancellationToken cancellationToken)
+    {
+        var profileScope = RequireScope(profile);
+        using var exactScope = requestContext.AccessMode == ControlPlaneAccessMode.Workspace
+            ? profileScope.Kind switch
+            {
+                ResourceScopeKind.Instance => requestScopes.PushInstance(requestContext.Current),
+                ResourceScopeKind.Tenant when profileScope.TargetId == requestContext.Current.TenantId =>
+                    requestScopes.PushTenantAdministration(requestContext.Current),
+                _ => null
+            }
+            : null;
+        return await store.GetExactAsync<DataSourceProfileRevisionResource>(Address(profileScope, profile.Namespace,
             DataSourceResourceKinds.DataSourceProfileRevision, RevisionName(profile.Name, version)), cancellationToken);
+    }
 
     private Task AuditAsync(string action, ResourceScopeRef scope, string reason, CancellationToken cancellationToken)
     {
@@ -314,11 +374,11 @@ public sealed class DataSourceProfileService(
             throw Error("data_source_profile_schema_invalid", "Configuration schemas must be bounded JSON objects.");
     }
 
-    private static void ValidateFlow(DataSourceFlowTarget target)
+    private static void ValidateFlow(DataSourceFlowTarget target, string purpose)
     {
-        ValidateToken(target.Name, "acquisition Flow name");
+        ValidateToken(target.Name, $"{purpose} Flow name");
         if (target.UseActiveVersion == (target.Version is not null))
-            throw Error("data_source_profile_flow_reference_invalid", "Acquisition Flow references must select either the active version or one exact version.");
+            throw Error("data_source_profile_flow_reference_invalid", $"{purpose} Flow references must select either the active version or one exact version.");
     }
 
     private static void ValidateToken(string value, string label)
@@ -337,6 +397,48 @@ public sealed class DataSourceProfileService(
 
     private static string Hash(DataSourceProfileProperties definition) =>
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(definition)));
+    private static string Hash(ResolvedDataSourceProfileDependencies dependencies) =>
+        Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(dependencies)));
+
+    private static void ValidateAcquisitionFlow(ResolvedDataSourceFlowBinding flow)
+    {
+        if (!string.Equals(flow.Contract, DataSourceFlowContracts.Acquisition, StringComparison.Ordinal))
+            throw Error("data_source_acquisition_contract_required",
+                $"Flow '{flow.Namespace}/{flow.Name}:{flow.Version}' must declare contract '{DataSourceFlowContracts.Acquisition}'.");
+        RequireProperties(flow.InputSchema,
+            ["dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile", "sourceConfiguration",
+                "parameters", "caller", "correlationId", "acquisitionId"], "input");
+        RequireProperties(flow.OutputSchema, ["artifacts"], "output");
+    }
+
+    private static void ValidateDiscoveryFlow(ResolvedDataSourceFlowBinding flow)
+    {
+        if (!string.Equals(flow.Contract, DataSourceFlowContracts.Discovery, StringComparison.Ordinal))
+            throw Error("data_source_discovery_contract_required",
+                $"Flow '{flow.Namespace}/{flow.Name}:{flow.Version}' must declare contract '{DataSourceFlowContracts.Discovery}'.");
+        DataSourceAcquisitionService.RequireContractProperties(flow.InputSchema,
+            ["dataSourceId", "dataSourceUid", "dataSourceGeneration", "profile", "sourceConfiguration",
+                "parameters", "caller", "correlationId", "discoveryId"], "input",
+            DataSourceFlowContracts.Discovery, "data_source_discovery_contract_invalid");
+        DataSourceAcquisitionService.RequireContractProperties(flow.OutputSchema, ["choices"], "output",
+            DataSourceFlowContracts.Discovery, "data_source_discovery_contract_invalid");
+    }
+
+    private static void RequireProperties(JsonElement? schema, IReadOnlyList<string> names, string direction)
+    {
+        if (schema is not { ValueKind: JsonValueKind.Object }
+            || !schema.Value.TryGetProperty("type", out var type) || type.GetString() != "object"
+            || !schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object
+            || !schema.Value.TryGetProperty("required", out var required) || required.ValueKind != JsonValueKind.Array)
+            throw Error("data_source_acquisition_contract_invalid",
+                $"The {DataSourceFlowContracts.Acquisition} {direction} schema must be an object with properties and required arrays.");
+        var requiredNames = required.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal);
+        foreach (var name in names)
+            if (!properties.TryGetProperty(name, out _) || !requiredNames.Contains(name))
+                throw Error("data_source_acquisition_contract_invalid",
+                    $"The {DataSourceFlowContracts.Acquisition} {direction} schema must require property '{name}'.");
+    }
     private static string RevisionName(string name, string version) =>
         $"data-source-profile-revision-{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{name}\0{version}")))[..32]}";
     private static ResourceScopeRef RequireScope(Resource resource) => resource.ScopeRef
@@ -355,6 +457,8 @@ public sealed class DataSourceProfileService(
 
 public sealed class DataSourceManagementService(
     IResourceStore store,
+    IResourceReferenceResolver references,
+    IResourceAccessPolicyService accessPolicies,
     IResourceScopeOperations scopeOperations,
     DataSourceProfileService profiles,
     IDataSourceAcquisitionCompositionResolver compositions,
@@ -376,8 +480,8 @@ public sealed class DataSourceManagementService(
     {
         var scope = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(DataSourceResourceKinds.DataSource);
         var desired = resource with { ScopeRef = scope, Generation = 1 };
-        var readiness = await ValidateAndResolveAsync(desired, cancellationToken);
-        desired = desired with { Status = Status(readiness) };
+        var readiness = await ValidateAndResolveAsync(desired, false, cancellationToken);
+        desired = PinProfile(desired, readiness) with { Status = Status(readiness) };
         var stored = await scopeOperations.WriteAsync(desired, scope, AuthorizationPermissions.ResourcesWrite,
             token => store.PutExactAsync(scope, desired, null, true, token), cancellationToken);
         await AuditAsync(SecurityAuditActions.DataSourceCreated, scope, stored.Value.Name, cancellationToken);
@@ -390,8 +494,8 @@ public sealed class DataSourceManagementService(
         var existing = await GetAsync(ns, name, scopeRef, cancellationToken) ?? throw NotFound(name, ns);
         var scope = existing.Value.ScopeRef ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
         var updated = existing.Value with { Generation = checked(existing.Value.Generation + 1), Definition = definition };
-        var readiness = await ValidateAndResolveAsync(updated, cancellationToken);
-        updated = updated with { Status = Status(readiness) };
+        var readiness = await ValidateAndResolveAsync(updated, false, cancellationToken);
+        updated = PinProfile(updated, readiness) with { Status = Status(readiness) };
         var stored = await scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
             token => store.PutExactAsync(scope, updated, ifMatch, false, token), cancellationToken);
         await AuditAsync(SecurityAuditActions.DataSourceUpdated, scope, stored.Value.Name, cancellationToken);
@@ -403,6 +507,27 @@ public sealed class DataSourceManagementService(
     {
         var source = await GetAsync(ns, name, scopeRef, cancellationToken) ?? throw NotFound(name, ns);
         return await ResolveReadinessAsync(source.Value, cancellationToken);
+    }
+
+    public async Task<StoredResource<DataSourceResource>> ResolveForUseAsync(ResourceNamespace ns, string name,
+        ResourceScopeRef? sourceScope, ResourceScopeRef consumerScope, CancellationToken cancellationToken)
+    {
+        var reference = new ResourceReference(name, sourceScope, ns);
+        var source = await references.ResolveAsync<DataSourceResource>(reference, ns,
+            DataSourceResourceKinds.DataSource, consumerScope, cancellationToken)
+            ?? throw Error("data_source_not_found", $"Data Source '{ns}/{name}' was not found.");
+        var ownerScope = source.Value.ScopeRef
+            ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
+        if (ownerScope != consumerScope)
+        {
+            var access = await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(source.Value.Uid,
+                ownerScope, source.Value.Namespace, DataSourceResourceKinds.DataSource,
+                source.Value.Generation), consumerScope, ResourceAccessAction.Use, cancellationToken);
+            if (!access.Allowed)
+                throw Error("data_source_access_denied",
+                    $"Data Source '{source.Value.Address}' does not authorize use from '{consumerScope}' ({access.ReasonCode}).");
+        }
+        return source;
     }
 
     public async Task DeleteAsync(ResourceNamespace ns, string name, ResourceScopeRef? scopeRef,
@@ -418,45 +543,37 @@ public sealed class DataSourceManagementService(
         await AuditAsync(SecurityAuditActions.DataSourceDeleted, exact, name, cancellationToken);
     }
 
-    private async Task<DataSourceReadiness> ValidateAndResolveAsync(DataSourceResource resource, CancellationToken cancellationToken)
+    private async Task<DataSourceReadiness> ValidateAndResolveAsync(DataSourceResource resource,
+        bool requirePinnedProfile, CancellationToken cancellationToken)
     {
         Validate(resource);
-        var readiness = await ResolveReadinessAsync(resource, cancellationToken);
+        var readiness = await ResolveReadinessAsync(resource, requirePinnedProfile, cancellationToken);
         if (!readiness.Ready) throw Error("data_source_not_ready", string.Join(' ', readiness.Issues));
         return readiness;
     }
 
-    private async Task<DataSourceReadiness> ResolveReadinessAsync(DataSourceResource resource, CancellationToken cancellationToken)
+    private Task<DataSourceReadiness> ResolveReadinessAsync(DataSourceResource resource,
+        CancellationToken cancellationToken) => ResolveReadinessAsync(resource, true, cancellationToken);
+
+    private async Task<DataSourceReadiness> ResolveReadinessAsync(DataSourceResource resource,
+        bool requirePinnedProfile, CancellationToken cancellationToken)
     {
         if (!resource.Definition.Enabled) return new(false, false, null, ["The Data Source is disabled."]);
+        if (requirePinnedProfile && resource.ProfileUid is null)
+            return new(false, true, null,
+                ["The Data Source does not pin an exact Data Source Profile identity."]);
         try
         {
             var profile = await profiles.ResolveActiveAsync(resource.ScopeRef!.Value, resource.Namespace,
-                resource.Definition.Profile, cancellationToken);
+                resource.Definition.Profile, resource.ProfileUid, cancellationToken);
             var issues = DataSourceProfileService.ValidateConfiguration(profile.Definition.ConfigurationSchema,
                 resource.Definition.Configuration);
             if (issues.Count != 0) return new(false, true, profile, issues);
 
-            ResolvedDataSourceFlowBinding? acquisition = null;
-            if (requestContext.IsInitialized)
-            {
-                try
-                {
-                    acquisition = await compositions.ResolveFlowAsync(
-                        ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId), resource.Namespace, profile,
-                        cancellationToken);
-                }
-                catch (Exception exception) when (exception is DataSourceAcquisitionException
-                    or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)
-                {
-                    // Flow metadata enriches readiness for schema-driven clients. Acquisition still performs
-                    // authoritative composition resolution, so an unavailable Flow must not invalidate a
-                    // Data Source that was valid before this optional metadata was exposed.
-                }
-            }
-            return new(true, true, profile, issues, acquisition);
+            await compositions.ValidatePinnedAsync(resource.ScopeRef.Value, profile, cancellationToken);
+            return new(true, true, profile, issues, profile.AcquisitionFlow, profile.DiscoveryFlow);
         }
-        catch (Exception exception) when (exception is DataSourceValidationException
+        catch (Exception exception) when (exception is DataSourceValidationException or DataSourceAcquisitionException
             or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)
         {
             return new(false, true, null, [exception.Message]);
@@ -497,6 +614,19 @@ public sealed class DataSourceManagementService(
             Message = readiness.Ready ? "The Data Source is ready." : string.Join(' ', readiness.Issues)
         }]
     };
+    private static DataSourceResource PinProfile(DataSourceResource resource, DataSourceReadiness readiness)
+    {
+        var profile = readiness.Profile
+            ?? throw Error("data_source_profile_not_found", "The resolved Data Source Profile is unavailable.");
+        return resource with
+        {
+            ProfileUid = profile.Uid,
+            Definition = resource.Definition with
+            {
+                Profile = new ResourceReference(profile.Name, profile.ScopeRef, profile.Namespace)
+            }
+        };
+    }
     private static ResourceNotFoundException NotFound(string name, ResourceNamespace ns) =>
         new(new ResourceKey(DataSourceResourceKinds.DataSource, name, ns));
     private static DataSourceValidationException Error(string code, string message) => new(code, message);

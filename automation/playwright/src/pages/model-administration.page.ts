@@ -47,8 +47,10 @@ export class ModelAdministrationPage {
   }
 
   public async refreshProviderModels(consoleUrl: string, providerName: string): Promise<void> {
+    const scopeRef = await this.selectedScopeRef();
     const response = await this.page.request.post(
       `${consoleUrl}/api/modelproviders/${encodeURIComponent(providerName)}/models/refresh`,
+      scopeRef ? { headers: { 'X-Agentstration-Context': scopeRef } } : undefined,
     );
     if (!response.ok()) {
       throw new Error(`Model discovery refresh returned HTTP ${response.status()}.`);
@@ -65,11 +67,16 @@ export class ModelAdministrationPage {
     await this.page.getByTestId(TestIds.modelAdministration.modelOverrideMessage).waitFor({ state: 'visible' });
   }
 
-  public async createProfile(consoleUrl: string, definition: ModelAdministrationDefinition): Promise<Locator> {
+  public async createProfile(
+    consoleUrl: string,
+    definition: ModelAdministrationDefinition,
+    scopeRef = '/instance',
+  ): Promise<Locator> {
     await this.open(consoleUrl, '/modelprofiles/new', TestIds.resourceAdministration.modelProfileEditor);
     await this.waitForInteractive(TestIds.modelAdministration.profileForm);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileName), definition.profileName);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName), definition.profileDisplayName);
+    await this.page.getByTestId(TestIds.secretGrants.scopePicker).selectOption(scopeRef);
     await selectMatchingOption(this.page.getByTestId(TestIds.modelAdministration.profileProvider), definition.providerName);
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.profileModel));
     await this.page.getByTestId(TestIds.modelAdministration.profileSave).click();
@@ -123,6 +130,34 @@ export class ModelAdministrationPage {
     await this.openProviderConfiguration();
   }
 
+  public async openProviderAccess(consoleUrl: string, name: string, scopeRef = '/instance'): Promise<void> {
+    await this.open(
+      consoleUrl,
+      `/modelproviders/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`,
+      TestIds.resourceAdministration.modelProviderEditor,
+    );
+    await this.page.locator(
+      `[data-testid="${TestIds.modelAdministration.providerConfigurationTab}"][data-interactive="true"]`,
+    ).waitFor({ state: 'visible' });
+    const tab = this.page.getByTestId(TestIds.modelAdministration.providerAccessTab);
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+    }).toPass();
+    await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
+  }
+
+  public async openProfileAccess(consoleUrl: string, name: string, scopeRef: string): Promise<void> {
+    await this.open(
+      consoleUrl,
+      `/modelprofiles/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`,
+      TestIds.resourceAdministration.modelProfileEditor,
+    );
+    await this.waitForPersisted(TestIds.modelAdministration.profileForm);
+    await this.page.getByTestId(TestIds.modelAdministration.profileAccessTab).click();
+    await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
+  }
+
   public async deleteProvider(): Promise<void> {
     await this.deleteCurrent(TestIds.modelAdministration.providerDelete, TestIds.modelAdministration.providerDeleteConfirm, '/modelproviders');
   }
@@ -163,9 +198,18 @@ export class ModelAdministrationPage {
   }
 
   private async open(consoleUrl: string, path: string, marker: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}${path}`, { waitUntil: 'domcontentloaded' });
+    const target = new URL(path, consoleUrl);
+    const scopeRef = await this.selectedScopeRef();
+    if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
+    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Model administration route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
+  }
+
+  private async selectedScopeRef(): Promise<string | null> {
+    return await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
   }
 }
 

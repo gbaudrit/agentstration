@@ -49,4 +49,6 @@
   <data name="CreatedNotification"><value>Runtime profile created</value></data>
   <data name="UpdatedNotification"><value>Runtime profile updated</value></data>
   <data name="ProfileUsedError"><value>This profile is used by {0}.</value></data>
+  <data name="Definition"><value>Definition</value></data>
+  <data name="Access"><value>Access</value></data>
 </root>

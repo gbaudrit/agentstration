@@ -76,7 +76,7 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
             workspace = isPlatformAdministrator
                 ? await identityStore.GetWorkspaceAsync(internalWorkspaceId, httpContext.RequestAborted)
                 : await ResolveMembershipWorkspaceAsync(
-                    identityStore, principal.Id, internalWorkspaceId, httpContext.RequestAborted);
+                    identityStore, principal.Id, internalWorkspaceId, true, httpContext.RequestAborted);
         }
         else if (isPersonalAccessToken)
         {
@@ -92,6 +92,7 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
                     identityStore,
                     principal.Id,
                     restrictedWorkspaceId,
+                    false,
                     httpContext.RequestAborted);
         }
         else if (isPlatformAdministrator)
@@ -106,6 +107,7 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
                 identityStore,
                 principal.Id,
                 requestedWorkspaceId,
+                true,
                 httpContext.RequestAborted);
         }
         if (workspace?.Status != WorkspaceStatus.Active)
@@ -137,8 +139,19 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         IIdentityStore store,
         Guid principalId,
         Guid? requestedWorkspaceId,
+        bool allowTenantOperations,
         CancellationToken cancellationToken)
     {
+        if (allowTenantOperations && requestedWorkspaceId is { } requested)
+        {
+            var candidate = await store.GetWorkspaceAsync(requested, cancellationToken);
+            if (candidate is { Status: WorkspaceStatus.Active }
+                && candidate.Kind == WorkspaceKind.TenantOperations)
+            {
+                var tenantMembership = await store.FindMembershipAsync(candidate.TenantId, principalId, cancellationToken);
+                if (tenantMembership?.Status == MembershipStatus.Active) return candidate;
+            }
+        }
         var memberships = (await store.ListWorkspaceMembershipsAsync(principalId, cancellationToken))
             .Where(value => value.Status == MembershipStatus.Active);
         var selected = requestedWorkspaceId is null
@@ -157,14 +170,17 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         {
             var preferred = await store.GetWorkspaceAsync(defaultWorkspaceId, cancellationToken);
             if (preferred is not null
+                && !OperationalTopologyIdentities.IsOperationalWorkspace(preferred)
                 && (preferences.DefaultTenantId is null || preferred.TenantId == preferences.DefaultTenantId))
                 return preferred;
         }
 
-        foreach (var tenant in (await store.ListTenantsAsync(cancellationToken)).Where(value => value.Status == TenantStatus.Active))
+        foreach (var tenant in (await store.ListTenantsAsync(cancellationToken)).Where(value => value.Status == TenantStatus.Active
+                     && !OperationalTopologyIdentities.IsSystemTenant(value)))
         {
             var workspace = (await store.ListWorkspacesAsync(tenant.Id, cancellationToken))
-                .FirstOrDefault(value => value.Status == WorkspaceStatus.Active);
+                .FirstOrDefault(value => value.Status == WorkspaceStatus.Active
+                    && !OperationalTopologyIdentities.IsOperationalWorkspace(value));
             if (workspace is not null) return workspace;
         }
         return null;
@@ -177,6 +193,10 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         if (context.Request.RouteValues.TryGetValue("workspaceName", out routeValue)
             && Guid.TryParse(routeValue?.ToString(), out routeWorkspace)) return routeWorkspace;
         if (Guid.TryParse(context.Request.Headers[WorkspaceHeader].FirstOrDefault(), out var headerWorkspace)) return headerWorkspace;
+        if (RequestContextMiddleware.HasExplicitConsoleScope(context.Request)
+            || !context.Request.Path.StartsWithSegments("/api")
+            && context.Request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            return null;
         if (Guid.TryParse(context.Request.Cookies[RequestContextMiddleware.WorkspaceCookie], out var cookieWorkspace)) return cookieWorkspace;
         return null;
     }

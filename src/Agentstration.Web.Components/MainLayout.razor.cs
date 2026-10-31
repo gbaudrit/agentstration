@@ -15,6 +15,11 @@ public partial class MainLayout
     private sealed record NavigationGroup(string LabelKey, string Tone, IReadOnlyList<NavigationItem> Items);
     private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null, bool IsFallback = false);
+    private sealed record ContextTenantGroup(
+        Guid TenantId,
+        string DisplayName,
+        ConsoleContextOption? Tenant,
+        IReadOnlyList<ConsoleContextOption> Workspaces);
 
     private static readonly NavigationGroup[] NavigationGroups =
     [
@@ -91,6 +96,7 @@ public partial class MainLayout
     private IJSObjectReference? navigationTooltipModule;
     private IJSObjectReference? commandRegistration;
     private IJSObjectReference? navigationTooltipRegistration;
+    private IDisposable? locationChangingRegistration;
     private DotNetObjectReference<MainLayout>? selfReference;
     private ElementReference shellElement;
     private ElementReference commandInput;
@@ -99,6 +105,9 @@ public partial class MainLayout
     private bool focusCommandInput;
     private bool searchingResources;
     private bool themeReady;
+    private bool contextSelectorOpen;
+    private bool switchingContext;
+    private string contextQuery = string.Empty;
     private int selectedCommandIndex;
     private IReadOnlyList<CommandItem> resourceCommands = [];
     private Task? platformStatusRefresh;
@@ -120,6 +129,39 @@ public partial class MainLayout
             .Take(12)
             .Concat(fallbackCommands)
             .ToArray();
+    private IReadOnlyList<ConsoleContextOption> FilteredContexts => ContextState.Current?.Contexts
+        .Where(option => string.IsNullOrWhiteSpace(contextQuery)
+            || option.DisplayName.Contains(contextQuery, StringComparison.CurrentCultureIgnoreCase)
+            || (option.TenantDisplayName?.Contains(contextQuery, StringComparison.CurrentCultureIgnoreCase) ?? false)
+            || (option.WorkspaceName?.Contains(contextQuery, StringComparison.OrdinalIgnoreCase) ?? false)
+            || option.Kind.ToString().Contains(contextQuery, StringComparison.OrdinalIgnoreCase))
+        .ToArray() ?? [];
+    private bool IsFilteringContexts => !string.IsNullOrWhiteSpace(contextQuery);
+    private IReadOnlyList<ConsoleContextOption> InstanceContexts => ContextState.Current?.Contexts
+        .Where(option => option.Kind == ConsoleContextKind.Instance)
+        .ToArray() ?? [];
+    private IReadOnlyList<ContextTenantGroup> ContextTenantGroups
+    {
+        get
+        {
+            var contexts = ContextState.Current?.Contexts ?? [];
+            return contexts
+                .Where(option => option.TenantId.HasValue
+                    && option.Kind is ConsoleContextKind.Tenant or ConsoleContextKind.Workspace)
+                .GroupBy(option => option.TenantId!.Value)
+                .Select(group =>
+                {
+                    var tenant = group.FirstOrDefault(option => option.Kind == ConsoleContextKind.Tenant);
+                    var workspaces = group.Where(option => option.Kind == ConsoleContextKind.Workspace).ToArray();
+                    var displayName = tenant?.DisplayName
+                        ?? workspaces.FirstOrDefault()?.TenantDisplayName
+                        ?? string.Empty;
+                    return new ContextTenantGroup(group.Key, displayName, tenant, workspaces);
+                })
+                .OrderBy(group => group.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+        }
+    }
 
     private string CurrentSection
     {
@@ -133,6 +175,16 @@ public partial class MainLayout
         }
     }
 
+    private string CurrentContextPath => ContextState.Current is { } context
+        ? context.SelectedKind switch
+        {
+            ConsoleContextKind.Instance => T("InstanceAdministration"),
+            ConsoleContextKind.Tenant => context.TenantDisplayName,
+            ConsoleContextKind.Workspace => $"{context.TenantDisplayName} / {context.WorkspaceDisplayName}",
+            _ => T("OrganizationFallback")
+        }
+        : T("OrganizationFallback");
+
     protected override async Task OnInitializedAsync()
     {
         Navigation.Changed += StateHasChanged;
@@ -145,6 +197,8 @@ public partial class MainLayout
         await Task.WhenAll(
             ContextState.LoadAsync(lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
+        NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        locationChangingRegistration = NavigationManager.RegisterLocationChangingHandler(PreserveConsoleContextAsync);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -153,6 +207,8 @@ public partial class MainLayout
         {
             commandModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/command-palette.js");
             contextModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/context-selector.js");
+            if (ContextState.Current is { } context)
+                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
             themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
             navigationTooltipModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/navigation-tooltips.js");
             Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
@@ -259,14 +315,40 @@ public partial class MainLayout
         NavigationManager.NavigateTo(command.Url);
     }
 
-    private bool switchingWorkspace;
-    private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);
-    private async Task SelectWorkspaceAsync(ChangeEventArgs args)
+    private ValueTask PreserveConsoleContextAsync(LocationChangingContext context)
     {
-        if (contextModule is null || !Guid.TryParse(args.Value?.ToString(), out var workspaceId) || workspaceId == ContextState.Current?.WorkspaceId) return;
-        switchingWorkspace = true;
-        try { await contextModule.InvokeVoidAsync("selectWorkspace", workspaceId); }
-        finally { switchingWorkspace = false; }
+        var contextualUri = NavigationContext.AddToUri(context.TargetLocation);
+        if (string.Equals(contextualUri, context.TargetLocation, StringComparison.Ordinal))
+            return ValueTask.CompletedTask;
+        context.PreventNavigation();
+        _ = InvokeAsync(() => NavigationManager.NavigateTo(contextualUri));
+        return ValueTask.CompletedTask;
+    }
+
+    private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);
+
+    private void ToggleContextSelector()
+    {
+        contextSelectorOpen = !contextSelectorOpen;
+        if (!contextSelectorOpen) contextQuery = string.Empty;
+    }
+
+    private void UpdateContextQuery(ChangeEventArgs args) => contextQuery = args.Value?.ToString() ?? string.Empty;
+
+    private async Task SelectContextAsync(ConsoleContextOption option)
+    {
+        if (contextModule is null || option.ScopeRef == ContextState.Current?.SelectedScopeRef) return;
+        switchingContext = true;
+        try
+        {
+            _ = await contextModule.InvokeAsync<bool>("selectContext", option.ScopeRef, T("ConfirmContextChange"));
+        }
+        catch (JSException exception)
+        {
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ContextChangeFailed"), exception.Message,
+                DateTimeOffset.Now, UiStatus.Danger));
+        }
+        finally { switchingContext = false; }
     }
 
     private static string ShortIdentifier(string value) => value.Length <= 48 ? value : $"…{value[^47..]}";
@@ -274,19 +356,42 @@ public partial class MainLayout
     private string T(string key) => string.IsNullOrEmpty(key) ? string.Empty : Localizer[key];
     private string PlatformStatusLabel => T($"PlatformStatus.{PlatformStatus.Kind}");
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
-    private static string WorkspaceLabel(ConsoleContextSnapshot context, ConsoleWorkspaceOption workspace) =>
-        context.Workspaces.Select(value => value.TenantId).Distinct().Skip(1).Any()
-            ? $"{workspace.TenantDisplayName} / {workspace.DisplayName}"
-            : workspace.DisplayName;
+    private string ContextKindLabel(ConsoleContextKind kind) => T($"ContextKind.{kind}");
+    private string SelectedContextLabel(ConsoleContextSnapshot context) =>
+        context.Contexts.FirstOrDefault(option => option.ScopeRef == context.SelectedScopeRef)?.DisplayName
+        ?? CurrentContextPath;
+    private string ContextOptionPath(ConsoleContextOption option) => option.Kind switch
+    {
+        ConsoleContextKind.Instance => T("GlobalAdministration"),
+        ConsoleContextKind.Tenant => T("TenantAdministration"),
+        ConsoleContextKind.Workspace => option.TenantDisplayName ?? string.Empty,
+        _ => string.Empty
+    };
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
     {
+        var requestedContext = ConsoleNavigationContext.GetScopeRef(args.Location);
+        if (requestedContext is not null
+            && ContextState.Current is { } current
+            && !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal))
+        {
+            await ContextState.LoadAsync(lifetimeCancellation.Token);
+        }
         StateHasChanged();
-        try { await JS.InvokeVoidAsync("window.scrollTo", 0, 0); }
+        try
+        {
+            await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+            if (contextModule is not null && ContextState.Current is { } context)
+                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
+        }
         catch (JSDisconnectedException) { }
         catch (InvalidOperationException) { }
     });
-    private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnContextChanged()
+    {
+        NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        _ = InvokeAsync(StateHasChanged);
+    }
     private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
@@ -297,6 +402,7 @@ public partial class MainLayout
         PlatformStatus.Changed -= OnPlatformStatusChanged;
         ContextState.Changed -= OnContextChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
+        locationChangingRegistration?.Dispose();
         lifetimeCancellation.Cancel();
         if (platformStatusRefresh is not null)
         {

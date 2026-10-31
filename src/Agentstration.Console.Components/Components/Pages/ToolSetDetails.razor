@@ -2,11 +2,12 @@
 @implements IDisposable
 @inject IToolSetsClient Client
 @inject NavigationManager Navigation
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolSetsStrings> Localizer
 
 <PageTitle>@(toolSet?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 <PageHeader Title="@(toolSet?.Definition.DisplayName ?? Name)" Description="@(toolSet?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-toolset-details">
-    <Actions><a class="button-secondary" href="/tools/sets">@T("Back")</a>@if (toolSet is not null) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+    <Actions><a class="button-secondary" href="/tools/sets">@T("Back")</a>@if (toolSet is not null && CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
@@ -14,6 +15,10 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (toolSet is not null)
 {
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
+    <InheritedResourceNotice OwnerScopeRef="@(toolSet.ScopeRef ?? ResourceScopeRef.Instance)" />
+    <ResourceTabs Label="@T("DetailsDescription")"><button type="button" class="@(activeTab == DetailsTab.Overview ? "active" : null)" @onclick="() => activeTab = DetailsTab.Overview">@T("Overview")</button>@if (CanManage) { <button type="button" class="@(activeTab == DetailsTab.Access ? "active" : null)" data-testid="toolset-access-tab" @onclick="() => activeTab = DetailsTab.Access">@T("Access")</button> }</ResourceTabs>
+    @if (activeTab == DetailsTab.Overview)
+    {
     <section class="metric-grid" aria-label="@T("Overview")">
         <MetricCard Label="@T("DraftVersion")" Value="@toolSet.Definition.Version" Detail="@T(toolSet.Definition.Publish ? "PublishRequested" : "Draft")" Status="UiStatus.Info" />
         <MetricCard Label="@T("Members")" Value="@toolSet.Definition.Members.Count.ToString()" Detail="@T("GovernedIndividually")" Status="UiStatus.Neutral" />
@@ -37,6 +42,11 @@ else if (toolSet is not null)
             </article>
         }
     </section>
+    }
+    else if (CanManage)
+    {
+        <ResourceAccessPanel OwnerScopeRef="@(toolSet.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="toolSet.Namespace" Kind="@ToolResourceKinds.ToolSet" Name="@toolSet.Name" Generation="toolSet.Generation" Version="toolSet.Definition.Version" Governance="toolSet.Governance" />
+    }
 }
 
 @if (confirmDelete)
@@ -52,7 +62,9 @@ else if (toolSet is not null)
     private IReadOnlyList<ToolSetVersionResource> versions = [];
     private string? etag, error, message;
     private bool loading = true, busy, confirmDelete;
+    private DetailsTab activeTab;
     private ResourceNamespace ResourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
+    private bool CanManage => toolSet is not null && ResourceOwnershipContext.CanManage(toolSet.ScopeRef ?? ResourceScopeRef.Instance, Services);
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     protected override async Task OnParametersSetAsync()
     {
@@ -73,7 +85,7 @@ else if (toolSet is not null)
     }
     private async Task DeleteAsync()
     {
-        if (etag is null || busy) return;
+        if (!CanManage || etag is null || busy) return;
         busy = true;
         message = null;
         try { await Client.DeleteAsync(ResourceNamespace, Name, etag, cancellation.Token); Navigation.NavigateTo("/tools/sets"); }
@@ -84,5 +96,6 @@ else if (toolSet is not null)
         ? $"/tools/{Uri.EscapeDataString(member.ToolName)}"
         : $"/tools/{Uri.EscapeDataString(member.ToolName)}?namespace={Uri.EscapeDataString(member.ToolNamespace.Value)}";
     private static string Map(IReadOnlyDictionary<string, string> values) => values.Count == 0 ? "—" : string.Join(" · ", values.Select(value => $"{value.Key}={value.Value}"));
+    private enum DetailsTab { Overview, Access }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

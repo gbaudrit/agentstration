@@ -66,7 +66,7 @@ public sealed class CommandPaletteFallbackTests
         rendered.WaitForElement("[data-testid='console-entry-fallback']", TimeSpan.FromSeconds(3));
         Assert.AreEqual("http://localhost/", context.Services.GetRequiredService<NavigationManager>().Uri, "Typing must not execute or navigate.");
         await rendered.Find("[data-testid='console-command-input']").KeyDownAsync(new KeyboardEventArgs { Key = "Enter" });
-        Assert.AreEqual($"http://localhost{target}", context.Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.AreEqual($"http://localhost{target}&context=%2Fworkspaces%2F00000000-0000-0000-0000-000000000000", context.Services.GetRequiredService<NavigationManager>().Uri);
     }
 
     [TestMethod]
@@ -83,7 +83,7 @@ public sealed class CommandPaletteFallbackTests
         StringAssert.Contains(fallbacks[0].TextContent, "First");
         StringAssert.Contains(fallbacks[1].TextContent, "Second");
         await fallbacks[1].ClickAsync(new());
-        Assert.AreEqual($"http://localhost{secondTarget}", context.Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.AreEqual($"http://localhost{secondTarget}&context=%2Fworkspaces%2F00000000-0000-0000-0000-000000000000", context.Services.GetRequiredService<NavigationManager>().Uri);
     }
 
     [TestMethod]

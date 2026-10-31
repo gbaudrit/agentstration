@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
-export type SecretResourceScope = 'tenant' | 'workspace';
+export type SecretResourceScope = 'instance' | 'tenant' | 'workspace';
 
 export class DescendantSecretsPage {
   public constructor(private readonly page: Page) {}
@@ -27,7 +27,7 @@ export class DescendantSecretsPage {
 
   public async selectScope(kind: SecretResourceScope): Promise<string> {
     const picker = this.page.getByTestId(TestIds.secretGrants.scopePicker);
-    const prefix = kind === 'tenant' ? '/tenants/' : '/workspaces/';
+    const prefix = kind === 'instance' ? '/instance' : kind === 'tenant' ? '/tenants/' : '/workspaces/';
     await picker.locator(`option[value^="${prefix}"]`).first().waitFor({ state: 'attached' });
     const options = await picker.locator('option').evaluateAll(elements => elements.map(element => ({
       value: (element as HTMLOptionElement).value,
@@ -58,13 +58,12 @@ export class DescendantSecretsPage {
   }
 
   public async createSecret(name: string, displayName: string, vaultName: string, vaultScopeRef: string): Promise<void> {
+    const option = await this.waitForVaultOption(vaultName, vaultScopeRef);
     const displayNameInput = this.page.getByTestId(TestIds.secretGrants.secretDisplayName);
     await displayNameInput.fill(displayName);
     await displayNameInput.press('Tab');
     await expect(this.page.getByTestId(TestIds.secretGrants.secretName)).toHaveValue(name);
     await expect(this.page.getByTestId(TestIds.secretGrants.secretVaultKey)).toHaveValue(name);
-    const option = await this.vaultOption(vaultName, vaultScopeRef);
-    if (!option) throw new Error(`Vault '${vaultName}' at '${vaultScopeRef}' is not offered to this Secret.`);
     await this.page.getByTestId(TestIds.secretGrants.secretVault).selectOption(option);
     await this.saveNew('secrets', name);
   }
@@ -78,6 +77,7 @@ export class DescendantSecretsPage {
   }
 
   public async addGrant(scopeRef: string): Promise<void> {
+    await this.openAccessTab();
     const target = this.page.getByTestId(TestIds.secretGrants.grantTarget);
     await target.selectOption(scopeRef);
     await this.page.getByTestId(TestIds.secretGrants.grantAdd).click();
@@ -85,6 +85,7 @@ export class DescendantSecretsPage {
   }
 
   public async removeGrant(scopeRef: string): Promise<void> {
+    await this.openAccessTab();
     await this.grantRow(scopeRef).getByTestId(TestIds.secretGrants.grantRemove).click();
     await this.grantRow(scopeRef).waitFor({ state: 'detached' });
   }
@@ -104,10 +105,35 @@ export class DescendantSecretsPage {
     await bar.waitFor({ state: 'hidden' });
   }
 
+  public async saveChangesIfPresent(): Promise<void> {
+    const bar = this.page.locator('.resource-form .unsaved-changes-bar');
+    await bar.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
+    if (await bar.isVisible()) await this.saveChanges();
+  }
+
   private async vaultOption(name: string, scopeRef: string): Promise<string | undefined> {
     const options = await this.page.getByTestId(TestIds.secretGrants.secretVault).locator('option').evaluateAll(elements =>
       elements.map(element => (element as HTMLOptionElement).value));
     return options.find(value => value === `${scopeRef}|default|${name}`);
+  }
+
+  private async waitForVaultOption(name: string, scopeRef: string): Promise<string> {
+    const expected = `${scopeRef}|default|${name}`;
+    await expect.poll(
+      () => this.vaultOption(name, scopeRef),
+      {
+        message: `Vault '${name}' at '${scopeRef}' should be offered to this Secret.`,
+        timeout: 15_000,
+      },
+    ).toBe(expected);
+    return expected;
+  }
+
+  private async openAccessTab(): Promise<void> {
+    const target = this.page.getByTestId(TestIds.secretGrants.grantTarget);
+    if (await target.count() > 0) return;
+    await this.page.locator('[data-testid="vault-access-tab"], [data-testid="secret-access-tab"]').click();
+    await target.waitFor({ state: 'visible' });
   }
 
   private async saveNew(kind: 'vaults' | 'secrets', name: string): Promise<void> {
@@ -117,7 +143,14 @@ export class DescendantSecretsPage {
   }
 
   private async open(url: string, marker: Locator): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    const selectedScopeRef = await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
+    const target = new URL(url);
+    if (selectedScopeRef && !target.searchParams.has('context')) {
+      target.searchParams.set('context', selectedScopeRef);
+    }
+    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Secret management route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await marker.waitFor({ state: 'visible' });
     await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });

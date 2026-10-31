@@ -99,13 +99,13 @@ public sealed partial class ApiClientTests
             Scope = new FlowRunScope(Guid.Empty, TestWorkspaceId, Guid.Empty),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = now,
-            DefinitionSnapshot = new FlowVersion(TestWorkspaceId, flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now)
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(TestWorkspaceId.Value), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now)
         };
     }
 
     private static RuntimeRunEvent RunEvent(long sequence, RuntimeRunEventKind kind, string? content = null, RuntimeRunState? state = null) => new()
     {
-        WorkspaceId = TestWorkspaceId,
+        ScopeRef = ResourceScopeRef.Workspace(TestWorkspaceId.Value),
         Sequence = sequence,
         EventId = Guid.NewGuid(),
         RunId = "run-test",
@@ -124,11 +124,6 @@ public sealed partial class ApiClientTests
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(responseFactory(request));
         }
-    }
-
-    private sealed class StubHttpClientFactory(Func<string, HttpClient> factory) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => factory(name);
     }
 
 }

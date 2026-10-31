@@ -15,6 +15,7 @@ public sealed class KnowledgeSourceToolExposureService(
     ToolSetService toolSets,
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
+    ICurrentRequestContext requestContext,
     ISecurityAuditWriter audit)
 {
     private const string KnowledgeSourceUidAnnotation = "agentstration.io/knowledge-source-uid";
@@ -23,9 +24,13 @@ public sealed class KnowledgeSourceToolExposureService(
 
     public Task<StoredResource<KnowledgeSourceToolExposureResource>?> GetAsync(
         KnowledgeSourceId id,
-        CancellationToken cancellationToken) =>
-        store.GetAsync<KnowledgeSourceToolExposureResource>(
-            new(KnowledgeResourceKinds.KnowledgeSourceToolExposure, id.Value, id.Namespace), cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var scopeRef = CurrentWorkspaceScope();
+        return store.GetExactAsync<KnowledgeSourceToolExposureResource>(
+            ScopedResourceAddress.Create(scopeRef, id.Namespace,
+                KnowledgeResourceKinds.KnowledgeSourceToolExposure, id.Value), cancellationToken);
+    }
 
     public async Task<StoredResource<KnowledgeSourceToolExposureResource>> PublishAsync(
         KnowledgeSourceId id,
@@ -33,10 +38,9 @@ public sealed class KnowledgeSourceToolExposureService(
         bool requiresApproval,
         CancellationToken cancellationToken)
     {
-        var source = await sources.GetAsync(id, cancellationToken) ?? throw new KnowledgeSourceNotFoundException(id);
-        var scopeRef = source.Value.ScopeRef
-            ?? throw new KnowledgeSourceValidationException("knowledge_source_scope_invalid", "A KnowledgeSource requires an ownership scope.");
-        var readiness = await sources.GetReadinessAsync(id, cancellationToken);
+        var scopeRef = CurrentWorkspaceScope();
+        var source = await sources.ResolveForUseAsync(id, scopeRef, cancellationToken);
+        var readiness = await sources.GetReadinessForUseAsync(id, scopeRef, cancellationToken);
         var retrieval = readiness.Retrieval
             ?? throw new KnowledgeSourceValidationException("knowledge_source_retrieval_flow_unavailable", "The KnowledgeSource retrieval Flow is unavailable.");
         if (!readiness.Ready)
@@ -49,16 +53,17 @@ public sealed class KnowledgeSourceToolExposureService(
         if (supportedOperations.Length == 0)
             throw new KnowledgeSourceValidationException("knowledge_source_retrieval_capabilities_missing",
                 "The retrieval Flow must declare at least one supported Knowledge capability.");
-        var existingToolSet = await toolSets.GetAsync(source.Value.Namespace, source.Value.Name, cancellationToken);
-        if (existingToolSet is not null
-            && (existingToolSet.Value.ScopeRef != scopeRef || !IsOwnedBy(existingToolSet.Value.Metadata, source.Value.Uid)))
+        var existingToolSet = await toolSets.GetExactAsync(scopeRef,
+            source.Value.Namespace, source.Value.Name, cancellationToken);
+        if (existingToolSet is not null && !IsOwnedBy(existingToolSet.Value.Metadata, source.Value.Uid))
             throw new KnowledgeSourceValidationException("knowledge_source_tool_set_conflict",
                 $"ToolSet '{source.Value.Namespace}/{source.Value.Name}' is not owned by this KnowledgeSource.");
         var currentDefinitions = new Dictionary<KnowledgeSourceOperation, StoredResource<ToolDefinitionResource>?>();
         foreach (var operation in supportedOperations)
         {
             var definitionName = $"{source.Value.Name}.{operation.ToString().ToLowerInvariant()}";
-            var current = await definitions.GetAsync(definitionName, source.Value.Namespace, cancellationToken);
+            var current = await store.GetExactAsync<ToolDefinitionResource>(ScopedResourceAddress.Create(scopeRef,
+                source.Value.Namespace, ToolResourceKinds.ToolDefinition, definitionName), cancellationToken);
             if (current is not null && !IsOwnedBy(current.Value.Metadata, source.Value.Uid))
                 throw new KnowledgeSourceValidationException("knowledge_source_tool_definition_conflict",
                     $"ToolDefinition '{source.Value.Namespace}/{definitionName}' is not owned by this KnowledgeSource.");
@@ -84,6 +89,7 @@ public sealed class KnowledgeSourceToolExposureService(
                     {
                         ["agentstration.io/knowledge-source"] = source.Value.Name,
                         [KnowledgeSourceUidAnnotation] = source.Value.Uid.ToString("D"),
+                        ["agentstration.io/knowledge-source-scope"] = source.Value.ScopeRef!.Value.Value,
                         ["agentstration.io/knowledge-operation"] = route
                     }
                 },
@@ -110,6 +116,7 @@ public sealed class KnowledgeSourceToolExposureService(
                     {
                         Name = retrieval.Name,
                         Namespace = retrieval.Namespace,
+                        ScopeRef = retrieval.ScopeRef,
                         Version = retrieval.Version,
                         UseActiveVersion = false
                     }
@@ -176,6 +183,7 @@ public sealed class KnowledgeSourceToolExposureService(
             Generation = existing is null ? 1 : checked(existing.Value.Generation + 1),
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
             KnowledgeSourceUid = source.Value.Uid,
+            KnowledgeSourceScopeRef = source.Value.ScopeRef,
             KnowledgeSourceName = source.Value.Name,
             KnowledgeSourceGeneration = source.Value.Generation,
             RetrievalFlow = retrieval,
@@ -188,6 +196,14 @@ public sealed class KnowledgeSourceToolExposureService(
         await audit.WriteAsync(new(SecurityAuditActions.KnowledgeSourceToolExposurePublished,
             WorkspaceId: scopeRef.TargetId), cancellationToken);
         return stored;
+    }
+
+    private ResourceScopeRef CurrentWorkspaceScope()
+    {
+        if (!requestContext.IsInitialized)
+            throw new KnowledgeSourceValidationException("knowledge_source_context_required",
+                "A Workspace request context is required to materialize Knowledge Tools.");
+        return ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId);
     }
 
     private static bool IsOwnedBy(ResourceMetadata metadata, Guid sourceUid) =>

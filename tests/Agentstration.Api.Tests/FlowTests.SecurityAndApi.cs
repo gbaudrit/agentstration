@@ -6,11 +6,13 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Flows.Storage.Sqlite;
+using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Web.Hosting;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Microsoft.AspNetCore.Hosting;
@@ -61,11 +63,13 @@ public sealed partial class FlowTests
         var created = await createdResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
         Assert.IsInstanceOfType<DirectFlowDefinition>(created!.Definition);
         Assert.AreEqual("Direct SQL review", created.DisplayName);
+        Assert.AreEqual(ResourceScopeKind.Workspace, created.ScopeRef?.Kind);
 
         using var versionResponse = await client.PostAsJsonAsync("/api/flows/direct-sql/versions", new CreateFlowVersionRequest("1.0.0"));
         Assert.AreEqual(HttpStatusCode.Created, versionResponse.StatusCode);
         var version = await client.GetFromJsonAsync<FlowVersionResponse>("/api/flows/direct-sql/versions/1.0.0", JsonOptions);
         Assert.AreEqual("1.0.0", version!.Version);
+        Assert.AreEqual(created.ScopeRef, version.ScopeRef);
 
         var get = await client.GetAsync("/api/flows/direct-sql");
         var etag = get.Headers.ETag!.Tag;
@@ -78,6 +82,7 @@ public sealed partial class FlowTests
         Assert.AreEqual(HttpStatusCode.OK, updated.StatusCode);
         var list = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows");
         Assert.IsTrue(list!.Value.Any(value => value.Id == "direct-sql"));
+        Assert.AreEqual(created.ScopeRef, list.Value.Single(value => value.Id == "direct-sql").ScopeRef);
 
         var openApi = await client.GetStringAsync("/openapi/v1.json");
         StringAssert.Contains(openApi, "flowKind");
@@ -115,6 +120,76 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowApiListsVisibleOwnersRequiresExactScopeOnCollisionAndAllowsAuthorizedExactMutation()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        await factory.Services.GetRequiredService<IIdentityStore>().AddPlatformAdministratorAsync(
+            new PlatformAdministrator(context!.Context.PrincipalId, DateTimeOffset.UtcNow), default);
+        client.DefaultRequestHeaders.Add(PrincipalResolutionMiddleware.WorkspaceHeader, context.Context.WorkspaceId.ToString("D"));
+        var definition = GraphOnlyDefinition();
+        var request = new CreateFlowRequest("scoped-collision", "Workspace", "1.0.0", true, definition);
+        using var workspaceResponse = await client.PostAsJsonAsync("/api/flows", request, JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Created, workspaceResponse.StatusCode);
+
+        var service = factory.Services.GetRequiredService<FlowService>();
+        using var instanceRequest = new HttpRequestMessage(HttpMethod.Post, "/api/flows")
+        {
+            Content = JsonContent.Create(
+                request with { Description = "Instance", ScopeRef = ResourceScopeRef.Instance },
+                options: JsonOptions)
+        };
+        instanceRequest.Headers.TryAddWithoutValidation(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
+        using var instanceResponse = await client.SendAsync(instanceRequest);
+        Assert.AreEqual(HttpStatusCode.Created, instanceResponse.StatusCode, await instanceResponse.Content.ReadAsStringAsync());
+        var instanceFlow = await instanceResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
+        Assert.AreEqual(ResourceScopeRef.Instance, instanceFlow?.ScopeRef);
+        await service.PublishVersionExactAsync(ResourceScopeRef.Instance, new FlowId("scoped-collision"), "1.0.0", activate: true, default);
+        var storedInstanceFlow = await service.GetExactAsync(
+            ResourceScopeRef.Instance, new FlowId("scoped-collision"), default);
+        Assert.IsNotNull(storedInstanceFlow);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+                new ResourceAccessPolicy(
+                    new(storedInstanceFlow.Value.Uid, ResourceScopeRef.Instance,
+                        storedInstanceFlow.Value.Id.Namespace, FlowResourceKinds.Flow,
+                        Version: storedInstanceFlow.Value.Version),
+                    [new(ResourceScopeRef.Workspace(context.Context.WorkspaceId),
+                        [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+                null,
+                default);
+        }
+
+        var page = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?allNamespaces=true&top=200", JsonOptions);
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Workspace, ResourceScopeKind.Instance },
+            page!.Value.Where(value => value.Id == "scoped-collision").Select(value => value.ScopeRef!.Value.Kind).ToArray());
+        Assert.AreEqual(HttpStatusCode.BadRequest, (await client.GetAsync("/api/flows/scoped-collision")).StatusCode);
+
+        var exactPath = $"/api/flows/scoped-collision?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}";
+        using var inheritedResponse = await client.GetAsync(exactPath);
+        var inherited = await inheritedResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
+        Assert.AreEqual(ResourceScopeRef.Instance, inherited?.ScopeRef);
+        client.DefaultRequestHeaders.Add(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
+        using var mutation = new HttpRequestMessage(HttpMethod.Put, exactPath)
+        {
+            Content = JsonContent.Create(new UpdateFlowRequest("Changed", "1.0.0", true, definition), options: JsonOptions)
+        };
+        mutation.Headers.TryAddWithoutValidation("If-Match", inheritedResponse.Headers.ETag?.Tag);
+        using var updatedResponse = await client.SendAsync(mutation);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode, await updatedResponse.Content.ReadAsStringAsync());
+        var updated = await updatedResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
+        Assert.AreEqual("Changed", updated?.Description);
+        Assert.AreEqual(ResourceScopeRef.Instance, updated?.ScopeRef);
+    }
+
+    [TestMethod]
     public async Task FlowRunsAreIsolatedByTheirCompleteDurableScope()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -138,7 +213,7 @@ public sealed partial class FlowTests
         async Task<StoredInputRequest> CreatePrivateInputAsync(StoredFlowRun run, string id) =>
             await fixture.Repository.CreateInputRequestAsync(new InputRequest
             {
-                WorkspaceId = run.Value.WorkspaceId,
+                ScopeRef = run.Value.ExecutionScopeRef,
                 Id = id,
                 RunId = run.Value.Id,
                 RuntimeRequestId = $"runtime-{id}",
@@ -523,7 +598,7 @@ public sealed partial class FlowTests
         var scope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
         var flows = factory.Services.GetRequiredService<FlowService>();
         var runs = factory.Services.GetRequiredService<FlowRunService>();
-        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
+        var definition = GraphOnlyDefinition();
         var defaultFlow = await flows.CreateAsync(scope.WorkspaceId, new CreateFlowCommand("paged-default", null, "1.0.0", true, definition), default);
         var namespacedFlow = await flows.CreateAsync(scope.WorkspaceId, new CreateFlowCommand("paged-namespaced", null, "1.0.0", true, definition), new ResourceNamespace("team-a"), default);
         await flows.PublishVersionAsync(scope.WorkspaceId, defaultFlow.Value.Id, "1.0.0", true, default);
@@ -640,10 +715,15 @@ public sealed partial class FlowTests
         var version = await publishResponse.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions);
         Assert.AreEqual("Initial designer release", version!.ReleaseNotes);
         Assert.IsNotNull(version.Graph);
-        Assert.AreEqual(replaced.Value.DefinitionHash, version.DefinitionHash);
+        Assert.AreNotEqual(replaced.Value.DefinitionHash, version.DefinitionHash,
+            "Publishing must hash the graph after Agent references are pinned to immutable generations.");
         var routing = Assert.IsInstanceOfType<RoutingFlowDefinition>(version.Definition);
         CollectionAssert.AreEqual(new[] { "sql-expert", "dotnet-expert" }, routing.Destinations.Select(target => target.Id).ToArray());
         Assert.AreEqual("dotnet-expert", routing.Fallback?.Id);
+        Assert.IsTrue(routing.Destinations.All(target => target.ScopeRef?.Kind == ResourceScopeKind.Workspace
+            && long.TryParse(target.Version, out var generation) && generation > 0));
+        Assert.IsTrue(routing.Fallback?.ScopeRef?.Kind == ResourceScopeKind.Workspace);
+        Assert.IsTrue(long.TryParse(routing.Fallback?.Version, out var fallbackGeneration) && fallbackGeneration > 0);
 
         var current = await client.GetFromJsonAsync<FlowResponse>("/api/flows/designer-api-flow", JsonOptions);
         Assert.IsNotNull(current);
@@ -657,5 +737,42 @@ public sealed partial class FlowTests
         Assert.AreEqual(3L, recreated!.Value.Revision);
     }
 
+    [TestMethod]
+    public async Task DraftApiPreservesInstanceOwnerScopeAcrossDesignerOperations()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        await factory.Services.GetRequiredService<IIdentityStore>().AddPlatformAdministratorAsync(
+            new PlatformAdministrator(context!.Context.PrincipalId, DateTimeOffset.UtcNow), default);
+        client.DefaultRequestHeaders.Add(PrincipalResolutionMiddleware.WorkspaceHeader, context.Context.WorkspaceId.ToString("D"));
+        client.DefaultRequestHeaders.Add(
+            RequestContextMiddleware.ConsoleContextHeader,
+            ResourceScopeRef.Instance.Value);
+        var request = new CreateFlowDraftRequest("instance-designer-flow", "Instance Designer Flow", Template: "Empty")
+        {
+            ScopeRef = ResourceScopeRef.Instance
+        };
+
+        using var createdResponse = await client.PostAsJsonAsync("/api/flows/drafts", request, JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode, await createdResponse.Content.ReadAsStringAsync());
+        var draft = await createdResponse.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions);
+        Assert.AreEqual(ResourceScopeRef.Instance, draft?.Value.ScopeRef);
+
+        var scope = Uri.EscapeDataString(ResourceScopeRef.Instance.Value);
+        var stored = await client.GetFromJsonAsync<FlowResponse>($"/api/flows/instance-designer-flow?scopeRef={scope}", JsonOptions);
+        Assert.AreEqual(ResourceScopeRef.Instance, stored?.ScopeRef);
+        var source = await client.GetFromJsonAsync<FlowSourceResponse>($"/api/flows/instance-designer-flow/draft/source?scopeRef={scope}&format=yaml", JsonOptions);
+        Assert.IsNotNull(source);
+        StringAssert.Contains(source.Source, "entryStep:");
+
+        using var validationResponse = await client.PostAsync($"/api/flows/instance-designer-flow/validate?scopeRef={scope}", null);
+        Assert.AreEqual(HttpStatusCode.OK, validationResponse.StatusCode, await validationResponse.Content.ReadAsStringAsync());
+    }
+
+    private static WorkflowFlowDefinition GraphOnlyDefinition() => new(
+        "input",
+        [new FlowNode("input", FlowNodeKind.Input)],
+        []);
 }
 

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
 using Agentstration.Sources.Contracts;
@@ -30,6 +31,7 @@ public sealed class ResourceManagementDbContext(DbContextOptions<ResourceManagem
     internal DbSet<SecurityAuditRow> SecurityAuditEvents => Set<SecurityAuditRow>();
     internal DbSet<PersonalAccessTokenRow> PersonalAccessTokens => Set<PersonalAccessTokenRow>();
     internal DbSet<TriggerOccurrenceRow> TriggerOccurrences => Set<TriggerOccurrenceRow>();
+    internal DbSet<ResourceAccessPolicyRow> ResourceAccessPolicies => Set<ResourceAccessPolicyRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,6 +67,15 @@ public sealed class ResourceManagementDbContext(DbContextOptions<ResourceManagem
         occurrence.Property(value => value.WorkItemId).HasMaxLength(128);
         occurrence.Property(value => value.ErrorCode).HasMaxLength(128);
         occurrence.HasIndex(value => new { value.WorkspaceId, value.TriggerUid, value.ScheduledAt });
+        var accessPolicy = modelBuilder.Entity<ResourceAccessPolicyRow>();
+        accessPolicy.ToTable("ResourceAccessPolicies");
+        accessPolicy.HasKey(value => value.ResourceUid);
+        accessPolicy.Property(value => value.OwnerScopeRef).HasMaxLength(128);
+        accessPolicy.Property(value => value.Namespace).HasMaxLength(128);
+        accessPolicy.Property(value => value.Kind).HasMaxLength(256);
+        accessPolicy.Property(value => value.Version).HasMaxLength(128);
+        accessPolicy.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        accessPolicy.HasIndex(value => value.OwnerScopeRef);
         modelBuilder.ConfigureIdentityModel();
     }
 }
@@ -92,7 +103,9 @@ internal sealed class ResourceScopeRow
 public sealed class PostgreSqlResourceStore(
     IDbContextFactory<ResourceManagementDbContext> contextFactory,
     TimeProvider timeProvider,
-    ICurrentRequestContext requestContext) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver
+    ICurrentRequestContext requestContext,
+    IResourceGovernanceContext governanceContext,
+    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -140,10 +153,11 @@ public sealed class PostgreSqlResourceStore(
         if (requestContext.AccessMode != ControlPlaneAccessMode.System)
         {
             var target = await RequireScopeAsync(context, CurrentScopeRef(), cancellationToken);
-            var visibleScopeIds = await VisibleScopeIdsAsync(context, target, cancellationToken);
+            var visibleScopeIds = await EffectiveVisibleScopeIdsAsync(context, target, cancellationToken);
             query = query.Where(value => visibleScopeIds.Contains(value.ScopeId));
         }
-        var matches = await query.Take(2).ToArrayAsync(cancellationToken);
+        var matches = await FilterDiscoverableAsync(context,
+            await query.ToArrayAsync(cancellationToken), cancellationToken);
         return matches.Length switch
         {
             0 => null,
@@ -157,8 +171,27 @@ public sealed class PostgreSqlResourceStore(
         if (uid == Guid.Empty) throw new ArgumentException("A resource UID cannot be empty.", nameof(uid));
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.Documents.AsNoTracking().Include(value => value.Scope).SingleOrDefaultAsync(value => value.Uid == uid, cancellationToken);
-        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken)) return null;
+        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken)
+            || !await CanDiscoverAsync(context, document, cancellationToken)) return null;
         return Deserialize<T>(document);
+    }
+
+    public async Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(Guid uid, CancellationToken cancellationToken)
+    {
+        if (uid == Guid.Empty) throw new ArgumentException("A resource UID cannot be empty.", nameof(uid));
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Documents.AsNoTracking().Include(value => value.Scope)
+            .SingleOrDefaultAsync(value => value.Uid == uid, cancellationToken);
+        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken)
+            || !await CanDiscoverAsync(context, document, cancellationToken)) return null;
+        using var payload = JsonDocument.Parse(document.Payload);
+        var root = payload.RootElement;
+        var generation = root.TryGetProperty("generation", out var generationValue)
+            && generationValue.TryGetInt64(out var parsedGeneration) ? parsedGeneration : 0;
+        var version = root.TryGetProperty("version", out var versionValue)
+            && versionValue.ValueKind == JsonValueKind.String ? versionValue.GetString() : null;
+        return new(document.Uid, ResourceScopeRef.Parse(document.Scope.Ref),
+            ResourceNamespace.Parse(document.Namespace), document.Kind, document.Name, generation, version, document.ETag);
     }
 
     public async Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource
@@ -168,7 +201,9 @@ public sealed class PostgreSqlResourceStore(
         await EnsureCanReadAsync(context, scope, cancellationToken);
         var document = await context.Documents.AsNoTracking().Include(value => value.Scope).SingleOrDefaultAsync(value => value.ScopeId == scope.Id
             && value.Namespace == address.Namespace.Value && value.Kind == address.Kind && value.Name == address.Name, cancellationToken);
-        return document is null ? null : Deserialize<T>(document);
+        return document is null || !await CanDiscoverAsync(context, document, cancellationToken)
+            ? null
+            : Deserialize<T>(document);
     }
 
     public Task<IReadOnlyList<StoredResource<T>>> ListExactAsync<T>(ResourceScopeRef scopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
@@ -213,8 +248,9 @@ public sealed class PostgreSqlResourceStore(
         take = Math.Min(take, 1000);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var query = Scoped(context.Documents.AsNoTracking()).Where(value => value.Kind == kind);
-        var documents = await query.Include(value => value.Scope).OrderBy(value => value.Namespace).ThenBy(value => value.Name).Skip(skip).Take(take).ToArrayAsync(cancellationToken);
-        return documents.Select(Deserialize<T>).ToArray();
+        var candidates = await query.Include(value => value.Scope).OrderBy(value => value.Namespace).ThenBy(value => value.Name).ToArrayAsync(cancellationToken);
+        var documents = (await FilterDiscoverableAsync(context, candidates, cancellationToken)).Skip(skip).Take(take);
+        return (await FilterDiscoverableAsync(context, documents, cancellationToken)).Select(Deserialize<T>).ToArray();
     }
 
     public async Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
@@ -240,6 +276,8 @@ public sealed class PostgreSqlResourceStore(
         if (existing is not null && ifNoneMatch) throw new ResourceConcurrencyException("If-None-Match prevented replacement of an existing resource.");
         if (existing is not null && ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
+
+        resource = await ApplyGovernanceAsync(resource, existing is null ? null : DeserializeValue<T>(existing), cancellationToken);
 
         var etag = NewETag();
         var now = timeProvider.GetUtcNow();
@@ -275,11 +313,13 @@ public sealed class PostgreSqlResourceStore(
             existing.UpdatedAt = now;
         }
         await SaveAsync(context, cancellationToken);
+        await AuditReconciliationAsync(versioned.Governance, cancellationToken);
         return new StoredResource<T>(versioned, etag, now);
     }
 
     public async Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource
     {
+        resource = await ApplyGovernanceAsync(resource, null, cancellationToken);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var etag = NewETag();
         var now = timeProvider.GetUtcNow();
@@ -303,6 +343,7 @@ public sealed class PostgreSqlResourceStore(
         });
         try { await SaveAsync(context, cancellationToken); }
         catch (ResourceConcurrencyException exception) { throw new ResourceConcurrencyException($"Immutable resource '{resource.Kind}/{resource.Metadata.Name}' already exists: {exception.Message}"); }
+        await AuditReconciliationAsync(versioned.Governance, cancellationToken);
         return new StoredResource<T>(versioned, etag, now);
     }
 
@@ -323,8 +364,14 @@ public sealed class PostgreSqlResourceStore(
         };
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
+        var governance = ReadGovernance(existing.Payload);
+        await EnsureManagedMutationAsync(governance, cancellationToken);
+        var accessPolicy = await context.ResourceAccessPolicies
+            .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
+        if (accessPolicy is not null) context.ResourceAccessPolicies.Remove(accessPolicy);
         context.Documents.Remove(existing);
         await SaveAsync(context, cancellationToken);
+        await AuditReconciliationAsync(governance, cancellationToken);
     }
 
     public async Task DeleteExactAsync(ScopedResourceAddress address, string? ifMatch, CancellationToken cancellationToken)
@@ -336,17 +383,64 @@ public sealed class PostgreSqlResourceStore(
             ?? throw new ResourceNotFoundException(new ResourceKey(address.Kind, address.Name, address.Namespace));
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current resource version.");
+        var governance = ReadGovernance(existing.Payload);
+        await EnsureManagedMutationAsync(governance, cancellationToken);
+        var accessPolicy = await context.ResourceAccessPolicies
+            .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
+        if (accessPolicy is not null) context.ResourceAccessPolicies.Remove(accessPolicy);
         context.Documents.Remove(existing);
         await SaveAsync(context, cancellationToken);
+        await AuditReconciliationAsync(governance, cancellationToken);
     }
 
     private static StoredResource<T> Deserialize<T>(ControlPlaneDocument document) where T : Resource
     {
-        var value = JsonSerializer.Deserialize<T>(document.Payload, JsonOptions)
-            ?? throw new InvalidOperationException($"Stored resource '{document.Kind}/{document.Name}' is invalid.");
+        var value = DeserializeValue<T>(document);
         value = ApplySystemState(value, document.Uid, ResourceScopeRef.Parse(document.Scope.Ref), document.ETag);
         return new StoredResource<T>(value, document.ETag, document.UpdatedAt);
     }
+
+    private async Task<T> ApplyGovernanceAsync<T>(T resource, T? existing, CancellationToken cancellationToken) where T : Resource
+    {
+        try
+        {
+            var governance = existing is null
+                ? ResourceGovernanceEnforcement.PrepareCreate(resource.Governance, governanceContext.Current)
+                : ResourceGovernanceEnforcement.PrepareUpdate(existing.Governance, resource.Governance, governanceContext.Current);
+            return (T)resource.WithGovernance(governance);
+        }
+        catch (ResourceGovernanceViolationException exception)
+        {
+            await AuditDeniedAsync(exception.Code, cancellationToken);
+            throw new ResourceConcurrencyException($"{exception.Code}: {exception.Message}");
+        }
+    }
+
+    private async Task EnsureManagedMutationAsync(ResourceGovernance governance, CancellationToken cancellationToken)
+    {
+        try { ResourceGovernanceEnforcement.EnsureManager(governance, governanceContext.Current); }
+        catch (ResourceGovernanceViolationException exception)
+        {
+            await AuditDeniedAsync(exception.Code, cancellationToken);
+            throw new ResourceConcurrencyException($"{exception.Code}: {exception.Message}");
+        }
+    }
+
+    private Task AuditReconciliationAsync(ResourceGovernance governance, CancellationToken cancellationToken) =>
+        audit is null || !governance.IsManaged
+            ? Task.CompletedTask
+            : audit.WriteAsync(new(SecurityAuditActions.ManagedResourceReconciled), cancellationToken);
+
+    private Task AuditDeniedAsync(string reasonCode, CancellationToken cancellationToken) =>
+        audit?.WriteAsync(new(SecurityAuditActions.ManagedResourceMutationDenied, SecurityAuditOutcome.Failed, ReasonCode: reasonCode), cancellationToken)
+        ?? Task.CompletedTask;
+
+    private static T DeserializeValue<T>(ControlPlaneDocument document) where T : Resource =>
+        JsonSerializer.Deserialize<T>(document.Payload, JsonOptions)
+        ?? throw new InvalidOperationException($"Stored resource '{document.Kind}/{document.Name}' is invalid.");
+
+    private static ResourceGovernance ReadGovernance(string payload) =>
+        JsonSerializer.Deserialize<ResourceGovernanceEnvelope>(payload, JsonOptions)?.Governance ?? ResourceGovernance.User;
 
     public Task<IReadOnlyList<StoredResource<T>>> ListAllAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource =>
         LoadKindAsync<T>(kind, cancellationToken);
@@ -378,7 +472,7 @@ public sealed class PostgreSqlResourceStore(
             .Where(value => value.Kind == kind)
             .OrderBy(value => value.Namespace).ThenBy(value => value.Name)
             .ToArrayAsync(cancellationToken);
-        return documents.Select(Deserialize<T>).ToArray();
+        return (await FilterDiscoverableAsync(context, documents, cancellationToken)).Select(Deserialize<T>).ToArray();
     }
 
     private IQueryable<ControlPlaneDocument> Scoped(IQueryable<ControlPlaneDocument> query)
@@ -386,6 +480,10 @@ public sealed class PostgreSqlResourceStore(
         return requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.System => query,
+            ControlPlaneAccessMode.Instance => query.Where(value =>
+                value.Scope.Ref == ResourceScopeRef.Instance.Value),
+            ControlPlaneAccessMode.TenantAdministration => query.Where(value =>
+                value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value),
             ControlPlaneAccessMode.Tenant => query.Where(value =>
                 value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value
                 || value.Scope.Ref == ResourceScopeRef.Instance.Value),
@@ -403,6 +501,10 @@ public sealed class PostgreSqlResourceStore(
             return ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId);
         if (requestContext.AccessMode == ControlPlaneAccessMode.Tenant)
             return ResourceScopeRef.Tenant(requestContext.Current.TenantId);
+        if (requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration)
+            return ResourceScopeRef.Tenant(requestContext.Current.TenantId);
+        if (requestContext.AccessMode == ControlPlaneAccessMode.Instance)
+            return ResourceScopeRef.Instance;
         if (requestContext.AccessMode == ControlPlaneAccessMode.System)
             return resource.ScopeRef ?? ResourceScopeRef.Instance;
         throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.");
@@ -416,16 +518,21 @@ public sealed class PostgreSqlResourceStore(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var target = await RequireScopeAsync(context, targetScopeRef, cancellationToken);
         await EnsureCanReadAsync(context, target, cancellationToken);
-        var scopeIds = visible ? await VisibleScopeIdsAsync(context, target, cancellationToken) : [target.Id];
+        var scopeIds = visible ? await EffectiveVisibleScopeIdsAsync(context, target, cancellationToken) : [target.Id];
         var query = context.Documents.AsNoTracking().Where(value => value.Kind == kind);
         query = query.Where(value => scopeIds.Contains(value.ScopeId));
-        var documents = await query.Include(value => value.Scope).OrderBy(value => value.ScopeId).ThenBy(value => value.Namespace).ThenBy(value => value.Name).Skip(skip).Take(take).ToArrayAsync(cancellationToken);
+        var candidates = await query.Include(value => value.Scope).OrderBy(value => value.ScopeId).ThenBy(value => value.Namespace).ThenBy(value => value.Name).ToArrayAsync(cancellationToken);
+        var documents = visible
+            ? (await FilterDiscoverableAsync(context, candidates, cancellationToken)).Skip(skip).Take(take)
+            : candidates.Skip(skip).Take(take);
         return documents.Select(Deserialize<T>).ToArray();
     }
 
     private ResourceScopeRef CurrentScopeRef() => requestContext.AccessMode switch
     {
         ControlPlaneAccessMode.System => ResourceScopeRef.Instance,
+        ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+        ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(requestContext.Current.TenantId),
         ControlPlaneAccessMode.Tenant => ResourceScopeRef.Tenant(requestContext.Current.TenantId),
         ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
         _ => throw new InvalidOperationException("Control Plane access requires an explicit tenant, workspace, or system context.")
@@ -434,10 +541,43 @@ public sealed class PostgreSqlResourceStore(
     private async Task<bool> CanReadAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken)
     {
         if (requestContext.AccessMode == ControlPlaneAccessMode.System) return true;
-        if (requestContext.AccessMode is not (ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.Workspace)) return false;
+        if (requestContext.AccessMode is not (ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration or ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.Workspace)) return false;
         var current = await RequireScopeAsync(context, CurrentScopeRef(), cancellationToken);
-        return (await VisibleScopeIdsAsync(context, current, cancellationToken)).Contains(scope.Id);
+        return (await EffectiveVisibleScopeIdsAsync(context, current, cancellationToken)).Contains(scope.Id);
     }
+
+    private async Task<bool> CanDiscoverAsync(ResourceManagementDbContext context, ControlPlaneDocument document,
+        CancellationToken cancellationToken)
+    {
+        if (requestContext.AccessMode != ControlPlaneAccessMode.Workspace
+            || document.Scope.Ref == ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId).Value)
+            return true;
+        return (await FilterDiscoverableAsync(context, [document], cancellationToken)).Length == 1;
+    }
+
+    private async Task<ControlPlaneDocument[]> FilterDiscoverableAsync(ResourceManagementDbContext context,
+        IEnumerable<ControlPlaneDocument> documents, CancellationToken cancellationToken)
+    {
+        var candidates = documents.ToArray();
+        if (requestContext.AccessMode != ControlPlaneAccessMode.Workspace || candidates.Length == 0)
+            return candidates;
+        var workspaceRef = ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId);
+        var tenantRef = ResourceScopeRef.Tenant(requestContext.Current.TenantId);
+        var ancestorUids = candidates.Where(value => value.Scope.Ref != workspaceRef.Value)
+            .Select(value => value.Uid).Distinct().ToArray();
+        var policies = await context.ResourceAccessPolicies.AsNoTracking()
+            .Where(value => ancestorUids.Contains(value.ResourceUid))
+            .ToDictionaryAsync(value => value.ResourceUid, cancellationToken);
+        return candidates.Where(value => value.Scope.Ref == workspaceRef.Value
+            || policies.TryGetValue(value.Uid, out var policy)
+            && GrantsDiscover(policy.GrantsJson, workspaceRef, tenantRef)).ToArray();
+    }
+
+    private static bool GrantsDiscover(string grantsJson, ResourceScopeRef workspaceRef, ResourceScopeRef tenantRef) =>
+        (JsonSerializer.Deserialize<ResourceAccessGrant[]>(grantsJson, JsonOptions) ?? []).Any(grant =>
+            grant.Actions.Contains(ResourceAccessAction.Discover)
+            && (grant.TargetScopeRef == workspaceRef
+                || grant.TargetScopeRef == tenantRef && grant.IncludeDescendants));
 
     private async Task EnsureCanReadAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken)
     {
@@ -450,6 +590,8 @@ public sealed class PostgreSqlResourceStore(
         var allowed = requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.System => true,
+            ControlPlaneAccessMode.Instance => scopeRef == ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.TenantAdministration => scopeRef == ResourceScopeRef.Tenant(requestContext.Current.TenantId),
             ControlPlaneAccessMode.Tenant => scopeRef == ResourceScopeRef.Tenant(requestContext.Current.TenantId),
             ControlPlaneAccessMode.Workspace => scopeRef == ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
             _ => false
@@ -475,6 +617,14 @@ public sealed class PostgreSqlResourceStore(
         return [.. result];
     }
 
+    private Task<long[]> EffectiveVisibleScopeIdsAsync(
+        ResourceManagementDbContext context,
+        ResourceScopeRow target,
+        CancellationToken cancellationToken) =>
+        requestContext.AccessMode is ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration
+            ? Task.FromResult(new[] { target.Id })
+            : VisibleScopeIdsAsync(context, target, cancellationToken);
+
 
     private static ResourceScope Map(ResourceScopeRow row) => new(
         row.Id,
@@ -494,6 +644,11 @@ public sealed class PostgreSqlResourceStore(
 
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
 
+    private sealed record ResourceGovernanceEnvelope
+    {
+        public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
+    }
+
 }
 
 public static class PostgreSqlResourceManagementServiceCollectionExtensions
@@ -502,11 +657,13 @@ public static class PostgreSqlResourceManagementServiceCollectionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         services.TryAddSingleton<ICurrentRequestContext, UnavailableRequestContext>();
+        services.TryAddSingleton<IResourceGovernanceContext, ResourceGovernanceContext>();
         services.TryAddSingleton<ITriggerExecutionContext, TriggerExecutionContextAdapter>();
         services.AddDbContextFactory<ResourceManagementDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "management").EnableRetryOnFailure()).AddInterceptors(new UtcDateTimeOffsetInterceptor()));
         services.AddSingleton<IResourceStore, PostgreSqlResourceStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (PostgreSqlResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceScopeResolver>(provider => (PostgreSqlResourceStore)provider.GetRequiredService<IResourceStore>());
+        services.AddSingleton<IResourceAccessPolicyStore, PostgreSqlResourceAccessPolicyStore>();
         services.AddSingleton<ITriggerOccurrenceStore, PostgreSqlTriggerOccurrenceStore>();
         services.AddSingleton<PostgreSqlIdentityStore>();
         services.AddSingleton<IIdentityStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());

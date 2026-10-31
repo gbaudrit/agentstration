@@ -40,12 +40,24 @@ public record AgentProperties
 
 public sealed record ResolvedAgentToolSetAssignment
 {
+    public required Guid ToolSetUid { get; init; }
+    public required ResourceScopeRef ToolSetScopeRef { get; init; }
     public required string ToolSetName { get; init; }
     public required ResourceNamespace ToolSetNamespace { get; init; }
+    public required long ToolSetGeneration { get; init; }
     public required string Version { get; init; }
     public required string DefinitionHash { get; init; }
     public required IReadOnlyList<string> Members { get; init; }
 }
+
+public sealed record ResolvedResourceDependency(
+    Guid Uid,
+    ResourceScopeRef ScopeRef,
+    ResourceNamespace Namespace,
+    string Kind,
+    string Name,
+    long Generation,
+    string? Version = null);
 
 public sealed record AgentResource : Resource
 {
@@ -99,9 +111,12 @@ public sealed record ResolvedAgentDefinition
     public required string EffectiveInstructions { get; init; }
     public required string ModelProfileName { get; init; }
     public ResourceNamespace? ModelProfileNamespace { get; init; }
+    public ResolvedResourceDependency? ModelProfilePin { get; init; }
     public required string RuntimeProfileName { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
+    public ResolvedResourceDependency? RuntimeProfilePin { get; init; }
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
+    public IReadOnlyCollection<ResolvedResourceDependency> ToolPins { get; init; } = [];
     public IReadOnlyCollection<ResolvedAgentToolSetAssignment> ToolSetAssignments { get; init; } = [];
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
     public required IReadOnlyCollection<string> ContextProviderIds { get; init; }

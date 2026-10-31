@@ -148,18 +148,18 @@ export class AgentInstanceObservabilityPage {
 
   public async followAgentLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
     await this.instanceRow(instance.instanceId).locator(`a[href="/agents/${instance.agentName}"]`).click();
-    await expect(this.page).toHaveURL(`${consoleUrl}/agents/${instance.agentName}`);
+    await this.expectContextualPath(consoleUrl, `/agents/${instance.agentName}`);
   }
 
   public async followRunLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
     const prefix = instance.runKind === 'FlowRun' ? 'flow-runs' : 'runs';
     await this.instanceRow(instance.instanceId).locator(`a[href="/${prefix}/${instance.runId}"]`).click();
-    await expect(this.page).toHaveURL(`${consoleUrl}/${prefix}/${instance.runId}`);
+    await this.expectContextualPath(consoleUrl, `/${prefix}/${instance.runId}`);
   }
 
   public async followWorkerLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
     await this.instanceRow(instance.instanceId).locator(`a[href="/settings/runtime-workers/${instance.workerId}"]`).click();
-    await expect(this.page).toHaveURL(`${consoleUrl}/settings/runtime-workers/${instance.workerId}`);
+    await this.expectContextualPath(consoleUrl, `/settings/runtime-workers/${instance.workerId}`);
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.details)).toBeVisible();
   }
 
@@ -225,6 +225,16 @@ export class AgentInstanceObservabilityPage {
 
   private instanceRow(instanceId: string): Locator {
     return this.page.locator(`[data-testid="${TestIds.agentInstanceObservability.row}"][data-instance-id="${instanceId}"]`);
+  }
+
+  private async expectContextualPath(consoleUrl: string, path: string): Promise<void> {
+    const selectedScopeRef = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope');
+    if (!selectedScopeRef) throw new Error('The authenticated Console shell does not expose its selected context.');
+    const expectedOrigin = new URL(consoleUrl).origin;
+    await expect(this.page).toHaveURL(url =>
+      url.origin === expectedOrigin
+      && url.pathname === path
+      && url.searchParams.get('context') === selectedScopeRef);
   }
 
   private async getInstances(consoleUrl: string): Promise<AgentInstanceWire[]> {

@@ -30,7 +30,11 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
         cancellationToken.ThrowIfCancellationRequested();
         var values = agents.Values.Select(snapshot => snapshot.Value)
             .OrderBy(agent => agent.Name, StringComparer.Ordinal)
-            .Select(agent => new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Definition.ModelProfile.Name))
+            .Select(agent => new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Definition.ModelProfile.Name)
+            {
+                Namespace = agent.Namespace,
+                ScopeRef = ResourceScopeRef.Workspace(MockWorkspaceId.Value)
+            })
             .ToArray();
         return Task.FromResult<IReadOnlyList<AgentSummary>>(values);
     }
@@ -281,7 +285,7 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
         var values = runEvents[runId];
         var runEvent = new RuntimeRunEvent
         {
-            WorkspaceId = MockWorkspaceId,
+            ScopeRef = ResourceScopeRef.Workspace(MockWorkspaceId.Value),
             Sequence = values.Count + 1,
             EventId = Guid.NewGuid(),
             RunId = runId,

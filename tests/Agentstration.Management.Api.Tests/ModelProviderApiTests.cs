@@ -5,6 +5,7 @@ using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Api.Contracts;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
@@ -23,6 +24,80 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ModelProviderApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task ExactTenantGrantExposesInstanceProviderOnlyInTenantContext()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var providers = factory.Services.GetRequiredService<ModelProviderManagementService>();
+        using (scopes.PushInstance(context))
+        {
+            var provider = await providers.GetExactAsync(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "ollama-local", default);
+            Assert.IsNotNull(provider);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                    ModelResourceKinds.ModelProvider, provider.Value.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId),
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: false)]),
+                null, default);
+        }
+
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
+        var tenantProviders = await client.GetFromJsonAsync<ValueResponse<ModelProviderResponse>>(
+            "/api/modelproviders");
+        Assert.IsTrue(tenantProviders!.Value.Any(value => value.Name == "ollama-local"));
+        using var tenantModels = await client.GetAsync("/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(HttpStatusCode.OK, tenantModels.StatusCode);
+
+        SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
+        var workspaceProviders = await client.GetFromJsonAsync<ValueResponse<ModelProviderResponse>>(
+            "/api/modelproviders");
+        Assert.IsFalse(workspaceProviders!.Value.Any(value => value.Name == "ollama-local"));
+        using var workspaceModels = await client.GetAsync("/api/modelproviders/ollama-local/models");
+        Assert.AreEqual(HttpStatusCode.Forbidden, workspaceModels.StatusCode);
+        Assert.DoesNotContain("ollama-local", await workspaceModels.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task AuthorizedInstanceProviderHealthIsEvaluatedInItsOwnerScopeFromAWorkspace()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IModelProviderDiscovery>();
+            services.AddSingleton<IModelProviderDiscovery>(serviceProvider =>
+                new OwnerScopeModelDiscovery(serviceProvider.GetRequiredService<ICurrentRequestContext>()));
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        var providers = factory.Services.GetRequiredService<ModelProviderManagementService>();
+        using (scopes.PushInstance(context))
+        {
+            var provider = await providers.GetExactAsync(ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "ollama-local", default);
+            Assert.IsNotNull(provider);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(
+                new(provider.Value.Uid, ResourceScopeRef.Instance, provider.Value.Namespace,
+                    ModelResourceKinds.ModelProvider, provider.Value.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId),
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
+                null, default);
+        }
+
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
+        var status = await client.GetFromJsonAsync<ModelProviderStatusResponse>(
+            "/api/modelproviders/ollama-local/status");
+
+        Assert.IsNotNull(status);
+        Assert.AreEqual("available", status.Status, status.Details);
+    }
+
     [TestMethod]
     public async Task ReadOnlyProviderApisExposeConfiguredProviderAndPersistedInventory()
     {
@@ -63,6 +138,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             () => throw new InvalidOperationException("observation failed"));
         await using var factory = DiscoveryFactory(discovery);
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
 
         var before = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>("/api/modelproviders/ollama-local/models");
         Assert.AreEqual(0, before?.Value.Count);
@@ -117,6 +193,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         var discovery = new PerProviderModelDiscovery();
         await using var factory = DiscoveryFactory(discovery);
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/ollama-local");
         var tenant = provider!.ScopeRef!.Value;
 
@@ -172,6 +249,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             ]);
         await using var factory = DiscoveryFactory(discovery);
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         _ = await RefreshAsync(client);
 
         using var providerResponse = await client.GetAsync("/api/modelproviders/ollama-local");
@@ -288,6 +366,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         var invalid = new CreateModelProviderRequest(
             "invalid-provider",
             new ModelProviderProperties
@@ -339,16 +418,17 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             services.AddSingleton<IExtensionInspector>(new ConfiguredEndpointInspector(requirements));
         }));
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         var targets = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
             $"/api/resource-scopes/targets?kind={ParameterResourceKinds.Parameter}"))!;
-        var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        var instance = targets.Single(value => value.Kind == ResourceScopeKind.Instance).ScopeRef;
         using var extension = await client.PostAsJsonAsync("/api/extensionregistrations",
             new CreateExtensionRegistrationRequest("binding-extension", new()
             {
                 DisplayName = "Binding extension",
                 Endpoint = new Uri("http://127.0.0.1:6789"),
                 ExpectedExtensionId = "binding-extension"
-            }, ScopeRef: tenant));
+            }, ScopeRef: instance));
         Assert.AreEqual(HttpStatusCode.Created, extension.StatusCode);
 
         using var parameter = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
@@ -358,7 +438,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                 DisplayName = "Provider endpoint",
                 ValueType = ParameterValueType.Text,
                 Value = JsonSerializer.SerializeToElement("https://provider.test")
-            }, tenant));
+            }, instance));
         Assert.AreEqual(HttpStatusCode.Created, parameter.StatusCode);
         using var disallowedParameter = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
             "disallowed-endpoint",
@@ -367,20 +447,20 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                 DisplayName = "Disallowed endpoint",
                 ValueType = ParameterValueType.Text,
                 Value = JsonSerializer.SerializeToElement("https://other.test")
-            }, tenant));
+            }, instance));
         Assert.AreEqual(HttpStatusCode.Created, disallowedParameter.StatusCode);
         var reference = new ParameterReference(
-            ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "provider-endpoint"), tenant);
+            ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "provider-endpoint"), instance);
         ModelProviderProperties Properties(string name, IReadOnlyList<ModelProviderValueBinding> bindings) => new()
         {
             DisplayName = name,
-            Extension = new ResourceReference("binding-extension", tenant),
+            Extension = new ResourceReference("binding-extension", instance),
             ContributionId = "discovered",
             ValueBindings = bindings
         };
 
         using var created = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
-            "bound-provider", Properties("Bound provider", [ModelProviderValueBinding.FromParameter("endpoint", reference)]), ScopeRef: tenant));
+            "bound-provider", Properties("Bound provider", [ModelProviderValueBinding.FromParameter("endpoint", reference)]), ScopeRef: instance));
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
         var saved = await created.Content.ReadFromJsonAsync<ModelProviderResource>();
         Assert.AreEqual(reference, saved?.Definition.ValueBindings.Single().Parameter);
@@ -405,13 +485,13 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         for (var index = 0; index < invalidCases.Length; index++)
         {
             using var invalid = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
-                $"invalid-binding-{index}", invalidCases[index], ScopeRef: tenant));
+                $"invalid-binding-{index}", invalidCases[index], ScopeRef: instance));
             Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
             Assert.IsFalse((await invalid.Content.ReadAsStringAsync()).Contains("https://other.test", StringComparison.Ordinal));
         }
 
         using var delete = new HttpRequestMessage(HttpMethod.Delete,
-            $"/api/parameters/provider-endpoint?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+            $"/api/parameters/provider-endpoint?scopeRef={Uri.EscapeDataString(instance.Value)}");
         delete.Headers.IfMatch.ParseAdd(parameter.Headers.ETag!.ToString());
         using var protectedDelete = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.Conflict, protectedDelete.StatusCode);
@@ -442,6 +522,22 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             var observation = observations[Math.Min(index++, observations.Length - 1)];
             return ValueTask.FromResult(observation());
         }
+    }
+
+    private sealed class OwnerScopeModelDiscovery(ICurrentRequestContext context) : IModelProviderDiscovery
+    {
+        public string ProviderType => "owner-scope";
+        public bool CanHandle(string providerType) => true;
+        public ValueTask<ModelProviderHealth> GetHealthAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(context.AccessMode == ControlPlaneAccessMode.Instance
+                ? new ModelProviderHealth("available")
+                : new ModelProviderHealth("unavailable", $"Resolved from '{context.AccessMode}' instead of Instance."));
+        public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult<IReadOnlyList<DiscoveredModel>>([]);
     }
 
     private sealed class PerProviderModelDiscovery : IModelProviderDiscovery

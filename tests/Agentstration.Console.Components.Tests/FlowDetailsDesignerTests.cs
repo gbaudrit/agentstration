@@ -12,6 +12,7 @@ using Agentstration.Triggers;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Http.Connections.Client;
@@ -23,6 +24,76 @@ namespace Agentstration.Web.Tests;
 [DoNotParallelize]
 public sealed class FlowDetailsDesignerTests
 {
+    [TestMethod]
+    public void FlowRunSummaryDistinguishesDefinitionAndExecutionScopes()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("inherited-flow");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var executionScope = ResourceScopeRef.Workspace(workspaceId.Value);
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-inherited",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            DefinitionScopeRef = ResourceScopeRef.Instance,
+            Status = FlowRunStatus.Succeeded,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        Assert.AreEqual("/instance", rendered.Find("[data-testid=flow-run-definition-scope] code").TextContent);
+        Assert.AreEqual(executionScope.Value, rendered.Find("[data-testid=flow-run-execution-scope] code").TextContent);
+    }
+
+    [TestMethod]
+    public void FlowRunSummaryExplainsUnavailableModelProfile()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("profile-diagnostic");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        const string diagnostic = "Pinned ModelProfile 'default/default-reasoning' is unavailable in the execution context or no longer matches its published identity.";
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-profile-diagnostic",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Failed,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            Error = new("agent_model_profile_unavailable", diagnostic),
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0",
+                null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        var error = rendered.Find(".run-error");
+        StringAssert.Contains(error.TextContent, strings["Error.AgentModelProfileUnavailable"].Value);
+        StringAssert.Contains(error.TextContent, diagnostic);
+    }
+
     [TestMethod]
     public void FlowRunGridUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
     {
@@ -42,7 +113,7 @@ public sealed class FlowDetailsDesignerTests
             CreatedAt = FlowClientStub.Now,
             StartedAt = FlowClientStub.Now,
             CompletedAt = FlowClientStub.Now.AddSeconds(2),
-            DefinitionSnapshot = new FlowVersion(workspaceId, new FlowId("multi-agent-review"), "1.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), new FlowId("multi-agent-review"), "1.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
         };
 
         var rendered = context.Render<RunGrid>(parameters => parameters.Add(component => component.Runs, [run]));
@@ -52,7 +123,7 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual(strings["Status"].Value, headers[2]);
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("multi-agent-review", link.TextContent.Trim());
-        Assert.AreEqual("/flow-runs/flowrun-review-1", link.GetAttribute("href"));
+        Assert.AreEqual($"/flow-runs/flowrun-review-1?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", link.GetAttribute("href"));
         Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
     }
 
@@ -91,6 +162,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
 
@@ -105,31 +177,33 @@ public sealed class FlowDetailsDesignerTests
         Assert.AreEqual("Explain the plan", client.LastRunRequest!.Input.GetProperty("request").GetString());
         Assert.AreEqual("1.0.0", client.LastRunRequest.Version);
         Assert.AreEqual("local", client.LastRunRequest.DeploymentResourceId);
+        Assert.AreEqual(client.ScopeRef, client.LastRunRequest.DefinitionScopeRef);
+        Assert.IsNull(client.LastRunRequest.ExecutionScopeRef);
     }
 
     [TestMethod]
-    public void NamespacedFlowOrdersDefinitionSecondAndExposesReadOnlyYamlLast()
+    public void PackManagedNamespacedFlowOrdersDefinitionSecondAndExposesReadOnlyYamlLast()
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        var client = new FlowClientStub();
+        var inheritedScope = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        var client = new FlowClientStub(scopeRef: inheritedScope, managed: true);
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo($"?scopeRef={Uri.EscapeDataString(inheritedScope.Value)}");
 
         var rendered = context.Render<FlowDetails>(parameters => parameters
             .Add(component => component.FlowId, "sample")
             .Add(component => component.FlowNamespace, "pack.sample"));
 
-        var overviewLink = rendered.FindAll("a").Single(link => link.TextContent.Trim() == strings["ReadOnlyDesigner"].Value);
-        Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", overviewLink.GetAttribute("href"));
+        Assert.HasCount(0, rendered.FindAll(".page-header .flow-header-designer"));
         CollectionAssert.AreEqual(
-            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Runs"].Value, strings["Tab.Deployments"].Value, strings["Tab.YAML"].Value },
+            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Runs"].Value, strings["Tab.Deployments"].Value, strings["Tab.Access"].Value, strings["Tab.YAML"].Value },
             rendered.FindAll("nav.section-tabs button").Select(button => button.TextContent.Trim()).ToArray());
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
 
-        var link = rendered.Find(".page-header .flow-header-designer");
-        Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", link.GetAttribute("href"));
-        Assert.AreEqual(strings["ViewInFlowDesigner"].Value, link.TextContent.Trim());
         Assert.HasCount(0, rendered.FindAll(".flow-definition-heading a"));
         StringAssert.Contains(rendered.Find(".flow-definition-heading").TextContent, strings["DefinitionIdentityTitle"].Value);
         Assert.HasCount(0, rendered.FindAll(".flow-definition-sheet .topology-shell"));
@@ -153,10 +227,13 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
-        Assert.AreEqual("/flows/sample/designer", rendered.Find(".page-header .flow-header-designer").GetAttribute("href"));
+        Assert.AreEqual(
+            "/flows/sample/designer?scopeRef=%2Fworkspaces%2F11111111-1111-1111-1111-111111111111",
+            rendered.Find(".page-header .flow-header-designer").GetAttribute("href"));
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
 
         Assert.HasCount(0, rendered.FindAll(".flow-definition-sheet .topology-shell"));
@@ -176,12 +253,35 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
+    public void InstanceFlowIsEditableAndIsNotPresentedAsInheritedReadOnly()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub(scopeRef: ResourceScopeRef.Instance);
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo($"?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Instance.Value)}");
+
+        var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "instance-flow"));
+
+        Assert.HasCount(1, rendered.FindAll(".page-header .flow-header-designer"));
+        Assert.IsFalse(rendered.Markup.Contains(strings["InheritedReadOnlyHelp"].Value, StringComparison.Ordinal));
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+        Assert.IsFalse(rendered.Find("[data-testid='flow-definition-display-name']").HasAttribute("disabled"));
+        Assert.HasCount(1, rendered.FindAll(".flow-definition-form button[type=submit]"));
+        Assert.AreEqual(1, client.DraftLoadCount);
+    }
+
+    [TestMethod]
     public void WorkspaceDefinitionRejectsEmptyDisplayNameWithoutSaving()
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
@@ -200,6 +300,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub { SimulateDraftConflict = true };
         context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
@@ -216,7 +317,7 @@ public sealed class FlowDetailsDesignerTests
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        var client = new FlowClientStub(orchestration: true);
+        var client = new FlowClientStub(orchestration: true, managed: true);
         context.Services.AddSingleton<IFlowApiClient>(client);
         context.Services.AddSingleton<IManagementApiClient>(new ManagementClientStub());
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings>>();
@@ -238,6 +339,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(orchestration: true));
         context.Services.AddSingleton<IManagementApiClient>(new ManagementClientStub());
+        AddConsoleContext(context);
         var detailsStrings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         var editorStrings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings>>();
 
@@ -275,7 +377,7 @@ public sealed class FlowDetailsDesignerTests
             Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "2.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "2.0.0", null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
         };
         const string logicalCallId = "flow:flowrun-news:step:notify";
         const string invocationId = "flow:flowrun-news:step:notify:attempt:1";
@@ -371,7 +473,7 @@ public sealed class FlowDetailsDesignerTests
             Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition,
                 new Dictionary<string, string>(), FlowClientStub.Now, graph)
         };
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
@@ -402,7 +504,7 @@ public sealed class FlowDetailsDesignerTests
             Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition,
                 new Dictionary<string, string>(), FlowClientStub.Now),
             TokenUsage = new(
                 FlowRunTokenUsageState.Final,
@@ -446,7 +548,7 @@ public sealed class FlowDetailsDesignerTests
             Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition,
                 new Dictionary<string, string>(), FlowClientStub.Now)
         };
         var workerId = Guid.NewGuid();
@@ -475,17 +577,22 @@ public sealed class FlowDetailsDesignerTests
         private static readonly JsonElement InputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { request = new { type = "string", description = "Request to process" } }, required = new[] { "request" }, additionalProperties = false });
         private static readonly FlowGraphDefinition Graph = new() { EntryStep = "input", InputSchema = InputSchema, Steps = [new InputFlowStepDefinition { Name = "input", Schema = InputSchema }], Transitions = [] };
         private readonly FlowDefinition definition;
+        private readonly ResourceScopeRef scopeRef;
         private readonly FlowRun? run;
+        private readonly bool managed;
         private readonly FlowRunCausalityPageResponse? causality;
         private FlowDraftResponse? storedDraft;
-        public FlowClientStub(bool orchestration = false, FlowRun? run = null, FlowRunCausalityPageResponse? causality = null)
+        public FlowClientStub(bool orchestration = false, FlowRun? run = null, FlowRunCausalityPageResponse? causality = null, ResourceScopeRef? scopeRef = null, bool managed = false)
         {
             definition = orchestration
                 ? new OrchestrationFlowDefinition([new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")], new SequentialOrchestrationPattern())
                 : new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
             this.run = run;
             this.causality = causality;
+            this.scopeRef = scopeRef ?? ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+            this.managed = managed;
         }
+        public ResourceScopeRef ScopeRef => scopeRef;
         public ResourceNamespace RequestedNamespace { get; private set; }
         public FlowGraphDefinition OriginalGraph => Graph;
         public UpdateFlowDraftRequest? LastDraftUpdate { get; private set; }
@@ -498,10 +605,17 @@ public sealed class FlowDetailsDesignerTests
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
-            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), Now, Now, Graph) { Namespace = @namespace });
+            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), Now, Now, Graph)
+            {
+                Namespace = @namespace,
+                ScopeRef = scopeRef,
+                Governance = managed
+                    ? ResourceGovernance.Pack("/instances/local/InstalledPack/sample", "publisher/sample", "1.0.0")
+                    : ResourceGovernance.User
+            });
         }
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace }]);
+            Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace, ScopeRef = scopeRef }]);
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowRun>>([]);
         public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult(FlowSummaries);
         public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
@@ -538,7 +652,7 @@ public sealed class FlowDetailsDesignerTests
                 Scope = new FlowRunScope(Guid.NewGuid(), new WorkspaceId(Guid.NewGuid()), Guid.NewGuid()),
                 Input = request.Input.Clone(),
                 CreatedAt = Now,
-                DefinitionSnapshot = new FlowVersion(new WorkspaceId(Guid.NewGuid()), new FlowId(flowId), version, null, definition, new Dictionary<string, string>(), Now, Graph)
+                DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(Guid.NewGuid()), new FlowId(flowId), version, null, definition, new Dictionary<string, string>(), Now, Graph)
             });
         }
         public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -584,6 +698,30 @@ public sealed class FlowDetailsDesignerTests
         public Task<FlowVersionResponse> PublishDraftAsync(string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private static void AddConsoleContext(BunitContext context)
+    {
+        var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var workspaceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var snapshot = new ConsoleContextSnapshot(
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            "Test user",
+            tenantId,
+            "test",
+            "Test tenant",
+            workspaceId,
+            "default",
+            "Default workspace",
+            new HashSet<string>(StringComparer.Ordinal),
+            [new(workspaceId, tenantId, "test", "Test tenant", "default", "Default workspace")]);
+        context.Services.AddSingleton<IConsoleContextProvider>(new TestConsoleContextProvider(snapshot));
+        context.Services.AddScoped<ConsoleContextState>();
+    }
+
+    private sealed class TestConsoleContextProvider(ConsoleContextSnapshot snapshot) : IConsoleContextProvider
+    {
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(snapshot);
     }
 
     private sealed class ManagementClientStub : IManagementApiClient

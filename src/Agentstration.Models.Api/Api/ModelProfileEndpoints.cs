@@ -19,11 +19,12 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
         CancellationToken cancellationToken) => ModelsApiHttp.ExecuteAsync(async () =>
         {
             var profiles = await service.ListAsync(cancellationToken);
+            var usagesByProfile = await service.GetUsagesAsync(
+                profiles.Select(value => value.Value).ToArray(), cancellationToken);
             var responses = new List<ModelProfileSummaryResponse>(profiles.Count);
             foreach (var profile in profiles)
             {
                 var resolution = await service.ResolveAsync(profile.Value, cancellationToken);
-                var usages = await service.GetUsagesAsync(profile.Value.Namespace, profile.Value.Metadata.Name, cancellationToken);
                 responses.Add(new ModelProfileSummaryResponse(
                     profile.Value.Metadata.Name,
                     profile.Value.Metadata.Name,
@@ -39,7 +40,7 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
                         profile.Value.Definition.Reasoning,
                         profile.Value.Definition.Output,
                         resolution.Status,
-                        usages.Count),
+                        usagesByProfile[profile.Value.Uid].Count),
                     profile.Value.Namespace.Value,
                     profile.Value.ScopeRef));
             }
@@ -50,11 +51,11 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
 internal sealed class GetModelProfileEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, string? scopeRef, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
             var @namespace = ModelsApiHttp.Namespace(resourceNamespace);
-            var stored = await service.GetAsync(@namespace, profileName, cancellationToken)
+            var stored = await service.GetAsync(@namespace, profileName, ModelProfileScope.Parse(scopeRef), cancellationToken)
                 ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
             return ModelsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
@@ -74,7 +75,7 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
                 Definition = body.Properties,
                 ScopeRef = body.ScopeRef
             }, cancellationToken);
-            response.Headers.Location = $"/api/modelprofiles/{Uri.EscapeDataString(stored.Value.Metadata.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
+            response.Headers.Location = $"/api/modelprofiles/{Uri.EscapeDataString(stored.Value.Metadata.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}&scopeRef={Uri.EscapeDataString(stored.Value.ScopeRef!.Value.Value)}";
             return ModelsApiHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
         });
 }
@@ -82,9 +83,9 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
 internal sealed class PutModelProfileEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapPut("/{profileName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, PutModelProfileRequest body, HttpRequest request, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, string? scopeRef, PutModelProfileRequest body, HttpRequest request, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () => ModelsApiHttp.ResourceResult(
-            await service.PutAsync(ModelsApiHttp.Namespace(resourceNamespace), profileName, body.Properties, ModelsApiHttp.IfMatch(request), cancellationToken),
+            await service.PutAsync(ModelsApiHttp.Namespace(resourceNamespace), profileName, ModelProfileScope.Parse(scopeRef), body.Properties, ModelsApiHttp.IfMatch(request), cancellationToken),
             response,
             StatusCodes.Status200OK));
 }
@@ -92,25 +93,38 @@ internal sealed class PutModelProfileEndpoint : IModelManagementEndpoint
 internal sealed class DeleteModelProfileEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapDelete("/{profileName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, HttpRequest request, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, string? scopeRef, HttpRequest request, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
-            await service.DeleteAsync(ModelsApiHttp.Namespace(resourceNamespace), profileName, ModelsApiHttp.IfMatch(request), cancellationToken);
+            await service.DeleteAsync(ModelsApiHttp.Namespace(resourceNamespace), profileName, ModelProfileScope.Parse(scopeRef), ModelsApiHttp.IfMatch(request), cancellationToken);
             return Results.NoContent();
         });
+}
+
+internal static class ModelProfileScope
+{
+    public static ResourceScopeRef? Parse(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);
 }
 
 internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}/usages", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, string? scopeRef, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
             var @namespace = ModelsApiHttp.Namespace(resourceNamespace);
-            _ = await service.GetAsync(@namespace, profileName, cancellationToken)
+            var profile = await service.GetAsync(@namespace, profileName, ModelProfileScope.Parse(scopeRef), cancellationToken)
                 ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
-            var usages = await service.GetUsagesAsync(@namespace, profileName, cancellationToken);
-            var values = usages.Select(value => new ModelProfileUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
+            var usages = await service.GetUsagesAsync(profile.Value, cancellationToken);
+            var values = usages.Select(value => new ModelProfileUsageResponse(
+                value.Kind,
+                value.Name,
+                value.Name,
+                value.DisplayName,
+                value.Namespace.Value,
+                value.ScopeRef,
+                value.ScopeDisplayName)).ToArray();
             return Results.Ok(new ModelProfileUsagesResponse(values, values.Length));
         });
 }
@@ -118,11 +132,11 @@ internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
 internal sealed class ResolveModelProfileEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}/resolution", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, string? scopeRef, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
             var @namespace = ModelsApiHttp.Namespace(resourceNamespace);
-            var profile = await service.GetAsync(@namespace, profileName, cancellationToken)
+            var profile = await service.GetAsync(@namespace, profileName, ModelProfileScope.Parse(scopeRef), cancellationToken)
                 ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, @namespace));
             return Results.Ok(ModelsApiHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken, includeCapabilityDiagnostics: true)));
         });
@@ -134,6 +148,7 @@ internal sealed class PreviewModelProfileOptionMigrationEndpoint : IModelManagem
     private static Task<IResult> HandleAsync(
         string profileName,
         string? resourceNamespace,
+        string? scopeRef,
         PreviewModelProfileOptionMigrationRequest body,
         HttpResponse response,
         ModelProfileOptionMigrationService service,
@@ -143,6 +158,7 @@ internal sealed class PreviewModelProfileOptionMigrationEndpoint : IModelManagem
             var preview = await service.PreviewAsync(
                 ModelsApiHttp.Namespace(resourceNamespace),
                 profileName,
+                ModelProfileScope.Parse(scopeRef),
                 body.TargetVersion,
                 cancellationToken);
             response.Headers.ETag = preview.ProfileETag;
@@ -161,6 +177,7 @@ internal sealed class ApplyModelProfileOptionMigrationEndpoint : IModelManagemen
     private static Task<IResult> HandleAsync(
         string profileName,
         string? resourceNamespace,
+        string? scopeRef,
         PreviewModelProfileOptionMigrationRequest body,
         HttpRequest request,
         HttpResponse response,
@@ -170,6 +187,7 @@ internal sealed class ApplyModelProfileOptionMigrationEndpoint : IModelManagemen
             await service.ApplyAsync(
                 ModelsApiHttp.Namespace(resourceNamespace),
                 profileName,
+                ModelProfileScope.Parse(scopeRef),
                 body.TargetVersion,
                 ModelsApiHttp.IfMatch(request),
                 cancellationToken),

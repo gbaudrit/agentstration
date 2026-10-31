@@ -1,4 +1,7 @@
 using System.Net;
+using System.Text.Json;
+using Agentstration.DataSources.Contracts;
+using Agentstration.Flows.Storage.PostgreSql;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -9,6 +12,7 @@ using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -16,6 +20,23 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class PostgreSqlStorageProfileTests
 {
+    [TestMethod]
+    public void ResourceManagementMigrationsMatchCurrentModel()
+    {
+        using var context = new Agentstration.ResourceManagement.Storage.PostgreSql.PostgreSqlDesignTimeFactory()
+            .CreateDbContext([]);
+
+        Assert.IsFalse(context.Database.HasPendingModelChanges());
+    }
+
+    [TestMethod]
+    public void FlowMigrationsMatchCurrentModel()
+    {
+        using var context = new PostgreSqlDesignTimeFactory().CreateDbContext([]);
+
+        Assert.IsFalse(context.Database.HasPendingModelChanges());
+    }
+
     [TestMethod]
     public async Task EmptyDatabaseMigratesAndRemainsReadyAfterRestart()
     {
@@ -121,6 +142,7 @@ public sealed class PostgreSqlStorageProfileTests
                 }
             }, null, true, default);
         }
+        await store.PutExactAsync(ResourceScopeRef.Workspace(workspaceId), DiscoveryTarget(workspaceId), null, true, default);
     }
 
     private static async Task AssertScopedSecretsAfterRestartAsync(IServiceProvider services, Guid tenantId, Guid workspaceId)
@@ -143,6 +165,52 @@ public sealed class PostgreSqlStorageProfileTests
             Assert.AreEqual(scope == ResourceScopeRef.Tenant(tenantId) ? ResourceScopeRef.Workspace(workspaceId) : null,
                 secret.Value.Definition.UsePolicy.Grants.SingleOrDefault()?.ScopeRef);
         }
+        var target = await store.GetExactAsync<DataSourceAcquisitionTargetResource>(ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(workspaceId), ResourceNamespace.Default,
+            DataSourceResourceKinds.DataSourceAcquisitionTarget, "documents"), default);
+        Assert.IsNotNull(target);
+        Assert.AreEqual("documents", target.Value.ChoiceId);
+        Assert.AreEqual("documents", target.Value.Selector.GetProperty("collection").GetString());
+    }
+
+    private static DataSourceAcquisitionTargetResource DiscoveryTarget(Guid workspaceId)
+    {
+        var scope = ResourceScopeRef.Workspace(workspaceId);
+        return new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
+            Metadata = new() { Name = "documents" },
+            ScopeRef = scope,
+            DisplayName = "Documents",
+            DataSourceScopeRef = scope,
+            DataSourceUid = Guid.NewGuid(),
+            DataSourceName = "origin",
+            DataSourceNamespace = ResourceNamespace.Default,
+            DataSourceGeneration = 1,
+            DiscoveryId = "discovery-1",
+            DiscoveryUid = Guid.NewGuid(),
+            ChoiceId = "documents",
+            ChoiceDisplayName = "Documents",
+            Selector = JsonSerializer.SerializeToElement(new { collection = "documents" }),
+            Profile = new()
+            {
+                Name = "profile",
+                Namespace = ResourceNamespace.Default,
+                ScopeRef = scope,
+                Uid = Guid.NewGuid(),
+                Generation = 1,
+                Version = "1.0.0",
+                DefinitionHash = "hash",
+                DependencyHash = "dependencies",
+                Definition = new() { DisplayName = "Profile", AcquisitionFlow = new() { Name = "acquire" } },
+                AcquisitionFlow = new("acquire", ResourceNamespace.Default, "1.0.0", false,
+                    null, null, DataSourceFlowContracts.Acquisition, "sha256:acquire")
+                { ScopeRef = scope }
+            },
+            PromotedAt = DateTimeOffset.UtcNow,
+            PromotedBy = Guid.Empty
+        };
     }
 
     private static ResourceScopeRef[] SecretScopes(Guid tenantId, Guid workspaceId) =>

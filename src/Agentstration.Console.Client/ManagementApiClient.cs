@@ -25,9 +25,20 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         var agentsTask = ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, "api/agents?allNamespaces=true&top=1000", cancellationToken);
         var deploymentsTask = ApiResponse.ReadAsync<PagedResponse<AgentDeployment>>(httpClient, "api/deployments?top=1000", cancellationToken);
         await Task.WhenAll(agentsTask, deploymentsTask);
-        var page = await agentsTask;
-        var deployments = (await deploymentsTask).Value;
-        return page.Value.Select(agent =>
+        return ToSummaries((await agentsTask).Value, (await deploymentsTask).Value);
+    }
+
+    public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
+    {
+        var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(
+            httpClient, "api/agents?allNamespaces=true&top=1000", contextScope, cancellationToken);
+        return ToSummaries(page.Value, []);
+    }
+
+    private static IReadOnlyList<AgentSummary> ToSummaries(
+        IReadOnlyList<AgentResource> agents,
+        IReadOnlyList<AgentDeployment> deployments) =>
+        agents.Select(agent =>
         {
             var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ModelResourceKinds.ModelProfile);
             var deployment = FindCurrentDeployment(agent, deployments);
@@ -36,12 +47,12 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
                 Namespace = agent.Namespace,
                 ScopeRef = agent.ScopeRef,
                 ModelProfileNamespace = modelProfile.Namespace,
+                ModelProfileScopeRef = agent.Definition.ModelProfile.ScopeRef,
                 DeploymentId = deployment?.Metadata.Name,
                 InputSchema = agent.Definition.InputSchema?.Clone(),
                 InputSchemaReference = agent.Definition.InputSchemaBinding?.Reference
             };
         }).ToArray();
-    }
 
     private static AgentDeployment? FindCurrentDeployment(AgentResource agent, IReadOnlyList<AgentDeployment> deployments)
     {
@@ -94,6 +105,12 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         return await ReadResourceAsync<AgentResource>(response, cancellationToken);
     }
 
+    public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(AgentPath(@namespace, name, scopeRef), cancellationToken);
+        return await ReadResourceAsync<AgentResource>(response, cancellationToken);
+    }
+
     public async Task<ResourceSnapshot<AgentRevision>> GetAgentRevisionAsync(
         ResourceNamespace @namespace,
         string agentName,
@@ -127,6 +144,14 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task DeleteAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Delete, AgentPath(@namespace, name, scopeRef));
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public async Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken)
     {
         var agentsTask = GetAgentsAsync(cancellationToken);
@@ -139,6 +164,9 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
     private static string AgentPath(ResourceNamespace @namespace, string name) => @namespace.IsDefault
         ? $"api/agents/{Uri.EscapeDataString(name)}"
         : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(name)}";
+
+    private static string AgentPath(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef) =>
+        $"{AgentPath(@namespace, name)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
 
     private static async Task<ResourceSnapshot<T>> ReadResourceAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
