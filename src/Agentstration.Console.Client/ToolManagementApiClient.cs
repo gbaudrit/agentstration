@@ -61,7 +61,8 @@ public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
 
     public async Task<IReadOnlyList<ToolResource>> GetToolsAsync(ResourceScopeRef contextScope, string? provider = null, CancellationToken cancellationToken = default)
     {
-        var path = provider is null ? "api/tools" : ProviderChildPath(provider, "tools");
+        var path = (provider is null ? "api/tools" : ProviderChildPath(provider, "tools"))
+            + $"?scopeRef={Uri.EscapeDataString(contextScope.Value)}";
         return (await ApiResponse.ReadAsync<ValueResponse<ToolResource>>(httpClient, path, contextScope, cancellationToken)).Value;
     }
 

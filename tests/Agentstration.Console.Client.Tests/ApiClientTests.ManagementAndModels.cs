@@ -57,7 +57,10 @@ public sealed partial class ApiClientTests
                     : null);
                 return new HttpResponseMessage(HttpStatusCode.OK);
             })
-        }) { BaseAddress = new Uri("http://localhost/") };
+        })
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
 
         using var instanceResponse = await client.GetAsync("api/agents");
         navigationContext.ScopeRef = ResourceScopeRef.Workspace(Guid.Parse(
@@ -233,9 +236,11 @@ public sealed partial class ApiClientTests
     {
         var scope = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         var contexts = new List<string>();
+        var paths = new List<string>();
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
             contexts.Add(request.Headers.GetValues("X-Agentstration-Context").Single());
+            paths.Add(request.RequestUri!.PathAndQuery);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = request.RequestUri!.AbsolutePath == "/api/agents"
@@ -248,6 +253,9 @@ public sealed partial class ApiClientTests
         _ = await new ManagementApiClient(httpClient).GetAgentsAsync(scope, default);
 
         CollectionAssert.AreEqual(new[] { scope.Value }, contexts);
+        CollectionAssert.AreEqual(
+            new[] { $"/api/agents?allNamespaces=true&top=1000&scopeRef={Uri.EscapeDataString(scope.Value)}" },
+            paths);
     }
 
     [TestMethod]
@@ -403,7 +411,10 @@ public sealed partial class ApiClientTests
                 ? new ValueResponse<AvailableModelResponse>([])
                 : new ValueResponse<ModelProviderResponse>([]);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
         var client = new ModelProvidersApiClient(httpClient);
 
         _ = await client.GetModelProvidersAsync(ResourceScopeRef.Instance, CancellationToken.None);
