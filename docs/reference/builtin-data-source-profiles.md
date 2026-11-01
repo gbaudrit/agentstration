@@ -37,5 +37,5 @@ These annotations describe provenance; the protection boundary is the reserved i
 
 An AEP extension may contribute a declarative Data Source Profile bundle containing ToolSets, Flows, and a profile. Agentstration resolves contributed Tool bindings and installs the documents through the ordinary host-owned Bootstrap handlers; the extension never writes the resource store directly.
 
-The optional Crawl4AI extension contributes `crawl4ai-web`. Installing that bundle is an explicit operation today. Automatic installation in the extension's scope during enrollment is tracked independently by [#696](https://github.com/gbaudrit/agentstration/issues/696).
+The optional Crawl4AI extension contributes `crawl4ai-web`. Successful enrollment installs that bundle at the exact extension-registration scope and records its governed resources in the durable extension installation inventory.
 

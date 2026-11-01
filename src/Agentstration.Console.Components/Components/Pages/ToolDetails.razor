@@ -48,7 +48,11 @@ else
             <section class="panel" aria-labelledby="tool-governance-heading">
                 <div class="panel-header"><h2 id="tool-governance-heading">@T("GovernanceAndSource")</h2></div>
                 <dl class="resource-details">
-                    <dt>@T("Provider")</dt><dd><code>@tool.Definition.Provider?.ResourceId</code></dd>
+                    @if (managingExtension is not null)
+                    {
+                        <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@ManagingExtensionUrl">@managingExtension.DisplayName</a><br /><code>@managingExtension.ExtensionId</code> · @(managingExtension.Version ?? "—") · <ResourceScopeBadge ScopeRef="managingExtension.RegistrationScopeRef" Compact /></dd>
+                    }
+                    <dt>@T("TechnicalProvider")</dt><dd><code>@tool.Definition.Provider?.ResourceId</code></dd>
                     <dt>@T("ExternalName")</dt><dd><code>@tool.Definition.ExternalId</code></dd>
                     <dt>@T("Enabled")</dt><dd>@BooleanLabel(tool.Definition.Enabled)</dd>
                     <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(tool.Definition.RequiresApproval)</dd>
@@ -161,6 +165,8 @@ else
     private enum ToolDetailTab { Overview, Execution, Access }
     private string ActiveTabId => activeTab switch { ToolDetailTab.Overview => "tool-overview-tab", ToolDetailTab.Execution => "tool-execution-tab", ToolDetailTab.Access => "tool-access-tab", _ => "tool-overview-tab" };
     private ToolResource? tool;
+    private ToolProviderResource? provider;
+    private ExtensionInventoryItemResponse? managingExtension;
     private string? etag;
     private ToolDetailTab activeTab;
     private ToolRunMode runMode = ToolRunMode.Simulate;
@@ -204,6 +210,20 @@ else
             : await Client.GetToolAsync(ToolNamespace, Name, default);
         tool = value.Value;
         etag = value.ETag;
+        provider = null;
+        managingExtension = null;
+        if (Services.GetService<IExtensionsClient>() is { } extensions
+            && tool.Definition.Provider is { } providerReference)
+        {
+            provider = (await Client.GetProviderAsync(providerReference.Name, default)).Value;
+            if (provider.Definition.Aep?.Extension is { } extensionReference)
+            {
+                managingExtension = (await extensions.GetExtensionInventoryAsync(default)).SingleOrDefault(candidate =>
+                    string.Equals(candidate.RegistrationName, extensionReference.Name, StringComparison.Ordinal)
+                    && string.Equals(candidate.RegistrationNamespace, (extensionReference.Namespace ?? provider.Namespace).Value, StringComparison.Ordinal)
+                    && (extensionReference.ScopeRef is null || candidate.RegistrationScopeRef == extensionReference.ScopeRef));
+            }
+        }
         activeTab = ToolDetailTab.Overview;
         runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
         runInput = CanSimulate
@@ -213,6 +233,10 @@ else
         runError = null;
         runResult = null;
     }
+
+    private string ManagingExtensionUrl => managingExtension?.RegistrationName is null
+        ? "/extensions"
+        : $"/extensions/{Uri.EscapeDataString(managingExtension.RegistrationName)}?namespace={Uri.EscapeDataString(managingExtension.RegistrationNamespace)}";
 
     private async Task ToggleAsync()
     {

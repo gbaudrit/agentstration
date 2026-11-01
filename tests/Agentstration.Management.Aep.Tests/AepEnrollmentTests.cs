@@ -1,11 +1,15 @@
+extern alias crawl4ai;
+
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Tools;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -15,6 +19,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Crawl4AiDataSourceProfileBundle = crawl4ai::Agentstration.Extensions.Crawl4AI.Crawl4AiDataSourceProfileBundle;
 
 namespace Agentstration.Management.Tests;
 
@@ -439,7 +444,7 @@ public sealed class AepEnrollmentTests
         var registration = await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>()
             .GetExactAsync(target, ResourceNamespace.Default, registrationName, default);
         var manifest = handler.Manifest();
-        await factory.Services.GetServices<IAepEnrollmentResourceProvisioner>().Single()
+        await factory.Services.GetServices<IAepEnrollmentResourceProvisioner>().OfType<AepEnrollmentToolProvisioner>().Single()
             .ProvisionAsync(registration!.Value, manifest, default);
         var secondProvider = await tools.GetProviderExactAsync(target, registrationName, ResourceNamespace.Default, default);
         var secondTool = (await tools.ListToolsAsync(default)).Single(value => value.Value.ScopeRef == target
@@ -449,6 +454,75 @@ public sealed class AepEnrollmentTests
         Assert.AreEqual(firstProvider.Value.Generation, secondProvider.Value.Generation);
         Assert.AreEqual(firstTool.Value.Uid, secondTool.Value.Uid);
         Assert.AreEqual(firstTool.Value.Generation, secondTool.Value.Generation);
+    }
+
+    [TestMethod]
+    public async Task PairingInstallsAdvertisedBundleAndPersistsGovernedInventory()
+    {
+        var handler = new EnrollmentLifecycleHandler("Agentstration.Extensions.Crawl4AI", advertiseBundle: true);
+        await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IToolProviderDiscovery>();
+            services.AddSingleton<IToolProviderDiscovery, CrawlToolDiscovery>();
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var enrollment = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var instanceId = Guid.NewGuid();
+        var target = ResourceScopeRef.Workspace(context.WorkspaceId);
+        _ = await enrollment.AnnounceAsync(new(
+            instanceId,
+            new AepExtensionIdentity("Agentstration.Extensions.Crawl4AI", "Crawl4AI", "1.0.0"),
+            new Uri("https://crawl4ai.example/"),
+            new Uri("https://crawl4ai.example/aep/enrollment/pair")), default);
+        await enrollment.AssignAsync(context, instanceId, target, default);
+        var code = await enrollment.RotateAsync(context, instanceId, default);
+        var credential = await enrollment.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+
+        try
+        {
+            _ = await enrollment.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default);
+        }
+        catch (AepEnrollmentException)
+        {
+            using var systemScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            var failed = await store.ListExactAsync<ExtensionBundleInstallationResource>(target,
+                ExtensionKinds.ExtensionBundleInstallation, 0, 10, default);
+            Assert.Fail(failed.SingleOrDefault()?.Value.Definition.Diagnostic ?? "Bundle installation did not create a diagnostic record.");
+        }
+
+        using var readScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var installations = await store.ListExactAsync<ExtensionBundleInstallationResource>(target,
+            ExtensionKinds.ExtensionBundleInstallation, 0, 10, default);
+        var installation = installations.Single().Value;
+        Assert.AreEqual(ExtensionBundleInstallationState.Installed, installation.Definition.State);
+        Assert.AreEqual("crawl4ai-web", installation.Definition.BundleId);
+        Assert.HasCount(3, installation.Definition.ToolBindings);
+        Assert.IsTrue(installation.Definition.ManagedResources.Any(value =>
+            value.Kind == DataSourceResourceKinds.DataSourceProfile && value.Name == "crawl4ai-web"));
+        Assert.IsTrue(installation.Definition.ManagedResources.All(value => value.ScopeRef == target));
+        Assert.IsTrue(installation.Definition.ManagedResources.All(value => value.DefinitionHash is not null));
+        var registrationName = $"paired-{instanceId:N}";
+        var extensionView = (await factory.Services.GetRequiredService<ExtensionManagementService>()
+            .ListAsync(default)).Single(value => value.RegistrationName == registrationName);
+        Assert.HasCount(1, extensionView.BundleInstallations);
+        Assert.AreEqual(ExtensionBundleInstallationState.Installed,
+            extensionView.BundleInstallations.Single().Definition.State);
+
+        var toolSetEvidence = installation.Definition.ManagedResources.Single(value =>
+            value.Kind == ToolResourceKinds.ToolSet && !value.Published);
+        var toolSetAddress = ScopedResourceAddress.Create(target, toolSetEvidence.Namespace,
+            toolSetEvidence.Kind, toolSetEvidence.Name);
+        var toolSet = await store.GetExactAsync<ToolSetResource>(toolSetAddress, default);
+        Assert.IsNotNull(toolSet);
+        var mutation = await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() =>
+            store.PutExactAsync(target, toolSet.Value with
+            {
+                Definition = toolSet.Value.Definition with { DisplayName = "Forged" }
+            }, toolSet.ETag, false, default));
+        StringAssert.StartsWith(mutation.Message, "resource_managed:");
     }
 
     [TestMethod]
@@ -762,7 +836,30 @@ public sealed class AepEnrollmentTests
                 new Dictionary<string, string>()));
     }
 
-    private sealed class EnrollmentLifecycleHandler(string extensionId, bool advertiseTool = false) : HttpMessageHandler
+    private sealed class CrawlToolDiscovery : IToolProviderDiscovery
+    {
+        public bool Supports(ToolProviderType providerType) => providerType == ToolProviderType.Aep;
+
+        public Task<ToolProviderDiscoveryResult> DiscoverAsync(
+            ToolProviderResource provider,
+            CancellationToken cancellationToken) => Task.FromResult(new ToolProviderDiscoveryResult(
+                new[] { "web.fetch", "web.crawl", "content.extract", "content.read", "content.delete" }
+                    .Select(id => new DiscoveredToolDescriptor(
+                        id,
+                        id,
+                        id,
+                        JsonSerializer.SerializeToElement(new { type = "object" }),
+                        null,
+                        new Dictionary<string, JsonElement>()))
+                    .ToArray(),
+                new Dictionary<string, bool> { ["tools"] = true },
+                new Dictionary<string, string>()));
+    }
+
+    private sealed class EnrollmentLifecycleHandler(
+        string extensionId,
+        bool advertiseTool = false,
+        bool advertiseBundle = false) : HttpMessageHandler
     {
         public AepCredentialRotation? Rotation { get; private set; }
         public int PreviousRevocationCount { get; private set; }
@@ -785,15 +882,24 @@ public sealed class AepEnrollmentTests
 
         public AepManifest Manifest()
         {
-            var tools = advertiseTool
+            var tools = advertiseBundle
+                ? new[]
+                {
+                    new AepToolContribution("web.fetch", "Fetch", new AepMcpToolMapping("main", "web_fetch")),
+                    new AepToolContribution("web.crawl", "Crawl", new AepMcpToolMapping("main", "web_crawl")),
+                    new AepToolContribution("content.extract", "Extract", new AepMcpToolMapping("main", "content_extract")),
+                    new AepToolContribution("content.read", "Read", new AepMcpToolMapping("main", "content_read")),
+                    new AepToolContribution("content.delete", "Delete", new AepMcpToolMapping("main", "content_delete"))
+                }
+                : advertiseTool
                 ? new[] { new AepToolContribution("lookup", "Lookup", new AepMcpToolMapping("main", "lookup")) }
                 : [];
             return new AepManifest(
                 AepProtocol.Version,
                 new(extensionId, "Pairing test", "1.0.0"),
                 new Dictionary<string, AepCapabilityDescriptor>(),
-                new AepContributions([], tools),
-                advertiseTool ? new AepMcpDescriptor([new AepMcpServerDescriptor("main", "/mcp")]) : null);
+                new AepContributions([], tools, DataSourceProfileBundles: advertiseBundle ? [Crawl4AiDataSourceProfileBundle.Create()] : []),
+                advertiseTool || advertiseBundle ? new AepMcpDescriptor([new AepMcpServerDescriptor("main", "/mcp")]) : null);
         }
     }
 }

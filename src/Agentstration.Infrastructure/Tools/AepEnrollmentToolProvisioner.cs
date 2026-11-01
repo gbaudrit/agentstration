@@ -1,6 +1,7 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
 
@@ -8,6 +9,7 @@ namespace Agentstration.Infrastructure.Tools;
 
 public sealed class AepEnrollmentToolProvisioner(
     ToolManagementService tools,
+    IResourceStore store,
     IResourceGovernanceContext governance) : IAepEnrollmentResourceProvisioner
 {
     public async Task ProvisionAsync(
@@ -60,6 +62,29 @@ public sealed class AepEnrollmentToolProvisioner(
             _ = await tools.PutProviderAsync(provider, existing?.ETag, existing is null, cancellationToken);
 
         _ = await tools.RefreshDiscoveryExactAsync(scopeRef, provider.Name, provider.Namespace, cancellationToken);
+        var requiredTools = (authenticatedManifest?.Contributions.DataSourceProfileBundles ?? [])
+            .SelectMany(value => value.RequiredTools ?? [])
+            .ToHashSet(StringComparer.Ordinal);
+        if (requiredTools.Count == 0) return;
+        var materialized = (await store.ListExactAsync<ToolResource>(scopeRef,
+                ToolResourceKinds.Tool, 0, int.MaxValue, cancellationToken))
+            .Where(value => value.Value.Namespace == provider.Namespace
+                && value.Value.Definition.Provider?.Name == provider.Name
+                && value.Value.Definition.Provider.ScopeRef == scopeRef)
+            .ToArray();
+        foreach (var externalId in requiredTools)
+        {
+            var tool = materialized.SingleOrDefault(value =>
+                string.Equals(value.Value.Definition.ExternalId, externalId, StringComparison.Ordinal))
+                ?? throw new ToolResourceValidationException(
+                    $"Required bundle Tool contribution '{externalId}' was not materialized by registration '{registration.Name}'.");
+            if (tool.Value.Definition.Enabled) continue;
+            _ = await store.PutExactAsync(scopeRef, tool.Value with
+            {
+                Generation = checked(tool.Value.Generation + 1),
+                Definition = tool.Value.Definition with { Enabled = true }
+            }, tool.ETag, false, cancellationToken);
+        }
     }
 
     private static bool IsOwnedBy(ToolProviderResource provider, ResourceReference extension) =>

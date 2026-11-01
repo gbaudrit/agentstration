@@ -1,5 +1,6 @@
 @page "/tools"
 @inject IToolsClient Client
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
@@ -15,18 +16,29 @@ else
 {
     <DataGrid TItem="ToolResource" Items="tools">
         <Header><tr><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
-        <Row Context="tool"><tr><td><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></td><td>@ResourceName(tool.Definition.Provider?.ResourceId)</td><td><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>
+        <Row Context="tool"><tr><td><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></td><td><strong>@ProviderDisplayName(tool)</strong><br /><code>@ResourceName(tool.Definition.Provider?.ResourceId)</code></td><td><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>
     </DataGrid>
 }
 
 @code {
-    private IReadOnlyList<ToolResource> tools = []; private bool loading = true; private string? error;
+    private IReadOnlyList<ToolResource> tools = []; private IReadOnlyList<ToolProviderResource> providers = []; private IReadOnlyList<ExtensionInventoryItemResponse> extensions = []; private bool loading = true; private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { tools = await Client.GetToolsAsync(); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
+    private async Task LoadAsync() { loading = true; error = null; try { var toolsTask = Client.GetToolsAsync(); var providersTask = Client.GetProvidersAsync(default); await Task.WhenAll(toolsTask, providersTask); tools = toolsTask.Result; providers = providersTask.Result; if (Services.GetService<IExtensionsClient>() is { } client) extensions = await client.GetExtensionInventoryAsync(default); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
     private static string ResourceName(string? id) => id ?? "—";
+    private string ProviderDisplayName(ToolResource tool)
+    {
+        var provider = providers.SingleOrDefault(value => value.Name == tool.Definition.Provider?.Name
+            && value.Namespace == (tool.Definition.Provider?.Namespace ?? tool.Namespace));
+        var extension = provider?.Definition.Aep?.Extension;
+        if (extension is null) return provider?.Definition.DisplayName ?? ResourceName(tool.Definition.Provider?.ResourceId);
+        return extensions.SingleOrDefault(value => value.RegistrationName == extension.Name
+            && value.RegistrationNamespace == (extension.Namespace ?? provider!.Namespace).Value
+            && (extension.ScopeRef is null || value.RegistrationScopeRef == extension.ScopeRef))?.DisplayName
+            ?? provider!.Definition.DisplayName;
+    }
     private static string ToolUrl(ToolResource tool)
     {
         var query = new List<string>();

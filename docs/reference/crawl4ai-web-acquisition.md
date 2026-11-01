@@ -76,7 +76,7 @@ Data Source identity, resolved profile evidence, and acquisition parameters
 
 The temporary Crawl4AI reference is not an Agentstration `StagedArtifact`. It is intentionally local to the extension and expires. A Flow must transfer content through the governed staging Tools before handing it to a remote Agent, another Flow, or durable storage. On retry, `content_delete` is safe to repeat; an expired reference requires acquisition to restart.
 
-The extension contributes the `crawl4ai-web` Data Source Profile bundle. The bundle contains the exact ToolSet, bounded chunk-transfer Flow, `datasource.acquisition/v1` Flow, and Data Source Profile needed by this composition. Bundle installation is host-owned and explicit today; automatic installation in the extension's scope during enrollment is tracked by [#696](https://github.com/gbaudrit/agentstration/issues/696).
+The extension contributes the `crawl4ai-web` Data Source Profile bundle. The bundle contains the exact ToolSet, bounded chunk-transfer Flow, `datasource.acquisition/v1` Flow, and Data Source Profile needed by this composition. Successful enrollment installs it through host-owned handlers at the exact extension-registration scope and retains immutable governance and installation evidence.
 
 The resulting durable Artifact is independent of Knowledge. A Knowledge Source may later bind this Data Source and preserve the corpus unchanged through `knowledge-projection-builtin`, or apply an explicit `artifact.transform/v1` Flow before projection.
 

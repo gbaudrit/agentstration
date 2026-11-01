@@ -166,6 +166,46 @@ else
         </section>
     }
 
+    @if (activeTab == DetailTab.Resources)
+    {
+        <section class="panel resource-section">
+            <div class="panel-header"><div><p class="eyebrow">@T("ManagedResources")</p><h2>@T("ManagedResources")</h2><p>@T("ManagedResources.Description")</p></div><span>@T("InstallationCount", item.Extension?.BundleInstallations?.Count ?? 0)</span></div>
+            @if (item.Extension?.BundleInstallations?.Count > 0)
+            {
+                @foreach (var installation in item.Extension.BundleInstallations)
+                {
+                    <article class="resource-section">
+                        <div class="panel-header">
+                            <div><h3>@installation.BundleId <small>@installation.BundleVersion</small></h3><p><code>@installation.Name</code> · @installation.ExtensionId @installation.ExtensionVersion</p></div>
+                            <StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" />
+                        </div>
+                        <dl class="resource-details">
+                            <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="installation.ScopeRef" /></dd>
+                            <dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd>
+                            <dt>@T("ToolBindings")</dt><dd>@(installation.ToolBindings.Count == 0 ? "—" : string.Join(", ", installation.ToolBindings.Select(value => $"{value.Key} → {value.Value.Name}")))</dd>
+                            @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <dt>@T("Diagnostics")</dt><dd>@installation.Diagnostic</dd> }
+                        </dl>
+                        @if (installation.ManagedResources.Count > 0)
+                        {
+                            <DataGrid TItem="ExtensionManagedResourceResponse" Items="installation.ManagedResources">
+                                <Header><tr><th>@T("Type")</th><th>@T("Identity")</th><th>@T("Scope")</th><th>@T("Version")</th><th>@T("State")</th></tr></Header>
+                                <Row Context="resource"><tr>
+                                    <td>@resource.Kind</td>
+                                    <td>@if (ManagedResourceUrl(resource) is { } url) { <a class="text-button" href="@url">@resource.Namespace/@resource.Name</a> } else { <code>@resource.Namespace/@resource.Name</code> }</td>
+                                    <td><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></td>
+                                    <td>@(resource.Version ?? "—")</td>
+                                    <td>@(resource.Published ? T("Published") : T("ManagedReadOnly"))</td>
+                                </tr></Row>
+                            </DataGrid>
+                        }
+                        else { <p>@T("NoManagedResources")</p> }
+                    </article>
+                }
+            }
+            else { <p>@T("NoBundleInstallations")</p> }
+        </section>
+    }
+
     @if (activeTab == DetailTab.Options)
     {
         <section class="panel resource-section">
@@ -337,5 +377,21 @@ else
     private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) => $"/modelproviders/new?extension={Uri.EscapeDataString(extension.RegistrationName)}&extensionNamespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
     private sealed class RegistrationEditForm { [System.ComponentModel.DataAnnotations.Required] public string DisplayName { get; set; } = string.Empty; [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.Url] public string Endpoint { get; set; } = string.Empty; public string? ExpectedExtensionId { get; set; } public bool Enabled { get; set; } }
-    private enum DetailTab { Summary, Connection, Enrollment, Contributions, Options, Usages }
+    private static UiStatus InstallationStatus(ExtensionBundleInstallationState state) => state switch
+    {
+        ExtensionBundleInstallationState.Installed => UiStatus.Success,
+        ExtensionBundleInstallationState.Installing or ExtensionBundleInstallationState.Degraded => UiStatus.Warning,
+        ExtensionBundleInstallationState.Failed => UiStatus.Danger,
+        _ => UiStatus.Neutral
+    };
+    private static string? ManagedResourceUrl(ExtensionManagedResourceResponse resource) => resource.Kind switch
+    {
+        ToolResourceKinds.ToolSet or ToolResourceKinds.ToolSetVersion => $"/tools/sets/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}",
+        FlowResourceKinds.Flow or "FlowVersion" => resource.Namespace == ResourceNamespace.DefaultValue
+            ? $"/flows/{Uri.EscapeDataString(resource.Name)}"
+            : $"/namespaces/{Uri.EscapeDataString(resource.Namespace)}/flows/{Uri.EscapeDataString(resource.Name)}",
+        DataSourceResourceKinds.DataSourceProfile or DataSourceResourceKinds.DataSourceProfileRevision => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}",
+        _ => null
+    };
+    private enum DetailTab { Summary, Connection, Enrollment, Contributions, Resources, Options, Usages }
 }

@@ -24,7 +24,7 @@ This scoped reconciliation compares the implementation delivered through the #62
 | Projection and Snapshot | One `knowledge.projection/v1` Run over all prepared inputs; every success publishes and activates a distinct immutable Snapshot. | Clarified identity aggregation, heterogeneous Snapshots, failure behavior, and exact provenance. |
 | Retrieval | Search, query, and bounded read through `knowledge.retrieval/v1`, restricted to the selected Snapshot. | Clarified local deterministic behavior and source-specific Tool exposure through the existing Tool pipeline and internal MCP provider. |
 | Flow classification | One Flow-owned `flow.contract` key; families own their contract values. | Removed the obsolete family-specific metadata-key model from current guidance. |
-| Extension bundles | AEP contributes declarative ToolSet, Flow, and Data Source Profile documents; the host installs them through ordinary handlers. | Documented explicit installation and kept automatic enrollment installation in independent #696. |
+| Extension bundles | AEP contributes declarative ToolSet, Flow, and Data Source Profile documents; the host installs them through ordinary handlers. | Enrollment now installs each bundle at the registration's exact scope and records its immutable governed inventory. |
 
 ## Decision-history interpretation
 
@@ -36,7 +36,6 @@ The earlier ADR files remain unchanged as historical evidence. Current guidance 
 
 - ADR-0156 still describes a built-in `knowledge.ingestion/v1` Flow. ADR-0167 supersedes that behavior but does not name ADR-0156 in its supersession list. The implementation provisions `datasource.acquisition/v1` Flows and `knowledge-projection-builtin`; a future decision-history cleanup should make this supersession explicit without rewriting ADR-0156.
 - The dormant pre-release `KnowledgeSourceProfile`, Knowledge acquisition, and ingestion-oriented Snapshot remnants have been removed from contracts, services, adapters, Console surfaces, and composition. The supported model now starts with Data Source acquisition and continues with Knowledge projection, immutable snapshots, retrieval, and governed Tool exposure.
-- Automatic installation of an extension-contributed Data Source Profile bundle during AEP enrollment is not implemented. [#696](https://github.com/gbaudrit/agentstration/issues/696) owns that independent capability and requires installation at the extension's scope.
 - MCP-aligned normalization of Tool output `content` and `structuredContent` remains independent in [#737](https://github.com/gbaudrit/agentstration/issues/737).
 - Reusable browser UX scenarios are intentionally independent of #624 so they can be authored after the planned graphical evolution. This does not defer existing regression tests or offline functional validation.
 

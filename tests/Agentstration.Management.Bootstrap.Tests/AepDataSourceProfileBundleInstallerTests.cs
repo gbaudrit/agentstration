@@ -54,6 +54,48 @@ public sealed class AepDataSourceProfileBundleInstallerTests
         Assert.IsEmpty(profile.Planned);
     }
 
+    [TestMethod]
+    [DataRow(BootstrapProfileScope.Instance)]
+    [DataRow(BootstrapProfileScope.Tenant)]
+    [DataRow(BootstrapProfileScope.Workspace)]
+    public async Task PreservesExactEnrollmentScope(BootstrapProfileScope scope)
+    {
+        var profile = new RecordingHandler("DataSourceProfile");
+        var installer = new AepDataSourceProfileBundleInstaller([profile]);
+        var bundle = new AepDataSourceProfileBundleContribution(
+            "crawl4ai-web", "Crawl4AI Web", "1.0.0", [ProfileManifest]);
+        var target = scope switch
+        {
+            BootstrapProfileScope.Instance => new BootstrapApplicationTarget(),
+            BootstrapProfileScope.Tenant => new BootstrapApplicationTarget(TenantId: Guid.NewGuid()),
+            _ => new BootstrapApplicationTarget(WorkspaceId: Guid.NewGuid())
+        };
+
+        _ = await installer.InstallAsync(bundle, target,
+            new Dictionary<string, ResourceReference>
+            {
+                ["web.crawl"] = new("crawl", ResourceScopeRef.Instance, ResourceNamespace.Default)
+            }, default);
+
+        Assert.AreEqual(scope, profile.Operations.Single().ProfileScope);
+    }
+
+    [TestMethod]
+    public async Task RejectsManifestScopeOverride()
+    {
+        var profile = new RecordingHandler("DataSourceProfile");
+        var installer = new AepDataSourceProfileBundleInstaller([profile]);
+        var manifest = ProfileManifest.Replace("definition:", "scopeRef: /instance\ndefinition:", StringComparison.Ordinal);
+        var bundle = new AepDataSourceProfileBundleContribution(
+            "crawl4ai-web", "Crawl4AI Web", "1.0.0", [manifest]);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => installer.InstallAsync(
+            bundle, new(WorkspaceId: Guid.NewGuid()), new Dictionary<string, ResourceReference>(), default));
+
+        StringAssert.Contains(exception.Message, "cannot override");
+        Assert.IsEmpty(profile.Planned);
+    }
+
     private const string FlowManifest = """
         apiVersion: agentstration.io/v1
         kind: Flow
@@ -79,6 +121,8 @@ public sealed class AepDataSourceProfileBundleInstallerTests
         public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
         public List<BootstrapResourceDocument> Planned { get; } = [];
         public List<BootstrapResourceDocument> Applied { get; } = [];
+        public List<BootstrapResourceOperationContext> Operations { get; } = [];
+        public bool SupportsProfileScope(BootstrapProfileScope profileScope) => true;
 
         public Task<BootstrapResourcePlanResult> PlanAsync(
             BootstrapResourceDocument resource,
@@ -87,6 +131,7 @@ public sealed class AepDataSourceProfileBundleInstallerTests
             CancellationToken cancellationToken)
         {
             Planned.Add(resource);
+            Operations.Add(operation);
             return Task.FromResult(new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create));
         }
 
