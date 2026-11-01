@@ -216,6 +216,7 @@ export const Checkpoints = {
     secretUnavailable: 'foundry-secret-binding-secret-unavailable',
   },
   governedKnowledge: {
+    governanceVerified: 'governed-toolsets-governance-verified',
     toolsPublished: 'governed-knowledge-tools-published',
     agentPinned: 'governed-knowledge-agent-pinned',
     artifactPurged: 'governed-knowledge-artifact-purged',

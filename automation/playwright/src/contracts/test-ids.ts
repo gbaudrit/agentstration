@@ -129,7 +129,7 @@ export const TestIds = {
   },
   governedKnowledge: {
     exposure: 'knowledge-source-tool-exposure', toolLink: 'knowledge-tool-link',
-    toolSetRow: 'toolset-row', toolSetDetails: 'resource-toolset-details', toolSetVersion: 'toolset-version',
+    toolSetVersions: 'toolset-versions', toolSetRow: 'toolset-row', toolSetDetails: 'resource-toolset-details', toolSetVersion: 'toolset-version',
     activeAssignments: 'agent-active-toolsets', stagedDelete: 'staged-artifact-delete',
     stagedRetentionTab: 'staged-artifact-retention-tab',
   },

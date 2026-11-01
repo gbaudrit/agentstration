@@ -194,3 +194,12 @@ authentication):
 ```powershell
 npm run capture -- --plan examples/administer-governed-knowledge.capture-plan.json --output .work/governed-knowledge --console-url http://localhost:53400
 ```
+
+The shared `administer-governed-toolsets` journey covers #640's later-version pinning,
+not-ready and conflicting sources, Viewer mutation denial, and in-use deletion
+feedback. The same desktop/mobile/French Knowledge specification exercises it;
+its independent capture plan ends before Artifact administration:
+
+```powershell
+npm run capture -- --plan examples/administer-governed-toolsets.capture-plan.json --output .work/governed-toolsets --console-url http://localhost:53400
+```

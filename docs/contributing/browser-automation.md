@@ -151,7 +151,7 @@ raises the scope authorization failure consumed by the family API error handlers
 
 `administer-governed-knowledge` implements [#647](https://github.com/gbaudrit/agentstration/issues/647)
 on the current Data Source-backed UX delivered by merged PRs #648, #739 and #745.
-It composes `project-knowledge-sources` from #732 rather than duplicating acquisition,
+It composes the shared ToolSet journey and `project-knowledge-sources` from #732 rather than duplicating acquisition,
 projection readiness, partial failure, Snapshot provenance, retrieval and scope-denial
 assertions. Implementation was requested by the maintainer on 2026-11-01; the
 Data Source and projection UX validation is recorded above. The final routes are
@@ -168,20 +168,40 @@ artifact link it inspects the durable artifact, explicitly materializes and prev
 the local copy, verifies metadata-only credentials cannot read or download content,
 extends retention, observes active-lease purge denial, revokes that fixture lease,
 and cancels then confirms deletion. The durable artifact and complete Snapshot
-history remain unchanged after local-copy purge. The ToolSet page operations are
-reusable by #640, which still owns later-version, conflicting-exposure and in-use
-deletion cases. ToolSet detail coverage remains `partial` in the catalog until that
-separate work is complete.
+history remain unchanged after local-copy purge.
+
+The composed `administer-governed-toolsets` journey implements
+[#640](https://github.com/gbaudrit/agentstration/issues/640) using the accepted
+ToolSet UX from merged PR #641. The maintainer requested its inclusion in the same
+PR on 2026-11-01. It reuses the ready-source setup and all ToolSet/Agent operations
+above, and can be captured independently without the Artifact administration tail.
+It prepares version `2.0.0` with a fourth local Flow-backed Tool through the owning
+APIs because the current Console has no later-version publication editor. The
+Console must show both immutable versions while the Agent keeps version `1.0.0`,
+its original hash, and only the selected search Tool. Saved broader draft grants
+also leave that published revision unchanged.
+
+Expected failures use separate source identities: a disabled source prevents
+publication, a ready source colliding with a foreign unpublished ToolSet shows a
+conflict, and a real same-Workspace Viewer receives visible authorization failures
+when publishing an exposure or deleting the published ToolSet. An administrator's
+confirmed deletion is rejected while the ToolSet is assigned to the Agent. Supported
+APIs verify the failure codes and unchanged resources; no fault injection or test-only
+product endpoint is used. ToolSet list and detail surfaces are now `covered` in the
+catalog. The combined desktop, mobile and French tests exercise both #640 and #647.
 
 Prerequisites are the local deterministic host, Development bootstrap, built-in
 Knowledge and Artifact Flows, and Platform-administrator access. Fixtures use local
 text only, compatible published graph-only Flows, explicit ancestor grants, and a
 real unauthorized account; no crawler, Internet content, remote model or cloud storage
 is used. External capture mutates the selected instance and requires a disposable
-campaign Workspace with these same prerequisites. The scenario changes only its own
-Agent and staged copy; it does not purge the durable Snapshot artifact.
+campaign Workspace with these same prerequisites. The Artifact cleanup step purges only the generated local copy and preserves the
+durable Snapshot artifact.
 
 Run `npx playwright test governed-knowledge.spec.ts` from `automation/playwright`.
 The smoke lane covers desktop, 390 × 844 mobile, and French labels. Capture checkpoints
 are `source-lifecycle-projections`, `governed-knowledge-tools-published`,
-`governed-knowledge-agent-pinned`, and `governed-knowledge-artifact-purged`.
+`governed-knowledge-agent-pinned`, and `governed-knowledge-artifact-purged`. ToolSet governance adds
+`governed-toolsets-governance-verified`. The external Local-authentication capture
+plan is `examples/administer-governed-toolsets.capture-plan.json`; provide the same
+disposable instance and campaign Workspace prerequisites as the Knowledge plan.

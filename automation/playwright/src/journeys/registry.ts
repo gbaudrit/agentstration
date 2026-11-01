@@ -1,3 +1,4 @@
+import { administerGovernedToolSets } from './administer-governed-toolsets.journey.js';
 import { administerGovernedKnowledge } from './administer-governed-knowledge.journey.js';
 import { administerDataSources, projectKnowledgeSources } from './source-lifecycle.journey.js';
 import { authenticateConsole } from './authenticate-console.journey.js';
@@ -44,6 +45,7 @@ import { exerciseScopedFlowDesigner, type ExerciseScopedFlowDesignerInput } from
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
+  'administer-governed-toolsets': (context, input) => administerGovernedToolSets(context, input),
   'administer-governed-knowledge': (context, input) => administerGovernedKnowledge(context, input),
   'authenticate-console': authenticateConsole as Journey<Record<string, unknown>>,
   'create-agent': (context, input) => createAgent(context, input as unknown as CreateAgentInput),

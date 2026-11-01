@@ -255,13 +255,13 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('tools', `${consolePages}/Tools.razor`, ['/tools'], 420),
   {
     id: 'tool-sets', host: 'console', source: `${consolePages}/ToolSets.razor`, routes: ['/tools/sets'], fixtureKeys: [],
-    pageObject: 'src/pages/governed-knowledge.page.ts', journey: 'administer-governed-knowledge',
+    pageObject: 'src/pages/governed-knowledge.page.ts', journey: 'administer-governed-toolsets',
     specification: 'tests/governed-knowledge.spec.ts', coverage: 'covered',
   },
   {
     id: 'tool-set-details', host: 'console', source: `${consolePages}/ToolSetDetails.razor`, routes: ['/tools/sets/{Name}'], fixtureKeys: ['name'],
-    pageObject: 'src/pages/governed-knowledge.page.ts', journey: 'administer-governed-knowledge',
-    specification: 'tests/governed-knowledge.spec.ts', coverage: 'partial', trackingIssue: 640,
+    pageObject: 'src/pages/governed-knowledge.page.ts', journey: 'administer-governed-toolsets',
+    specification: 'tests/governed-knowledge.spec.ts', coverage: 'covered',
   },
   {
     id: 'tool-details', host: 'console', source: `${consolePages}/ToolDetails.razor`, routes: ['/tools/{Name}'], fixtureKeys: ['name'],

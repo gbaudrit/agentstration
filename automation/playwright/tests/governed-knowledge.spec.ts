@@ -6,16 +6,16 @@ import { test } from '../src/fixtures/test.js';
 test.use({ authenticationMode: 'Local' });
 test.setTimeout(540_000);
 
-test('governed Knowledge administration pins Agent tools and protects Snapshot artifacts @smoke', async ({ page, product }) => {
+test('governed Knowledge and ToolSet administration pins Agent tools and protects Snapshot artifacts @smoke', async ({ page, product }) => {
   await administerGovernedKnowledge({ ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, {});
 });
 
-test('governed Knowledge administration remains usable on mobile @smoke @responsive', async ({ page, product }) => {
+test('governed Knowledge and ToolSet administration remains usable on mobile @smoke @responsive', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await administerGovernedKnowledge({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
   await pages.sourceLifecycle.assertResponsive();
 });
 
-test('governed Knowledge administration uses French governance and retention labels @smoke @locale', async ({ page, product }) => {
+test('governed Knowledge and ToolSet administration uses French governance and retention labels @smoke @locale', async ({ page, product }) => {
   await administerGovernedKnowledge({ ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, { locale: 'fr-FR' });
 });
