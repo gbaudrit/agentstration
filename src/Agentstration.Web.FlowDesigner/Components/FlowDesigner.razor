@@ -77,7 +77,7 @@ else
 
     @if (error is not null)
     {
-        <div class="designer-feedback" role="alert">
+        <div class="designer-feedback" role="alert" data-testid="flow-designer-publication-error">
             <span class="designer-feedback-icon" aria-hidden="true">!</span>
             <div><strong>@T("ActionFailed")</strong><p>@error</p></div>
             <button aria-label="@T("DismissError")" @onclick="() => error = null">×</button>
@@ -237,7 +237,9 @@ else
                                 <option value="${steps.route-request.output.selectedAgent}">@T("RouterOutput")</option>
                                 @if (SelectedAgent is null && !agent.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal))
                                 {
-                                    <option value="@AgentSelectionValue(agent.Agent)">@T("UnavailableReference", ResourceIdentity(agent.Agent.ScopeRef, agent.Agent.Namespace ?? Namespace, agent.Agent.ResourceId))</option>
+                                    <option value="@AgentSelectionValue(agent.Agent)">@(agent.Agent.ResourceId == UnconfiguredAgent
+                                        ? T("AgentNotSelected")
+                                        : T("UnavailableReference", ResourceIdentity(agent.Agent.ScopeRef, agent.Agent.Namespace ?? Namespace, agent.Agent.ResourceId)))</option>
                                 }
                                 @foreach (var item in agents) { <option value="@ResourceKey(item.ScopeRef, item.Namespace, item.Name)">@ResourceOptionLabel(item.DisplayName, item.Namespace, item.ScopeRef)</option> }
                             </select>
@@ -506,7 +508,9 @@ else
                                         <label>@T("Agent")<select disabled="@ReadOnly" value="@AgentSelectionValue(candidate.Agent)" @onchange="e => UpdateRouterCandidateAgentAsync(routeIndex, e)">
                                             @if (ResolveAgent(candidate.Agent) is null)
                                             {
-                                                <option value="@AgentSelectionValue(candidate.Agent)">@T("UnavailableReference", ResourceIdentity(candidate.Agent.ScopeRef, candidate.Agent.Namespace ?? Namespace, candidate.Agent.ResourceId))</option>
+                                                <option value="@AgentSelectionValue(candidate.Agent)">@(candidate.Agent.ResourceId == UnconfiguredAgent
+                                                    ? T("AgentNotSelected")
+                                                    : T("UnavailableReference", ResourceIdentity(candidate.Agent.ScopeRef, candidate.Agent.Namespace ?? Namespace, candidate.Agent.ResourceId)))</option>
                                             }
                                             @foreach (var item in routerAgents) { <option value="@ResourceKey(item.ScopeRef, item.Namespace, item.Name)">@ResourceOptionLabel(item.DisplayName, item.Namespace, item.ScopeRef)</option> }
                                         </select></label>

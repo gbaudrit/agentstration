@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { ExpectedTextByLocale } from '../locales/expected-text.js';
 import { LoginPage } from './login.page.js';
 
 interface IdentityContextWire {
@@ -61,6 +62,11 @@ export interface ScopedExecutionEvidence {
   runtimeRunId: string;
   flowRunId: string;
   workItemId: string;
+}
+
+export interface ModelProfileDiagnosticEvidence {
+  scopeRef: string;
+  flowRunId: string;
 }
 
 const agentName = 'hierarchical-execution-agent';
@@ -166,6 +172,91 @@ export class ExecutionScopesPage {
     expect(work.executionScopeRef).toBe(scopeRef);
     return { scopeRef, runtimeRunId: runtime.id, flowRunId: flow.id, workItemId: work.id };
   }
+
+  public async exerciseUnavailableModelProfileDiagnostic(
+    consoleUrl: string,
+    fixture: ExecutionScopeFixture,
+  ): Promise<ModelProfileDiagnosticEvidence> {
+    const profile = await this.resolveExactResourceIdentity(
+      consoleUrl,
+      fixture.scopes.instance,
+      'ModelProfile',
+      fixture.modelProfileName,
+    );
+    const policyUrl = `${consoleUrl}/api/resource-access-policies/${profile.uid}`;
+    const ownerHeaders = { 'X-Agentstration-Context': fixture.scopes.instance };
+    const current = await this.page.request.get(policyUrl, { headers: ownerHeaders });
+    expect(current.status(), await current.text()).toBe(200);
+    const original = await current.json() as {
+      resource: Record<string, unknown>;
+      grants: Array<{ targetScopeRef: string; actions: string[]; includeDescendants: boolean }>;
+    };
+    const etag = current.headers()['etag'];
+    const withoutTenant = original.grants.filter(grant => grant.targetScopeRef !== fixture.scopes.tenant);
+
+    const denied = await this.page.request.put(policyUrl, {
+      headers: { ...ownerHeaders, ...(etag ? { 'If-Match': etag } : {}) },
+      data: { resource: original.resource, grants: withoutTenant },
+    });
+    expect(denied.status(), await denied.text()).toBe(200);
+
+    try {
+      await this.selectWorkspace(consoleUrl, fixture.workspaceId);
+      await this.open(
+        `${consoleUrl}/flows/${encodeURIComponent(fixture.flowName)}?scopeRef=${encodeURIComponent(fixture.scopes.instance)}`,
+        TestIds.flowObservability.flowDetails,
+      );
+      await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
+      await this.page.getByTestId(TestIds.flowObservability.flowRunOpen).dispatchEvent('click');
+      await this.page.getByTestId(TestIds.flowObservability.flowRunDialog).waitFor({ state: 'visible' });
+      const flowInput = this.page.getByRole('textbox', { name: 'JSON input' });
+      await flowInput.fill('{}');
+      await flowInput.dispatchEvent('change');
+      await this.page.getByTestId(TestIds.flowObservability.flowRunSubmit).click();
+      await this.page.waitForURL(/\/flow-runs\/[^?]+\?scopeRef=/, { timeout: 30_000 });
+      await this.page.getByTestId(TestIds.flowObservability.runDetails).waitFor({ state: 'visible' });
+      const flowRunId = decodeURIComponent(new URL(this.page.url()).pathname.split('/').at(-1) ?? '');
+      if (!flowRunId) throw new Error('The failed Flow execution did not expose its Flow Run identifier.');
+      await expect.poll(async () => {
+        const run = await this.read<FlowRunWire & { error?: { code?: string } }>(
+          `${consoleUrl}/api/flowRuns/${encodeURIComponent(flowRunId)}`,
+        );
+        return run.error?.code;
+      }, { timeout: 90_000 }).toBe('agent_model_profile_unavailable');
+
+      const error = this.runError;
+      await expect(error).toContainText('agent_model_profile_unavailable');
+      await expect(error).toContainText(ExpectedTextByLocale['en-US'].flowDiagnostics.modelProfileUnavailable);
+      await expect(error).toContainText(fixture.modelProfileName);
+      await expect(error).not.toContainText(/stack trace|authorization|forbidden|secret|prompt|provider response/i);
+
+      await this.page.request.put(`${consoleUrl}/api/identity/preferences`, { data: { theme: 'Dark', language: 'fr-FR' } });
+      await this.page.request.get(`${consoleUrl}/_culture?culture=fr-FR&returnUrl=%2F`);
+      await this.open(this.page.url(), TestIds.flowObservability.runDetails);
+      const localizedError = this.runError;
+      await expect(localizedError).toContainText('agent_model_profile_unavailable');
+      await expect(localizedError).toContainText(ExpectedTextByLocale['fr-FR'].flowDiagnostics.modelProfileUnavailable);
+      await expect(localizedError).toContainText(fixture.modelProfileName);
+      await expect(localizedError).not.toContainText(/stack trace|authorization|forbidden|secret|prompt|provider response/i);
+
+      await this.page.request.put(`${consoleUrl}/api/identity/preferences`, { data: { theme: 'Dark', language: 'en-US' } });
+      await this.page.request.get(`${consoleUrl}/_culture?culture=en-US&returnUrl=%2F`);
+      return { scopeRef: fixture.scopes.workspace, flowRunId };
+    } finally {
+      const latest = await this.page.request.get(policyUrl, { headers: ownerHeaders });
+      expect(latest.status(), await latest.text()).toBe(200);
+      const restored = await this.page.request.put(policyUrl, {
+        headers: {
+          ...ownerHeaders,
+          ...(latest.headers()['etag'] ? { 'If-Match': latest.headers()['etag']! } : {}),
+        },
+        data: { resource: original.resource, grants: original.grants },
+      });
+      expect(restored.status(), await restored.text()).toBe(200);
+    }
+  }
+
+  public get runError(): Locator { return this.page.getByTestId(TestIds.flowObservability.runError); }
 
   public async openRuntimeRun(consoleUrl: string, evidence: ScopedExecutionEvidence): Promise<void> {
     await this.open(

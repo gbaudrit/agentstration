@@ -31,7 +31,10 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
     public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
     {
         var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(
-            httpClient, "api/agents?allNamespaces=true&top=1000", contextScope, cancellationToken);
+            httpClient,
+            $"api/agents?allNamespaces=true&top=1000&scopeRef={Uri.EscapeDataString(contextScope.Value)}",
+            contextScope,
+            cancellationToken);
         return ToSummaries(page.Value, []);
     }
 

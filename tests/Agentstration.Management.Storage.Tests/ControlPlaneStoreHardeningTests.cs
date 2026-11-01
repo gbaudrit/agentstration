@@ -210,7 +210,7 @@ public sealed class ControlPlaneStoreHardeningTests
     }
 
     [TestMethod]
-    public async Task TenantContextCanReadAncestorsButCannotCrossTenantOrWriteAnotherScope()
+    public async Task TenantContextDiscoversOnlyAuthorizedAncestorsAndCannotCrossTenantOrWriteAnotherScope()
     {
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
@@ -219,14 +219,19 @@ public sealed class ControlPlaneStoreHardeningTests
         await using var fixture = await StoreFixture.CreateAsync(context);
         await fixture.EnsureTenantAsync(tenantA);
         await fixture.EnsureTenantAsync(tenantB);
-        var instance = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("instance"), null, true, default);
+        var sharedInstance = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("shared-instance"), null, true, default);
+        var hiddenInstance = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("hidden-instance"), null, true, default);
         var own = await fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantA), Resource("own"), null, true, default);
         var foreign = await fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantB), Resource("foreign"), null, true, default);
+        await fixture.PolicyStore.PutAsync(new(new(sharedInstance.Value.Uid, ResourceScopeRef.Instance,
+                ResourceNamespace.Default, "MemoryProvider"),
+            [new(ResourceScopeRef.Tenant(tenantA), [ResourceAccessAction.Discover])]), null, default);
 
         context.UseTenant(Guid.NewGuid(), tenantA);
         var visible = await fixture.Store.ListVisibleAsync<ExtensionResource>(ResourceScopeRef.Tenant(tenantA), "MemoryProvider", 0, 10, default);
-        CollectionAssert.AreEquivalent(new[] { "instance", "own" }, visible.Select(value => value.Value.Name).ToArray());
-        Assert.AreEqual(instance.Value.Uid, (await fixture.Store.GetByUidAsync<ExtensionResource>(instance.Value.Uid, default))?.Value.Uid);
+        CollectionAssert.AreEquivalent(new[] { "shared-instance", "own" }, visible.Select(value => value.Value.Name).ToArray());
+        Assert.AreEqual(sharedInstance.Value.Uid, (await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default))?.Value.Uid);
+        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(hiddenInstance.Value.Uid, default));
         Assert.AreEqual(own.Value.Uid, (await fixture.Store.GetByUidAsync<ExtensionResource>(own.Value.Uid, default))?.Value.Uid);
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(foreign.Value.Uid, default));
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
@@ -279,6 +284,11 @@ public sealed class ControlPlaneStoreHardeningTests
         CollectionAssert.AreEquivalent(
             new[] { sharedTenant.Value.Name, tenantOnly.Value.Name },
             tenantVisible.Select(value => value.Value.Name).ToArray());
+        var tenantDesignerVisible = await fixture.Store.ListVisibleAsync<ExtensionResource>(
+            ResourceScopeRef.Tenant(tenantId), "MemoryProvider", 0, 20, default);
+        CollectionAssert.AreEquivalent(
+            new[] { sharedInstance.Value.Name, sharedTenant.Value.Name, tenantOnly.Value.Name },
+            tenantDesignerVisible.Select(value => value.Value.Name).ToArray());
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(workspaceOwned.Value.Uid, default));
     }

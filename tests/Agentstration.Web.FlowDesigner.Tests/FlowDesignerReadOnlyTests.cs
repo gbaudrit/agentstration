@@ -740,6 +740,75 @@ public sealed class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
+    public void AgentStepWithoutAnAccessibleTargetShowsAnExplicitEmptySelection()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+        rendered.FindAll(".step-palette button").Single(button => button.TextContent.Trim() == "Agent").Click();
+        rendered.Find("[data-testid='configure-selected-step']").Click();
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
+
+        var options = rendered.Find("#flow-agent-reference").QuerySelectorAll("option");
+        Assert.IsTrue(options.Any(option => option.TextContent.Trim() == "No agent selected"));
+        Assert.IsFalse(options.Any(option => option.TextContent.Contains("unconfigured", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ExistingAgentReferenceThatIsNoLongerDiscoverableIsPreservedAsUnavailable()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition
+                {
+                    Name = "agent",
+                    DisplayName = "Welcome Agent",
+                    Agent = new("welcome-agent") { ScopeRef = ResourceScopeRef.Instance }
+                }
+            ],
+            Transitions = []
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample"));
+        rendered.FindAll("button.flow-node-settings")
+            .Single(button => button.GetAttribute("aria-label")!.Contains("Welcome Agent", StringComparison.Ordinal))
+            .Click();
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
+
+        var options = rendered.Find("#flow-agent-reference").QuerySelectorAll("option");
+        var unavailable = options.Single(option => option.TextContent.Contains("not available in this scope", StringComparison.Ordinal));
+        StringAssert.Contains(unavailable.TextContent, "welcome-agent");
+        Assert.IsFalse(options.Any(option => option.TextContent.Contains("Welcome Agent", StringComparison.Ordinal)));
+        var reference = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps
+            .OfType<AgentFlowStepDefinition>().Single().Agent;
+        Assert.AreEqual("welcome-agent", reference.ResourceId);
+        Assert.AreEqual(ResourceScopeRef.Instance, reference.ScopeRef);
+    }
+
+    [TestMethod]
     public void SelectingARouterCandidateWithADuplicateNamePersistsItsExactScope()
     {
         using var culture = new CultureScope("en-US");

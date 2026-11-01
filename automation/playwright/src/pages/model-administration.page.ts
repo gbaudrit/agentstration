@@ -133,7 +133,7 @@ export class ModelAdministrationPage {
   public async openProviderAccess(consoleUrl: string, name: string, scopeRef = '/instance'): Promise<void> {
     await this.open(
       consoleUrl,
-      `/modelproviders/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`,
+      `/modelproviders/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}&context=${encodeURIComponent(scopeRef)}`,
       TestIds.resourceAdministration.modelProviderEditor,
     );
     await this.page.locator(
@@ -150,7 +150,7 @@ export class ModelAdministrationPage {
   public async openProfileAccess(consoleUrl: string, name: string, scopeRef: string): Promise<void> {
     await this.open(
       consoleUrl,
-      `/modelprofiles/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`,
+      `/modelprofiles/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}&context=${encodeURIComponent(scopeRef)}`,
       TestIds.resourceAdministration.modelProfileEditor,
     );
     await this.waitForPersisted(TestIds.modelAdministration.profileForm);
@@ -207,6 +207,8 @@ export class ModelAdministrationPage {
   }
 
   private async selectedScopeRef(): Promise<string | null> {
+    const urlScopeRef = new URL(this.page.url()).searchParams.get('context');
+    if (urlScopeRef) return urlScopeRef;
     return await this.page.getByTestId(TestIds.console.shell)
       .getAttribute('data-context-scope')
       .catch(() => null);

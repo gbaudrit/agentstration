@@ -15,9 +15,11 @@ public sealed partial class ApiClientTests
     {
         var scope = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
         string? context = null;
+        string? path = null;
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
             context = request.Headers.GetValues("X-Agentstration-Context").Single();
+            path = request.RequestUri!.PathAndQuery;
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(new Agentstration.Api.Contracts.ValueResponse<ToolResource>([]))
@@ -28,6 +30,7 @@ public sealed partial class ApiClientTests
         _ = await new ToolsApiClient(httpClient).GetToolsAsync(scope, cancellationToken: default);
 
         Assert.AreEqual(scope.Value, context);
+        Assert.AreEqual($"/api/tools?scopeRef={Uri.EscapeDataString(scope.Value)}", path);
     }
 
     [TestMethod]

@@ -117,6 +117,12 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         }
 
         SelectConsoleContext(client, workspace.ScopeRef);
+        using var discoverableVaultsResponse = await client.GetAsync(
+            $"/api/vaults?consumerScopeRef={Uri.EscapeDataString(workspace.ScopeRef.Value)}");
+        Assert.AreEqual(HttpStatusCode.OK, discoverableVaultsResponse.StatusCode);
+        var discoverableVaults = await discoverableVaultsResponse.Content.ReadFromJsonAsync<VaultResponse[]>();
+        Assert.IsTrue(discoverableVaults?.Any(value => value.Resource.Uid == tenantVault.Uid));
+
         using var rejected = await client.PostAsJsonAsync(
             "/api/secrets",
             new CreateSecretRequest("invalid-workspace-secret", new SecretProperties

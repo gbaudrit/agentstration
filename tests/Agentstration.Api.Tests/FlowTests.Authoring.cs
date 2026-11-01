@@ -238,6 +238,53 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task DraftPublicationPreservesExactAgentScopeWhilePinningLegacyAndGraphSnapshots()
+    {
+        var agentScopeRef = ResourceScopeRef.Instance;
+        var agentNamespace = new ResourceNamespace("shared");
+        var resolver = new ExactFlowAgentReferenceResolver(agentScopeRef, agentNamespace, "duplicate-agent");
+        await using var fixture = await FlowFixture.CreateAsync(agentReferenceResolver: resolver);
+        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new AlwaysValidFlowValidator(), TimeProvider.System);
+        var created = await drafts.CreateAsync(TestScope.WorkspaceId,
+            new CreateFlowDraftCommand("scoped-agent", "Scoped agent", null, null, "Empty"), default);
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition
+                {
+                    Name = "agent",
+                    Agent = new("duplicate-agent", Namespace: agentNamespace, ScopeRef: agentScopeRef)
+                },
+                new OutputFlowStepDefinition { Name = "completed" }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-completed", "agent", "success", "completed")
+            ]
+        };
+        await drafts.SaveAsync(TestScope.WorkspaceId, created.Value.FlowId,
+            new UpdateFlowDraftCommand("Scoped agent", null, null, graph, "tester"), created.ETag, default);
+
+        var published = await drafts.PublishAsync(TestScope.WorkspaceId, created.Value.FlowId,
+            "1.0.0", null, true, default);
+
+        Assert.AreEqual(2, resolver.References.Count);
+        Assert.IsTrue(resolver.References.All(reference => reference.ScopeRef == agentScopeRef));
+        Assert.IsTrue(resolver.References.All(reference => reference.Namespace == agentNamespace));
+        var legacyTarget = Assert.IsInstanceOfType<RoutingFlowDefinition>(published.Value.Definition)
+            .Destinations.Single();
+        Assert.AreEqual(agentScopeRef, legacyTarget.ScopeRef);
+        Assert.AreEqual(agentNamespace, legacyTarget.Namespace);
+        var graphTarget = published.Value.Graph!.Steps.OfType<AgentFlowStepDefinition>().Single().Agent;
+        Assert.AreEqual(agentScopeRef, graphTarget.ScopeRef);
+        Assert.AreEqual(agentNamespace, graphTarget.Namespace);
+    }
+
+    [TestMethod]
     public async Task CreatesMissingDraftFromNamespacedPublishedVersion()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -407,6 +454,40 @@ public sealed partial class FlowTests
         Assert.IsTrue(result.Issues.Any(issue => issue.Code == "expression_invalid" && issue.StepId == "decision"));
         Assert.IsTrue(result.Issues.Any(issue => issue.Code == "flow_cycle_not_supported"));
         Assert.IsTrue(result.Issues.Any(issue => issue.Code == "step_unreachable" && issue.StepId == "output"));
+    }
+
+    [TestMethod]
+    public async Task TypedGraphValidationResolvesAnExactlyScopedAgentReferenceWithoutFallingBackToItsName()
+    {
+        var scopeRef = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var resolver = new ExactAgentResourceResolver(scopeRef, "duplicate-agent");
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new AgentFlowStepDefinition
+                {
+                    Name = "agent",
+                    Agent = new FlowResourceReference("duplicate-agent", ScopeRef: scopeRef)
+                },
+                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success },
+                new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
+            ],
+            Transitions =
+            [
+                new("input-agent", "input", "completed", "agent"),
+                new("agent-completed", "agent", "success", "completed"),
+                new("agent-error", "agent", "error", "error")
+            ]
+        };
+
+        var result = await new FlowGraphValidator(resolver).ValidateAsync(graph, new(), default);
+
+        Assert.IsTrue(result.IsValid);
+        Assert.AreEqual(1, resolver.ExactCalls);
+        Assert.AreEqual(0, resolver.UnscopedCalls);
     }
 
     [TestMethod]
@@ -582,6 +663,54 @@ public sealed partial class FlowTests
             Assert.IsFalse(json.Contains("Microsoft.Agents", StringComparison.Ordinal));
             var restored = JsonSerializer.Deserialize<FlowOrchestrationPattern>(json, JsonOptions);
             Assert.AreEqual(pattern.GetType(), restored!.GetType());
+        }
+    }
+
+    private sealed class ExactAgentResourceResolver(ResourceScopeRef expectedScopeRef, string expectedName)
+        : IFlowResourceReferenceResolver
+    {
+        public int ExactCalls { get; private set; }
+        public int UnscopedCalls { get; private set; }
+
+        public Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace,
+            CancellationToken cancellationToken)
+        {
+            UnscopedCalls++;
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> ExistsExactAsync(ResourceScopeRef scopeRef, string resourceId,
+            ResourceNamespace? @namespace, CancellationToken cancellationToken)
+        {
+            ExactCalls++;
+            return Task.FromResult(scopeRef == expectedScopeRef
+                && resourceId == expectedName
+                && (@namespace ?? ResourceNamespace.Default) == ResourceNamespace.Default);
+        }
+    }
+
+    private sealed class ExactFlowAgentReferenceResolver(
+        ResourceScopeRef expectedScopeRef,
+        ResourceNamespace expectedNamespace,
+        string expectedName) : IFlowAgentReferenceResolver
+    {
+        public List<FlowTargetReference> References { get; } = [];
+
+        public Task<FlowTargetReference> ResolveAsync(ResourceScopeRef ownerScopeRef,
+            ResourceNamespace ownerNamespace, FlowTargetReference reference,
+            CancellationToken cancellationToken)
+        {
+            References.Add(reference);
+            Assert.AreEqual(expectedScopeRef, reference.ScopeRef);
+            Assert.AreEqual(expectedNamespace, reference.Namespace);
+            Assert.AreEqual(expectedName, reference.Id);
+            return Task.FromResult(reference with
+            {
+                Version = "1",
+                ResourceUid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                RevisionUid = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                DefinitionHash = "pinned-definition"
+            });
         }
     }
 

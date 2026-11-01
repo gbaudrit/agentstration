@@ -141,6 +141,11 @@ public sealed class ManagementFlowResourceReferenceResolver(
     public async Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) =>
         await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId, @namespace ?? ResourceNamespace.Default), cancellationToken) is not null;
 
+    public async Task<bool> ExistsExactAsync(ResourceScopeRef scopeRef, string resourceId,
+        ResourceNamespace? @namespace, CancellationToken cancellationToken) =>
+        await store.GetExactAsync<AgentResource>(ScopedResourceAddress.Create(scopeRef,
+            @namespace ?? ResourceNamespace.Default, AgentResourceKinds.Agent, resourceId), cancellationToken) is not null;
+
     public async Task<ResolvedFlowCall?> ResolveFlowAsync(
         ResourceScopeRef ownerScopeRef,
         ResourceNamespace ownerNamespace,
