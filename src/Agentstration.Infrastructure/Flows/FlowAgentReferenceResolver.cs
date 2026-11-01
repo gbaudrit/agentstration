@@ -1,6 +1,7 @@
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -9,7 +10,8 @@ namespace Agentstration.Infrastructure.Flows;
 public sealed class FlowAgentReferenceResolver(
     IResourceReferenceResolver references,
     IResourceAccessPolicyService accessPolicies,
-    AgentManagementService agents) : IFlowAgentReferenceResolver
+    AgentManagementService agents,
+    IRequestContextScopeFactory requestScopes) : IFlowAgentReferenceResolver
 {
     public async Task<FlowTargetReference> ResolveAsync(ResourceScopeRef ownerScopeRef,
         ResourceNamespace ownerNamespace, FlowTargetReference reference, CancellationToken cancellationToken)
@@ -47,8 +49,10 @@ public sealed class FlowAgentReferenceResolver(
             && (!long.TryParse(reference.Version, out generation) || generation < 1))
             throw new FlowValidationException("agent_version_invalid",
                 $"Agent version '{reference.Version}' is not a positive generation number.");
-        var revision = await agents.EnsureExecutionRevisionAsync(stored.Value.Namespace, stored.Value.Name,
-            agentScopeRef, generation, cancellationToken);
+        StoredResource<AgentRevision> revision;
+        using (requestScopes.PushSystem())
+            revision = await agents.EnsureExecutionRevisionAsync(stored.Value.Namespace, stored.Value.Name,
+                agentScopeRef, generation, cancellationToken);
         return reference with
         {
             Namespace = stored.Value.Namespace,

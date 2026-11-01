@@ -1,3 +1,4 @@
+using System.Globalization;
 using Agentstration.Flows;
 
 namespace Agentstration.Flows.Application;
@@ -24,18 +25,28 @@ internal static class FlowDraftSnapshotAdapter
 
     private static FlowTargetReference[] Destinations(FlowGraphDefinition graph, RouterFlowStepDefinition? router) =>
         router?.Candidates
-            .Select(candidate => new FlowTargetReference(FlowTargetKind.Agent, candidate.Agent.ResourceId))
+            .Select(candidate => ToTarget(candidate.Agent))
             .ToArray()
         ?? graph.Steps.OfType<AgentFlowStepDefinition>()
             .Where(step => !step.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal))
-            .Select(step => new FlowTargetReference(FlowTargetKind.Agent, step.Agent.ResourceId))
+            .Select(step => ToTarget(step.Agent))
             .ToArray();
 
     private static RoutingFlowDefinition CreateRouting(RouterFlowStepDefinition? router, FlowTargetReference[] destinations)
     {
         var fallback = router?.Fallback is null
             ? null
-            : new FlowTargetReference(FlowTargetKind.Agent, router.Fallback.ResourceId);
+            : ToTarget(router.Fallback);
         return new RoutingFlowDefinition(FlowRoutingStrategy.Deterministic, destinations, fallback);
     }
+
+    private static FlowTargetReference ToTarget(FlowResourceReference reference) => new(
+        FlowTargetKind.Agent,
+        reference.ResourceId,
+        reference.Version?.ToString(CultureInfo.InvariantCulture),
+        reference.Namespace,
+        reference.ScopeRef,
+        reference.ResourceUid,
+        reference.RevisionUid,
+        reference.DefinitionHash);
 }

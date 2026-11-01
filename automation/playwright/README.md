@@ -138,6 +138,19 @@ The Model Profile cross-scope journey verifies complete authorized usage impact,
 npm exec playwright test tests/model-profile-cross-scope.spec.ts
 ```
 
+The scoped Flow Designer journey verifies the exact Instance, Tenant, and Workspace resource catalogues, persists a duplicate-named Agent reference with its owner scope, and covers explicit publication success and duplicate-version failure feedback:
+
+```powershell
+npm exec playwright test tests/scoped-flow-designer.spec.ts
+```
+
+The unavailable Model Profile diagnostic journey executes a deterministic Flow through its real Runtime path, then verifies the stable, localized and security-safe Flow Run failure on desktop and mobile viewports:
+
+```powershell
+npm exec playwright test tests/model-profile-flow-diagnostic.spec.ts --project=desktop-chromium
+npm exec playwright test tests/model-profile-flow-diagnostic.spec.ts --project=mobile-chromium
+```
+
 The solution-discovery video Flow and Entry are captured with:
 
 ```powershell

@@ -37,6 +37,8 @@ import { exerciseSchemaDrivenFlowInputs, type ExerciseSchemaDrivenFlowInputsInpu
 import { exerciseModelProviderAccess, type ExerciseModelProviderAccessInput } from './exercise-model-provider-access.journey.js';
 import { exerciseInheritedResourceReadOnly, type ExerciseInheritedResourceReadOnlyInput } from './exercise-inherited-resource-readonly.journey.js';
 import { exerciseModelProfileCrossScope, type ExerciseModelProfileCrossScopeInput } from './exercise-model-profile-cross-scope.journey.js';
+import { exerciseModelProfileFlowDiagnostic, type ExerciseModelProfileFlowDiagnosticInput } from './exercise-model-profile-flow-diagnostic.journey.js';
+import { exerciseScopedFlowDesigner, type ExerciseScopedFlowDesignerInput } from './exercise-scoped-flow-designer.journey.js';
 import type { Journey } from './journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
@@ -79,4 +81,6 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-model-provider-access': (context, input) => exerciseModelProviderAccess(context, input as unknown as ExerciseModelProviderAccessInput),
   'exercise-inherited-resource-readonly': (context, input) => exerciseInheritedResourceReadOnly(context, input as unknown as ExerciseInheritedResourceReadOnlyInput),
   'exercise-model-profile-cross-scope': (context, input) => exerciseModelProfileCrossScope(context, input as unknown as ExerciseModelProfileCrossScopeInput),
+  'exercise-model-profile-flow-diagnostic': (context, input) => exerciseModelProfileFlowDiagnostic(context, input as unknown as ExerciseModelProfileFlowDiagnosticInput),
+  'exercise-scoped-flow-designer': (context, input) => exerciseScopedFlowDesigner(context, input as unknown as ExerciseScopedFlowDesignerInput),
 };

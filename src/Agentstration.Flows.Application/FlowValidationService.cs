@@ -56,6 +56,8 @@ public interface IFlowDefinitionValidator
 public interface IFlowResourceReferenceResolver
 {
     Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken);
+    Task<bool> ExistsExactAsync(ResourceScopeRef scopeRef, string resourceId, ResourceNamespace? @namespace,
+        CancellationToken cancellationToken) => ExistsAsync(resourceId, @namespace, cancellationToken);
     Task<ResolvedFlowCall?> ResolveFlowAsync(
         ResourceScopeRef ownerScopeRef,
         ResourceNamespace ownerNamespace,
@@ -189,7 +191,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 ValidateSchemaContract(input.Schema, input.SchemaBinding, "schema", input.Name, issues);
                 break;
             case AgentFlowStepDefinition agent:
-                await ValidateResourceAsync(agent.Agent.ResourceId, agent.Agent.Namespace, step.Name, "agent.resourceId", context, issues, token);
+                await ValidateResourceAsync(agent.Agent, step.Name, "agent.resourceId", context, issues, token);
                 ValidateJsonExpressions(agent.InputMapping, issues, step.Name, "inputMapping");
                 break;
             case RouterFlowStepDefinition router:
@@ -200,9 +202,9 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 {
                     if (!NamePattern().IsMatch(candidate.Route)) issues.Add(Error("router_route_invalid", "Route keys must contain letters, digits, '-' or '_'.", step.Name, property: "candidates.route"));
                     if (!routes.Add(candidate.Route)) issues.Add(Error("router_route_duplicate", $"Route '{candidate.Route}' is duplicated.", step.Name));
-                    await ValidateResourceAsync(candidate.Agent.ResourceId, candidate.Agent.Namespace, step.Name, "candidates.agent.resourceId", context, issues, token);
+                    await ValidateResourceAsync(candidate.Agent, step.Name, "candidates.agent.resourceId", context, issues, token);
                 }
-                if (router.Fallback is not null) await ValidateResourceAsync(router.Fallback.ResourceId, router.Fallback.Namespace, step.Name, "fallback.resourceId", context, issues, token);
+                if (router.Fallback is not null) await ValidateResourceAsync(router.Fallback, step.Name, "fallback.resourceId", context, issues, token);
                 break;
             case ConditionFlowStepDefinition condition:
                 if (condition.Mode.Equals("Advanced", StringComparison.OrdinalIgnoreCase)) ValidateExpression(condition.Expression, issues, step.Name, property: "expression");
@@ -556,8 +558,10 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 stepName, property: property));
     }
 
-    private async Task ValidateResourceAsync(string resourceId, ResourceNamespace? @namespace, string step, string property, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)
+    private async Task ValidateResourceAsync(FlowResourceReference reference, string step, string property,
+        FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)
     {
+        var resourceId = reference.ResourceId;
         if (resourceId.StartsWith("${", StringComparison.Ordinal))
         {
             ValidateExpression(resourceId, issues, step, property: property);
@@ -568,7 +572,11 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             issues.Add(Error("agent_reference_invalid", "Agent references must use a logical Agent name.", step, property: property));
             return;
         }
-        if (context.ResolveResources && !await resources.ExistsAsync(resourceId, @namespace, token)) issues.Add(Error("agent_resource_not_found", $"Agent '{resourceId}' was not found.", step, property: property));
+        if (!context.ResolveResources) return;
+        var exists = reference.ScopeRef is { } scopeRef
+            ? await resources.ExistsExactAsync(scopeRef, resourceId, reference.Namespace, token)
+            : await resources.ExistsAsync(resourceId, reference.Namespace, token);
+        if (!exists) issues.Add(Error("agent_resource_not_found", $"Agent '{resourceId}' was not found.", step, property: property));
     }
 
     private static void ValidateJsonExpressions(JsonElement? value, List<FlowValidationIssue> issues, string step, string property)
