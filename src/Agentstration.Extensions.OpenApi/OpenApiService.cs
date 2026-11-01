@@ -128,7 +128,12 @@ public sealed class OpenApiService(
         var result = new List<Uri>(hints.Length);
         foreach (var hint in hints)
         {
-            if (hint.Length > 512 || Uri.TryCreate(hint, UriKind.Absolute, out _))
+            // On .NET 10 a root-relative path such as "/openapi.json" is also
+            // recognized as an absolute file URI. Keep root-relative candidates
+            // valid while still rejecting explicitly absolute URI strings.
+            if (hint.Length > 512
+                || (Uri.TryCreate(hint, UriKind.Absolute, out _)
+                    && !hint.StartsWith('/')))
                 throw Error("openapi_candidate_invalid", "Discovery candidates must be bounded same-origin relative paths.");
             var resolved = new Uri(origin, hint);
             if (!OpenApiDestinationPolicy.SameOrigin(origin, resolved))
