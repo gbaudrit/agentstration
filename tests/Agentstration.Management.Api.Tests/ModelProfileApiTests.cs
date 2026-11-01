@@ -633,19 +633,19 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         string name,
         ResourceScopeRef scopeRef,
         ResourceReference modelProfile) => new()
-    {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = AgentResourceKinds.Agent,
-        Metadata = new ResourceMetadata { Name = name },
-        ScopeRef = scopeRef,
-        Definition = new AgentProperties
         {
-            DisplayName = name,
-            Instructions = "Use the selected model profile.",
-            ModelProfile = modelProfile,
-            RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance)
-        }
-    };
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = name },
+            ScopeRef = scopeRef,
+            Definition = new AgentProperties
+            {
+                DisplayName = name,
+                Instructions = "Use the selected model profile.",
+                ModelProfile = modelProfile,
+                RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance)
+            }
+        };
 
     private static Task<StoredResource<AgentResource>> PutAgentAsync(
         IResourceStore store,
