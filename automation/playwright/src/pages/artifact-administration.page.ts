@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { ExpectedText } from '../locales/expected-text.js';
 import { TestIds } from '../contracts/test-ids.js';
 
 interface StagedArtifact {
@@ -97,6 +98,71 @@ export class ArtifactAdministrationPage {
       provenance: { fileName: integritySource.fileName },
     });
     await this.assertMaterializationFailure(consoleUrl, integrity.artifactId, [integrity.receipt.opaqueReference, alteredText]);
+  }
+
+  /** Inspect the exact durable Artifact published in a Knowledge Snapshot. */
+  public async exerciseSnapshotArtifact(consoleUrl: string, artifactId: string, text: ExpectedText['governedKnowledge']): Promise<void> {
+    await expect(this.page.getByTestId(TestIds.artifacts.durableDetails)).toBeVisible();
+    await expect(this.page).toHaveURL(new RegExp(`/artifacts/durable/${artifactId}(?:\\?|$)`));
+    await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toHaveCount(0);
+    await this.selectTab(TestIds.artifacts.durableContentTab, TestIds.artifacts.durableContentPanel);
+    await this.page.getByTestId(TestIds.artifacts.durableMaterialize).click();
+    const materialized = this.page.getByTestId(TestIds.artifacts.durableOpenMaterialized);
+    await expect(materialized).toBeVisible({ timeout: 90_000 });
+    await materialized.click();
+    await expect(this.page.getByTestId(TestIds.artifacts.stagedDetails)).toBeVisible();
+    const stagedId = this.page.url().split('/artifacts/staged/')[1]!.split('?')[0]!;
+    const api = `${consoleUrl}/api/artifacts/staged/${stagedId}`;
+    const read = async () => {
+      const response = await this.page.request.get(api);
+      expect(response.status(), await response.text()).toBe(200);
+      return await response.json() as { expiresAt: string; status: number; sha256: string; producer: { id: string }; leases: { id: ResourceId; consumerId: string }[] };
+    };
+    const durableUrl = `${consoleUrl}/api/artifacts/flow-run-artifacts/${artifactId}`;
+    const before = await this.page.request.get(durableUrl);
+    expect(before.status(), await before.text()).toBe(200);
+    const durableEvidence: unknown = await before.json();
+    const original = await read();
+    expect(original.sha256).toMatch(/^[a-f0-9]{64}$/i);
+    await expect(this.page.getByTestId(TestIds.artifacts.stagedContent)).toHaveCount(0);
+    await this.openStagedContent();
+    await this.page.getByTestId(TestIds.artifacts.stagedReadPreview).click();
+    await expect(this.page.getByTestId(TestIds.artifacts.stagedContent)).toContainText('Schema-driven source');
+    const protectedContent = await this.page.getByTestId(TestIds.artifacts.stagedContent).innerText();
+    await this.assertMetadataOnlyTokenIsDenied(consoleUrl, stagedId, protectedContent);
+    await this.page.getByTestId(TestIds.governedKnowledge.stagedRetentionTab).click();
+    const expiration = new Date(new Date(original.expiresAt).getTime() + 60 * 60_000).toISOString().slice(0, 16);
+    await this.page.getByLabel(text.newExpiration, { exact: true }).fill(expiration);
+    await this.page.getByLabel(text.newExpiration, { exact: true }).blur();
+    await this.page.getByRole('button', { name: text.extendRetention, exact: true }).click();
+    await expect.poll(async () => new Date((await read()).expiresAt).getTime()).toBe(Date.parse(`${expiration}:00Z`));
+    const leaseResponse = await this.page.request.post(`${api}/leases`, {
+      data: { consumerKind: 'flow', consumerId: 'knowledge-browser-consumer', operations: [0, 1], expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() },
+    });
+    expect(leaseResponse.status(), await leaseResponse.text()).toBe(200);
+    await this.page.reload();
+    const remove = this.page.getByTestId(TestIds.governedKnowledge.stagedDelete);
+    await expect(remove).toBeDisabled();
+    await expect(remove).toHaveAttribute('title', /.+/);
+    const denied = await this.page.request.delete(api);
+    expect(denied.status(), await denied.text()).toBe(422);
+    expect(await denied.text()).toContain('staged_artifact_active_lease');
+    const lease = (await read()).leases.find(item => item.consumerId === 'knowledge-browser-consumer')!;
+    const revoked = await this.page.request.delete(`${api}/leases/${identifier(lease.id)}`);
+    expect(revoked.status(), await revoked.text()).toBe(200);
+    await this.page.reload();
+    await expect(remove).toBeEnabled();
+    await remove.click();
+    await this.page.getByRole('dialog').getByRole('button', { name: text.cancel, exact: true }).click();
+    expect((await read()).sha256).toBe(original.sha256);
+    await remove.click();
+    await this.page.getByRole('dialog').getByRole('button', { name: text.confirmDelete, exact: true }).click();
+    await expect(this.page.getByTestId(TestIds.artifacts.list)).toBeVisible();
+    const purged = await read();
+    expect(purged.status).toBe(7); // StagedArtifactStatus.Purged
+    const durable = await this.page.request.get(durableUrl);
+    expect(durable.status(), await durable.text()).toBe(200);
+    expect(await durable.json()).toEqual(durableEvidence);
   }
 
   private async openStaged(consoleUrl: string, artifactId: string): Promise<void> {
@@ -198,7 +264,7 @@ export class ArtifactAdministrationPage {
     expect(response.headers()['content-disposition']).toContain(artifact.fileName);
   }
 
-  private async assertMetadataOnlyTokenIsDenied(consoleUrl: string, artifactId: string): Promise<void> {
+  private async assertMetadataOnlyTokenIsDenied(consoleUrl: string, artifactId: string, protectedContent = 'Governed artifact'): Promise<void> {
     const workspaceId = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-workspace-id');
     if (!workspaceId) throw new Error('The authenticated Console shell does not expose its Workspace identifier.');
     const tokenResponse = await this.page.request.post(`${consoleUrl}/api/identity/pat`, {
@@ -216,13 +282,13 @@ export class ArtifactAdministrationPage {
     const request = (path: string) => fetch(`${consoleUrl}${path}`, { headers: authorization, redirect: 'manual' });
     const metadata = await request(`/api/artifacts/staged/${artifactId}`);
     expect(metadata.status, `${metadata.headers.get('location') ?? ''} ${await metadata.text()}`).toBe(200);
-    await this.expectDenied(await request(`/api/artifacts/staged/${artifactId}/content?offset=0&length=64`));
-    await this.expectDenied(await request(`/api/artifacts/staged/${artifactId}/download`));
+    await this.expectDenied(await request(`/api/artifacts/staged/${artifactId}/content?offset=0&length=64`), protectedContent);
+    await this.expectDenied(await request(`/api/artifacts/staged/${artifactId}/download`), protectedContent);
   }
 
-  private async expectDenied(response: Response): Promise<void> {
+  private async expectDenied(response: Response, protectedContent: string): Promise<void> {
     expect(response.status).toBe(403);
-    expect(await response.text()).not.toContain('Governed artifact');
+    expect(await response.text()).not.toContain(protectedContent);
   }
 
   private async assertMaterializationFailure(consoleUrl: string, artifactId: string, secrets: readonly string[]): Promise<void> {

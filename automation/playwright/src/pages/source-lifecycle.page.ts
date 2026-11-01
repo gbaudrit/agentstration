@@ -50,6 +50,7 @@ interface LifecycleFixture {
 export class SourceLifecyclePage {
   private fixture!: LifecycleFixture;
   public constructor(private readonly page: Page) {}
+  public get projectionFixture(): Readonly<LifecycleFixture> { return this.fixture; }
   public get acquisitionHistory(): Locator { return this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitions); }
   public get snapshots(): Locator { return this.page.getByTestId(TestIds.sourceLifecycle.snapshots); }
 
@@ -490,6 +491,21 @@ export class SourceLifecyclePage {
       const denied = await member.request.get(this.apiUrl(consoleUrl, resource));
       await status(denied, 403);
     } finally { await context.close(); }
+  }
+
+  public async openSnapshotArtifact(consoleUrl: string): Promise<void> {
+    await this.openKnowledge(consoleUrl, 'snapshots');
+    await this.page.getByTestId(TestIds.sourceLifecycle.snapshotDetails)
+      .getByRole('link', { name: this.fixture.artifactId, exact: true }).click();
+    await expect(this.page.getByTestId(TestIds.artifacts.durableDetails)).toBeVisible();
+  }
+
+  public async snapshotEvidence(consoleUrl: string): Promise<unknown> {
+    return await this.read(consoleUrl, this.knowledgeApi() + '/snapshots');
+  }
+
+  public async assertSnapshotEvidence(consoleUrl: string, expected: unknown): Promise<void> {
+    expect(await this.snapshotEvidence(consoleUrl)).toEqual(expected);
   }
 
   public async assertResponsive(): Promise<void> {

@@ -146,3 +146,41 @@ Browser UX CI lane. The capture checkpoints are `source-lifecycle-acquisitions`
 and `source-lifecycle-projections`. Both journeys own their corresponding routes in the application coverage catalog.
 Explicit reads of another Workspace’s resources must return HTTP 403; storage
 raises the scope authorization failure consumed by the family API error handlers.
+
+## Governed Knowledge administration
+
+`administer-governed-knowledge` implements [#647](https://github.com/gbaudrit/agentstration/issues/647)
+on the current Data Source-backed UX delivered by merged PRs #648, #739 and #745.
+It composes `project-knowledge-sources` from #732 rather than duplicating acquisition,
+projection readiness, partial failure, Snapshot provenance, retrieval and scope-denial
+assertions. Implementation was requested by the maintainer on 2026-11-01; the
+Data Source and projection UX validation is recorded above. The final routes are
+`/data-sources/{Name}`, `/knowledge-sources`, `/knowledge-sources/new`,
+`/knowledge-sources/{Name}/edit`, `/knowledge-sources/{Name}` (including `tools`),
+`/tools/sets`, `/tools/sets/{Name}`, `/agents/new`, `/agents/{Name}`, `/artifacts`,
+`/artifacts/durable/{Id}`, and `/artifacts/staged/{Id}`.
+
+The journey publishes the source-specific retrieval ToolSet, inspects its immutable
+version, deploys an Agent with only the search member, and checks that saving broader
+draft grants does not alter the active revision's pinned permissions. From a Snapshot
+artifact link it inspects the durable artifact, explicitly materializes and previews
+the local copy, verifies metadata-only credentials cannot read or download content,
+extends retention, observes active-lease purge denial, revokes that fixture lease,
+and cancels then confirms deletion. The durable artifact and complete Snapshot
+history remain unchanged after local-copy purge. The ToolSet page operations are
+reusable by #640, which still owns later-version, conflicting-exposure and in-use
+deletion cases. ToolSet detail coverage remains `partial` in the catalog until that
+separate work is complete.
+
+Prerequisites are the local deterministic host, Development bootstrap, built-in
+Knowledge and Artifact Flows, and Platform-administrator access. Fixtures use local
+text only, compatible published graph-only Flows, explicit ancestor grants, and a
+real unauthorized account; no crawler, Internet content, remote model or cloud storage
+is used. External capture mutates the selected instance and requires a disposable
+campaign Workspace with these same prerequisites. The scenario changes only its own
+Agent and staged copy; it does not purge the durable Snapshot artifact.
+
+Run `npx playwright test governed-knowledge.spec.ts` from `automation/playwright`.
+The smoke lane covers desktop, 390 × 844 mobile, and French labels. Capture checkpoints
+are `source-lifecycle-projections`, `governed-knowledge-tools-published`,
+`governed-knowledge-agent-pinned`, and `governed-knowledge-artifact-purged`.

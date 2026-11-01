@@ -215,6 +215,11 @@ export const Checkpoints = {
     secretBound: 'foundry-secret-binding-secret-bound',
     secretUnavailable: 'foundry-secret-binding-secret-unavailable',
   },
+  governedKnowledge: {
+    toolsPublished: 'governed-knowledge-tools-published',
+    agentPinned: 'governed-knowledge-agent-pinned',
+    artifactPurged: 'governed-knowledge-artifact-purged',
+  },
   sourceLifecycle: { acquisitions: 'source-lifecycle-acquisitions', projections: 'source-lifecycle-projections' },
   schemaDrivenSources: {
     completed: 'schema-driven-sources-completed',

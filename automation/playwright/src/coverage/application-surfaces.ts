@@ -253,8 +253,16 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('vaults', `${consolePages}/Vaults.razor`, ['/vaults'], 418),
   partialResourceAdministration('vault-editor', `${consolePages}/VaultEditor.razor`, ['/vaults/new', '/vaults/{Name}'], 419, ['name']),
   partialResourceAdministration('tools', `${consolePages}/Tools.razor`, ['/tools'], 420),
-  planned('tool-sets', `${consolePages}/ToolSets.razor`, ['/tools/sets'], 640),
-  planned('tool-set-details', `${consolePages}/ToolSetDetails.razor`, ['/tools/sets/{Name}'], 640, ['name']),
+  {
+    id: 'tool-sets', host: 'console', source: `${consolePages}/ToolSets.razor`, routes: ['/tools/sets'], fixtureKeys: [],
+    pageObject: 'src/pages/governed-knowledge.page.ts', journey: 'administer-governed-knowledge',
+    specification: 'tests/governed-knowledge.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'tool-set-details', host: 'console', source: `${consolePages}/ToolSetDetails.razor`, routes: ['/tools/sets/{Name}'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/governed-knowledge.page.ts', journey: 'administer-governed-knowledge',
+    specification: 'tests/governed-knowledge.spec.ts', coverage: 'partial', trackingIssue: 640,
+  },
   {
     id: 'tool-details', host: 'console', source: `${consolePages}/ToolDetails.razor`, routes: ['/tools/{Name}'], fixtureKeys: ['name'],
     pageObject: 'src/pages/tool-execution.page.ts', journey: 'exercise-tool-execution',

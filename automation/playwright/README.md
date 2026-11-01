@@ -173,3 +173,24 @@ On a persistent external instance, run the workspace plan first and set `workspa
 Profile inputs may be an ordered array when equivalent environments use different resource names. The journey selects the first available candidate and reports the available options immediately when none match.
 
 See [Browser automation](../../docs/contributing/browser-automation.md), [ADR-0117](../../docs/decisions/0117-product-owned-browser-journeys.md), and [ADR-0118](../../docs/decisions/0118-browser-campaigns-use-dedicated-workspaces.md) for ownership, extension, and external-consumption rules.
+
+The governed Knowledge administration journey composes the Data Source-backed
+projection scenario with source-specific ToolSet publication, partial Agent grants,
+immutable active-revision evidence, Snapshot artifact content authorization,
+retention, and lease-protected purge:
+
+```powershell
+npx playwright test governed-knowledge.spec.ts
+```
+
+It runs offline with local authentication on desktop, mobile, and the French
+Console. See [the scenario prerequisites and routes](../../docs/contributing/browser-automation.md#governed-knowledge-administration)
+before using `administer-governed-knowledge` in an external capture plan.
+
+For capture, point the checked-in plan at a disposable instance configured with
+Local authentication (the generic capture CLI's managed host uses Development
+authentication):
+
+```powershell
+npm run capture -- --plan examples/administer-governed-knowledge.capture-plan.json --output .work/governed-knowledge --console-url http://localhost:53400
+```
