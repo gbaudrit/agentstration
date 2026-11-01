@@ -392,7 +392,9 @@ public sealed class OpenApiExtensionTests
 
     private static OpenApiOptions DefaultOptions() => new()
     {
-        AllowedDomains = ["example.test"], AllowedPorts = [443], AllowPrivateAddresses = true
+        AllowedDomains = ["example.test"],
+        AllowedPorts = [443],
+        AllowPrivateAddresses = true
     };
 
     private static string ContractWithSchema(string reference) => """

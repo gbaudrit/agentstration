@@ -160,8 +160,11 @@ public sealed class OpenApiService(
                 contractId, operation.Eligible, JsonSerializer.SerializeToElement(selector),
                 new Dictionary<string, string>
                 {
-                    ["kind"] = "operation", ["method"] = operation.Method, ["path"] = operation.Path,
-                    ["readOnly"] = operation.ReadOnly ? "true" : "false", ["contractDigest"] = contract.Sha256
+                    ["kind"] = "operation",
+                    ["method"] = operation.Method,
+                    ["path"] = operation.Path,
+                    ["readOnly"] = operation.ReadOnly ? "true" : "false",
+                    ["contractDigest"] = contract.Sha256
                 });
         }
     }
@@ -212,8 +215,10 @@ public sealed class OpenApiService(
             if (name is null || location is null || !required) continue;
             var present = location switch
             {
-                "path" => path.ContainsKey(name), "query" => query.ContainsKey(name),
-                "header" => headers.ContainsKey(name), _ => true
+                "path" => path.ContainsKey(name),
+                "query" => query.ContainsKey(name),
+                "header" => headers.ContainsKey(name),
+                _ => true
             };
             if (!present) throw Error("openapi_argument_required", $"Required {location} argument '{name}' is missing.");
         }

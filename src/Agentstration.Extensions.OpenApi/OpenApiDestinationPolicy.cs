@@ -64,7 +64,8 @@ public sealed class OpenApiDestinationPolicy(IOptions<OpenApiOptions> options, I
             return allowPrivate || (bytes[0] & 0xfe) != 0xfc;
         return bytes[0] switch
         {
-            0 or 127 => false, 10 => allowPrivate,
+            0 or 127 => false,
+            10 => allowPrivate,
             100 when bytes[1] is >= 64 and <= 127 => allowPrivate,
             169 when bytes[1] == 254 => false,
             172 when bytes[1] is >= 16 and <= 31 => allowPrivate,
@@ -73,7 +74,8 @@ public sealed class OpenApiDestinationPolicy(IOptions<OpenApiOptions> options, I
             198 when bytes[1] is 18 or 19 => false,
             198 when bytes[1] == 51 && bytes[2] == 100 => false,
             203 when bytes[1] == 0 && bytes[2] == 113 => false,
-            >= 224 => false, _ => true
+            >= 224 => false,
+            _ => true
         };
     }
 
