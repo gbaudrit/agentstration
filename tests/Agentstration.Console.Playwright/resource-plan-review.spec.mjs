@@ -19,7 +19,10 @@ test('review a Resource Plan from intent through changes, graph, validation, act
     ['/api/modelprofiles', { name: modelName, scopeRef: '/instance', properties: { displayName: 'Review fixture model', provider: { name: providerName, namespace: 'default', scopeRef: '/instance' }, model: { name: 'fixture-model' } } }],
     ['/api/runtimeprofiles', { name: runtimeName, scopeRef: '/instance', properties: { displayName: 'Review fixture runtime', runtimeType: 'microsoft-agent-framework' } }],
   ]) {
-    const response = await page.request.post(path, { data });
+    const response = await page.request.post(path, {
+      headers: { 'X-Agentstration-Context': '/instance' },
+      data,
+    });
     const body = await response.text();
     expect(response.status(), body).toBe(201);
     createdResources.set(path, JSON.parse(body));
