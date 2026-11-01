@@ -51,7 +51,8 @@ public sealed partial class FlowTests
             TimeProvider? timeProvider = null,
             IFlowScopeHierarchy? scopeHierarchy = null,
             IFlowDiscoveryPolicy? discoveryPolicy = null,
-            IFlowResourceReferenceResolver? resourceReferenceResolver = null)
+            IFlowResourceReferenceResolver? resourceReferenceResolver = null,
+            IFlowAgentReferenceResolver? agentReferenceResolver = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -73,6 +74,8 @@ public sealed partial class FlowTests
             services.AddSingleton<ISchemaBindingResolver, TestSchemaBindingResolver>();
             if (resourceReferenceResolver is not null)
                 services.AddSingleton(resourceReferenceResolver);
+            if (agentReferenceResolver is not null)
+                services.AddSingleton(agentReferenceResolver);
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);

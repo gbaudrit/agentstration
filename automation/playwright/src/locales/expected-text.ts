@@ -65,6 +65,9 @@ export interface ExpectedText {
     message: string;
     changeScope: string;
   };
+  flowDiagnostics: {
+    modelProfileUnavailable: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -140,6 +143,9 @@ export const ExpectedTextByLocale = {
       message: 'To modify this resource, go to its owner scope.',
       changeScope: 'Change scope',
     },
+    flowDiagnostics: {
+      modelProfileUnavailable: 'An Agent model profile required by this Flow is unavailable in the execution context. Check its access policy and republish the Agent if its pinned revision changed.',
+    },
   },
   'fr-FR': {
     navigation: {
@@ -212,6 +218,9 @@ export const ExpectedTextByLocale = {
       title: 'Consultation uniquement',
       message: 'Pour modifier cette ressource, acc\u00e9dez \u00e0 son p\u00e9rim\u00e8tre propri\u00e9taire.',
       changeScope: 'Changer de p\u00e9rim\u00e8tre',
+    },
+    flowDiagnostics: {
+      modelProfileUnavailable: 'Un profil de mod\u00e8le requis par un agent de ce Flow est indisponible dans le p\u00e9rim\u00e8tre d\u2019ex\u00e9cution. V\u00e9rifiez sa politique d\u2019acc\u00e8s et republiez l\u2019agent si sa r\u00e9vision \u00e9pingl\u00e9e a chang\u00e9.',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;

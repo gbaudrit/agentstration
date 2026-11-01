@@ -95,6 +95,43 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
+    public void FlowRunSummaryKeepsGenericRuntimeFailureMessage()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("generic-runtime-failure");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        const string message = "The Runtime Worker could not complete the Flow Run.";
+        const string detail = "The assignment failed before producing an output.";
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "flowrun-generic-runtime-failure",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Failed,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            Error = new("worker_execution_failed", message, detail),
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0",
+                null, definition, new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        var error = rendered.Find(".run-error");
+        StringAssert.Contains(error.TextContent, message);
+        StringAssert.Contains(error.TextContent, detail);
+        Assert.IsFalse(error.TextContent.Contains("agent_model_profile_unavailable", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void FlowRunGridUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
     {
         using var context = new BunitContext();

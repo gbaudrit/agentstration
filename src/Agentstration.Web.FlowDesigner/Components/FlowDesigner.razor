@@ -77,7 +77,7 @@ else
 
     @if (error is not null)
     {
-        <div class="designer-feedback" role="alert">
+        <div class="designer-feedback" role="alert" data-testid="flow-designer-publication-error">
             <span class="designer-feedback-icon" aria-hidden="true">!</span>
             <div><strong>@T("ActionFailed")</strong><p>@error</p></div>
             <button aria-label="@T("DismissError")" @onclick="() => error = null">×</button>

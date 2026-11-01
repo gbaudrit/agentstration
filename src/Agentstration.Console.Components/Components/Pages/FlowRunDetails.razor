@@ -36,7 +36,7 @@ else
     </nav>
     @if (run.Error is not null)
     {
-        <article class="panel run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
+        <article class="panel run-error" data-testid="flow-run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
     }
     @if (pendingInput is not null)
     {

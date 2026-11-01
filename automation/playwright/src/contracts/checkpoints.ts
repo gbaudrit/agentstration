@@ -169,6 +169,12 @@ export const Checkpoints = {
     isolated: 'model-profile-cross-scope-isolated',
     updated: 'model-profile-cross-scope-updated',
   },
+  modelProfileFlowDiagnostic: {
+    unavailable: 'model-profile-flow-diagnostic-unavailable',
+  },
+  scopedFlowDesigner: {
+    publicationFailure: 'scoped-flow-designer-publication-failure',
+  },
   operationalWorkspaces: {
     topology: 'operational-workspaces-topology',
     instanceRun: 'operational-workspaces-instance-run',
