@@ -76,6 +76,7 @@
   <data name="PublicationSucceededInactive"><value>Version {0} was published without activation.</value></data>
   <data name="DismissPublication"><value>Dismiss publication result</value></data>
   <data name="UnavailableReference"><value>{0} (not available in this scope)</value></data>
+  <data name="AgentNotSelected"><value>No agent selected</value></data>
   <data name="ResourceOption"><value>{0} · {1}</value></data>
   <data name="ResourceOptionNamespaced"><value>{0} ({1}) · {2}</value></data>
   <data name="ResourceOptionDetails"><value>{0} / {1} · {2}</value></data>

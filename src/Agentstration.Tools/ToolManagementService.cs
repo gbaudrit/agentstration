@@ -30,6 +30,10 @@ public sealed class ToolManagementService(
     public Task<StoredResource<ToolProviderResource>?> GetProviderExactAsync(ResourceScopeRef scopeRef, string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
         store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ToolResourceKinds.ToolProvider, name), cancellationToken);
     public Task<IReadOnlyList<StoredResource<ToolResource>>> ListToolsAsync(CancellationToken cancellationToken) => store.ListAllAsync<ToolResource>(ToolResourceKinds.Tool, cancellationToken);
+    public Task<IReadOnlyList<StoredResource<ToolResource>>> ListVisibleToolsAsync(
+        ResourceScopeRef targetScopeRef,
+        CancellationToken cancellationToken) =>
+        store.ListVisibleAsync<ToolResource>(targetScopeRef, ToolResourceKinds.Tool, 0, 1000, cancellationToken);
     public Task<IReadOnlyList<StoredResource<ToolProviderResource>>> ListProvidersAsync(CancellationToken cancellationToken) => store.ListAllAsync<ToolProviderResource>(ToolResourceKinds.ToolProvider, cancellationToken);
 
     public async Task<StoredResource<ToolProviderResource>> PutProviderAsync(ToolProviderResource resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken)

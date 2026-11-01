@@ -143,9 +143,11 @@ export class DescendantSecretsPage {
   }
 
   private async open(url: string, marker: Locator): Promise<void> {
-    const selectedScopeRef = await this.page.getByTestId(TestIds.console.shell)
+    const shellScopeRef = await this.page.getByTestId(TestIds.console.shell)
       .getAttribute('data-context-scope')
       .catch(() => null);
+    const urlScopeRef = new URL(this.page.url()).searchParams.get('context');
+    const selectedScopeRef = urlScopeRef ?? shellScopeRef;
     const target = new URL(url);
     if (selectedScopeRef && !target.searchParams.has('context')) {
       target.searchParams.set('context', selectedScopeRef);
