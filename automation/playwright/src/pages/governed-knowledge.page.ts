@@ -62,11 +62,21 @@ export class GovernedKnowledgePage {
     const selected = search!.tool.name;
     const excluded = exposure.operations.filter(item => item.tool.name !== selected).map(item => item.tool.name);
     const agentName = `knowledge-reader-${Date.now().toString(36)}`;
+    // Keep the shared execution-scope profile's usage graph unchanged for other journeys.
+    const template = await this.page.request.get(`${consoleUrl}/api/modelprofiles/execution-scope-reasoning?scopeRef=${encodeURIComponent('/instance')}`);
+    await status(template, 200);
+    const model = await template.json() as { definition: Record<string, unknown> };
+    const profileName = `${agentName}-model`;
+    const profile = await this.page.request.post(`${consoleUrl}/api/modelprofiles`, {
+      data: { name: profileName, namespace: 'default', scopeRef: scope,
+        properties: { ...model.definition, displayName: profileName } },
+    });
+    await status(profile, 201);
     const editor = new AgentEditorPage(this.page);
     await editor.openNew(consoleUrl);
     await editor.fillIdentity({ name: agentName, displayName: agentName, description: 'Offline governed Knowledge reader' });
     await editor.configureBehavior({ instructions: 'Use only the granted Knowledge search tool.',
-      modelProfile: '/instance|default|execution-scope-reasoning', runtimeProfile: '/instance|default|maf-builtin' });
+      modelProfile: `${scope}|default|${profileName}`, runtimeProfile: '/instance|default|maf-builtin' });
     await editor.openTools();
     const card = this.page.getByTestId(TestIds.agentEditor.toolSetConfiguration)
       .locator('article[data-toolset]').filter({ has: this.page.getByRole('heading', { name: exposure.toolSet.name, exact: true }) });

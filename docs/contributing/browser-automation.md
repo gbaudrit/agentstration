@@ -160,7 +160,8 @@ Data Source and projection UX validation is recorded above. The final routes are
 `/tools/sets`, `/tools/sets/{Name}`, `/agents/new`, `/agents/{Name}`, `/artifacts`,
 `/artifacts/durable/{Id}`, and `/artifacts/staged/{Id}`.
 
-The journey publishes the source-specific retrieval ToolSet, inspects its immutable
+The journey creates a dedicated Workspace Model Profile to preserve shared fixture
+usage graphs, publishes the source-specific retrieval ToolSet, inspects its immutable
 version, deploys an Agent with only the search member, and checks that saving broader
 draft grants does not alter the active revision's pinned permissions. From a Snapshot
 artifact link it inspects the durable artifact, explicitly materializes and previews
