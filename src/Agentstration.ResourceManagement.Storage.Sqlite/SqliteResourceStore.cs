@@ -627,8 +627,14 @@ public sealed class SqliteResourceStore(
     private async Task<bool> CanDiscoverAsync(ResourceManagementDbContext context, ControlPlaneDocument document,
         CancellationToken cancellationToken)
     {
-        if (requestContext.AccessMode != ControlPlaneAccessMode.Workspace
-            || document.Scope.Ref == ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId).Value)
+        var targetRef = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration =>
+                ResourceScopeRef.Tenant(requestContext.Current.TenantId),
+            ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
+            _ => default
+        };
+        if (targetRef == default || document.Scope.Ref == targetRef.Value)
             return true;
         return (await FilterDiscoverableAsync(context, [document], cancellationToken)).Length == 1;
     }
@@ -641,7 +647,7 @@ public sealed class SqliteResourceStore(
             return candidates;
         var targetRef = requestContext.AccessMode switch
         {
-            ControlPlaneAccessMode.TenantAdministration =>
+            ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration =>
                 ResourceScopeRef.Tenant(requestContext.Current.TenantId),
             ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
             _ => default
