@@ -254,15 +254,20 @@ public sealed class DataSourceAcquisitionCompositionResolver(
         ResourceScopeRef consumerScope,
         CancellationToken cancellationToken) where T : Resource
     {
-        using var exactScope = requestContext.AccessMode == ControlPlaneAccessMode.Workspace
-            ? address.ScopeRef.Kind switch
+        using var exactScope = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.Workspace => address.ScopeRef.Kind switch
             {
                 ResourceScopeKind.Instance => requestScopes.PushInstance(requestContext.Current),
                 ResourceScopeKind.Tenant when address.ScopeRef.TargetId == requestContext.Current.TenantId =>
                     requestScopes.PushTenantAdministration(requestContext.Current),
                 _ => null
-            }
-            : null;
+            },
+            ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration
+                when address.ScopeRef.Kind == ResourceScopeKind.Instance =>
+                requestScopes.PushInstance(requestContext.Current),
+            _ => null
+        };
         return await store.GetExactAsync<T>(address, cancellationToken);
     }
 

@@ -336,15 +336,20 @@ public sealed class DataSourceProfileService(
         CancellationToken cancellationToken)
     {
         var profileScope = RequireScope(profile);
-        using var exactScope = requestContext.AccessMode == ControlPlaneAccessMode.Workspace
-            ? profileScope.Kind switch
+        using var exactScope = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.Workspace => profileScope.Kind switch
             {
                 ResourceScopeKind.Instance => requestScopes.PushInstance(requestContext.Current),
                 ResourceScopeKind.Tenant when profileScope.TargetId == requestContext.Current.TenantId =>
                     requestScopes.PushTenantAdministration(requestContext.Current),
                 _ => null
-            }
-            : null;
+            },
+            ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration
+                when profileScope.Kind == ResourceScopeKind.Instance =>
+                requestScopes.PushInstance(requestContext.Current),
+            _ => null
+        };
         return await store.GetExactAsync<DataSourceProfileRevisionResource>(Address(profileScope, profile.Namespace,
             DataSourceResourceKinds.DataSourceProfileRevision, RevisionName(profile.Name, version)), cancellationToken);
     }
