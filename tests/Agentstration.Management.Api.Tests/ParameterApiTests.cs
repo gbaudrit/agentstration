@@ -79,7 +79,8 @@ public sealed class ParameterApiTests : ModelManagementApiTestBase
                 await Assert.ThrowsExactlyAsync<ParameterAccessDeniedException>(() => resolver.ResolveAsync(reference, denied));
             }
         }
-        Assert.AreEqual(HttpStatusCode.UnprocessableEntity,
+        // An explicit lateral read is an authorization failure, not an invalid Parameter definition.
+        Assert.AreEqual(HttpStatusCode.Forbidden,
             (await client.GetAsync(Url("shared-setting", ResourceScopeRef.Workspace(foreignWorkspaceId)))).StatusCode);
 
         SelectConsoleContext(client, tenant);

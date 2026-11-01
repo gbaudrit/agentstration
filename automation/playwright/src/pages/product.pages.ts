@@ -1,3 +1,4 @@
+import { SourceLifecyclePage } from './source-lifecycle.page.js';
 import type { Locator, Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { AgentEditorPage } from './agent-editor.page.js';
@@ -63,6 +64,7 @@ export class ProductPages {
   public readonly toolExecution: ToolExecutionPage;
   public readonly runtimeWorkerObservability: RuntimeWorkerObservabilityPage;
   public readonly agentInstanceObservability: AgentInstanceObservabilityPage;
+  public readonly sourceLifecycle: SourceLifecyclePage;
   public readonly schemaDrivenSources: SchemaDrivenSourcesPage;
   public readonly schemaAdministration: SchemaAdministrationPage;
   public readonly resourceAccess: ResourceAccessPage;
@@ -102,6 +104,7 @@ export class ProductPages {
     this.toolExecution = new ToolExecutionPage(page);
     this.runtimeWorkerObservability = new RuntimeWorkerObservabilityPage(page);
     this.agentInstanceObservability = new AgentInstanceObservabilityPage(page);
+    this.sourceLifecycle = new SourceLifecyclePage(page);
     this.schemaDrivenSources = new SchemaDrivenSourcesPage(page);
     this.schemaAdministration = new SchemaAdministrationPage(page);
     this.resourceAccess = new ResourceAccessPage(page);

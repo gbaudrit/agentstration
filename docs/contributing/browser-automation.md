@@ -108,3 +108,41 @@ The runner starts isolated product hosts unless an external Console URL is provi
 Use `--console-url <url>` to run against an existing Console; add `--workplace-url <url>` only when the selected journey uses Workplace. Command-line URLs override values from the plan. Supplying a Console URL disables local product-host startup.
 
 An external repository should checkout the requested Agentstration tag, run the command from that checkout, and write output into its own workspace. It must not copy the page objects or journeys.
+
+## Data Source and Knowledge lifecycle scenarios
+
+The current Data Source and Knowledge UX was explicitly validated by the maintainer
+on 2026-11-01 for [#731](https://github.com/gbaudrit/agentstration/issues/731) and
+[#732](https://github.com/gbaudrit/agentstration/issues/732). Their owning PRs
+#733 and #739 are merged; #740 completed the composition replacement.
+
+`administer-data-sources` visits `/data-source-profiles`,
+`/data-source-profiles/new`, `/data-source-profiles/{Name}`, `/data-sources`,
+`/data-sources/new`, and `/data-sources/{Name}`. It creates a profile and two
+configurations, checks schema errors, acquires offline content, publishes and
+activates a compatible revision, and verifies that historical acquisitions retain
+their exact original composition. Disabling a profile exposes unavailable-binding
+feedback and prevents acquisition.
+
+`project-knowledge-sources` visits `/knowledge-sources`, `/knowledge-sources/new`,
+`/knowledge-sources/{Name}/edit`, and `/knowledge-sources/{Name}` with the
+`projections`, `snapshots`, and `retrieval` views. It exercises a single input,
+a required input without an acquisition, optional partial failure, and successful
+aggregation. It checks Snapshot input, acquisition, profile, Flow, artifact, storage,
+and retrieval provenance and proves that reacquisition does not itself project.
+The bounded acquisition and projection fixtures invoke no Tools, so their expected
+acquisition Tool binding set is explicitly empty.
+
+Both journeys reuse the authentication and execution-scope fixtures, including the
+sibling Workspace and Tenant, and use two locally staged durable text artifacts and
+published deterministic Flows. The `example.test` configuration values are never
+fetched. Ancestor grants and lateral or unauthorized access are checked through the
+supported resource APIs. No live model, crawler, remote provider, or Internet call
+is part of the scenarios.
+
+Run `npx playwright test source-lifecycle.spec.ts` from `automation/playwright`.
+Desktop and 390 × 844 mobile variants are tagged `@smoke` and run in the existing
+Browser UX CI lane. The capture checkpoints are `source-lifecycle-acquisitions`
+and `source-lifecycle-projections`. Both journeys own their corresponding routes in the application coverage catalog.
+Explicit reads of another Workspace’s resources must return HTTP 403; storage
+raises the scope authorization failure consumed by the family API error handlers.

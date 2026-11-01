@@ -132,6 +132,15 @@ function coveredOperationalTriggers(
   };
 }
 
+function lifecycleSurface(id: string, component: string, routes: readonly string[], issueNumber: number, fixtureKeys: readonly string[] = []): ApplicationSurface {
+  return {
+    id, host: 'console', source: `${consolePages}/${component}.razor`, routes, fixtureKeys,
+    pageObject: 'src/pages/source-lifecycle.page.ts', specification: 'tests/source-lifecycle.spec.ts',
+    journey: issueNumber === 731 ? 'administer-data-sources' : 'project-knowledge-sources',
+    coverage: 'covered',
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -272,8 +281,13 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredDistribution('source-registries', `${consolePages}/SourceRegistries.razor`, ['/settings/source-registries', '/settings/source-registries/new', '/settings/source-registries/{Name}'], ['name']),
   coveredDistribution('source-registry-discovery', `${consolePages}/SourceRegistryDiscovery.razor`, ['/settings/source-registries/discovery']),
   coveredDistribution('sources', `${consolePages}/Sources.razor`, ['/settings/sources', '/settings/sources/{Publisher}/{Name}'], ['publisher', 'name'], 'import-source'),
-  planned('knowledge-sources', `${consolePages}/KnowledgeSources.razor`, ['/knowledge-sources'], 640),
-  planned('knowledge-source-details', `${consolePages}/KnowledgeSourceDetails.razor`, ['/knowledge-sources/{Name}'], 640, ['name']),
+  lifecycleSurface('knowledge-sources', 'KnowledgeSources', ['/knowledge-sources'], 732),
+  lifecycleSurface('knowledge-source-details', 'KnowledgeSourceDetails', ['/knowledge-sources/{Name}'], 732, ['name']),
+  lifecycleSurface('knowledge-source-editor', 'KnowledgeSourceEditor', ['/knowledge-sources/new', '/knowledge-sources/{Name}/edit'], 732, ['name']),
+  lifecycleSurface('data-source-profiles', 'DataSourceProfiles', ['/data-source-profiles'], 731),
+  lifecycleSurface('data-source-profile-editor', 'DataSourceProfileEditor', ['/data-source-profiles/new', '/data-source-profiles/{Name}'], 731, ['name']),
+  lifecycleSurface('data-sources', 'DataSources', ['/data-sources'], 731),
+  lifecycleSurface('data-source-editor', 'DataSourceEditor', ['/data-sources/new', '/data-sources/{Name}'], 731, ['name']),
   {
     id: 'artifacts', host: 'console', source: `${consolePages}/Artifacts.razor`, routes: ['/artifacts'], fixtureKeys: [],
     pageObject: 'src/pages/artifact-administration.page.ts', journey: 'inspect-artifact-content',
