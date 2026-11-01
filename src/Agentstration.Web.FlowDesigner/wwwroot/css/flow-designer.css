@@ -81,6 +81,7 @@
 .source-apply-spinner{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
 .designer-feedback{display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:start;gap:12px;margin:0 0 14px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--color-danger) 38%,var(--border));border-radius:9px;background:color-mix(in srgb,var(--color-danger) 8%,var(--surface));color:var(--text)}
 .designer-feedback-icon{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--color-danger);color:#fff;font-weight:800}.designer-feedback strong{display:block;margin:2px 0 0;font-size:.85rem}.designer-feedback p{margin:4px 0 0;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere}.designer-feedback button{width:26px;height:26px;border:0;border-radius:5px;background:transparent;color:var(--muted);cursor:pointer}.designer-feedback button:hover,.designer-feedback button:focus-visible{background:var(--surface-2);color:var(--text)}
+.designer-feedback-success{border-color:color-mix(in srgb,var(--color-success) 38%,var(--border));background:color-mix(in srgb,var(--color-success) 8%,var(--surface))}.designer-feedback-success .designer-feedback-icon{background:var(--color-success)}
 
 @media(min-width:801px){
     .content:has(.flow-designer-page){height:calc(100dvh - var(--topbar-height));overflow:hidden}
@@ -152,8 +153,8 @@
     .flow-editor-shell.palette-open .designer-view-controls{left:calc(var(--palette-drawer-width) + 12px)}
     .flow-editor-shell.inspector-open>.flow-inspector{right:0;border-left:1px solid var(--border)}
     .flow-editor-shell.split{grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr)}
-    .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1}
-    .flow-editor-shell.split>.source-editor{grid-column:2;min-height:420px}
+    .flow-designer-page .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1}
+    .flow-designer-page .flow-editor-shell.split>.source-editor{grid-column:2;min-height:420px}
     .designer-view-controls .desktop-panel-toggle{display:none}
     .designer-view-controls .compact-panel-toggle{display:grid}
     .designer-focus-toolbar .focus-workspace-controls .desktop-panel-toggle{display:none}
@@ -177,8 +178,8 @@
 @container flow-designer (max-width:620px){
     .flow-editor-shell{--palette-drawer-width:min(210px,56%)}
     .flow-editor-shell.split{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(460px,1fr) minmax(420px,auto)}
-    .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1;grid-row:1}
-    .flow-editor-shell.split>.source-editor{grid-column:1;grid-row:2}
+    .flow-designer-page .flow-editor-shell.split>.flow-canvas-wrap{grid-column:1;grid-row:1}
+    .flow-designer-page .flow-editor-shell.split>.source-editor{grid-column:1;grid-row:2}
     .designer-focus-toolbar{right:10px;left:10px;justify-content:flex-start;max-width:none;overflow-x:auto;transform:none}
     .designer-focus-toolbar .focus-exit span{display:none}
     .flow-designer-page .designer-toolbar{padding:12px}

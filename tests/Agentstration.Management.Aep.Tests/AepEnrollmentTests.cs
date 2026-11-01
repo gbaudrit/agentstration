@@ -7,8 +7,10 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
+using Agentstration.Tools;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,14 +59,22 @@ public sealed class AepEnrollmentTests
             string registrationName,
             Uri endpoint,
             CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult(new ExtensionInspection(
-                registrationName,
-                endpoint,
-                "unavailable",
-                null,
-                [],
-                [],
-                "The test extension is intentionally unavailable."));
+            endpoint.Host == "instance-inventory.extension.example"
+                ? ValueTask.FromResult(new ExtensionInspection(
+                    registrationName,
+                    endpoint,
+                    "available",
+                    new ExtensionIdentity("extension.instance-inventory", "Instance inventory", "1.0.0", null),
+                    [new ExtensionContribution(AepContributionKinds.Tool, "lookup")],
+                    []))
+                : ValueTask.FromResult(new ExtensionInspection(
+                    registrationName,
+                    endpoint,
+                    "unavailable",
+                    null,
+                    [],
+                    [],
+                    "The test extension is intentionally unavailable."));
     }
 
     [TestMethod]
@@ -247,6 +257,15 @@ public sealed class AepEnrollmentTests
 
             var unassigned = await Assert.ThrowsAsync<AepEnrollmentException>(() => service.RotateAsync(context, instanceId, default));
             Assert.AreEqual("scope_required", unassigned.Code);
+            if (target.Kind != ResourceScopeKind.Workspace)
+            {
+                using var workspaceScope = factory.Services
+                    .GetRequiredService<IRequestContextScopeFactory>()
+                    .Push(context);
+                await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+                    service.AssignAsync(context, instanceId, target, default));
+            }
+            using var ownerScope = PushOwnerScope(factory, context, target);
             await service.AssignAsync(context, instanceId, target, default);
             var code = await service.RotateAsync(context, instanceId, default);
             var credential = await service.ClaimAsync(new(instanceId, instanceId, code.Code), default);
@@ -259,7 +278,177 @@ public sealed class AepEnrollmentTests
                 $"paired-{instanceId:N}",
                 default);
             Assert.IsNotNull(registration, $"Expected a registration in {target.Value}.");
+            var provider = await factory.Services.GetRequiredService<ToolManagementService>().GetProviderExactAsync(
+                target,
+                $"paired-{instanceId:N}",
+                ResourceNamespace.Default,
+                default);
+            Assert.IsNull(provider, "An extension that advertises no Tools must not create a ToolProvider.");
         }
+    }
+
+    [TestMethod]
+    public async Task PairingReadyProvisionsResourcesFromTheAuthenticatedManifestAndExactRegistration()
+    {
+        var recorder = new RecordingResourceProvisioner();
+        var handler = new EnrollmentLifecycleHandler("extension.tools-test", advertiseTool: true);
+        await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IAepEnrollmentResourceProvisioner>();
+            services.AddSingleton<IAepEnrollmentResourceProvisioner>(recorder);
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var service = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var instanceId = Guid.NewGuid();
+        var target = ResourceScopeRef.Tenant(context.TenantId);
+        _ = await service.AnnounceAsync(new(
+            instanceId,
+            new AepExtensionIdentity("extension.tools-test", "Tools test", "1.0.0"),
+            new Uri("https://tools.example/"),
+            new Uri("https://tools.example/aep/enrollment/pair")), default);
+        using var ownerScope = PushOwnerScope(factory, context, target);
+        await service.AssignAsync(context, instanceId, target, default);
+        var code = await service.RotateAsync(context, instanceId, default);
+        var credential = await service.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+
+        var result = await service.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default);
+
+        Assert.AreEqual("available", result.State);
+        Assert.IsNotNull(recorder.Registration);
+        Assert.AreEqual(target, recorder.Registration.ScopeRef);
+        Assert.AreEqual($"paired-{instanceId:N}", recorder.Registration.Name);
+        Assert.HasCount(1, recorder.Manifest!.Contributions.Tools!);
+        Assert.AreEqual("lookup", recorder.Manifest.Contributions.Tools![0].Id);
+    }
+
+    [TestMethod]
+    public async Task InstanceInventoryPreservesTheSelectedScopeWhenLoadingContributions()
+    {
+        var handler = new EnrollmentLifecycleHandler("extension.instance-inventory", advertiseTool: true);
+        await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IToolProviderDiscovery>();
+            services.AddSingleton<IToolProviderDiscovery, StaticToolDiscovery>();
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var enrollment = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var instanceId = Guid.NewGuid();
+        var endpoint = new Uri("https://instance-inventory.extension.example/");
+        _ = await enrollment.AnnounceAsync(new(
+            instanceId,
+            new AepExtensionIdentity("extension.instance-inventory", "Instance inventory", "1.0.0"),
+            endpoint,
+            new Uri(endpoint, AepEnrollmentProtocol.PairingPath)), default);
+        using var ownerScope = PushOwnerScope(factory, context, ResourceScopeRef.Instance);
+        await enrollment.AssignAsync(context, instanceId, ResourceScopeRef.Instance, default);
+        var code = await enrollment.RotateAsync(context, instanceId, default);
+        var credential = await enrollment.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+        _ = await enrollment.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default);
+
+        var item = (await factory.Services.GetRequiredService<ExtensionInventoryService>().ListAsync(context, default))
+            .Single(value => value.EnrollmentInstanceId == instanceId);
+
+        Assert.AreEqual(ResourceScopeRef.Instance, item.RegistrationScopeRef);
+        Assert.IsNotNull(item.Extension);
+        Assert.IsTrue(
+            item.Extension.Contributions.Any(value => value.Kind == AepContributionKinds.Tool && value.Id == "lookup"),
+            $"Expected lookup Tool contribution; status={item.AvailabilityStatus}, details={item.Extension.Details}, contributions={string.Join(',', item.Extension.Contributions.Select(value => $"{value.Kind}:{value.Id}"))}.");
+    }
+
+    [TestMethod]
+    public async Task PairingReadyFailsEnrollmentWhenResourceProvisioningFails()
+    {
+        var recorder = new RecordingResourceProvisioner { Failure = new InvalidOperationException("collision") };
+        var handler = new EnrollmentLifecycleHandler("extension.tools-failure", advertiseTool: true);
+        await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IAepEnrollmentResourceProvisioner>();
+            services.AddSingleton<IAepEnrollmentResourceProvisioner>(recorder);
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var service = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var instanceId = Guid.NewGuid();
+        _ = await service.AnnounceAsync(new(
+            instanceId,
+            new AepExtensionIdentity("extension.tools-failure", "Tools failure", "1.0.0"),
+            new Uri("https://tools-failure.example/"),
+            new Uri("https://tools-failure.example/aep/enrollment/pair")), default);
+        using var ownerScope = PushOwnerScope(factory, context, ResourceScopeRef.Instance);
+        await service.AssignAsync(context, instanceId, ResourceScopeRef.Instance, default);
+        var code = await service.RotateAsync(context, instanceId, default);
+        var credential = await service.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+
+        var exception = await Assert.ThrowsAsync<AepEnrollmentException>(() =>
+            service.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default));
+
+        Assert.AreEqual("resource_provisioning_failed", exception.Code);
+        var enrollment = (await service.ListAsync(context, default)).Single(value => value.Definition.InstanceId == instanceId);
+        Assert.AreEqual(AepEnrollmentState.VerificationFailed, enrollment.Definition.State);
+        Assert.AreEqual("resource_provisioning_failed", enrollment.Definition.Outcome);
+    }
+
+    [TestMethod]
+    public async Task PairingAutomaticallyMaterializesExactScopedToolsAndRetryPreservesIdentity()
+    {
+        var handler = new EnrollmentLifecycleHandler("extension.materialization-test", advertiseTool: true);
+        await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IToolProviderDiscovery>();
+            services.AddSingleton<IToolProviderDiscovery, StaticToolDiscovery>();
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var enrollment = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var tools = factory.Services.GetRequiredService<ToolManagementService>();
+        var instanceId = Guid.NewGuid();
+        var target = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var registrationName = $"paired-{instanceId:N}";
+        _ = await enrollment.AnnounceAsync(new(
+            instanceId,
+            new AepExtensionIdentity("extension.materialization-test", "Materialization test", "1.0.0"),
+            new Uri("https://materialization.example/"),
+            new Uri("https://materialization.example/aep/enrollment/pair")), default);
+        await enrollment.AssignAsync(context, instanceId, target, default);
+        var code = await enrollment.RotateAsync(context, instanceId, default);
+        var credential = await enrollment.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+
+        _ = await enrollment.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default);
+
+        using var systemScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var firstProvider = await tools.GetProviderExactAsync(target, registrationName, ResourceNamespace.Default, default);
+        var firstTool = (await tools.ListToolsAsync(default)).Single(value => value.Value.ScopeRef == target
+            && value.Value.Definition.Provider?.Name == registrationName);
+        Assert.IsNotNull(firstProvider);
+        Assert.AreEqual(target, firstProvider.Value.Definition.Aep!.Extension.ScopeRef);
+        Assert.AreEqual(registrationName, firstProvider.Value.Definition.Aep.Extension.Name);
+        Assert.AreEqual("lookup", firstTool.Value.Definition.ExternalId);
+        Assert.IsFalse(firstTool.Value.Definition.Enabled);
+        Assert.AreEqual(ResourceOriginKind.Extension, firstProvider.Value.Governance.Origin.Kind);
+        Assert.AreEqual("extension.materialization-test", firstProvider.Value.Governance.Origin.Reference);
+        Assert.AreEqual("1.0.0", firstProvider.Value.Governance.Origin.Version);
+        Assert.AreEqual(ResourceManagementAuthorityKind.ExtensionInstallation, firstProvider.Value.Governance.ManagedBy?.Kind);
+        Assert.AreEqual(firstProvider.Value.Governance, firstTool.Value.Governance);
+
+        var registration = await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>()
+            .GetExactAsync(target, ResourceNamespace.Default, registrationName, default);
+        var manifest = handler.Manifest();
+        await factory.Services.GetServices<IAepEnrollmentResourceProvisioner>().Single()
+            .ProvisionAsync(registration!.Value, manifest, default);
+        var secondProvider = await tools.GetProviderExactAsync(target, registrationName, ResourceNamespace.Default, default);
+        var secondTool = (await tools.ListToolsAsync(default)).Single(value => value.Value.ScopeRef == target
+            && value.Value.Definition.Provider?.Name == registrationName);
+
+        Assert.AreEqual(firstProvider.Value.Uid, secondProvider!.Value.Uid);
+        Assert.AreEqual(firstProvider.Value.Generation, secondProvider.Value.Generation);
+        Assert.AreEqual(firstTool.Value.Uid, secondTool.Value.Uid);
+        Assert.AreEqual(firstTool.Value.Generation, secondTool.Value.Generation);
     }
 
     [TestMethod]
@@ -312,13 +501,17 @@ public sealed class AepEnrollmentTests
             new AepExtensionIdentity("extension.reenrollment-test", "Re-enrollment test", "1.0.0"),
             new Uri("https://reenrollment.example/"),
             new Uri("https://reenrollment.example/aep/enrollment/pair")), default);
-        await service.AssignAsync(context, instanceId, initialTarget, default);
-        var firstCode = await service.RotateAsync(context, instanceId, default);
-        var firstCredential = await service.ClaimAsync(new(instanceId, instanceId, firstCode.Code), default);
-        _ = await service.ReadyAsync(new(instanceId, instanceId, firstCredential.CompletionToken), default);
+        AepEnrollmentCredential firstCredential;
+        using (PushOwnerScope(factory, context, initialTarget))
+        {
+            await service.AssignAsync(context, instanceId, initialTarget, default);
+            var firstCode = await service.RotateAsync(context, instanceId, default);
+            firstCredential = await service.ClaimAsync(new(instanceId, instanceId, firstCode.Code), default);
+            _ = await service.ReadyAsync(new(instanceId, instanceId, firstCredential.CompletionToken), default);
 
-        await service.UnenrollAsync(context, instanceId, default);
-        await service.UnenrollAsync(context, instanceId, default);
+            await service.UnenrollAsync(context, instanceId, default);
+            await service.UnenrollAsync(context, instanceId, default);
+        }
 
         var unenrolled = (await service.ListAsync(context, default)).Single(value => value.Definition.InstanceId == instanceId);
         Assert.AreEqual(AepEnrollmentState.Unpaired, unenrolled.Definition.State);
@@ -331,10 +524,14 @@ public sealed class AepEnrollmentTests
             Assert.IsFalse(disabled.Value.Definition.Enabled);
         }
 
-        await service.AssignAsync(context, instanceId, reenrollmentTarget, default);
-        var secondCode = await service.RotateAsync(context, instanceId, default);
-        var secondCredential = await service.ClaimAsync(new(instanceId, instanceId, secondCode.Code), default);
-        _ = await service.ReadyAsync(new(instanceId, instanceId, secondCredential.CompletionToken), default);
+        AepEnrollmentCredential secondCredential;
+        using (PushOwnerScope(factory, context, reenrollmentTarget))
+        {
+            await service.AssignAsync(context, instanceId, reenrollmentTarget, default);
+            var secondCode = await service.RotateAsync(context, instanceId, default);
+            secondCredential = await service.ClaimAsync(new(instanceId, instanceId, secondCode.Code), default);
+            _ = await service.ReadyAsync(new(instanceId, instanceId, secondCredential.CompletionToken), default);
+        }
 
         Assert.AreNotEqual(firstCredential.AccessToken, secondCredential.AccessToken);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
@@ -361,6 +558,7 @@ public sealed class AepEnrollmentTests
             {
                 builder.UseSetting("Agentstration:Extensions:extension.shared-key:EnrollmentMode", "SharedKeyFile");
                 builder.UseSetting("Agentstration:Extensions:extension.shared-key:SharedKeyFile:Path", path);
+                builder.ConfigureServices(services => services.RemoveAll<IAepEnrollmentResourceProvisioner>());
             });
             var context = await GetBootstrapContextAsync(factory);
             var service = factory.Services.GetRequiredService<AepEnrollmentService>();
@@ -502,6 +700,21 @@ public sealed class AepEnrollmentTests
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
 
+    private static IDisposable PushOwnerScope(
+        WebApplicationFactory<Program> factory,
+        RequestContext context,
+        ResourceScopeRef target)
+    {
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        return target.Kind switch
+        {
+            ResourceScopeKind.Instance => scopes.PushInstance(context),
+            ResourceScopeKind.Tenant => scopes.PushTenant(context.PrincipalId, context.TenantId),
+            ResourceScopeKind.Workspace => scopes.Push(context),
+            _ => throw new InvalidOperationException($"Unsupported resource scope '{target}'.")
+        };
+    }
+
     private sealed class AllowEnrollmentPlatformAdministrator : IPlatformAuthorizationService
     {
         public Task<bool> IsPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken) =>
@@ -514,7 +727,42 @@ public sealed class AepEnrollmentTests
             Task.FromResult(false);
     }
 
-    private sealed class EnrollmentLifecycleHandler(string extensionId) : HttpMessageHandler
+    private sealed class RecordingResourceProvisioner : IAepEnrollmentResourceProvisioner
+    {
+        public ExtensionRegistrationResource? Registration { get; private set; }
+        public AepManifest? Manifest { get; private set; }
+        public Exception? Failure { get; init; }
+
+        public Task ProvisionAsync(
+            ExtensionRegistrationResource registration,
+            AepManifest? authenticatedManifest,
+            CancellationToken cancellationToken)
+        {
+            Registration = registration;
+            Manifest = authenticatedManifest;
+            return Failure is null ? Task.CompletedTask : Task.FromException(Failure);
+        }
+    }
+
+    private sealed class StaticToolDiscovery : IToolProviderDiscovery
+    {
+        public bool Supports(ToolProviderType providerType) => providerType == ToolProviderType.Aep;
+
+        public Task<ToolProviderDiscoveryResult> DiscoverAsync(
+            ToolProviderResource provider,
+            CancellationToken cancellationToken) => Task.FromResult(new ToolProviderDiscoveryResult(
+                [new DiscoveredToolDescriptor(
+                    "lookup",
+                    "Lookup",
+                    "Looks up a value.",
+                    JsonSerializer.SerializeToElement(new { type = "object" }),
+                    null,
+                    new Dictionary<string, JsonElement>())],
+                new Dictionary<string, bool> { ["tools"] = true },
+                new Dictionary<string, string>()));
+    }
+
+    private sealed class EnrollmentLifecycleHandler(string extensionId, bool advertiseTool = false) : HttpMessageHandler
     {
         public AepCredentialRotation? Rotation { get; private set; }
         public int PreviousRevocationCount { get; private set; }
@@ -531,12 +779,21 @@ public sealed class AepEnrollmentTests
 
             if (request.RequestUri?.AbsolutePath != AepProtocol.DiscoveryPath)
                 return new(HttpStatusCode.OK);
-            var manifest = new AepManifest(
+            var manifest = Manifest();
+            return new(HttpStatusCode.OK) { Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions) };
+        }
+
+        public AepManifest Manifest()
+        {
+            var tools = advertiseTool
+                ? new[] { new AepToolContribution("lookup", "Lookup", new AepMcpToolMapping("main", "lookup")) }
+                : [];
+            return new AepManifest(
                 AepProtocol.Version,
                 new(extensionId, "Pairing test", "1.0.0"),
                 new Dictionary<string, AepCapabilityDescriptor>(),
-                new AepContributions([]));
-            return new(HttpStatusCode.OK) { Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions) };
+                new AepContributions([], tools),
+                advertiseTool ? new AepMcpDescriptor([new AepMcpServerDescriptor("main", "/mcp")]) : null);
         }
     }
 }

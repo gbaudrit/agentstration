@@ -247,6 +247,8 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(RuntimeToolInvocationMode.Automatic, standardRuntime.Definition.Execution.ToolInvocation);
         Assert.AreEqual(StreamingMode.Automatic, standardRuntime.Definition.Execution.Streaming);
         Assert.AreEqual("true", standardRuntime.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
+        Assert.AreEqual(ResourceOriginKind.BuiltIn, standardRuntime.Governance.Origin.Kind);
+        Assert.AreEqual(ResourceManagementAuthorityKind.Core, standardRuntime.Governance.ManagedBy?.Kind);
         Assert.AreEqual(HttpStatusCode.OK, platform.StatusCode);
 
         await using var scope = factory.Services.CreateAsyncScope();
@@ -275,6 +277,32 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.NoContent, login.StatusCode);
         using var authenticated = await client.GetAsync("/api/agents");
         Assert.AreEqual(HttpStatusCode.OK, authenticated.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task PlatformAdministratorCanOpenMembersFromTenantContext()
+    {
+        await using var factory = Factory("Local");
+        using var client = UnredirectedClient(factory);
+        await BootstrapAsync(client, "tenant-members-admin");
+
+        var context = await client.GetFromJsonAsync<IdentityConsoleContextResponse>("/api/identity/context");
+        Assert.IsNotNull(context);
+        var tenant = context.AvailableContexts.Single(value => value.Kind == IdentityConsoleContextKind.Tenant);
+        using var selected = await client.PostAsJsonAsync(
+            "/api/identity/context/selection",
+            new SelectConsoleContextRequest(tenant.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.OK, selected.StatusCode);
+
+        using var accounts = await client.GetAsync("/api/identity/accounts/");
+        Assert.AreEqual(HttpStatusCode.OK, accounts.StatusCode);
+        var localAccounts = await accounts.Content.ReadFromJsonAsync<LocalAccountResponse[]>();
+        Assert.IsNotNull(localAccounts);
+        Assert.HasCount(1, localAccounts);
+
+        using var membersPage = await client.GetAsync(
+            $"/settings/organization/members?context={Uri.EscapeDataString(tenant.ScopeRef)}");
+        Assert.AreEqual(HttpStatusCode.OK, membersPage.StatusCode);
     }
 
 }

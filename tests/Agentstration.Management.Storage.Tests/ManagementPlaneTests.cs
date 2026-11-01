@@ -11,6 +11,7 @@ using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Core;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Security.Contracts;
 using Agentstration.Sources;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -65,6 +66,23 @@ public sealed class ManagementPlaneTests
         Assert.IsNotNull(remote);
         Assert.AreEqual("profile-b", remote.Name);
         Assert.AreEqual(ResourceScopeRef.Tenant(Guid.Parse("11111111-1111-1111-1111-111111111111")), remote.ScopeRef);
+    }
+
+    [TestMethod]
+    public void GovernanceClassifiesAllSupportedOriginsWithoutBootstrap()
+    {
+        var values = new[]
+        {
+            ResourceGovernance.User,
+            ResourceGovernance.Core("agentstration.core", "1.0.0"),
+            ResourceGovernance.Pack("/instances/local/InstalledPack/sample", "publisher/sample", "1.0.0"),
+            ResourceGovernance.Extension("/instances/local/ExtensionInstallation/sample", "publisher/sample", "1.0.0")
+        };
+
+        CollectionAssert.AreEqual(
+            new[] { ResourceOriginKind.User, ResourceOriginKind.BuiltIn, ResourceOriginKind.Pack, ResourceOriginKind.Extension },
+            values.Select(value => value.Origin.Kind).ToArray());
+        Assert.IsFalse(Enum.GetNames<ResourceOriginKind>().Contains("Bootstrap", StringComparer.Ordinal));
     }
 
     [TestMethod]
@@ -230,6 +248,60 @@ public sealed class ManagementPlaneTests
         Assert.IsNotNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, "assistant", secondNamespace), default));
     }
 
+    [TestMethod]
+    public async Task SqliteStoreRejectsCallerSuppliedManagedGovernance()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var exception = await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => fixture.Store.PutAsync(
+            Agent("forged") with { Governance = ResourceGovernance.Core("agentstration.core") },
+            null,
+            true,
+            default));
+
+        StringAssert.Contains(exception.Message, "resource_governance_reserved");
+    }
+
+    [TestMethod]
+    public async Task SqliteStoreAllowsOnlyExactManagerToMutateManagedResource()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var v1 = ResourceGovernance.Pack("/instances/local/InstalledPack/sample", "publisher/sample", "1.0.0");
+        StoredResource<AgentResource> created;
+        using (fixture.Governance.Push(v1))
+            created = await fixture.Store.PutAsync(Agent("managed"), null, true, default);
+
+        Assert.AreEqual(v1, created.Value.Governance);
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => fixture.Store.PutAsync(
+            created.Value with { Definition = created.Value.Definition with { Description = "forbidden" } },
+            created.ETag,
+            false,
+            default));
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => fixture.Store.DeleteAsync(
+            new(AgentResourceKinds.Agent, "managed"), created.ETag, default));
+
+        var wrong = ResourceGovernance.Pack("/instances/local/InstalledPack/other", "publisher/other", "1.0.0");
+        using (fixture.Governance.Push(wrong))
+            await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => fixture.Store.PutAsync(created.Value, created.ETag, false, default));
+
+        var v2 = ResourceGovernance.Pack("/instances/local/InstalledPack/sample", "publisher/sample", "2.0.0");
+        StoredResource<AgentResource> updated;
+        using (fixture.Governance.Push(v2))
+            updated = await fixture.Store.PutAsync(
+                created.Value with { Definition = created.Value.Definition with { Description = "reconciled" } },
+                created.ETag,
+                false,
+                default);
+
+        Assert.AreEqual("2.0.0", updated.Value.Governance.Origin.Version);
+        using (fixture.Governance.Push(v2))
+            await fixture.Store.DeleteAsync(new(AgentResourceKinds.Agent, "managed"), updated.ETag, default);
+
+        Assert.IsTrue(fixture.Audit.Events.Any(value => value.Action == SecurityAuditActions.ManagedResourceMutationDenied
+            && value.Outcome == SecurityAuditOutcome.Failed
+            && value.ReasonCode == "resource_managed"));
+        Assert.IsTrue(fixture.Audit.Events.Count(value => value.Action == SecurityAuditActions.ManagedResourceReconciled) >= 3);
+    }
+
     private static AgentResource Agent(string name) => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
@@ -256,32 +328,49 @@ public sealed class ManagementPlaneTests
         private readonly string directory;
         private readonly ServiceProvider services;
         public IResourceStore Store { get; }
+        public IResourceGovernanceContext Governance { get; }
+        public RecordingAuditWriter Audit { get; }
 
-        private StoreFixture(string directory, ServiceProvider services, IResourceStore store)
+        private StoreFixture(string directory, ServiceProvider services, IResourceStore store, IResourceGovernanceContext governance, RecordingAuditWriter audit)
         {
             this.directory = directory;
             this.services = services;
             Store = store;
+            Governance = governance;
+            Audit = audit;
         }
 
         public static async Task<StoreFixture> CreateAsync()
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-resource-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
+            var audit = new RecordingAuditWriter();
             var services = new ServiceCollection()
                 .AddSingleton(TimeProvider.System)
                 .AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>()
+                .AddSingleton<ISecurityAuditWriter>(audit)
                 .AddSqliteControlPlane($"Data Source={Path.Combine(directory, "control-plane.db")};Pooling=False")
                 .BuildServiceProvider();
             var store = services.GetRequiredService<IResourceStore>();
             await store.InitializeAsync(default);
-            return new StoreFixture(directory, services, store);
+            return new StoreFixture(directory, services, store, services.GetRequiredService<IResourceGovernanceContext>(), audit);
         }
 
         public async ValueTask DisposeAsync()
         {
             await services.DisposeAsync();
             if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private sealed class RecordingAuditWriter : ISecurityAuditWriter
+    {
+        public List<SecurityAuditWrite> Events { get; } = [];
+
+        public Task WriteAsync(SecurityAuditWrite entry, CancellationToken cancellationToken)
+        {
+            Events.Add(entry);
+            return Task.CompletedTask;
         }
     }
 }

@@ -28,7 +28,12 @@ public sealed record WorkItemQuery(
     bool OperationalTasks = false,
     bool WorkplaceTasksOnly = false,
     DateTimeOffset? UpdatedFrom = null,
-    DateTimeOffset? UpdatedTo = null);
+    DateTimeOffset? UpdatedTo = null)
+{
+    public ResourceScopeRef ScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
+        ? ResourceScopeRef.Instance
+        : ResourceScopeRef.Workspace(WorkspaceId.Value);
+}
 
 public sealed record StoredWorkItem(WorkItem Value, string ETag, DateTimeOffset UpdatedAt);
 public sealed record WorkItemPage(IReadOnlyList<StoredWorkItem> Items, bool HasMore, int TotalCount = -1);
@@ -39,7 +44,11 @@ public interface IWorkItemRepository
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredWorkItem> CreateAsync(WorkItem workItem, CancellationToken cancellationToken);
     Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken);
+    Task<StoredWorkItem?> GetExactAsync(ResourceScopeRef scopeRef, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken) =>
+        GetAsync(RequiredWorkspace(scopeRef), ownerPrincipalId, id, cancellationToken);
     Task<StoredWorkItem?> GetForExecutionAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken);
+    Task<StoredWorkItem?> GetForExecutionExactAsync(ResourceScopeRef scopeRef, WorkItemId id, CancellationToken cancellationToken) =>
+        GetForExecutionAsync(RequiredWorkspace(scopeRef), id, cancellationToken);
     Task<StoredWorkItem> SaveAsync(WorkItem workItem, long expectedVersion, CancellationToken cancellationToken);
     Task<WorkItemPage> QueryAsync(WorkItemQuery query, CancellationToken cancellationToken);
     Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
@@ -53,6 +62,11 @@ public interface IWorkItemRepository
         WorkTaskId taskId,
         string expectedETag,
         CancellationToken cancellationToken);
+
+    private static WorkspaceId RequiredWorkspace(ResourceScopeRef scopeRef) =>
+        scopeRef.Kind == ResourceScopeKind.Workspace && scopeRef.TargetId is { } workspaceId
+            ? new WorkspaceId(workspaceId)
+            : throw new WorkValidationException("work_execution_scope_unsupported", $"Execution scope '{scopeRef}' is not supported by this store.");
 }
 
 public sealed class WorkItemConcurrencyException(string message) : Exception(message);

@@ -69,7 +69,10 @@ public sealed record SubmitRootFlowCommand(
     string? InteractionId = null,
     string? WorkTaskId = null,
     string? TriggerMessageId = null,
-    WorkItemId? WorkItemId = null);
+    WorkItemId? WorkItemId = null)
+{
+    public ResourceScopeRef? ExecutionScopeRef { get; init; }
+}
 
 public sealed record RootFlowSubmission(StoredWorkItem WorkItem, RootFlowRunResult FlowRun, bool Recovered);
 
@@ -121,10 +124,13 @@ public sealed class RootFlowSubmissionService(
         ArgumentNullException.ThrowIfNull(command);
         if (string.IsNullOrWhiteSpace(command.CallerId))
             throw new WorkValidationException("flow_invocation_caller_required", "A root Flow invocation requires a caller identity.");
-        var scope = executionScopeAccessors.Select(accessor => accessor.Current).FirstOrDefault(value => value is not null)
-            ?? throw new WorkValidationException("work_execution_scope_required", "Root Flow submission requires an authenticated Workspace scope.");
-        if (scope.WorkspaceId != command.WorkspaceId)
-            throw new WorkValidationException("flow_invocation_scope_mismatch", "The root Flow invocation and execution scope must belong to the same Workspace.");
+        var scope = WorkExecutionScopeSelection.Select(executionScopeAccessors)
+            ?? throw new WorkValidationException("work_execution_scope_required", "Root Flow submission requires an authenticated execution scope.");
+        var requestedScopeRef = command.ExecutionScopeRef ?? (command.WorkspaceId.Value == Guid.Empty
+            ? scope.ScopeRef
+            : ResourceScopeRef.Workspace(command.WorkspaceId.Value));
+        if (scope.ScopeRef != requestedScopeRef)
+            throw new WorkValidationException("flow_invocation_scope_mismatch", "The root Flow invocation must use the authenticated exact execution scope.");
         if (expectedOwnerPrincipalId is not null && scope.PrincipalId != expectedOwnerPrincipalId.Value)
             throw new WorkValidationException("work_owner_mismatch", "Conversation work must retain the conversation owner.");
         await authorizer.AuthorizeAsync(scope, cancellationToken);
@@ -134,7 +140,7 @@ public sealed class RootFlowSubmissionService(
             : DeterministicWorkItemId(scope, command.Origin, command.IdempotencyKey));
         var runId = $"flowrun-root-{workItemId.Value:N}";
         var inputHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(command.Input.GetRawText()))).ToLowerInvariant();
-        var existing = await repository.GetAsync(command.WorkspaceId, scope.PrincipalId, workItemId, cancellationToken);
+        var existing = await repository.GetExactAsync(scope.ScopeRef, scope.PrincipalId, workItemId, cancellationToken);
         if (existing is not null)
         {
             ValidateExisting(existing.Value, command, runId, inputHash);
@@ -172,7 +178,10 @@ public sealed class RootFlowSubmissionService(
                 : [new WorkInput(Structured: command.Input.Clone()), .. command.WorkInputs],
             Attachments: command.Attachments,
             Flow: resolved.Reference,
-            Id: workItemId);
+            Id: workItemId)
+        {
+            ExecutionScopeRef = scope.ScopeRef
+        };
 
         StoredWorkItem stored;
         try
@@ -181,7 +190,7 @@ public sealed class RootFlowSubmissionService(
         }
         catch (WorkItemConcurrencyException)
         {
-            var recovered = await repository.GetAsync(command.WorkspaceId, scope.PrincipalId, workItemId, cancellationToken);
+            var recovered = await repository.GetExactAsync(scope.ScopeRef, scope.PrincipalId, workItemId, cancellationToken);
             if (recovered is null) throw;
             stored = recovered;
             ValidateExisting(stored.Value, command, runId, inputHash);
@@ -247,7 +256,7 @@ public sealed class RootFlowSubmissionService(
 
     private static WorkItemId DeterministicWorkItemId(FlowRunScope scope, FlowInvocationOrigin origin, string key)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{scope.TenantId:D}\n{scope.WorkspaceId.Value:D}\n{origin}\n{key.Trim()}"));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{scope.ScopeRef.Value}\n{origin}\n{key.Trim()}"));
         return new WorkItemId(new Guid(bytes.AsSpan(0, 16)));
     }
 }

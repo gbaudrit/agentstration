@@ -12,7 +12,7 @@ The profile does not create an Agent, Entry, source-specific Tool exposure, or a
 1. Enable and enroll the Crawl4AI AEP extension with `docs.agentstration.io` in `Crawl4AI:AllowedDomains`.
 2. Create the AEP Tool Provider and run Tool discovery.
 3. Install the extension's `crawl4ai-web` Data Source Profile bundle in the same Workspace. Automatic bundle installation during enrollment is not implemented yet and is tracked by [#696](https://github.com/gbaudrit/agentstration/issues/696).
-4. Ensure Workspace platform reconciliation has provisioned the built-in staged Artifact ToolSet, filesystem Storage Flows, projection Flow, and retrieval Flow.
+4. Ensure platform reconciliation has provisioned the instance-owned staged Artifact ToolSet and filesystem Storage Flows, plus the Workspace-owned projection and retrieval Flows.
 
 The documentation site does not need `llms.txt`. Crawl4AI traverses ordinary pages, produces one bounded normalized corpus reference, and the acquisition Flow transfers that reference through governed staging into one durable Artifact.
 

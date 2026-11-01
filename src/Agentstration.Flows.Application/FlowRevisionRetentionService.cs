@@ -26,7 +26,7 @@ public sealed class FlowRevisionRetentionService(
             var keys = await repository.ListRunKeysAsync(skip, 200, cancellationToken);
             foreach (var key in keys)
             {
-                var run = await repository.GetRunAsync(key.WorkspaceId, key.RunId, cancellationToken);
+                var run = await repository.GetRunExactAsync(key.ScopeRef, key.RunId, cancellationToken);
                 if (run is null || !run.Value.RuntimeBindings.Any(binding =>
                         string.Equals(binding.RevisionId, revisionId, StringComparison.Ordinal)))
                     continue;
@@ -35,9 +35,9 @@ public sealed class FlowRevisionRetentionService(
                 {
                     active.Add(run.Value.Id);
                     if (run.Value.Status == FlowRunStatus.WaitingForInput) waiting++;
-                    var pendingInputs = await repository.ListInputRequestsAsync(
-                        run.Value.WorkspaceId, run.Value.Id, InputRequestStatus.Pending, cancellationToken);
-                    activeRuns.Add(new(run.Value.WorkspaceId, run.Value.Id, run.Value.Status, pendingInputs.Count));
+                    var pendingInputs = await repository.ListInputRequestsExactAsync(
+                        run.Value.Scope.ScopeRef, run.Value.Id, InputRequestStatus.Pending, cancellationToken);
+                    activeRuns.Add(new(run.Value.Scope.ScopeRef, run.Value.Id, run.Value.Status, pendingInputs.Count));
                 }
             }
             skip += keys.Count;
@@ -49,20 +49,19 @@ public sealed class FlowRevisionRetentionService(
     public async Task<FlowRevisionUsage> ForceTerminateAsync(string revisionId, CancellationToken cancellationToken)
     {
         var usage = await GetUsageAsync(revisionId, cancellationToken);
-        var activeRuns = new List<StoredFlowRun>();
+        var activeRuns = new List<(StoredFlowRun Run, FlowRevisionRunImpact Impact)>();
         foreach (var impact in usage.ActiveRuns)
         {
-            var active = await repository.GetRunAsync(impact.WorkspaceId, impact.RunId, cancellationToken);
-            if (active is not null && !active.Value.Status.IsTerminal()) activeRuns.Add(active);
+            var active = await repository.GetRunExactAsync(impact.ScopeRef, impact.RunId, cancellationToken);
+            if (active is not null && !active.Value.Status.IsTerminal()) activeRuns.Add((active, impact));
         }
-        foreach (var candidate in activeRuns.OrderByDescending(value => value.Value.NestingDepth))
+        foreach (var candidate in activeRuns.OrderByDescending(value => value.Run.Value.NestingDepth))
         {
-            var impact = usage.ActiveRuns.Single(value => value.WorkspaceId == candidate.Value.WorkspaceId
-                && value.RunId == candidate.Value.Id);
-            cancellations.Cancel(new FlowRunKey(impact.WorkspaceId, impact.RunId));
+            var impact = candidate.Impact;
+            cancellations.Cancel(new FlowRunKey(impact.ScopeRef, impact.RunId));
             try
             {
-                var stored = await repository.GetRunAsync(impact.WorkspaceId, impact.RunId, cancellationToken);
+                var stored = await repository.GetRunExactAsync(impact.ScopeRef, impact.RunId, cancellationToken);
                 if (stored is null || stored.Value.Status.IsTerminal()) continue;
                 var now = timeProvider.GetUtcNow();
                 var error = new FlowRunError(
@@ -86,10 +85,10 @@ public sealed class FlowRevisionRetentionService(
                     TokenUsage = await tokenUsageConsolidator.FinalizeAsync(terminal, cancellationToken)
                 };
                 await repository.UpdateRunAsync(terminal, stored.ETag, cancellationToken);
-                foreach (var input in await repository.ListInputRequestsAsync(impact.WorkspaceId, impact.RunId, InputRequestStatus.Pending, cancellationToken))
+                foreach (var input in await repository.ListInputRequestsExactAsync(impact.ScopeRef, impact.RunId, InputRequestStatus.Pending, cancellationToken))
                     await repository.UpdateInputRequestAsync(input.Value with { Status = InputRequestStatus.Cancelled }, input.ETag, cancellationToken);
                 var runEvent = await repository.AppendRunEventAsync(new FlowRunEvent(
-                    impact.WorkspaceId,
+                    impact.ScopeRef,
                     impact.RunId,
                     0,
                     FlowRunEventType.FlowRunCancelled,

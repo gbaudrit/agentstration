@@ -21,7 +21,7 @@ else if (agent is not null)
 {
     <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())" TestId="resource-namespaced-agent-details">
         <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>@T("Generation", agent.Generation)</span></Metadata>
-        <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
+        <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button>@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="namespaced-agent-context-return">@T("ReturnToSource")</a> }<a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
     </ResourceHeader>
     <nav class="section-tabs namespaced-agent-tabs" role="tablist" aria-label="@T("AgentDetails")">
         @foreach (var tab in Enum.GetValues<PageTab>())
@@ -114,6 +114,10 @@ else if (agent is not null)
                 <div class="namespaced-agent-actions"><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="@RuntimeProfileUrl">@T("OpenEffectiveRuntimeProfile")</a>@if (ownerPack is not null) { <a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a> }</div>
             </section>
         }
+        else if (activeTab == PageTab.Access)
+        {
+            <ResourceAccessPanel OwnerScopeRef="@(agent.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="agent.Namespace" Kind="@AgentResourceKinds.Agent" Name="@agent.Name" Generation="agent.Generation" Governance="agent.Governance" />
+        }
         else if (activeTab == PageTab.Definition)
         {
             <section data-testid="pack-agent-definition">
@@ -136,6 +140,7 @@ else if (agent is not null)
     [Parameter] public string Name { get; set; } = string.Empty;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private AgentResource? agent;
     private InstalledPackResource? ownerPack;
@@ -150,9 +155,10 @@ else if (agent is not null)
     private bool deploying;
     private PageTab activeTab;
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Parse(AgentNamespace);
+    private string? SafeReturnUrl => ConsoleResourceUrls.LocalReturnUrl(ReturnUrl);
     private ResourceAddress ModelProfileAddress => agent?.Definition.ModelProfile.Resolve(AgentResourceNamespace, ModelResourceKinds.ModelProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, ModelResourceKinds.ModelProfile, "unavailable");
-    private string ModelProfileUrl => ConsoleResourceUrls.ModelProfile(ModelProfileAddress);
+    private string ModelProfileUrl => ConsoleResourceUrls.ModelProfile(ModelProfileAddress, agent?.Definition.ModelProfile.ScopeRef);
     private ResourceAddress RuntimeProfileAddress => agent?.Definition.RuntimeProfile.Resolve(AgentResourceNamespace, RuntimeProfileResourceKinds.RuntimeProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile, "unavailable");
     private string RuntimeProfileUrl => ConsoleResourceUrls.RuntimeProfile(RuntimeProfileAddress);
@@ -176,9 +182,7 @@ else if (agent is not null)
             : T("DirectModelReferenceHelp");
     private UiStatus ModelBindingTone => modelBindings.Count > 0 ? UiStatus.Info : ownerPack is null ? UiStatus.Warning : UiStatus.Neutral;
     private bool RuntimeIsPackResource => ownerPack is not null && RuntimeProfileAddress.Namespace == AgentResourceNamespace;
-    private bool IsPackManaged => agent is not null
-        && agent.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Publisher)
-        && agent.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name);
+    private bool IsManaged => agent?.Governance.IsManaged is true;
     private string RuntimeBindingStatus => runtimeBindings.Count > 0 ? T("InstallationBinding") : RuntimeIsPackResource ? T("PackResource") : T("DirectReference");
     private string RuntimeBindingDetail => runtimeBindings.Count > 0 ? string.Join(", ", runtimeBindings.Select(binding => $"{binding.Name} → {BindingTarget(binding.Target)}")) : RuntimeProfileAddress.ToString();
     private string RuntimeBindingHelp => runtimeBindings.Count > 0
@@ -203,7 +207,7 @@ else if (agent is not null)
         {
             agent = (await Client.GetAgentAsync(AgentResourceNamespace, Name, cancellation.Token)).Value;
             await Task.WhenAll(LoadPackContextAsync(), LoadReadinessAsync());
-            if (!IsPackManaged)
+            if (!IsManaged)
             {
                 var editorUrl = $"/agents/{Uri.EscapeDataString(Name)}?namespace={Uri.EscapeDataString(AgentResourceNamespace.Value)}";
                 if (Navigation.Uri != Navigation.ToAbsoluteUri(editorUrl).AbsoluteUri)
@@ -211,6 +215,7 @@ else if (agent is not null)
                 return;
             }
             if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = PageTab.Definition;
+            else if (string.Equals(View, "access", StringComparison.OrdinalIgnoreCase)) activeTab = PageTab.Access;
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
@@ -275,7 +280,7 @@ else if (agent is not null)
     private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
     private static string TabId(PageTab tab) => $"agent-{tab.ToString().ToLowerInvariant()}-tab";
     private string TabLabel(PageTab tab) => Localizer[$"Tab.{tab}"];
-    private enum PageTab { Overview, Definition, Model, Runtime, Yaml }
+    private enum PageTab { Overview, Definition, Model, Runtime, Access, Yaml }
 
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

@@ -25,11 +25,14 @@ public sealed record RuntimeAssignmentAttempt
     public DateTimeOffset? CompletedAt { get; init; }
     public Guid? TerminalEventId { get; init; }
     public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
 }
 
 public sealed record RuntimeWorkerAssignment
 {
     public required WorkspaceId WorkspaceId { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public ResourceScopeRef ExecutionScopeRef => ScopeRef ?? ResourceScopeRef.Workspace(WorkspaceId.Value);
     public Guid TenantId { get; init; }
     public required RuntimeAssignmentId Id { get; init; }
     public RuntimeAssignmentTargetKind TargetKind { get; init; } = RuntimeAssignmentTargetKind.RuntimeRun;
@@ -58,6 +61,7 @@ public sealed record StoredRuntimeWorkerAssignment(RuntimeWorkerAssignment Value
 public sealed record RuntimeWorkerAssignmentQuery
 {
     public WorkspaceId? WorkspaceId { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     public RuntimeWorkerId? WorkerId { get; init; }
     public IReadOnlySet<RuntimeAssignmentState>? States { get; init; }
     public int Skip { get; init; }
@@ -78,6 +82,8 @@ public sealed record RuntimeWorkerClaimRequest
 public sealed record RuntimeAssignmentOwnershipProof
 {
     public required WorkspaceId WorkspaceId { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public ResourceScopeRef ExecutionScopeRef => ScopeRef ?? ResourceScopeRef.Workspace(WorkspaceId.Value);
     public required RuntimeAssignmentId AssignmentId { get; init; }
     public required RuntimeAssignmentAttemptId AttemptId { get; init; }
     public required RuntimeWorkerId WorkerId { get; init; }
@@ -103,7 +109,8 @@ public sealed record RuntimeAssignmentAuthorization(
 public sealed record RuntimeAssignmentTerminalResult(
     RuntimeWorkerAssignment Assignment,
     RuntimeRunState RunState,
-    bool IdempotentReplay);
+    bool IdempotentReplay,
+    string? ErrorMessage = null);
 
 public sealed record RuntimeAssignmentStepExecution
 {
@@ -181,11 +188,19 @@ public interface IRuntimeWorkerAssignmentStore
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredRuntimeWorkerAssignment> CreateAsync(RuntimeWorkerAssignment assignment, CancellationToken cancellationToken);
     Task<StoredRuntimeWorkerAssignment?> GetAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId, CancellationToken cancellationToken);
+    Task<StoredRuntimeWorkerAssignment?> GetExactAsync(ResourceScopeRef scopeRef, RuntimeAssignmentId assignmentId, CancellationToken cancellationToken) =>
+        GetAsync(RequiredWorkspace(scopeRef), assignmentId, cancellationToken);
     Task<StoredRuntimeWorkerAssignment?> GetByTargetAsync(
         WorkspaceId workspaceId,
         RuntimeAssignmentTargetKind targetKind,
         string targetRunId,
         CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeWorkerAssignment?>(null);
+    Task<StoredRuntimeWorkerAssignment?> GetByTargetExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentTargetKind targetKind,
+        string targetRunId,
+        CancellationToken cancellationToken) =>
+        GetByTargetAsync(RequiredWorkspace(scopeRef), targetKind, targetRunId, cancellationToken);
     Task<IReadOnlyList<StoredRuntimeWorkerAssignment>> ListAsync(
         RuntimeWorkerAssignmentQuery query,
         CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<StoredRuntimeWorkerAssignment>>([]);
@@ -247,12 +262,24 @@ public interface IRuntimeWorkerAssignmentStore
         RuntimeAssignmentId assignmentId,
         DateTimeOffset requestedAt,
         CancellationToken cancellationToken);
+    Task<StoredRuntimeWorkerAssignment> RequestCancellationExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId,
+        DateTimeOffset requestedAt,
+        CancellationToken cancellationToken) =>
+        RequestCancellationAsync(RequiredWorkspace(scopeRef), assignmentId, requestedAt, cancellationToken);
     Task<StoredRuntimeWorkerAssignment> RequeueAsync(
         WorkspaceId workspaceId,
         RuntimeAssignmentId assignmentId,
         DateTimeOffset requestedAt,
         CancellationToken cancellationToken) =>
         Task.FromException<StoredRuntimeWorkerAssignment>(new NotSupportedException("Assignment requeue is not supported by this store."));
+    Task<StoredRuntimeWorkerAssignment> RequeueExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId,
+        DateTimeOffset requestedAt,
+        CancellationToken cancellationToken) =>
+        RequeueAsync(RequiredWorkspace(scopeRef), assignmentId, requestedAt, cancellationToken);
     Task<RuntimeAssignmentTerminalResult> CompleteAsync(
         RuntimeAssignmentOwnershipProof proof,
         byte[] ownershipTokenDigest,
@@ -268,6 +295,11 @@ public interface IRuntimeWorkerAssignmentStore
         RuntimeWorkerSessionId activeSessionId,
         DateTimeOffset observedAt,
         CancellationToken cancellationToken);
+
+    private static WorkspaceId RequiredWorkspace(ResourceScopeRef scopeRef) =>
+        scopeRef.Kind == ResourceScopeKind.Workspace && scopeRef.TargetId is { } workspaceId
+            ? new WorkspaceId(workspaceId)
+            : throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.InvalidCoordinate, $"Execution scope '{scopeRef}' is not supported by this store.");
 }
 
 public interface IRuntimeAssignmentProjection

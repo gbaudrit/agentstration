@@ -66,72 +66,148 @@ public sealed class FlowToolExecutorTests
         Assert.HasCount(0, pipeline.Contexts);
     }
 
+    [TestMethod]
+    public async Task ToolSetRouteExecutesTheExactPinnedToolAndFailsClosedWhenItIsStale()
+    {
+        var store = await StoreAsync();
+        var pipeline = new RecordingPipeline();
+        var executor = new ManagedFlowToolExecutor(store, pipeline);
+        var request = Request(JsonSerializer.SerializeToElement(new { message = "hello" }), 1) with
+        {
+            Route = Route()
+        };
+
+        _ = await executor.ExecuteAsync(request, default);
+        var context = pipeline.Contexts.Single();
+        Assert.AreEqual(WorkspaceScope, context.ToolScopeRef);
+        Assert.AreEqual(WorkspaceScope, context.ToolProviderScopeRef);
+        Assert.AreEqual(Route().ToolUid, context.ToolUid);
+        Assert.AreEqual(Route().ProviderUid, context.ToolProviderUid);
+
+        var exception = await Assert.ThrowsExactlyAsync<FlowValidationException>(() =>
+            executor.ExecuteAsync(request with { Route = Route() with { ToolGeneration = 3 } }, default));
+        Assert.AreEqual("tool_set_member_stale", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task DirectToolReferenceExecutesFromItsExactOwnerScope()
+    {
+        var store = await StoreAsync(scopeRef: ResourceScopeRef.Instance);
+        var pipeline = new RecordingPipeline();
+        var executor = new ManagedFlowToolExecutor(store, pipeline);
+        var request = Request(JsonSerializer.SerializeToElement(new { message = "hello" }), 1) with
+        {
+            Tool = new FlowToolReference("notification.send", ScopeRef: ResourceScopeRef.Instance)
+        };
+
+        _ = await executor.ExecuteAsync(request, default);
+
+        var context = pipeline.Contexts.Single();
+        Assert.AreEqual(ResourceScopeRef.Instance, context.ToolScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, context.ToolProviderScopeRef);
+    }
+
     private static readonly FlowRunScope Scope = new(
         Guid.Parse("11111111-1111-1111-1111-111111111111"),
         new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222")),
         Guid.Parse("33333333-3333-3333-3333-333333333333"));
+    private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Scope.WorkspaceId.Value);
+    private static readonly Guid ProviderUid = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
     private static FlowToolExecutionRequest Request(JsonElement arguments, int attempt) => new(
         Scope,
         "run-42",
         new FlowId("parent"),
+        WorkspaceScope,
         "notify",
         attempt,
         "correlation-42",
         new("notification.send"),
         arguments);
 
-    private static async Task<MemoryStore> StoreAsync(ToolProviderType providerType = ToolProviderType.Mcp)
+    private static ResolvedFlowToolRoute Route() => new(
+        new("notification.send"),
+        "notifications",
+        ResourceNamespace.Default,
+        "1.0.0",
+        "notification.create",
+        "default",
+        WorkspaceScope,
+        Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        4,
+        "internal",
+        ResourceNamespace.Default,
+        WorkspaceScope,
+        ProviderUid,
+        2,
+        Tool().Definition.Schema!.Input,
+        null,
+        false);
+
+    private static async Task<MemoryStore> StoreAsync(
+        ToolProviderType providerType = ToolProviderType.Mcp,
+        ResourceScopeRef? scopeRef = null)
     {
+        var ownerScope = scopeRef ?? WorkspaceScope;
         var store = new MemoryStore();
         await store.PutAsync(new ToolProviderResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolProvider,
+            Uid = ProviderUid,
+            Generation = 2,
             Metadata = new ResourceMetadata { Name = "internal" },
+            ScopeRef = ownerScope,
             Definition = new ToolProviderProperties
             {
                 DisplayName = "Test provider",
                 ProviderType = providerType,
                 Mcp = providerType == ToolProviderType.Mcp ? new McpToolProviderConfiguration { Internal = true } : null,
-                Aep = providerType == ToolProviderType.Aep ? new AepToolProviderConfiguration { ExtensionId = "extension-1" } : null
+                Aep = providerType == ToolProviderType.Aep
+                    ? new AepToolProviderConfiguration { Extension = new ResourceReference("extension-1") }
+                    : null
             }
         }, null, true, default);
-        await store.PutAsync(Tool(), null, true, default);
+        await store.PutAsync(Tool(scopeRef: ownerScope), null, true, default);
         return store;
     }
 
-    private static ToolResource Tool(bool requiresApproval = false) => new()
+    private static ToolResource Tool(bool requiresApproval = false, ResourceScopeRef? scopeRef = null)
     {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = ToolResourceKinds.Tool,
-        Uid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-        Generation = 4,
-        Metadata = new ResourceMetadata { Name = "notification.send" },
-        Definition = new ToolResourceProperties
+        var ownerScope = scopeRef ?? WorkspaceScope;
+        return new()
         {
-            DisplayName = "Send notification",
-            Enabled = true,
-            RequiresApproval = requiresApproval,
-            Provider = new("internal"),
-            ExternalId = "notification_send",
-            Discovery = new ToolDiscoveryState
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Uid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            Generation = 4,
+            Metadata = new ResourceMetadata { Name = "notification.send" },
+            ScopeRef = ownerScope,
+            Definition = new ToolResourceProperties
             {
-                Available = true,
-                FirstSeenAt = DateTimeOffset.UnixEpoch,
-                LastSeenAt = DateTimeOffset.UnixEpoch
-            },
-            Schema = new ToolSchema
-            {
-                Input = JsonSerializer.SerializeToElement(new
+                DisplayName = "Send notification",
+                Enabled = true,
+                RequiresApproval = requiresApproval,
+                Provider = new("internal", ownerScope),
+                ExternalId = "notification_send",
+                Discovery = new ToolDiscoveryState
                 {
-                    type = "object",
-                    properties = new { message = new { type = "string" } },
-                    required = new[] { "message" }
-                })
+                    Available = true,
+                    FirstSeenAt = DateTimeOffset.UnixEpoch,
+                    LastSeenAt = DateTimeOffset.UnixEpoch
+                },
+                Schema = new ToolSchema
+                {
+                    Input = JsonSerializer.SerializeToElement(new
+                    {
+                        type = "object",
+                        properties = new { message = new { type = "string" } },
+                        required = new[] { "message" }
+                    })
+                }
             }
-        }
-    };
+        };
+    }
 
     private sealed class RecordingPipeline : IToolExecutionPipeline
     {
@@ -155,6 +231,13 @@ public sealed class FlowToolExecutorTests
             Task.FromResult(values.TryGetValue(key, out var entry) && entry.Value is T typed
                 ? new StoredResource<T>(typed, entry.ETag, entry.At)
                 : null);
+
+        public Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource =>
+            Task.FromResult(values.TryGetValue(new ResourceKey(address.Address.Kind, address.Address.Name, address.Address.Namespace), out var entry)
+                && entry.Value is T typed
+                && entry.Value.ScopeRef == address.ScopeRef
+                    ? new StoredResource<T>(typed, entry.ETag, entry.At)
+                    : null);
 
         public Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
             Task.FromResult<IReadOnlyList<StoredResource<T>>>([]);

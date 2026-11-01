@@ -183,7 +183,7 @@ public static class WorkplaceValidation
         if (string.IsNullOrWhiteSpace(flowName) || flowName.Contains('/', StringComparison.Ordinal))
             throw new WorkValidationException("entry_target_not_supported", "The Entry target must reference a Flow name.");
         if (string.IsNullOrWhiteSpace(target.Version)) throw new WorkValidationException("entry_target_version_required", "A published Entry target version is required.");
-        return new FlowReference(new FlowId(flowName, target.Namespace), target.Version, UseActiveVersion: false, target.Namespace);
+        return new FlowReference(new FlowId(flowName, target.Namespace), target.Version, UseActiveVersion: false, target.Namespace, target.ScopeRef);
     }
 
     private static void ValidateName(string value, string code)

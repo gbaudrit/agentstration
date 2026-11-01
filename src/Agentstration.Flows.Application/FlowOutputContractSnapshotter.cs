@@ -6,7 +6,7 @@ namespace Agentstration.Flows.Application;
 internal sealed class FlowOutputContractSnapshotter(IFlowResourceReferenceResolver? resources)
 {
     public async ValueTask<FlowGraphDefinition> ResolveAsync(
-        WorkspaceId workspaceId,
+        ResourceScopeRef ownerScopeRef,
         FlowId flowId,
         FlowGraphDefinition graph,
         CancellationToken cancellationToken)
@@ -28,7 +28,7 @@ internal sealed class FlowOutputContractSnapshotter(IFlowResourceReferenceResolv
             {
                 var source = graph.Steps.FirstOrDefault(candidate => candidate.Name == transition.FromStep);
                 var schema = await ResolveTransitionSchemaAsync(
-                    workspaceId, flowId.Namespace, graph, source, transition.Event, cancellationToken);
+                    ownerScopeRef, flowId.Namespace, graph, source, transition.Event, cancellationToken);
                 if (schema is { } value
                     && !candidates.Any(candidate => JsonElement.DeepEquals(candidate, value)))
                     candidates.Add(value.Clone());
@@ -46,7 +46,7 @@ internal sealed class FlowOutputContractSnapshotter(IFlowResourceReferenceResolv
     }
 
     private async ValueTask<JsonElement?> ResolveTransitionSchemaAsync(
-        WorkspaceId workspaceId,
+        ResourceScopeRef ownerScopeRef,
         ResourceNamespace ownerNamespace,
         FlowGraphDefinition graph,
         FlowStepDefinition? source,
@@ -62,14 +62,14 @@ internal sealed class FlowOutputContractSnapshotter(IFlowResourceReferenceResolv
             case ToolFlowStepDefinition tool when resources is not null
                                                   && string.Equals(outputEvent, "success", StringComparison.Ordinal):
                 return (await resources.ResolveToolAsync(
-                    workspaceId, ownerNamespace, tool.Tool, cancellationToken))?.OutputSchema;
+                    ownerScopeRef, ownerNamespace, tool.Tool, cancellationToken))?.OutputSchema;
             case ToolRouteFlowStepDefinition toolRoute when resources is not null
                                                            && string.Equals(outputEvent, "success", StringComparison.Ordinal):
                 return (await resources.ResolveToolRouteAsync(
-                    workspaceId, ownerNamespace, toolRoute, cancellationToken))?.OutputSchema;
+                    ownerScopeRef, ownerNamespace, toolRoute, cancellationToken))?.OutputSchema;
             case FlowCallStepDefinition call when resources is not null:
                 var resolved = await resources.ResolveFlowAsync(
-                    workspaceId, ownerNamespace, call.Flow, cancellationToken);
+                    ownerScopeRef, ownerNamespace, call.Flow, cancellationToken);
                 return resolved?.Outputs?.FirstOrDefault(output => output.Name == outputEvent)?.Schema
                     ?? resolved?.OutputSchema;
             default:

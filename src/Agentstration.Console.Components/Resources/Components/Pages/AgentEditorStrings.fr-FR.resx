@@ -6,6 +6,7 @@
   <data name="CreateAgent"><value>Créer un agent</value></data>
   <data name="CreateDescription"><value>Définissez l’état souhaité d’une nouvelle ressource d’agent spécialisé.</value></data>
   <data name="BackToAgents"><value>Retour aux agents</value></data>
+  <data name="ReturnToSource"><value>Retour à la source</value></data>
   <data name="Loading"><value>Chargement de la ressource d’agent…</value></data>
   <data name="Generation"><value>Génération {0}</value></data>
   <data name="Run"><value>Exécuter</value></data>
@@ -101,6 +102,7 @@
   <data name="CategorySelection"><value>{0} sur {1} sélectionné(s)</value></data>
   <data name="ToolSetConfiguration" xml:space="preserve"><value>Droits versionnés</value></data><data name="GovernedToolSets" xml:space="preserve"><value>Droits accordés par ToolSet</value></data><data name="ToolSetConfigurationHelp" xml:space="preserve"><value>Accordez une version publiée exacte d’un ToolSet, puis conservez tous ses membres ou choisissez un sous-ensemble. Les Tools accordés sont reflétés dans la liste des accès effectifs ci-dessous.</value></data><data name="ManageToolSets" xml:space="preserve"><value>Gérer les ToolSets</value></data><data name="NoPublishedToolSets" xml:space="preserve"><value>Aucune version publiée de ToolSet n’est disponible dans cet espace de travail.</value></data><data name="PublishedToolSet" xml:space="preserve"><value>ToolSet publié</value></data><data name="InspectToolSet" xml:space="preserve"><value>Consulter</value></data><data name="AllMembers" xml:space="preserve"><value>Accorder tous les membres</value></data><data name="SelectedMembers" xml:space="preserve"><value>Accorder les membres sélectionnés</value></data><data name="PinnedVersionHelp" xml:space="preserve"><value>La version {0} sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.</value></data><data name="ToolSetMembers" xml:space="preserve"><value>Membres du ToolSet</value></data><data name="ChooseToolSetMembers" xml:space="preserve"><value>Choisissez les membres accordés par cette version.</value></data>
   <data name="ActiveRevision"><value>Révision active</value></data><data name="PinnedToolSetAssignments"><value>Attributions de ToolSets figées</value></data><data name="PinnedToolSetAssignmentsHelp"><value>Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.</value></data><data name="ToolSet"><value>ToolSet</value></data><data name="Version"><value>Version</value></data><data name="DefinitionHash"><value>Empreinte de définition</value></data><data name="EffectiveMembers"><value>Membres effectifs</value></data>
+  <data name="Access"><value>Accès</value></data>
   <data name="Contracts"><value>Contrats</value></data>
   <data name="InvocationContracts"><value>Contrats d’invocation</value></data>
   <data name="InvocationContractsHelp"><value>Décrivez la valeur structurée acceptée par cet Agent et celle qu’il retourne. L’exécution reste textuelle.</value></data>

@@ -23,6 +23,16 @@ internal static class ApiResponse
         return await response.Content.ReadFromJsonAsync<T>(cancellationToken) ?? throw new AgentstrationApiException("Agentstration API returned an empty response.", Guid.NewGuid().ToString("N"));
     }
 
+    public static async Task<T> ReadAsync<T>(HttpClient client, string path, ResourceScopeRef contextScope, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.TryAddWithoutValidation("X-Agentstration-Context", contextScope.Value);
+        using var response = await client.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<T>(cancellationToken) ?? throw new AgentstrationApiException("Agentstration API returned an empty response.", Guid.NewGuid().ToString("N"));
+    }
+
     public static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode) return;

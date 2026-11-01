@@ -25,8 +25,9 @@ public sealed class ToolRunnerService(
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
-        var tool = (await store.GetAsync<ToolResource>(
-            new ResourceKey(ToolResourceKinds.Tool, toolName, toolNamespace), cancellationToken))?.Value
+        var workspaceScope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var tool = (await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+            workspaceScope, toolNamespace, ToolResourceKinds.Tool, toolName), cancellationToken))?.Value
             ?? throw new ToolRunException("tool_not_found", 404, $"Tool '{toolNamespace}/{toolName}' was not found.");
         EnsureWorkspaceScope(tool, requestContext.WorkspaceId);
         if (!tool.Definition.Enabled)
@@ -36,8 +37,9 @@ public sealed class ToolRunnerService(
         var providerReference = tool.Definition.Provider
             ?? throw new ToolRunException("tool_mapping_invalid", 422, $"Tool '{tool.Address}' has no provider mapping.");
         var providerNamespace = providerReference.Namespace ?? tool.Namespace;
-        var provider = (await store.GetAsync<ToolProviderResource>(
-            new ResourceKey(ToolResourceKinds.ToolProvider, providerReference.Name, providerNamespace), cancellationToken))?.Value
+        var providerScope = providerReference.ScopeRef ?? workspaceScope;
+        var provider = (await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+            providerScope, providerNamespace, ToolResourceKinds.ToolProvider, providerReference.Name), cancellationToken))?.Value
             ?? throw new ToolRunException("tool_provider_not_found", 404, $"ToolProvider '{providerNamespace}/{providerReference.Name}' was not found.");
         EnsureWorkspaceScope(provider, requestContext.WorkspaceId);
         if (!provider.Definition.Enabled)
@@ -59,9 +61,15 @@ public sealed class ToolRunnerService(
             InvocationId = $"{callId}:attempt:1",
             ToolId = tool.Name,
             ToolNamespace = tool.Namespace,
+            ToolScopeRef = tool.ScopeRef,
+            ToolUid = tool.Uid,
+            ToolGeneration = tool.Generation,
             ToolName = tool.Definition.ExternalId ?? tool.Name,
             ToolProviderId = provider.Name,
             ToolProviderNamespace = provider.Namespace,
+            ToolProviderScopeRef = provider.ScopeRef,
+            ToolProviderUid = provider.Uid,
+            ToolProviderGeneration = provider.Generation,
             ExternalToolId = tool.Definition.ExternalId,
             TenantId = requestContext.TenantId,
             WorkspaceId = new WorkspaceId(requestContext.WorkspaceId),

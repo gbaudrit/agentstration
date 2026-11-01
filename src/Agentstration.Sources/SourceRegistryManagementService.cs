@@ -673,6 +673,9 @@ public sealed partial class SourceRegistryManagementService(
         SourceRegistryRegistrationResource registration,
         CancellationToken cancellationToken)
     {
+        using var systemScope = requestContext.AccessMode == ControlPlaneAccessMode.System
+            ? null
+            : requestScopes.PushSystem();
         var existing = await GetObservedStoredAsync(registration.Name, cancellationToken);
         if (existing is not null && existing.Value.Definition.RegistrationUid == registration.Uid) return existing;
         try
@@ -869,7 +872,13 @@ public sealed partial class SourceRegistryManagementService(
     private Task AuditFailureAsync(string action, string reason, Guid? actor, CancellationToken cancellationToken) =>
         audit.WriteAsync(new(action, SecurityAuditOutcome.Failed, ActorPrincipalId: actor, ReasonCode: reason), cancellationToken);
 
-    private Guid? ActorPrincipalId() => requestContext.IsInitialized ? requestContext.Current.PrincipalId : null;
+    private Guid? ActorPrincipalId() => requestContext.AccessMode is
+        ControlPlaneAccessMode.Workspace or
+        ControlPlaneAccessMode.Instance or
+        ControlPlaneAccessMode.Tenant or
+        ControlPlaneAccessMode.TenantAdministration
+            ? requestContext.Current.PrincipalId
+            : null;
 
     private static ResourceStatus SucceededStatus() => new() { ProvisioningState = ProvisioningState.Succeeded };
 

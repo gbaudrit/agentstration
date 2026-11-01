@@ -21,12 +21,13 @@ internal static class AgentstrationMcpHandlers
     {
         var services = request.Services ?? throw new InvalidOperationException("MCP request services are unavailable.");
         var current = services.GetRequiredService<ICurrentRequestContext>().Current;
+        var workspaceScope = ResourceScopeRef.Workspace(current.WorkspaceId);
         await services.GetRequiredService<InternalMcpToolProjectionService>().EnsureAsync(
-            ResourceScopeRef.Workspace(current.WorkspaceId), ResourceNamespace.Default, cancellationToken);
+            workspaceScope, ResourceNamespace.Default, cancellationToken);
         var definitions = services.GetRequiredService<ToolDefinitionService>();
         var values = await definitions.ListAsync(cancellationToken);
         var projected = (await services.GetRequiredService<IResourceStore>()
-                .ListAllAsync<ToolResource>(ToolResourceKinds.Tool, cancellationToken))
+                .ListExactAsync<ToolResource>(workspaceScope, ToolResourceKinds.Tool, 0, 1_000, cancellationToken))
             .Select(value => value.Value)
             .Where(value => value.Namespace.IsDefault && value.Definition.Provider?.Name == AgentstrationToolProvider.Name)
             .ToDictionary(value => value.Definition.ExternalId ?? string.Empty, StringComparer.Ordinal);
@@ -81,8 +82,9 @@ internal static class AgentstrationMcpHandlers
             var services = request.Services ?? throw new ToolDefinitionInvocationException("tool_execution_scope_required", "MCP request services are unavailable.");
             var context = services.GetRequiredService<ICurrentRequestContext>();
             var current = context.Current;
+            var workspaceScope = ResourceScopeRef.Workspace(current.WorkspaceId);
             await services.GetRequiredService<InternalMcpToolProjectionService>().EnsureAsync(
-                ResourceScopeRef.Workspace(current.WorkspaceId), ResourceNamespace.Default, cancellationToken);
+                workspaceScope, ResourceNamespace.Default, cancellationToken);
             var arguments = JsonSerializer.SerializeToElement(parameters.Arguments ?? new Dictionary<string, JsonElement>());
             var builtIn = services.GetServices<IInternalMcpToolHandler>()
                 .SingleOrDefault(value => string.Equals(value.Definition.Name, parameters.Name, StringComparison.Ordinal));
@@ -98,9 +100,11 @@ internal static class AgentstrationMcpHandlers
                     InvocationId = $"{callId}:attempt:1",
                     ToolId = resourceName,
                     ToolNamespace = ResourceNamespace.Default,
+                    ToolScopeRef = workspaceScope,
                     ToolName = builtIn.Definition.Name,
                     ToolProviderId = AgentstrationToolProvider.Name,
                     ToolProviderNamespace = ResourceNamespace.Default,
+                    ToolProviderScopeRef = workspaceScope,
                     ExternalToolId = builtIn.Definition.Name,
                     TenantId = current.TenantId,
                     WorkspaceId = new WorkspaceId(current.WorkspaceId),

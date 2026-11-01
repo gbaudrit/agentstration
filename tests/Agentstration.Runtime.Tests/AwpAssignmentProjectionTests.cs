@@ -49,7 +49,7 @@ public sealed class AwpAssignmentProjectionTests
                 ],
                 Transitions = [new("lookup-completed", "lookup", "success", "completed")]
             };
-            var version = new FlowVersion(workspaceId, new("flow", ResourceNamespace.Default), "1.0", null,
+            var version = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), new("flow", ResourceNamespace.Default), "1.0", null,
                 new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")),
                 new Dictionary<string, string>(), now, graph, "sha256:flow");
             var scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid());
@@ -263,6 +263,92 @@ public sealed class AwpAssignmentProjectionTests
                 timedOut.Steps.Single(value => value.StepName == "completed").Status);
             Assert.IsTrue((await repository.ListRunEventsAsync(workspaceId, runId, 0, default))
                 .Any(value => value.Type == FlowRunEventType.FlowRunTimedOut));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task FlowTerminalPreservesSafeModelProfileDiagnostic()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-awp-diagnostic-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSqliteFlowStorage($"Data Source={Path.Combine(directory, "flow.db")}");
+            await using var provider = services.BuildServiceProvider();
+            var repository = provider.GetRequiredService<IFlowRepository>();
+            await repository.InitializeAsync(default);
+            var now = DateTimeOffset.Parse("2026-10-26T12:00:00Z",
+                System.Globalization.CultureInfo.InvariantCulture);
+            var workspaceId = new WorkspaceId(Guid.NewGuid());
+            var flowId = new FlowId("profile-diagnostic");
+            const string runId = "flowrun-profile-diagnostic";
+            var version = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0", null,
+                new DirectFlowDefinition(new(FlowTargetKind.Agent, "welcome-agent")),
+                new Dictionary<string, string>(), now);
+            await repository.CreateRunAsync(new FlowRun
+            {
+                WorkspaceId = workspaceId,
+                Id = runId,
+                FlowId = flowId,
+                FlowVersion = version.Version,
+                DefinitionSnapshot = version,
+                Status = FlowRunStatus.Running,
+                Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+                Input = JsonSerializer.SerializeToElement(new { prompt = "hello" }),
+                CreatedAt = now,
+                StartedAt = now,
+                Steps = [new FlowStepRun { StepName = "Agent", StepType = "agent", Status = FlowStepRunStatus.NotStarted }]
+            }, default);
+            var assignment = new RuntimeWorkerAssignment
+            {
+                WorkspaceId = workspaceId,
+                TenantId = Guid.NewGuid(),
+                Id = new(Guid.NewGuid()),
+                TargetKind = RuntimeAssignmentTargetKind.FlowRun,
+                TargetRunId = runId,
+                RuntimeCapability = AwpRuntimeKinds.MicrosoftAgentFramework,
+                RuntimeCapabilityVersion = "1.0",
+                ExecutionMaterialVersion = "1.0",
+                ExecutionMaterialId = "material-profile-diagnostic",
+                ExecutionMaterialDigest = "sha256:profile-diagnostic",
+                State = RuntimeAssignmentState.Failed,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Attempts =
+                [
+                    new RuntimeAssignmentAttempt
+                    {
+                        Id = new(Guid.NewGuid()),
+                        WorkerId = new(Guid.NewGuid()),
+                        WorkerSessionId = new(Guid.NewGuid()),
+                        FencingGeneration = 1,
+                        AcquiredAt = now,
+                        LeaseExpiresAt = now.AddMinutes(1),
+                        LastHeartbeatAt = now,
+                        State = RuntimeAssignmentAttemptState.Failed,
+                        CompletedAt = now,
+                        ErrorCode = "agent_model_profile_unavailable"
+                    }
+                ]
+            };
+            const string diagnostic = "Pinned ModelProfile 'default/default-reasoning' is unavailable in the execution context or no longer matches its published identity.";
+            var projection = new AwpAssignmentProjection(null!, repository, new NullFlowRunEventSink(),
+                TimeProvider.System, Options.Create(new FlowRunExecutionOptions()));
+
+            await projection.ProjectTerminalAsync(
+                new(assignment, RuntimeRunState.Failed, false, diagnostic), default);
+
+            var failed = (await repository.GetRunAsync(workspaceId, runId, default))!.Value;
+            Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
+            Assert.AreEqual("agent_model_profile_unavailable", failed.Error?.Code);
+            Assert.AreEqual(diagnostic, failed.Error?.Message);
         }
         finally
         {

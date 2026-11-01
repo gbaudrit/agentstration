@@ -5,6 +5,7 @@ using System.Text.Json;
 using Agentstration.Awp.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Runtime.Tests;
 
@@ -137,6 +138,32 @@ public sealed class AwpWorkerClientTests
         Assert.AreEqual("http_media_type_invalid", exception.Code);
         Assert.AreEqual("Media type 'text/html' is not allowed for this profile.", exception.Message);
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, exception.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task AssignmentFailurePreservesAuthorityMaterialDiagnostic()
+    {
+        var now = DateTimeOffset.Parse("2026-10-26T12:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture);
+        using var credential = Credential();
+        var handler = new MaterialFailureHandler(now);
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 0, handler);
+        var assignment = Assignment(now.AddMinutes(2)) with
+        {
+            Scope = new(Guid.NewGuid(), Guid.NewGuid().ToString("D")),
+            Ownership = new("ownership-token", 1, now.AddMinutes(2), 60)
+        };
+        var runner = new AwpAssignmentRunner(null!, TimeProvider.System,
+            NullLogger<AwpRuntimeWorkerService>.Instance);
+
+        await runner.RunAsync(client, assignment, now, new RuntimeWorkerOptions(), CancellationToken.None);
+
+        Assert.IsNotNull(handler.Failure);
+        Assert.AreEqual("agent_model_profile_unavailable", handler.Failure.Code);
+        Assert.AreEqual(
+            "Pinned ModelProfile 'default/default-reasoning' is unavailable in the execution context or no longer matches its published identity.",
+            handler.Failure.Message);
     }
 
     [TestMethod]
@@ -286,6 +313,50 @@ public sealed class AwpWorkerClientTests
                     code = "http_media_type_invalid"
                 })
             });
+    }
+
+    private sealed class MaterialFailureHandler(DateTimeOffset now) : HttpMessageHandler
+    {
+        public AwpExecutionFailure? Failure { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == AwpProtocol.ExecutionMaterialPath)
+                return new HttpResponseMessage(HttpStatusCode.Conflict)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        title = "Pinned ModelProfile 'default/default-reasoning' is unavailable in the execution context or no longer matches its published identity.",
+                        code = "agent_model_profile_unavailable"
+                    })
+                };
+
+            if (path == AwpProtocol.AppendEventsPath)
+            {
+                var envelope = await request.Content!.ReadFromJsonAsync<AwpEnvelope<AwpAppendEventsRequest>>(
+                    AwpProtocol.JsonOptions, cancellationToken);
+                var sequence = envelope!.Payload.Events.Max(value => value.AttemptEventSequence);
+                return Response(envelope.MessageId, new AwpAppendEventsResponse(now, sequence, []));
+            }
+
+            if (path == AwpProtocol.FailAssignmentPath)
+            {
+                var envelope = await request.Content!.ReadFromJsonAsync<AwpEnvelope<AwpFailAssignmentRequest>>(
+                    AwpProtocol.JsonOptions, cancellationToken);
+                Failure = envelope!.Payload.Failure;
+                return Response(envelope.MessageId, new AwpTerminalResponse(now, AwpTerminalState.Failed, 1));
+            }
+
+            throw new InvalidOperationException($"Unexpected AWP path '{path}'.");
+        }
+
+        private HttpResponseMessage Response<T>(Guid messageId, T payload) => new(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new AwpEnvelope<T>(AwpProtocol.Version, messageId, now, payload),
+                options: AwpProtocol.JsonOptions)
+        };
     }
 
     private sealed class ModelStreamHandler(bool includeTerminal) : HttpMessageHandler

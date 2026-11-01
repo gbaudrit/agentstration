@@ -69,6 +69,29 @@ public sealed class RuntimeWorkerOperationGatewayTests
         Assert.AreEqual(ControlPlaneAccessMode.Unavailable, scopes.AccessMode);
     }
 
+    [TestMethod]
+    public async Task ModelInvocationUsesPinnedInstanceModelProfileScope()
+    {
+        var scopes = new RecordingRequestContextScopes();
+        var resolver = new AccessModeAssertingChatClientResolver(scopes, ControlPlaneAccessMode.System);
+        var gateway = new RuntimeWorkerOperationGateway(
+            resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System, scopes);
+        var agent = Agent() with { ModelProfileScopeRef = ResourceScopeRef.Instance };
+
+        var response = await gateway.InvokeModelAsync(new RuntimeGovernedModelRequest(
+            agent,
+            [new(RuntimeMessageRole.User, [new RuntimeGovernedModelText("Hello")])],
+            [],
+            new RuntimeExecutionOptions(),
+            Guid.NewGuid(),
+            new WorkspaceId(Guid.NewGuid()),
+            Guid.NewGuid()), default);
+
+        Assert.AreEqual("OK", Assert.IsInstanceOfType<RuntimeGovernedModelText>(response.Contents.Single()).Text);
+        Assert.AreEqual(ResourceScopeRef.Instance, resolver.RequestedScope);
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, scopes.AccessMode);
+    }
+
     private static RuntimeExecutionAgentMaterial Agent() => new(
         "agent-material", "agent", Guid.NewGuid(), "agent", 1, "revision", "hash", "handler",
         "Agent", "Agent", "Instructions", "default-reasoning", ResourceNamespace.Default, []);
@@ -94,6 +117,35 @@ public sealed class RuntimeWorkerOperationGatewayTests
             Assert.AreEqual(workspaceId, context.Current.WorkspaceId);
             Assert.AreEqual(principalId, context.Current.PrincipalId);
             return ValueTask.FromResult<IChatClient>(new StubChatClient(options => LastOptions = options));
+        }
+    }
+
+    private sealed class AccessModeAssertingChatClientResolver(
+        ICurrentRequestContext context,
+        ControlPlaneAccessMode expectedMode) : IChatClientResolver
+    {
+        public ResourceScopeRef? RequestedScope { get; private set; }
+
+        public ValueTask<IChatClient> ResolveAsync(string modelProfileName, CancellationToken cancellationToken = default) =>
+            ResolveAsync(ResourceNamespace.Default, modelProfileName, cancellationToken);
+
+        public ValueTask<IChatClient> ResolveAsync(
+            ResourceNamespace @namespace,
+            string modelProfileName,
+            CancellationToken cancellationToken = default)
+        {
+            Assert.AreEqual(expectedMode, context.AccessMode);
+            return ValueTask.FromResult<IChatClient>(new StubChatClient(_ => { }));
+        }
+
+        public ValueTask<IChatClient> ResolveAsync(
+            ResourceScopeRef profileScopeRef,
+            ResourceNamespace @namespace,
+            string modelProfileName,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedScope = profileScopeRef;
+            return ResolveAsync(@namespace, modelProfileName, cancellationToken);
         }
     }
 
@@ -135,23 +187,34 @@ public sealed class RuntimeWorkerOperationGatewayTests
     private sealed class RecordingRequestContextScopes : ICurrentRequestContext, IRequestContextScopeFactory
     {
         private RequestContext? current;
-        public bool IsInitialized => current is not null;
-        public ControlPlaneAccessMode AccessMode => current is null
-            ? ControlPlaneAccessMode.Unavailable
-            : ControlPlaneAccessMode.Workspace;
+        private ControlPlaneAccessMode mode;
+        public bool IsInitialized => mode == ControlPlaneAccessMode.Workspace;
+        public ControlPlaneAccessMode AccessMode => mode;
         public RequestContext Current => current ?? throw new InvalidOperationException();
 
-        public IDisposable Push(RequestContext context)
+        public IDisposable Push(RequestContext context) => Push(ControlPlaneAccessMode.Workspace, context);
+
+        private IDisposable Push(ControlPlaneAccessMode accessMode, RequestContext? context)
         {
             var previous = current;
+            var previousMode = mode;
             current = context;
-            return new Scope(() => current = previous);
+            mode = accessMode;
+            return new Scope(() =>
+            {
+                current = previous;
+                mode = previousMode;
+            });
         }
 
         public IDisposable PushTenant(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null) =>
             throw new NotSupportedException();
 
-        public IDisposable PushSystem() => throw new NotSupportedException();
+        public IDisposable PushTenantAdministration(RequestContext operationalContext) => throw new NotSupportedException();
+
+        public IDisposable PushInstance(RequestContext operationalContext) => throw new NotSupportedException();
+
+        public IDisposable PushSystem() => Push(ControlPlaneAccessMode.System, null);
 
         private sealed class Scope(Action dispose) : IDisposable
         {

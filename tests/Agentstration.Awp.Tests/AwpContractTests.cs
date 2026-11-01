@@ -204,7 +204,10 @@ public sealed class AwpContractTests
             "1.0", "sha256:flow", JsonSerializer.SerializeToElement(new { input = "hello" }),
             JsonSerializer.SerializeToElement(new { version = "1.0" }), [agent], principalId,
             RootFlowRunId: "flowrun-root", CorrelationId: "correlation-1",
-            OrchestrationTimeoutMilliseconds: 600_000);
+            OrchestrationTimeoutMilliseconds: 600_000)
+        {
+            FlowScopeRef = "/instance"
+        };
 
         var json = JsonSerializer.Serialize(material, AwpProtocol.JsonOptions);
         var actual = Assert.IsInstanceOfType<AwpRootFlowExecutionMaterial>(
@@ -216,6 +219,7 @@ public sealed class AwpContractTests
         Assert.AreEqual("platform", actual.Agents.Single().RuntimeProfileNamespace);
         Assert.AreEqual("flowrun-root", actual.RootFlowRunId);
         Assert.AreEqual("correlation-1", actual.CorrelationId);
+        Assert.AreEqual("/instance", actual.FlowScopeRef);
         Assert.AreEqual(600_000, actual.OrchestrationTimeoutMilliseconds);
         Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("credential", json, StringComparison.OrdinalIgnoreCase);

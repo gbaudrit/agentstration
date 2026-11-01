@@ -206,11 +206,7 @@ public sealed class ToolSetService(
         if (candidates.Length > 1)
             throw new ToolSetValidationException("tool_route_ambiguous", $"ToolSet '{@namespace}/{name}:{version}' has multiple compatible routes for capability '{capability}'.");
         var selected = candidates[0];
-        var current = await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, selected.ToolName, selected.ToolNamespace), cancellationToken);
-        if (current is null || current.Value.Uid != selected.ToolUid || current.Value.Generation != selected.ToolGeneration)
-            throw new ToolSetValidationException("tool_set_member_stale", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' no longer matches its pinned revision.");
-        if (!current.Value.Definition.Enabled || current.Value.Definition.Discovery?.Available != true)
-            throw new ToolSetValidationException("tool_set_member_unavailable", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' is unavailable.");
+        await ValidatePinnedMemberAsync(selected, cancellationToken);
         return new(name, @namespace, version, selected);
     }
 
@@ -233,12 +229,7 @@ public sealed class ToolSetService(
         if (candidates.Length > 1)
             throw new ToolSetValidationException("tool_route_ambiguous", $"ToolSet '{@namespace}/{name}:{version}' has multiple compatible routes for capability '{capability}'.");
         var selected = candidates[0];
-        var current = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
-            scopeRef, selected.ToolNamespace, ToolResourceKinds.Tool, selected.ToolName), cancellationToken);
-        if (current is null || current.Value.Uid != selected.ToolUid || current.Value.Generation != selected.ToolGeneration)
-            throw new ToolSetValidationException("tool_set_member_stale", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' no longer matches its pinned revision.");
-        if (!current.Value.Definition.Enabled || current.Value.Definition.Discovery?.Available != true)
-            throw new ToolSetValidationException("tool_set_member_unavailable", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' is unavailable.");
+        await ValidatePinnedMemberAsync(selected, cancellationToken);
         return new(name, @namespace, version, selected);
     }
 
@@ -254,10 +245,18 @@ public sealed class ToolSetService(
                 ToolResourceKinds.Tool, scopeRef, cancellationToken)
                 ?? throw new ToolSetValidationException("tool_set_member_not_found", $"Tool member '{member.Tool.Name}' was not found.");
             var tool = stored.Value;
+            var toolScopeRef = tool.ScopeRef
+                ?? throw new ToolSetValidationException("tool_set_member_scope_missing", $"Tool member '{tool.Address}' has no ownership scope.");
             if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
                 throw new ToolSetValidationException("tool_set_member_unavailable", $"Tool member '{tool.Address}' is unavailable.");
-            var provider = tool.Definition.Provider?.Resolve(tool.Namespace, ToolResourceKinds.ToolProvider)
+            var providerReference = tool.Definition.Provider
                 ?? throw new ToolSetValidationException("tool_set_member_provider_missing", $"Tool member '{tool.Address}' has no provider mapping.");
+            var providerAddress = providerReference.Resolve(tool.Namespace, ToolResourceKinds.ToolProvider);
+            var provider = await references.ResolveAsync<ToolProviderResource>(providerReference, tool.Namespace,
+                ToolResourceKinds.ToolProvider, toolScopeRef, cancellationToken)
+                ?? throw new ToolSetValidationException("tool_set_member_provider_missing", $"Tool member '{tool.Address}' references unavailable provider '{providerAddress}'.");
+            var providerScopeRef = provider.Value.ScopeRef
+                ?? throw new ToolSetValidationException("tool_set_member_provider_scope_missing", $"Provider '{provider.Value.Address}' has no ownership scope.");
             var schema = tool.Definition.Schema
                 ?? throw new ToolSetValidationException("tool_set_member_schema_missing", $"Tool member '{tool.Address}' has no schema.");
             members.Add(new PublishedToolSetMember
@@ -266,10 +265,14 @@ public sealed class ToolSetService(
                 Route = member.Route,
                 ToolName = tool.Name,
                 ToolNamespace = tool.Namespace,
+                ToolScopeRef = toolScopeRef,
                 ToolUid = tool.Uid,
                 ToolGeneration = tool.Generation,
-                ProviderName = provider.Name,
-                ProviderNamespace = provider.Namespace,
+                ProviderName = provider.Value.Name,
+                ProviderNamespace = provider.Value.Namespace,
+                ProviderScopeRef = providerScopeRef,
+                ProviderUid = provider.Value.Uid,
+                ProviderGeneration = provider.Value.Generation,
                 ExternalToolId = tool.Definition.ExternalId
                     ?? throw new ToolSetValidationException("tool_set_member_external_id_missing", $"Tool member '{tool.Address}' has no external identity."),
                 InputSchema = schema.Input.Clone(),
@@ -280,12 +283,29 @@ public sealed class ToolSetService(
         return members;
     }
 
+    private async Task ValidatePinnedMemberAsync(PublishedToolSetMember selected, CancellationToken cancellationToken)
+    {
+        var current = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+            selected.ToolScopeRef, selected.ToolNamespace, ToolResourceKinds.Tool, selected.ToolName), cancellationToken);
+        if (current is null || current.Value.Uid != selected.ToolUid || current.Value.Generation != selected.ToolGeneration)
+            throw new ToolSetValidationException("tool_set_member_stale", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' no longer matches its pinned revision.");
+        if (!current.Value.Definition.Enabled || current.Value.Definition.Discovery?.Available != true)
+            throw new ToolSetValidationException("tool_set_member_unavailable", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' is unavailable.");
+        var provider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+            selected.ProviderScopeRef, selected.ProviderNamespace, ToolResourceKinds.ToolProvider, selected.ProviderName), cancellationToken);
+        if (provider is null || provider.Value.Uid != selected.ProviderUid || provider.Value.Generation != selected.ProviderGeneration)
+            throw new ToolSetValidationException("tool_set_member_provider_stale", $"Published Tool provider '{selected.ProviderNamespace}/{selected.ProviderName}' no longer matches its pinned revision.");
+        if (!provider.Value.Definition.Enabled)
+            throw new ToolSetValidationException("tool_set_member_provider_unavailable", $"Published Tool provider '{selected.ProviderNamespace}/{selected.ProviderName}' is unavailable.");
+    }
+
     public static void Validate(ToolSetResource resource)
     {
         if (resource.Kind != ToolResourceKinds.ToolSet || resource.ApiVersion != ResourceApiVersions.CoreV1)
             throw new ToolSetValidationException("tool_set_identity_invalid", "ToolSet kind and apiVersion are required.");
-        if (resource.ScopeRef is not { Kind: ResourceScopeKind.Workspace })
-            throw new ToolSetValidationException("tool_set_scope_invalid", "A ToolSet must belong to a Workspace scope.");
+        if (resource.ScopeRef is not { } scopeRef
+            || !ResourceScopePolicy.AllowedScopes(ToolResourceKinds.ToolSet).Contains(scopeRef.Kind))
+            throw new ToolSetValidationException("tool_set_scope_invalid", "A ToolSet must belong to an Instance, Tenant, or Workspace scope.");
         ValidateToken(resource.Name, "tool_set_name_invalid", "ToolSet name");
         if (string.IsNullOrWhiteSpace(resource.Definition?.DisplayName) || resource.Definition.DisplayName.Length > 200)
             throw new ToolSetValidationException("tool_set_display_name_invalid", "ToolSet display names must contain 1 to 200 characters.");

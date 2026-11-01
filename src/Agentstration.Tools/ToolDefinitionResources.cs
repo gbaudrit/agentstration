@@ -14,6 +14,7 @@ public sealed record ToolDefinitionFlowTarget
 {
     public required string Name { get; init; }
     public ResourceNamespace? Namespace { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? Version { get; init; }
     public bool UseActiveVersion { get; init; } = true;
 }
@@ -45,7 +46,10 @@ public sealed record ResolvedToolDefinitionFlowContract(
     ResourceNamespace Namespace,
     string Version,
     JsonElement? InputSchema,
-    JsonElement? OutputSchema);
+    JsonElement? OutputSchema)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 
 public interface IToolDefinitionFlowResolver
 {

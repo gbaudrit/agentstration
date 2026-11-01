@@ -38,6 +38,7 @@ public abstract record Resource
     public required string ApiVersion { get; init; }
     public string Kind { get; init; } = string.Empty;
     public ResourceMetadata Metadata { get; init; } = new();
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
     [JsonIgnore] public string Name => Metadata.Name;
     [JsonIgnore] public ResourceNamespace Namespace => Metadata.Namespace;
     [JsonIgnore] public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
@@ -54,6 +55,8 @@ public abstract record Resource
         ETag = etag,
         Status = Status with { ResourceVersion = etag }
     };
+
+    public Resource WithGovernance(ResourceGovernance governance) => this with { Governance = governance };
 }
 
 public sealed record ResourceCondition

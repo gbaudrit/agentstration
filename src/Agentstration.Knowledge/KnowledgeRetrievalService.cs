@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
@@ -177,15 +178,22 @@ public sealed class KnowledgeRetrievalService(
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
         try
         {
-            var source = await sources.GetAsync(sourceId, cancellationToken)
-                ?? throw Error("knowledge_retrieval_source_not_found", $"KnowledgeSource '{sourceId}' was not found.");
+            StoredResource<KnowledgeSourceResource> source;
+            try
+            {
+                source = await sources.ResolveForUseAsync(sourceId,
+                    ResourceScopeRef.Workspace(context.WorkspaceId), cancellationToken);
+            }
+            catch (KnowledgeSourceNotFoundException)
+            {
+                throw Error("knowledge_retrieval_source_not_found", $"KnowledgeSource '{sourceId}' was not found.");
+            }
+            catch (KnowledgeSourceValidationException exception)
+            {
+                throw Error(exception.Code, exception.Message, exception);
+            }
             if (!source.Value.Definition.Enabled)
                 throw Error("knowledge_retrieval_source_disabled", $"KnowledgeSource '{source.Value.Address}' is disabled.");
-            var scopeRef = source.Value.ScopeRef
-                ?? throw Error("knowledge_retrieval_source_scope_invalid", "The KnowledgeSource has no Workspace scope.");
-            if (scopeRef != ResourceScopeRef.Workspace(context.WorkspaceId))
-                throw Error("knowledge_retrieval_source_scope_mismatch",
-                    "The KnowledgeSource is not owned by the current Workspace.");
             KnowledgeSnapshotResource snapshot;
             try { snapshot = await snapshots.ResolveForRetrievalAsync(sourceId, snapshotName, cancellationToken); }
             catch (KnowledgeSnapshotException exception)

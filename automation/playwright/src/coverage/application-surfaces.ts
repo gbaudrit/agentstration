@@ -118,6 +118,20 @@ function coveredModelAdministration(id: string, source: string, routes: readonly
   };
 }
 
+function coveredOperationalTriggers(
+  id: string,
+  source: string,
+  routes: readonly string[],
+  fixtureKeys: readonly string[] = [],
+): ApplicationSurface {
+  return {
+    id, host: 'console', source, routes, fixtureKeys,
+    pageObject: 'src/pages/operational-triggers.page.ts',
+    journey: 'exercise-operational-triggers',
+    specification: 'tests/operational-triggers.spec.ts', coverage: 'covered',
+  };
+}
+
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
@@ -164,7 +178,11 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredConsoleAdministration('logout', `${razorPages}/Logout.cshtml`, ['/logout']),
 
   partialResourceAdministration('agents', `${consolePages}/Agents.razor`, ['/agents'], 412),
-  coveredFlow('agent-runner', `${consolePages}/AgentRunner.razor`, ['/agents/{Name}/run', '/runs/{RunId}'], ['name', 'runId'], 'inspect-flow-observability'),
+  {
+    id: 'agent-runner', host: 'console', source: `${consolePages}/AgentRunner.razor`, routes: ['/agents/{Name}/run', '/runs/{RunId}'], fixtureKeys: ['name', 'runId'],
+    pageObject: 'src/pages/execution-scopes.page.ts', journey: 'exercise-execution-scopes',
+    specification: 'tests/execution-scopes.spec.ts', coverage: 'covered',
+  },
   coveredFlow('agent-runs', `${consolePages}/AgentRuns.razor`, ['/agent-runs'], [], 'inspect-flow-observability'),
   {
     id: 'namespaced-agent-details', host: 'console', source: `${consolePages}/NamespacedAgentDetails.razor`,
@@ -192,7 +210,11 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     specification: 'tests/flow-connection-contracts.spec.ts', coverage: 'covered',
   },
   coveredFlow('flow-runs', `${consolePages}/FlowRuns.razor`, ['/flow-runs'], [], 'inspect-flow-observability'),
-  coveredFlow('flow-run-details', `${consolePages}/FlowRunDetails.razor`, ['/flow-runs/{RunId}'], ['runId'], 'inspect-flow-observability'),
+  {
+    id: 'flow-run-details', host: 'console', source: `${consolePages}/FlowRunDetails.razor`, routes: ['/flow-runs/{RunId}'], fixtureKeys: ['runId'],
+    pageObject: 'src/pages/execution-scopes.page.ts', journey: 'exercise-execution-scopes',
+    specification: 'tests/execution-scopes.spec.ts', coverage: 'covered',
+  },
   coveredFlow('run-events', `${consolePages}/RunEvents.razor`, ['/run-events'], [], 'inspect-flow-observability'),
   coveredFlow('tasks', `${consolePages}/Tasks.razor`, ['/tasks', '/work'], [], 'inspect-flow-observability'),
   coveredFlow('task-details', `${consolePages}/TaskDetails.razor`, ['/tasks/{TaskId:guid}'], ['taskId'], 'inspect-flow-observability'),
@@ -239,9 +261,9 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     specification: 'tests/schema-contract-bindings.spec.ts', coverage: 'covered',
   },
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),
-  partialResourceAdministration('triggers', `${consolePages}/Triggers.razor`, ['/triggers'], 427),
-  planned('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], 428, ['name']),
-  partialResourceAdministration('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], 429, ['name']),
+  coveredOperationalTriggers('triggers', `${consolePages}/Triggers.razor`, ['/triggers']),
+  coveredOperationalTriggers('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], ['name']),
+  coveredOperationalTriggers('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], ['name']),
 
   coveredDistribution('extensions', `${consolePages}/Extensions.razor`, ['/extensions']),
   coveredDistribution('extension-details', `${consolePages}/ExtensionDetails.razor`, ['/extensions/{RegistrationName}', '/extensions/enrollment/{EnrollmentInstanceId:guid}'], ['registrationName', 'enrollmentInstanceId']),

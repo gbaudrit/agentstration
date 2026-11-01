@@ -123,7 +123,10 @@ public sealed class RuntimeWorkerExecutionService(
             ? direct.Execution
             : new RuntimeExecutionOptions();
         return await operations.InvokeModelAsync(new RuntimeGovernedModelRequest(
-            agent, messages, tools, options, material.TenantId, material.WorkspaceId, material.PrincipalId), lease.Token);
+            agent, messages, tools, options, material.TenantId, material.WorkspaceId, material.PrincipalId)
+        {
+            ExecutionScopeRef = material.ScopeRef
+        }, lease.Token);
     }
 
     public async Task<IAsyncEnumerable<RuntimeGovernedModelUpdate>> StreamModelAsync(
@@ -149,7 +152,10 @@ public sealed class RuntimeWorkerExecutionService(
                 ? direct.Execution
                 : new RuntimeExecutionOptions();
             var stream = operations.StreamModelAsync(new RuntimeGovernedModelRequest(
-                agent, messages, tools, options, material.TenantId, material.WorkspaceId, material.PrincipalId), lease.Token);
+                agent, messages, tools, options, material.TenantId, material.WorkspaceId, material.PrincipalId)
+            {
+                ExecutionScopeRef = material.ScopeRef
+            }, lease.Token);
             return GuardStream(stream, lease, cancellationToken);
         }
         catch
@@ -181,7 +187,10 @@ public sealed class RuntimeWorkerExecutionService(
         return await operations.InvokeToolAsync(new RuntimeGovernedToolRequest(
             agent, tool, toolCallId, turnId, turnAttemptId, turn.StepExecutionId,
             material.TenantId, material.WorkspaceId, material.PrincipalId, material.RunId,
-            arguments, material is RuntimeDirectAgentExecutionMaterial direct ? direct.Execution.PersistToolArguments : null), lease.Token);
+            arguments, material is RuntimeDirectAgentExecutionMaterial direct ? direct.Execution.PersistToolArguments : null)
+        {
+            ExecutionScopeRef = material.ScopeRef
+        }, lease.Token);
     }
 
     public async Task<RuntimeGovernedArtifact> StoreArtifactAsync(
@@ -210,7 +219,7 @@ public sealed class RuntimeWorkerExecutionService(
         var step = authorization.Assignment.StepExecutions.SingleOrDefault(value => value.Id == stepExecutionId)
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Tool does not reference an authorized StepExecution.");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
-        return await operations.InvokeFlowToolAsync(proof.WorkspaceId, step.FlowRunId,
+        return await operations.InvokeFlowToolAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,
             step.StepDefinitionId, arguments, lease.Token);
     }
 
@@ -229,7 +238,7 @@ public sealed class RuntimeWorkerExecutionService(
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
         var step = AuthorizedFlowStep(authorization, stepExecutionId, "Flow Artifact capture");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
-        return await operations.CaptureFlowArtifactAsync(proof.WorkspaceId, step.FlowRunId,
+        return await operations.CaptureFlowArtifactAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,
             step.StepDefinitionId, fileName, mediaType, content, provenance, lease.Token);
     }
 
@@ -242,7 +251,7 @@ public sealed class RuntimeWorkerExecutionService(
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
         var step = AuthorizedFlowStep(authorization, stepExecutionId, "Flow Artifact cleanup");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
-        await operations.CleanupFlowArtifactAsync(proof.WorkspaceId, step.FlowRunId,
+        await operations.CleanupFlowArtifactAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,
             step.StepDefinitionId, artifact, lease.Token);
     }
 
@@ -269,7 +278,7 @@ public sealed class RuntimeWorkerExecutionService(
         var step = authorization.Assignment.StepExecutions.SingleOrDefault(value => value.Id == stepExecutionId)
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The child Flow does not reference an authorized StepExecution.");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
-        var child = await operations.CreateOrGetChildFlowAsync(proof.WorkspaceId, step.FlowRunId,
+        var child = await operations.CreateOrGetChildFlowAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,
             step.StepDefinitionId, input, purpose, iteration, lease.Token);
         await assignments.RegisterChildFlowAsync(proof, child.RunId, lease.Token);
         var material = await materials.ResolveFlowRunAsync(authorization.Assignment, child.RunId, lease.Token);

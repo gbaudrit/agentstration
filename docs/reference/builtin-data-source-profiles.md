@@ -1,6 +1,6 @@
 # Built-in Data Source Profiles
 
-Agentstration reconciles three published Data Source Profiles into every Workspace. They are executable local defaults and do not require an AEP extension, a model, a cloud service, or a remote provider.
+Agentstration reconciles three published Data Source Profiles at instance scope. They are executable local defaults shared with authorized tenants and Workspaces and do not require an AEP extension, a model, a cloud service, or a remote provider.
 
 | Profile | Source configuration | Acquisition behavior |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ The Web and REST implementations accept a response of at most 1 MiB, follow at m
 
 ## Scope, ownership, and customization
 
-Data Sources and Data Source Profiles may be owned at instance, tenant, or Workspace scope. A Data Source may reference only a profile visible through the ancestor-only scope rules. Acquisition always executes in a consuming Workspace because Flows, Tools, Tool Providers, staging, and durable Artifact stores are Workspace-owned.
+Data Sources and Data Source Profiles may be owned at instance, tenant, or Workspace scope. A Data Source may reference only a profile visible through the ancestor-only scope rules and an explicit descendant-use grant. The three core built-ins, their acquisition Flows, Tools, Tool Providers, ToolSets, and staging composition are instance-owned; their tenant grants propagate discovery and use to descendant Workspaces. Acquisition records, Flow Runs, staged content, and durable Artifacts remain isolated in the consuming Workspace.
 
 The `-builtin` identities are owned by Agentstration and cannot be edited, republished, reactivated, deleted, or replaced through YAML. Their metadata includes:
 
@@ -31,7 +31,7 @@ annotations:
   agentstration.io/owner: agentstration
 ```
 
-These annotations describe provenance; the protection boundary is the reserved identity plus the system Control Plane writer. To customize acquisition, create a separate Data Source Profile and publish its own immutable revision. Existing custom profiles are never overwritten by Workspace reconciliation.
+These annotations describe provenance; the protection boundary is the reserved identity plus the system Control Plane writer. To customize acquisition, create a separate Data Source Profile and publish its own immutable revision. Existing custom profiles are never overwritten by platform reconciliation.
 
 ## Optional extension profiles
 

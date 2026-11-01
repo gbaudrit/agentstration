@@ -55,6 +55,8 @@ else
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [Parameter] public bool Embedded { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private readonly CancellationTokenSource cancellation = new();
@@ -67,13 +69,22 @@ else
     private string? message;
     private bool loading = true;
     private bool saving;
+    private bool isReadOnly;
     private string? publishedVersion;
     private string? lastPublishedVersion;
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
-    private bool IsReadOnly => !FlowResourceNamespace.IsDefault;
-    private string DetailsUrl => IsReadOnly
-        ? $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows/{Uri.EscapeDataString(FlowId)}"
-        : $"/flows/{Uri.EscapeDataString(FlowId)}";
+    private bool IsReadOnly => isReadOnly;
+    private ResourceScopeRef? RequestedScope => ScopeRef ?? (string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue));
+    private string DetailsUrl
+    {
+        get
+        {
+            var path = FlowResourceNamespace.IsDefault
+                ? $"/flows/{Uri.EscapeDataString(FlowId)}"
+                : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows/{Uri.EscapeDataString(FlowId)}";
+            return selectedScope is null ? path : $"{path}?scopeRef={Uri.EscapeDataString(selectedScope.Value.Value)}";
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -81,12 +92,18 @@ else
         {
             loading = true; error = null;
             var agentsTask = Management.GetAgentsAsync(cancellation.Token);
+            var requestedScope = RequestedScope;
+            var snapshot = requestedScope is null
+                ? await Client.GetFlowSnapshotAsync(FlowId, cancellation.Token)
+                : await Client.GetFlowSnapshotAsync(FlowResourceNamespace, FlowId, requestedScope.Value, cancellation.Token);
+            selectedScope = snapshot.Value.ScopeRef;
+            isReadOnly = snapshot.Value.Governance.IsManaged;
             if (IsReadOnly)
             {
-                var flow = await Client.GetFlowAsync(FlowResourceNamespace, FlowId, cancellation.Token);
+                var flow = snapshot.Value;
                 if (string.IsNullOrWhiteSpace(flow.ActiveVersion))
                     throw new InvalidOperationException(T("NoActivePublishedVersion", $"{FlowResourceNamespace.Value}/{FlowId}"));
-                var version = await Client.GetFlowVersionAsync(FlowResourceNamespace, FlowId, flow.ActiveVersion, cancellation.Token);
+                var version = await Client.GetFlowVersionAsync(FlowResourceNamespace, FlowId, flow.ActiveVersion, flow.ScopeRef, cancellation.Token);
                 if (version.Definition is not OrchestrationFlowDefinition)
                     throw new InvalidOperationException(T("NotOrchestration", version.Version));
                 model = OrchestrationEditorModel.From(flow with { Version = version.Version, Definition = version.Definition, Description = version.Description });
@@ -96,9 +113,6 @@ else
             }
             else
             {
-                var flowTask = Client.GetFlowSnapshotAsync(FlowId, cancellation.Token);
-                await Task.WhenAll(flowTask, agentsTask);
-                var snapshot = await flowTask;
                 model = OrchestrationEditorModel.From(snapshot.Value);
                 etag = snapshot.ETag;
                 agents = await agentsTask;
@@ -115,11 +129,14 @@ else
         try
         {
             saving = true; error = null; message = null;
-            var saved = await Client.UpdateFlowAsync(FlowId, new UpdateFlowRequest(
+            var request = new UpdateFlowRequest(
                 model.Description,
                 model.Version,
                 model.Enabled,
-                model.CreateDefinition()), etag, cancellation.Token);
+                model.CreateDefinition());
+            var saved = selectedScope is { } ownerScope
+                ? await Client.UpdateFlowAsync(FlowResourceNamespace, FlowId, ownerScope, request, etag, cancellation.Token)
+                : await Client.UpdateFlowAsync(FlowId, request, etag, cancellation.Token);
             model = OrchestrationEditorModel.From(saved.Value);
             etag = saved.ETag;
             message = T("Saved");
@@ -136,7 +153,10 @@ else
         try
         {
             saving = true; message = null;
-            var published = await Client.CreateFlowVersionAsync(FlowId, new CreateFlowVersionRequest(publishVersion, true), cancellation.Token);
+            var request = new CreateFlowVersionRequest(publishVersion, true);
+            var published = selectedScope is { } ownerScope
+                ? await Client.CreateFlowVersionAsync(FlowResourceNamespace, FlowId, ownerScope, request, cancellation.Token)
+                : await Client.CreateFlowVersionAsync(FlowId, request, cancellation.Token);
             lastPublishedVersion = published.Version;
             message = T("VersionPublished", published.Version);
             publishVersion = NextVersion(published.Version);

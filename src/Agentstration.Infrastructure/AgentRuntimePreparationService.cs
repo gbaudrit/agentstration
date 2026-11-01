@@ -18,6 +18,17 @@ public sealed class AgentRuntimePreparationService(AgentManagementService agents
             revision.Value.Metadata.Name,
             "Ready");
     }
+
+    public async Task<PreparedAgentRuntime> PrepareAsync(
+        ResourceNamespace resourceNamespace,
+        string agentName,
+        ResourceScopeRef? scopeRef,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        var revision = await agents.EnsureExecutionRevisionAsync(resourceNamespace, agentName, scopeRef, generation, cancellationToken);
+        return new(string.Empty, revision.Value.Metadata.Name, "Ready");
+    }
 }
 
 public sealed class ExternalWorkerAgentDeploymentReconciler : IAgentDeploymentReconciler

@@ -76,11 +76,10 @@ internal sealed partial class TriggerEndpoints
         return Results.NoContent();
     });
 
-    private static Task<IResult> RunNowAsync(string name, ICurrentRequestContext context, IAuthorizationService authorization, TriggerFiringService service, CancellationToken token) => RunNowCoreAsync(ResourceNamespace.Default, name, context, authorization, service, token);
-    private static Task<IResult> RunNowNamespacedAsync(string @namespace, string name, ICurrentRequestContext context, IAuthorizationService authorization, TriggerFiringService service, CancellationToken token) => RunNowCoreAsync(ResourceNamespace.Parse(@namespace), name, context, authorization, service, token);
-    private static Task<IResult> RunNowCoreAsync(ResourceNamespace @namespace, string name, ICurrentRequestContext context, IAuthorizationService authorization, TriggerFiringService service, CancellationToken token) => TriggersApiHttp.ExecuteAsync(async () =>
+    private static Task<IResult> RunNowAsync(string name, TriggerFiringService service, CancellationToken token) => RunNowCoreAsync(ResourceNamespace.Default, name, service, token);
+    private static Task<IResult> RunNowNamespacedAsync(string @namespace, string name, TriggerFiringService service, CancellationToken token) => RunNowCoreAsync(ResourceNamespace.Parse(@namespace), name, service, token);
+    private static Task<IResult> RunNowCoreAsync(ResourceNamespace @namespace, string name, TriggerFiringService service, CancellationToken token) => TriggersApiHttp.ExecuteAsync(async () =>
     {
-        await authorization.EnsurePermissionAsync(context.Current, AuthorizationPermissions.RunsExecute, token);
         var occurrence = await service.RunNowAsync(@namespace, name, token);
         return Results.Accepted($"/api/triggers/{Uri.EscapeDataString(name)}/occurrences", occurrence);
     });

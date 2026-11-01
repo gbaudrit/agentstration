@@ -10,6 +10,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -158,7 +159,7 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         var requestContext = await GetBootstrapContextAsync(factory);
-        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext);
         var service = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         var id = RuntimeProfileManagementService.ProfileId("maf-persistent-test");
         var stored = await service.CreateAsync(new RuntimeProfileResource
@@ -212,17 +213,20 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         const string runtimeName = "runtime-cleanup-profile";
         const string deploymentName = "runtime-cleanup-test--g000001";
 
-        var runtime = await runtimes.CreateAsync(new RuntimeProfileResource
-        {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
-            Metadata = new ResourceMetadata { Name = runtimeName },
-            Definition = new RuntimeProfileProperties
+        StoredResource<RuntimeProfileResource> runtime;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext))
+            runtime = await runtimes.CreateAsync(new RuntimeProfileResource
             {
-                DisplayName = "Runtime cleanup test",
-                RuntimeType = "microsoft-agent-framework"
-            }
-        }, default);
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+                Metadata = new ResourceMetadata { Name = runtimeName },
+                Definition = new RuntimeProfileProperties
+                {
+                    DisplayName = "Runtime cleanup test",
+                    RuntimeType = "microsoft-agent-framework"
+                }
+            }, default);
+        await GrantRuntimeUseAsync(factory, requestContext, runtime.Value);
         var agent = await agents.PutAgentAsync(new AgentResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -251,7 +255,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 
         Assert.IsNull(await agents.GetDeploymentAsync(deploymentName, default));
         Assert.IsEmpty(await runtimes.GetUsagesAsync(runtimeName, default));
-        await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext))
+            await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
         Assert.IsNull(await store.GetAsync<RuntimeProfileResource>(new(RuntimeProfileResourceKinds.RuntimeProfile, runtimeName), default));
     }
 
@@ -312,13 +317,16 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         const string runtimeName = "orphan-cleanup-profile";
         const string deploymentName = "orphan-cleanup-test--g000001";
 
-        var runtime = await runtimes.CreateAsync(new RuntimeProfileResource
-        {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
-            Metadata = new ResourceMetadata { Name = runtimeName },
-            Definition = new RuntimeProfileProperties { DisplayName = "Orphan cleanup test", RuntimeType = "microsoft-agent-framework" }
-        }, default);
+        StoredResource<RuntimeProfileResource> runtime;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext))
+            runtime = await runtimes.CreateAsync(new RuntimeProfileResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+                Metadata = new ResourceMetadata { Name = runtimeName },
+                Definition = new RuntimeProfileProperties { DisplayName = "Orphan cleanup test", RuntimeType = "microsoft-agent-framework" }
+            }, default);
+        await GrantRuntimeUseAsync(factory, requestContext, runtime.Value);
         var agent = await agents.PutAgentAsync(new AgentResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -344,7 +352,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         await store.DeleteAsync(new(AgentResourceKinds.Agent, agentName), agent.ETag, default);
 
         Assert.IsEmpty(await runtimes.GetUsagesAsync(runtimeName, default));
-        await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(requestContext))
+            await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
 
         Assert.IsNull(await agents.GetDeploymentAsync(deploymentName, default));
         Assert.IsNull(await runtimes.GetAsync(runtimeName, default));
@@ -355,13 +364,15 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
         const string resourceNamespace = "team-a";
         const string providerName = "ollama-local";
 
         using var extensionResponse = await client.PostAsJsonAsync("/api/extensionregistrations", new CreateExtensionRegistrationRequest(
             "team-ollama-extension",
             new ExtensionRegistrationProperties { DisplayName = "Team Ollama extension", Endpoint = new Uri("http://127.0.0.1:11439") },
-            resourceNamespace));
+            resourceNamespace,
+            ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, extensionResponse.StatusCode);
 
         using var providerResponse = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
@@ -372,7 +383,8 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
                 Extension = new ResourceReference("team-ollama-extension"),
                 ContributionId = "ollama"
             },
-            resourceNamespace));
+            resourceNamespace,
+            ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
 
         var provider = await client.GetFromJsonAsync<ModelProviderResource>($"/api/modelproviders/{providerName}?resourceNamespace={resourceNamespace}");
@@ -387,10 +399,11 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
             new ModelProfileProperties
             {
                 DisplayName = "Team profile",
-                Provider = new ResourceReference(providerName, @namespace: new ResourceNamespace(resourceNamespace)),
+                Provider = new ResourceReference(providerName, ResourceScopeRef.Instance, new ResourceNamespace(resourceNamespace)),
                 Model = new ModelSelection { Name = "qwen3:8b" }
             },
-            resourceNamespace));
+            resourceNamespace,
+            ResourceScopeRef.Instance));
         Assert.AreEqual(HttpStatusCode.Created, profileResponse.StatusCode);
         var profile = await client.GetFromJsonAsync<ModelProfileResource>($"/api/modelprofiles/{profileName}?resourceNamespace={resourceNamespace}");
         Assert.AreEqual(resourceNamespace, profile?.Namespace.Value);
@@ -466,6 +479,19 @@ public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
         delete.Headers.IfMatch.Add(updatedResponse.Headers.ETag!);
         using var deleted = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
+
+    private static async Task GrantRuntimeUseAsync(WebApplicationFactory<Program> factory,
+        RequestContext context, RuntimeProfileResource runtime)
+    {
+        using var instanceScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        _ = await policies.PutAsync(new ResourceAccessPolicy(
+            new(runtime.Uid, ResourceScopeRef.Instance, runtime.Namespace,
+                RuntimeProfileResourceKinds.RuntimeProfile, runtime.Generation),
+            [new(ResourceScopeRef.Workspace(context.WorkspaceId),
+                [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+            null, default);
     }
 
     [TestMethod]

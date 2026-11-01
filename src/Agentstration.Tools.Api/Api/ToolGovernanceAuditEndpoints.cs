@@ -25,16 +25,18 @@ public static class ToolGovernanceAuditEndpoints
         string? hookId,
         long? resourceGeneration,
         string? decision,
+        string? scopeRef,
         IToolGovernanceAuditReader reader,
         ICurrentRequestContext requestContext,
         CancellationToken cancellationToken)
     {
         try
         {
+            var scope = RequestedScope(requestContext, scopeRef);
             var query = new ToolGovernanceAuditQuery
             {
                 OwnerKind = ParseOwnerKind(ownerKind),
-                WorkspaceId = new WorkspaceId(requestContext.Current.WorkspaceId),
+                ScopeRef = scope,
                 RunId = runId,
                 AfterSequence = afterSequence ?? 0,
                 Limit = limit ?? 100,
@@ -77,4 +79,21 @@ public static class ToolGovernanceAuditEndpoints
     }
 
     private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static ResourceScopeRef RequestedScope(ICurrentRequestContext requestContext, string? value)
+    {
+        var current = requestContext.Current;
+        var requested = string.IsNullOrWhiteSpace(value)
+            ? ResourceScopeRef.Workspace(current.WorkspaceId)
+            : ResourceScopeRef.Parse(value);
+        return requested.Kind switch
+        {
+            ResourceScopeKind.Instance => requested,
+            ResourceScopeKind.Tenant when requested.TargetId == current.TenantId => requested,
+            ResourceScopeKind.Workspace when requested.TargetId == current.WorkspaceId => requested,
+            _ => throw new ToolGovernanceAuditValidationException(
+                "execution_scope_not_authorized",
+                "The requested execution scope is not the current Instance, Tenant, or Workspace context.")
+        };
+    }
 }

@@ -8,6 +8,7 @@ namespace Agentstration.Flows.Contracts;
 public sealed record CreateFlowRequest(string Name, string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }
 }
 public sealed record UpdateFlowRequest(string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null)
@@ -18,19 +19,29 @@ public sealed record CreateFlowVersionRequest(string Version, bool Activate = tr
 public sealed record FlowResponse(string Id, string Name, string? Description, string Version, bool Enabled, string? ActiveVersion, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, FlowGraphDefinition? Graph = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }
 public sealed record FlowSummaryResponse(string Id, string Name, string? Description, FlowKind FlowKind, string Version, bool Enabled, string? ActiveVersion, DateTimeOffset UpdatedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }
 public sealed record FlowVersionResponse(string FlowId, string Version, string? Description, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset PublishedAt, FlowGraphDefinition? Graph = null, string? DefinitionHash = null, string? ReleaseNotes = null, IReadOnlyDictionary<string, SchemaBindingSnapshot>? SchemaBindings = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }
 public sealed record FlowPageResponse(IReadOnlyList<FlowSummaryResponse> Value, string? NextLink);
-public sealed record CreateFlowRunRequest(JsonElement Input, string? Version = null, string? DeploymentResourceId = "local", FlowRunTrigger Trigger = FlowRunTrigger.Manual, string? CorrelationId = null, IReadOnlyDictionary<string, JsonElement>? Options = null);
+public sealed record CreateFlowRunRequest(JsonElement Input, string? Version = null, string? DeploymentResourceId = "local", FlowRunTrigger Trigger = FlowRunTrigger.Manual, string? CorrelationId = null, IReadOnlyDictionary<string, JsonElement>? Options = null)
+{
+    public ResourceScopeRef? DefinitionScopeRef { get; init; }
+    public ResourceScopeRef? ExecutionScopeRef { get; init; }
+}
 public sealed record FlowRunPageResponse(IReadOnlyList<FlowRun> Value, string? NextLink);
 public sealed record FlowRunCausalityPageResponse(
     FlowRunCausalityOrigin Origin,
@@ -38,7 +49,10 @@ public sealed record FlowRunCausalityPageResponse(
     int TotalCount,
     string? NextLink);
 public sealed record SubmitInputResponseRequest(JsonElement Value);
-public sealed record CreateFlowDraftRequest(string Name, string DisplayName, string? Description = null, IReadOnlyDictionary<string, string>? Tags = null, string Template = "AgentRouting");
+public sealed record CreateFlowDraftRequest(string Name, string DisplayName, string? Description = null, IReadOnlyDictionary<string, string>? Tags = null, string Template = "AgentRouting")
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 public sealed record UpdateFlowDraftRequest(string DisplayName, string? Description, IReadOnlyDictionary<string, string>? Tags, FlowGraphDefinition Definition, string UpdatedBy = "local-user");
 public sealed record PublishFlowDraftRequest(string Version, string? ReleaseNotes = null, bool Activate = true);
 public sealed record FlowDraftResponse(FlowDraft Value, string ETag);

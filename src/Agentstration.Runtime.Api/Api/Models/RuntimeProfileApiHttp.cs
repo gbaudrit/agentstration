@@ -11,6 +11,8 @@ internal static class RuntimeProfileApiHttp
         try { return await action(); }
         catch (ResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "runtime-profile-not-found", detail: exception.Message); }
         catch (ResourceConcurrencyException exception) { return Results.Problem(statusCode: 409, title: "resource-version-conflict", detail: exception.Message); }
+        catch (ResourceScopeAccessDeniedException exception) { return Results.Problem(statusCode: 403, title: "resource-scope-access-denied", detail: exception.Message); }
+        catch (ResourceScopePolicyException exception) { return Results.Problem(statusCode: 422, title: "runtime-profile-scope-invalid", detail: exception.Message); }
         catch (RuntimeProfileInUseException exception)
         {
             return Results.Problem(statusCode: 409, title: "runtime-profile-in-use", detail: exception.Message,

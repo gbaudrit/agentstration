@@ -502,7 +502,7 @@ public sealed class WorkplaceApiTests
                 FlowRun NewRun(string id, FlowRunScope scope, string secret)
                 {
                     var definition = new FlowVersion(
-                        scope.WorkspaceId,
+                        ResourceScopeRef.Workspace(scope.WorkspaceId.Value),
                         new FlowId("isolation-flow"),
                         "1.0.0",
                         null,

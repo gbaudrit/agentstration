@@ -69,8 +69,10 @@ public sealed partial class SecurityApiTests
             Assert.IsTrue(result.Succeeded, string.Join("; ", result.Errors.Select(error => error.Description)));
 
             var store = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
-            var tenant = (await store.ListTenantsAsync(default)).Single();
-            var workspace = (await store.ListWorkspacesAsync(tenant.Id, default)).Single();
+            var tenant = (await store.ListTenantsAsync(default)).Single(value =>
+                !OperationalTopologyIdentities.IsSystemTenant(value));
+            var workspace = (await store.ListWorkspacesAsync(tenant.Id, default)).Single(value =>
+                !OperationalTopologyIdentities.IsOperationalWorkspace(value));
             var owner = await store.FindRoleDefinitionByNameAsync("Owner", default);
             Assert.IsNotNull(owner);
             var principal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Workspace owner", null, PrincipalStatus.Active, DateTimeOffset.UtcNow);
@@ -337,7 +339,8 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode);
         Assert.IsNull(await resolver.ResolveAsync(firstIssuer, "same-subject", default));
 
-        using var details = await administrator.GetAsync($"/settings/organization/members/{first.PrincipalId:D}");
+        using var details = await administrator.GetAsync(
+            $"/settings/organization/members/{first.PrincipalId:D}?context={Uri.EscapeDataString(context.SelectedScopeRef.Value)}");
         Assert.AreEqual(HttpStatusCode.OK, details.StatusCode);
         StringAssert.Contains(await details.Content.ReadAsStringAsync(), "External authentication");
         var auditEvents = await administrator.GetFromJsonAsync<SecurityAuditEvent[]>("/api/identity/audit-events");

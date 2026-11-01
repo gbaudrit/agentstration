@@ -17,10 +17,12 @@ public sealed class FlowDesignerResourceProviderTests
         var client = new MockApiClient(TimeProvider.System);
         var provider = new FlowDesignerResourceProvider(client, client, null!, null!, null!);
 
-        var agents = await provider.GetAgentsAsync(CancellationToken.None);
+        var scope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var agents = await provider.GetAgentsAsync(scope, CancellationToken.None);
 
         var agent = agents.Single(item => item.Name == "dotnet-expert");
         Assert.AreEqual(".NET Expert", agent.DisplayName);
+        Assert.AreEqual(scope, agent.ScopeRef);
     }
 
     [TestMethod]
@@ -39,6 +41,7 @@ public sealed class FlowDesignerResourceProviderTests
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.Tool,
+            ScopeRef = reference.ScopeRef,
             Metadata = new ResourceMetadata { Name = "agentstration.notify" },
             Definition = new ToolResourceProperties
             {
@@ -70,7 +73,7 @@ public sealed class FlowDesignerResourceProviderTests
         var provider = new FlowDesignerResourceProvider(
             client, client, new ToolsClientStub([tool]), new ToolDefinitionsClientStub([definition]), null!);
 
-        var tools = await provider.GetToolsAsync(CancellationToken.None);
+        var tools = await provider.GetToolsAsync(reference.ScopeRef!.Value, CancellationToken.None);
 
         Assert.AreEqual(reference, tools.Single().InputSchemaReference);
     }

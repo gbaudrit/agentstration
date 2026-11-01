@@ -1,0 +1,20 @@
+{
+  "journey": "exercise-model-provider-access",
+  "input": {
+    "providerName": "provider-access-ollama",
+    "providerDisplayName": "Provider access Ollama",
+    "profileName": "provider-access-reasoning",
+    "profileDisplayName": "Provider access reasoning",
+    "authorizedWorkspaceName": "provider-access-authorized",
+    "siblingWorkspaceName": "provider-access-sibling",
+    "agentName": "provider-access-agent",
+    "agentDisplayName": "Provider access Agent"
+  },
+  "checkpoints": [
+    "model-provider-access-provider-granted",
+    "model-provider-access-profile-granted",
+    "model-provider-access-workspace-executed",
+    "model-provider-access-sibling-denied",
+    "model-provider-access-revoked"
+  ]
+}

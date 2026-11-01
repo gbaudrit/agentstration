@@ -1,0 +1,26 @@
+@namespace Agentstration.Web.Components
+@inject NavigationManager Navigation
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
+
+@if (IsInherited)
+{
+    <aside class="inherited-resource-notice" role="status" data-testid="inherited-resource-notice">
+        <span class="inherited-resource-notice-icon" aria-hidden="true"><TablerIcon Name="lock" /></span>
+        <span class="inherited-resource-notice-copy">
+            <strong>@Localizer["InheritedResource.ReadOnlyTitle"]</strong>
+            <span>@Localizer["InheritedResource.ReadOnlyMessage"]</span>
+        </span>
+        <span class="inherited-resource-notice-actions">
+            <span class="inherited-resource-notice-owner"><ResourceScopeBadge ScopeRef="OwnerScopeRef" /></span>
+            <a class="button-secondary" href="@OwnerContextUrl" data-testid="switch-to-owner-context">@Localizer["InheritedResource.SwitchToOwner"]</a>
+        </span>
+    </aside>
+}
+
+@code {
+    [Parameter, EditorRequired] public ResourceScopeRef OwnerScopeRef { get; set; } = ResourceScopeRef.Instance;
+
+    private bool IsInherited => !ResourceOwnershipContext.CanManage(OwnerScopeRef, Services);
+    private string OwnerContextUrl => Navigation.GetUriWithQueryParameter("context", OwnerScopeRef.Value);
+}

@@ -21,22 +21,33 @@ public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestCont
 {
     private readonly AsyncLocal<AmbientRequestContext?> ambient = new();
     public bool IsInitialized => AccessMode == ControlPlaneAccessMode.Workspace;
+    public Guid? ActorPrincipalId => ambient.Value?.PrincipalId;
     public ControlPlaneAccessMode AccessMode => ambient.Value?.AccessMode ?? ControlPlaneAccessMode.Unavailable;
     public RequestContext Current => ambient.Value switch
     {
-        { AccessMode: ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Tenant, Context: not null } value => value.Context,
+        { AccessMode: ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration, Context: not null } value => value.Context,
         { AccessMode: ControlPlaneAccessMode.System } => throw new InvalidOperationException("System operations do not have a workspace request context."),
         _ => throw new InvalidOperationException("The request context has not been initialized.")
     };
     TriggerExecutionIdentity ITriggerExecutionContext.Current => new(Current.TenantId, Current.WorkspaceId, Current.PrincipalId);
-    public IDisposable Push(RequestContext context) => Push(new AmbientRequestContext(ControlPlaneAccessMode.Workspace, context));
+    public IDisposable Push(RequestContext context) => Push(new AmbientRequestContext(ControlPlaneAccessMode.Workspace, context, context.PrincipalId));
+    public IDisposable PushInstance(RequestContext operationalContext)
+    {
+        ArgumentNullException.ThrowIfNull(operationalContext);
+        return Push(new AmbientRequestContext(ControlPlaneAccessMode.Instance, operationalContext, operationalContext.PrincipalId));
+    }
     public IDisposable PushTenant(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null)
     {
         if (principalId == Guid.Empty) throw new ArgumentException("A tenant context requires a non-empty Principal ID.", nameof(principalId));
         if (tenantId == Guid.Empty) throw new ArgumentException("A tenant context requires a non-empty Tenant ID.", nameof(tenantId));
-        return Push(new AmbientRequestContext(ControlPlaneAccessMode.Tenant, new RequestContext(principalId, tenantId, Guid.Empty, restriction)));
+        return Push(new AmbientRequestContext(ControlPlaneAccessMode.Tenant, new RequestContext(principalId, tenantId, Guid.Empty, restriction), principalId));
     }
-    public IDisposable PushSystem() => Push(new AmbientRequestContext(ControlPlaneAccessMode.System, null));
+    public IDisposable PushTenantAdministration(RequestContext operationalContext)
+    {
+        ArgumentNullException.ThrowIfNull(operationalContext);
+        return Push(new AmbientRequestContext(ControlPlaneAccessMode.TenantAdministration, operationalContext, operationalContext.PrincipalId));
+    }
+    public IDisposable PushSystem() => Push(new AmbientRequestContext(ControlPlaneAccessMode.System, null, null));
 
     private IDisposable Push(AmbientRequestContext context)
     {
@@ -45,7 +56,7 @@ public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestCont
         return new Scope(() => ambient.Value = previous);
     }
 
-    private sealed record AmbientRequestContext(ControlPlaneAccessMode AccessMode, RequestContext? Context);
+    private sealed record AmbientRequestContext(ControlPlaneAccessMode AccessMode, RequestContext? Context, Guid? PrincipalId);
 
     private sealed class Scope(Action dispose) : IDisposable
     {
@@ -98,7 +109,8 @@ public sealed class InitialPrincipalProvisioner(
 public sealed class InitialTopologyProvisioner(
     IIdentityStore store,
     TimeProvider timeProvider,
-    IWorkspaceProvisioner workspaceProvisioner) : IInitialTopologyProvisioner
+    IWorkspaceProvisioner workspaceProvisioner,
+    IOperationalTopologyProvisioner operationalTopology) : IInitialTopologyProvisioner
 {
     public async Task<InitialTopologyProvisioningResult> ProvisionAsync(
         InitialTopologyProvisioning request,
@@ -113,6 +125,10 @@ public sealed class InitialTopologyProvisioner(
         var tenantDisplayName = IdentityBootstrapValidation.DisplayName(request.TenantDisplayName, "Tenant");
         var workspaceName = IdentityBootstrapValidation.Name(request.WorkspaceName, "Workspace");
         var workspaceDisplayName = IdentityBootstrapValidation.DisplayName(request.WorkspaceDisplayName, "Workspace");
+        if (OperationalTopologyIdentities.IsReservedTenantName(tenantName))
+            throw new ArgumentException("The Tenant name is reserved for Agentstration operations.", nameof(request));
+        if (OperationalTopologyIdentities.IsReservedWorkspaceName(workspaceName))
+            throw new ArgumentException("The Workspace name is reserved for Agentstration operations.", nameof(request));
         var now = timeProvider.GetUtcNow();
 
         var tenant = await store.FindTenantByNameAsync(tenantName, cancellationToken);
@@ -143,6 +159,7 @@ public sealed class InitialTopologyProvisioner(
             DefaultWorkspaceId = workspace.Id,
             UpdatedAt = now
         }, cancellationToken);
+        _ = await operationalTopology.EnsureTenantAsync(tenant, cancellationToken);
         return new InitialTopologyProvisioningResult(tenant, workspace);
     }
 }
@@ -215,7 +232,8 @@ public sealed class LocalPrincipalProvisioner(
 {
     public async Task<Principal> ProvisionAsync(LocalPrincipalProvisioning request, CancellationToken cancellationToken)
     {
-        if (!requestContext.IsInitialized || !await platformAuthorization.IsPlatformAdministratorAsync(requestContext.Current.PrincipalId, cancellationToken))
+        if (requestContext.ActorPrincipalId is not Guid actorPrincipalId
+            || !await platformAuthorization.IsPlatformAdministratorAsync(actorPrincipalId, cancellationToken))
             throw new AuthorizationDeniedException("platform/admin");
         if (await store.FindLocalIdentityAsync(request.AccountId, cancellationToken) is not null)
             throw new InvalidOperationException("The local account is already linked.");

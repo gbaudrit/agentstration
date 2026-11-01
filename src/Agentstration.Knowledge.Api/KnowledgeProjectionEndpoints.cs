@@ -30,12 +30,13 @@ internal static class KnowledgeProjectionEndpoints
     private static Task<IResult> StartAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         StartKnowledgeProjectionRequest body,
         HttpResponse response,
         KnowledgeProjectionService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
         {
-            var stored = await service.StartAsync(new(name, ResourceNamespace.Parse(@namespace)), body, cancellationToken);
+            var stored = await service.StartAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body, cancellationToken);
             response.Headers.Location = Location(stored.Value);
             response.Headers.ETag = stored.ETag;
             return Results.Json(stored.Value, statusCode: StatusCodes.Status201Created);
@@ -44,9 +45,10 @@ internal static class KnowledgeProjectionEndpoints
     private static Task<IResult> ListAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         KnowledgeProjectionService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Results.Ok(
-            await service.ListAsync(new(name, ResourceNamespace.Parse(@namespace)), cancellationToken)));
+            await service.ListAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), cancellationToken)));
 
     private static Task<IResult> GetAsync(
         string id,
@@ -91,4 +93,7 @@ internal static class KnowledgeProjectionEndpoints
         Status = status,
         Detail = detail
     });
+
+    private static ResourceScopeRef? ParseScope(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);
 }

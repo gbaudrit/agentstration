@@ -37,10 +37,80 @@ public sealed class ModelProfilePickerTests
         });
     }
 
-    private sealed class FakeModelProfilesClient : IModelProfilesClient
+    [TestMethod]
+    public void HomonymousProfilesDisplayAndSelectTheirExactScope()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceScope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient([
+            Summary("shared-reasoning", "Instance reasoning", ResourceScopeRef.Instance),
+            Summary("shared-reasoning", "Workspace reasoning", workspaceScope)
+        ]));
+        ModelProfileSummaryResponse? selectedProfile = null;
+
+        var rendered = context.Render<ModelProfilePicker>(parameters => parameters
+            .Add(component => component.Value, "shared-reasoning")
+            .Add(component => component.Namespace, "default")
+            .Add(component => component.ScopeRef, ResourceScopeRef.Instance)
+            .Add(component => component.SelectedChanged, value => selectedProfile = value));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(ResourceScopeRef.Instance, selectedProfile?.ScopeRef);
+            StringAssert.Contains(rendered.Markup, "Instance reasoning — Instance");
+            StringAssert.Contains(rendered.Markup, "Workspace reasoning — Workspace");
+            StringAssert.Contains(rendered.Markup, "resource-scope-badge");
+        });
+
+        rendered.Find("[data-testid='model-profile-select']")
+            .Change($"{workspaceScope.Value}|default|shared-reasoning");
+
+        Assert.AreEqual(workspaceScope, selectedProfile?.ScopeRef);
+    }
+
+    [TestMethod]
+    public void AgentRequestPinsSelectedModelAndRuntimeProfileScopes()
+    {
+        var workspaceScope = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        var model = new AgentEditorModel
+        {
+            Name = "scoped-agent",
+            DisplayName = "Scoped agent",
+            Instructions = "Use the exact profiles.",
+            RuntimeProfileName = "maf-builtin",
+            RuntimeProfileNamespace = "default",
+            RuntimeProfileScopeRef = ResourceScopeRef.Instance
+        };
+
+        Assert.IsTrue(model.SelectModelProfile(Summary("reasoning", "Workspace reasoning", workspaceScope)));
+
+        var request = model.ToRequest();
+        Assert.AreEqual(workspaceScope, request.Definition.ModelProfile.ScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, request.Definition.RuntimeProfile.ScopeRef);
+    }
+
+    private static ModelProfileSummaryResponse Summary(string name, string displayName, ResourceScopeRef scopeRef) =>
+        new(
+            name,
+            name,
+            new ModelProfileSummaryPropertiesResponse(
+                displayName,
+                null,
+                new ModelProviderReferenceResponse("ollama-local", "ollama-local", "Ollama local"),
+                new ModelReferenceResponse("qwen3:1.7b"),
+                new ModelGenerationOptions(),
+                new ModelReasoningOptions(),
+                new ModelOutputOptions(),
+                "available",
+                0),
+            ScopeRef: scopeRef);
+
+    private sealed class FakeModelProfilesClient(IReadOnlyList<ModelProfileSummaryResponse>? profiles = null) : IModelProfilesClient
     {
         public Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ModelProfileSummaryResponse>>([
+            Task.FromResult(profiles ?? (IReadOnlyList<ModelProfileSummaryResponse>)[
                 new(
                     "default-reasoning",
                     "default-reasoning",

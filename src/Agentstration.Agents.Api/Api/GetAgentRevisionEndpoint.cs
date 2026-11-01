@@ -17,26 +17,29 @@ internal sealed class GetAgentRevisionEndpoint : IManagementEndpoint
     private static Task<IResult> HandleAsync(
         string agentName,
         string revisionName,
+        string? scopeRef,
         HttpRequest request,
         HttpResponse response,
         AgentManagementService service,
         CancellationToken cancellationToken) =>
-        HandleCoreAsync(ResourceNamespace.Default, agentName, revisionName, request, response, service, cancellationToken);
+        HandleCoreAsync(ResourceNamespace.Default, agentName, revisionName, scopeRef, request, response, service, cancellationToken);
 
     private static Task<IResult> HandleNamespacedAsync(
         string @namespace,
         string agentName,
         string revisionName,
+        string? scopeRef,
         HttpRequest request,
         HttpResponse response,
         AgentManagementService service,
         CancellationToken cancellationToken) =>
-        HandleCoreAsync(ResourceNamespace.Parse(@namespace), agentName, revisionName, request, response, service, cancellationToken);
+        HandleCoreAsync(ResourceNamespace.Parse(@namespace), agentName, revisionName, scopeRef, request, response, service, cancellationToken);
 
     private static Task<IResult> HandleCoreAsync(
         ResourceNamespace @namespace,
         string agentName,
         string revisionName,
+        string? scopeRef,
         HttpRequest request,
         HttpResponse response,
         AgentManagementService service,
@@ -44,7 +47,8 @@ internal sealed class GetAgentRevisionEndpoint : IManagementEndpoint
         AgentsApiHttp.ExecuteAsync(async () =>
         {
             AgentsApiHttp.RequireApiVersion(request);
-            var stored = await service.GetRevisionAsync(@namespace, agentName, revisionName, cancellationToken);
+            ResourceScopeRef? requestedScope = string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef);
+            var stored = await service.GetRevisionAsync(@namespace, agentName, revisionName, requestedScope, cancellationToken);
             return AgentsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 }

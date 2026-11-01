@@ -4,5 +4,6 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
   </ItemGroup>
 </Project>

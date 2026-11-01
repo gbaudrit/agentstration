@@ -122,11 +122,11 @@ model {
       }
 
       identity = component 'Identity and authorization' {
-        description 'Authentication, Principals, Workspace access, RBAC, PATs, delegation, and security audit'
+        description 'Authentication, Principals, exact administrative contexts, governed operational Workspaces, RBAC, PATs, delegation, and security audit'
       }
 
       resources = component 'Resource-family services' {
-        description 'Family-owned lifecycle services for Agents, Models, Entries, Triggers, Extensions, Sources, Data Sources, Artifacts, Knowledge, Secrets, and related resources'
+        description 'Family-owned exact-scope lifecycle and descendant-access services for Agents, Models, Entries, Triggers, Extensions, Sources, Data Sources, Artifacts, Knowledge, Secrets, and related resources'
       }
 
       distribution = component 'Distribution and bootstrap' {
@@ -175,11 +175,11 @@ model {
     }
 
     flowData = container 'Flow data' {
-      description 'Editable Flow definitions, immutable published versions, Flow Runs, and execution events'
+      description 'Exact-scope editable Flow definitions, immutable published versions, plus Workspace-owned Flow Runs and execution events'
     }
 
     runtimeData = container 'Runtime data' {
-      description 'Technical Runtime Runs, events, attempts, and execution state'
+      description 'Workspace-owned technical Runtime Runs, events, attempts, and execution state, including protected operational Workspaces'
     }
   }
 

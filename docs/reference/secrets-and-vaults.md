@@ -7,7 +7,7 @@ sidebar_position: 7
 
 Agentstration resources never store credentials directly. A consumer such as a Model Provider stores a reference to a `Secret`; the Secret stores a key and a reference to a `Vault`; only the Vault provider stores the value.
 
-Secrets and Vaults may belong to the instance, a tenant, or a workspace. Their ownership scope determines where they are stored. A separate `usePolicy` determines which descendants may use them. No descendant receives access by default.
+Secrets and Vaults may belong to the instance, a tenant, or a workspace. Their ownership scope determines where they are stored. A separate local access-policy overlay determines which descendants may discover or use them. No descendant receives access by default, and changing access does not mutate the Secret or Vault resource definition.
 
 ```mermaid
 flowchart LR
@@ -58,7 +58,7 @@ If either a configured key file already exists or `AGENTSTRATION_MASTER_KEY` is 
 
 To use a Vault owned by an ancestor scope, first add a use grant on the Vault for the Secret's scope. The Console then offers that Vault in the Secret editor. To let a descendant consumer use an ancestor Secret, add a separate grant on the Secret. A grant to a tenant can optionally include its workspaces. Grants cannot target another tenant's branch, siblings, or ancestors.
 
-An ancestor resource reference must name its exact `scopeRef`; an omitted scope means the consumer's own scope for Secret resolution. Names are never searched through parent scopes. `PUT /api/vaults/{name}` and `PUT /api/secrets/{name}` accept `usePolicy.grants` in their properties and require the current ETag. For example:
+An ancestor resource reference must name its exact `scopeRef`; an omitted scope means the consumer's own scope for Secret resolution. Names are never searched through parent scopes. Access is administered through `/api/resource-access-policies/{resourceUid}` with the overlay's own ETag. The current Secret and Vault endpoints still accept `usePolicy.grants` as a compatibility bridge for the Console and translate them into `discover` plus `use` overlay grants. For example:
 
 One-use AEP Secret capabilities retain the exact consumer scope. After the host validates and consumes a capability, it opens a bounded internal system context only to load the exact Secret and Vault metadata. Their descendant-use grants are then re-evaluated against that retained consumer scope before the value is returned. This internal lookup does not grant the extension or the descendant caller permission to read ancestor resources through the Management API.
 
@@ -72,9 +72,9 @@ One-use AEP Secret capabilities retain the exact consumer scope. After the host 
 }
 ```
 
-This fragment shows the policy fields inside `properties`; a complete PUT also includes the resource's other required properties. Management reads expose grant metadata, never the Secret value. Removing a grant immediately prevents subsequent resolutions through that path.
+This compatibility fragment shows the policy fields inside `properties`; a complete PUT also includes the resource's other required properties. The authoritative overlay is stored outside the resource document, so its changes do not alter the resource generation, integrity, or provenance. Management reads expose grant metadata, never the Secret value. Removing a grant immediately prevents subsequent resolutions through that path.
 
-Workspace Secrets and Vaults use same-scope references without descendant grants. When `usePolicy` is omitted, the grant list is empty and descendant use is denied. Resources with the same name at different scopes remain distinct, including their Local Vault encrypted values. The master key and encrypted payloads are stored separately from resource metadata; neither belongs in a resource export.
+Workspace Secrets and Vaults use same-scope references without descendant grants. When no overlay exists, descendant discovery and use are denied. Resources with the same name at different scopes remain distinct, including their Local Vault encrypted values. The access overlay, master key, and encrypted payloads are stored separately from resource metadata; none belongs in a resource export.
 
 For example, the Display name `Clé OpenAI — Production` produces:
 

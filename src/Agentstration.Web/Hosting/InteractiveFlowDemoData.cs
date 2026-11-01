@@ -37,6 +37,9 @@ public static class InteractiveFlowDemoData
         }
 
         var tools = services.GetRequiredService<ToolManagementService>();
+        var providerScope = ResourceScopeRef.Workspace(workspaceId.Value);
+        var registrationName = configuration["Agentstration:Extensions:Agentstration.Extensions.Utilities:RegistrationName"]
+            ?? "utilities-extension";
         var provider = await tools.GetProviderAsync(ProviderName, cancellationToken);
         if (provider is null)
         {
@@ -53,9 +56,13 @@ public static class InteractiveFlowDemoData
                 {
                     DisplayName = "Agentstration deterministic utilities",
                     ProviderType = ToolProviderType.Aep,
-                    Aep = new AepToolProviderConfiguration { ExtensionId = "Agentstration.Extensions.Utilities" }
+                    Aep = new AepToolProviderConfiguration
+                    {
+                        Extension = new ResourceReference(registrationName, providerScope, ResourceNamespace.Default)
+                    }
                 }
-            }, null, true, cancellationToken);
+            } with
+            { ScopeRef = providerScope }, null, true, cancellationToken);
         }
 
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(InteractiveFlowDemoData));

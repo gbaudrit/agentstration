@@ -43,7 +43,7 @@ public sealed class ModelProfileEditorModel
         {
             DisplayName = DisplayName.Trim(),
             Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-            Provider = new ResourceReference(ProviderName.Trim(), @namespace: ResourceNamespace.Parse(ProviderNamespace)),
+            Provider = new ResourceReference(ProviderName.Trim(), ResourceScopeRef.Instance, ResourceNamespace.Parse(ProviderNamespace)),
             Model = new ModelSelection { Name = ModelName.Trim() },
             Generation = new ModelGenerationOptions
             {

@@ -403,7 +403,8 @@ public sealed class AepVerticalTests
         var deployment = new ModelDeploymentConfiguration
         {
             Name = "profile",
-            ScopeRef = ResourceScopeRef.Instance,
+            Namespace = new ResourceNamespace("team-a"),
+            ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
             ProviderName = "test-local",
             ModelName = "test-model",
             SecretBindings = [new("credential", new(new(ResourceNamespace.Default, "Secret", "api-key"), ResourceScopeRef.Instance))]
@@ -414,6 +415,9 @@ public sealed class AepVerticalTests
 
         Assert.AreEqual("pong", response.Text);
         Assert.AreEqual("credential", capabilities.Issued?.RequirementId);
+        Assert.AreEqual(ModelResourceKinds.ModelProfile, capabilities.Issued?.Consumer.Address.Kind);
+        Assert.AreEqual(deployment.ScopeRef, capabilities.Issued?.Consumer.ScopeRef);
+        Assert.AreEqual(deployment.Namespace, capabilities.Issued?.Consumer.Address.Namespace);
         Assert.AreEqual(1, capabilities.Revocations);
         var boundValue = factory.Provider.LastBoundValues?.Single();
         Assert.IsNotNull(boundValue);

@@ -24,7 +24,7 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
         if (scopeRef.Kind != ResourceScopeKind.Workspace || scopeRef.TargetId is not { } workspaceId)
             throw new ToolDefinitionValidationException("tool_definition_scope_invalid", "A ToolDefinition must belong to a Workspace scope.");
         var flowNamespace = target.Namespace ?? ownerNamespace;
-        var reference = new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace);
+        var reference = new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace, target.ScopeRef);
         var resolved = await flows.ResolveAsync(new WorkspaceId(workspaceId), reference, ownerNamespace, cancellationToken);
         return Contract(resolved);
     }
@@ -42,7 +42,10 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
             version.FlowId.Namespace,
             version.Version,
             version.Graph?.ResolveInputSchema()?.Clone(),
-            output?.Clone());
+            output?.Clone())
+        {
+            ScopeRef = version.ScopeRef
+        };
     }
 }
 
@@ -156,7 +159,7 @@ public sealed class ToolDefinitionExecutor(
         {
             submission = await submissions.SubmitAsync(new SubmitRootFlowCommand(
                 invocation.WorkspaceId,
-                new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace),
+                new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace, target.ScopeRef),
                 flowInput,
                 origin,
                 callerId,
@@ -240,7 +243,11 @@ public sealed class ToolDefinitionExecutor(
                 ToolDefinitionCallerKind.Flow => KnowledgeRetrievalInvocationOrigin.Flow,
                 _ => KnowledgeRetrievalInvocationOrigin.Mcp
             };
-            var sourceId = new KnowledgeSourceId(sourceName, definition.Namespace);
+            var sourceScope = definition.Metadata.Annotations.TryGetValue(
+                "agentstration.io/knowledge-source-scope", out var serializedScope)
+                ? ResourceScopeRef.Parse(serializedScope)
+                : (ResourceScopeRef?)null;
+            var sourceId = new KnowledgeSourceId(sourceName, definition.Namespace, sourceScope);
             var executionContext = new KnowledgeRetrievalExecutionContext(
                 invocation.ExecutionContext?.AgentId,
                 invocation.ExecutionContext?.AgentRevisionId,

@@ -64,25 +64,32 @@ interface ControlledWorkerAuthorityProxy {
 
 const startupTimeoutMilliseconds = 180_000;
 
-export async function startProductHosts(authenticationMode: 'Development' | 'Local' = 'Development'): Promise<ProductHosts> {
+export async function startProductHosts(
+  authenticationMode: 'Development' | 'Local' = 'Development',
+  aiProvider: 'Deterministic' | 'Managed' = 'Deterministic',
+): Promise<ProductHosts> {
   const runId = `${Date.now()}-${process.pid}`;
   const workDirectory = path.join(automationRoot, '.work', runId);
   const dataDirectory = path.join(workDirectory, 'data');
   await fs.mkdir(dataDirectory, { recursive: true });
 
-  const [consolePort, workplacePort, workerPort, extensionPort, gitExtensionPort, foundryExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort(), freePort()]);
+  const [consolePort, workplacePort, workerPort, extensionPort, gitExtensionPort, foundryExtensionPort, utilitiesExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), freePort()]);
   const consoleUrl = `http://127.0.0.1:${consolePort}`;
   const workplaceUrl = `http://127.0.0.1:${workplacePort}`;
   const workerUrl = `http://127.0.0.1:${workerPort}`;
   const extensionUrl = `http://127.0.0.1:${extensionPort}`;
   const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort}`;
   const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort}`;
-  const bootstrapPath = path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles');
+  const utilitiesExtensionUrl = `http://127.0.0.1:${utilitiesExtensionPort}`;
+  const bootstrapPath = path.join(workDirectory, 'bootstrap-profiles');
+  await fs.cp(path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles'), bootstrapPath, { recursive: true });
+  await fs.cp(path.join(automationRoot, 'fixtures', 'bootstrap-profiles'), bootstrapPath, { recursive: true });
   const runtimeProxy = await startControlledRuntimeProxy(consoleUrl);
   const workerAuthorityProxy = await startControlledWorkerAuthorityProxy(consoleUrl);
   const workerId = randomUUID();
   const credentialId = randomUUID();
   const workerKeyFile = path.join(workDirectory, 'runtime-worker.key');
+  const utilitiesEnrollmentStateFile = path.join(workDirectory, 'utilities-extension.instance');
   await fs.writeFile(workerKeyFile, `${randomBytes(48).toString('base64')}\n`, { mode: 0o600 });
 
   const fakeOllama = await startFakeOllama();
@@ -103,17 +110,29 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     ASPNETCORE_URLS: foundryExtensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',
   });
+  const utilitiesExtension = runDotnet('src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj', path.join(workDirectory, 'utilities-extension.log'), {
+    ASPNETCORE_ENVIRONMENT: 'Development',
+    ASPNETCORE_URLS: utilitiesExtensionUrl,
+    Logging__EventLog__LogLevel__Default: 'None',
+    Aep__EnrollmentMode: 'PairingCode',
+    Aep__PairingCode__AuthorityUrl: consoleUrl,
+    Aep__PairingCode__PublicEndpoint: utilitiesExtensionUrl,
+    Aep__PairingCode__StateFile: utilitiesEnrollmentStateFile,
+    Aep__PairingCode__AllowInsecureHttp: 'true',
+  });
 
   try {
     await Promise.all([
       waitUntilHealthy(`${extensionUrl}/health`, modelExtension),
       waitUntilHealthy(`${gitExtensionUrl}/health`, gitExtension),
       waitUntilHealthy(`${foundryExtensionUrl}/health`, foundryExtension),
+      waitUntilHealthy(`${utilitiesExtensionUrl}/health`, utilitiesExtension),
     ]);
   } catch (error) {
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
     await stopProcess(foundryExtension);
+    await stopProcess(utilitiesExtension);
     await fakeOllama.stop();
     await runtimeProxy.stop();
     throw error;
@@ -128,7 +147,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     Data__WorkPlanePath: path.join(dataDirectory, 'work-plane.db'),
     Data__FlowPath: path.join(dataDirectory, 'flow-plane.db'),
     Data__RuntimePath: path.join(dataDirectory, 'runtime-plane.db'),
-    AI__Provider: 'Deterministic',
+    AI__Provider: aiProvider,
     Agentstration__Authentication__Mode: authenticationMode,
     Agentstration__Authentication__DevelopmentGrantPlatformAdministrator: 'true',
     Agentstration__Bootstrap__Path: bootstrapPath,
@@ -195,6 +214,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
     await stopProcess(modelExtension);
     await stopProcess(gitExtension);
     await stopProcess(foundryExtension);
+    await stopProcess(utilitiesExtension);
     await fakeOllama.stop();
     await runtimeProxy.stop();
     await workerAuthorityProxy.stop();
@@ -229,6 +249,7 @@ export async function startProductHosts(authenticationMode: 'Development' | 'Loc
       await stopProcess(modelExtension);
       await stopProcess(gitExtension);
       await stopProcess(foundryExtension);
+      await stopProcess(utilitiesExtension);
       await fakeOllama.stop();
       await runtimeProxy.stop();
       await workerAuthorityProxy.stop();
@@ -402,7 +423,7 @@ async function startControlledRuntimeProxy(targetBaseUrl: string): Promise<Contr
 }
 
 async function startFakeOllama(): Promise<FakeOllama> {
-  const server = createServer((request, response) => {
+  const server = createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/') {
       response.setHeader('Content-Type', 'text/plain');
       response.end('Ollama is running');
@@ -423,6 +444,25 @@ async function startFakeOllama(): Promise<FakeOllama> {
           digest: `sha256:browser-fixture-${name}`,
           details: { parameter_size: 'test', quantization_level: 'test' },
         })),
+      }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/api/chat') {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+        model?: string;
+        messages?: Array<{ role?: string; content?: string }>;
+      };
+      const prompt = body.messages?.at(-1)?.content ?? '';
+      response.end(JSON.stringify({
+        model: body.model ?? 'deterministic',
+        created_at: '2026-01-01T00:00:00Z',
+        message: { role: 'assistant', content: `User ${prompt}` },
+        done: true,
+        done_reason: 'stop',
+        prompt_eval_count: 1,
+        eval_count: 1,
       }));
       return;
     }

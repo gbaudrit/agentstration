@@ -11,7 +11,7 @@ The DAT is organized by concern:
 - [Dynamic execution views](runtime/dynamic-views.md), including Work, Flow, Agent, Tool, AEP, and MCP paths
 - [Resource and persistence models](data/resource-model.md), plus the [Data Source and Knowledge Source model](../concepts/data-sources-and-knowledge.md)
 - [Standalone deployment](deployment/standalone.md) and [tenancy/isolation](cross-cutting/tenancy-and-isolation.md)
-- [Implementation mapping](implementation/project-structure.md), [dependency rules](implementation/dependency-rules.md), the [detailed current-state inventory](implementation/current-state.md), the [initial reconciliation baseline](implementation/reconciliation-baseline-2026-09-28.md), and the [Data Source and Knowledge reconciliation](implementation/knowledge-reconciliation-2026-10-08.md)
+- [Implementation mapping](implementation/project-structure.md), [dependency rules](implementation/dependency-rules.md), the [detailed current-state inventory](implementation/current-state.md), the [initial reconciliation baseline](implementation/reconciliation-baseline-2026-09-28.md), the [Data Source and Knowledge reconciliation](implementation/knowledge-reconciliation-2026-10-08.md), and the [hierarchical resource-access reconciliation](implementation/hierarchical-resource-access-reconciliation-2026-10-26.md)
 
 The dominant design rules are local-first operation, provider-neutral application contracts, separate persistence boundaries, reconstructible runtime objects, and shared use cases across REST, Razor, MCP, and workers.
 

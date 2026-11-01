@@ -86,7 +86,7 @@ internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
 
 internal sealed class TestModelProviderEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/test", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/test", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {

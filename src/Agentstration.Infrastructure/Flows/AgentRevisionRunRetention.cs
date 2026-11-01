@@ -15,7 +15,7 @@ public sealed class AgentRevisionRunRetention(
     {
         var usage = await flowRuns.ForceTerminateAsync(revisionName, cancellationToken);
         foreach (var run in usage.ActiveRuns)
-            await executionStates.DeleteAsync(run.WorkspaceId, run.RunId, null, cancellationToken);
+            await executionStates.DeleteExactAsync(run.ScopeRef, run.RunId, null, cancellationToken);
         return Map(usage);
     }
 

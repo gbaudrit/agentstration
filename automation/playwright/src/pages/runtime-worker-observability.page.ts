@@ -32,6 +32,30 @@ interface AgentWire {
   generation: number;
 }
 
+interface ScopedResourceWire {
+  uid: string;
+  namespace: string;
+  kind: string;
+  generation: number;
+}
+
+interface ResourceAccessGrantWire {
+  targetScopeRef: string;
+  actions: string[];
+  includeDescendants: boolean;
+}
+
+interface ResourceAccessPolicyWire {
+  resource: {
+    uid: string;
+    ownerScopeRef: string;
+    namespace: string;
+    kind: string;
+    generation: number;
+  };
+  grants: ResourceAccessGrantWire[];
+}
+
 const observabilityAgentName = 'worker-observability-agent';
 const observabilityFlowName = 'worker-observability-flow';
 const observabilityProviderName = 'worker-observability-ollama';
@@ -88,7 +112,7 @@ export class RuntimeWorkerObservabilityPage {
     await expect(row).toBeVisible();
     const assignmentId = await row.getAttribute('data-assignment-id');
     if (!assignmentId) throw new Error(`Worker assignment '${runId}' does not expose its assignment identifier.`);
-    await row.locator(`a[href$="/${runId}"]`).click();
+    await row.locator(`a[href^="/runs/${runId}"], a[href^="/flow-runs/${runId}"]`).click();
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.placement)).toHaveAttribute('data-assignment-id', assignmentId);
   }
 
@@ -144,7 +168,11 @@ export class RuntimeWorkerObservabilityPage {
   }
 
   public async ensureExecutionFixture(consoleUrl: string): Promise<void> {
-    await this.ensureModelProfile(consoleUrl);
+    const workspaceId = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-workspace-id');
+    if (!workspaceId) throw new Error('The authenticated Console shell does not expose its Workspace identifier.');
+    const workspaceScopeRef = `/workspaces/${workspaceId}`;
+    await this.ensureModelProfile(consoleUrl, workspaceScopeRef);
+    await this.ensureRuntimeProfileAccess(consoleUrl, workspaceScopeRef);
     const agentResponse = await this.page.request.get(`${consoleUrl}/api/agents/${observabilityAgentName}`);
     let agent: AgentWire;
     if (agentResponse.status() === 404) {
@@ -158,8 +186,8 @@ export class RuntimeWorkerObservabilityPage {
             displayName: 'Worker observability agent',
             description: 'Deterministic Agent used by the Runtime Worker browser scenario.',
             instructions: 'Return a concise deterministic response.',
-            modelProfile: { name: observabilityProfileName, namespace: 'default' },
-            runtimeProfile: { name: 'maf-builtin', namespace: 'default' },
+            modelProfile: { name: observabilityProfileName, namespace: 'default', scopeRef: workspaceScopeRef },
+            runtimeProfile: { name: 'maf-builtin', namespace: 'default', scopeRef: '/instance' },
             tools: [],
             toolSets: [],
             behaviors: [],
@@ -294,7 +322,7 @@ export class RuntimeWorkerObservabilityPage {
 
   private assignmentRow(runId: string): Locator {
     return this.page.getByTestId(TestIds.runtimeWorkerObservability.assignmentRow)
-      .filter({ has: this.page.locator(`a[href$="/${runId}"]`) });
+      .filter({ has: this.page.locator(`a[href^="/runs/${runId}"], a[href^="/flow-runs/${runId}"]`) });
   }
 
   private async getFlowRun(consoleUrl: string, runId: string): Promise<FlowRunWire> {
@@ -303,14 +331,24 @@ export class RuntimeWorkerObservabilityPage {
     return await response.json() as FlowRunWire;
   }
 
-  private async ensureModelProfile(consoleUrl: string): Promise<void> {
-    const profile = await this.page.request.get(`${consoleUrl}/api/modelprofiles/${observabilityProfileName}`);
+  private async ensureModelProfile(consoleUrl: string, workspaceScopeRef: string): Promise<void> {
+    const instanceHeaders = { 'X-Agentstration-Context': '/instance' };
+    const workspaceHeaders = { 'X-Agentstration-Context': workspaceScopeRef };
+    const profile = await this.page.request.get(
+      `${consoleUrl}/api/modelprofiles/${observabilityProfileName}`,
+      { headers: workspaceHeaders },
+    );
     if (profile.status() === 200) return;
     expect(profile.status(), await profile.text()).toBe(404);
 
-    const provider = await this.page.request.get(`${consoleUrl}/api/modelproviders/${observabilityProviderName}`);
+    const provider = await this.page.request.get(
+      `${consoleUrl}/api/modelproviders/${observabilityProviderName}`,
+      { headers: instanceHeaders },
+    );
+    let providerResource: ScopedResourceWire;
     if (provider.status() === 404) {
       const created = await this.page.request.post(`${consoleUrl}/api/modelproviders`, {
+        headers: instanceHeaders,
         data: {
           name: observabilityProviderName,
           namespace: 'default',
@@ -324,21 +362,40 @@ export class RuntimeWorkerObservabilityPage {
         },
       });
       expect(created.status(), await created.text()).toBe(201);
+      providerResource = await created.json() as ScopedResourceWire;
     } else {
       expect(provider.status(), await provider.text()).toBe(200);
+      providerResource = await provider.json() as ScopedResourceWire;
     }
+    const policy = await this.page.request.put(`${consoleUrl}/api/resource-access-policies/${providerResource.uid}`, {
+      headers: instanceHeaders,
+      data: {
+        resource: {
+          uid: providerResource.uid,
+          ownerScopeRef: '/instance',
+          namespace: providerResource.namespace,
+          kind: providerResource.kind,
+          generation: providerResource.generation,
+        },
+        grants: [{ targetScopeRef: workspaceScopeRef, actions: ['discover', 'use'], includeDescendants: false }],
+      },
+    });
+    expect(policy.status(), await policy.text()).toBe(200);
     const refreshed = await this.page.request.post(
       `${consoleUrl}/api/modelproviders/${observabilityProviderName}/models/refresh`,
+      { headers: instanceHeaders },
     );
     expect(refreshed.status(), await refreshed.text()).toBe(200);
     const created = await this.page.request.post(`${consoleUrl}/api/modelprofiles`, {
+      headers: workspaceHeaders,
       data: {
         name: observabilityProfileName,
         namespace: 'default',
+        scopeRef: workspaceScopeRef,
         properties: {
           displayName: 'Worker observability reasoning',
           description: 'Deterministic model profile used by the Runtime Worker browser scenario.',
-          provider: { name: observabilityProviderName, namespace: 'default' },
+          provider: { name: observabilityProviderName, namespace: 'default', scopeRef: '/instance' },
           model: { name: 'qwen3:1.7b' },
           generation: { temperature: 0 },
           reasoning: { mode: 0 },
@@ -349,6 +406,55 @@ export class RuntimeWorkerObservabilityPage {
       },
     });
     expect(created.status(), await created.text()).toBe(201);
+  }
+
+  private async ensureRuntimeProfileAccess(consoleUrl: string, workspaceScopeRef: string): Promise<void> {
+    const response = await this.page.request.get(
+      `${consoleUrl}/api/runtimeprofiles/maf-builtin?resourceNamespace=default`,
+      { headers: { 'X-Agentstration-Context': '/instance' } },
+    );
+    expect(response.status(), await response.text()).toBe(200);
+    const runtimeProfile = await response.json() as ScopedResourceWire;
+    await this.ensureUseGrant(consoleUrl, runtimeProfile, '/instance', workspaceScopeRef);
+  }
+
+  private async ensureUseGrant(
+    consoleUrl: string,
+    resource: ScopedResourceWire,
+    ownerScopeRef: string,
+    targetScopeRef: string,
+  ): Promise<void> {
+    const policyUrl = `${consoleUrl}/api/resource-access-policies/${resource.uid}`;
+    const contextHeaders = { 'X-Agentstration-Context': ownerScopeRef };
+    const current = await this.page.request.get(policyUrl, { headers: contextHeaders });
+    let policy: ResourceAccessPolicyWire;
+    let headers: Record<string, string> | undefined;
+    if (current.status() === 404) {
+      policy = {
+        resource: {
+          uid: resource.uid,
+          ownerScopeRef,
+          namespace: resource.namespace,
+          kind: resource.kind,
+          generation: resource.generation,
+        },
+        grants: [],
+      };
+    } else {
+      expect(current.status(), await current.text()).toBe(200);
+      policy = await current.json() as ResourceAccessPolicyWire;
+      const etag = current.headers()['etag'];
+      if (etag) headers = { 'If-Match': etag };
+    }
+    const existing = policy.grants.find(grant => grant.targetScopeRef === targetScopeRef);
+    if (existing?.actions.includes('discover') && existing.actions.includes('use')) return;
+    const grants = policy.grants.filter(grant => grant.targetScopeRef !== targetScopeRef);
+    grants.push({ targetScopeRef, actions: ['discover', 'use'], includeDescendants: false });
+    const saved = await this.page.request.put(policyUrl, {
+      headers: { ...contextHeaders, ...headers },
+      data: { ...policy, grants },
+    });
+    expect(saved.status(), await saved.text()).toBe(200);
   }
 
   private async open(url: string, marker: string): Promise<void> {

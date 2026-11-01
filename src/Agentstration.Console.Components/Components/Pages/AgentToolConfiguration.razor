@@ -43,7 +43,7 @@
         <div class="agent-tool-groups">
             @foreach (var group in Groups)
             {
-                <article class="agent-tool-group" data-provider="@group.ProviderName">
+                <article class="agent-tool-group" data-provider="@group.ProviderName" data-scope="@group.ProviderScopeRef?.Value">
                     <header>
                         <div class="agent-tool-provider-identity">
                             <span class="agent-tool-provider-icon" aria-hidden="true"><TablerIcon Name="server" /></span>
@@ -60,7 +60,7 @@
                             </div>
                             @if (group.HasProvider)
                             {
-                                <a class="text-button" href="@ProviderUrl(group.ProviderName)">@T("OpenMcp") →</a>
+                                <a class="text-button" href="@ProviderUrl(group)">@T("OpenMcp") →</a>
                             }
                         </div>
                     </header>
@@ -71,12 +71,12 @@
                             var inherited = IsInherited(tool.Metadata.Name);
                             var effective = assigned || inherited;
                             var usable = tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
-                            var inputId = ToolInputId(tool.Metadata.Name);
+                            var inputId = ToolInputId(tool);
                             <div class="agent-tool-option @(inherited ? "inherited" : null)">
                                 <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@effective" disabled="@(inherited || (!usable && !assigned))" @onchange="args => ToggleAsync(tool.Metadata.Name, (bool)args.Value!)" />
                                 <label class="agent-tool-card-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
                                 <span class="agent-tool-copy">
-                                    <strong><a class="agent-tool-name" href="@ToolUrl(tool.Metadata.Name)">@tool.Definition.DisplayName</a>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }</strong>
+                                    <strong><a class="agent-tool-name" href="@ToolUrl(tool)">@tool.Definition.DisplayName</a>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }</strong>
                                     @if (inherited)
                                     {
                                         <span class="tool-status inherited"><i></i>@T("GrantedViaToolSet", ToolSetSources(tool.Metadata.Name))</span>
@@ -152,7 +152,14 @@
         await SelectedToolIdsChanged.InvokeAsync(values);
     }
 
-    private static string ProviderUrl(string name) => $"/tools/providers/{Uri.EscapeDataString(name)}";
-    private static string ToolUrl(string name) => $"/tools/{Uri.EscapeDataString(name)}";
-    private static string ToolInputId(string name) => $"agent-tool-{Uri.EscapeDataString(name)}";
+    private static string ProviderUrl(AgentToolProviderGroup group) => ScopedUrl($"/tools/providers/{Uri.EscapeDataString(group.ProviderName)}", group.ProviderNamespace, group.ProviderScopeRef);
+    private static string ToolUrl(ToolResource tool) => ScopedUrl($"/tools/{Uri.EscapeDataString(tool.Name)}", tool.Namespace, tool.ScopeRef);
+    private static string ToolInputId(ToolResource tool) => $"agent-tool-{tool.Uid:N}-{Uri.EscapeDataString(tool.Name)}";
+    private static string ScopedUrl(string path, ResourceNamespace @namespace, ResourceScopeRef? scopeRef)
+    {
+        var query = new List<string>();
+        if (!@namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(@namespace.Value)}");
+        if (scopeRef is { } scope) query.Add($"scopeRef={Uri.EscapeDataString(scope.Value)}");
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
+    }
 }

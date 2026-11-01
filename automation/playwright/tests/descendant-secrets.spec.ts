@@ -16,5 +16,5 @@ test('Console persists descendant Vault and Secret grants across reloads @smoke'
     tenantSecret: { name: 'tenant-grants-secret', displayName: 'Tenant grants Secret' },
   });
   await expect(page).toHaveURL(/\/secrets\/tenant-grants-secret\?scopeRef=/);
-  await expect(page.getByTestId(TestIds.secretGrants.secretName)).toHaveValue('tenant-grants-secret');
+  await expect(page.getByTestId(TestIds.resourceAccess.panel)).toHaveAttribute('data-resource-uid', /.+/);
 });

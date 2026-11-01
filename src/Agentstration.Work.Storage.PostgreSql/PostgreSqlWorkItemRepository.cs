@@ -27,7 +27,8 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         modelBuilder.HasDefaultSchema("work");
         var item = modelBuilder.Entity<WorkItemDocument>();
         item.ToTable("WorkItems");
-        item.HasKey(value => new { value.WorkspaceId, value.Id });
+        item.HasKey(value => new { value.ScopeRef, value.Id });
+        item.Property(value => value.ScopeRef).HasMaxLength(64).IsRequired();
         item.Property(value => value.Id).HasMaxLength(36);
         item.Property(value => value.Type).HasMaxLength(128);
         item.Property(value => value.Status).HasConversion<string>().HasMaxLength(32);
@@ -35,7 +36,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.RequestedAgentId).HasMaxLength(1024);
         item.Property(value => value.SelectedAgentId).HasMaxLength(1024);
         item.Property(value => value.Title).HasMaxLength(512);
-        item.Property(value => value.WorkspaceId).HasMaxLength(36).IsRequired();
+        item.Property(value => value.WorkspaceId).HasMaxLength(36);
         item.Property(value => value.OwnerPrincipalId).HasMaxLength(36).IsRequired();
         item.Property(value => value.InteractionId).HasMaxLength(36);
         item.Property(value => value.EntryId).HasMaxLength(512);
@@ -241,6 +242,7 @@ internal sealed class WorkTaskArtifactDocument : IWorkTaskEntityDocument { publi
 internal sealed class WorkItemDocument
 {
     public required string Id { get; set; }
+    public required string ScopeRef { get; set; }
     public required string Type { get; set; }
     public WorkItemStatus Status { get; set; }
     public string? RequesterIdentity { get; set; }
@@ -282,19 +284,25 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
     }
 
     public async Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken)
+        => await GetExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), ownerPrincipalId, id, cancellationToken);
+
+    public async Task<StoredWorkItem?> GetExactAsync(ResourceScopeRef scopeRef, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var workspaceKey = workspaceId.ToString();
+        var scopeKey = scopeRef.Value;
         var ownerKey = ownerPrincipalId.ToString("D");
-        var document = await context.WorkItems.AsNoTracking().SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && value.Id == id.ToString(), cancellationToken);
+        var document = await context.WorkItems.AsNoTracking().SingleOrDefaultAsync(value => value.ScopeRef == scopeKey && value.OwnerPrincipalId == ownerKey && value.Id == id.ToString(), cancellationToken);
         return document is null ? null : FromDocument(document);
     }
 
     public async Task<StoredWorkItem?> GetForExecutionAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken)
+        => await GetForExecutionExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, cancellationToken);
+
+    public async Task<StoredWorkItem?> GetForExecutionExactAsync(ResourceScopeRef scopeRef, WorkItemId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var workspaceKey = workspaceId.ToString();
-        var document = await context.WorkItems.AsNoTracking().SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.Id == id.ToString(), cancellationToken);
+        var scopeKey = scopeRef.Value;
+        var document = await context.WorkItems.AsNoTracking().SingleOrDefaultAsync(value => value.ScopeRef == scopeKey && value.Id == id.ToString(), cancellationToken);
         return document is null ? null : FromDocument(document);
     }
 
@@ -303,9 +311,9 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         ArgumentNullException.ThrowIfNull(workItem);
         if (workItem.Version <= expectedVersion) throw new WorkItemConcurrencyException("The work item version must increase before it is saved.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var workspaceKey = workItem.WorkspaceId.ToString();
+        var scopeKey = workItem.ExecutionScopeRef.Value;
         var ownerKey = workItem.OwnerPrincipalId.ToString("D");
-        var document = await context.WorkItems.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey && value.Id == workItem.Id.ToString(), cancellationToken)
+        var document = await context.WorkItems.SingleOrDefaultAsync(value => value.ScopeRef == scopeKey && value.OwnerPrincipalId == ownerKey && value.Id == workItem.Id.ToString(), cancellationToken)
             ?? throw new KeyNotFoundException($"Work item '{workItem.Id}' was not found.");
         if (document.Version != expectedVersion) throw new WorkItemConcurrencyException("The supplied version does not match the current work item version.");
         Apply(document, workItem);
@@ -321,8 +329,9 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         var take = Math.Min(query.Take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var workspaceKey = query.WorkspaceId.ToString();
+        var scopeKey = query.ScopeRef.Value;
         var ownerKey = query.OwnerPrincipalId.ToString("D");
-        IQueryable<WorkItemDocument> documents = context.WorkItems.AsNoTracking().Where(value => value.WorkspaceId == workspaceKey && value.OwnerPrincipalId == ownerKey);
+        IQueryable<WorkItemDocument> documents = context.WorkItems.AsNoTracking().Where(value => value.ScopeRef == scopeKey && value.OwnerPrincipalId == ownerKey);
         if (query.Status is not null && !query.OperationalTasks) documents = documents.Where(value => value.Status == query.Status);
         if (!string.IsNullOrWhiteSpace(query.Type)) documents = documents.Where(value => value.Type == query.Type);
         if (!string.IsNullOrWhiteSpace(query.RequesterIdentity)) documents = documents.Where(value => value.RequesterIdentity == query.RequesterIdentity);
@@ -478,6 +487,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
     private static WorkItemDocument ToDocument(WorkItem item) => new()
     {
         Id = item.Id.ToString(),
+        ScopeRef = item.ExecutionScopeRef.Value,
         Type = item.Type,
         Status = item.Status,
         RequesterIdentity = item.RequesterIdentity,
@@ -485,7 +495,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         SelectedAgentId = item.SelectedAgentId,
         Title = item.Title,
         Description = item.Description,
-        WorkspaceId = item.WorkspaceId.ToString(),
+        WorkspaceId = item.ExecutionScopeRef.Kind == ResourceScopeKind.Workspace ? item.WorkspaceId.ToString() : null,
         OwnerPrincipalId = item.OwnerPrincipalId.ToString("D"),
         InteractionId = Metadata(item, "workplace.interactionId"),
         EntryId = Metadata(item, "workplace.entryId"),
@@ -502,6 +512,8 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
     {
         var updated = ToDocument(item);
         document.Type = updated.Type;
+        if (!string.Equals(document.ScopeRef, updated.ScopeRef, StringComparison.Ordinal))
+            throw new WorkItemConcurrencyException("Work item execution scope is immutable.");
         document.Status = updated.Status;
         document.RequesterIdentity = updated.RequesterIdentity;
         document.RequestedAgentId = updated.RequestedAgentId;

@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Agentstration.ResourceManagement.Storage.Sqlite;
 
-internal sealed class TenantRow { public Guid Id { get; set; } public required string Name { get; set; } public required string DisplayName { get; set; } public TenantStatus Status { get; set; } public DateTimeOffset CreatedAt { get; set; } }
-internal sealed class WorkspaceRow { public Guid Id { get; set; } public Guid TenantId { get; set; } public required string Name { get; set; } public required string DisplayName { get; set; } public WorkspaceStatus Status { get; set; } public DateTimeOffset CreatedAt { get; set; } }
+internal sealed class TenantRow { public Guid Id { get; set; } public required string Name { get; set; } public required string DisplayName { get; set; } public TenantStatus Status { get; set; } public TenantKind Kind { get; set; } public DateTimeOffset CreatedAt { get; set; } }
+internal sealed class WorkspaceRow { public Guid Id { get; set; } public Guid TenantId { get; set; } public required string Name { get; set; } public required string DisplayName { get; set; } public WorkspaceStatus Status { get; set; } public WorkspaceKind Kind { get; set; } public DateTimeOffset CreatedAt { get; set; } }
 internal sealed class PrincipalRow { public Guid Id { get; set; } public string? LegacyExternalSubject { get; set; } public PrincipalKind Kind { get; set; } public required string DisplayName { get; set; } public string? Email { get; set; } public PrincipalStatus Status { get; set; } public DateTimeOffset CreatedAt { get; set; } }
 internal sealed class PrincipalPreferencesRow { public Guid PrincipalId { get; set; } public required string PreferencesJson { get; set; } public DateTimeOffset UpdatedAt { get; set; } }
 internal sealed class ExternalIdentityRow { public Guid Id { get; set; } public required string Issuer { get; set; } public required string Subject { get; set; } public Guid PrincipalId { get; set; } public DateTimeOffset LinkedAt { get; set; } }
@@ -25,8 +25,8 @@ internal static class IdentityModel
 {
     public static void ConfigureIdentityModel(this ModelBuilder modelBuilder)
     {
-        var tenant = modelBuilder.Entity<TenantRow>(); tenant.ToTable("Tenants"); tenant.HasKey(x => x.Id); tenant.HasIndex(x => x.Name).IsUnique();
-        var workspace = modelBuilder.Entity<WorkspaceRow>(); workspace.ToTable("Workspaces"); workspace.HasKey(x => x.Id); workspace.HasIndex(x => new { x.TenantId, x.Name }).IsUnique(); workspace.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+        var tenant = modelBuilder.Entity<TenantRow>(); tenant.ToTable("Tenants"); tenant.HasKey(x => x.Id); tenant.HasIndex(x => x.Name).IsUnique(); tenant.HasIndex(x => x.Kind).IsUnique().HasFilter("Kind = 1");
+        var workspace = modelBuilder.Entity<WorkspaceRow>(); workspace.ToTable("Workspaces"); workspace.HasKey(x => x.Id); workspace.HasIndex(x => new { x.TenantId, x.Name }).IsUnique(); workspace.HasIndex(x => x.Kind).IsUnique().HasFilter("Kind = 1"); workspace.HasIndex(x => new { x.TenantId, x.Kind }).IsUnique().HasFilter("Kind = 2"); workspace.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
         var principal = modelBuilder.Entity<PrincipalRow>(); principal.ToTable("Users"); principal.HasKey(x => x.Id); principal.Property(x => x.LegacyExternalSubject).HasColumnName("ExternalSubject");
         var preferences = modelBuilder.Entity<PrincipalPreferencesRow>(); preferences.ToTable("PrincipalPreferences"); preferences.HasKey(x => x.PrincipalId); preferences.HasOne<PrincipalRow>().WithOne().HasForeignKey<PrincipalPreferencesRow>(x => x.PrincipalId).OnDelete(DeleteBehavior.Cascade);
         var externalIdentity = modelBuilder.Entity<ExternalIdentityRow>(); externalIdentity.ToTable("ExternalIdentities"); externalIdentity.HasKey(x => x.Id); externalIdentity.HasIndex(x => new { x.Issuer, x.Subject }).IsUnique(); externalIdentity.HasIndex(x => x.PrincipalId); externalIdentity.HasOne<PrincipalRow>().WithMany().HasForeignKey(x => x.PrincipalId).OnDelete(DeleteBehavior.Cascade);
@@ -51,7 +51,7 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ResourceManagementDbCo
     {
         await using var db = await CreateAsync(token);
         var parent = await db.ResourceScopes.SingleAsync(value => value.Ref == ResourceScopeRef.Instance.Value, token);
-        db.Tenants.Add(new() { Id = x.Id, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, CreatedAt = x.CreatedAt });
+        db.Tenants.Add(new() { Id = x.Id, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, Kind = x.Kind, CreatedAt = x.CreatedAt });
         db.ResourceScopes.Add(new()
         {
             Ref = ResourceScopeRef.Tenant(x.Id).Value,
@@ -64,6 +64,7 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ResourceManagementDbCo
     public async Task<Workspace?> FindWorkspaceByNameAsync(Guid tenantId, string name, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Workspaces.AsNoTracking().SingleOrDefaultAsync(x => x.TenantId == tenantId && x.Name == name, token)); }
     public async Task<Workspace?> GetWorkspaceAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Workspaces.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, token)); }
     public async Task<Workspace?> GetWorkspaceAsync(Guid tenantId, Guid id, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Workspaces.AsNoTracking().SingleOrDefaultAsync(x => x.TenantId == tenantId && x.Id == id, token)); }
+    public async Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(CancellationToken token) { await using var db = await CreateAsync(token); return (await db.Workspaces.AsNoTracking().OrderBy(x => x.TenantId).ThenBy(x => x.Name).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
     public async Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(Guid tenantId, CancellationToken token) { await using var db = await CreateAsync(token); return (await db.Workspaces.AsNoTracking().Where(x => x.TenantId == tenantId).OrderBy(x => x.Name).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
     public async Task AddWorkspaceAsync(Workspace x, CancellationToken token)
     {
@@ -71,7 +72,7 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ResourceManagementDbCo
         var parentRef = ResourceScopeRef.Tenant(x.TenantId).Value;
         var parent = await db.ResourceScopes.SingleOrDefaultAsync(value => value.Ref == parentRef, token)
             ?? throw new InvalidOperationException($"Tenant scope '{parentRef}' does not exist.");
-        db.Workspaces.Add(new() { Id = x.Id, TenantId = x.TenantId, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, CreatedAt = x.CreatedAt });
+        db.Workspaces.Add(new() { Id = x.Id, TenantId = x.TenantId, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, Kind = x.Kind, CreatedAt = x.CreatedAt });
         db.ResourceScopes.Add(new()
         {
             Ref = ResourceScopeRef.Workspace(x.Id).Value,
@@ -102,6 +103,7 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ResourceManagementDbCo
     public async Task RemovePlatformAdministratorAsync(Guid principalId, CancellationToken token) { await using var db = await CreateAsync(token); var row = await db.PlatformAdministrators.SingleOrDefaultAsync(x => x.PrincipalId == principalId, token); if (row is null) return; db.PlatformAdministrators.Remove(row); await db.SaveChangesAsync(token); }
     public async Task<TenantMembership?> FindMembershipAsync(Guid tenantId, Guid principalId, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.TenantMemberships.AsNoTracking().SingleOrDefaultAsync(x => x.TenantId == tenantId && x.PrincipalId == principalId, token)); }
     public async Task<IReadOnlyList<TenantMembership>> ListMembershipsAsync(Guid tenantId, CancellationToken token) { await using var db = await CreateAsync(token); return (await db.TenantMemberships.AsNoTracking().Where(x => x.TenantId == tenantId).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
+    public async Task<IReadOnlyList<TenantMembership>> ListTenantMembershipsAsync(Guid principalId, CancellationToken token) { await using var db = await CreateAsync(token); return (await db.TenantMemberships.AsNoTracking().Where(x => x.PrincipalId == principalId).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
     public Task AddMembershipAsync(TenantMembership x, CancellationToken token) => AddAsync(db => db.TenantMemberships.Add(new() { Id = x.Id, TenantId = x.TenantId, PrincipalId = x.PrincipalId, Status = x.Status, JoinedAt = x.JoinedAt }), token);
     public async Task<WorkspaceMembership?> FindWorkspaceMembershipAsync(Guid workspaceId, Guid principalId, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.WorkspaceMemberships.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == workspaceId && x.PrincipalId == principalId, token)); }
     public async Task<IReadOnlyList<WorkspaceMembership>> ListWorkspaceMembershipsAsync(Guid principalId, CancellationToken token) { await using var db = await CreateAsync(token); return (await db.WorkspaceMemberships.AsNoTracking().Where(x => x.PrincipalId == principalId).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
@@ -111,6 +113,7 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ResourceManagementDbCo
     public async Task RemoveWorkspaceMembershipAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); var row = await db.WorkspaceMemberships.SingleOrDefaultAsync(value => value.Id == id, token); if (row is null) return; db.WorkspaceMemberships.Remove(row); await db.SaveChangesAsync(token); }
     public async Task<RoleDefinition?> FindRoleDefinitionByNameAsync(string name, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.RoleDefinitions.AsNoTracking().SingleOrDefaultAsync(x => x.Name == name, token)); }
     public async Task<RoleDefinition?> GetRoleDefinitionAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.RoleDefinitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, token)); }
+    public async Task<IReadOnlyList<RoleDefinition>> ListRoleDefinitionsAsync(CancellationToken token) { await using var db = await CreateAsync(token); return (await db.RoleDefinitions.AsNoTracking().OrderBy(x => x.Name).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
     public Task AddRoleDefinitionAsync(RoleDefinition x, CancellationToken token) => AddAsync(db => db.RoleDefinitions.Add(new() { Id = x.Id, Name = x.Name, DisplayName = x.DisplayName, PermissionsJson = JsonSerializer.Serialize(x.Permissions, JsonOptions), IsBuiltIn = x.IsBuiltIn }), token);
     public async Task UpdateRoleDefinitionAsync(RoleDefinition x, CancellationToken token)
     {
@@ -123,6 +126,7 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ResourceManagementDbCo
         await db.SaveChangesAsync(token);
     }
     public async Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid tenantId, Guid principalId, CancellationToken token) { await using var db = await CreateAsync(token); return (await db.RoleAssignments.AsNoTracking().Where(x => x.TenantId == tenantId && x.PrincipalId == principalId).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
+    public async Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid principalId, CancellationToken token) { await using var db = await CreateAsync(token); return (await db.RoleAssignments.AsNoTracking().Where(x => x.PrincipalId == principalId).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
     public Task AddRoleAssignmentAsync(RoleAssignment x, CancellationToken token) => AddAsync(db => db.RoleAssignments.Add(new() { Id = x.Id, TenantId = x.TenantId, PrincipalId = x.PrincipalId, PrincipalType = x.PrincipalType, RoleDefinitionId = x.RoleDefinitionId, Scope = x.Scope }), token);
     public async Task RemoveRoleAssignmentAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); var row = await db.RoleAssignments.SingleOrDefaultAsync(value => value.Id == id, token); if (row is null) return; db.RoleAssignments.Remove(row); await db.SaveChangesAsync(token); }
     public Task AppendAsync(SecurityAuditEvent x, CancellationToken token) => AddAsync(db => db.SecurityAuditEvents.Add(new() { Id = x.Id, Action = x.Action, Outcome = x.Outcome, ActorPrincipalId = x.ActorPrincipalId, TargetPrincipalId = x.TargetPrincipalId, TargetAccountId = x.TargetAccountId, TenantId = x.TenantId, WorkspaceId = x.WorkspaceId, ReasonCode = x.ReasonCode, CorrelationId = x.CorrelationId, OccurredAtUtcTicks = x.OccurredAt.UtcTicks }), token);
@@ -140,8 +144,8 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ResourceManagementDbCo
         try { await db.SaveChangesAsync(token); }
         catch (DbUpdateException exception) { throw new ResourceConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
     }
-    private static Tenant? Map(TenantRow? x) => x is null ? null : new(x.Id, x.Name, x.DisplayName, x.Status, x.CreatedAt);
-    private static Workspace? Map(WorkspaceRow? x) => x is null ? null : new(x.Id, x.TenantId, x.Name, x.DisplayName, x.Status, x.CreatedAt);
+    private static Tenant? Map(TenantRow? x) => x is null ? null : new(x.Id, x.Name, x.DisplayName, x.Status, x.CreatedAt, x.Kind);
+    private static Workspace? Map(WorkspaceRow? x) => x is null ? null : new(x.Id, x.TenantId, x.Name, x.DisplayName, x.Status, x.CreatedAt, x.Kind);
     private static Principal? Map(PrincipalRow? x) => x is null ? null : new(x.Id, x.Kind, x.DisplayName, x.Email, x.Status, x.CreatedAt);
     private static ExternalIdentity? Map(ExternalIdentityRow? x) => x is null ? null : new(x.Id, x.Issuer, x.Subject, x.PrincipalId, x.LinkedAt);
     private static LocalIdentity? Map(LocalIdentityRow? x) => x is null ? null : new(x.AccountId, x.PrincipalId, x.LinkedAt);

@@ -19,8 +19,10 @@ public sealed class AgentEditorModel
     [Required] public string Instructions { get; set; } = string.Empty;
     [Required] public string ModelProfileName { get; set; } = string.Empty;
     [Required] public string ModelProfileNamespace { get; set; } = ResourceNamespace.Default.Value;
+    public ResourceScopeRef? ModelProfileScopeRef { get; set; }
     [Required] public string RuntimeProfileName { get; set; } = string.Empty;
     [Required] public string RuntimeProfileNamespace { get; set; } = ResourceNamespace.Default.Value;
+    public ResourceScopeRef? RuntimeProfileScopeRef { get; set; }
     public string ToolNames { get; set; } = string.Empty;
     public IReadOnlyList<AgentToolSetSelection> ToolSets { get; set; } = [];
     public string Tags { get; set; } = string.Empty;
@@ -35,10 +37,12 @@ public sealed class AgentEditorModel
     {
         ArgumentNullException.ThrowIfNull(profile);
         if (string.Equals(ModelProfileName, profile.Name, StringComparison.Ordinal)
-            && string.Equals(ModelProfileNamespace, profile.Namespace, StringComparison.Ordinal))
+            && string.Equals(ModelProfileNamespace, profile.Namespace, StringComparison.Ordinal)
+            && ModelProfileScopeRef == profile.ScopeRef)
             return false;
         ModelProfileName = profile.Name;
         ModelProfileNamespace = profile.Namespace;
+        ModelProfileScopeRef = profile.ScopeRef;
         return true;
     }
 
@@ -56,15 +60,15 @@ public sealed class AgentEditorModel
             {
                 DisplayName = DisplayName.Trim(),
                 Instructions = Instructions.Trim(),
-                ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace))
+                ModelProfile = new ResourceReference(ModelProfileName.Trim(), ModelProfileScopeRef, ResourceNamespace.Parse(ModelProfileNamespace))
             }) with
             {
                 DisplayName = DisplayName.Trim(),
                 Description = NullIfWhiteSpace(Description),
                 Handler = Handler.Trim(),
                 Instructions = Instructions.Trim(),
-                ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace)),
-                RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), @namespace: ResourceNamespace.Parse(RuntimeProfileNamespace)),
+                ModelProfile = new ResourceReference(ModelProfileName.Trim(), ModelProfileScopeRef, ResourceNamespace.Parse(ModelProfileNamespace)),
+                RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), RuntimeProfileScopeRef, ResourceNamespace.Parse(RuntimeProfileNamespace)),
                 Tools = tools,
                 ToolSets = ToolSets,
                 InputSchema = InputSchema?.Clone(),
@@ -85,8 +89,10 @@ public sealed class AgentEditorModel
         Instructions = resource.Definition.Instructions,
         ModelProfileName = resource.Definition.ModelProfile.Name,
         ModelProfileNamespace = (resource.Definition.ModelProfile.Namespace ?? resource.Namespace).Value,
+        ModelProfileScopeRef = resource.Definition.ModelProfile.ScopeRef,
         RuntimeProfileName = resource.Definition.RuntimeProfile.Name,
         RuntimeProfileNamespace = (resource.Definition.RuntimeProfile.Namespace ?? resource.Namespace).Value,
+        RuntimeProfileScopeRef = resource.Definition.RuntimeProfile.ScopeRef,
         ToolNames = string.Join(Environment.NewLine, resource.Definition.Tools.Select(tool => tool.Name)),
         ToolSets = resource.Definition.ToolSets,
         InputSchema = resource.Definition.InputSchema?.Clone(),
@@ -108,8 +114,10 @@ public sealed class AgentEditorModel
         Instructions = request.Definition.Instructions,
         ModelProfileName = request.Definition.ModelProfile.Name,
         ModelProfileNamespace = (request.Definition.ModelProfile.Namespace ?? ResourceNamespace.Default).Value,
+        ModelProfileScopeRef = request.Definition.ModelProfile.ScopeRef,
         RuntimeProfileName = request.Definition.RuntimeProfile.Name,
         RuntimeProfileNamespace = (request.Definition.RuntimeProfile.Namespace ?? ResourceNamespace.Default).Value,
+        RuntimeProfileScopeRef = request.Definition.RuntimeProfile.ScopeRef,
         ToolNames = string.Join(Environment.NewLine, request.Definition.Tools.Select(tool => tool.Name)),
         ToolSets = request.Definition.ToolSets,
         InputSchema = request.Definition.InputSchema?.Clone(),

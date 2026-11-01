@@ -8,10 +8,10 @@ definition:
   version: 1.0.0
   enabled: true
   spec:
-    flowKind: direct
-    target:
-      kind: agent
-      id: unused-graph-target
+    flowKind: workflow
+    entryNodeId: input
+    nodes: [{ id: input, kind: input }]
+    edges: []
   graph:
     entryStep: input
     inputSchema:

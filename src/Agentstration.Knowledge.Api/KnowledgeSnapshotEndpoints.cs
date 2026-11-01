@@ -36,17 +36,19 @@ internal static class KnowledgeSnapshotEndpoints
     private static Task<IResult> ListAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         KnowledgeSnapshotService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Results.Ok(
-            await service.ListAsync(new(name, ResourceNamespace.Parse(@namespace)), cancellationToken)));
+            await service.ListAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), cancellationToken)));
 
     private static Task<IResult> GetActiveAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         KnowledgeSnapshotService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
         {
-            var value = await service.GetActiveAsync(new(name, ResourceNamespace.Parse(@namespace)), cancellationToken);
+            var value = await service.GetActiveAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), cancellationToken);
             return value is null
                 ? Problem("knowledge_snapshot_active_not_found", "Active Knowledge Snapshot not found", 404,
                     $"KnowledgeSource '{name}' has no active Snapshot.")
@@ -56,10 +58,11 @@ internal static class KnowledgeSnapshotEndpoints
     private static Task<IResult> SelectActiveAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         SelectActiveKnowledgeSnapshotRequest body,
         KnowledgeSnapshotService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Results.Ok(
-            await service.SelectActiveAsync(new(name, ResourceNamespace.Parse(@namespace)),
+            await service.SelectActiveAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)),
                 body.SnapshotName, cancellationToken)));
 
     private static Task<IResult> GetAsync(
@@ -99,4 +102,7 @@ internal static class KnowledgeSnapshotEndpoints
         Status = status,
         Detail = detail
     });
+
+    private static ResourceScopeRef? ParseScope(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);
 }

@@ -94,7 +94,7 @@ public sealed class OpenApiTests
             ("GET", "/api/modelproviders", AgentstrationPolicies.CanReadResources),
             ("POST", "/api/modelproviders", AgentstrationPolicies.CanWriteResources),
             ("DELETE", "/api/modelproviders/{providerName}", AgentstrationPolicies.CanDeleteResources),
-            ("POST", "/api/modelproviders/{providerName}/test", AgentstrationPolicies.CanExecuteRuns),
+            ("POST", "/api/modelproviders/{providerName}/test", AgentstrationPolicies.CanWriteResources),
             ("GET", "/api/sourceproviders", AgentstrationPolicies.PlatformAdmin),
             ("POST", "/api/sourceproviders", AgentstrationPolicies.PlatformAdmin),
             ("DELETE", "/api/sourceproviders/{providerName}", AgentstrationPolicies.PlatformAdmin),

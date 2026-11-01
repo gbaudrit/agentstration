@@ -12,14 +12,20 @@ public sealed class LocalEnvironmentBootstrapper(
     IIdentityStore store,
     TimeProvider timeProvider,
     LocalBootstrapOptions options,
-    IWorkspaceProvisioner workspaceProvisioner) : ILocalEnvironmentBootstrapper
+    IWorkspaceProvisioner workspaceProvisioner,
+    IOperationalTopologyProvisioner operationalTopology) : ILocalEnvironmentBootstrapper
 {
     public static readonly Guid OwnerRoleId = new("65c86c44-4c42-4e33-91d4-2d8d13bdd681");
 
     public async Task<RequestContext> EnsureInitializedAsync(CancellationToken cancellationToken)
     {
+        if (OperationalTopologyIdentities.IsReservedTenantName(options.TenantName))
+            throw new InvalidOperationException("The configured Tenant name is reserved for Agentstration operations.");
+        if (OperationalTopologyIdentities.IsReservedWorkspaceName(options.WorkspaceName))
+            throw new InvalidOperationException("The configured Workspace name is reserved for Agentstration operations.");
         var now = timeProvider.GetUtcNow();
         var tenant = await store.FindTenantByNameAsync(options.TenantName, cancellationToken);
+        var tenantCreated = tenant is null;
         if (tenant is null)
         {
             tenant = new Tenant(Guid.NewGuid(), options.TenantName, options.TenantDisplayName, TenantStatus.Active, now);
@@ -69,6 +75,9 @@ public sealed class LocalEnvironmentBootstrapper(
             workspace = workspace with { Status = WorkspaceStatus.Active };
         }
 
+        if (tenantCreated)
+            _ = await operationalTopology.EnsureTenantAsync(tenant, cancellationToken);
+
         return new RequestContext(principal.Id, tenant.Id, workspace.Id);
     }
 }
@@ -81,31 +90,66 @@ public sealed class PermissionAuthorizationService(
     {
         var principal = await store.GetPrincipalAsync(context.PrincipalId, cancellationToken);
         if (principal?.Status != PrincipalStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
-        var workspace = await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
-        if (workspace?.Status != WorkspaceStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
         var tenant = await store.GetTenantAsync(context.TenantId, cancellationToken);
         if (tenant?.Status != TenantStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
 
         if (await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken))
+            return ResolvePermissions(context, true, false, false, [], new Dictionary<Guid, RoleDefinition>());
+
+        var tenantOnly = context.WorkspaceId == Guid.Empty;
+        var workspace = tenantOnly
+            ? null
+            : await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
+        var tenantOperations = workspace?.Kind == WorkspaceKind.TenantOperations;
+        var hasTenantMembership = false;
+        var hasWorkspaceMembership = false;
+        if (tenantOnly || tenantOperations)
         {
-            var platformPermissions = new HashSet<string>(AuthorizationPermissions.All, StringComparer.Ordinal);
-            ApplyRestriction(platformPermissions, context);
-            return platformPermissions;
+            var tenantMembership = await store.FindMembershipAsync(context.TenantId, context.PrincipalId, cancellationToken);
+            hasTenantMembership = tenantMembership?.Status == MembershipStatus.Active;
         }
-
-        var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
-        if (membership?.Status != MembershipStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
-
-        var tenantScope = AuthorizationScopes.Tenant(context.TenantId);
-        var workspaceScope = AuthorizationScopes.Workspace(context.WorkspaceId);
-        var assignments = await store.ListRoleAssignmentsAsync(context.TenantId, context.PrincipalId, cancellationToken);
-        var permissions = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var assignment in assignments.Where(value => value.PrincipalType == PrincipalType.User
-                     && (string.Equals(value.Scope, tenantScope, StringComparison.Ordinal)
-                         || string.Equals(value.Scope, workspaceScope, StringComparison.Ordinal))))
+        if (!tenantOnly)
         {
-            var role = await store.GetRoleDefinitionAsync(assignment.RoleDefinitionId, cancellationToken);
-            if (role is not null) permissions.UnionWith(role.Permissions);
+            if (workspace?.Status != WorkspaceStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
+            if (tenantOperations)
+                hasWorkspaceMembership = hasTenantMembership;
+            else
+            {
+                var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
+                hasWorkspaceMembership = membership?.Status == MembershipStatus.Active;
+            }
+        }
+        if (tenantOnly ? !hasTenantMembership : !hasWorkspaceMembership)
+            return new HashSet<string>(StringComparer.Ordinal);
+
+        var assignments = await store.ListRoleAssignmentsAsync(context.TenantId, context.PrincipalId, cancellationToken);
+        var roles = (await store.ListRoleDefinitionsAsync(cancellationToken)).ToDictionary(value => value.Id);
+        return ResolvePermissions(context, false, hasTenantMembership, hasWorkspaceMembership, assignments, roles);
+    }
+
+    internal static IReadOnlySet<string> ResolvePermissions(
+        RequestContext context,
+        bool isPlatformAdministrator,
+        bool hasTenantMembership,
+        bool hasWorkspaceMembership,
+        IReadOnlyList<RoleAssignment> assignments,
+        IReadOnlyDictionary<Guid, RoleDefinition> roles)
+    {
+        var permissions = new HashSet<string>(StringComparer.Ordinal);
+        if (isPlatformAdministrator)
+            permissions.UnionWith(AuthorizationPermissions.All);
+        else
+        {
+            var tenantOnly = context.WorkspaceId == Guid.Empty;
+            if (tenantOnly ? !hasTenantMembership : !hasWorkspaceMembership) return permissions;
+            var tenantScope = AuthorizationScopes.Tenant(context.TenantId);
+            var workspaceScope = AuthorizationScopes.Workspace(context.WorkspaceId);
+            foreach (var assignment in assignments.Where(value => value.TenantId == context.TenantId
+                         && value.PrincipalType == PrincipalType.User
+                         && (string.Equals(value.Scope, tenantScope, StringComparison.Ordinal)
+                             || !tenantOnly && string.Equals(value.Scope, workspaceScope, StringComparison.Ordinal))))
+                if (roles.TryGetValue(assignment.RoleDefinitionId, out var role))
+                    permissions.UnionWith(role.Permissions);
         }
         ApplyRestriction(permissions, context);
         return permissions;

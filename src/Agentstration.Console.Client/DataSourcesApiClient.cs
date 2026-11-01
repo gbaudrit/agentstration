@@ -23,6 +23,17 @@ public interface IDataSourcesClient
     Task<ResourceSnapshot<DataSourceAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace ns, string name,
         ResourceScopeRef sourceScope, StartDataSourceAcquisitionRequest request,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DataSourceDiscoveryResource>> GetDiscoveriesAsync(ResourceNamespace ns, string name,
+        ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<ResourceSnapshot<DataSourceDiscoveryResource>> StartDiscoveryAsync(ResourceNamespace ns, string name,
+        ResourceScopeRef sourceScope, StartDataSourceDiscoveryRequest request,
+        CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns, string name,
+        ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>([]);
+    Task<ResourceSnapshot<DataSourceAcquisitionTargetResource>> PromoteTargetAsync(ResourceNamespace ns,
+        string discoveryId, PromoteDataSourceAcquisitionTargetRequest request,
+        CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 public interface IDataSourceProfilesClient
@@ -76,6 +87,23 @@ public sealed class DataSourcesApiClient(HttpClient httpClient) : IDataSourcesCl
         ResourceScopeRef sourceScope, StartDataSourceAcquisitionRequest request,
         CancellationToken cancellationToken = default) => SendAsync<DataSourceAcquisitionResource>(HttpMethod.Post,
             ChildPath(ns, name, sourceScope, "acquisitions"), request, null, cancellationToken);
+    public Task<IReadOnlyList<DataSourceDiscoveryResource>> GetDiscoveriesAsync(ResourceNamespace ns, string name,
+        ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) =>
+        ApiResponse.ReadAsync<IReadOnlyList<DataSourceDiscoveryResource>>(httpClient,
+            ChildPath(ns, name, sourceScope, "discoveries"), cancellationToken);
+    public Task<ResourceSnapshot<DataSourceDiscoveryResource>> StartDiscoveryAsync(ResourceNamespace ns, string name,
+        ResourceScopeRef sourceScope, StartDataSourceDiscoveryRequest request,
+        CancellationToken cancellationToken = default) => SendAsync<DataSourceDiscoveryResource>(HttpMethod.Post,
+            ChildPath(ns, name, sourceScope, "discoveries"), request, null, cancellationToken);
+    public Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns, string name,
+        ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) =>
+        ApiResponse.ReadAsync<IReadOnlyList<DataSourceAcquisitionTargetView>>(httpClient,
+            ChildPath(ns, name, sourceScope, "acquisition-targets"), cancellationToken);
+    public Task<ResourceSnapshot<DataSourceAcquisitionTargetResource>> PromoteTargetAsync(ResourceNamespace ns,
+        string discoveryId, PromoteDataSourceAcquisitionTargetRequest request,
+        CancellationToken cancellationToken = default) => SendAsync<DataSourceAcquisitionTargetResource>(HttpMethod.Post,
+            $"api/datasourcediscoveries/{Uri.EscapeDataString(discoveryId)}/targets?namespace={Uri.EscapeDataString(ns.Value)}",
+            request, null, cancellationToken);
 
     private async Task<ResourceSnapshot<T>> GetResourceAsync<T>(string path, CancellationToken cancellationToken)
     {

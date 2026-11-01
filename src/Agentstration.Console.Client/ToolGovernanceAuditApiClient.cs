@@ -18,6 +18,7 @@ public sealed class ToolGovernanceAuditApiClient(HttpClient httpClient) : IToolG
     public Task<ToolGovernanceAuditPage> GetAsync(
         ToolExecutionOwnerKind ownerKind,
         string runId,
+        ResourceScopeRef? scopeRef,
         long afterSequence,
         int limit,
         ToolGovernanceAuditFilters filters,
@@ -35,6 +36,8 @@ public sealed class ToolGovernanceAuditApiClient(HttpClient httpClient) : IToolG
             $"afterSequence={afterSequence.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
             $"limit={limit.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
         };
+        if (scopeRef is { } exactScopeRef)
+            query.Add($"scopeRef={Uri.EscapeDataString(exactScopeRef.Value)}");
         Add(query, "toolCallId", filters.ToolCallId);
         Add(query, "invocationId", filters.InvocationId);
         Add(query, "toolId", filters.ToolId);

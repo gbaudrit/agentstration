@@ -1,9 +1,11 @@
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Runtime.Contracts;
 
 public sealed record CreateRuntimeRunRequest
 {
+    public ResourceScopeRef? ExecutionScopeRef { get; init; }
     public required RuntimeAgentReference Agent { get; init; }
     public required RuntimeRunInput Input { get; init; }
     public RuntimeExecutionOptions Execution { get; init; } = new();

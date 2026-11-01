@@ -137,7 +137,9 @@ public sealed partial class PackManagementService
         {
             foreach (var pair in prepared.Handlers.OrderBy(value => value.Value.InstallOrder).ThenBy(value => value.Key.Path, StringComparer.Ordinal))
             {
-                var managed = await pair.Value.InstallAsync(pair.Key, identity, @namespace, archive.Manifest.Metadata.Version, cancellationToken);
+                ManagedPackResource managed;
+                using (BeginManagedResourceReconciliation(identity, targetScopeRef, archive.Manifest.Metadata.Version))
+                    managed = await pair.Value.InstallAsync(pair.Key, identity, @namespace, archive.Manifest.Metadata.Version, cancellationToken);
                 applied.Add((managed, pair.Value));
                 installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = applied.Select(value => value.Resource).ToArray() }, ProvisioningState.Creating, cancellationToken);
             }
@@ -156,7 +158,11 @@ public sealed partial class PackManagementService
             var remaining = new List<ManagedPackResource>();
             foreach (var item in applied.AsEnumerable().Reverse())
             {
-                try { await item.Handler.DeleteAsync(item.Resource, new PackRemovalOptions(), CancellationToken.None); }
+                try
+                {
+                    using var reconciliation = BeginManagedResourceReconciliation(identity, targetScopeRef, archive.Manifest.Metadata.Version);
+                    await item.Handler.DeleteAsync(item.Resource, new PackRemovalOptions(), CancellationToken.None);
+                }
                 catch { remaining.Add(item.Resource); }
             }
 
@@ -249,10 +255,13 @@ public sealed partial class PackManagementService
             {
                 var key = (pair.Key.Kind, pair.Key.Name);
                 ManagedPackResource applied;
-                if (previous.TryGetValue(key, out var current) && existingTokens[key] is not null)
-                    applied = await pair.Value.UpdateAsync(pair.Key, current, identity, archive.Manifest.Metadata.Version, cancellationToken);
-                else
-                    applied = await pair.Value.InstallAsync(pair.Key, identity, identity.Namespace, archive.Manifest.Metadata.Version, cancellationToken);
+                using (BeginManagedResourceReconciliation(identity, installed.Value.ScopeRef, archive.Manifest.Metadata.Version))
+                {
+                    if (previous.TryGetValue(key, out var current) && existingTokens[key] is not null)
+                        applied = await pair.Value.UpdateAsync(pair.Key, current, identity, archive.Manifest.Metadata.Version, cancellationToken);
+                    else
+                        applied = await pair.Value.InstallAsync(pair.Key, identity, identity.Namespace, archive.Manifest.Metadata.Version, cancellationToken);
+                }
                 managed.RemoveAll(value => value.Kind == key.Kind && value.Name == key.Name);
                 managed.Add(applied);
                 installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = managed.ToArray() }, ProvisioningState.Updating, cancellationToken);
@@ -261,7 +270,10 @@ public sealed partial class PackManagementService
             foreach (var removed in previous.Values.Where(value => !incomingKeys.Contains((value.Kind, value.Name))).OrderByDescending(value => handlers[value.Kind].InstallOrder))
             {
                 if (existingTokens[(removed.Kind, removed.Name)] is not null)
+                {
+                    using var reconciliation = BeginManagedResourceReconciliation(identity, installed.Value.ScopeRef, archive.Manifest.Metadata.Version);
                     await handlers[removed.Kind].DeleteAsync(removed, removalOptions, cancellationToken);
+                }
                 managed.RemoveAll(value => value.Kind == removed.Kind && value.Name == removed.Name);
                 installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = managed.ToArray() }, ProvisioningState.Updating, cancellationToken);
             }

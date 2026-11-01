@@ -19,6 +19,7 @@ using Agentstration.Models;
 using Agentstration.Packs;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -64,6 +65,11 @@ public sealed class PackTests
                 """
         });
         using var content = ArchiveContent(archive.ToArray(), "tenant-pack.zip");
+        var environment = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>()
+            .EnsureInitializedAsync(default);
+        client.DefaultRequestHeaders.Add(
+            "X-Agentstration-Context",
+            ResourceScopeRef.Tenant(environment.TenantId).Value);
 
         using var response = await client.PostAsync("/api/packs", content);
 
@@ -511,17 +517,28 @@ public sealed class PackTests
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var runtimeNamespace = new ResourceNamespace("shared.platform");
         var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
-        var runtime = await runtimeProfiles.CreateAsync(new RuntimeProfileResource
+        StoredResource<RuntimeProfileResource> runtime;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = RuntimeProfileResourceKinds.RuntimeProfile,
-            Metadata = new ResourceMetadata { Name = "pack-runtime", Namespace = runtimeNamespace },
-            Definition = new RuntimeProfileProperties
+            runtime = await runtimeProfiles.CreateAsync(new RuntimeProfileResource
             {
-                DisplayName = "Pack runtime",
-                RuntimeType = "microsoft-agent-framework"
-            }
-        }, default);
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = RuntimeProfileResourceKinds.RuntimeProfile,
+                Metadata = new ResourceMetadata { Name = "pack-runtime", Namespace = runtimeNamespace },
+                Definition = new RuntimeProfileProperties
+                {
+                    DisplayName = "Pack runtime",
+                    RuntimeType = "microsoft-agent-framework"
+                }
+            }, default);
+            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+                new ResourceAccessPolicy(
+                    new(runtime.Value.Uid, ResourceScopeRef.Instance, runtime.Value.Namespace,
+                        runtime.Value.Kind, runtime.Value.Generation),
+                    [new(ResourceScopeRef.Workspace(requestContext.WorkspaceId),
+                        [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+                null, default);
+        }
         await using var archive = CreateZip(new Dictionary<string, string>
         {
             ["pack.yaml"] = """
@@ -557,7 +574,7 @@ public sealed class PackTests
         using var content = InstallationContent(
             archive.ToArray(),
             "runtime-binding.pack.zip",
-            [new PackBindingSelection("local-runtime", new("pack-runtime", @namespace: runtimeNamespace))]);
+            [new PackBindingSelection("local-runtime", new("pack-runtime", ResourceScopeRef.Instance, runtimeNamespace))]);
 
         using var response = await client.PostAsync("/api/packs", content);
 
@@ -566,6 +583,9 @@ public sealed class PackTests
         var packNamespace = new ResourceNamespace("agentstration.runtime-binding-pack");
         var agent = await agents.GetAgentAsync(packNamespace, "assistant", default);
         Assert.IsNotNull(agent);
+        Assert.AreEqual(ResourceOriginKind.Pack, agent.Value.Governance.Origin.Kind);
+        Assert.AreEqual(ResourceManagementAuthorityKind.PackInstallation, agent.Value.Governance.ManagedBy?.Kind);
+        Assert.AreEqual("1.0.0", agent.Value.Governance.Origin.Version);
         Assert.AreEqual("pack-runtime", agent.Value.Definition.RuntimeProfile.Name);
         Assert.AreEqual(runtimeNamespace, agent.Value.Definition.RuntimeProfile.Namespace);
         var revision = await agents.EnsureExecutionRevisionAsync(packNamespace, "assistant", agent.Value.Generation, default);
@@ -587,8 +607,14 @@ public sealed class PackTests
         Assert.AreEqual("Ready", prepared.State);
 
         var store = factory.Services.GetRequiredService<IResourceStore>();
-        await store.DeleteAsync(new(AgentResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
-        await runtimeProfiles.DeleteAsync(runtimeNamespace, "pack-runtime", runtime.ETag, default);
+        await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() =>
+            store.DeleteAsync(new(AgentResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default));
+        using (factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(agent.Value.Governance))
+            await store.DeleteAsync(new(AgentResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            await runtimeProfiles.DeleteAsync(runtimeNamespace, "pack-runtime", runtime.ETag, default);
+        }
         Assert.IsNotNull(await store.GetAsync<AgentRevision>(
             new(AgentResourceKinds.AgentRevision, revision.Value.Metadata.Name, packNamespace), default));
     }
@@ -602,15 +628,16 @@ public sealed class PackTests
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         await using var archive = CreateZip(new Dictionary<string, string>
         {
-            ["pack.yaml"] = Manifest("profiles/pack-runtime.yaml"),
-            ["profiles/pack-runtime.yaml"] = """
+            ["pack.yaml"] = Manifest("parameters/pack-parameter.yaml"),
+            ["parameters/pack-parameter.yaml"] = """
                 apiVersion: agentstration.io/v1
-                kind: RuntimeProfile
+                kind: Parameter
                 metadata:
-                  name: pack-runtime
+                  name: pack-parameter
                 definition:
-                  displayName: Pack Runtime
-                  runtimeType: microsoft-agent-framework
+                  displayName: Pack Parameter
+                  valueType: string
+                  value: pack-value
                 """
         });
         var archiveBytes = archive.ToArray();
@@ -622,8 +649,8 @@ public sealed class PackTests
         using var previewBody = JsonDocument.Parse(await previewed.Content.ReadAsStringAsync());
         Assert.IsTrue(previewBody.RootElement.GetProperty("canInstall").GetBoolean());
         Assert.AreEqual("agentstration.test-pack", previewBody.RootElement.GetProperty("namespace").GetString());
-        Assert.AreEqual("pack-runtime", previewBody.RootElement.GetProperty("resources")[0].GetProperty("name").GetString());
-        using var absentBeforeInstall = await client.GetAsync("/api/runtimeprofiles/pack-runtime");
+        Assert.AreEqual("pack-parameter", previewBody.RootElement.GetProperty("resources")[0].GetProperty("name").GetString());
+        using var absentBeforeInstall = await client.GetAsync("/api/parameters/pack-parameter");
         Assert.AreEqual(HttpStatusCode.NotFound, absentBeforeInstall.StatusCode);
 
         using var content = new ByteArrayContent(archiveBytes);
@@ -651,12 +678,13 @@ public sealed class PackTests
         var listed = await client.GetFromJsonAsync<JsonElement[]>("/api/packs");
         Assert.IsNotNull(listed);
         Assert.IsTrue(listed.Any(value => value.GetProperty("definition").GetProperty("packName").GetString() == "test-pack"));
-        using var defaultResource = await client.GetAsync("/api/runtimeprofiles/pack-runtime");
-        Assert.AreEqual(HttpStatusCode.NotFound, defaultResource.StatusCode);
+        using var defaultResource = await client.GetAsync("/api/parameters/pack-parameter");
+        Assert.AreEqual(HttpStatusCode.OK, defaultResource.StatusCode);
 
         var packService = factory.Services.GetRequiredService<PackManagementService>();
-        var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
-        Assert.IsNotNull(await runtimeProfiles.GetAsync(new ResourceNamespace("agentstration.test-pack"), "pack-runtime", default));
+        var parameters = factory.Services.GetRequiredService<ParameterManagementService>();
+        var workspaceScope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        Assert.IsNotNull(await parameters.GetExactAsync(workspaceScope, "pack-parameter", default));
         var controlStore = factory.Services.GetRequiredService<IResourceStore>();
         var retained = await packService.GetAsync(new("agentstration", "test-pack"), default);
         Assert.IsNotNull(retained);
@@ -681,7 +709,7 @@ public sealed class PackTests
 
         using var removed = await client.DeleteAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode);
-        Assert.IsNull(await runtimeProfiles.GetAsync(new ResourceNamespace("agentstration.test-pack"), "pack-runtime", default));
+        Assert.IsNull(await parameters.GetExactAsync(workspaceScope, "pack-parameter", default));
         using var missing = await client.GetAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
     }
@@ -713,10 +741,10 @@ public sealed class PackTests
                   enabled: true
                   metadata: { flow.contract: datasource.acquisition/v1 }
                   spec:
-                    flowKind: direct
-                    target:
-                      kind: agent
-                      id: unused
+                    flowKind: workflow
+                    entryNodeId: input
+                    nodes: [{ id: input, kind: input }]
+                    edges: []
                   graph:
                     entryStep: input
                     inputSchema:
@@ -753,7 +781,7 @@ public sealed class PackTests
                   version: 1.0.0
                   enabled: true
                   metadata: { flow.contract: knowledge.projection/v1 }
-                  spec: { flowKind: direct, target: { kind: agent, id: unused } }
+                  spec: { flowKind: workflow, entryNodeId: input, nodes: [{ id: input, kind: input }], edges: [] }
                   graph:
                     entryStep: input
                     inputSchema:
@@ -778,7 +806,7 @@ public sealed class PackTests
                   version: 1.0.0
                   enabled: true
                   metadata: { flow.contract: knowledge.retrieval/v1, knowledge.capabilities: knowledge.search/v1 }
-                  spec: { flowKind: direct, target: { kind: agent, id: unused } }
+                  spec: { flowKind: workflow, entryNodeId: input, nodes: [{ id: input, kind: input }], edges: [] }
                   graph:
                     entryStep: input
                     inputSchema:
@@ -845,18 +873,22 @@ public sealed class PackTests
         using var installedResponse = await client.PostAsync("/api/packs", installContent);
         Assert.AreEqual(HttpStatusCode.Created, installedResponse.StatusCode, await installedResponse.Content.ReadAsStringAsync());
         var ns = new ResourceNamespace("agentstration.test-pack");
-        var source = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
-            .GetAsync(new("pack-knowledge", ns), default);
+        var knowledgeSources = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
+        var source = await knowledgeSources.GetAsync(new("pack-knowledge", ns), default);
         Assert.IsNotNull(source);
         var ready = source.Value.Status.Conditions.Single(value => value.Type == "Ready");
-        Assert.AreEqual("False", ready.Status);
-        StringAssert.Contains(ready.Message, "has no successful acquisition with artifacts");
+        Assert.AreEqual("True", ready.Status);
+        var operationalReadiness = await knowledgeSources.GetReadinessForUseAsync(
+            new("pack-knowledge", ns, source.Value.ScopeRef),
+            ResourceScopeRef.Workspace(requestContext.WorkspaceId), default);
+        Assert.IsFalse(operationalReadiness.Ready);
+        Assert.IsTrue(operationalReadiness.Issues.Any(issue =>
+            issue.Contains("has no successful acquisition with artifacts", StringComparison.Ordinal)));
         Assert.AreEqual("test-pack", source.Value.Metadata.Annotations[PackProvenanceAnnotations.Name]);
 
         using var removed = await client.DeleteAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode, await removed.Content.ReadAsStringAsync());
-        Assert.IsNull(await factory.Services.GetRequiredService<KnowledgeSourceManagementService>()
-            .GetAsync(new("pack-knowledge", ns), default));
+        Assert.IsNull(await knowledgeSources.GetAsync(new("pack-knowledge", ns), default));
         Assert.IsNull(await factory.Services.GetRequiredService<DataSourceManagementService>()
             .GetAsync(ns, "pack-source", ResourceScopeRef.Workspace(requestContext.WorkspaceId), default));
         Assert.IsNull(await factory.Services.GetRequiredService<FlowService>()

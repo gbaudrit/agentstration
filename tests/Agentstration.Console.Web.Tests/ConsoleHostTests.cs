@@ -70,6 +70,10 @@ public sealed class ConsoleHostTests
         Assert.AreEqual("http://127.0.0.1:5102/", endpointOptions.WorkApi.BaseAddress);
         Assert.AreEqual("http://127.0.0.1:5103/", endpointOptions.FlowApi.BaseAddress);
         Assert.AreEqual("http://127.0.0.1:5104/", endpointOptions.RuntimeApi.BaseAddress);
+        var entryTarget = factory.Services.GetServices<BffDelegationTarget>()
+            .Single(value => value.Name == nameof(IEntryAdministrationApiClient));
+        Assert.AreEqual(InternalDelegationAudiences.Work, entryTarget.Audience);
+        Assert.AreEqual(new Uri("http://127.0.0.1:5102/"), entryTarget.Origin);
         Assert.AreEqual(ConsoleAuthenticationDefaults.Cookie, cookies.Cookie.Name);
         Assert.AreEqual("returnUrl", cookies.ReturnUrlParameter);
         Assert.AreEqual(CookieSecurePolicy.Always, cookies.Cookie.SecurePolicy);
@@ -89,9 +93,7 @@ public sealed class ConsoleHostTests
         foreach (var name in new[]
         {
             CleanupApiClient.RuntimeClient, CleanupApiClient.FlowClient,
-            CleanupApiClient.ManagementClient, CleanupApiClient.WorkClient,
-            EntryAdministrationApiClient.AgentResourceCatalogClient,
-            EntryAdministrationApiClient.FlowResourceCatalogClient
+            CleanupApiClient.ManagementClient, CleanupApiClient.WorkClient
         })
         {
             using var client = clients.CreateClient(name);

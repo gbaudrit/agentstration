@@ -195,7 +195,7 @@ public sealed class CleanupConsoleTests
         }
     }
 
-    private sealed class TestHttpClientFactory(IReadOnlyDictionary<string, HttpClient> clients) : IHttpClientFactory
+    private sealed class TestHttpClientFactory(IReadOnlyDictionary<string, HttpClient> clients) : IConsoleContextHttpClientFactory
     {
         public HttpClient CreateClient(string name) => clients[name];
     }

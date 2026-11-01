@@ -1,7 +1,9 @@
 namespace Agentstration.Identity.Contracts;
 
 public enum TenantStatus { Active, Disabled }
+public enum TenantKind { Standard = 0, System = 1 }
 public enum WorkspaceStatus { Active = 0, Disabled = 1, Initializing = 2 }
+public enum WorkspaceKind { Business = 0, InstanceOperations = 1, TenantOperations = 2 }
 public enum PrincipalStatus { Active, Disabled }
 public enum PrincipalKind { Human, Workload }
 public enum MembershipStatus { Active, Suspended }
@@ -14,12 +16,34 @@ public static class OfficialWorkspaceIdentities
     public const string AgentstrationAssistantDisplayName = "Agentstration Assistant";
 }
 
+public static class OperationalTopologyIdentities
+{
+    public const string SystemTenantName = "agentstration-system";
+    public const string SystemTenantDisplayName = "Agentstration System";
+    public const string InstanceOperationsWorkspaceName = "agentstration-instance-operations";
+    public const string InstanceOperationsWorkspaceDisplayName = "Instance operations";
+    public const string TenantOperationsWorkspaceName = "agentstration-tenant-operations";
+    public const string TenantOperationsWorkspaceDisplayName = "Tenant operations";
+
+    public static bool IsSystemTenant(Tenant tenant) => tenant.Kind == TenantKind.System;
+
+    public static bool IsOperationalWorkspace(Workspace workspace) => workspace.Kind != WorkspaceKind.Business;
+
+    public static bool IsReservedTenantName(string name) =>
+        string.Equals(name, SystemTenantName, StringComparison.Ordinal);
+
+    public static bool IsReservedWorkspaceName(string name) =>
+        string.Equals(name, InstanceOperationsWorkspaceName, StringComparison.Ordinal)
+        || string.Equals(name, TenantOperationsWorkspaceName, StringComparison.Ordinal);
+}
+
 public sealed record Tenant(
     Guid Id,
     string Name,
     string DisplayName,
     TenantStatus Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    TenantKind Kind = TenantKind.Standard);
 
 public sealed record Workspace(
     Guid Id,
@@ -27,7 +51,8 @@ public sealed record Workspace(
     string Name,
     string DisplayName,
     WorkspaceStatus Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    WorkspaceKind Kind = WorkspaceKind.Business);
 
 public sealed record Principal(
     Guid Id,
@@ -134,11 +159,20 @@ public sealed record RequestContext(
 {
     public Guid UserId => PrincipalId;
 }
-public enum ControlPlaneAccessMode { Unavailable = 0, Workspace = 1, System = 2, Tenant = 3 }
+public enum ControlPlaneAccessMode
+{
+    Unavailable = 0,
+    Workspace = 1,
+    System = 2,
+    Tenant = 3,
+    Instance = 4,
+    TenantAdministration = 5
+}
 
 public interface ICurrentRequestContext
 {
     bool IsInitialized { get; }
+    Guid? ActorPrincipalId => IsInitialized ? Current.PrincipalId : null;
     RequestContext Current { get; }
     ControlPlaneAccessMode AccessMode => IsInitialized ? ControlPlaneAccessMode.Workspace : ControlPlaneAccessMode.Unavailable;
 }
@@ -160,15 +194,37 @@ public sealed class SystemOperationRequestContext : ICurrentRequestContext
 public interface IRequestContextScopeFactory
 {
     IDisposable Push(RequestContext context);
+    IDisposable PushInstance(RequestContext operationalContext);
+    IDisposable PushTenantAdministration(RequestContext operationalContext);
     IDisposable PushTenant(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null);
     IDisposable PushSystem();
+}
+
+public sealed class InstanceOperationRequestContext(Guid principalId) : ICurrentRequestContext
+{
+    public Guid PrincipalId { get; } = principalId != Guid.Empty
+        ? principalId
+        : throw new ArgumentException("An instance context requires a non-empty Principal ID.", nameof(principalId));
+    public bool IsInitialized => false;
+    public Guid? ActorPrincipalId => PrincipalId;
+    public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.Instance;
+    public RequestContext Current => throw new InvalidOperationException("Instance operations do not have a workspace request context.");
 }
 
 public sealed class TenantOperationRequestContext(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null) : ICurrentRequestContext
 {
     public bool IsInitialized => false;
+    public Guid? ActorPrincipalId => Current.PrincipalId;
     public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.Tenant;
     public RequestContext Current { get; } = new(principalId, tenantId, Guid.Empty, restriction);
+}
+
+public sealed class TenantAdministrationRequestContext(Guid principalId, Guid tenantId) : ICurrentRequestContext
+{
+    public bool IsInitialized => false;
+    public Guid? ActorPrincipalId => Current.PrincipalId;
+    public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.TenantAdministration;
+    public RequestContext Current { get; } = new(principalId, tenantId, Guid.Empty);
 }
 
 public interface IPrincipalResolver
@@ -243,6 +299,14 @@ public interface IWorkspaceProvisioner
     Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken);
 }
 
+public interface IOperationalTopologyProvisioner
+{
+    Task EnsureAllAsync(CancellationToken cancellationToken);
+    Task<Workspace> EnsureTenantAsync(Tenant tenant, CancellationToken cancellationToken);
+    Task<Workspace> GetInstanceOperationsWorkspaceAsync(CancellationToken cancellationToken);
+    Task<Workspace> GetTenantOperationsWorkspaceAsync(Guid tenantId, CancellationToken cancellationToken);
+}
+
 public interface IAuthorizationService
 {
     Task<IReadOnlySet<string>> GetPermissionsAsync(RequestContext context, CancellationToken cancellationToken);
@@ -259,6 +323,7 @@ public interface IIdentityStore
     Task<Workspace?> FindWorkspaceByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken);
     Task<Workspace?> GetWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken);
     Task<Workspace?> GetWorkspaceAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(Guid tenantId, CancellationToken cancellationToken);
     Task AddWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken);
     Task UpdateWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken);
@@ -282,6 +347,7 @@ public interface IIdentityStore
     Task RemovePlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
     Task<TenantMembership?> FindMembershipAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TenantMembership>> ListMembershipsAsync(Guid tenantId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TenantMembership>> ListTenantMembershipsAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddMembershipAsync(TenantMembership membership, CancellationToken cancellationToken);
     Task<WorkspaceMembership?> FindWorkspaceMembershipAsync(Guid workspaceId, Guid principalId, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkspaceMembership>> ListWorkspaceMembershipsAsync(Guid principalId, CancellationToken cancellationToken);
@@ -291,9 +357,11 @@ public interface IIdentityStore
     Task RemoveWorkspaceMembershipAsync(Guid membershipId, CancellationToken cancellationToken);
     Task<RoleDefinition?> FindRoleDefinitionByNameAsync(string name, CancellationToken cancellationToken);
     Task<RoleDefinition?> GetRoleDefinitionAsync(Guid roleDefinitionId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RoleDefinition>> ListRoleDefinitionsAsync(CancellationToken cancellationToken);
     Task AddRoleDefinitionAsync(RoleDefinition roleDefinition, CancellationToken cancellationToken);
     Task UpdateRoleDefinitionAsync(RoleDefinition roleDefinition, CancellationToken cancellationToken);
     Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddRoleAssignmentAsync(RoleAssignment roleAssignment, CancellationToken cancellationToken);
     Task RemoveRoleAssignmentAsync(Guid roleAssignmentId, CancellationToken cancellationToken);
 }

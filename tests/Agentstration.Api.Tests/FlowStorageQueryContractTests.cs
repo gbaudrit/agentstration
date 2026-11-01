@@ -88,7 +88,7 @@ public sealed partial class FlowTests
     private static FlowRun CreateStoredRun(string id, FlowId flowId, FlowRunStatus status)
     {
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
-        var version = new FlowVersion(TestScope.WorkspaceId, flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now);
+        var version = new FlowVersion(ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now);
         return new FlowRun
         {
             WorkspaceId = TestScope.WorkspaceId,

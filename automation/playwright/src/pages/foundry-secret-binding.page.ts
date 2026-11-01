@@ -10,7 +10,10 @@ export class FoundrySecretBindingPage {
   }
 
   public async openNewProvider(consoleUrl: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/modelproviders/new`, { waitUntil: 'domcontentloaded' });
+    const response = await this.page.goto(
+      await this.contextualUrl(`${consoleUrl}/modelproviders/new`),
+      { waitUntil: 'domcontentloaded' },
+    );
     if (!response?.ok()) throw new Error(`Foundry provider route returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(TestIds.resourceAdministration.modelProviderEditor).waitFor({ state: 'visible' });
     await this.page.locator(`[data-testid="model-provider-form"][data-interactive="true"]`).waitFor({ state: 'visible' });
@@ -71,14 +74,20 @@ export class FoundrySecretBindingPage {
   }
 
   public async openSecret(consoleUrl: string, name: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/secrets/${encodeURIComponent(name)}`, { waitUntil: 'domcontentloaded' });
+    const response = await this.page.goto(
+      await this.contextualUrl(`${consoleUrl}/secrets/${encodeURIComponent(name)}`),
+      { waitUntil: 'domcontentloaded' },
+    );
     if (!response?.ok()) throw new Error(`Secret route returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(TestIds.resourceAdministration.secretEditor).waitFor({ state: 'visible' });
     await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
   }
 
   public async openProvider(consoleUrl: string, name: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/modelproviders/${encodeURIComponent(name)}`, { waitUntil: 'domcontentloaded' });
+    const response = await this.page.goto(
+      await this.contextualUrl(`${consoleUrl}/modelproviders/${encodeURIComponent(name)}`),
+      { waitUntil: 'domcontentloaded' },
+    );
     if (!response?.ok()) throw new Error(`Provider route returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.openConfiguration();
     await this.page.locator(`[data-testid="model-provider-form"][data-interactive="true"]`).waitFor({ state: 'visible' });
@@ -89,6 +98,15 @@ export class FoundrySecretBindingPage {
     await tab.waitFor({ state: 'visible' });
     await tab.click();
     await expect(tab).toHaveAttribute('aria-selected', 'true');
+  }
+
+  private async contextualUrl(url: string): Promise<string> {
+    const target = new URL(url);
+    const scopeRef = await this.page.getByTestId(TestIds.console.shell)
+      .getAttribute('data-context-scope')
+      .catch(() => null);
+    if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
+    return target.toString();
   }
 
   public async deleteSecretValue(): Promise<void> {

@@ -9,6 +9,16 @@
 <PageHeader Title="@(IsNew ? T("CreateVault") : model.DisplayName)" Description="@T("VaultEditor.Description")" TestId="resource-vault-editor"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/vaults">@T("Back")</a></Actions></PageHeader>
 <ResourceTabs Label="@T("SecretManagement")"><a href="/secrets">@T("Secrets")</a><a class="active" href="/vaults">@T("Vaults")</a></ResourceTabs>
 @if (error is not null) { <div class="form-alert form-alert-danger">@error.Message</div> }
+@if (!IsNew)
+{
+    <ResourceTabs Label="@T("Vault")"><button type="button" class="@(!accessMode ? "active" : null)" @onclick="() => accessMode = false">@T("Definition")</button><button type="button" class="@(accessMode ? "active" : null)" data-testid="vault-access-tab" @onclick="() => accessMode = true">@T("Access")</button></ResourceTabs>
+}
+@if (accessMode && resource?.ScopeRef is { } ownerScope)
+{
+    <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@SecretResourceKinds.Vault" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
+}
+else
+{
 <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirtyFromForm" @onchange="MarkDirtyFromForm"><DataAnnotationsValidator /><ValidationSummary />
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("VaultResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusText(status)" Status="@(status == "available" ? UiStatus.Success : UiStatus.Danger)" /> }</div>
@@ -32,6 +42,7 @@
         </UnsavedChangesBar>
     }
 </EditForm>
+}
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteVault")" Message="@T("DeleteVaultMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteVault")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 <ConfirmationDialog IsOpen="@confirmInitialize" Title="@T("InitializeLocalVault")" Message="@T("InitializeLocalVaultMessage")" ConfirmLabel="@T("GenerateMasterKey")" OnConfirm="InitializeAsync" OnCancel="() => confirmInitialize = false" />
 
@@ -40,18 +51,19 @@
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private VaultEditorModel model = new();
+    private VaultResource? resource;
     private string? etag, status, keyFilePath;
     private ResourceScopeRef? selectedScope;
     private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
     private Exception? error;
-    private bool busy, confirmDelete, confirmInitialize, saveError, dirty, interactive;
+    private bool busy, confirmDelete, confirmInitialize, saveError, dirty, interactive, accessMode;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private void MarkDirty() => dirty = true;
     private void MarkDirtyFromForm(EventArgs _) => MarkDirty();
     private string StatusText(string value) => value.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T($"Status.{value}") };
     protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
-    protected override async Task OnParametersSetAsync() { try { scopeTargets = await Client.GetScopeTargetsAsync(SecretResourceKinds.Vault, cancellation.Token); if (IsNew) { selectedScope ??= scopeTargets.FirstOrDefault(value => value.Kind == ResourceScopeKind.Workspace && value.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(value => value.CanWrite)?.ScopeRef; return; } var requestedScope = ParseScope(); var snapshot = requestedScope is null ? await Client.GetVaultAsync(Name!, cancellation.Token) : await Client.GetVaultAsync(Name!, requestedScope.Value, cancellation.Token); model = VaultEditorModel.From(snapshot.Value.Resource); selectedScope = snapshot.Value.Resource.ScopeRef; status = snapshot.Value.Status; etag = snapshot.ETag; } catch (Exception ex) { error = ex; } }
+    protected override async Task OnParametersSetAsync() { try { scopeTargets = await Client.GetScopeTargetsAsync(SecretResourceKinds.Vault, cancellation.Token); if (IsNew) { selectedScope ??= scopeTargets.FirstOrDefault(value => value.Kind == ResourceScopeKind.Workspace && value.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(value => value.CanWrite)?.ScopeRef; return; } var requestedScope = ParseScope(); var snapshot = requestedScope is null ? await Client.GetVaultAsync(Name!, cancellation.Token) : await Client.GetVaultAsync(Name!, requestedScope.Value, cancellation.Token); resource = snapshot.Value.Resource; model = VaultEditorModel.From(snapshot.Value.Resource); selectedScope = snapshot.Value.Resource.ScopeRef; status = snapshot.Value.Status; etag = snapshot.ETag; } catch (Exception ex) { error = ex; } }
     private async Task SaveAsync()
     {
         busy = true;
@@ -65,6 +77,7 @@
             if (IsNew) Navigation.NavigateTo(ResourceUrl(snapshot.Value));
             else
             {
+                resource = snapshot.Value;
                 model = VaultEditorModel.From(snapshot.Value);
                 etag = snapshot.ETag;
                 dirty = false;

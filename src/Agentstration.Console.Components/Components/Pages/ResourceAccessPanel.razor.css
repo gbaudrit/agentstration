@@ -1,0 +1,18 @@
+.resource-access-panel { display: grid; gap: 1rem; }
+.access-identity-grid, .access-governance-grid { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: .65rem 1rem; }
+.access-identity-grid dd, .access-governance-grid dd { min-width: 0; overflow-wrap: anywhere; }
+.access-grant-list { display: grid; gap: .75rem; margin-top: 1rem; }
+.access-grant { display: grid; grid-template-columns: minmax(14rem, 1fr) auto auto; align-items: center; gap: 1rem; padding: .9rem; border: 1px solid var(--color-border, #d7dfeb); border-radius: .75rem; }
+.access-target { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .25rem .6rem; min-width: 0; }
+.access-target code { grid-column: 2; overflow-wrap: anywhere; }
+.access-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.access-actions label { display: inline-flex; align-items: center; gap: .35rem; }
+.access-add { display: flex; align-items: end; gap: .75rem; margin-top: 1rem; }
+.access-add label { flex: 1; display: grid; gap: .35rem; }
+.access-readonly { margin-top: 1rem; color: var(--color-text-muted, #5f6f85); }
+.access-success { color: var(--color-success, #087f5b); }
+@media (max-width: 760px) {
+    .access-identity-grid, .access-governance-grid { grid-template-columns: 1fr; }
+    .access-grant { grid-template-columns: 1fr; align-items: stretch; }
+    .access-add { align-items: stretch; flex-direction: column; }
+}

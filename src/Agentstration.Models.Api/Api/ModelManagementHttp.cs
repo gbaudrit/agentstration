@@ -29,6 +29,8 @@ internal static class ModelsApiHttp
         }
         catch (ResourceNotFoundException exception) { return Problem("model-profile-not-found", "Resource not found", 404, exception.Message); }
         catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
+        catch (ResourceScopeAccessDeniedException exception) { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }
+        catch (ResourceScopePolicyException exception) { return Problem("resource-scope-invalid", "Invalid resource scope", 422, exception.Message); }
         catch (ModelProfileInUseException exception)
         {
             return Problem("model-profile-in-use", "Model profile is in use", 409, exception.Message, new Dictionary<string, object?>
@@ -42,6 +44,10 @@ internal static class ModelsApiHttp
         catch (ModelProfileValidationException exception)
         {
             return Problem(exception.Code, "Invalid model profile", 422, exception.Message, new Dictionary<string, object?> { ["errors"] = exception.Errors });
+        }
+        catch (ModelProviderAccessDeniedException exception)
+        {
+            return Problem("model-provider-access-denied", "Model provider access denied", 403, exception.Message);
         }
         catch (ModelProviderResolutionException exception) { return Problem("model-profile-invalid", "Invalid model configuration", 422, exception.Message); }
         catch (ArgumentException exception) { return Problem("validation-failed", "Invalid request", 400, exception.Message); }
@@ -69,7 +75,7 @@ internal static class ModelsApiHttp
     public static ResourceNamespace Namespace(string? value) => ResourceNamespace.Parse(value);
 
     public static ModelProfileResolutionResponse Resolution(ModelProfileResolution resolution) => new(
-        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName, resolution.Profile.Namespace.Value),
+        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName, resolution.Profile.Namespace.Value, resolution.Profile.ScopeRef),
         resolution.Provider is null ? null : new ModelProviderReferenceResponse(
             resolution.Profile.Definition.Provider.Name,
             resolution.Provider.Name,

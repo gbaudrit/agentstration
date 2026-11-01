@@ -66,7 +66,11 @@ public sealed class SchemaApiTests : ModelManagementApiTestBase
         };
         var createdFlow = await flows.CreateAsync(workspaceId, new CreateFlowCommand(
             "schema-bound-flow", null, "1.0.0", true,
-            new DirectFlowDefinition(new(FlowTargetKind.Agent, "agent")), Graph: graph), default);
+            new WorkflowFlowDefinition(
+                "input",
+                [new FlowNode("input", FlowNodeKind.Input)],
+                []),
+            Graph: graph), default);
 
         var published = await flows.PublishVersionAsync(workspaceId, createdFlow.Value.Id,
             "1.0.0", false, default);

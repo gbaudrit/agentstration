@@ -30,26 +30,29 @@ internal static class KnowledgeRetrievalEndpoints
     private static Task<IResult> SearchAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         SearchKnowledgeRequest body,
         KnowledgeRetrievalService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Results.Ok(
-            await service.SearchAsync(new(name, ResourceNamespace.Parse(@namespace)), body, cancellationToken)));
+            await service.SearchAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body, cancellationToken)));
 
     private static Task<IResult> QueryAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         QueryKnowledgeRequest body,
         KnowledgeRetrievalService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Results.Ok(
-            await service.QueryAsync(new(name, ResourceNamespace.Parse(@namespace)), body, cancellationToken)));
+            await service.QueryAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body, cancellationToken)));
 
     private static Task<IResult> ReadAsync(
         string name,
         string? @namespace,
+        string? scopeRef,
         ReadKnowledgeRequest body,
         KnowledgeRetrievalService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Results.Ok(
-            await service.ReadAsync(new(name, ResourceNamespace.Parse(@namespace)), body, cancellationToken)));
+            await service.ReadAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body, cancellationToken)));
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
@@ -74,4 +77,7 @@ internal static class KnowledgeRetrievalEndpoints
         Status = status,
         Detail = detail
     });
+
+    private static ResourceScopeRef? ParseScope(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : ResourceScopeRef.Parse(value);
 }

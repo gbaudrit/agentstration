@@ -30,6 +30,7 @@ public sealed class ToolGovernanceAuditConsoleTests
         await client.GetAsync(
             ToolExecutionOwnerKind.RuntimeRun,
             "run/1",
+            ResourceScopeRef.Instance,
             12,
             50,
             new ToolGovernanceAuditFilters
@@ -50,6 +51,7 @@ public sealed class ToolGovernanceAuditConsoleTests
         Assert.Contains("invocationId=attempt%2F2", requested.Query, StringComparison.Ordinal);
         Assert.Contains("resourceGeneration=7", requested.Query, StringComparison.Ordinal);
         Assert.Contains("decision=denied", requested.Query, StringComparison.Ordinal);
+        Assert.Contains("scopeRef=%2Finstance", requested.Query, StringComparison.Ordinal);
     }
 
     [TestMethod]
@@ -97,6 +99,7 @@ public sealed class ToolGovernanceAuditConsoleTests
         public Task<ToolGovernanceAuditPage> GetAsync(
             ToolExecutionOwnerKind ownerKind,
             string runId,
+            ResourceScopeRef? scopeRef,
             long afterSequence,
             int limit,
             ToolGovernanceAuditFilters filters,

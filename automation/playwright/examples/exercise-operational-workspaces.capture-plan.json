@@ -1,0 +1,17 @@
+{
+  "journey": "exercise-operational-workspaces",
+  "locale": "en-US",
+  "theme": "dark",
+  "viewport": {
+    "width": 1440,
+    "height": 1024
+  },
+  "checkpoints": [
+    "operational-workspaces-topology",
+    "operational-workspaces-instance-run",
+    "operational-workspaces-tenant-run",
+    "operational-workspaces-recovery",
+    "operational-workspaces-isolation"
+  ],
+  "input": {}
+}

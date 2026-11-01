@@ -26,7 +26,8 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
     {
         var item = modelBuilder.Entity<WorkItemDocument>();
         item.ToTable("WorkItems");
-        item.HasKey(value => new { value.WorkspaceId, value.Id });
+        item.HasKey(value => new { value.ScopeRef, value.Id });
+        item.Property(value => value.ScopeRef).HasMaxLength(64).IsRequired();
         item.Property(value => value.Id).HasMaxLength(36);
         item.Property(value => value.Type).HasMaxLength(128);
         item.Property(value => value.Status).HasConversion<string>().HasMaxLength(32);
@@ -34,7 +35,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.RequestedAgentId).HasMaxLength(1024);
         item.Property(value => value.SelectedAgentId).HasMaxLength(1024);
         item.Property(value => value.Title).HasMaxLength(512);
-        item.Property(value => value.WorkspaceId).HasMaxLength(36).IsRequired();
+        item.Property(value => value.WorkspaceId).HasMaxLength(36);
         item.Property(value => value.OwnerPrincipalId).HasMaxLength(36).IsRequired();
         item.Property(value => value.InteractionId).HasMaxLength(36);
         item.Property(value => value.EntryId).HasMaxLength(512);
@@ -240,6 +241,7 @@ internal sealed class WorkTaskArtifactDocument : IWorkTaskEntityDocument { publi
 internal sealed class WorkItemDocument
 {
     public required string Id { get; set; }
+    public required string ScopeRef { get; set; }
     public required string Type { get; set; }
     public WorkItemStatus Status { get; set; }
     public string? RequesterIdentity { get; set; }

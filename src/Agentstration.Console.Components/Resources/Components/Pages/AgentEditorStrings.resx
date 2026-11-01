@@ -6,6 +6,7 @@
   <data name="CreateAgent"><value>Create agent</value></data>
   <data name="CreateDescription"><value>Define the desired state for a new specialized agent resource.</value></data>
   <data name="BackToAgents"><value>Back to agents</value></data>
+  <data name="ReturnToSource"><value>Return to source</value></data>
   <data name="Loading"><value>Loading agent resource…</value></data>
   <data name="Generation"><value>Generation {0}</value></data>
   <data name="Run"><value>Run</value></data>
@@ -101,6 +102,7 @@
   <data name="CategorySelection"><value>{0} of {1} selected</value></data>
   <data name="ToolSetConfiguration" xml:space="preserve"><value>Versioned permissions</value></data><data name="GovernedToolSets" xml:space="preserve"><value>ToolSet grants</value></data><data name="ToolSetConfigurationHelp" xml:space="preserve"><value>Grant an exact published ToolSet version, then keep every member or choose a subset. Granted Tools are reflected in the effective access list below.</value></data><data name="ManageToolSets" xml:space="preserve"><value>Manage ToolSets</value></data><data name="NoPublishedToolSets" xml:space="preserve"><value>No published ToolSet version is available in this Workspace.</value></data><data name="PublishedToolSet" xml:space="preserve"><value>Published ToolSet</value></data><data name="InspectToolSet" xml:space="preserve"><value>Inspect</value></data><data name="AllMembers" xml:space="preserve"><value>Grant all members</value></data><data name="SelectedMembers" xml:space="preserve"><value>Grant selected members</value></data><data name="PinnedVersionHelp" xml:space="preserve"><value>Version {0} will be pinned; later additions do not extend a published Agent revision.</value></data><data name="ToolSetMembers" xml:space="preserve"><value>ToolSet members</value></data><data name="ChooseToolSetMembers" xml:space="preserve"><value>Choose the members granted through this version.</value></data>
   <data name="ActiveRevision"><value>Active revision</value></data><data name="PinnedToolSetAssignments"><value>Pinned ToolSet assignments</value></data><data name="PinnedToolSetAssignmentsHelp"><value>This immutable evidence controls the Tools available to the active Agent revision.</value></data><data name="ToolSet"><value>ToolSet</value></data><data name="Version"><value>Version</value></data><data name="DefinitionHash"><value>Definition hash</value></data><data name="EffectiveMembers"><value>Effective members</value></data>
+  <data name="Access"><value>Access</value></data>
   <data name="Contracts"><value>Contracts</value></data>
   <data name="InvocationContracts"><value>Invocation contracts</value></data>
   <data name="InvocationContractsHelp"><value>Describe the structured value accepted by this Agent and the value it returns. Runtime execution remains text-based.</value></data>

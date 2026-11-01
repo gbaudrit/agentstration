@@ -70,6 +70,64 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task WorkspaceRunResolvesAnUnscopedChildFlowFromTheInstanceHierarchy()
+    {
+        await using var fixture = await FlowFixture.CreateAsync(
+            scopeHierarchy: new TestFlowScopeHierarchy(TestScope.TenantId));
+        var childId = new FlowId("instance-child");
+        await fixture.Service.CreateExactAsync(
+            ResourceScopeRef.Instance,
+            new CreateFlowCommand(
+                childId.Value,
+                null,
+                "1.0.0",
+                true,
+                PlaceholderDefinition(),
+                Graph: ChildGraph()),
+            ResourceNamespace.Default,
+            default);
+        await fixture.Service.PublishVersionExactAsync(
+            ResourceScopeRef.Instance,
+            childId,
+            "1.0.0",
+            activate: true,
+            default);
+        var parent = await CreatePublishedGraphAsync(fixture, "workspace-parent", CallingGraph(childId.Value));
+        var runs = new FlowRunService(
+            fixture.Repository,
+            new TestFlowRunQueue(),
+            new TestCancellationRegistry(),
+            new NullFlowRunEventSink(),
+            TimeProvider.System,
+            flowDefinitions: fixture.Service);
+        using var input = JsonDocument.Parse("""{"article":"new item"}""");
+
+        var root = await runs.CreateAsync(
+            parent.Value.Id,
+            "1.0.0",
+            "local",
+            FlowRunTrigger.Manual,
+            "tester",
+            "hierarchical-child",
+            input.RootElement,
+            TestScope,
+            default);
+        var child = await runs.CreateOrGetAssignedChildAsync(
+            TestScope.WorkspaceId,
+            root.Value.Id,
+            "analyze",
+            input.RootElement,
+            "flowCall",
+            null,
+            default);
+
+        Assert.AreEqual(ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value), child.Value.ExecutionScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, child.Value.DefinitionScopeRef);
+        Assert.AreEqual(childId, child.Value.FlowId);
+        Assert.AreEqual("1.0.0", child.Value.FlowVersion);
+    }
+
+    [TestMethod]
     public async Task NestedFlowDepthIsBoundedWithAStableFailure()
     {
         await using var fixture = await FlowFixture.CreateAsync();

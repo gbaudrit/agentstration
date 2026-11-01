@@ -10,6 +10,7 @@
   <data name="Tab.Designer"><value>Designer</value></data>
   <data name="Tab.Runs"><value>Runs</value></data>
   <data name="Tab.Deployments"><value>Deployments</value></data>
+  <data name="Tab.Access"><value>Access</value></data>
   <data name="CurrentVersion"><value>Current version</value></data>
   <data name="NotPublished"><value>Not published</value></data>
   <data name="ActiveVersion"><value>Active {0}</value></data>
@@ -29,6 +30,8 @@
   <data name="ExecutionProfile"><value>Execution profile</value></data>
   <data name="LastPublication"><value>Last publication</value></data>
   <data name="ManagedByNamespace"><value>This Flow is managed by namespace</value></data>
+  <data name="InheritedScope"><value>This Flow is inherited from scope {0}.</value></data>
+  <data name="InheritedReadOnlyHelp"><value>Its definition and published versions are read-only from this workspace.</value></data>
   <data name="PublishedVersionPrefix"><value>Its active published version can be inspected in the</value></data>
   <data name="ReadOnlyOrchestrationView"><value>read-only orchestration view</value></data>
   <data name="ReadOnlyDesigner"><value>read-only Flow Designer</value></data>
@@ -40,7 +43,7 @@
   <data name="DefinitionIdentityHelp"><value>Update the Flow’s details here. Open the Designer to edit its steps and connections.</value></data>
   <data name="DefinitionIdentitySection"><value>Identity and description</value></data>
   <data name="DefinitionDraftHelp"><value>Changes saved here remain in the draft until it is published.</value></data>
-  <data name="DefinitionPublishedHelp"><value>This namespaced Flow is published and read-only.</value></data>
+  <data name="DefinitionPublishedHelp"><value>This inherited Flow is published and read-only in this workspace.</value></data>
   <data name="DefinitionIdentityFixedHelp"><value>Fixed when the Flow is created.</value></data>
   <data name="DefinitionDraftUnavailable"><value>No editable draft is available for this Flow. Open the Designer to inspect its definition.</value></data>
   <data name="DefinitionDisplayNameRequired"><value>Enter a display name before saving.</value></data>

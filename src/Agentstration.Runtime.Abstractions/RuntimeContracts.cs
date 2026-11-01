@@ -134,6 +134,7 @@ public sealed record ExecutableAgentDefinition
     public required string RuntimeProfileName { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
+    public IReadOnlyCollection<RuntimeToolReference> ToolReferences { get; init; } = [];
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
     public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
     public required IReadOnlyCollection<string> Capabilities { get; init; }
@@ -155,8 +156,11 @@ public sealed record ResolvedRuntimeAgent(
     string? Error)
 {
     public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? AgentScopeRef { get; init; }
+    public Guid RevisionUid { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ModelProfileScopeRef { get; init; }
 }
 
 public interface IRuntimeAgentResolver
@@ -170,6 +174,14 @@ public interface IRuntimeAgentResolver
         @namespace == ResourceNamespace.Default
             ? ResolveLatestAsync(resourceId, cancellationToken)
             : throw new RuntimeAgentResolutionException("latest_agent_resolution_unsupported", $"Latest-version resolution is not supported for agent '{@namespace}/{resourceId}'.");
+}
+
+public interface IRuntimeAgentAccessValidator
+{
+    Task ValidateUseAsync(
+        ResolvedRuntimeAgent agent,
+        ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken);
 }
 
 public sealed class RuntimeAgentResolutionException(string code, string message) : Exception(message)
@@ -199,6 +211,12 @@ public interface IAgentRuntimePreparationService
         string agentName,
         long generation,
         CancellationToken cancellationToken);
+    Task<PreparedAgentRuntime> PrepareAsync(
+        ResourceNamespace resourceNamespace,
+        string agentName,
+        ResourceScopeRef? scopeRef,
+        long generation,
+        CancellationToken cancellationToken) => PrepareAsync(resourceNamespace, agentName, generation, cancellationToken);
 }
 public sealed record AgentRuntimeReadiness(
     string AgentId,
@@ -265,17 +283,35 @@ public interface IAgentTool
     JsonElement InputSchema { get; }
     JsonElement? OutputSchema { get; }
     bool RequiresApproval { get; }
+    ResourceScopeRef? ScopeRef => null;
+    Guid? Uid => null;
+    long? Generation => null;
+    ResourceScopeRef? ProviderScopeRef => null;
+    Guid? ProviderUid => null;
+    long? ProviderGeneration => null;
 }
+
+public sealed record RuntimeToolReference(
+    string Id,
+    ResourceNamespace Namespace,
+    ResourceScopeRef ScopeRef,
+    Guid Uid,
+    long Generation);
 
 public interface IToolCatalog
 {
     ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
+
+    ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(
+        IEnumerable<RuntimeToolReference> tools,
+        CancellationToken cancellationToken = default) => ResolveAsync(tools.Select(value => value.Id), cancellationToken);
 }
 
 public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console }
 
 public sealed record ToolExecutionScope
 {
+    public ResourceScopeRef? ScopeRef { get; init; }
     public ToolExecutionOwnerKind OwnerKind { get; init; }
     public Guid? TenantId { get; init; }
     public WorkspaceId? WorkspaceId { get; init; }
@@ -294,9 +330,15 @@ public sealed record ToolExecutionContext
     public required string InvocationId { get; init; }
     public required string ToolId { get; init; }
     public ResourceNamespace? ToolNamespace { get; init; }
+    public ResourceScopeRef? ToolScopeRef { get; init; }
+    public Guid? ToolUid { get; init; }
+    public long? ToolGeneration { get; init; }
     public required string ToolName { get; init; }
     public string? ToolProviderId { get; init; }
     public ResourceNamespace? ToolProviderNamespace { get; init; }
+    public ResourceScopeRef? ToolProviderScopeRef { get; init; }
+    public Guid? ToolProviderUid { get; init; }
+    public long? ToolProviderGeneration { get; init; }
     public string? ExternalToolId { get; init; }
     public Guid? TenantId { get; init; }
     public WorkspaceId? WorkspaceId { get; init; }

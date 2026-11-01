@@ -31,8 +31,17 @@ public sealed class WorkApiClient(HttpClient httpClient) : IWorkApiClient
         return ApiResponse.ReadAsync<WorkTaskOperationsPageResponse>(httpClient, $"api/tasks?{string.Join('&', values)}", cancellationToken);
     }
 
-    public Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<WorkTaskOperationsCountersResponse>(httpClient, string.IsNullOrWhiteSpace(workspaceId) ? "api/tasks/summary" : $"api/tasks/summary?workspaceId={Uri.EscapeDataString(workspaceId)}", cancellationToken);
+    public async Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            string.IsNullOrWhiteSpace(workspaceId)
+                ? "api/tasks/summary"
+                : $"api/tasks/summary?workspaceId={Uri.EscapeDataString(workspaceId)}");
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkTaskOperationsCountersResponse>(cancellationToken)
+            ?? throw new AgentstrationApiException("Work API returned an empty Task summary.", Guid.NewGuid().ToString("N"));
+    }
     public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => ApiResponse.ReadAsync<WorkTaskOperationsDetailResponse>(httpClient, $"api/tasks/{taskId}", cancellationToken);
     public Task<FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => ApiResponse.ReadAsync<FlowRun>(httpClient, $"api/tasks/{taskId}/flow-runs/{Uri.EscapeDataString(runId)}", cancellationToken);
     public async Task<PendingActionContract> RespondTaskPendingActionAsync(Guid taskId, Guid actionId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken cancellationToken)

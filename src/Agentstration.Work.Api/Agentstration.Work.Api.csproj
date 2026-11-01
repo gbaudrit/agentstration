@@ -4,6 +4,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../Agentstration.Work/Agentstration.Work.csproj" />

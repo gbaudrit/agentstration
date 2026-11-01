@@ -646,7 +646,7 @@ public sealed class ToolExecutionLifecycleTests
     {
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
         var version = new FlowVersion(
-            Workspace,
+            ResourceScopeRef.Workspace(Workspace.Value),
             new FlowId("flow"),
             "1.0.0",
             null,

@@ -48,7 +48,7 @@ public sealed class ToolDefinitionConsoleTests
         context.Services.AddSingleton<ISchemasClient>(new SchemasClient());
 
         var rendered = context.Render<ToolDefinitionEditor>();
-        rendered.WaitForElement("select").Change("default|contract-flow");
+        rendered.WaitForElement("select").Change("/workspaces/11111111-1111-1111-1111-111111111111|default|contract-flow");
 
         rendered.WaitForAssertion(() =>
         {
@@ -116,6 +116,7 @@ public sealed class ToolDefinitionConsoleTests
             Task.FromResult<IReadOnlyList<FlowSummary>>([
                 new("contract-flow", "Contract Flow", "flow", "1.2.0", "Published", 0, 0, DateTimeOffset.UtcNow)
                 {
+                    ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111")),
                     ActiveVersion = "1.2.0"
                 }
             ]);
@@ -133,6 +134,10 @@ public sealed class ToolDefinitionConsoleTests
             RequestedVersion = version;
             return (await GetFlowVersionsAsync(@namespace, flowId, cancellationToken)).Single();
         }
+
+        public Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId,
+            string version, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
+            GetFlowVersionAsync(@namespace, flowId, version, cancellationToken);
 
         public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();

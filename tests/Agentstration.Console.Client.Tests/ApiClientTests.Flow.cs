@@ -22,14 +22,15 @@ public sealed partial class ApiClientTests
         var now = DateTimeOffset.UtcNow;
         var flowId = new FlowId("console-run");
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
-        var version = new FlowVersion(new WorkspaceId(Guid.NewGuid()), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now);
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var version = new FlowVersion(ResourceScopeRef.Workspace(workspaceId.Value), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now);
         var run = new FlowRun
         {
-            WorkspaceId = version.WorkspaceId,
+            WorkspaceId = workspaceId,
             Id = "flowrun-console",
             FlowId = flowId,
             FlowVersion = version.Version,
-            Scope = new(Guid.NewGuid(), version.WorkspaceId, Guid.NewGuid()),
+            Scope = new(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }),
             CreatedAt = now,
             DefinitionSnapshot = version
@@ -61,18 +62,12 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
-    public async Task EntryResourcePickerLoadsFlowsFromCanonicalFlowApiInsteadOfWorkApi()
+    public async Task EntryResourcePickerLoadsFlowsFromWorkApiWithTheEntryWorkspaceContext()
     {
-        var requestedCatalogs = new List<string>();
         var workRequests = new List<string>();
         using var workClient = new HttpClient(new StubHandler(request =>
         {
             workRequests.Add(request.RequestUri!.AbsolutePath);
-            return new HttpResponseMessage(HttpStatusCode.InternalServerError);
-        }))
-        { BaseAddress = new Uri("http://work-api/") };
-        using var flowCatalog = new HttpClient(new StubHandler(request =>
-        {
             Assert.AreEqual("/api/resources", request.RequestUri!.AbsolutePath);
             Assert.AreEqual(FlowResourceKinds.Flow, Uri.UnescapeDataString(request.RequestUri.Query.Replace("?kind=", "", StringComparison.Ordinal)));
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -84,20 +79,14 @@ public sealed partial class ApiClientTests
                 })
             };
         }))
-        { BaseAddress = new Uri("http://flow-api/") };
-        var factory = new StubHttpClientFactory(name =>
-        {
-            requestedCatalogs.Add(name);
-            return flowCatalog;
-        });
-        var client = new EntryAdministrationApiClient(workClient, factory);
+        { BaseAddress = new Uri("http://work-api/") };
+        var client = new EntryAdministrationApiClient(workClient);
 
         var resources = await client.GetResourcesAsync(EntryBindingKind.Flow, CancellationToken.None);
 
         Assert.HasCount(2, resources);
         Assert.IsTrue(resources.Any(value => value.Name == "My flow"));
-        CollectionAssert.AreEqual(new[] { EntryAdministrationApiClient.FlowResourceCatalogClient }, requestedCatalogs);
-        Assert.IsEmpty(workRequests);
+        CollectionAssert.AreEqual(new[] { "/api/resources" }, workRequests);
     }
 
     [TestMethod]
@@ -132,9 +121,7 @@ public sealed partial class ApiClientTests
                 };
         }))
         { BaseAddress = new Uri("http://work-api/") };
-        IEntryAdministrationApiClient client = new EntryAdministrationApiClient(
-            httpClient,
-            new StubHttpClientFactory(_ => httpClient));
+        IEntryAdministrationApiClient client = new EntryAdministrationApiClient(httpClient);
 
         _ = await client.GetConsoleEntriesAsync(default);
         _ = await client.SubmitConsoleEntryAsync(
@@ -248,6 +235,49 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task FlowAuthoringClientPreservesExactOwnerScope()
+    {
+        var now = new DateTimeOffset(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
+        var @namespace = new ResourceNamespace("platform");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "reviewer"));
+        var flow = new FlowResponse("review", "review", null, "1.0.0", true, null, definition, new Dictionary<string, string>(), now, now)
+        {
+            Namespace = @namespace,
+            ScopeRef = ResourceScopeRef.Instance
+        };
+        var version = new FlowVersionResponse("review", "1.0.0", null, definition, new Dictionary<string, string>(), now)
+        {
+            Namespace = @namespace,
+            ScopeRef = ResourceScopeRef.Instance
+        };
+        var requests = new List<(HttpMethod Method, string PathAndQuery, string? IfMatch)>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.PathAndQuery, request.Headers.IfMatch.FirstOrDefault()?.ToString()));
+            if (request.RequestUri.AbsolutePath.EndsWith("/versions", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(version) };
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
+            response.Headers.ETag = new EntityTagHeaderValue(request.Method == HttpMethod.Put ? "\"v2\"" : "\"v1\"");
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new FlowApiClient(httpClient);
+
+        var snapshot = await client.GetFlowSnapshotAsync(@namespace, "review", ResourceScopeRef.Instance, default);
+        _ = await client.UpdateFlowAsync(@namespace, "review", ResourceScopeRef.Instance,
+            new UpdateFlowRequest(null, "1.0.0", true, definition), snapshot.ETag, default);
+        _ = await client.CreateFlowVersionAsync(@namespace, "review", ResourceScopeRef.Instance,
+            new CreateFlowVersionRequest("1.0.0"), default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Get, "/api/namespaces/platform/flows/review?scopeRef=%2Finstance", (string?)null),
+            (HttpMethod.Put, "/api/namespaces/platform/flows/review?scopeRef=%2Finstance", "\"v1\""),
+            (HttpMethod.Post, "/api/namespaces/platform/flows/review/versions?scopeRef=%2Finstance", (string?)null)
+        }, requests);
+    }
+
+    [TestMethod]
     public async Task FlowClientListsAndLoadsNamespacedFlows()
     {
         var now = new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
@@ -295,6 +325,26 @@ public sealed partial class ApiClientTests
             "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions/0.1.0",
             "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/runs?top=200"
         }, requests);
+    }
+
+    [TestMethod]
+    public async Task FlowClientListsDesignerFlowsInTheExplicitFlowContext()
+    {
+        var scope = ResourceScopeRef.Instance;
+        string? context = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            context = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FlowPageResponse([], null))
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new FlowApiClient(httpClient).GetFlowsAsync(scope, default);
+
+        Assert.AreEqual(scope.Value, context);
     }
 
     [TestMethod]
@@ -346,6 +396,62 @@ public sealed partial class ApiClientTests
         await Assert.ThrowsExactlyAsync<AgentstrationApiException>(() =>
             new FlowApiClient(repeatedHttpClient).GetFlowRunsAsync((string?)null, default));
         Assert.AreEqual(1, repeatedRequests);
+    }
+
+    [TestMethod]
+    public async Task FlowClientKeepsNavigationContextWhenListingRunsInAnExplicitExecutionScope()
+    {
+        var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        string? requested = null;
+        string? contextHeader = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri!.PathAndQuery;
+            contextHeader = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FlowRunPageResponse([], null))
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
+        _ = await new FlowApiClient(httpClient).GetFlowRunsAsync(
+            null, ResourceScopeRef.Workspace(workspaceId), default);
+
+        Assert.AreEqual(
+            $"/api/flowRuns?top=200&scopeRef=%2Fworkspaces%2F{workspaceId:D}",
+            requested);
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, contextHeader);
+    }
+
+    [TestMethod]
+    public async Task FlowClientUsesTheOperationalWorkspaceAsDataScopeForDefinitionRuns()
+    {
+        var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        string? requested = null;
+        string? contextHeader = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri!.PathAndQuery;
+            contextHeader = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FlowRunPageResponse([], null))
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
+        _ = await new FlowApiClient(httpClient).GetFlowRunsAsync(
+            ResourceNamespace.Default,
+            "instance-flow",
+            ResourceScopeRef.Instance,
+            ResourceScopeRef.Workspace(workspaceId),
+            default);
+
+        Assert.AreEqual($"/api/flows/instance-flow/runs?top=200&scopeRef=%2Fworkspaces%2F{workspaceId:D}", requested);
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, contextHeader);
     }
 
     [TestMethod]

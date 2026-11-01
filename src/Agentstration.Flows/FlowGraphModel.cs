@@ -8,7 +8,15 @@ namespace Agentstration.Flows;
 using Agentstration.Resources;
 using Agentstration.Schemas.Contracts;
 
-public sealed record FlowResourceReference(string ResourceId, string VersionStrategy = "UseDeploymentVersion", long? Version = null, ResourceNamespace? Namespace = null);
+public sealed record FlowResourceReference(
+    string ResourceId,
+    string VersionStrategy = "UseDeploymentVersion",
+    long? Version = null,
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null,
+    Guid? ResourceUid = null,
+    Guid? RevisionUid = null,
+    string? DefinitionHash = null);
 public sealed record FlowNodePosition(double X, double Y);
 public sealed record FlowViewportMetadata(double X, double Y, double Zoom = 1);
 public sealed record FlowDesignerMetadata
@@ -150,7 +158,8 @@ public sealed record FlowCallReference(
     string ResourceId,
     FlowCallVersionStrategy VersionStrategy = FlowCallVersionStrategy.Active,
     string? Version = null,
-    ResourceNamespace? Namespace = null)
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public FlowId Resolve(ResourceNamespace ownerNamespace) => new(ResourceId, Namespace ?? ownerNamespace);
 }
@@ -172,7 +181,8 @@ public sealed record RepeatFlowStepDefinition : FlowStepDefinition
 
 public sealed record FlowToolReference(
     string ResourceId,
-    ResourceNamespace? Namespace = null)
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
 }
@@ -186,7 +196,8 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
 public sealed record FlowToolSetReference(
     string ResourceId,
     string Version,
-    ResourceNamespace? Namespace = null)
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
 }
@@ -253,6 +264,7 @@ public sealed record FlowGraphDefinition
 public sealed record FlowDraft
 {
     public required Agentstration.Resources.WorkspaceId WorkspaceId { get; init; }
+    public Agentstration.Resources.ResourceScopeRef? ScopeRef { get; init; }
     public required string Id { get; init; }
     public required FlowId FlowId { get; init; }
     public required string DisplayName { get; init; }
@@ -386,6 +398,12 @@ public static class FlowGraphDefinitionExtensions
 public static class FlowDefinitionHash
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    public static string Compute(FlowDefinition definition)
+    {
+        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(definition, JsonOptions));
+        return Convert.ToHexStringLower(SHA256.HashData(bytes));
+    }
+
     public static string Compute(FlowGraphDefinition definition)
     {
         var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(definition, JsonOptions));

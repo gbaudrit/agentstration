@@ -23,8 +23,8 @@ export const exerciseResourceNaming: Journey<ExerciseResourceNamingInput> = asyn
   });
   await context.pages.agentEditor.configureBehavior({
     instructions: 'Welcome the user and answer concisely.',
-    modelProfile: ['default:missing-profile', 'default:reasoning-default'],
-    runtimeProfile: 'default:maf-builtin',
+    modelProfile: ['/instance|default|missing-profile', '/instance|default|reasoning-default'],
+    runtimeProfile: '/instance|default|maf-builtin',
   });
   await context.pages.agentEditor.createAndDeploy('manual-welcome-agent');
 

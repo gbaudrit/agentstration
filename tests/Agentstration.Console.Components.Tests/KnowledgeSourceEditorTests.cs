@@ -80,6 +80,25 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
+    public void CreationSelectsAnAcquisitionTargetForTheBinding()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new KnowledgeClientStub();
+        using var context = CreateContext(client, new DataSourcesClientStub(withTarget: true));
+        var rendered = context.Render<KnowledgeSourceEditor>();
+
+        rendered.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        rendered.WaitForElement("[data-testid='knowledge-source-binding-acquisition-target']")
+            .Change("documents");
+        rendered.Find("[data-testid='knowledge-source-display-name']").Change("Targeted documentation");
+        rendered.Find("button[type='submit']").Click();
+
+        rendered.WaitForAssertion(() =>
+            Assert.AreEqual("documents", client.CreatedRequest?.Properties.DataSources.Single().AcquisitionTarget?.Name));
+    }
+
+    [TestMethod]
     public void CreationRejectsATransformationConfigurationThatIsNotAJsonObject()
     {
         using var culture = new TestCultureScope("en-US");
@@ -115,7 +134,7 @@ public sealed class KnowledgeSourceEditorTests
         rendered.FindAll("[data-testid='knowledge-source-data-source-bindings'] select")[0]
             .Change($"{DataSourceScope.Value}|default|documentation");
         rendered.FindAll("[data-testid='knowledge-source-data-source-bindings'] select")[1]
-            .Change("default|artifact-transform-builtin|1.0.0");
+            .Change($"{FlowClientStub.WorkspaceScope.Value}|default|artifact-transform-builtin|1.0.0");
         rendered.WaitForElement("[data-schema-path='$.format'] input").Input("markdown");
         rendered.Find("button[type='submit']").Click();
 
@@ -208,9 +227,9 @@ public sealed class KnowledgeSourceEditorTests
         rendered.WaitForAssertion(() =>
         {
             var tabs = rendered.FindAll("[role='tab']");
-            Assert.HasCount(7, tabs);
+            Assert.HasCount(8, tabs);
             CollectionAssert.AreEqual(
-                new[] { "Overview", "Definition", "Projections", "Snapshots", "Retrieval", "Tools", "YAML" },
+                new[] { "Overview", "Definition", "Projections", "Snapshots", "Retrieval", "Tools", "Access", "YAML" },
                 tabs.Select(tab => tab.TextContent).ToArray());
             Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-source-overview-tab']").GetAttribute("aria-selected"));
             Assert.HasCount(1, rendered.FindAll(".metric-grid"));
@@ -369,7 +388,7 @@ public sealed class KnowledgeSourceEditorTests
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
 
-        rendered.WaitForAssertion(() => Assert.HasCount(7, rendered.FindAll("[role='tab']")));
+        rendered.WaitForAssertion(() => Assert.HasCount(8, rendered.FindAll("[role='tab']")));
         rendered.Find("[data-testid='knowledge-source-definition-tab']").Click();
         rendered.WaitForAssertion(() =>
         {
@@ -450,12 +469,12 @@ public sealed class KnowledgeSourceEditorTests
         });
     }
 
-    private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge)
+    private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null)
     {
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(knowledge);
-        context.Services.AddSingleton<IDataSourcesClient>(new DataSourcesClientStub());
+        context.Services.AddSingleton(dataSourcesClient ?? new DataSourcesClientStub());
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
         return context;
     }
@@ -664,11 +683,14 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class FlowClientStub : IFlowApiClient
     {
+        internal static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
+            Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+
         public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowSummary>>(
         [
-            new("knowledge-projection-builtin", "Knowledge projection", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0" },
-            new("knowledge-retrieval-builtin", "Knowledge retrieval", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0" },
-            new("artifact-transform-builtin", "Artifact transform", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0" }
+            new("knowledge-projection-builtin", "Knowledge projection", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },
+            new("knowledge-retrieval-builtin", "Knowledge retrieval", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },
+            new("artifact-transform-builtin", "Artifact transform", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope }
         ]);
         public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken)
         {
@@ -676,7 +698,8 @@ public sealed class KnowledgeSourceEditorTests
             return Task.FromResult(new FlowResponse(flowId, flowId, null, "1.0.0", true, "1.0.0",
                 new WorkflowFlowDefinition("input", [], [], []),
                 new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract },
-                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
+                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+            { ScopeRef = WorkspaceScope });
         }
         public Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -721,7 +744,7 @@ public sealed class KnowledgeSourceEditorTests
         public Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class DataSourcesClientStub : IDataSourcesClient
+    private sealed class DataSourcesClientStub(bool withTarget = false) : IDataSourcesClient
     {
         private static readonly DataSourceResource Source = new()
         {
@@ -744,6 +767,26 @@ public sealed class KnowledgeSourceEditorTests
         public Task<DataSourceReadiness> GetReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, StartDataSourceAcquisitionRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns,
+            string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>(withTarget
+                ? [new(new DataSourceAcquisitionTargetResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,
+                    Metadata = new() { Name = "documents" }, ScopeRef = DataSourceScope, DisplayName = "Documents",
+                    DataSourceScopeRef = DataSourceScope, DataSourceUid = Source.Uid, DataSourceName = Source.Name,
+                    DataSourceNamespace = Source.Namespace, DataSourceGeneration = Source.Generation,
+                    DiscoveryId = "discovery-1", DiscoveryUid = Guid.NewGuid(), ChoiceId = "documents",
+                    ChoiceDisplayName = "Documents", Profile = new ResolvedDataSourceProfile
+                    {
+                        Name = "web-builtin", Namespace = ResourceNamespace.Default, ScopeRef = DataSourceScope,
+                        Uid = Guid.NewGuid(), Generation = 1, Version = "1.0.0", DefinitionHash = "hash",
+                        DependencyHash = "dependencies",
+                        Definition = new DataSourceProfileProperties { DisplayName = "Web", AcquisitionFlow = new() { Name = "acquire" } },
+                        AcquisitionFlow = new("acquire", ResourceNamespace.Default, "1.0.0", false,
+                            null, null, DataSourceFlowContracts.Acquisition, "sha256:acquire") { ScopeRef = DataSourceScope }
+                    }, PromotedAt = DateTimeOffset.UtcNow, PromotedBy = Guid.Empty
+                }, false, [])] : []);
     }
 
 }

@@ -73,7 +73,15 @@ else
     private static string? SoftwareBuild(string? version) => version?.Split('+', 2) is [_, var build] ? build : null;
     private static UiStatus PresenceStatus(RuntimeWorkerPresenceState presence) => PlatformDashboardService.ToStatus(presence.ToString());
     private static string TabId(WorkerTab tab) => $"worker-{tab.ToString().ToLowerInvariant()}-tab";
-    private static string RunUrl(RuntimeAssignmentPlacementResponse item) => item.TargetKind == nameof(RuntimeAssignmentTargetKind.FlowRun) ? $"/flow-runs/{Uri.EscapeDataString(item.RunId)}" : $"/runs/{Uri.EscapeDataString(item.RunId)}";
+    private static string RunUrl(RuntimeAssignmentPlacementResponse item)
+    {
+        var path = item.TargetKind == nameof(RuntimeAssignmentTargetKind.FlowRun)
+            ? $"/flow-runs/{Uri.EscapeDataString(item.RunId)}"
+            : $"/runs/{Uri.EscapeDataString(item.RunId)}";
+        return item.ExecutionScopeRef is { } scopeRef
+            ? $"{path}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}"
+            : path;
+    }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
     private enum WorkerTab { Overview, Assignments }
 }

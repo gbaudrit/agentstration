@@ -19,7 +19,9 @@ public sealed class PlatformDashboardService(
     IFlowApiClient flow,
     IModelProvidersClient modelProviders,
     IExtensionsClient extensions,
-    ILogger<PlatformDashboardService> logger) : IPlatformStatusProvider, IDisposable
+    ILogger<PlatformDashboardService> logger,
+    IConsoleContextProvider? contextProvider = null,
+    ConsoleContextState? contextState = null) : IPlatformStatusProvider, IDisposable
 {
     private readonly CancellationTokenSource lifetime = new();
     private readonly object loadLock = new();
@@ -37,12 +39,17 @@ public sealed class PlatformDashboardService(
 
     public PlatformDashboardLoad Start(CancellationToken cancellationToken)
     {
+        var contextTask = contextState is not null
+            ? LoadContextAsync(contextState, cancellationToken)
+            : contextProvider is null
+                ? Task.FromResult<ConsoleContextSnapshot?>(null)
+                : LoadContextAsync(contextProvider, cancellationToken);
         var agentsTask = LoadAsync("Agents", management.GetAgentsAsync, Array.Empty<AgentSummary>(), cancellationToken);
-        var instancesTask = LoadAsync("Agent instances", runtime.GetAgentInstancesAsync, Array.Empty<AgentInstanceResponse>(), cancellationToken);
-        var runtimeRunsTask = LoadAsync("Agents Run", token => runtime.GetRunsAsync(null, token), Array.Empty<RuntimeRun>(), cancellationToken);
-        var workTask = LoadAsync("Work Tasks", token => work.GetTaskSummaryAsync(null, token), new WorkTaskOperationsCountersResponse(0, 0, 0, 0, 0), cancellationToken);
+        var instancesTask = LoadAsync("Agent instances", token => GetAgentInstancesAsync(contextTask, token), Array.Empty<AgentInstanceResponse>(), cancellationToken);
+        var runtimeRunsTask = LoadAsync("Agents Run", token => GetRuntimeRunsAsync(contextTask, token), Array.Empty<RuntimeRun>(), cancellationToken);
+        var workTask = LoadAsync("Work Tasks", token => GetWorkSummaryAsync(contextTask, token), new WorkTaskOperationsCountersResponse(0, 0, 0, 0, 0), cancellationToken);
         var flowsTask = LoadAsync("Flows", flow.GetFlowsAsync, Array.Empty<FlowSummary>(), cancellationToken);
-        var flowRunsTask = LoadAsync("Flow Runs", token => flow.GetFlowRunsAsync(null, token), Array.Empty<FlowRun>(), cancellationToken);
+        var flowRunsTask = LoadAsync("Flow Runs", token => GetFlowRunsAsync(contextTask, token), Array.Empty<FlowRun>(), cancellationToken);
         var triggersTask = LoadAsync("Triggers", management.GetTriggersAsync, Array.Empty<TriggerResource>(), cancellationToken);
         var providersTask = LoadAsync("Model providers", modelProviders.GetModelProvidersAsync, Array.Empty<ModelProviderResponse>(), cancellationToken);
         var extensionsTask = LoadAsync("Extensions", extensions.GetExtensionsAsync, Array.Empty<ExtensionResponse>(), cancellationToken);
@@ -85,6 +92,59 @@ public sealed class PlatformDashboardService(
             }),
             snapshotTask);
     }
+
+    private async Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(
+        Task<ConsoleContextSnapshot?> contextTask,
+        CancellationToken cancellationToken)
+    {
+        var context = await contextTask;
+        return context is null
+            ? await runtime.GetAgentInstancesAsync(cancellationToken)
+            : await runtime.GetAgentInstancesAsync(OperationalScope(context), cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<RuntimeRun>> GetRuntimeRunsAsync(
+        Task<ConsoleContextSnapshot?> contextTask,
+        CancellationToken cancellationToken)
+    {
+        var context = await contextTask;
+        return context is null
+            ? await runtime.GetRunsAsync(null, cancellationToken)
+            : await runtime.GetRunsAsync(null, OperationalScope(context), cancellationToken);
+    }
+
+    private async Task<WorkTaskOperationsCountersResponse> GetWorkSummaryAsync(
+        Task<ConsoleContextSnapshot?> contextTask,
+        CancellationToken cancellationToken)
+    {
+        var context = await contextTask;
+        return await work.GetTaskSummaryAsync(context?.WorkspaceId.ToString("D"), cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(
+        Task<ConsoleContextSnapshot?> contextTask,
+        CancellationToken cancellationToken)
+    {
+        var context = await contextTask;
+        return context is null
+            ? await flow.GetFlowRunsAsync(null, cancellationToken)
+            : await flow.GetFlowRunsAsync(null, OperationalScope(context), cancellationToken);
+    }
+
+    private static async Task<ConsoleContextSnapshot?> LoadContextAsync(
+        IConsoleContextProvider provider,
+        CancellationToken cancellationToken) => await provider.GetAsync(cancellationToken);
+
+    private static async Task<ConsoleContextSnapshot?> LoadContextAsync(
+        ConsoleContextState state,
+        CancellationToken cancellationToken)
+    {
+        await state.EnsureLoadedAsync(cancellationToken);
+        return state.Current;
+    }
+
+    private static ResourceScopeRef OperationalScope(ConsoleContextSnapshot context) =>
+        ResourceScopeRef.Workspace(context.WorkspaceId);
 
     public Task<PlatformSnapshot> GetAsync(CancellationToken cancellationToken) =>
         StartShared().Snapshot.WaitAsync(cancellationToken);

@@ -191,6 +191,8 @@ internal static class DataSourceProfileEndpoints
         catch (ResourceScopeAccessDeniedException exception) { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }
         catch (DataSourceValidationException exception)
         { return Problem(exception.Code, "Invalid Data Source Profile", exception.Code.EndsWith("_in_use", StringComparison.Ordinal) ? 409 : 422, exception.Message); }
+        catch (DataSourceAcquisitionException exception)
+        { return Problem(exception.Code, "Invalid Data Source Profile dependency", 422, exception.Message); }
         catch (Exception exception) when (exception is ResourceScopePolicyException or ResourceReferenceAmbiguousException
             or ResourceReferenceOutsideScopeException or ArgumentException or FormatException)
         { return Problem("data-source-profile-invalid", "Invalid Data Source Profile", 422, exception.Message); }

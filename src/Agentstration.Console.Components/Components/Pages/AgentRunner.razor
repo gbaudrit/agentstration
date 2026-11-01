@@ -4,6 +4,7 @@
 @inject IAgentRunnerManagementClient ManagementClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
 @inject IAgentsModelClient ModelsClient
+@inject ConsoleContextState ContextState
 @inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerInspectorStrings> InspectorLocalizer
@@ -43,6 +44,10 @@ else
         <div><span>@T("Deployment")</span><strong><StatusBadge Text="@(readiness?.State ?? T("Unknown"))" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /></strong></div>
         <div><span>@T("RuntimeProfile")</span><strong>@(readiness?.RuntimeProfileId is null ? T("NotResolved") : ResourceName(readiness.RuntimeProfileId))</strong></div>
         <div><span>@T("ExecutionMode")</span><strong>@T("Interactive")</strong></div>
+        <div data-testid="agent-definition-scope">
+            <span>@T("DefinitionScope")</span>
+            <strong><ResourceScopeBadge ScopeRef="@AgentDefinitionScope" /></strong>
+        </div>
     </section>
 
     @if (readiness is { Ready: false })
@@ -80,7 +85,7 @@ else
 
     @if (state.Run is not null)
     {
-        <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.RuntimeRun" RunId="@state.Run.Id" />
+        <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.RuntimeRun" RunId="@state.Run.Id" ScopeRef="@state.Run.ExecutionScopeRef" />
         <section class="panel runner-inspector" data-testid="agent-run-details" data-run-id="@state.Run.Id" data-run-state="@state.State">
             <div class="runner-tabs" role="tablist">
                 @foreach (var tab in Tabs)
@@ -97,6 +102,7 @@ else
                 {
                     <dl class="runner-details">
                         <dt>@I("RunId")</dt><dd><code>@state.Run.Id</code></dd>
+                        <dt>@I("DefinitionScope")</dt><dd data-testid="agent-run-definition-scope"><ResourceScopeBadge ScopeRef="@AgentDefinitionScope" /></dd>
                         <dt>@I("Status")</dt><dd><StatusBadge Text="@I($"RunState.{state.State}")" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
                         <dt>@I("Duration")</dt><dd>@Duration(state.Run)</dd>
                         <dt>@I("AgentVersion")</dt><dd>@state.Run.Properties.Agent.Version</dd>
@@ -147,7 +153,7 @@ else
         {
             <DataGrid TItem="RuntimeRun" Items="history">
                 <Header><tr><th>@I("Run")</th><th>@I("Date")</th><th>@I("Status")</th><th>@I("Duration")</th><th>@I("Initiator")</th><th>@I("Version")</th><th>@I("Prompt")</th><th>@I("Origin")</th></tr></Header>
-                <Row Context="run"><tr><td><a href="/runs/@run.Id"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@I($"RunState.{run.Status.State}")" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
+                <Row Context="run"><tr><td><a href="/runs/@run.Id?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@I($"RunState.{run.Status.State}")" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
             </DataGrid>
         }
     </section>
@@ -157,6 +163,7 @@ else
 @code {
     [Parameter] public string? Name { get; set; }
     [Parameter] public string? RunId { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
 
     private static readonly string[] Tabs = ["Response", "Execution", "Messages", "Tools", "Trace", "Raw"];
     private string T(string key) => Localizer[key];
@@ -180,9 +187,12 @@ else
     private bool preparing;
     private bool interactive;
     private bool IsBusy => state.Run is not null && !state.State.IsTerminal();
-    private bool CanRun => readiness is { Ready: true }
-        && modelResolution?.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
+    private bool CanRun => modelResolution is not null
+        && modelResolution.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
     private bool CanCancel => state.Run is not null && state.State is RuntimeRunState.Pending or RuntimeRunState.Running;
+    private ResourceScopeRef SelectedExecutionScope => state.Run?.ExecutionScopeRef
+        ?? ResourceScopeRef.Workspace(ContextState.Current?.WorkspaceId ?? Guid.Empty);
+    private ResourceScopeRef AgentDefinitionScope => state.Run?.Properties.Agent.ScopeRef ?? agent?.ScopeRef ?? ResourceScopeRef.Instance;
     private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.Name)}";
     private string RawResponse => JsonSerializer.Serialize(new { run = state.Run, events = state.Events }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
 
@@ -196,9 +206,12 @@ else
         {
             if (!string.IsNullOrWhiteSpace(RunId))
             {
-                var run = await RuntimeClient.GetRunAsync(RunId, cancellation.Token);
+                var run = string.IsNullOrWhiteSpace(ScopeRef)
+                    ? await RuntimeClient.GetRunAsync(RunId, cancellation.Token)
+                    : await RuntimeClient.GetRunAsync(RunId, ResourceScopeRef.Parse(ScopeRef), cancellation.Token);
                 state.Reset(run);
-                agent = (await ManagementClient.GetAgentAsync(run.Properties.Agent.ResourceId, cancellation.Token)).Value;
+                agent = (await ManagementClient.GetAgentAsync(run.Properties.Agent.Namespace, run.Properties.Agent.ResourceId,
+                    run.Properties.Agent.ScopeRef ?? run.ExecutionScopeRef, cancellation.Token)).Value;
                 await LoadExecutionContextAsync(run.Properties.Agent.Version);
                 rawRequest = JsonSerializer.Serialize(ToRequest(run), new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
                 await LoadHistoryAsync();
@@ -207,7 +220,9 @@ else
             }
             else
             {
-                agent = (await ManagementClient.GetAgentAsync(Name!, cancellation.Token)).Value;
+                agent = string.IsNullOrWhiteSpace(ScopeRef)
+                    ? (await ManagementClient.GetAgentAsync(Name!, cancellation.Token)).Value
+                    : (await ManagementClient.GetAgentAsync(ResourceNamespace.Default, Name!, ResourceScopeRef.Parse(ScopeRef), cancellation.Token)).Value;
                 await LoadExecutionContextAsync();
                 await LoadHistoryAsync();
             }
@@ -239,7 +254,7 @@ else
     private async Task CancelAsync()
     {
         if (state.Run is null) return;
-        try { state.Refresh(await RuntimeClient.CancelRunAsync(state.Run.Id, cancellation.Token)); }
+        try { state.Refresh(await RuntimeClient.CancelRunAsync(state.Run.Id, state.Run.ExecutionScopeRef, cancellation.Token)); }
         catch (AgentstrationApiException exception) { errorMessage = exception.Message; }
     }
 
@@ -248,7 +263,7 @@ else
         if (state.Run is null) return;
         try
         {
-            var run = await RuntimeClient.RetryRunAsync(state.Run.Id, cancellation.Token);
+            var run = await RuntimeClient.RetryRunAsync(state.Run.Id, state.Run.ExecutionScopeRef, cancellation.Token);
             state.Reset(run);
             history = [run, .. history.Where(item => item.Id != run.Id)];
             StartObservation(run.Id);
@@ -266,7 +281,7 @@ else
 
     private async Task RestoreEventHistoryAsync(string runId)
     {
-        await foreach (var runEvent in RuntimeClient.ObserveRunAsync(runId, 0, cancellation.Token))
+        await foreach (var runEvent in RuntimeClient.ObserveRunAsync(runId, SelectedExecutionScope, 0, cancellation.Token))
             state.Restore(runEvent);
     }
 
@@ -277,12 +292,12 @@ else
         {
             try
             {
-                await foreach (var runEvent in RuntimeClient.ObserveRunAsync(runId, state.LastSequence, token))
+                await foreach (var runEvent in RuntimeClient.ObserveRunAsync(runId, SelectedExecutionScope, state.LastSequence, token))
                 {
                     state.Apply(runEvent);
                     await InvokeAsync(StateHasChanged);
                 }
-                var refreshed = await RuntimeClient.GetRunAsync(runId, token);
+                var refreshed = await RuntimeClient.GetRunAsync(runId, SelectedExecutionScope, token);
                 state.Refresh(refreshed);
                 history = [refreshed, .. history.Where(item => item.Id != refreshed.Id)];
                 if (state.State.IsTerminal()) break;
@@ -301,7 +316,10 @@ else
 
     private async Task LoadHistoryAsync()
     {
-        if (agent is not null) history = await RuntimeClient.GetRunsAsync(agent.Metadata.Name, cancellation.Token);
+        if (agent is null) return;
+        history = state.Run is null
+            ? await RuntimeClient.GetRunsAsync(agent.Metadata.Name, cancellation.Token)
+            : await RuntimeClient.GetRunsAsync(agent.Metadata.Name, state.Run.ExecutionScopeRef, cancellation.Token);
     }
 
     private Task LoadExecutionContextAsync() => LoadExecutionContextAsync(agent?.Generation);
@@ -317,7 +335,7 @@ else
                 modelWarning = string.Join(" ", modelResolution.Warnings.DefaultIfEmpty($"Model resolution state is {ModelManagementUi.Label(modelResolution.Status)}."));
         }
         catch (AgentstrationApiException exception) { modelWarning = $"Model resolution is unavailable: {exception.Message}"; }
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.Name, generation.Value, cancellation.Token); }
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.Namespace, agent.Name, AgentDefinitionScope, generation.Value, cancellation.Token); }
         catch (AgentstrationApiException exception) { readiness = null; modelWarning = $"Runtime readiness is unavailable: {exception.Message}"; }
     }
 
@@ -328,7 +346,7 @@ else
         errorMessage = null;
         try
         {
-            var activation = await RuntimeClient.PrepareAgentAsync(agent.Name, agent.Generation, cancellation.Token);
+            var activation = await RuntimeClient.PrepareAgentAsync(agent.Namespace, agent.Name, AgentDefinitionScope, agent.Generation, cancellation.Token);
             await LoadExecutionContextAsync();
             if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 errorMessage = $"Generation {agent.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
@@ -339,11 +357,12 @@ else
 
     private ValueTask CopyAsync(string value) => JavaScript.InvokeVoidAsync("navigator.clipboard.writeText", value);
     private static string ResourceName(string id) => id;
+    private string ScopeLabel(ResourceScopeRef scopeRef) => $"{T($"Scope.{scopeRef.Kind}")} · {scopeRef.Value}";
     private static string ShortId(string id) => id.Length > 13 ? id[..13] : id;
     private static string PromptPreview(RuntimeRun run) { var value = run.Properties.Input.Messages.LastOrDefault(message => message.Role == RuntimeMessageRole.User)?.Content ?? "—"; return value.Length > 60 ? $"{value[..60]}…" : value; }
     private string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? I("Live") : (end.Value - start).ToString("g"); }
     private string ToolArgumentRetentionLabel(bool? value) => value switch { true => T("ToolArguments.Retain"), false => T("ToolArguments.DoNotRetain"), null => T("ToolArguments.Inherit") };
-    private static string GovernanceUrl(string runId, RuntimeToolCall tool) => $"/tool-governance/runtime/{Uri.EscapeDataString(runId)}?toolCallId={Uri.EscapeDataString(tool.Id)}&invocationId={Uri.EscapeDataString(tool.InvocationId)}";
+    private string GovernanceUrl(string runId, RuntimeToolCall tool) => $"/tool-governance/runtime/{Uri.EscapeDataString(runId)}?scopeRef={Uri.EscapeDataString(SelectedExecutionScope.Value)}&toolCallId={Uri.EscapeDataString(tool.Id)}&invocationId={Uri.EscapeDataString(tool.InvocationId)}";
     private static CreateRuntimeRunRequest ToRequest(RuntimeRun run) => new() { Agent = run.Properties.Agent, Input = run.Properties.Input, Execution = run.Properties.Execution, Origin = run.Properties.Origin };
 
     public void Dispose()

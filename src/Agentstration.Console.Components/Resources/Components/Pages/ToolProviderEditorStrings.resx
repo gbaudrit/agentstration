@@ -25,7 +25,7 @@
   <data name="Status"><value>Status</value></data>
   <data name="LastDiscovery"><value>Last discovery</value></data>
   <data name="Never"><value>Never</value></data>
-  <data name="AepExtensionId"><value>AEP extension ID</value></data>
+  <data name="AepExtensionId"><value>Extension Registration name</value></data>
   <data name="Transport"><value>Transport</value></data>
   <data name="Command"><value>Command</value></data>
   <data name="Arguments"><value>Arguments (one per line)</value></data>

@@ -6,6 +6,7 @@
   <data name="Flows" xml:space="preserve"><value>Flows</value></data>
   <data name="Flow" xml:space="preserve"><value>Flow</value></data>
   <data name="Scope" xml:space="preserve"><value>Périmètre</value></data>
+  <data name="InheritedReadOnly" xml:space="preserve"><value>Hérité · lecture seule</value></data>
   <data name="Description" xml:space="preserve"><value>Définissez des orchestrations et inspectez chaque exécution depuis un espace opérationnel unique.</value></data>
   <data name="NewFlow" xml:space="preserve"><value>Nouveau Flow</value></data>
   <data name="ViewAllRuns" xml:space="preserve"><value>Voir toutes les exécutions</value></data>

@@ -27,7 +27,12 @@ else
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync() { loading = true; error = null; try { tools = await Client.GetToolsAsync(); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
     private static string ResourceName(string? id) => id ?? "—";
-    private static string ToolUrl(ToolResource tool) => tool.Namespace.IsDefault
-        ? $"/tools/{Uri.EscapeDataString(tool.Name)}"
-        : $"/tools/{Uri.EscapeDataString(tool.Name)}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}";
+    private static string ToolUrl(ToolResource tool)
+    {
+        var query = new List<string>();
+        if (!tool.Namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(tool.Namespace.Value)}");
+        if (tool.ScopeRef is { } scopeRef) query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value)}");
+        var path = $"/tools/{Uri.EscapeDataString(tool.Name)}";
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
+    }
 }

@@ -2,7 +2,10 @@ using System.Text.Json.Serialization;
 
 namespace Agentstration.Awp.Abstractions;
 
-public sealed record AwpWorkspaceScope(Guid TenantId, string WorkspaceId);
+public sealed record AwpWorkspaceScope(Guid TenantId, string WorkspaceId)
+{
+    public string? ScopeRef { get; init; }
+}
 
 public sealed record AwpRuntimeRequirement(
     string RuntimeKind,

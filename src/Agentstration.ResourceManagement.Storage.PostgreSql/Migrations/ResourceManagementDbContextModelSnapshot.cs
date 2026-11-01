@@ -75,6 +75,54 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
                     b.ToTable("ControlPlaneResources", "management");
                 });
 
+            modelBuilder.Entity("Agentstration.ResourceManagement.Storage.PostgreSql.ResourceAccessPolicyRow", b =>
+                {
+                    b.Property<Guid>("ResourceUid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ETag")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long?>("Generation")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("GrantsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Namespace")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("OwnerScopeRef")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("ResourceUid");
+
+                    b.HasIndex("OwnerScopeRef");
+
+                    b.ToTable("ResourceAccessPolicies", "management");
+                });
+
             modelBuilder.Entity("Agentstration.ResourceManagement.Storage.PostgreSql.ExternalIdentityRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -439,6 +487,9 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -450,6 +501,10 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique();
+
+                    b.HasIndex("Kind")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 1");
 
                     b.ToTable("Tenants", "management");
                 });
@@ -557,6 +612,9 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -571,6 +629,14 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
 
                     b.HasIndex("TenantId", "Name")
                         .IsUnique();
+
+                    b.HasIndex("Kind")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 1");
+
+                    b.HasIndex("TenantId", "Kind")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 2");
 
                     b.ToTable("Workspaces", "management");
                 });

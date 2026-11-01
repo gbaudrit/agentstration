@@ -15,7 +15,9 @@ internal static class SecretEndpoints
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         var vaults = endpoints.MapGroup("/api/vaults");
-        vaults.MapGet("/", async (SecretManagementService service, CancellationToken token) => Results.Ok((await service.ListVaultViewsAsync(token)).Select(Response))).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        vaults.MapGet("/", async (string? consumerScopeRef, SecretManagementService service, CancellationToken token) => Results.Ok((consumerScopeRef is null
+            ? await service.ListVaultViewsAsync(token)
+            : await service.ListVaultViewsAsync(ResourceScopeRef.Parse(consumerScopeRef), token)).Select(Response))).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         vaults.MapGet("/{name}", async (string name, string? scopeRef, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () =>
         {
             var scope = Scope(scopeRef);
@@ -34,7 +36,9 @@ internal static class SecretEndpoints
         vaults.MapDelete("/{name}", async (string name, string? scopeRef, HttpRequest request, SecretManagementService service, CancellationToken token) => await Execute(async () => { if (Scope(scopeRef) is { } scope) await service.DeleteVaultExactAsync(scope, name, request.Headers.IfMatch.FirstOrDefault(), token); else await service.DeleteVaultAsync(name, request.Headers.IfMatch.FirstOrDefault(), token); return Results.NoContent(); })).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
 
         var secrets = endpoints.MapGroup("/api/secrets");
-        secrets.MapGet("/", async (SecretManagementService service, CancellationToken token) => Results.Ok((await service.ListSecretsAsync(token)).Select(Response))).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        secrets.MapGet("/", async (string? consumerScopeRef, SecretManagementService service, CancellationToken token) => Results.Ok((consumerScopeRef is null
+            ? await service.ListSecretsAsync(token)
+            : await service.ListSecretsAsync(ResourceScopeRef.Parse(consumerScopeRef), token)).Select(Response))).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         secrets.MapGet("/{name}", async (string name, string? scopeRef, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () => { var view = Scope(scopeRef) is { } scope ? await service.GetSecretViewExactAsync(scope, name, token) : await service.GetSecretViewAsync(name, token); response.Headers.ETag = view.Resource.ETag; return Results.Ok(Response(view)); })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         secrets.MapGet("/{name}/usages", async (string name, string? scopeRef, SecretManagementService service, CancellationToken token) => await Execute(async () =>
         {

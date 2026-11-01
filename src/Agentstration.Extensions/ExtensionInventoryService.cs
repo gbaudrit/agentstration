@@ -45,7 +45,7 @@ public sealed class ExtensionInventoryService(
         RequestContext context,
         CancellationToken cancellationToken)
     {
-        using var scopeContext = RequestScopes().Push(context);
+        using var scopeContext = PushRequestScope(context);
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.ResourcesRead, cancellationToken);
         var isPlatformAdministrator = await platformAuthorization.IsPlatformAdministratorAsync(
             context.PrincipalId,
@@ -198,4 +198,15 @@ public sealed class ExtensionInventoryService(
 
     private IRequestContextScopeFactory RequestScopes() => requestContext as IRequestContextScopeFactory
         ?? throw new InvalidOperationException("Extension inventory requires a mutable Control Plane request context.");
+
+    private IDisposable PushRequestScope(RequestContext context) => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.Instance => RequestScopes().PushInstance(context),
+        ControlPlaneAccessMode.Tenant => RequestScopes().PushTenant(
+            context.PrincipalId,
+            context.TenantId,
+            context.Restriction),
+        ControlPlaneAccessMode.TenantAdministration => RequestScopes().PushTenantAdministration(context),
+        _ => RequestScopes().Push(context)
+    };
 }

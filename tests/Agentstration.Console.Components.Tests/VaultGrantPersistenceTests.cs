@@ -14,6 +14,21 @@ namespace Agentstration.Web.Tests;
 public sealed class VaultGrantPersistenceTests
 {
     [TestMethod]
+    public void NewSecretLoadsVaultsForItsSelectedConsumerScope()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var client = new StubSecretsClient(tenant, workspace);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISecretsClient>(client);
+
+        _ = context.Render<SecretEditor>();
+
+        Assert.AreEqual(workspace, client.LastVaultConsumerScope);
+    }
+
+    [TestMethod]
     public void GrantIsSentBySaveAndShownWhenEditorIsReopened()
     {
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
@@ -85,6 +100,7 @@ public sealed class VaultGrantPersistenceTests
 
     private sealed class StubSecretsClient(ResourceScopeRef tenant, ResourceScopeRef workspace) : ISecretsClient
     {
+        public ResourceScopeRef? LastVaultConsumerScope { get; private set; }
         public VaultResource Saved { get; private set; } = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -116,6 +132,11 @@ public sealed class VaultGrantPersistenceTests
         }
 
         public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<VaultResponse>>([new(Saved, "available")]);
+        public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(ResourceScopeRef consumerScopeRef, CancellationToken token)
+        {
+            LastVaultConsumerScope = consumerScopeRef;
+            return GetVaultsAsync(token);
+        }
         public Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<VaultResource>> CreateVaultAsync(CreateVaultRequest request, CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<VaultResource>> UpdateVaultAsync(string name, PutVaultRequest request, string etag, CancellationToken token) => throw new NotSupportedException();

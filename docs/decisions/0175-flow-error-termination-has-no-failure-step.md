@@ -26,4 +26,3 @@ An `Output` that omits `outcome` retains its historical successful behavior beca
 - Output names remain business event identities; output outcomes alone determine terminal Run status and automatic error routing.
 - The Designer, runtime, validators, manifests, and tests no longer carry an unreleased compatibility branch.
 - Local data produced by intermediate development branches containing `type: failure` is intentionally unreadable and must be reseeded.
-

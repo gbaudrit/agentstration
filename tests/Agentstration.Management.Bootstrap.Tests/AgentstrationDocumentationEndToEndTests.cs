@@ -71,7 +71,8 @@ public sealed class AgentstrationDocumentationEndToEndTests
         Assert.IsNotNull(workspace);
         var context = new RequestContext(principal.Id, tenant.Id, workspace.Id);
         using var requestScope = services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
-        _ = await services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverAsync(default);
+        using (services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+            _ = await services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverAsync(default);
 
         var target = new BootstrapApplicationTarget(tenant.Id, workspace.Id);
         var management = services.GetRequiredService<BootstrapProfileManagementService>();

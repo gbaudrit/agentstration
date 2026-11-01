@@ -10,7 +10,15 @@ public sealed record AwpExecutionToolMaterial(
     string? Description,
     JsonElement InputSchema,
     JsonElement? OutputSchema,
-    bool RequiresApproval);
+    bool RequiresApproval)
+{
+    public string? ScopeRef { get; init; }
+    public Guid? Uid { get; init; }
+    public long? Generation { get; init; }
+    public string? ProviderScopeRef { get; init; }
+    public Guid? ProviderUid { get; init; }
+    public long? ProviderGeneration { get; init; }
+}
 
 public sealed record AwpExecutionAgentMaterial(
     string MaterialId,
@@ -29,6 +37,7 @@ public sealed record AwpExecutionAgentMaterial(
     IReadOnlyList<AwpExecutionToolMaterial> Tools)
 {
     public string AgentNamespace { get; init; } = "default";
+    public string? ModelProfileScopeRef { get; init; }
     public string RuntimeProfileName { get; init; } = string.Empty;
     public string RuntimeProfileNamespace { get; init; } = "default";
 }
@@ -71,7 +80,10 @@ public sealed record AwpRootFlowExecutionMaterial(
     string? ParentFlowRunId = null,
     string? CorrelationId = null,
     int OrchestrationTimeoutMilliseconds = 0)
-    : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId);
+    : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId)
+{
+    public string? FlowScopeRef { get; init; }
+}
 
 public sealed record AwpFlowResumeMaterial(
     string RuntimeType,

@@ -40,6 +40,30 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task WorkClientKeepsNavigationContextWhenSelectingTaskSummaryWorkspace()
+    {
+        var workspaceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        string? contextHeader = null;
+        string? requested = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri!.PathAndQuery;
+            contextHeader = request.Headers.GetValues("X-Agentstration-Context").Single();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new WorkTaskOperationsCountersResponse(0, 0, 0, 0, 0))
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("X-Agentstration-Context", ResourceScopeRef.Instance.Value);
+        _ = await new WorkApiClient(httpClient).GetTaskSummaryAsync(workspaceId.ToString("D"), default);
+
+        Assert.AreEqual($"/api/tasks/summary?workspaceId={workspaceId:D}", requested);
+        Assert.AreEqual(ResourceScopeRef.Instance.Value, contextHeader);
+    }
+
+    [TestMethod]
     public async Task WorkClientRespondsToTaskScopedPendingActionWithoutInteractionToken()
     {
         var taskId = Guid.NewGuid();

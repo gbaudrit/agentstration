@@ -14,7 +14,12 @@ public readonly record struct FlowId(string Value, ResourceNamespace Namespace =
     public override string ToString() => Value;
 }
 
-public sealed record FlowReference(FlowId FlowId, string? Version = null, bool UseActiveVersion = true, ResourceNamespace? Namespace = null)
+public sealed record FlowReference(
+    FlowId FlowId,
+    string? Version = null,
+    bool UseActiveVersion = true,
+    ResourceNamespace? Namespace = null,
+    ResourceScopeRef? ScopeRef = null)
 {
     public FlowId Resolve(ResourceNamespace ownerNamespace) => new(FlowId.Value, Namespace ?? ownerNamespace);
 }

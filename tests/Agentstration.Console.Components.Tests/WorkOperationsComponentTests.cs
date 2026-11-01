@@ -124,6 +124,7 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Exécutions d’agents", agentRuns["Title"].Value);
         Assert.AreEqual("Aucune exécution d’agent", agentRuns["EmptyTitle"].Value);
         Assert.AreEqual("Données brutes", agentRunnerInspector["Tab.Raw"].Value);
+        Assert.AreEqual("Périmètre de définition", agentRunnerInspector["DefinitionScope"].Value);
         Assert.AreEqual("Exécutions récentes de l’agent", agentRunnerInspector["RecentAgentRuns"].Value);
         Assert.AreEqual("Copier la requête JSON", agentRunnerInspector["CopyRequestJson"].Value);
         Assert.AreEqual("Nouveau Flow", flows["NewFlow"].Value);
@@ -131,6 +132,7 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Exécutions de Flow", flowRuns["Title"].Value);
         Assert.AreEqual("En attente d’une saisie", flowRuns["Status.WaitingForInput"].Value);
         Assert.AreEqual("Déroulement", flowRunDetails["ExecutionTimeline"].Value);
+        Assert.AreEqual("Périmètre de définition", flowRunDetails["DefinitionScope"].Value);
         Assert.AreEqual("Synthèse", flowRunDetails["Summary"].Value);
         Assert.AreEqual("Entrée / sortie", flowRunDetails["InputOutputTab"].Value);
         Assert.AreEqual("3 événements", flowRunDetails["EventCount.Many", 3].Value);

@@ -18,6 +18,7 @@ public sealed record RuntimeProfileUsage(Guid ResourceUid, string Name, string E
 public sealed class RuntimeProfileManagementService(
     IResourceStore store,
     ResourceScopeOperationService scopeOperations,
+    IRequestContextScopeFactory requestScopes,
     IAgentDeploymentReconciler reconciler)
 {
     public static string ProfileId(string name) => name;
@@ -92,12 +93,13 @@ public sealed class RuntimeProfileManagementService(
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
         var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, name, @namespace));
-        await DeleteOrphanedDeploymentsAsync(@namespace, name, cancellationToken);
-        var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
-        if (usages.Count > 0) throw new RuntimeProfileInUseException(name, usages);
         var scopeRef = existing.Value.ScopeRef ?? throw new RuntimeProfileValidationException("The runtime profile has no ownership scope.");
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
+            using var systemScope = requestScopes.PushSystem();
+            await DeleteOrphanedDeploymentsAsync(@namespace, name, token);
+            var usages = await GetUsagesAsync(@namespace, name, token);
+            if (usages.Count > 0) throw new RuntimeProfileInUseException(name, usages);
             await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, RuntimeProfileResourceKinds.RuntimeProfile, name), ifMatch, token);
             return true;
         }, cancellationToken);

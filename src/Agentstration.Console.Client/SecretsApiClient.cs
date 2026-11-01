@@ -10,6 +10,7 @@ namespace Agentstration.Web.Console;
 public interface ISecretsClient
 {
     Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken) => GetVaultsAsync(cancellationToken);
     Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(string kind, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([]);
     Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetVaultAsync(name, cancellationToken);
@@ -21,6 +22,7 @@ public interface ISecretsClient
     Task<VaultInitializationResponse> InitializeVaultAsync(string name, CancellationToken cancellationToken);
     Task<VaultInitializationResponse> InitializeVaultAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => InitializeVaultAsync(name, cancellationToken);
     Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken) => GetSecretsAsync(cancellationToken);
     Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetSecretAsync(name, cancellationToken);
     Task<ResourceSnapshot<SecretResource>> CreateSecretAsync(CreateSecretRequest request, CancellationToken cancellationToken);
@@ -39,6 +41,7 @@ public interface ISecretsClient
 public sealed class SecretsApiClient(HttpClient httpClient) : ISecretsClient
 {
     public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(CancellationToken token) => ReadListAsync<VaultResponse>("api/vaults", token);
+    public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(ResourceScopeRef consumerScopeRef, CancellationToken token) => ReadListAsync<VaultResponse>($"api/vaults?consumerScopeRef={Uri.EscapeDataString(consumerScopeRef.Value)}", token);
     public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(string kind, CancellationToken token) => ReadListAsync<ResourceScopeTargetResponse>($"api/resource-scopes/targets?kind={Uri.EscapeDataString(kind)}", token);
     public Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, CancellationToken token) => ReadSnapshotAsync<VaultResponse>(HttpMethod.Get, VaultPath(name), null, null, token);
     public Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) => ReadSnapshotAsync<VaultResponse>(HttpMethod.Get, VaultPath(name, scopeRef), null, null, token);
@@ -50,6 +53,7 @@ public sealed class SecretsApiClient(HttpClient httpClient) : ISecretsClient
     public async Task<VaultInitializationResponse> InitializeVaultAsync(string name, CancellationToken token) { using var response = await httpClient.PostAsync($"{VaultPath(name)}/initialize", null, token); await ApiResponse.EnsureSuccessAsync(response, token); return await response.Content.ReadFromJsonAsync<VaultInitializationResponse>(token) ?? throw new AgentstrationApiException("Agentstration API returned an empty Vault initialization response.", Guid.NewGuid().ToString("N")); }
     public async Task<VaultInitializationResponse> InitializeVaultAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) { using var response = await httpClient.PostAsync(VaultChildPath(name, scopeRef, "initialize"), null, token); await ApiResponse.EnsureSuccessAsync(response, token); return await response.Content.ReadFromJsonAsync<VaultInitializationResponse>(token) ?? throw new AgentstrationApiException("Agentstration API returned an empty Vault initialization response.", Guid.NewGuid().ToString("N")); }
     public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken token) => ReadListAsync<SecretResponse>("api/secrets", token);
+    public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(ResourceScopeRef consumerScopeRef, CancellationToken token) => ReadListAsync<SecretResponse>($"api/secrets?consumerScopeRef={Uri.EscapeDataString(consumerScopeRef.Value)}", token);
     public Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, CancellationToken token) => ReadSnapshotAsync<SecretResponse>(HttpMethod.Get, SecretPath(name), null, null, token);
     public Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) => ReadSnapshotAsync<SecretResponse>(HttpMethod.Get, SecretPath(name, scopeRef), null, null, token);
     public Task<ResourceSnapshot<SecretResource>> CreateSecretAsync(CreateSecretRequest request, CancellationToken token) => ReadSnapshotAsync<SecretResource>(HttpMethod.Post, "api/secrets", JsonContent.Create(request), null, token);

@@ -74,7 +74,9 @@ else
         deleteConflictUsages = [];
         try
         {
-            var usages = await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(profile.Namespace), profile.Name, cancellation.Token);
+            var usages = profile.ScopeRef is { } scope
+                ? await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(profile.Namespace), profile.Name, scope, cancellation.Token)
+                : await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(profile.Namespace), profile.Name, cancellation.Token);
             if (usages.Count > 0) { deleteConflictUsages = usages.Value; return; }
             pendingDelete = profile;
         }
@@ -88,8 +90,13 @@ else
         try
         {
             var @namespace = ResourceNamespace.Parse(selected.Namespace);
-            var snapshot = await Client.GetModelProfileAsync(@namespace, selected.Name, cancellation.Token);
-            await Client.DeleteModelProfileAsync(@namespace, selected.Name, snapshot.ETag, cancellation.Token);
+            var snapshot = selected.ScopeRef is { } scope
+                ? await Client.GetModelProfileAsync(@namespace, selected.Name, scope, cancellation.Token)
+                : await Client.GetModelProfileAsync(@namespace, selected.Name, cancellation.Token);
+            if (selected.ScopeRef is { } deleteScope)
+                await Client.DeleteModelProfileAsync(@namespace, selected.Name, deleteScope, snapshot.ETag, cancellation.Token);
+            else
+                await Client.DeleteModelProfileAsync(@namespace, selected.Name, snapshot.ETag, cancellation.Token);
             Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), selected.Name, DateTimeOffset.Now, UiStatus.Success));
             await LoadAsync();
         }
@@ -98,11 +105,19 @@ else
             error = exception;
             if (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
-                try { deleteConflictUsages = (await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(selected.Namespace), selected.Name, cancellation.Token)).Value; } catch (AgentstrationApiException) { }
+                try
+                {
+                    deleteConflictUsages = selected.ScopeRef is { } scope
+                        ? (await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(selected.Namespace), selected.Name, scope, cancellation.Token)).Value
+                        : (await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(selected.Namespace), selected.Name, cancellation.Token)).Value;
+                }
+                catch (AgentstrationApiException) { }
             }
         }
     }
-    private static string DetailsUrl(ModelProfileSummaryResponse profile) => $"/modelprofiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(profile.Namespace)}";
-    private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
+    private static string DetailsUrl(ModelProfileSummaryResponse profile) =>
+        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(profile.Namespace), ModelResourceKinds.ModelProfile, profile.Name), profile.ScopeRef);
+    private static string AgentUrl(ModelProfileUsageResponse usage) =>
+        ConsoleResourceUrls.Agent(ResourceNamespace.Parse(usage.Namespace), usage.Name, usage.ScopeRef, usage.ScopeRef);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

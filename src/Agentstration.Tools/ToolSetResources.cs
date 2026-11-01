@@ -32,10 +32,14 @@ public sealed record PublishedToolSetMember
     public required string Route { get; init; }
     public required string ToolName { get; init; }
     public required ResourceNamespace ToolNamespace { get; init; }
+    public required ResourceScopeRef ToolScopeRef { get; init; }
     public required Guid ToolUid { get; init; }
     public required long ToolGeneration { get; init; }
     public required string ProviderName { get; init; }
     public required ResourceNamespace ProviderNamespace { get; init; }
+    public required ResourceScopeRef ProviderScopeRef { get; init; }
+    public required Guid ProviderUid { get; init; }
+    public required long ProviderGeneration { get; init; }
     public required string ExternalToolId { get; init; }
     public required JsonElement InputSchema { get; init; }
     public JsonElement? OutputSchema { get; init; }

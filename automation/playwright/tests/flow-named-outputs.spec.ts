@@ -3,7 +3,7 @@ import { exerciseFlowNamedOutputs } from '../src/journeys/exercise-flow-named-ou
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { test } from '../src/fixtures/test.js';
 
-test('Named outputs and FlowCall ports remain versioned, editable, reconnectable, and read-only after publication @smoke', async ({ page, product }) => {
+test('Named outputs remain editable after publication while managed Flows remain read-only @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await exerciseFlowNamedOutputs({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });

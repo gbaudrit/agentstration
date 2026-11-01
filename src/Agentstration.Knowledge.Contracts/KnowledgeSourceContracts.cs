@@ -34,9 +34,14 @@ public static class KnowledgeFlowContracts
 
 public enum KnowledgeSourceOperation { Search, Query, Read }
 
-public readonly record struct KnowledgeSourceId(string Value, ResourceNamespace Namespace = default)
+public readonly record struct KnowledgeSourceId(
+    string Value,
+    ResourceNamespace Namespace = default,
+    ResourceScopeRef? ScopeRef = null)
 {
-    public override string ToString() => $"{Namespace}/{Value}";
+    public override string ToString() => ScopeRef is null
+        ? $"{Namespace}/{Value}"
+        : $"{ScopeRef}/{Namespace}/{Value}";
 }
 
 public readonly record struct KnowledgeSnapshotId(string Value, ResourceNamespace Namespace = default)
@@ -48,6 +53,7 @@ public sealed record KnowledgeFlowTarget
 {
     public required string Name { get; init; }
     public ResourceNamespace? Namespace { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     public string? Version { get; init; }
     public bool UseActiveVersion { get; init; } = true;
 }
@@ -66,6 +72,7 @@ public sealed record KnowledgeDataSourceBinding
 {
     public required string Name { get; init; }
     public required ResourceReference DataSource { get; init; }
+    public ResourceReference? AcquisitionTarget { get; init; }
     public KnowledgeFlowTarget? TransformationFlow { get; init; }
     public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
     public bool Required { get; init; } = true;
@@ -75,6 +82,7 @@ public sealed record KnowledgeDataSourceBinding
 public sealed record KnowledgeSourceResource : Resource
 {
     public KnowledgeSourceProperties Definition { get; init; } = null!;
+    public ResolvedKnowledgeSourceComposition? Composition { get; init; }
 }
 
 public sealed record ResolvedKnowledgeFlowBinding(
@@ -85,7 +93,39 @@ public sealed record ResolvedKnowledgeFlowBinding(
     JsonElement? InputSchema,
     JsonElement? OutputSchema,
     string? Contract = null,
-    IReadOnlyList<string>? Capabilities = null);
+    IReadOnlyList<string>? Capabilities = null,
+    string? DefinitionHash = null)
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
+
+public sealed record ResolvedKnowledgeDataSourceBinding
+{
+    public required string BindingName { get; init; }
+    public required ResourceScopeRef DataSourceScopeRef { get; init; }
+    public required ResourceNamespace DataSourceNamespace { get; init; }
+    public required string DataSourceName { get; init; }
+    public required Guid DataSourceUid { get; init; }
+    public required long DataSourceGeneration { get; init; }
+    public required ResourceScopeRef ProfileScopeRef { get; init; }
+    public required ResourceNamespace ProfileNamespace { get; init; }
+    public required string ProfileName { get; init; }
+    public required Guid ProfileUid { get; init; }
+    public required long ProfileGeneration { get; init; }
+    public required string ProfileVersion { get; init; }
+    public required string ProfileDefinitionHash { get; init; }
+    public required string ProfileDependencyHash { get; init; }
+}
+
+public sealed record ResolvedKnowledgeSourceComposition
+{
+    public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
+    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public IReadOnlyList<ResolvedKnowledgeDataSourceBinding> DataSources { get; init; } = [];
+    public IReadOnlyDictionary<string, ResolvedKnowledgeFlowBinding> TransformationFlows { get; init; }
+        = new Dictionary<string, ResolvedKnowledgeFlowBinding>(StringComparer.Ordinal);
+    public required string DependencyHash { get; init; }
+}
 
 public sealed record KnowledgeSourceReadiness(
     bool Ready,
@@ -114,6 +154,7 @@ public sealed record KnowledgeSourceToolOperationExposure
 public sealed record KnowledgeSourceToolExposureResource : Resource
 {
     public required Guid KnowledgeSourceUid { get; init; }
+    public ResourceScopeRef? KnowledgeSourceScopeRef { get; init; }
     public required string KnowledgeSourceName { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }
     public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
@@ -125,7 +166,8 @@ public sealed record KnowledgeSourceToolExposureResource : Resource
 public sealed record CreateKnowledgeSourceRequest(
     string Name,
     KnowledgeSourceProperties Properties,
-    string? Namespace = null);
+    string? Namespace = null,
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record PutKnowledgeSourceRequest(KnowledgeSourceProperties Properties);
 public sealed record SetKnowledgeSourceEnabledRequest(bool Enabled);
@@ -181,6 +223,10 @@ public sealed record KnowledgeProjectionInputEvidence
     public required string DataSourceName { get; init; }
     public required ResourceNamespace DataSourceNamespace { get; init; }
     public required long DataSourceGeneration { get; init; }
+    public string? AcquisitionTargetName { get; init; }
+    public Guid? AcquisitionTargetUid { get; init; }
+    public string? DiscoveryId { get; init; }
+    public string? ChoiceId { get; init; }
     public required string AcquisitionId { get; init; }
     public required Guid AcquisitionUid { get; init; }
     public required string AcquisitionFlowRunId { get; init; }
@@ -195,6 +241,7 @@ public sealed record KnowledgeProjectionInputEvidence
 public sealed record KnowledgeProjectionResource : Resource
 {
     public required Guid KnowledgeSourceUid { get; init; }
+    public ResourceScopeRef? KnowledgeSourceScopeRef { get; init; }
     public required string KnowledgeSourceName { get; init; }
     public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }
@@ -281,6 +328,7 @@ public sealed record KnowledgeSnapshotArtifact
 public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
 {
     public required Guid KnowledgeSourceUid { get; init; }
+    public ResourceScopeRef? KnowledgeSourceScopeRef { get; init; }
     public required string KnowledgeSourceName { get; init; }
     public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }

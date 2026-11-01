@@ -144,8 +144,10 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             JsonSerializer.SerializeToElement(new { title = "Spoof", message = "Spoof", workspaceId = Guid.NewGuid() }),
             ToolDefinitionCallerKind.Mcp), default));
         Assert.AreEqual("notification_argument_unknown", spoof.Code);
-        var projected = await factory.Services.GetRequiredService<IResourceStore>().GetAsync<ToolResource>(
-            new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate)), default);
+        var projected = await factory.Services.GetRequiredService<IResourceStore>().GetExactAsync<ToolResource>(
+            ScopedResourceAddress.Create(ResourceScopeRef.Workspace(context.WorkspaceId), ResourceNamespace.Default,
+                ToolResourceKinds.Tool,
+                AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate)), default);
         Assert.IsNotNull(projected);
         Assert.AreEqual(AgentstrationInternalTools.NotificationCreate, projected.Value.Definition.ExternalId);
         Assert.AreEqual(tool.Description, projected.Value.Definition.Description);
@@ -171,9 +173,12 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         var projection = factory.Services.GetRequiredService<InternalMcpToolProjectionService>();
         var store = factory.Services.GetRequiredService<IResourceStore>();
         var key = new ResourceKey(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.NotificationCreate));
+        var address = key.AtScope(scope);
         await projection.EnsureAsync(scope, ResourceNamespace.Default, default);
-        var original = (await store.GetAsync<ToolResource>(key, default))!;
-        var stale = await store.PutAsync(original.Value with
+        var original = (await store.GetExactAsync<ToolResource>(address, default))!;
+        using var governanceScope = factory.Services.GetRequiredService<IResourceGovernanceContext>()
+            .Push(ResourceGovernance.Core("tools.internal-mcp"));
+        var stale = await store.PutExactAsync(scope, original.Value with
         {
             Generation = original.Value.Generation + 1,
             Definition = original.Value.Definition with
@@ -186,7 +191,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
 
         await projection.EnsureAsync(scope, ResourceNamespace.Default, default);
 
-        var refreshed = (await store.GetAsync<ToolResource>(key, default))!;
+        var refreshed = (await store.GetExactAsync<ToolResource>(address, default))!;
         Assert.IsFalse(refreshed.Value.Definition.Enabled);
         Assert.AreEqual(stale.Value.Generation + 1, refreshed.Value.Generation);
         Assert.AreEqual(new WorkNotificationMcpToolDefinitionProvider().Definition.Description, refreshed.Value.Definition.Description);
@@ -279,10 +284,15 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             null,
             version,
             true,
-            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "unused")),
+            GraphOnlyDefinition(),
             Graph: graph), ResourceNamespace.Default, default);
         await flows.PublishVersionAsync(workspaceId, new FlowId(name), version, activate, default);
     }
+
+    private static WorkflowFlowDefinition GraphOnlyDefinition() => new(
+        "input",
+        [new FlowNode("input", FlowNodeKind.Input)],
+        []);
 
     private static ToolDefinitionResource NotificationToolDefinition(
         string name,
@@ -399,7 +409,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             Definition = new ToolResourceProperties
             {
                 DisplayName = "Send external message",
-                Provider = new ResourceReference("third-party"),
+                Provider = new ResourceReference("third-party", ResourceScopeRef.Instance),
                 ExternalId = "messages.send",
                 Enabled = true,
                 Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },

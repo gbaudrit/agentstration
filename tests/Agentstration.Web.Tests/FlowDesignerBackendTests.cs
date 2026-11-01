@@ -66,7 +66,11 @@ public sealed class FlowDesignerBackendTests
         var @namespace = new ResourceNamespace("pack.sample");
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
-        var flow = new FlowResponse("sample", "Pack sample", null, "1.2.0", true, "1.2.0", definition, new Dictionary<string, string> { ["agentstration.io/pack.name"] = "sample-pack" }, now, now) { Namespace = @namespace };
+        var flow = new FlowResponse("sample", "Pack sample", null, "1.2.0", true, "1.2.0", definition, new Dictionary<string, string>(), now, now)
+        {
+            Namespace = @namespace,
+            Governance = ResourceGovernance.Pack("/instances/local/InstalledPack/sample-pack", "publisher/sample-pack", "1.2.0")
+        };
         var version = new FlowVersionResponse("sample", "1.2.0", null, definition, new Dictionary<string, string>(), now, graph) { Namespace = @namespace };
         var requests = new List<string>();
         using var httpClient = new HttpClient(new StubHandler(request =>
@@ -156,7 +160,11 @@ public sealed class FlowDesignerBackendTests
         var now = new DateTimeOffset(2026, 8, 15, 12, 0, 0, TimeSpan.Zero);
         var @namespace = new ResourceNamespace("pack.legacy");
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
-        var flow = new FlowResponse("legacy", "Legacy", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string> { ["agentstration.io/pack.name"] = "legacy-pack" }, now, now) { Namespace = @namespace };
+        var flow = new FlowResponse("legacy", "Legacy", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), now, now)
+        {
+            Namespace = @namespace,
+            Governance = ResourceGovernance.Pack("/instances/local/InstalledPack/legacy-pack", "publisher/legacy-pack", "1.0.0")
+        };
         var version = new FlowVersionResponse("legacy", "1.0.0", null, definition, new Dictionary<string, string>(), now) { Namespace = @namespace };
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/versions/1.0.0", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(version) }

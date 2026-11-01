@@ -230,7 +230,8 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
     public async Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var now = timeProvider.GetUtcNow();
-        FlowValidator.Validate(new(CurrentWorkspaceId(), new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
+        var workspaceId = CurrentWorkspaceId();
+        FlowValidator.Validate(new(ResourceScopeRef.Workspace(workspaceId.Value), new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
         if (value.Definition.Graph is not null)
         {
             var validation = await graphValidator.ValidateAsync(value.Definition.Graph, new(ResolveResources: false), cancellationToken);

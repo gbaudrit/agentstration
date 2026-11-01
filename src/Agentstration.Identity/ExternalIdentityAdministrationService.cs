@@ -79,10 +79,10 @@ public sealed class ExternalIdentityAdministrationService(
 
     private async Task RequireActorAsync(CancellationToken cancellationToken)
     {
-        if (!requestContext.IsInitialized
-            || !await authorization.IsPlatformAdministratorAsync(requestContext.Current.PrincipalId, cancellationToken))
+        if (requestContext.ActorPrincipalId is not Guid actorPrincipalId
+            || !await authorization.IsPlatformAdministratorAsync(actorPrincipalId, cancellationToken))
             throw new AuthorizationDeniedException("platform/admin");
-        if ((await store.GetPrincipalAsync(requestContext.Current.PrincipalId, cancellationToken))?.Status != PrincipalStatus.Active)
+        if ((await store.GetPrincipalAsync(actorPrincipalId, cancellationToken))?.Status != PrincipalStatus.Active)
             throw new AuthorizationDeniedException("platform/admin");
     }
 

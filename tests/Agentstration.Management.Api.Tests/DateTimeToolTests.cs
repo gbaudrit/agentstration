@@ -48,18 +48,21 @@ public sealed class DateTimeToolTests : ModelManagementApiTestBase
         await projection.EnsureAsync(scope, ResourceNamespace.Default, default);
 
         var toolName = AgentstrationToolProvider.ToolResourceName(AgentstrationInternalTools.DateTimeGet);
-        var tool = await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, toolName), default);
-        var category = await store.GetAsync<ToolCategoryResource>(new(ToolResourceKinds.ToolCategory, "base-tools"), default);
+        var toolAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ToolResourceKinds.Tool, toolName);
+        var categoryAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default,
+            ToolResourceKinds.ToolCategory, "base-tools");
+        var tool = await store.GetExactAsync<ToolResource>(toolAddress, default);
+        var category = await store.GetExactAsync<ToolCategoryResource>(categoryAddress, default);
         Assert.IsNotNull(tool);
         Assert.IsNotNull(category);
         Assert.AreEqual("Outils de base", category.Value.Definition.DisplayName);
         Assert.AreEqual(toolName, category.Value.Definition.Tools.Single().Name);
 
-        await store.DeleteAsync(new(ToolResourceKinds.ToolCategory, "base-tools"), category.ETag, default);
+        await store.DeleteExactAsync(categoryAddress, category.ETag, default);
         await projection.EnsureAsync(scope, ResourceNamespace.Default, default);
 
-        Assert.IsNull(await store.GetAsync<ToolCategoryResource>(new(ToolResourceKinds.ToolCategory, "base-tools"), default));
-        Assert.IsNotNull(await store.GetAsync<ToolResource>(new(ToolResourceKinds.Tool, toolName), default));
+        Assert.IsNull(await store.GetExactAsync<ToolCategoryResource>(categoryAddress, default));
+        Assert.IsNotNull(await store.GetExactAsync<ToolResource>(toolAddress, default));
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

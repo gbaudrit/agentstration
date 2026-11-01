@@ -63,6 +63,7 @@ else if (unavailable)
 @code {
     [Parameter, EditorRequired] public RuntimeAssignmentTargetKind TargetKind { get; set; }
     [Parameter, EditorRequired] public string RunId { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public ResourceScopeRef ScopeRef { get; set; }
 
     private RuntimeAssignmentPlacementResponse? placement;
     private bool loading;
@@ -81,7 +82,7 @@ else if (unavailable)
         }
         try
         {
-            placement = await runtimeClient.GetPlacementAsync(TargetKind, RunId, CancellationToken.None);
+            placement = await runtimeClient.GetPlacementAsync(TargetKind, RunId, ScopeRef, CancellationToken.None);
         }
         catch (HttpRequestException)
         {

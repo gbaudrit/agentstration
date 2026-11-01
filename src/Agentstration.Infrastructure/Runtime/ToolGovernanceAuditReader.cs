@@ -35,10 +35,12 @@ public sealed class ToolGovernanceAuditReader(
         ToolGovernanceAuditQuery query,
         CancellationToken cancellationToken)
     {
-        if (await runtimeRuns.GetAsync(query.WorkspaceId, query.RunId, cancellationToken) is null)
+        var expectedScope = RuntimeScope(query.ScopeRef);
+        var stored = await runtimeRuns.GetExactAsync(query.ScopeRef, query.RunId, cancellationToken);
+        if (stored is null || stored.Value.Scope != expectedScope)
             throw new ToolGovernanceAuditRunNotFoundException(query.RunId);
-        var events = await runtimeRuns.ListEventsAsync(
-            query.WorkspaceId,
+        var events = await runtimeRuns.ListEventsExactAsync(
+            query.ScopeRef,
             query.RunId,
             query.AfterSequence,
             cancellationToken);
@@ -52,13 +54,11 @@ public sealed class ToolGovernanceAuditReader(
         ToolGovernanceAuditQuery query,
         CancellationToken cancellationToken)
     {
-        var current = requestContext.Current;
-        var scope = new FlowRunScope(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId);
-        if (scope.WorkspaceId != query.WorkspaceId
-            || await flowRuns.GetRunAsync(scope, query.RunId, cancellationToken) is null)
+        var scope = FlowScope(query.ScopeRef);
+        if (await flowRuns.GetRunAsync(scope, query.RunId, cancellationToken) is null)
             throw new ToolGovernanceAuditRunNotFoundException(query.RunId);
-        var events = await flowRuns.ListRunEventsAsync(
-            query.WorkspaceId,
+        var events = await flowRuns.ListRunEventsExactAsync(
+            query.ScopeRef,
             query.RunId,
             query.AfterSequence,
             cancellationToken);
@@ -137,6 +137,34 @@ public sealed class ToolGovernanceAuditReader(
             throw new ToolGovernanceAuditValidationException(
                 "invalid_resource_generation",
                 "resourceGeneration must be greater than zero.");
+    }
+
+    private RuntimeRunScope RuntimeScope(ResourceScopeRef scopeRef)
+    {
+        var current = requestContext.Current;
+        return scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => RuntimeRunScope.Instance(current.PrincipalId),
+            ResourceScopeKind.Tenant when scopeRef.TargetId == current.TenantId =>
+                RuntimeRunScope.Tenant(current.TenantId, current.PrincipalId),
+            ResourceScopeKind.Workspace when scopeRef.TargetId == current.WorkspaceId =>
+                RuntimeRunScope.Workspace(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId),
+            _ => throw new ToolGovernanceAuditRunNotFoundException(string.Empty)
+        };
+    }
+
+    private FlowRunScope FlowScope(ResourceScopeRef scopeRef)
+    {
+        var current = requestContext.Current;
+        return scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => FlowRunScope.Instance(current.PrincipalId),
+            ResourceScopeKind.Tenant when scopeRef.TargetId == current.TenantId =>
+                FlowRunScope.Tenant(current.TenantId, current.PrincipalId),
+            ResourceScopeKind.Workspace when scopeRef.TargetId == current.WorkspaceId =>
+                FlowRunScope.Workspace(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId),
+            _ => throw new ToolGovernanceAuditRunNotFoundException(string.Empty)
+        };
     }
 
     private static string RequiredString(JsonElement payload, string name) =>

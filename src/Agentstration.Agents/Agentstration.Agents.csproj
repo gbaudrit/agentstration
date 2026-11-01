@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Models/Agentstration.Models.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Tools/Agentstration.Tools.csproj" />

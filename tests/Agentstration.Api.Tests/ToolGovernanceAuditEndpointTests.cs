@@ -27,7 +27,7 @@ public sealed class ToolGovernanceAuditEndpointTests
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync(
-            "/api/tool-governance/runtime/run-1?afterSequence=4&limit=25&toolCallId=logical-call&invocationId=attempt-2&toolId=lookup&hookId=managed%3Aguard&resourceGeneration=7&decision=denied");
+            "/api/tool-governance/runtime/run-1?scopeRef=%2Finstance&afterSequence=4&limit=25&toolCallId=logical-call&invocationId=attempt-2&toolId=lookup&hookId=managed%3Aguard&resourceGeneration=7&decision=denied");
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
         Assert.IsNotNull(reader.Query);
@@ -41,7 +41,7 @@ public sealed class ToolGovernanceAuditEndpointTests
         Assert.AreEqual("managed:guard", reader.Query.HookId);
         Assert.AreEqual(7L, reader.Query.ResourceGeneration);
         Assert.AreEqual(ToolExecutionHookEvaluationKind.Denied, reader.Query.Decision);
-        Assert.AreNotEqual(Guid.Empty, reader.Query.WorkspaceId.Value);
+        Assert.AreEqual(ResourceScopeRef.Instance, reader.Query.ScopeRef);
         var body = await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain("arguments", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("result", body, StringComparison.OrdinalIgnoreCase);

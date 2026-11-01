@@ -35,10 +35,15 @@ public sealed class AgentsWorkspaceAuthorizationFilter(ICurrentRequestContext re
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
-        if (!requestContext.IsInitialized) return Results.Unauthorized();
+        if (requestContext.AccessMode is not (ControlPlaneAccessMode.Workspace
+            or ControlPlaneAccessMode.Instance
+            or ControlPlaneAccessMode.TenantAdministration))
+            return Results.Unauthorized();
         var current = requestContext.Current;
         if (context.HttpContext.Request.RouteValues.TryGetValue("workspaceId", out var routeValue)
-            && (!Guid.TryParse(routeValue?.ToString(), out var workspaceId) || workspaceId != current.WorkspaceId))
+            && (requestContext.AccessMode != ControlPlaneAccessMode.Workspace
+                || !Guid.TryParse(routeValue?.ToString(), out var workspaceId)
+                || workspaceId != current.WorkspaceId))
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "workspace_access_denied", detail: "The requested workspace is not the current authorized workspace.");
         return await next(context);
     }

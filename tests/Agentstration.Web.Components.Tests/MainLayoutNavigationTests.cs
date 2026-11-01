@@ -123,16 +123,83 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/agent-instances']").Count);
     }
 
+    [TestMethod]
+    public void ContextSelectorPresentsOneSearchableInstanceTenantWorkspaceHierarchy()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(AllNavigationPermissions);
+        var rendered = RenderLayout(context);
+
+        rendered.Find("[data-testid='context-selector-trigger']").Click();
+
+        Assert.AreEqual(1, rendered.FindAll("[data-testid='context-selector']").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-option-instance").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-option-tenant").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-option-workspace").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-tenant-group").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-tenant-group .context-tenant-workspaces .context-option-workspace").Count);
+        Assert.AreEqual("Workspace", rendered.Find("[data-testid='context-selector-trigger'] .context-kind").TextContent.Trim());
+        Assert.AreEqual("Test organization / Default workspace",
+            rendered.Find("[data-testid='console-breadcrumb'] span").TextContent.Trim());
+
+        rendered.Find("[data-testid='context-selector-search']").Input("Instance");
+        Assert.AreEqual(1, rendered.FindAll(".context-option-instance").Count);
+        Assert.AreEqual(0, rendered.FindAll(".context-option-tenant").Count);
+        Assert.AreEqual(0, rendered.FindAll(".context-option-workspace").Count);
+    }
+
+    [TestMethod]
+    public void ContextSelectorKeepsAuthorizedWorkspaceVisibleWithoutTenantAdministration()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(AllNavigationPermissions, workspaceOnly: true);
+        var rendered = RenderLayout(context);
+
+        rendered.Find("[data-testid='context-selector-trigger']").Click();
+
+        Assert.AreEqual(0, rendered.FindAll(".context-option-instance").Count);
+        Assert.AreEqual(0, rendered.FindAll(".context-option-tenant").Count);
+        Assert.AreEqual(1, rendered.FindAll(".context-tenant-label").Count);
+        Assert.AreEqual("Test organization", rendered.Find(".context-tenant-label").TextContent.Trim());
+        Assert.AreEqual(1, rendered.FindAll(".context-option-workspace").Count);
+    }
+
+    [TestMethod]
+    public void NavigationContextChangeRefreshesTheCircuitWithoutForcingAPageReload()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddAgentstrationWebComponents();
+        var provider = new SwitchingContextProvider(AllNavigationPermissions);
+        context.Services.AddScoped<IConsoleContextProvider>(_ => provider);
+        var rendered = RenderLayout(context);
+        rendered.WaitForAssertion(() => Assert.AreEqual(ConsoleContextKind.Instance,
+            context.Services.GetRequiredService<ConsoleContextState>().Current?.SelectedKind));
+
+        var workspaceScope = $"/workspaces/{SwitchingContextProvider.WorkspaceId:D}";
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            $"/agents/assistant?context={Uri.EscapeDataString(workspaceScope)}");
+
+        rendered.WaitForAssertion(() =>
+        {
+            var current = context.Services.GetRequiredService<ConsoleContextState>().Current;
+            Assert.AreEqual(ConsoleContextKind.Workspace, current?.SelectedKind);
+            Assert.AreEqual(workspaceScope, current?.SelectedScopeRef);
+            Assert.AreEqual(2, provider.CallCount);
+        });
+    }
+
     private static readonly IReadOnlySet<string> AllNavigationPermissions = new HashSet<string>(
         ["resources/read", "resources/delete", "runs/read", "runs/delete"],
         StringComparer.Ordinal);
 
-    private static BunitContext CreateContext(IReadOnlySet<string> permissions)
+    private static BunitContext CreateContext(IReadOnlySet<string> permissions, bool workspaceOnly = false)
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
-        context.Services.AddScoped<IConsoleContextProvider>(_ => new StubContextProvider(permissions));
+        context.Services.AddScoped<IConsoleContextProvider>(_ => new StubContextProvider(permissions, workspaceOnly));
         return context;
     }
 
@@ -161,7 +228,7 @@ public sealed class MainLayoutNavigationTests
     private static string GroupLabel(AngleSharp.Dom.IElement group) =>
         group.QuerySelector("h2")?.TextContent.Trim() ?? string.Empty;
 
-    private sealed class StubContextProvider(IReadOnlySet<string> permissions) : IConsoleContextProvider
+    private sealed class StubContextProvider(IReadOnlySet<string> permissions, bool workspaceOnly) : IConsoleContextProvider
     {
         public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken)
         {
@@ -170,6 +237,8 @@ public sealed class MainLayoutNavigationTests
             return Task.FromResult(new ConsoleContextSnapshot(
                 Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 "Test User",
+                $"/workspaces/{workspaceId:D}",
+                ConsoleContextKind.Workspace,
                 tenantId,
                 "test",
                 "Test organization",
@@ -177,7 +246,48 @@ public sealed class MainLayoutNavigationTests
                 "default",
                 "Default workspace",
                 permissions,
-                [new(workspaceId, tenantId, "test", "Test organization", "default", "Default workspace")]));
+                [new(workspaceId, tenantId, "test", "Test organization", "default", "Default workspace")],
+                workspaceOnly
+                    ? [new($"/workspaces/{workspaceId:D}", ConsoleContextKind.Workspace, tenantId, "test", "Test organization", workspaceId, "default", "Default workspace")]
+                    :
+                    [
+                        new("/instance", ConsoleContextKind.Instance, null, null, null, null, null, "Instance"),
+                        new($"/tenants/{tenantId:D}", ConsoleContextKind.Tenant, tenantId, "test", "Test organization", null, null, "Test organization"),
+                        new($"/workspaces/{workspaceId:D}", ConsoleContextKind.Workspace, tenantId, "test", "Test organization", workspaceId, "default", "Default workspace")
+                    ]));
+        }
+    }
+
+    private sealed class SwitchingContextProvider(IReadOnlySet<string> permissions) : IConsoleContextProvider
+    {
+        public static readonly Guid TenantId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        public static readonly Guid WorkspaceId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        public int CallCount { get; private set; }
+
+        public async Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            CallCount++;
+            var workspaceScope = $"/workspaces/{WorkspaceId:D}";
+            var selectedScope = CallCount == 1 ? "/instance" : workspaceScope;
+            var selectedKind = CallCount == 1 ? ConsoleContextKind.Instance : ConsoleContextKind.Workspace;
+            return new ConsoleContextSnapshot(
+                Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                "Test User",
+                selectedScope,
+                selectedKind,
+                TenantId,
+                "test",
+                "Test organization",
+                WorkspaceId,
+                "default",
+                "Default workspace",
+                permissions,
+                [new(WorkspaceId, TenantId, "test", "Test organization", "default", "Default workspace")],
+                [
+                    new("/instance", ConsoleContextKind.Instance, null, null, null, null, null, "Instance"),
+                    new(workspaceScope, ConsoleContextKind.Workspace, TenantId, "test", "Test organization", WorkspaceId, "default", "Default workspace")
+                ]);
         }
     }
 

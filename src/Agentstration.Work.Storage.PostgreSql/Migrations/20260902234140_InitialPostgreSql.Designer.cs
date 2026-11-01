@@ -210,6 +210,11 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
 
             modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkItemDocument", b =>
                 {
+                    b.Property<string>("ScopeRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("WorkspaceId")
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
@@ -282,7 +287,7 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
-                    b.HasKey("WorkspaceId", "Id");
+                    b.HasKey("ScopeRef", "Id");
 
                     b.HasIndex("FlowRunId");
 

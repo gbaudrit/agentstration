@@ -11,6 +11,7 @@ using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
 
@@ -20,7 +21,9 @@ public sealed class KnowledgePlatformResourceProvisioner(
     IResourceStore store,
     FlowService flows,
     DataSourceProfileService dataSourceProfiles,
-    TimeProvider timeProvider)
+    IResourceAccessPolicyService accessPolicies,
+    TimeProvider timeProvider,
+    IResourceGovernanceContext governance)
 {
     public const string RetrievalToolSetName = "knowledge-retrieval-builtin";
     public const string ProjectionFlowName = "knowledge-projection-builtin";
@@ -34,38 +37,48 @@ public sealed class KnowledgePlatformResourceProvisioner(
     public const string ProfileFlowVersion = "1.0.0";
     public const string ProfileVersion = "1.0.0";
 
-    public async Task EnsureAsync(ResourceScopeRef workspaceScope, CancellationToken cancellationToken)
+    public async Task EnsureAsync(ResourceScopeRef tenantScope, ResourceScopeRef workspaceScope,
+        CancellationToken cancellationToken)
     {
-        if (workspaceScope is not { Kind: ResourceScopeKind.Workspace, TargetId: { } workspaceId })
+        if (tenantScope.Kind != ResourceScopeKind.Tenant)
+            throw new InvalidOperationException("Built-in Knowledge resources require a Tenant scope.");
+        if (workspaceScope.Kind != ResourceScopeKind.Workspace)
             throw new InvalidOperationException("Built-in Knowledge resources require a Workspace scope.");
-        await EnsureToolSetAsync(workspaceScope, RetrievalToolSetName,
+        using var governanceScope = governance.Push(ResourceGovernance.Core("knowledge.platform"));
+        var instanceScope = ResourceScopeRef.Instance;
+        await EnsureToolSetAsync(instanceScope, RetrievalToolSetName,
             "Knowledge retrieval · Built-in", "Local-first deterministic search, query, and read over Snapshot Artifacts.",
             [
                 (KnowledgeFlowContracts.Search, KnowledgeBuiltinToolNames.RetrievalSearch),
                 (KnowledgeFlowContracts.Query, KnowledgeBuiltinToolNames.RetrievalQuery),
                 (KnowledgeFlowContracts.Read, KnowledgeBuiltinToolNames.RetrievalRead)
             ], cancellationToken);
-        await EnsureProjectionFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
-        await EnsureRetrievalFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
-        await EnsureHttpAcquisitionFlowAsync(new WorkspaceId(workspaceId), WebAcquisitionFlowName,
+        var retrievalToolSet = await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(
+            instanceScope, ResourceNamespace.Default, ToolResourceKinds.ToolSet, RetrievalToolSetName), cancellationToken)
+            ?? throw new InvalidOperationException("The built-in Knowledge retrieval ToolSet was not reconciled.");
+        await EnsureTenantAccessAsync(retrievalToolSet.Value, tenantScope, cancellationToken);
+        await EnsureProjectionFlowAsync(instanceScope, cancellationToken);
+        await EnsureRetrievalFlowAsync(instanceScope, cancellationToken);
+        await EnsureHttpAcquisitionFlowAsync(instanceScope, WebAcquisitionFlowName,
             "Web resource acquisition · Built-in", WebFetchMcpTool.ToolName, cancellationToken);
-        await EnsureHttpAcquisitionFlowAsync(new WorkspaceId(workspaceId), RestAcquisitionFlowName,
+        await EnsureHttpAcquisitionFlowAsync(instanceScope, RestAcquisitionFlowName,
             "REST resource acquisition · Built-in", RestGetMcpTool.ToolName, cancellationToken);
-        await EnsureArtifactImportFlowAsync(new WorkspaceId(workspaceId), cancellationToken);
-        await EnsureDataSourceProfilesAsync(workspaceScope, cancellationToken);
+        await EnsureArtifactImportFlowAsync(instanceScope, cancellationToken);
+        await EnsureDataSourceProfilesAsync(instanceScope, tenantScope, cancellationToken);
     }
 
-    private async Task EnsureDataSourceProfilesAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
+    private async Task EnsureDataSourceProfilesAsync(ResourceScopeRef scope, ResourceScopeRef tenantScope,
+        CancellationToken cancellationToken)
     {
         await EnsureDataSourceProfileAsync(Profile(scope, "web-builtin", "Web · Built-in",
             "Fetches one bounded public HTTP(S) Web resource.", WebAcquisitionFlowName,
-            WebFetchMcpTool.ToolName, "web.fetch", UrlSchema()), cancellationToken);
+            WebFetchMcpTool.ToolName, "web.fetch", UrlSchema()), tenantScope, cancellationToken);
         await EnsureDataSourceProfileAsync(Profile(scope, "rest-builtin", "REST · Built-in",
             "Fetches one bounded public unauthenticated HTTP(S) GET response.", RestAcquisitionFlowName,
-            RestGetMcpTool.ToolName, "rest.get", UrlSchema()), cancellationToken);
+            RestGetMcpTool.ToolName, "rest.get", UrlSchema()), tenantScope, cancellationToken);
         await EnsureDataSourceProfileAsync(Profile(scope, "artifact-import-builtin",
             "Artifact import · Built-in", "Imports selected governed durable Artifacts.", ArtifactImportAcquisitionFlowName,
-            DataSourceBuiltinToolNames.ArtifactImport, "artifact.import", ArtifactImportSchema()), cancellationToken);
+            DataSourceBuiltinToolNames.ArtifactImport, "artifact.import", ArtifactImportSchema()), tenantScope, cancellationToken);
     }
 
     private static DataSourceProfileResource Profile(
@@ -100,7 +113,13 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 Version = ProfileVersion,
                 Enabled = true,
                 ConfigurationSchema = configurationSchema,
-                AcquisitionFlow = new() { Name = acquisitionFlow, Version = ProfileFlowVersion, UseActiveVersion = false },
+                AcquisitionFlow = new()
+                {
+                    Name = acquisitionFlow,
+                    ScopeRef = scope,
+                    Version = ProfileFlowVersion,
+                    UseActiveVersion = false
+                },
                 ToolBindings =
             [
                 new()
@@ -126,6 +145,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
 
     private async Task EnsureDataSourceProfileAsync(
         DataSourceProfileResource desired,
+        ResourceScopeRef tenantScope,
         CancellationToken cancellationToken)
     {
         var existing = await dataSourceProfiles.GetAsync(desired.Namespace, desired.Name, desired.ScopeRef, cancellationToken);
@@ -143,6 +163,36 @@ public sealed class KnowledgePlatformResourceProvisioner(
         else if (!string.Equals(existing.Value.ActiveVersion, ProfileVersion, StringComparison.Ordinal))
             _ = await dataSourceProfiles.ActivateAsync(desired.Namespace, desired.Name, desired.ScopeRef,
                 new(ProfileVersion), existing.ETag, cancellationToken);
+        var current = await dataSourceProfiles.GetAsync(desired.Namespace, desired.Name, desired.ScopeRef,
+            cancellationToken) ?? throw new InvalidOperationException(
+                $"Built-in Data Source Profile '{desired.Name}' disappeared during provisioning.");
+        await EnsureTenantAccessAsync(current.Value, tenantScope, cancellationToken);
+    }
+
+    private async Task EnsureTenantAccessAsync(Resource resource, ResourceScopeRef tenantScope,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var current = await accessPolicies.GetAsync(resource.Uid, cancellationToken);
+            var grants = current?.Policy.Grants.ToList() ?? [];
+            var existing = grants.FindIndex(value => value.TargetScopeRef == tenantScope);
+            var desired = new ResourceAccessGrant(tenantScope,
+                [ResourceAccessAction.Discover, ResourceAccessAction.Use], true);
+            if (existing >= 0
+                && grants[existing].IncludeDescendants
+                && desired.Actions.All(grants[existing].Actions.Contains))
+                return;
+            if (existing >= 0) grants[existing] = desired;
+            else grants.Add(desired);
+            try
+            {
+                _ = await accessPolicies.PutAsync(new(new(resource.Uid, resource.ScopeRef!.Value,
+                    resource.Namespace, resource.Kind, resource.Generation), grants), current?.ETag, cancellationToken);
+                return;
+            }
+            catch (ResourceConcurrencyException) when (attempt < 2) { }
+        }
     }
 
     private static JsonElement UrlSchema() => JsonSerializer.SerializeToElement(new
@@ -217,16 +267,23 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 ?? throw new InvalidOperationException($"Built-in Knowledge Tool '{toolName}' was not projected.");
             var provider = tool.Value.Definition.Provider?.Resolve(ResourceNamespace.Default, ToolResourceKinds.ToolProvider)
                 ?? throw new InvalidOperationException($"Built-in Knowledge Tool '{toolName}' has no provider.");
+            var storedProvider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
+                scope, provider.Namespace, ToolResourceKinds.ToolProvider, provider.Name), cancellationToken)
+                ?? throw new InvalidOperationException($"Built-in Knowledge Tool '{toolName}' references missing provider '{provider}'.");
             members.Add(new PublishedToolSetMember
             {
                 Capability = route.Capability,
                 Route = "default",
                 ToolName = tool.Value.Name,
                 ToolNamespace = tool.Value.Namespace,
+                ToolScopeRef = scope,
                 ToolUid = tool.Value.Uid,
                 ToolGeneration = tool.Value.Generation,
                 ProviderName = provider.Name,
                 ProviderNamespace = provider.Namespace,
+                ProviderScopeRef = scope,
+                ProviderUid = storedProvider.Value.Uid,
+                ProviderGeneration = storedProvider.Value.Generation,
                 ExternalToolId = tool.Value.Definition.ExternalId!,
                 InputSchema = tool.Value.Definition.Schema!.Input.Clone(),
                 OutputSchema = tool.Value.Definition.Schema.Output?.Clone(),
@@ -256,7 +313,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
     }
 
     private async Task EnsureHttpAcquisitionFlowAsync(
-        WorkspaceId workspaceId,
+        ResourceScopeRef scope,
         string name,
         string displayName,
         string externalToolId,
@@ -287,7 +344,8 @@ public sealed class KnowledgePlatformResourceProvisioner(
                     Name = "persist",
                     DisplayName = "Persist acquired content",
                     Flow = new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName,
-                        FlowCallVersionStrategy.Exact, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion),
+                        FlowCallVersionStrategy.Exact, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion,
+                        ScopeRef: scope),
                     InputMapping = JsonSerializer.SerializeToElement(new
                     {
                         stagedArtifactId = "${steps.fetch.output.stagedArtifactId}",
@@ -325,11 +383,11 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 new("persist-failure", "persist", "error", "failure")
             ]
         };
-        await CreateAndPublishFlowAsync(workspaceId, name, displayName,
+        await CreateAndPublishFlowAsync(scope, name, displayName,
             DataSourceFlowContracts.Acquisition, null, ProfileFlowVersion, graph, cancellationToken);
     }
 
-    private async Task EnsureArtifactImportFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
+    private async Task EnsureArtifactImportFlowAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
     {
         var input = KnowledgeBuiltinSchemas.DataSourceAcquisitionFlowInput;
         var output = KnowledgeBuiltinSchemas.ArtifactManifestOutput;
@@ -366,12 +424,12 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 new("import-failure", "import", "error", "failure")
             ]
         };
-        await CreateAndPublishFlowAsync(workspaceId, ArtifactImportAcquisitionFlowName,
+        await CreateAndPublishFlowAsync(scope, ArtifactImportAcquisitionFlowName,
             "Artifact import acquisition · Built-in", DataSourceFlowContracts.Acquisition, null,
             ProfileFlowVersion, graph, cancellationToken);
     }
 
-    private async Task EnsureRetrievalFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
+    private async Task EnsureRetrievalFlowAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
     {
         var input = KnowledgeBuiltinSchemas.RetrievalInput;
         var output = KnowledgeBuiltinSchemas.RetrievalOutput;
@@ -417,13 +475,13 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 new("read-failure", "read", "error", "failure")
             ]
         };
-        await CreateAndPublishFlowAsync(workspaceId, RetrievalFlowName, "Knowledge retrieval · Built-in",
+        await CreateAndPublishFlowAsync(scope, RetrievalFlowName, "Knowledge retrieval · Built-in",
             KnowledgeFlowContracts.Retrieval,
             string.Join(',', KnowledgeFlowContracts.Search, KnowledgeFlowContracts.Query, KnowledgeFlowContracts.Read),
             RetrievalFlowVersion, graph, cancellationToken);
     }
 
-    private async Task EnsureProjectionFlowAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
+    private async Task EnsureProjectionFlowAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
     {
         var input = KnowledgeBuiltinSchemas.ProjectionInput;
         var output = KnowledgeBuiltinSchemas.ArtifactManifestOutput;
@@ -449,11 +507,11 @@ public sealed class KnowledgePlatformResourceProvisioner(
             ],
             Transitions = [new("input-output", "input", "completed", "output")]
         };
-        await CreateAndPublishFlowAsync(workspaceId, ProjectionFlowName, "Knowledge projection · Built-in",
+        await CreateAndPublishFlowAsync(scope, ProjectionFlowName, "Knowledge projection · Built-in",
             KnowledgeFlowContracts.Projection, null, ProjectionFlowVersion, graph, cancellationToken);
     }
 
-    private async Task CreateAndPublishFlowAsync(WorkspaceId workspaceId, string name, string displayName, string contract,
+    private async Task CreateAndPublishFlowAsync(ResourceScopeRef scope, string name, string displayName, string contract,
         string? capabilities, string version, FlowGraphDefinition graph, CancellationToken cancellationToken)
     {
         var nodes = graph.Steps.Select(step => new FlowNode(step.Name, step switch
@@ -475,14 +533,14 @@ public sealed class KnowledgePlatformResourceProvisioner(
         };
         if (capabilities is not null) metadata[KnowledgeFlowContracts.CapabilitiesMetadataKey] = capabilities;
         var id = new FlowId(name);
-        var existing = await flows.GetAsync(workspaceId, id, cancellationToken);
+        var existing = await flows.GetExactAsync(scope, id, cancellationToken);
         if (existing is not null
             && (!existing.Value.Metadata.TryGetValue(ResourceProvenanceAnnotations.BuiltIn, out var builtIn)
                 || !string.Equals(builtIn, "true", StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"Reserved built-in Flow identity '{name}' is already in use.");
-        if (existing is not null && await flows.GetVersionAsync(workspaceId, id, version, cancellationToken) is not null)
+        if (existing is not null && await flows.GetVersionExactAsync(scope, id, version, cancellationToken) is not null)
         {
-            _ = await flows.ActivateVersionAsync(workspaceId, id, version, cancellationToken);
+            _ = await flows.ActivateVersionExactAsync(scope, id, version, cancellationToken);
             return;
         }
 
@@ -493,24 +551,25 @@ public sealed class KnowledgePlatformResourceProvisioner(
         try
         {
             if (existing is null)
-                _ = await flows.CreateAsync(workspaceId, new CreateFlowCommand(name,
-                    description, version, true, definition, metadata, graph, displayName), cancellationToken);
+                _ = await flows.CreateExactAsync(scope, new CreateFlowCommand(name,
+                    description, version, true, definition, metadata, graph, displayName),
+                    ResourceNamespace.Default, cancellationToken);
             else
             {
-                _ = await flows.UpdateAsync(workspaceId, id, new UpdateFlowCommand(
+                _ = await flows.UpdateExactAsync(scope, id, new UpdateFlowCommand(
                     description, version, true, definition, metadata, graph, displayName), existing.ETag, cancellationToken);
             }
-            _ = await flows.PublishVersionAsync(workspaceId, id, version, true, cancellationToken,
+            _ = await flows.PublishVersionExactAsync(scope, id, version, true, cancellationToken,
                 "Built-in local-first Knowledge contract implementation.");
         }
         catch (FlowConcurrencyException)
         {
-            if (await flows.GetVersionAsync(workspaceId, id, version, cancellationToken) is null) throw;
-            _ = await flows.ActivateVersionAsync(workspaceId, id, version, cancellationToken);
+            if (await flows.GetVersionExactAsync(scope, id, version, cancellationToken) is null) throw;
+            _ = await flows.ActivateVersionExactAsync(scope, id, version, cancellationToken);
         }
         catch (FlowValidationException exception) when (exception.Code == "flow_version_already_published")
         {
-            _ = await flows.ActivateVersionAsync(workspaceId, id, version, cancellationToken);
+            _ = await flows.ActivateVersionExactAsync(scope, id, version, cancellationToken);
         }
     }
 

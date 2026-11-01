@@ -48,12 +48,17 @@ public sealed class RuntimeObservabilityQueryService(
 
     public async Task<IReadOnlyList<AgentInstanceResponse>> ListAgentInstancesAsync(
         WorkspaceId workspaceId,
+        CancellationToken cancellationToken) =>
+        await ListAgentInstancesExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), cancellationToken);
+
+    public async Task<IReadOnlyList<AgentInstanceResponse>> ListAgentInstancesExactAsync(
+        ResourceScopeRef scopeRef,
         CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow();
         var active = await assignments.ListAsync(new RuntimeWorkerAssignmentQuery
         {
-            WorkspaceId = workspaceId,
+            ScopeRef = scopeRef,
             States = new HashSet<RuntimeAssignmentState> { RuntimeAssignmentState.Assigned },
             Take = 500
         }, cancellationToken);
@@ -89,7 +94,7 @@ public sealed class RuntimeObservabilityQueryService(
                     agent.RevisionId, agent.RuntimeProfileName, assignment.TargetKind.ToString(), assignment.TargetRunId,
                     turns.Key.ParticipantId, turns.Key.StepExecutionId, turns.Count(), assignment.Id.Value,
                     attempt.Id.Value, attempt.WorkerId.Value, attempt.WorkerSessionId.Value, started, activity,
-                    attempt.LeaseExpiresAt));
+                    attempt.LeaseExpiresAt, assignment.ExecutionScopeRef));
             }
         }
         return result.OrderByDescending(value => value.StartedAt).ToArray();
@@ -100,8 +105,15 @@ public sealed class RuntimeObservabilityQueryService(
         RuntimeAssignmentTargetKind targetKind,
         string runId,
         CancellationToken cancellationToken)
+        => await GetPlacementExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), targetKind, runId, cancellationToken);
+
+    public async Task<RuntimeAssignmentPlacementResponse?> GetPlacementExactAsync(
+        ResourceScopeRef scopeRef,
+        RuntimeAssignmentTargetKind targetKind,
+        string runId,
+        CancellationToken cancellationToken)
     {
-        var assignment = await assignments.GetByTargetAsync(workspaceId, targetKind, runId, cancellationToken);
+        var assignment = await assignments.GetByTargetExactAsync(scopeRef, targetKind, runId, cancellationToken);
         return assignment is null ? null : Map(assignment.Value);
     }
 
@@ -138,5 +150,5 @@ public sealed class RuntimeObservabilityQueryService(
         assignment.CreatedAt, assignment.UpdatedAt, assignment.Attempts.Select(attempt => new RuntimeAssignmentAttemptResponse(
             attempt.Id.Value, attempt.WorkerId.Value, attempt.WorkerSessionId.Value, attempt.FencingGeneration,
             attempt.State.ToString(), attempt.AcquiredAt, attempt.LastHeartbeatAt, attempt.LeaseExpiresAt,
-            attempt.CompletedAt, attempt.ErrorCode)).ToArray());
+            attempt.CompletedAt, attempt.ErrorCode)).ToArray(), assignment.ExecutionScopeRef);
 }

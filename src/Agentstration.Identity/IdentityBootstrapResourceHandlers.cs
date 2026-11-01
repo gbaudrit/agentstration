@@ -33,7 +33,8 @@ public sealed record PrincipalDefaultContextBootstrapDefinition
 
 public sealed class TenantBootstrapResourceHandler(
     IIdentityStore store,
-    TimeProvider timeProvider) : IBootstrapResourceHandler
+    TimeProvider timeProvider,
+    IOperationalTopologyProvisioner operationalTopology) : IBootstrapResourceHandler
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -62,15 +63,17 @@ public sealed class TenantBootstrapResourceHandler(
         if (await store.FindTenantByNameAsync(name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;
 
-        await store.AddTenantAsync(
-            new Tenant(Guid.NewGuid(), name, displayName, TenantStatus.Active, timeProvider.GetUtcNow()),
-            cancellationToken);
+        var tenant = new Tenant(Guid.NewGuid(), name, displayName, TenantStatus.Active, timeProvider.GetUtcNow());
+        await store.AddTenantAsync(tenant, cancellationToken);
+        _ = await operationalTopology.EnsureTenantAsync(tenant, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }
 
     private static (string Name, string DisplayName) Read(BootstrapResourceDocument resource)
     {
         var name = IdentityBootstrapValidation.Name(resource.Metadata.Name, "Tenant");
+        if (OperationalTopologyIdentities.IsReservedTenantName(name))
+            throw new InvalidOperationException($"Tenant name '{name}' is reserved for Agentstration operations.");
         var definition = resource.Definition.Deserialize<TenantBootstrapDefinition>(JsonOptions)
             ?? throw new InvalidOperationException("Tenant definition is required.");
         return (name, IdentityBootstrapValidation.DisplayName(definition.DisplayName, "Tenant"));
@@ -133,11 +136,15 @@ public sealed class WorkspaceBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         var name = IdentityBootstrapValidation.Name(resource.Metadata.Name, "Workspace");
+        if (OperationalTopologyIdentities.IsReservedWorkspaceName(name))
+            throw new InvalidOperationException($"Workspace name '{name}' is reserved for Agentstration operations.");
         var definition = resource.Definition.Deserialize<WorkspaceBootstrapDefinition>(JsonOptions)
             ?? throw new InvalidOperationException("Workspace definition is required.");
         var tenantName = definition.TenantRef is null
             ? await TargetTenantNameAsync(operation, cancellationToken)
             : IdentityBootstrapValidation.Name(definition.TenantRef.Name, "Tenant");
+        if (OperationalTopologyIdentities.IsReservedTenantName(tenantName))
+            throw new InvalidOperationException($"Tenant name '{tenantName}' is reserved for Agentstration operations.");
         if (operation.ProfileScope == BootstrapProfileScope.Tenant)
         {
             var targetTenantName = await TargetTenantNameAsync(operation, cancellationToken);
@@ -251,10 +258,15 @@ public sealed class PrincipalDefaultContextBootstrapResourceHandler(
             throw new InvalidOperationException("PrincipalDefaultContext definition.principalRef.localAccount must contain between 3 and 64 characters.");
         if (!string.Equals(resourceName, userName, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("PrincipalDefaultContext metadata.name must match definition.principalRef.localAccount.");
+        var tenantName = IdentityBootstrapValidation.Name(definition.TenantRef.Name, "Tenant");
+        var workspaceName = IdentityBootstrapValidation.Name(definition.WorkspaceRef.Name, "Workspace");
+        if (OperationalTopologyIdentities.IsReservedTenantName(tenantName)
+            || OperationalTopologyIdentities.IsReservedWorkspaceName(workspaceName))
+            throw new InvalidOperationException("PrincipalDefaultContext cannot target reserved operational topology.");
         return (
             resourceName,
             userName,
-            IdentityBootstrapValidation.Name(definition.TenantRef.Name, "Tenant"),
-            IdentityBootstrapValidation.Name(definition.WorkspaceRef.Name, "Workspace"));
+            tenantName,
+            workspaceName);
     }
 }

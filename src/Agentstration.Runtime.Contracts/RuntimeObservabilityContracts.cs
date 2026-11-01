@@ -47,7 +47,8 @@ public sealed record RuntimeAssignmentPlacementResponse(
     string ExecutionMaterialVersion,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<RuntimeAssignmentAttemptResponse> Attempts);
+    IReadOnlyList<RuntimeAssignmentAttemptResponse> Attempts,
+    ResourceScopeRef? ExecutionScopeRef = null);
 
 public sealed record RuntimeWorkerDetailsResponse(
     RuntimeWorkerSummaryResponse Worker,
@@ -71,13 +72,17 @@ public sealed record AgentInstanceResponse(
     Guid WorkerSessionId,
     DateTimeOffset StartedAt,
     DateTimeOffset LastActivityAt,
-    DateTimeOffset LeaseExpiresAt);
+    DateTimeOffset LeaseExpiresAt,
+    ResourceScopeRef? ExecutionScopeRef = null);
 
 public interface IRuntimeObservabilityQueryService
 {
     Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> ListWorkersAsync(CancellationToken cancellationToken);
     Task<RuntimeWorkerDetailsResponse?> GetWorkerAsync(Guid workerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<AgentInstanceResponse>> ListAgentInstancesAsync(WorkspaceId workspaceId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<AgentInstanceResponse>> ListAgentInstancesExactAsync(ResourceScopeRef scopeRef, CancellationToken cancellationToken);
     Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(WorkspaceId workspaceId, RuntimeAssignmentTargetKind targetKind,
+        string runId, CancellationToken cancellationToken);
+    Task<RuntimeAssignmentPlacementResponse?> GetPlacementExactAsync(ResourceScopeRef scopeRef, RuntimeAssignmentTargetKind targetKind,
         string runId, CancellationToken cancellationToken);
 }

@@ -6,5 +6,5 @@ import { expect, test } from '../src/fixtures/test.js';
 test('Console resource lists and creation editors render deterministic states @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await inspectResourceAdministration({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
-  await expect(page).toHaveURL(/\/triggers\/new$/);
+  await expect(page).toHaveURL(url => url.pathname === '/triggers/new');
 });

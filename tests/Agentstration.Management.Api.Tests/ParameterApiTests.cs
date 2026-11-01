@@ -24,14 +24,18 @@ public sealed class ParameterApiTests : ModelManagementApiTestBase
         var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
         var workspace = targets.Single(value => value.Kind == ResourceScopeKind.Workspace).ScopeRef;
 
+        SelectConsoleContext(client, tenant);
         using var tenantCreate = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
             "shared-setting", Properties("Tenant value"), tenant));
         Assert.AreEqual(HttpStatusCode.Created, tenantCreate.StatusCode);
+        SelectConsoleContext(client, workspace);
         using var workspaceCreate = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
             "shared-setting", Properties("Workspace value"), workspace));
         Assert.AreEqual(HttpStatusCode.Created, workspaceCreate.StatusCode);
 
+        SelectConsoleContext(client, tenant);
         using var tenantRead = await client.GetAsync(Url("shared-setting", tenant));
+        SelectConsoleContext(client, workspace);
         using var workspaceRead = await client.GetAsync(Url("shared-setting", workspace));
         Assert.AreEqual("Tenant value", (await tenantRead.Content.ReadFromJsonAsync<ParameterResource>())!.Definition.Value.GetString());
         Assert.AreEqual("Workspace value", (await workspaceRead.Content.ReadFromJsonAsync<ParameterResource>())!.Definition.Value.GetString());
@@ -50,6 +54,7 @@ public sealed class ParameterApiTests : ModelManagementApiTestBase
             await Assert.ThrowsExactlyAsync<ParameterAccessDeniedException>(() => resolver.ResolveAsync(workspaceReference, tenantContext));
         }
 
+        SelectConsoleContext(client, tenant);
         using var grant = await PutAsync(client, "shared-setting", tenant, tenantRead.Headers.ETag!.ToString(),
             Properties("Granted value", new() { Grants = [new(workspace)] }));
         Assert.AreEqual(HttpStatusCode.OK, grant.StatusCode);
@@ -77,6 +82,7 @@ public sealed class ParameterApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity,
             (await client.GetAsync(Url("shared-setting", ResourceScopeRef.Workspace(foreignWorkspaceId)))).StatusCode);
 
+        SelectConsoleContext(client, tenant);
         using var stale = await PutAsync(client, "shared-setting", tenant, tenantRead.Headers.ETag!.ToString(),
             Properties("Stale value", new() { Grants = [new(workspace)] }));
         Assert.AreEqual(HttpStatusCode.Conflict, stale.StatusCode);
@@ -102,6 +108,7 @@ public sealed class ParameterApiTests : ModelManagementApiTestBase
         var targets = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
             $"/api/resource-scopes/targets?kind={ParameterResourceKinds.Parameter}"))!;
         var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        SelectConsoleContext(client, tenant);
 
         using var wrongType = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest(
             "wrong-type", new()

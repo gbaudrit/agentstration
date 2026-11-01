@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Flows;
+using Agentstration.Resources;
 using Agentstration.Web.FlowDesigner.Components;
 
 namespace Agentstration.Web.FlowDesigner.Tests;
@@ -417,7 +418,7 @@ public sealed class FlowTopologyProjectorTests
         Input = JsonSerializer.SerializeToElement(new { prompt = "test" }),
         CreatedAt = DateTimeOffset.UtcNow,
         Scope = new FlowRunScope(Guid.Empty, WorkspaceId, Guid.Empty),
-        DefinitionSnapshot = new FlowVersion(WorkspaceId, new("flow"), "1.0.0", null, definition, new Dictionary<string, string>(), DateTimeOffset.UtcNow, graph)
+        DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Workspace(WorkspaceId.Value), new("flow"), "1.0.0", null, definition, new Dictionary<string, string>(), DateTimeOffset.UtcNow, graph)
     };
 
     private static FlowRunEvent Event(long sequence, string participant) => new(

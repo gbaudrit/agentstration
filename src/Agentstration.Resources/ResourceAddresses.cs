@@ -12,6 +12,65 @@ public readonly record struct WorkspaceId(Guid Value)
     public override string ToString() => Value.ToString("D");
 }
 
+/// <summary>
+/// Identifies the exact scope that owns one execution and the independently authenticated principal
+/// that initiated it. Tenant and Workspace coordinates are present only when required by the scope.
+/// </summary>
+public sealed record ExactExecutionScope
+{
+    [JsonConstructor]
+    public ExactExecutionScope(
+        ResourceScopeRef scopeRef,
+        Guid principalId,
+        Guid? tenantId,
+        WorkspaceId? workspaceId)
+    {
+        if (principalId == Guid.Empty) throw new ArgumentException("An execution scope requires a principal.", nameof(principalId));
+        ScopeRef = scopeRef;
+        PrincipalId = principalId;
+        TenantId = tenantId;
+        WorkspaceId = workspaceId;
+        Validate();
+    }
+
+    public ResourceScopeRef ScopeRef { get; }
+    public Guid PrincipalId { get; }
+    public Guid? TenantId { get; }
+    public WorkspaceId? WorkspaceId { get; }
+
+    public static ExactExecutionScope Instance(Guid principalId) =>
+        new(ResourceScopeRef.Instance, principalId, null, null);
+
+    public static ExactExecutionScope Tenant(Guid tenantId, Guid principalId) =>
+        new(ResourceScopeRef.Tenant(tenantId), principalId, tenantId, null);
+
+    public static ExactExecutionScope Workspace(Guid tenantId, Guid workspaceId, Guid principalId) =>
+        new(ResourceScopeRef.Workspace(workspaceId), principalId, tenantId, new WorkspaceId(workspaceId));
+
+    public static ExactExecutionScope Create(
+        ResourceScopeRef scopeRef,
+        Guid principalId,
+        Guid? tenantId = null,
+        Guid? workspaceId = null) => scopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => tenantId is null && workspaceId is null
+                ? Instance(principalId)
+                : throw new ArgumentException("An Instance execution cannot carry Tenant or Workspace coordinates.", nameof(scopeRef)),
+            ResourceScopeKind.Tenant when scopeRef.TargetId == tenantId && workspaceId is null =>
+                Tenant(tenantId!.Value, principalId),
+            ResourceScopeKind.Workspace when scopeRef.TargetId == workspaceId && tenantId is not null =>
+                Workspace(tenantId.Value, workspaceId!.Value, principalId),
+            _ => throw new ArgumentException("The execution coordinates do not match the exact scope reference.", nameof(scopeRef))
+        };
+
+    private void Validate()
+    {
+        if (TenantId == Guid.Empty) throw new ArgumentException("A Tenant coordinate cannot be empty.", nameof(TenantId));
+        if (WorkspaceId is { Value: var value } && value == Guid.Empty)
+            throw new ArgumentException("A Workspace coordinate cannot be empty.", nameof(WorkspaceId));
+    }
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<ResourceScopeKind>))]
 public enum ResourceScopeKind
 {

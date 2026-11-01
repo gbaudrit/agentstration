@@ -212,7 +212,10 @@ public sealed class McpToolCatalogTests
             {
                 DisplayName = "Utilities AEP",
                 ProviderType = ToolProviderType.Aep,
-                Aep = new AepToolProviderConfiguration { ExtensionId = "Agentstration.Extensions.Utilities" }
+                Aep = new AepToolProviderConfiguration
+                {
+                    Extension = new ResourceReference("utilities-extension", WorkspaceScope, ResourceNamespace.Default)
+                }
             }
         };
         var tool = Tool(provider.Metadata.Name) with
@@ -254,7 +257,7 @@ public sealed class McpToolCatalogTests
             ScopeRef = WorkspaceScope,
             Definition = baseline.Definition with { ExternalId = "json.compact" }
         };
-        var registration = Registration("utilities-extension", provider.Definition.Aep!.ExtensionId);
+        var registration = Registration("utilities-extension", "Agentstration.Extensions.Utilities");
         var store = new FakeStore(provider, tool, registration);
         var adapter = new ToolProviderAdapter(
             new ResourceAepExtensionRegistrationResolver(store),
@@ -306,29 +309,37 @@ public sealed class McpToolCatalogTests
     }
 
     [TestMethod]
-    public async Task AepRegistrationResolutionFailsClosedForMissingDisabledOrAmbiguousMatches()
+    public async Task AepRegistrationResolutionFailsClosedForMissingDisabledOrMismatchedScope()
     {
         var provider = AepProvider();
 
         await AssertResolutionCodeAsync("extension_unavailable", new FakeStore());
-        await AssertResolutionCodeAsync("extension_unavailable", new FakeStore(
-            Registration("disabled", provider.Definition.Aep!.ExtensionId) with
+        await AssertResolutionCodeAsync("extension_disabled", new FakeStore(
+            Registration("utilities-extension", "Agentstration.Extensions.Utilities") with
             {
-                Definition = Registration("disabled", provider.Definition.Aep.ExtensionId).Definition with { Enabled = false }
+                Definition = Registration("utilities-extension", "Agentstration.Extensions.Utilities").Definition with { Enabled = false }
             }));
         await AssertResolutionCodeAsync("extension_unavailable", new FakeStore(
-            Registration("sibling", provider.Definition.Aep!.ExtensionId) with
+            Registration("utilities-extension", "Agentstration.Extensions.Utilities") with
             {
                 ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("22222222-2222-2222-2222-222222222222"))
             }));
-        await AssertResolutionCodeAsync("extension_registration_ambiguous", new FakeStore(
-            Registration("first", provider.Definition.Aep!.ExtensionId),
-            Registration("second", provider.Definition.Aep.ExtensionId)));
+        var siblingScope = ResourceScopeRef.Workspace(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        await AssertResolutionCodeAsync("extension_scope_mismatch", new FakeStore(), AepProvider() with
+        {
+            Definition = AepProvider().Definition with
+            {
+                Aep = new AepToolProviderConfiguration
+                {
+                    Extension = new ResourceReference("utilities-extension", siblingScope, ResourceNamespace.Default)
+                }
+            }
+        });
 
-        static async Task AssertResolutionCodeAsync(string expected, IResourceStore store)
+        static async Task AssertResolutionCodeAsync(string expected, IResourceStore store, ToolProviderResource? candidate = null)
         {
             var exception = await Assert.ThrowsAsync<ToolResolutionException>(async () =>
-                await new ResourceAepExtensionRegistrationResolver(store).ResolveAsync(AepProvider(), default));
+                await new ResourceAepExtensionRegistrationResolver(store).ResolveAsync(candidate ?? AepProvider(), default));
             Assert.AreEqual(expected, exception.Code);
         }
     }
@@ -341,10 +352,13 @@ public sealed class McpToolCatalogTests
         {
             Definition = AepProvider().Definition with
             {
-                Aep = new AepToolProviderConfiguration { ExtensionId = "Agentstration.Extensions.Unexpected" }
+                Aep = new AepToolProviderConfiguration
+                {
+                    Extension = new ResourceReference("unexpected", WorkspaceScope, ResourceNamespace.Default)
+                }
             }
         };
-        var store = new FakeStore(provider, Registration("unexpected", provider.Definition.Aep!.ExtensionId));
+        var store = new FakeStore(provider, Registration("unexpected", "Agentstration.Extensions.Unexpected"));
         var adapter = new ToolProviderAdapter(
             new ResourceAepExtensionRegistrationResolver(store),
             new ConfigurationToolProviderEnvironmentResolver(new ConfigurationBuilder().Build()),
@@ -363,7 +377,7 @@ public sealed class McpToolCatalogTests
         var provider = AepProvider();
         var registration = Registration(
             "utilities-extension",
-            provider.Definition.Aep!.ExtensionId,
+            "Agentstration.Extensions.Utilities",
             AepTransportAuthenticationMode.StaticBearer,
             new ResourceReference("utilities-token", WorkspaceScope));
         var store = new FakeStore(provider, registration);
@@ -377,6 +391,49 @@ public sealed class McpToolCatalogTests
             await adapter.DiscoverAsync(provider, default));
 
         Assert.AreEqual("authentication_failed", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task ToolInvokerUsesExactExecutionPinsAndRejectsStaleMaterial()
+    {
+        var providerUid = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var toolUid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var provider = Provider() with { ScopeRef = WorkspaceScope, Uid = providerUid, Generation = 3 };
+        var tool = Tool(provider.Name) with
+        {
+            ScopeRef = WorkspaceScope,
+            Uid = toolUid,
+            Generation = 5,
+            Definition = Tool(provider.Name).Definition with
+            {
+                Provider = new ResourceReference(provider.Name, WorkspaceScope, provider.Namespace)
+            }
+        };
+        var invoker = new McpToolInvoker(new FakeStore(provider, tool), null!);
+        var context = new ToolExecutionContext
+        {
+            ToolCallId = "call-1",
+            InvocationId = "invocation-1",
+            ToolId = tool.Name,
+            ToolNamespace = tool.Namespace,
+            ToolScopeRef = WorkspaceScope,
+            ToolUid = toolUid,
+            ToolGeneration = 5,
+            ToolName = tool.Definition.ExternalId!,
+            ToolProviderId = provider.Name,
+            ToolProviderNamespace = provider.Namespace,
+            ToolProviderScopeRef = WorkspaceScope,
+            ToolProviderUid = providerUid,
+            ToolProviderGeneration = 3,
+            ExternalToolId = tool.Definition.ExternalId,
+            Arguments = JsonSerializer.SerializeToElement(new { })
+        };
+
+        await invoker.ValidateAsync(context, default);
+        var exception = await Assert.ThrowsAsync<ToolResolutionException>(async () =>
+            await invoker.ValidateAsync(context with { ToolGeneration = 4 }, default));
+
+        Assert.AreEqual("tool_stale", exception.Code);
     }
 
     private static ToolExecutionContext Context(IAgentTool tool) => new()
@@ -405,7 +462,10 @@ public sealed class McpToolCatalogTests
         {
             DisplayName = "Utilities AEP",
             ProviderType = ToolProviderType.Aep,
-            Aep = new AepToolProviderConfiguration { ExtensionId = "Agentstration.Extensions.Utilities" }
+            Aep = new AepToolProviderConfiguration
+            {
+                Extension = new ResourceReference("utilities-extension", WorkspaceScope, ResourceNamespace.Default)
+            }
         }
     };
 
@@ -465,6 +525,7 @@ public sealed class McpToolCatalogTests
         private readonly IReadOnlyList<Resource> values = resources;
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource => Task.FromResult(values.OfType<T>().Where(value => value.Kind == key.Kind && value.Namespace == key.Namespace && value.Name == key.Name).Select(Stored).SingleOrDefault());
+        public Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource => Task.FromResult(values.OfType<T>().Where(value => value.Kind == address.Address.Kind && value.Namespace == address.Address.Namespace && value.Name == address.Address.Name && value.ScopeRef == address.ScopeRef).Select(Stored).SingleOrDefault());
         public Task<IReadOnlyList<StoredResource<T>>> ListVisibleAsync<T>(ResourceScopeRef targetScopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource => Task.FromResult<IReadOnlyList<StoredResource<T>>>(values.OfType<T>().Where(value => value.Kind == kind && (value.ScopeRef == ResourceScopeRef.Instance || value.ScopeRef == targetScopeRef)).Skip(skip).Take(take).Select(Stored).ToArray());
         public Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource => Task.FromResult<IReadOnlyList<StoredResource<T>>>(values.OfType<T>().Where(value => value.Kind == kind).Skip(skip).Take(take).Select(Stored).ToArray());
         public Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();

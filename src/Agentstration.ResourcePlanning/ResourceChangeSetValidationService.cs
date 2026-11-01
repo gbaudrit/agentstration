@@ -145,7 +145,7 @@ public sealed class CanonicalPlannedResourceValidator(AgentManagementService age
             {
                 var definition = change.Proposed.Definition;
                 var spec = definition.GetProperty("spec").Deserialize<FlowDefinition>(JsonOptions) ?? throw new JsonException("Flow specification is empty.");
-                FlowValidator.Validate(new(scope.WorkspaceId, new(change.Proposed.Metadata.Name, change.Proposed.Metadata.Namespace), change.Proposed.Metadata.Name,
+                FlowValidator.Validate(new(ResourceScopeRef.Workspace(scope.WorkspaceId.Value), new(change.Proposed.Metadata.Name, change.Proposed.Metadata.Namespace), change.Proposed.Metadata.Name,
                     definition.GetProperty("description").GetString(), definition.GetProperty("version").GetString() ?? string.Empty,
                     definition.GetProperty("enabled").GetBoolean(), null, spec, new Dictionary<string, string>(), DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch,
                     definition.GetProperty("displayName").GetString()));

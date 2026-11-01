@@ -36,4 +36,27 @@
   <data name="RunCompleted"><value>Run now completed with outcome {0}.</value></data><data name="WorkSubmitted"><value>Work {0} submitted.</value></data><data name="EnabledSuccess"><value>Trigger enabled. Future occurrences will be scheduled.</value></data><data name="DisabledSuccess"><value>Trigger disabled. No further scheduled occurrences will fire.</value></data>
 <data name="Flow"><value>Flow</value></data><data name="Uid"><value>UID</value></data>
   <data name="Scope"><value>Scope</value></data>
+  <data name="DefinitionScope"><value>Definition scope</value></data>
+  <data name="ExecutionScope"><value>Execution scope</value></data>
+  <data name="Instance"><value>Instance</value></data>
+  <data name="Tenant"><value>Tenant</value></data>
+  <data name="TriggerDetailsTabs"><value>Trigger details</value></data>
+  <data name="Tab.Overview"><value>Overview</value></data>
+  <data name="Tab.Definition"><value>Definition</value></data>
+  <data name="Tab.Access"><value>Access</value></data>
+  <data name="Tab.YAML"><value>YAML</value></data>
+  <data name="Overview"><value>Trigger overview</value></data>
+  <data name="RawDefinition"><value>Raw resource</value></data>
+  <data name="TriggerYaml"><value>Trigger YAML</value></data>
+  <data name="TriggerYamlHelp"><value>Inspect the complete persisted Trigger resource as read-only YAML.</value></data>
+  <data name="ReadOnly"><value>Read-only</value></data>
+  <data name="Access"><value>Access</value></data>
+  <data name="TriggerAccessModel"><value>Flow access</value></data>
+  <data name="TriggerAccessModelHelp"><value>This Trigger uses the access permissions of its target Flow.</value></data>
+  <data name="ManageFlowAccess"><value>Manage Flow access</value></data>
+  <data name="Error.OperationalWorkspaceUnavailable"><value>The selected context has no operational Workspace available for Triggers.</value></data>
+  <data name="Error.TargetNotDiscoverable"><value>This Flow is no longer visible from the selected context. Choose another published Flow.</value></data>
+  <data name="Error.TargetAmbiguous"><value>More than one visible Flow has this identity. Select an exact Flow scope.</value></data>
+  <data name="Error.TargetUseDenied"><value>This context is not authorized to use the selected Flow. Update its access policy before enabling the Trigger.</value></data>
+  <data name="Error.TargetStale"><value>The saved Flow identity or published version has changed. Reopen the Trigger and select the Flow again.</value></data>
 </root>

@@ -75,7 +75,8 @@ export const exerciseFlowNamedOutputs: Journey<ExerciseFlowNamedOutputsInput> = 
   await designer.open(context.consoleUrl, 'default', fixture.parentName);
   await designer.expectTransition('review —rejected→ final-approved');
   await designer.expectTransition('review —provider-error→ error-parent');
-  await designer.publishAsReadOnlyFixture(context.consoleUrl, fixture.parentName);
-  await designer.expectReadOnlyPublished(context.consoleUrl, 'default', fixture.parentName);
+  await designer.publishUserFixture(context.consoleUrl, fixture.parentName);
+  await designer.expectPublishedUserFlowEditable(context.consoleUrl, 'default', fixture.parentName);
+  await designer.expectReadOnlyPublished(context.consoleUrl, 'default', 'artifact-storage-filesystem-read-builtin');
   await context.checkpoint({ name: Checkpoints.flowNamedOutputs.publishedReadOnly, page: context.pages.page, target: designer.designer });
 };

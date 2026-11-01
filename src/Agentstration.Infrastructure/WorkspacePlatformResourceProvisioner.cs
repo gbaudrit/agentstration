@@ -3,6 +3,7 @@ using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Profiles;
@@ -19,6 +20,8 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     IIdentityStore identities,
     IRequestContextScopeFactory scopes,
     IResourceStore resources,
+    IResourceGovernanceContext governance,
+    IResourceAccessPolicyService accessPolicies,
     InternalMcpToolProjectionService internalTools,
     ArtifactPlatformResourceProvisioner artifacts,
     KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
@@ -37,15 +40,22 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public async Task EnsureAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         using var systemScope = scopes.PushSystem();
-        await EnsureStandardRuntimeProfileAsync(ResourceScopeRef.Tenant(tenantId), cancellationToken);
+        var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
+            ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
+        var runtimeProfile = await EnsureStandardRuntimeProfileAsync(cancellationToken);
+        if (OperationalTopologyIdentities.IsOperationalWorkspace(workspace))
+            await RemoveWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
+        else
+            await EnsureWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
+        await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
+        await artifacts.EnsureAsync(ResourceScopeRef.Instance, cancellationToken);
         await internalTools.EnsureAsync(
             ResourceScopeRef.Workspace(workspaceId),
             ResourceNamespace.Default,
             cancellationToken);
         await artifacts.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
-        await knowledge.EnsureAsync(ResourceScopeRef.Workspace(workspaceId), cancellationToken);
-        var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
-            ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
+        await knowledge.EnsureAsync(ResourceScopeRef.Tenant(tenantId),
+            ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         if (workspace.Status == WorkspaceStatus.Initializing)
             await identities.UpdateWorkspaceAsync(workspace with { Status = WorkspaceStatus.Active }, cancellationToken);
     }
@@ -53,14 +63,16 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken) =>
         EnsureAsync(workspace.TenantId, workspace.Id, cancellationToken);
 
-    private async Task EnsureStandardRuntimeProfileAsync(ResourceScopeRef tenantScope, CancellationToken cancellationToken)
+    private async Task<StoredResource<RuntimeProfileResource>> EnsureStandardRuntimeProfileAsync(CancellationToken cancellationToken)
     {
+        using var governanceScope = governance.Push(ResourceGovernance.Core("runtime.standard-profile"));
+        var instanceScope = ResourceScopeRef.Instance;
         var address = ScopedResourceAddress.Create(
-            tenantScope,
+            instanceScope,
             ResourceNamespace.Default,
             RuntimeProfileResourceKinds.RuntimeProfile,
             "maf-builtin");
-        if (await resources.GetExactAsync<RuntimeProfileResource>(address, cancellationToken) is not null) return;
+        if (await resources.GetExactAsync<RuntimeProfileResource>(address, cancellationToken) is { } existing) return existing;
         var profile = new RuntimeProfileResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -73,7 +85,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
                     [ResourceProvenanceAnnotations.BuiltIn] = "true"
                 }
             },
-            ScopeRef = tenantScope,
+            ScopeRef = instanceScope,
             Generation = 1,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
             Definition = new RuntimeProfileProperties
@@ -90,12 +102,68 @@ internal sealed class WorkspacePlatformResourceProvisioner(
         };
         try
         {
-            await resources.PutExactAsync(tenantScope, profile, null, true, cancellationToken);
+            return await resources.PutExactAsync(instanceScope, profile, null, true, cancellationToken);
         }
         catch (ResourceConcurrencyException)
         {
-            if (await resources.GetExactAsync<RuntimeProfileResource>(address, cancellationToken) is null)
-                throw;
+            var recovered = await resources.GetExactAsync<RuntimeProfileResource>(address, cancellationToken);
+            if (recovered is null) throw;
+            return recovered;
+        }
+    }
+
+    private async Task EnsureWorkspaceAccessAsync(
+        Resource resource,
+        ResourceScopeRef workspaceScope,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var current = await accessPolicies.GetAsync(resource.Uid, cancellationToken);
+            if (current?.Policy.Grants.Any(grant => grant.TargetScopeRef == workspaceScope
+                    && grant.Actions.Contains(ResourceAccessAction.Discover)
+                    && grant.Actions.Contains(ResourceAccessAction.Use)) == true)
+                return;
+            var grants = (current?.Policy.Grants ?? [])
+                .Where(grant => grant.TargetScopeRef != workspaceScope)
+                .Append(new ResourceAccessGrant(workspaceScope,
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use]))
+                .ToArray();
+            try
+            {
+                _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(
+                    new(resource.Uid, resource.ScopeRef!.Value, resource.Namespace, resource.Kind, resource.Generation),
+                    grants), current?.ETag, cancellationToken);
+                return;
+            }
+            catch (ResourceConcurrencyException) when (attempt < 2)
+            {
+            }
+        }
+    }
+
+    private async Task RemoveWorkspaceAccessAsync(
+        Resource resource,
+        ResourceScopeRef workspaceScope,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var current = await accessPolicies.GetAsync(resource.Uid, cancellationToken);
+            if (current is null || current.Policy.Grants.All(grant => grant.TargetScopeRef != workspaceScope)) return;
+            var grants = current.Policy.Grants
+                .Where(grant => grant.TargetScopeRef != workspaceScope)
+                .ToArray();
+            try
+            {
+                _ = await accessPolicies.PutAsync(new ResourceAccessPolicy(
+                    current.Policy.Resource,
+                    grants), current.ETag, cancellationToken);
+                return;
+            }
+            catch (ResourceConcurrencyException) when (attempt < 2)
+            {
+            }
         }
     }
 }
