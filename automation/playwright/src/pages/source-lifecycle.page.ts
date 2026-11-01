@@ -144,6 +144,8 @@ export class SourceLifecyclePage {
     await this.assertScopeBoundaries(consoleUrl, scopeFixture, true);
     await this.assertUnauthorized(consoleUrl, scopeFixture, this.knowledgeApi());
     await this.openKnowledge(consoleUrl, 'snapshots');
+    await expect(this.snapshots).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.snapshotDetails)).toBeVisible();
   }
 
   private async provision(consoleUrl: string, scope: ExecutionScopeFixture, sources: boolean): Promise<void> {
@@ -491,8 +493,21 @@ export class SourceLifecyclePage {
   }
 
   public async assertResponsive(): Promise<void> {
-    const widths = await this.page.evaluate(() => ({ actual: document.documentElement.scrollWidth, viewport: window.innerWidth }));
-    expect(widths.actual).toBeLessThanOrEqual(widths.viewport);
+    const widths = await this.page.evaluate(async () => {
+      await document.fonts.ready;
+      return {
+        actual: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+        overflowing: Array.from(document.querySelectorAll<HTMLElement>('main *')).map(element => {
+          const bounds = element.getBoundingClientRect();
+          return {
+            element: element.dataset.testid ?? `${element.tagName.toLowerCase()}.${element.className}`,
+            right: Math.round(bounds.right), width: Math.round(bounds.width),
+          };
+        }).filter(element => element.right > window.innerWidth + 1).slice(-15),
+      };
+    });
+    expect(widths.actual, JSON.stringify(widths.overflowing)).toBeLessThanOrEqual(widths.viewport);
   }
   private async fillParameters(testId: string, value: object): Promise<void> {
     const editor = this.page.getByTestId(testId);
