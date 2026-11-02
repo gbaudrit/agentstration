@@ -22,8 +22,11 @@ export class ResourceScopesPage {
   }
 
   public async selectedWorkspace(): Promise<{ id: string; name: string }> {
+    const reference = this.detail.locator('.scope-reference');
+    await expect(reference).toHaveText(/^\/workspaces\/[0-9a-f-]{36}$/i);
+    const scopeRef = await reference.innerText();
     return {
-      id: (await this.page.getByTestId(TestIds.console.shell).getAttribute('data-workspace-id'))!,
+      id: scopeRef.slice('/workspaces/'.length),
       name: await this.detail.locator('h2').innerText(),
     };
   }
