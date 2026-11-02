@@ -14,7 +14,8 @@
         "Agentstration__Bootstrap__InitialProfiles__0": "development",
         "Agentstration__Aep__EnrollmentMode": "PairingCode",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
-        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057"
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057",
+        "DOCKER_HOST": "tcp://localhost:2375"
       }
     },
     "https-NoBootstrap": {
@@ -30,7 +31,8 @@
         "Agentstration__Bootstrap__InitialProfiles__0": "development",
         "Agentstration__Aep__EnrollmentMode": "PairingCode",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
-        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057"
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057",
+        "DOCKER_HOST": "tcp://localhost:2375"
       }
     },
     "https-LAN": {
@@ -47,6 +49,7 @@
         "Agentstration__Aep__EnrollmentMode": "PairingCode",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057",
+        "DOCKER_HOST": "tcp://localhost:2375",
         "Agentstration__Lan__Enabled": "true"
       }
     },
@@ -64,6 +67,7 @@
         "Agentstration__Aep__EnrollmentMode": "PairingCode",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057",
+        "DOCKER_HOST": "tcp://localhost:2375",
         "Agentstration__Lan__Enabled": "true"
       }
     }

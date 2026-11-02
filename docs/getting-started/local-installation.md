@@ -39,8 +39,6 @@ dotnet run --project src/Agentstration.AppHost --launch-profile https-LAN
 
 Use `https-LAN-NoBootstrap` to omit initial bootstrap. The usual `https` and `https-NoBootstrap` profiles remain local-only. The LAN profiles reuse the same instance and data directory; switching profiles does not create or reset an instance.
 
-All Aspire profiles use the configured Docker endpoint and context without overriding `DOCKER_HOST`. When using container-backed resources such as managed Crawl4AI or PostgreSQL, verify `docker info` succeeds in the launching environment. Docker Desktop's active context can use its normal local connection; the launch profiles do not require a daemon listening on TCP port `2375`.
-
 The LAN profiles add HTTPS listeners on all IPv4 interfaces, with fixed ports:
 
 | Application | Address from another machine |

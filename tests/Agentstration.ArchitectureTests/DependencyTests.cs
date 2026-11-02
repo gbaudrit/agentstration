@@ -1514,8 +1514,6 @@ public sealed class DependencyTests
             }
 
             var variables = profile.Value.GetProperty("environmentVariables");
-            Assert.IsFalse(variables.TryGetProperty("DOCKER_HOST", out _),
-                $"Profile {profile.Name} must respect the operator's Docker endpoint and context.");
             var enabled = variables.TryGetProperty("Agentstration__Lan__Enabled", out var lan)
                 && bool.Parse(lan.GetString()!);
             Assert.AreEqual(profile.Name is "https-LAN" or "https-LAN-NoBootstrap", enabled);
