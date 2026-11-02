@@ -17,7 +17,7 @@ The Development profile listens on `http://localhost:5310`. Enroll that endpoint
 - technical Tools `openapi.contract.discover` and `openapi.operation.invoke`;
 - the installable `openapi-governed` Data Source Profile bundle.
 
-Bundle installation remains explicit until extension-scoped installation from #696 is delivered.
+Enrollment installs the advertised bundle at the exact Extension Registration scope (Instance, Tenant, or Workspace), resolves and enables only its two required technical Tools, and records a durable governed inventory. Its ToolSet, published Flows, and Data Source Profile remain read-only through ordinary administration, including while the extension is offline. Identical enrollment retries are idempotent; ownership or definition drift produces a conflict. The former `openapi-testing` and `crawl4ai-testing` bootstrap profiles and temporary Tool activation bridge have been removed in favor of this lifecycle.
 
 For the Aspire development topology, set `OpenApi:Enabled=true` and provide at least one `OpenApi:AllowedDomains` entry. The flag is `false` by default, so the standalone topology remains offline and does not launch this optional extension. The AppHost forwards the configured domain, port, method, media-type and execution bounds, enrolls the extension through the selected development AEP enrollment mode, and registers it with the Console automatically.
 

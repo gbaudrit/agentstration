@@ -67,7 +67,7 @@ public static class OpenApiDataSourceProfileBundle
                 name: output
                 displayName: Discovered operations
                 outputMapping: { choices: "${steps.discover.output.structuredContent.choices}", artifacts: [], diagnostics: "${steps.discover.output.structuredContent.diagnostics}" }
-              - { type: failure, name: failure, displayName: Discovery failed }
+              - { type: output, name: failure, displayName: Discovery failed, outcome: error }
             transitions:
               - { id: input-discover, fromStep: input, event: completed, toStep: discover }
               - { id: discover-output, fromStep: discover, event: success, toStep: output }
@@ -125,28 +125,28 @@ public static class OpenApiDataSourceProfileBundle
               - type: toolRoute
                 name: create
                 displayName: Create staged response
-                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0, scopeRef: /instance }
                 capability: staged-artifact.create
                 route: default
                 argumentsMapping: { fileName: openapi-response.bin, mediaType: "${steps.invoke.output.structuredContent.mediaType}" }
               - type: toolRoute
                 name: write
                 displayName: Write response
-                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0, scopeRef: /instance }
                 capability: staged-artifact.write
                 route: default
                 argumentsMapping: { artifactId: "${steps.create.output.artifactReference}", offset: 0, contentBase64: "${steps.invoke.output.structuredContent.contentBase64}" }
               - type: toolRoute
                 name: seal
                 displayName: Seal response
-                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0 }
+                toolSet: { resourceId: staged-artifacts-builtin, version: 1.0.0, scopeRef: /instance }
                 capability: staged-artifact.seal
                 route: default
                 argumentsMapping: { artifactId: "${steps.create.output.artifactReference}" }
               - type: flow
                 name: persist
                 displayName: Persist acquired response
-                flow: { resourceId: artifact-storage-filesystem-write-builtin, versionStrategy: active }
+                flow: { resourceId: artifact-storage-filesystem-write-builtin, versionStrategy: active, scopeRef: /instance }
                 inputMapping: { stagedArtifactId: "${steps.create.output.artifactReference}", producerFlowRunId: "${execution.flowRunId}", producerFlowStepId: seal }
               - type: output
                 name: output
@@ -154,7 +154,7 @@ public static class OpenApiDataSourceProfileBundle
                 outputMapping:
                   artifacts:
                     - { artifactId: "${steps.persist.output.flowRunArtifactId}", kind: durable, disposition: publishable, name: "${input.dataSourceId}", mediaType: "${steps.invoke.output.structuredContent.mediaType}", digest: "${steps.invoke.output.structuredContent.sha256}" }
-              - { type: failure, name: failure, displayName: Acquisition failed }
+              - { type: output, name: failure, displayName: Acquisition failed, outcome: error }
             transitions:
               - { id: input-invoke, fromStep: input, event: completed, toStep: invoke }
               - { id: invoke-create, fromStep: invoke, event: success, toStep: create }
