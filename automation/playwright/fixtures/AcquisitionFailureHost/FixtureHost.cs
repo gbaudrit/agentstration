@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 
 namespace Agentstration.Playwright.AcquisitionFailure;
@@ -17,7 +18,10 @@ internal static class FixtureHost
             ?? throw new InvalidOperationException("The browser fixture requires ASPNETCORE_URLS."));
         factory.UseKestrel(address.Port);
         factory.StartServer();
-        await Task.Delay(Timeout.InfiniteTimeSpan);
+        var shutdown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var lifetime = factory.Services.GetRequiredService<IHostApplicationLifetime>();
+        using var registration = lifetime.ApplicationStopping.Register(() => shutdown.TrySetResult());
+        await shutdown.Task;
     }
 }
 
