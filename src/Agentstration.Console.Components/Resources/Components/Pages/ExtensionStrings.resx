@@ -44,4 +44,5 @@
   <data name="ManagedResourceKind.FlowVersion"><value>Flow version</value></data>
   <data name="ManagedResourceKind.DataSourceProfileRevision"><value>Data Source Profile revision</value></data>
   <data name="TechnicalDetails"><value>Technical details</value></data>
+  <data name="PublishedVersions"><value>Published versions</value></data>
 </root>

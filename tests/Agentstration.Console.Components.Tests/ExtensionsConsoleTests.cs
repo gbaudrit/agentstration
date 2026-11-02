@@ -545,6 +545,38 @@ public sealed class ExtensionsConsoleTests
         StringAssert.Contains(evidence.TextContent, "digest");
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Published versions")]
+    [DataRow("fr-FR", "Versions publiées")]
+    public async Task BundleInventoryKeepsPublicationsInTechnicalDetailsWithoutLinks(string cultureName, string publicationsLabel)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
+        context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters =>
+            parameters.Add(value => value.RegistrationName, "crawl4ai"));
+        await rendered.WaitForElements("[role='tab']")[4].ClickAsync(new());
+
+        var grid = rendered.Find(".extension-bundle-grid");
+        Assert.HasCount(3, grid.QuerySelectorAll("tbody tr"));
+        Assert.HasCount(3, grid.QuerySelectorAll("a"));
+        Assert.IsFalse(grid.TextContent.Contains("--92521fc3", StringComparison.Ordinal));
+        Assert.IsFalse(grid.TextContent.Contains("data-source-profile-revision", StringComparison.Ordinal));
+        var evidence = rendered.Find(".extension-bundle-evidence");
+        Assert.AreEqual(publicationsLabel, evidence.QuerySelector("h4")!.TextContent);
+        var publications = evidence.QuerySelector(".extension-bundle-publications")!;
+        Assert.HasCount(3, publications.QuerySelectorAll("li"));
+        Assert.IsEmpty(publications.QuerySelectorAll("a"));
+        StringAssert.Contains(publications.TextContent, "crawl4ai-web-acquisition--92521fc3");
+        StringAssert.Contains(publications.TextContent, "data-source-profile-revision--abcd");
+        Assert.HasCount(3, publications.QuerySelectorAll(".resource-scope-badge"));
+        Assert.HasCount(3, publications.QuerySelectorAll("span code").Where(value => value.TextContent == "1.0.0"));
+    }
+
     private sealed class BundleExtensionsClient(ExtensionBundleInstallationState state = ExtensionBundleInstallationState.Installed) : IExtensionsClient
     {
         private static readonly ResourceScopeRef Scope = ResourceScopeRef.Instance;
@@ -583,7 +615,10 @@ public sealed class ExtensionsConsoleTests
                     [
                         new(ToolResourceKinds.ToolSet, "default", "crawl4ai-web-acquisition", Scope, Guid.NewGuid(), 1, "1.0.0", "toolset-hash", false),
                         new(DataSourceResourceKinds.DataSourceProfile, "default", "crawl4ai-web", Scope, Guid.NewGuid(), 1, "1.0.0", "profile-hash", false),
-                        new(FlowResourceKinds.Flow, "default", "crawl4ai-web-acquisition", Scope, Guid.NewGuid(), null, "1.0.0", "flow-hash", false)
+                        new(FlowResourceKinds.Flow, "default", "crawl4ai-web-acquisition", Scope, Guid.NewGuid(), null, "1.0.0", "flow-hash", false),
+                        new(ToolResourceKinds.ToolSetVersion, "default", "crawl4ai-web-acquisition--92521fc3", Scope, Guid.NewGuid(), 1, "1.0.0", "published-toolset-hash", true),
+                        new("FlowVersion", "default", "crawl4ai-web-acquisition", Scope, null, null, "1.0.0", "published-flow-hash", true),
+                        new(DataSourceResourceKinds.DataSourceProfileRevision, "default", "data-source-profile-revision--abcd", Scope, Guid.NewGuid(), 1, "1.0.0", "published-profile-hash", true)
                     ],
                     null)
             ]);

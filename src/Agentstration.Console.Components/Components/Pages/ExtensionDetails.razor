@@ -208,6 +208,8 @@ else
             {
                 @foreach (var installation in item.Extension.BundleInstallations)
                 {
+                    var resources = installation.ManagedResources.Where(resource => !resource.Published).ToArray();
+                    var publications = installation.ManagedResources.Where(resource => resource.Published).ToArray();
                     <article class="resource-section extension-bundle-card">
                         <div class="extension-bundle-heading">
                             <div class="extension-bundle-title"><span class="extension-bundle-icon" aria-hidden="true"><UiIcon Name="layers" /></span><div><p class="eyebrow">@T("Bundle")</p><h3>@installation.BundleId</h3></div></div>
@@ -219,21 +221,32 @@ else
                             <div class="extension-bundle-bindings"><p class="field-label">@T("ToolBindings")</p><div class="extension-bundle-binding-list">@foreach (var binding in installation.ToolBindings) { <a href="@ToolReferenceUrl(installation.ScopeRef, binding.Value)" title="@binding.Value.Name">@binding.Key</a> }</div></div>
                         }
                         @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <div class="extension-bundle-diagnostic"><strong>@T("Diagnostics")</strong><p>@installation.Diagnostic</p></div> }
-                        @if (installation.ManagedResources.Count > 0)
+                        @if (resources.Length > 0)
                         {
-                            <div class="extension-bundle-grid"><DataGrid TItem="ExtensionManagedResourceResponse" Items="installation.ManagedResources">
+                            <div class="extension-bundle-grid"><DataGrid TItem="ExtensionManagedResourceResponse" Items="resources">
                                 <Header><tr><th>@T("Type")</th><th>@T("Identity")</th><th>@T("Scope")</th><th>@T("Version")</th><th>@T("State")</th></tr></Header>
                                 <Row Context="resource"><tr>
                                     <td data-label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></td>
                                     <td data-label="@T("Identity")">@if (installation.State != ExtensionBundleInstallationState.Degraded && ManagedResourceUrl(resource) is { } url) { <a class="text-button" href="@url">@resource.Namespace/@resource.Name</a> } else { <code>@resource.Namespace/@resource.Name</code> }</td>
                                     <td data-label="@T("Scope")"><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></td>
                                     <td data-label="@T("Version")"><code>@(resource.Version ?? "—")</code></td>
-                                    <td data-label="@T("State")"><StatusBadge Text="@(resource.Published ? T("Published") : T("ManagedReadOnly"))" Status="UiStatus.Neutral" /></td>
+                                    <td data-label="@T("State")"><StatusBadge Text="@T("ManagedReadOnly")" Status="UiStatus.Neutral" /></td>
                                 </tr></Row>
                             </DataGrid></div>
                         }
                         else { <p>@T("NoManagedResources")</p> }
-                        <details class="extension-bundle-evidence"><summary>@T("TechnicalDetails")</summary><dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@installation.Name</code></dd><dt>@T("ManagingExtension")</dt><dd><code>@installation.ExtensionId</code></dd><dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd><dt>@T("ToolBindings")</dt><dd>@foreach (var binding in installation.ToolBindings) { <div><code>@binding.Key</code><br /><code>@binding.Value.Name</code></div> }</dd></dl></details>
+                        <details class="extension-bundle-evidence"><summary>@T("TechnicalDetails")</summary><dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@installation.Name</code></dd><dt>@T("ManagingExtension")</dt><dd><code>@installation.ExtensionId</code></dd><dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd><dt>@T("ToolBindings")</dt><dd>@foreach (var binding in installation.ToolBindings) { <div><code>@binding.Key</code><br /><code>@binding.Value.Name</code></div> }</dd></dl>
+                            @if (publications.Length > 0)
+                            {
+                                <h4>@T("PublishedVersions")</h4>
+                                <ul class="extension-bundle-publications">
+                                    @foreach (var publication in publications)
+                                    {
+                                        <li><div><strong>@ManagedResourceKindLabel(publication.Kind)</strong><code>@publication.Namespace/@publication.Name</code></div><div><ResourceScopeBadge ScopeRef="publication.ScopeRef" Compact /><span>@T("Version") <code>@(publication.Version ?? "—")</code></span></div></li>
+                                    }
+                                </ul>
+                            }
+                        </details>
                     </article>
                 }
             }
@@ -524,12 +537,12 @@ else
     };
     private static string? ManagedResourceUrl(ExtensionManagedResourceResponse resource) => resource.Kind switch
     {
-        ToolResourceKinds.ToolSet or ToolResourceKinds.ToolSetVersion => $"/tools/sets/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        FlowResourceKinds.Flow or "FlowVersion" => (resource.Namespace == ResourceNamespace.DefaultValue
+        ToolResourceKinds.ToolSet => $"/tools/sets/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
+        FlowResourceKinds.Flow => (resource.Namespace == ResourceNamespace.DefaultValue
             ? $"/flows/{Uri.EscapeDataString(resource.Name)}"
             : $"/namespaces/{Uri.EscapeDataString(resource.Namespace)}/flows/{Uri.EscapeDataString(resource.Name)}")
             + $"?scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        DataSourceResourceKinds.DataSourceProfile or DataSourceResourceKinds.DataSourceProfileRevision => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
+        DataSourceResourceKinds.DataSourceProfile => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
         _ => null
     };
     private enum DetailTab { Summary, Connection, Enrollment, Contributions, Resources, Options, Usages }
