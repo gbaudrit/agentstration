@@ -28,7 +28,7 @@ if (plan.productRef) {
 
 let product: ProductHosts | undefined;
 const externalAddresses = resolveCaptureAddresses(options, plan);
-const addresses = externalAddresses ?? (product = await startProductHosts());
+const addresses = externalAddresses ?? (product = await startProductHosts('Development', 'Deterministic', plan.journey === 'inspect-acquisition-failure'));
 
 const browser = await chromium.launch({
   headless: true,

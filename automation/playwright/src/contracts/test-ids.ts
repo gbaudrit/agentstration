@@ -134,6 +134,7 @@ export const TestIds = {
     stagedRetentionTab: 'staged-artifact-retention-tab',
   },
   sourceLifecycle: {
+    runError: 'flow-run-error',
     profiles: 'resource-data-source-profiles', profileEditor: 'data-source-profile-editor', sources: 'resource-data-sources',
     knowledgeSources: 'resource-knowledge-sources', knowledgeDetails: 'resource-knowledge-source-details',
     projectionProvenance: 'knowledge-projection-provenance', snapshots: 'knowledge-snapshots',
