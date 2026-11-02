@@ -54,7 +54,8 @@ public sealed partial class ApiClientTests
             };
             response.Headers.ETag = EntityTagHeaderValue.Parse("\"exact\"");
             return response;
-        })) { BaseAddress = new("http://localhost/") };
+        }))
+        { BaseAddress = new("http://localhost/") };
         var client = new ToolSetsApiClient(http);
         var resource = await client.GetToolSetAsync(scope, ns, "documentation");
         _ = await client.GetVersionsAsync(scope, ns, "documentation");

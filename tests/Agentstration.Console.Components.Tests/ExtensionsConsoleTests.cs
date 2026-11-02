@@ -599,21 +599,30 @@ public sealed class ExtensionsConsoleTests
         {
             "missing" => Tools.Where(value => value.Definition.ExternalId != "web.crawl").ToArray(),
             "conflict" => [.. Tools, Tool("web.crawl") with { Metadata = new ResourceMetadata { Name = "duplicate-crawl" } }],
-            "unavailable" => Tools.Select(value => value with { Definition = value.Definition with
-            { Discovery = value.Definition.Discovery! with { Available = false } } }).ToArray(),
+            "unavailable" => Tools.Select(value => value with
+            {
+                Definition = value.Definition with
+                { Discovery = value.Definition.Discovery! with { Available = false } }
+            }).ToArray(),
             _ => Tools
         };
         public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(Values);
         public Task<IReadOnlyList<ToolResource>> GetToolsAsync(ResourceScopeRef contextScope, string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(Values);
         public ResourceScopeRef? RequestedProviderScope { get; private set; }
         private ToolProviderResource Provider() => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new ResourceMetadata { Name = "crawl4ai" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Governance = managedProvider ? ResourceGovernance.Extension("registration:crawl4ai", "Crawl4AI", "1.0.0") : ResourceGovernance.User,
+            Definition = new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider,
-                Metadata = new ResourceMetadata { Name = "crawl4ai" }, ScopeRef = ResourceScopeRef.Instance,
-                Governance = managedProvider ? ResourceGovernance.Extension("registration:crawl4ai", "Crawl4AI", "1.0.0") : ResourceGovernance.User,
-                Definition = new() { DisplayName = "Crawl4AI provider", ProviderType = ToolProviderType.Aep,
-                    Aep = new() { Extension = new("crawl4ai", ResourceScopeRef.Instance, ResourceNamespace.Default) } }
-            };
+                DisplayName = "Crawl4AI provider",
+                ProviderType = ToolProviderType.Aep,
+                Aep = new() { Extension = new("crawl4ai", ResourceScopeRef.Instance, ResourceNamespace.Default) }
+            }
+        };
         public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ToolProviderResource>>([Provider()]);
         public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken) =>

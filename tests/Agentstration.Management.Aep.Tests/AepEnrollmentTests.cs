@@ -1,5 +1,4 @@
 extern alias crawl4ai;
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -8,9 +7,9 @@ using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
-using Agentstration.Identity.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Declarative;
 using Agentstration.Infrastructure.Tools;
@@ -646,8 +645,11 @@ public sealed class AepEnrollmentTests
             {
                 var record = (await store.ListExactAsync<ExtensionBundleInstallationResource>(scope,
                     ExtensionKinds.ExtensionBundleInstallation, 0, 10, default)).Single();
-                installation = record.Value with { Definition = record.Value.Definition with
-                { State = ExtensionBundleInstallationState.Installing, ManagedResources = [] } };
+                installation = record.Value with
+                {
+                    Definition = record.Value.Definition with
+                    { State = ExtensionBundleInstallationState.Installing, ManagedResources = [] }
+                };
                 _ = await store.PutExactAsync(scope, installation, record.ETag, false, default);
             }
             if (drift is "missing" or "owner") await store.DeleteExactAsync(address, original.ETag, default);
@@ -686,11 +688,14 @@ public sealed class AepEnrollmentTests
         if (drift == "manifest")
         {
             var bundle = manifest.Contributions.DataSourceProfileBundles!.Single();
-            manifest = manifest with { Contributions = manifest.Contributions with
+            manifest = manifest with
             {
-                DataSourceProfileBundles = [bundle with { ResourceManifests = bundle.ResourceManifests
+                Contributions = manifest.Contributions with
+                {
+                    DataSourceProfileBundles = [bundle with { ResourceManifests = bundle.ResourceManifests
                     .Select(value => value.Replace("Crawl4AI Web acquisition", "Changed acquisition", StringComparison.Ordinal)).ToArray() }]
-            } };
+                }
+            };
         }
         var conflict = await Assert.ThrowsExactlyAsync<AepBundleConflictException>(() =>
             factory.Services.GetServices<IAepEnrollmentResourceProvisioner>().OfType<AepEnrollmentBundleProvisioner>()

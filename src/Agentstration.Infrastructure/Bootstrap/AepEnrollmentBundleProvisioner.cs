@@ -8,11 +8,11 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Infrastructure.Declarative;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
-using Agentstration.Infrastructure.Declarative;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Infrastructure.Bootstrap;
@@ -267,14 +267,14 @@ public sealed class AepEnrollmentBundleProvisioner(
                     var published = (await flows.GetVersionExactAsync(scopeRef, id, version, cancellationToken))?.Value;
                     if (published is not null && OwnedBy(published.Governance, installationReference))
                         result.Add(new ExtensionManagedResource
-                    {
-                        Kind = "FlowVersion",
-                        Namespace = id.Namespace,
-                        Name = id.Value,
-                        ScopeRef = scopeRef,
-                        Version = version,
-                        DefinitionHash = published.DefinitionHash,
-                        Published = true
+                        {
+                            Kind = "FlowVersion",
+                            Namespace = id.Namespace,
+                            Name = id.Value,
+                            ScopeRef = scopeRef,
+                            Version = version,
+                            DefinitionHash = published.DefinitionHash,
+                            Published = true
                         });
                     else if (!allowMissing) throw Conflict("resource_missing", $"Flow version '{id}:{version}' is missing or has another owner.");
                 }
@@ -329,9 +329,14 @@ public sealed class AepEnrollmentBundleProvisioner(
                     var desired = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeFlowDefinition>>(document).Definition;
                     matches = FlowDraftHash(current.Value) == FlowDraftHash(current.Value with
                     {
-                        Name = document.Metadata.Name, Description = desired.Description, Version = desired.Version,
-                        Enabled = desired.Enabled, Definition = desired.Spec, Graph = desired.Graph,
-                        Metadata = desired.Metadata, DisplayName = desired.DisplayName
+                        Name = document.Metadata.Name,
+                        Description = desired.Description,
+                        Version = desired.Version,
+                        Enabled = desired.Enabled,
+                        Definition = desired.Spec,
+                        Graph = desired.Graph,
+                        Metadata = desired.Metadata,
+                        DisplayName = desired.DisplayName
                     });
                 }
             }
@@ -341,8 +346,14 @@ public sealed class AepEnrollmentBundleProvisioner(
 
     private static string FlowDraftHash(FlowResource value) => Hash(new
     {
-        value.Definition, value.Graph, value.Metadata, value.Version, value.Enabled,
-        value.Name, value.Description, value.DisplayName
+        value.Definition,
+        value.Graph,
+        value.Metadata,
+        value.Version,
+        value.Enabled,
+        value.Name,
+        value.Description,
+        value.DisplayName
     });
 
     private static string Hash<T>(T value) => Sha256(JsonSerializer.Serialize(value, AepProtocol.JsonOptions));

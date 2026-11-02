@@ -2,8 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Agents;
-using Agentstration.Identity.Contracts;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
@@ -37,15 +37,23 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
             {
                 _ = await store.PutExactAsync(target, new ToolProviderResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider,
-                    Metadata = new ResourceMetadata { Name = "exact-navigation-provider" }, ScopeRef = target,
-                    Definition = new() { DisplayName = "Exact provider", ProviderType = ToolProviderType.Mcp,
-                        Mcp = new() { Internal = true } }
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ToolResourceKinds.ToolProvider,
+                    Metadata = new ResourceMetadata { Name = "exact-navigation-provider" },
+                    ScopeRef = target,
+                    Definition = new()
+                    {
+                        DisplayName = "Exact provider",
+                        ProviderType = ToolProviderType.Mcp,
+                        Mcp = new() { Internal = true }
+                    }
                 }, null, true, default);
                 _ = await store.PutExactAsync(target, new ExtensionRegistrationResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration,
-                    Metadata = new ResourceMetadata { Name = "exact-navigation-extension" }, ScopeRef = target,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ExtensionKinds.ExtensionRegistration,
+                    Metadata = new ResourceMetadata { Name = "exact-navigation-extension" },
+                    ScopeRef = target,
                     Definition = new() { DisplayName = "Exact extension", Endpoint = new("https://fixture.invalid/") }
                 }, null, true, default);
             }

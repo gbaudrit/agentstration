@@ -15,15 +15,15 @@ internal sealed record ExtensionManagedResourceOwner(
     {
         if (governance.ManagedBy?.Kind != ResourceManagementAuthorityKind.ExtensionInstallation) return null;
         foreach (var extension in inventory)
-        foreach (var installation in extension.Extension?.BundleInstallations ?? [])
-        {
-            var address = ScopedResourceAddress.Create(installation.ScopeRef,
-                ResourceNamespace.Parse(extension.RegistrationNamespace), ExtensionKinds.ExtensionBundleInstallation, installation.Name);
-            if (address.ToString() == governance.ManagedBy.Reference && installation.ManagedResources.Any(resource =>
-                resource.ScopeRef == scopeRef && resource.Namespace == @namespace.Value && resource.Kind == kind
-                && resource.Name == name && (uid is null || resource.Uid == uid)))
-                return new(extension, installation);
-        }
+            foreach (var installation in extension.Extension?.BundleInstallations ?? [])
+            {
+                var address = ScopedResourceAddress.Create(installation.ScopeRef,
+                    ResourceNamespace.Parse(extension.RegistrationNamespace), ExtensionKinds.ExtensionBundleInstallation, installation.Name);
+                if (address.ToString() == governance.ManagedBy.Reference && installation.ManagedResources.Any(resource =>
+                    resource.ScopeRef == scopeRef && resource.Namespace == @namespace.Value && resource.Kind == kind
+                    && resource.Name == name && (uid is null || resource.Uid == uid)))
+                    return new(extension, installation);
+            }
         return null;
     }
 }

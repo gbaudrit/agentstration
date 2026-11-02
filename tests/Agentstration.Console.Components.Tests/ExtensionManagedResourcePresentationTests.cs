@@ -1,13 +1,13 @@
 using Agentstration.Api.Contracts;
-using Agentstration.Extensions.Contracts;
 using Agentstration.DataSources.Contracts;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
 
@@ -128,10 +128,18 @@ public sealed class ExtensionManagedResourcePresentationTests
 
     private static DataSourceProfileResource Profile() => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceProfile,
-        Metadata = new ResourceMetadata { Name = "crawl4ai-web" }, ScopeRef = Scope, Uid = ToolSetUid,
-        Governance = Governance(), Definition = new() { DisplayName = "Crawl4AI profile", Version = "3.0.0",
-            AcquisitionFlow = new() { Name = "acquire", Version = "1.0.0" } }
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = DataSourceResourceKinds.DataSourceProfile,
+        Metadata = new ResourceMetadata { Name = "crawl4ai-web" },
+        ScopeRef = Scope,
+        Uid = ToolSetUid,
+        Governance = Governance(),
+        Definition = new()
+        {
+            DisplayName = "Crawl4AI profile",
+            Version = "3.0.0",
+            AcquisitionFlow = new() { Name = "acquire", Version = "1.0.0" }
+        }
     };
 
     private sealed class ProfilesClientStub : IDataSourceProfilesClient
