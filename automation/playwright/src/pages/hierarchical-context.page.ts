@@ -108,7 +108,11 @@ export class HierarchicalContextPage {
   }
 
   public async openAgents(consoleUrl: string): Promise<void> {
+    await expect(this.shell).toHaveAttribute('data-preferences-ready', 'true');
+    const requestedScope = new URL(this.page.url()).searchParams.get('context');
+    if (requestedScope) await expect(this.shell).toHaveAttribute('data-context-scope', requestedScope);
     const scopeRef = await this.shell.getAttribute('data-context-scope');
+    if (!scopeRef) throw new Error('The Console has not resolved its current resource scope.');
     const response = await this.page.goto(
       this.contextUrl(`${consoleUrl}/agents`, scopeRef),
       { waitUntil: 'domcontentloaded' },

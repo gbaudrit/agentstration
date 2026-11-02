@@ -1,3 +1,4 @@
+import { GovernedKnowledgePage } from './governed-knowledge.page.js';
 import { SourceLifecyclePage } from './source-lifecycle.page.js';
 import type { Locator, Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
@@ -40,6 +41,7 @@ import { ModelProfileCrossScopePage } from './model-profile-cross-scope.page.js'
 import { ScopedFlowDesignerPage } from './scoped-flow-designer.page.js';
 
 export class ProductPages {
+  public readonly governedKnowledge: GovernedKnowledgePage;
   public readonly agentEditor: AgentEditorPage;
   public readonly flowEditor: FlowEditorPage;
   public readonly flowDesigner: FlowDesignerPage;
@@ -80,6 +82,7 @@ export class ProductPages {
   public readonly scopedFlowDesigner: ScopedFlowDesignerPage;
 
   public constructor(public readonly page: Page) {
+    this.governedKnowledge = new GovernedKnowledgePage(page);
     this.agentEditor = new AgentEditorPage(page);
     this.flowEditor = new FlowEditorPage(page);
     this.flowDesigner = new FlowDesignerPage(page);

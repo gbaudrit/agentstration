@@ -127,6 +127,12 @@ export const TestIds = {
     occurrenceRow: 'trigger-occurrence-row',
     row: 'trigger-row',
   },
+  governedKnowledge: {
+    exposure: 'knowledge-source-tool-exposure', toolLink: 'knowledge-tool-link',
+    toolSetVersions: 'toolset-versions', toolSetRow: 'toolset-row', toolSetDetails: 'resource-toolset-details', toolSetVersion: 'toolset-version',
+    activeAssignments: 'agent-active-toolsets', stagedDelete: 'staged-artifact-delete',
+    stagedRetentionTab: 'staged-artifact-retention-tab',
+  },
   sourceLifecycle: {
     profiles: 'resource-data-source-profiles', profileEditor: 'data-source-profile-editor', sources: 'resource-data-sources',
     knowledgeSources: 'resource-knowledge-sources', knowledgeDetails: 'resource-knowledge-source-details',
