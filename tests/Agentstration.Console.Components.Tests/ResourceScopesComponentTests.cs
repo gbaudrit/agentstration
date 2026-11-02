@@ -55,6 +55,59 @@ public sealed class ResourceScopesComponentTests
         Assert.IsEmpty(rendered.FindAll(".resource-kind-mark"));
     }
 
+    [TestMethod]
+    public void WorkspaceRootRendersWithoutInventingAncestors()
+    {
+        var workspaceScope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var inventory = new ResourceScopeInventoryResponse(
+        [
+            new(workspaceScope, ResourceScopeKind.Workspace, "Isolated workspace", null, true, [])
+        ]);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
+
+        var rendered = context.Render<ResourceScopes>();
+
+        var node = rendered.Find(".scope-tree-node");
+        Assert.HasCount(1, rendered.FindAll(".scope-tree-node"));
+        Assert.AreEqual("true", node.GetAttribute("aria-current"));
+        Assert.AreEqual("--scope-depth: 0", node.GetAttribute("style"));
+        StringAssert.Contains(node.TextContent, "Isolated workspace");
+        Assert.IsEmpty(rendered.FindAll(".scope-kind-instance, .scope-kind-tenant"));
+        Assert.AreEqual(workspaceScope.Value, rendered.Find(".scope-reference").TextContent);
+    }
+
+    [TestMethod]
+    public void TenantRootRendersItsWorkspaceChildrenAndSupportsSelection()
+    {
+        var tenantScope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var workspaceScope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var inventory = new ResourceScopeInventoryResponse(
+        [
+            new(tenantScope, ResourceScopeKind.Tenant, "Visible tenant", null, true, []),
+            new(workspaceScope, ResourceScopeKind.Workspace, "Visible workspace", tenantScope, false,
+            [new(Guid.NewGuid(), ResourceNamespace.Default, AgentResourceKinds.AgentRevision, "workspace-revision", DateTimeOffset.UtcNow)])
+        ]);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
+
+        var rendered = context.Render<ResourceScopes>();
+
+        Assert.HasCount(2, rendered.FindAll(".scope-tree-node"));
+        Assert.IsEmpty(rendered.FindAll(".scope-kind-instance"));
+        Assert.AreEqual("--scope-depth: 0", rendered.Find(".scope-kind-tenant").GetAttribute("style"));
+        Assert.AreEqual("--scope-depth: 1", rendered.Find(".scope-kind-workspace").GetAttribute("style"));
+        rendered.Find(".scope-kind-workspace").Click();
+
+        Assert.AreEqual("true", rendered.Find(".scope-kind-workspace").GetAttribute("aria-current"));
+        Assert.AreEqual("Visible workspace", rendered.Find(".scope-detail h2").TextContent);
+        Assert.AreEqual(workspaceScope.Value, rendered.Find(".scope-reference").TextContent);
+        StringAssert.Contains(rendered.Find("tr.resource-row").TextContent, "workspace-revision");
+        Assert.IsEmpty(rendered.FindAll("tr.resource-row a"));
+    }
+
     private sealed class FakeClient(ResourceScopeInventoryResponse inventory) : IResourceScopeInventoryClient
     {
         public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) => Task.FromResult(inventory);

@@ -1,4 +1,5 @@
 export const Checkpoints = {
+  resourceScopes: { hierarchy: 'resource-scopes-hierarchy', tenantRoot: 'resource-scopes-tenant-root', filtered: 'resource-scopes-filtered', navigated: 'resource-scopes-navigated' },
   console: {
     home: 'console-home',
   },

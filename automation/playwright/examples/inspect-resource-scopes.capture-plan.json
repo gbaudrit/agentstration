@@ -1,0 +1,5 @@
+{
+  "journey": "inspect-resource-scopes",
+  "input": { "locale": "en-US" },
+  "checkpoints": ["resource-scopes-hierarchy", "resource-scopes-tenant-root", "resource-scopes-filtered", "resource-scopes-navigated"]
+}
