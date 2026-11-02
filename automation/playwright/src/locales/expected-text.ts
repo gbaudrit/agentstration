@@ -44,6 +44,11 @@ export interface ExpectedText {
     runTool: string;
     input: string;
   };
+  sourceLifecycle: {
+    displayName: string; technicalName: string; acquisitionFlow: string; configurationSchema: string;
+    save: string; yaml: string; revisions: string; definition: string; version: string;
+    publish: string; activate: string; enabled: string; addDataSource: string; notReady: string;
+  };
   schemaDrivenSources: {
     formMode: string;
     rawMode: string;
@@ -122,6 +127,7 @@ export const ExpectedTextByLocale = {
       runTool: 'Run this tool',
       input: 'Input',
     },
+    sourceLifecycle: { displayName: 'Display name', technicalName: 'Technical name', acquisitionFlow: 'Acquisition Flow', configurationSchema: 'Configuration schema (JSON)', save: 'Save', yaml: 'YAML', revisions: 'Revisions', definition: 'Definition', version: 'Version', publish: 'Publish', activate: 'Activate', enabled: 'Enabled', addDataSource: 'Add a Data Source', notReady: 'Not ready' },
     schemaDrivenSources: {
       formMode: 'Form',
       rawMode: 'Raw JSON',
@@ -198,6 +204,7 @@ export const ExpectedTextByLocale = {
       runTool: 'Exécuter cet outil',
       input: 'Entrées',
     },
+    sourceLifecycle: { displayName: 'Nom d’affichage', technicalName: 'Nom technique', acquisitionFlow: 'Flow d’acquisition', configurationSchema: 'Schéma de configuration (JSON)', save: 'Enregistrer', yaml: 'YAML', revisions: 'Révisions', definition: 'Définition', version: 'Version', publish: 'Publier', activate: 'Activer', enabled: 'Activée', addDataSource: 'Ajouter une source de données', notReady: 'Non prête' },
     schemaDrivenSources: {
       formMode: 'Formulaire',
       rawMode: 'JSON brut',

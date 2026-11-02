@@ -1,18 +1,6 @@
 import { expect, type APIResponse, type Locator, type Page } from '@playwright/test';
+import { SourceLifecycleFixtures, acquisitionFlowSource, transformationFlowSource, projectionFlowSource, configurationSchema } from '../fixtures/source-lifecycle.js';
 import { TestIds } from '../contracts/test-ids.js';
-
-type ResourceId = string | { value: string };
-
-interface StagedArtifactWire {
-  artifactId: ResourceId;
-}
-
-interface FlowRunWire {
-  id: string;
-  status: number;
-  output?: { flowRunArtifactId?: string };
-  error?: { message?: string };
-}
 
 interface DataSourceWire {
   definition: { configuration: Record<string, unknown> };
@@ -50,11 +38,13 @@ export class SchemaDrivenSourcesPage {
 
   public async provisionAndExercise(consoleUrl: string): Promise<SchemaDrivenSourceFixture> {
     this.page.setDefaultTimeout(15_000);
+    const identity = await this.read<{ context: { tenantId: string } }>(`${consoleUrl}/api/identity/context`);
+    await new SourceLifecycleFixtures(this.page).grantBuiltinAccess(consoleUrl, `/tenants/${identity.context.tenantId}`);
     const suffix = Date.now().toString(36);
     const workspaceId = await this.workspaceId();
     const scopeRef = `/workspaces/${workspaceId}`;
     this.fixtureScopeRef = scopeRef;
-    const durableArtifactId = await this.createDurableArtifact(consoleUrl, suffix);
+    const durableArtifactId = await new SourceLifecycleFixtures(this.page).createDurableArtifact(consoleUrl, suffix);
     const acquisitionFlow = `schema-input-acquisition-${suffix}`;
     const transformationFlow = `schema-input-transform-${suffix}`;
     const projectionFlow = `schema-input-projection-${suffix}`;
@@ -63,11 +53,11 @@ export class SchemaDrivenSourcesPage {
     const dataSourceName = `schema-input-source-${suffix}`;
     const knowledgeSourceName = `schema-input-knowledge-${suffix}`;
 
-    await this.createPublishedFlow(consoleUrl, acquisitionFlow, 'Schema input acquisition', 'datasource.acquisition/v1',
+    await new SourceLifecycleFixtures(this.page).createPublishedFlow(consoleUrl, acquisitionFlow, 'Schema input acquisition', 'datasource.acquisition/v1',
       acquisitionFlowSource(durableArtifactId));
-    await this.createPublishedFlow(consoleUrl, transformationFlow, 'Schema input transformation', 'artifact.transform/v1',
+    await new SourceLifecycleFixtures(this.page).createPublishedFlow(consoleUrl, transformationFlow, 'Schema input transformation', 'artifact.transform/v1',
       transformationFlowSource());
-    await this.createPublishedFlow(consoleUrl, projectionFlow, 'Schema input projection', 'knowledge.projection/v1',
+    await new SourceLifecycleFixtures(this.page).createPublishedFlow(consoleUrl, projectionFlow, 'Schema input projection', 'knowledge.projection/v1',
       projectionFlowSource());
     await this.createProfile(consoleUrl, scopeRef, profileName, 'Schema input profile', acquisitionFlow, configurationSchema());
     await this.createProfile(consoleUrl, scopeRef, fallbackProfileName, 'Schema input fallback', acquisitionFlow,
@@ -308,53 +298,6 @@ export class SchemaDrivenSourcesPage {
     await editor.getByTestId(TestIds.common.schemaFormMode).click();
   }
 
-  private async createPublishedFlow(consoleUrl: string, name: string, displayName: string, contract: string,
-    source: string): Promise<void> {
-    const created = await this.page.request.post(`${consoleUrl}/api/flows/drafts`, {
-      data: { name, displayName, template: 'Empty', tags: { 'flow.contract': contract } },
-    });
-    await expectApi(created, 201, `create Flow '${name}'`);
-    const etag = created.headers()['etag'];
-    if (!etag) throw new Error(`Flow '${name}' draft did not expose an ETag.`);
-    await expectApi(await this.page.request.put(`${consoleUrl}/api/flows/${name}/draft/source`, {
-      headers: { 'If-Match': etag }, data: { source, format: 'yaml', updatedBy: 'playwright' },
-    }), 200, `replace Flow '${name}' source`);
-    const validation = await this.page.request.post(`${consoleUrl}/api/flows/${name}/validate`);
-    await expectApi(validation, 200, `validate Flow '${name}'`);
-    const validationBody = await validation.json() as { isValid: boolean; issues?: unknown[] };
-    expect(validationBody.isValid, JSON.stringify(validationBody.issues)).toBe(true);
-    await expectApi(await this.page.request.post(`${consoleUrl}/api/flows/${name}/publish`, {
-      data: { version: '1.0.0', releaseNotes: 'Schema-driven source browser fixture', activate: true },
-    }), 201, `publish Flow '${name}'`);
-  }
-
-  private async createDurableArtifact(consoleUrl: string, suffix: string): Promise<string> {
-    const created = await this.page.request.post(`${consoleUrl}/api/artifacts/staged`, {
-      data: {
-        fileName: `schema-input-${suffix}.txt`, mediaType: 'text/plain',
-        producer: { kind: 0, id: `schema-input-${suffix}`, flowRunId: `schema-input-${suffix}`, flowStepId: 'fixture' },
-      },
-    });
-    await expectApi(created, 201, 'create staged Artifact');
-    const staged = await created.json() as StagedArtifactWire;
-    const stagedId = identifier(staged.artifactId);
-    await expectApi(await this.page.request.post(`${consoleUrl}/api/artifacts/staged/${stagedId}/content`, {
-      data: { offset: 0, contentBase64: Buffer.from(`Schema-driven source ${suffix}`).toString('base64') },
-    }), 200, 'write staged Artifact');
-    await expectApi(await this.page.request.post(`${consoleUrl}/api/artifacts/staged/${stagedId}/seal`), 200, 'seal staged Artifact');
-    const runResponse = await this.page.request.post(`${consoleUrl}/api/namespaces/default/flows/artifact-storage-filesystem-write-builtin/runs`, {
-      data: { input: { stagedArtifactId: stagedId, producerFlowRunId: `schema-input-${suffix}`, producerFlowStepId: 'fixture' }, version: '1.0.0' },
-    });
-    await expectApi(runResponse, 202, 'persist staged Artifact');
-    let run = await runResponse.json() as FlowRunWire;
-    await expect.poll(async () => {
-      run = await this.read<FlowRunWire>(`${consoleUrl}/api/flowRuns/${encodeURIComponent(run.id)}`);
-      return run.status;
-    }, { timeout: 90_000 }).toBe(3);
-    if (!run.output?.flowRunArtifactId) throw new Error(`Artifact storage Flow failed: ${run.error?.message ?? 'missing output'}.`);
-    return run.output.flowRunArtifactId;
-  }
-
   private async workspaceId(): Promise<string> {
     const workspaceId = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-workspace-id');
     if (!workspaceId) throw new Error('The authenticated Console shell does not expose its Workspace identifier.');
@@ -402,150 +345,6 @@ async function expectApi(response: APIResponse, status: number, operation: strin
   throw new Error(`Unable to ${operation}: HTTP ${response.status()} ${await response.text()}`);
 }
 
-function identifier(value: ResourceId): string {
-  return (typeof value === 'string' ? value : value.value).replaceAll('-', '');
-}
-
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function configurationSchema(): Record<string, unknown> {
-  return {
-    type: 'object',
-    properties: {
-      endpoint: { type: 'string', title: 'Endpoint', description: 'Source endpoint.', format: 'uri', minLength: 8 },
-      mode: { type: 'string', title: 'Mode', enum: ['compact', 'full'], default: 'compact' },
-      options: {
-        type: 'object', title: 'Options', properties: {
-          retries: { type: 'integer', title: 'Retries', minimum: 1, maximum: 5, default: 2 },
-        }, additionalProperties: false,
-      },
-    },
-    required: ['endpoint', 'mode', 'options'], additionalProperties: false,
-  };
-}
-
-function acquisitionFlowSource(artifactId: string): string {
-  return `entryStep: input
-inputSchema:
-  type: object
-  properties:
-    dataSourceId: { type: string }
-    dataSourceUid: { type: string }
-    dataSourceGeneration: { type: integer }
-    profile: { type: object }
-    sourceConfiguration: { type: object }
-    parameters:
-      type: object
-      properties:
-        query: { type: string, title: Acquisition query, minLength: 3 }
-        limit: { type: integer, title: Result limit, minimum: 1, maximum: 5, default: 2 }
-      required: [query, limit]
-      additionalProperties: false
-    caller: { type: object }
-    correlationId: { type: string }
-    acquisitionId: { type: string }
-  required: [dataSourceId, dataSourceUid, dataSourceGeneration, profile, sourceConfiguration, parameters, caller, correlationId, acquisitionId]
-  additionalProperties: false
-outputSchema:
-  type: object
-  properties:
-    artifacts: { type: array }
-  required: [artifacts]
-  additionalProperties: false
-steps:
-- type: input
-  name: input
-  schema:
-    type: object
-    properties:
-      dataSourceId: { type: string }
-      dataSourceUid: { type: string }
-      dataSourceGeneration: { type: integer }
-      profile: { type: object }
-      sourceConfiguration: { type: object }
-      parameters: { type: object }
-      caller: { type: object }
-      correlationId: { type: string }
-      acquisitionId: { type: string }
-    required: [dataSourceId, dataSourceUid, dataSourceGeneration, profile, sourceConfiguration, parameters, caller, correlationId, acquisitionId]
-- type: output
-  name: output
-  outputMapping:
-    artifacts:
-    - artifactId: ${artifactId}
-      kind: durable
-      disposition: publishable
-      name: schema-input.txt
-      mediaType: text/plain
-transitions:
-- { id: input-output, fromStep: input, event: completed, toStep: output }
-`;
-}
-
-function transformationFlowSource(): string {
-  return passthroughFlowSource([
-    'bindingName', 'dataSource', 'artifacts', 'configuration', 'caller', 'correlationId', 'transformationId',
-  ], `configuration:
-  type: object
-  properties:
-    prefix: { type: string, title: Prefix, minLength: 3 }
-    mode: { type: string, title: Transformation mode, enum: [compact, full], default: compact }
-  required: [prefix, mode]
-  additionalProperties: false`);
-}
-
-function projectionFlowSource(): string {
-  return passthroughFlowSource([
-    'knowledgeSourceId', 'knowledgeSourceUid', 'knowledgeSourceGeneration', 'inputs', 'artifacts', 'parameters',
-    'caller', 'correlationId', 'projectionId',
-  ], `parameters:
-  type: object
-  properties:
-    audience: { type: string, title: Audience, minLength: 3 }
-    includeMetadata: { type: boolean, title: Include metadata, default: true }
-  required: [audience, includeMetadata]
-  additionalProperties: false`);
-}
-
-function passthroughFlowSource(required: readonly string[], specializedProperty: string): string {
-  const properties = required.map(name => specializedProperty.startsWith(`${name}:`)
-    ? specializedProperty
-    : `${name}: { type: ${name === 'artifacts' || name === 'inputs' ? 'array' : name.endsWith('Generation') ? 'integer' : name === 'configuration' || name === 'parameters' || name === 'caller' || name === 'dataSource' ? 'object' : 'string'} }`).join('\n');
-  const inputProperties = indent(properties, 4);
-  const stepProperties = indent(properties, 6);
-  return `entryStep: input
-inputSchema:
-  type: object
-  properties:
-${inputProperties}
-  required: [${required.join(', ')}]
-  additionalProperties: false
-outputSchema:
-  type: object
-  properties:
-    artifacts: { type: array }
-  required: [artifacts]
-  additionalProperties: false
-steps:
-- type: input
-  name: input
-  schema:
-    type: object
-    properties:
-${stepProperties}
-    required: [${required.join(', ')}]
-- type: output
-  name: output
-  outputMapping:
-    artifacts: \${input.artifacts}
-transitions:
-- { id: input-output, fromStep: input, event: completed, toStep: output }
-`;
-}
-
-function indent(value: string, spaces: number): string {
-  const prefix = ' '.repeat(spaces);
-  return value.split('\n').map(line => `${prefix}${line}`).join('\n');
 }

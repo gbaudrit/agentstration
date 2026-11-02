@@ -78,6 +78,7 @@ public sealed class PostgreSqlStorageProfileTests
             await AssertWorkplaceDefaultReplacementAsync(host.Services);
             await AssertPrincipalPreferencesRoundTripAsync(host.Services);
             await WriteScopedSecretsAsync(host.Services, tenantId, workspaceId);
+            await AssertScopeReadAuthorizationAsync(host.Services, tenantId, workspaceId);
         }
         else await AssertScopedSecretsAfterRestartAsync(host.Services, tenantId, workspaceId);
     }
@@ -143,6 +144,61 @@ public sealed class PostgreSqlStorageProfileTests
             }, null, true, default);
         }
         await store.PutExactAsync(ResourceScopeRef.Workspace(workspaceId), DiscoveryTarget(workspaceId), null, true, default);
+    }
+
+    private static async Task AssertScopeReadAuthorizationAsync(IServiceProvider services, Guid tenantId, Guid workspaceId)
+    {
+        var identities = services.GetRequiredService<IIdentityStore>();
+        var scopes = services.GetRequiredService<IRequestContextScopeFactory>();
+        var store = services.GetRequiredService<IResourceStore>();
+        var siblingWorkspaceId = Guid.NewGuid();
+        var foreignTenantId = Guid.NewGuid();
+        var foreignWorkspaceId = Guid.NewGuid();
+        var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
+        await identities.AddWorkspaceAsync(new Workspace(siblingWorkspaceId, tenantId,
+            $"sibling-{siblingWorkspaceId:N}", "Sibling workspace", WorkspaceStatus.Active, now), default);
+        await identities.AddTenantAsync(new Tenant(foreignTenantId,
+            $"foreign-{foreignTenantId:N}", "Foreign tenant", TenantStatus.Active, now), default);
+        await identities.AddWorkspaceAsync(new Workspace(foreignWorkspaceId, foreignTenantId,
+            $"foreign-{foreignWorkspaceId:N}", "Foreign workspace", WorkspaceStatus.Active, now), default);
+
+        var lateralScopes = new[]
+        {
+            ResourceScopeRef.Workspace(siblingWorkspaceId),
+            ResourceScopeRef.Workspace(foreignWorkspaceId),
+            ResourceScopeRef.Tenant(foreignTenantId)
+        };
+        using (scopes.PushSystem())
+        {
+            foreach (var scope in lateralScopes)
+                await store.PutExactAsync(scope, new VaultResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = SecretResourceKinds.Vault,
+                    Metadata = new() { Name = "shared-vault" },
+                    Definition = new() { DisplayName = "Lateral vault", ProviderType = "local" }
+                }, null, true, default);
+        }
+
+        using (scopes.Push(new RequestContext(Guid.NewGuid(), tenantId, workspaceId)))
+        {
+            Assert.IsNotNull(await store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(
+                ResourceScopeRef.Workspace(workspaceId), ResourceNamespace.Default, SecretResourceKinds.Vault, "shared-vault"), default));
+            foreach (var denied in lateralScopes)
+            {
+                await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+                    store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(
+                        denied, ResourceNamespace.Default, SecretResourceKinds.Vault, "shared-vault"), default));
+                await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+                    store.ListVisibleAsync<VaultResource>(denied, SecretResourceKinds.Vault, 0, 10, default));
+            }
+        }
+        using (scopes.PushTenant(Guid.NewGuid(), tenantId))
+        {
+            await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+                store.GetExactAsync<VaultResource>(ScopedResourceAddress.Create(
+                    ResourceScopeRef.Tenant(foreignTenantId), ResourceNamespace.Default, SecretResourceKinds.Vault, "shared-vault"), default));
+        }
     }
 
     private static async Task AssertScopedSecretsAfterRestartAsync(IServiceProvider services, Guid tenantId, Guid workspaceId)

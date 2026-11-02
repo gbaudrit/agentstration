@@ -127,6 +127,13 @@ export const TestIds = {
     occurrenceRow: 'trigger-occurrence-row',
     row: 'trigger-row',
   },
+  sourceLifecycle: {
+    profiles: 'resource-data-source-profiles', profileEditor: 'data-source-profile-editor', sources: 'resource-data-sources',
+    knowledgeSources: 'resource-knowledge-sources', knowledgeDetails: 'resource-knowledge-source-details',
+    projectionProvenance: 'knowledge-projection-provenance', snapshots: 'knowledge-snapshots',
+    snapshotDetails: 'knowledge-snapshot-details', retrievalText: 'knowledge-retrieval-text',
+    retrievalRun: 'knowledge-retrieval-run', retrievalResult: 'knowledge-retrieval-result',
+  },
   schemaDrivenSources: {
     dataSourceEditor: 'data-source-editor',
     dataSourceDisplayName: 'data-source-display-name',
