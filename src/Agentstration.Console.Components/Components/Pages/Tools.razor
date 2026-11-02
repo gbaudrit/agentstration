@@ -1,5 +1,6 @@
 @page "/tools"
 @inject IToolsClient Client
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
@@ -13,26 +14,54 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (tools.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
 else
 {
-    <DataGrid TItem="ToolResource" Items="tools">
+    <div class="tool-catalog-grid"><DataGrid TItem="ToolResource" Items="tools">
         <Header><tr><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
-        <Row Context="tool"><tr><td><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></td><td>@ResourceName(tool.Definition.Provider?.ResourceId)</td><td><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>
-    </DataGrid>
+        <Row Context="tool"><tr><td data-label="@T("Tool")"><div class="tool-catalog-identity"><span class="tool-catalog-icon" aria-hidden="true"><UiIcon Name="wrench" /></span><div><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></div></div></td><td data-label="@T("Provider")">
+            @if (ManagingExtension(tool) is { } extension)
+            {
+                <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName</a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@(tool.Governance.Origin.Version ?? extension.Version)</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div></div>
+            }
+            else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }
+            </td><td data-label="@T("Availability")"><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td data-label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>
+    </DataGrid></div>
 }
 
 @code {
-    private IReadOnlyList<ToolResource> tools = []; private bool loading = true; private string? error;
+    private IReadOnlyList<ToolResource> tools = []; private IReadOnlyList<ToolProviderResource> providers = []; private IReadOnlyList<ExtensionInventoryItemResponse> extensions = []; private bool loading = true; private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { tools = await Client.GetToolsAsync(); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
-    private static string ResourceName(string? id) => id ?? "—";
+    private async Task LoadAsync() { loading = true; error = null; try { var toolsTask = Client.GetToolsAsync(); var providersTask = Client.GetProvidersAsync(default); await Task.WhenAll(toolsTask, providersTask); tools = toolsTask.Result; providers = providersTask.Result; if (Services.GetService<IExtensionsClient>() is { } client) extensions = await client.GetExtensionInventoryAsync(default); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
+    private string ProviderDisplayName(ToolResource tool)
+    {
+        return ManagingExtension(tool)?.DisplayName ?? providers.FirstOrDefault(value =>
+            value.Name == tool.Definition.Provider?.Name && value.Namespace == (tool.Definition.Provider?.Namespace ?? tool.Namespace)
+            && value.ScopeRef == (tool.Definition.Provider?.ScopeRef ?? tool.ScopeRef))?.Definition.DisplayName
+            ?? T("Provider");
+    }
+    private ExtensionInventoryItemResponse? ManagingExtension(ToolResource tool)
+    {
+        var provider = providers.SingleOrDefault(value => value.Name == tool.Definition.Provider?.Name
+            && value.Namespace == (tool.Definition.Provider?.Namespace ?? tool.Namespace)
+            && value.ScopeRef == (tool.Definition.Provider?.ScopeRef ?? tool.ScopeRef));
+        var extension = provider?.Definition.Aep?.Extension;
+        if (extension is null) return null;
+        return extensions.SingleOrDefault(value => value.RegistrationName == extension.Name
+            && value.RegistrationNamespace == (extension.Namespace ?? provider!.Namespace).Value
+            && value.RegistrationScopeRef == (extension.ScopeRef ?? provider!.ScopeRef));
+    }
     private static string ToolUrl(ToolResource tool)
     {
         var query = new List<string>();
         if (!tool.Namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(tool.Namespace.Value)}");
-        if (tool.ScopeRef is { } scopeRef) query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value)}");
+        if (tool.ScopeRef is { } scopeRef) { query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value)}"); query.Add($"context={Uri.EscapeDataString(scopeRef.Value)}"); }
         var path = $"/tools/{Uri.EscapeDataString(tool.Name)}";
         return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
+    }
+    private static string ExtensionUrl(ExtensionInventoryItemResponse extension)
+    {
+        var scope = extension.RegistrationScopeRef ?? ResourceScopeRef.Instance;
+        return $"/extensions/{Uri.EscapeDataString(extension.RegistrationName!)}?namespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&scopeRef={Uri.EscapeDataString(scope.Value)}&context={Uri.EscapeDataString(scope.Value)}";
     }
 }

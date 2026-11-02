@@ -3,6 +3,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
 namespace Agentstration.Extensions;
@@ -48,13 +49,15 @@ public sealed record ExtensionView(
     AepEnrollmentMode EnrollmentMode,
     ResourceScopeRef? RegistrationScopeRef,
     string RegistrationDisplayName,
-    IReadOnlyList<ExtensionValueRequirement> ValueRequirements);
+    IReadOnlyList<ExtensionValueRequirement> ValueRequirements,
+    IReadOnlyList<ExtensionBundleInstallationResource> BundleInstallations);
 
 public sealed class ExtensionManagementService(
     IModelProviderConfigurationStore providers,
     ModelProfileManagementService profiles,
     IEnumerable<IExtensionInspector> inspectors,
-    ExtensionRegistrationManagementService registrations)
+    ExtensionRegistrationManagementService registrations,
+    IResourceStore store)
 {
     public async Task<IReadOnlyList<ExtensionView>> ListAsync(CancellationToken cancellationToken)
     {
@@ -91,13 +94,27 @@ public sealed class ExtensionManagementService(
                 && usages.Any(value => string.Equals(value.Status, "incompatible", StringComparison.Ordinal))
                 ? "incompatible"
                 : inspection.Status;
+            var installations = resource.ScopeRef is { } scopeRef
+                ? (await store.ListExactAsync<ExtensionBundleInstallationResource>(scopeRef,
+                    ExtensionKinds.ExtensionBundleInstallation, 0, 1000, cancellationToken))
+                    .Where(value => value.Value.Definition.Registration == new ResourceReference(
+                        resource.Name, scopeRef, resource.Namespace))
+                    .Select(value => value.Value)
+                    .OrderBy(value => value.Definition.BundleId, StringComparer.Ordinal)
+                    .ThenBy(value => value.Definition.BundleVersion, StringComparer.Ordinal)
+                    .ToArray()
+                : [];
             views.Add(new ExtensionView(
                 resource.Name,
                 resource.Namespace.Value,
                 endpoint,
                 status,
                 inspection.Extension,
-                inspection.Contributions,
+                inspection.Contributions.Concat(installations.Select(value => new ExtensionContribution(
+                        AepContributionKinds.DataSourceProfileBundle, value.Definition.BundleId)))
+                    .Concat(installations.SelectMany(value => value.Definition.ToolBindings.Keys)
+                        .Select(value => new ExtensionContribution(AepContributionKinds.Tool, value)))
+                    .DistinctBy(value => (value.Kind, value.Id)).ToArray(),
                 inspection.OptionSets,
                 usages,
                 bindings.Select(value => new ExtensionProviderBinding(value.Name, value.Namespace.Value, value.ContributionId)).ToArray(),
@@ -107,7 +124,8 @@ public sealed class ExtensionManagementService(
                 resource.Definition.EnrollmentMode,
                 resource.ScopeRef,
                 resource.Definition.DisplayName,
-                (inspection.ValueRequirements ?? []).Select(MapRequirement).ToArray()));
+                (inspection.ValueRequirements ?? []).Select(MapRequirement).ToArray(),
+                installations));
         }
         return views;
     }

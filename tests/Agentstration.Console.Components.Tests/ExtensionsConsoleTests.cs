@@ -1,9 +1,14 @@
+using Agentstration.Api.Contracts;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Flows;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
+using Agentstration.Tools;
+using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
@@ -112,7 +117,7 @@ public sealed class ExtensionsConsoleTests
             _ = card.QuerySelector(".enrollment-status") ?? throw new AssertFailedException("The enrollment status stack is missing.");
             _ = card.QuerySelector(".enrollment-action-layout") ?? throw new AssertFailedException("The enrollment action layout is missing.");
             Assert.AreEqual("Enrôler l’extension", card.QuerySelector("button.button-primary")?.TextContent.Trim());
-            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default", card.QuerySelector("a.text-button")?.GetAttribute("href"));
+            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", card.QuerySelector("a.text-button")?.GetAttribute("href"));
             Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/']"));
             Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/aep/enrollment/pair']"));
         });
@@ -150,8 +155,8 @@ public sealed class ExtensionsConsoleTests
 
         rendered.WaitForAssertion(() =>
         {
-            var action = rendered.Find("table a.button-secondary");
-            Assert.AreEqual("Open llama-cpp-local provider", action.TextContent.Trim());
+            var action = rendered.Find(".extension-contribution-actions a.text-button");
+            Assert.AreEqual("Open llama-cpp-local provider →", action.TextContent.Trim());
             Assert.AreEqual("/modelproviders/llama-cpp-local?namespace=default", action.GetAttribute("href"));
         });
     }
@@ -173,9 +178,39 @@ public sealed class ExtensionsConsoleTests
 
         rendered.WaitForAssertion(() =>
         {
-            var action = rendered.Find("table a.button-primary");
-            Assert.AreEqual("Configure llama.cpp provider", action.TextContent.Trim());
+            var action = rendered.Find(".extension-contribution-actions a.text-button");
+            Assert.AreEqual("Configure llama.cpp provider →", action.TextContent.Trim());
             StringAssert.StartsWith(action.GetAttribute("href"), "/modelproviders/new?");
+        });
+    }
+
+    [TestMethod]
+    public async Task BundleContributionShowsLinkedToolSetProfileAndFlowResources()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
+        context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
+            .Add(value => value.RegistrationName, "crawl4ai"));
+        var tabs = rendered.WaitForElements("[role='tab']");
+        await tabs[3].ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(6, rendered.FindAll(".extension-contribution-card"));
+            var bundle = rendered.Find("[data-contribution-id='crawl4ai-web']");
+            StringAssert.Contains(bundle.TextContent, "3 ressource(s) gouvernée(s) matérialisée(s)");
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/tools/sets/crawl4ai-web-acquisition?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/data-source-profiles/crawl4ai-web?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/flows/crawl4ai-web-acquisition?scopeRef=%2Finstance&context=%2Finstance']"));
+
+            var tool = rendered.Find("[data-contribution-id='web.crawl']");
+            Assert.IsNotNull(tool.QuerySelector("a[href='/tools/paired-crawl4ai.web.crawl?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
         });
     }
 
@@ -200,7 +235,7 @@ public sealed class ExtensionsConsoleTests
             var row = rendered.Find("tbody tr");
             StringAssert.Contains(row.TextContent, "En attente");
             StringAssert.Contains(row.TextContent, "Disponible");
-            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default", row.QuerySelector("a")?.GetAttribute("href"));
+            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", row.QuerySelector("a")?.GetAttribute("href"));
         });
     }
 
@@ -396,6 +431,299 @@ public sealed class ExtensionsConsoleTests
             Assert.AreEqual("Configure Source provider git", action.TextContent.Trim());
             StringAssert.StartsWith(action.GetAttribute("href"), "/sourceproviders/new?");
         });
+    }
+
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void ToolCatalogLinksReadableExtensionWithoutDisplayingPairingIdentity(string cultureName)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
+        context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Tools>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var owners = rendered.FindAll(".tool-catalog-owner");
+            Assert.HasCount(5, owners);
+            foreach (var owner in owners)
+            {
+                var link = owner.QuerySelector("a")!;
+                Assert.AreEqual("Crawl4AI Web Acquisition", link.TextContent.Trim());
+                Assert.AreEqual("/extensions/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance", link.GetAttribute("href"));
+                Assert.IsNull(link.QuerySelector("svg"));
+                StringAssert.Contains(owner.TextContent, "Agentstration.Extensions.Crawl4AI");
+                Assert.IsFalse(owner.TextContent.Contains("paired-", StringComparison.Ordinal));
+                Assert.IsNotNull(owner.QuerySelector(".resource-scope-badge"));
+            }
+            StringAssert.Contains(rendered.Find("a[href*='/tools/paired-crawl4ai.web.crawl']").GetAttribute("href")!, "context=%2Finstance");
+            Assert.IsFalse(rendered.Find(".tool-catalog-grid").TextContent.Contains('→'));
+        });
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "available", "Available", true)]
+    [DataRow("en-US", "unavailable", "Unavailable", true)]
+    [DataRow("en-US", "missing", "Not materialized", false)]
+    [DataRow("en-US", "conflict", "Conflict", false)]
+    [DataRow("fr-FR", "available", "Disponible", true)]
+    [DataRow("fr-FR", "unavailable", "Indisponible", true)]
+    [DataRow("fr-FR", "missing", "Non matérialisée", false)]
+    [DataRow("fr-FR", "conflict", "En conflit", false)]
+    public async Task ToolContributionShowsLocalizedStateAndOnlyUnambiguousLinks(
+        string cultureName, string state, string label, bool hasToolLink)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
+        context.Services.AddSingleton<IToolsClient>(new BundleToolsClient(state));
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters =>
+            parameters.Add(value => value.RegistrationName, "crawl4ai"));
+        await rendered.WaitForElements("[role='tab']")[3].ClickAsync(new());
+        rendered.WaitForAssertion(() =>
+        {
+            var card = rendered.Find("[data-contribution-id='web.crawl']");
+            StringAssert.Contains(card.TextContent, label);
+            Assert.AreEqual(hasToolLink, card.QuerySelector(".extension-materialized-resources a") is not null);
+            Assert.AreEqual(state != "conflict", card.QuerySelector("a[href='/tools/providers/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance']") is not null);
+        });
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void ExactScopedToolProviderKeepsManagedContentReadOnlyAndOrdinaryContentEditable(bool managed)
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new BundleToolsClient(managedProvider: managed);
+        context.Services.AddSingleton<IToolsClient>(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo("/tools/providers/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance");
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ToolProviderEditor>(parameters =>
+            parameters.Add(value => value.Name, "crawl4ai"));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(ResourceScopeRef.Instance, client.RequestedProviderScope);
+            Assert.AreEqual(managed, rendered.Find("fieldset").HasAttribute("disabled"));
+            Assert.AreEqual(managed ? 0 : 1, rendered.FindAll(".tool-provider-actions button").Count);
+            Assert.IsNotNull(rendered.Find("a[href='/extensions/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
+        });
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Conflict", "Technical details")]
+    [DataRow("fr-FR", "En conflit", "Détails techniques")]
+    public async Task DegradedBundleKeepsItsEvidenceWithoutOfferingResourceNavigation(string cultureName, string label, string technicalDetails)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient(ExtensionBundleInstallationState.Degraded));
+        context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters =>
+            parameters.Add(value => value.RegistrationName, "crawl4ai"));
+        await rendered.WaitForElements("[role='tab']")[3].ClickAsync(new());
+        var card = rendered.Find("[data-contribution-id='crawl4ai-web']");
+        StringAssert.Contains(card.TextContent, label);
+        Assert.IsEmpty(card.QuerySelectorAll("a"));
+        await rendered.FindAll("[role='tab']")[4].ClickAsync(new());
+        StringAssert.Contains(rendered.Markup, "crawl4ai-web-acquisition");
+        Assert.IsEmpty(rendered.FindAll("article.resource-section td a"));
+        var evidence = rendered.Find(".extension-bundle-evidence");
+        Assert.AreEqual(technicalDetails, evidence.QuerySelector("summary")!.TextContent);
+        Assert.IsFalse(evidence.HasAttribute("open"));
+        StringAssert.Contains(evidence.TextContent, "Agentstration.Extensions.Crawl4AI");
+        StringAssert.Contains(evidence.TextContent, "digest");
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Published versions")]
+    [DataRow("fr-FR", "Versions publiées")]
+    public async Task BundleInventoryKeepsPublicationsInTechnicalDetailsWithoutLinks(string cultureName, string publicationsLabel)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
+        context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters =>
+            parameters.Add(value => value.RegistrationName, "crawl4ai"));
+        await rendered.WaitForElements("[role='tab']")[4].ClickAsync(new());
+
+        var grid = rendered.Find(".extension-bundle-grid");
+        Assert.HasCount(3, grid.QuerySelectorAll("tbody tr"));
+        Assert.HasCount(3, grid.QuerySelectorAll("a"));
+        Assert.IsFalse(grid.TextContent.Contains("--92521fc3", StringComparison.Ordinal));
+        Assert.IsFalse(grid.TextContent.Contains("data-source-profile-revision", StringComparison.Ordinal));
+        var evidence = rendered.Find(".extension-bundle-evidence");
+        Assert.AreEqual(publicationsLabel, evidence.QuerySelector("h4")!.TextContent);
+        var publications = evidence.QuerySelector(".extension-bundle-publications")!;
+        Assert.HasCount(3, publications.QuerySelectorAll("li"));
+        Assert.IsEmpty(publications.QuerySelectorAll("a"));
+        StringAssert.Contains(publications.TextContent, "crawl4ai-web-acquisition--92521fc3");
+        StringAssert.Contains(publications.TextContent, "data-source-profile-revision--abcd");
+        Assert.HasCount(3, publications.QuerySelectorAll(".resource-scope-badge"));
+        Assert.HasCount(3, publications.QuerySelectorAll("span code").Where(value => value.TextContent == "1.0.0"));
+    }
+
+    private sealed class BundleExtensionsClient(ExtensionBundleInstallationState state = ExtensionBundleInstallationState.Installed) : IExtensionsClient
+    {
+        private static readonly ResourceScopeRef Scope = ResourceScopeRef.Instance;
+        private static readonly ExtensionResponse Value = new(
+            "crawl4ai",
+            "default",
+            new Uri("http://localhost:5290/"),
+            "available",
+            new("Agentstration.Extensions.Crawl4AI", "Crawl4AI Web Acquisition", "1.0.0", "Web acquisition"),
+            [
+                new("tool", "web.fetch"),
+                new("tool", "web.crawl"),
+                new("tool", "content.extract"),
+                new("tool", "content.read"),
+                new("tool", "content.delete"),
+                new("data-source-profile-bundle", "crawl4ai-web")
+            ],
+            [],
+            [],
+            [],
+            null,
+            "aep",
+            RegistrationScopeRef: Scope,
+            BundleInstallations:
+            [
+                new(
+                    "crawl4ai-web",
+                    Scope,
+                    "Agentstration.Extensions.Crawl4AI",
+                    "1.0.0",
+                    "crawl4ai-web",
+                    "1.0.0",
+                    "digest",
+                    ExtensionBundleInstallationState.Installed,
+                    new Dictionary<string, ResourceReference>(),
+                    [
+                        new(ToolResourceKinds.ToolSet, "default", "crawl4ai-web-acquisition", Scope, Guid.NewGuid(), 1, "1.0.0", "toolset-hash", false),
+                        new(DataSourceResourceKinds.DataSourceProfile, "default", "crawl4ai-web", Scope, Guid.NewGuid(), 1, "1.0.0", "profile-hash", false),
+                        new(FlowResourceKinds.Flow, "default", "crawl4ai-web-acquisition", Scope, Guid.NewGuid(), null, "1.0.0", "flow-hash", false),
+                        new(ToolResourceKinds.ToolSetVersion, "default", "crawl4ai-web-acquisition--92521fc3", Scope, Guid.NewGuid(), 1, "1.0.0", "published-toolset-hash", true),
+                        new("FlowVersion", "default", "crawl4ai-web-acquisition", Scope, null, null, "1.0.0", "published-flow-hash", true),
+                        new(DataSourceResourceKinds.DataSourceProfileRevision, "default", "data-source-profile-revision--abcd", Scope, Guid.NewGuid(), 1, "1.0.0", "published-profile-hash", true)
+                    ],
+                    null)
+            ]);
+
+        private ExtensionResponse EffectiveValue => Value with
+        {
+            BundleInstallations = Value.BundleInstallations!.Select(value => value with { State = state }).ToArray()
+        };
+        public Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>([new(
+                "registration:default/crawl4ai", "crawl4ai", "default", Scope, null,
+                "Crawl4AI Web Acquisition", "Agentstration.Extensions.Crawl4AI", "1.0.0",
+                Value.Endpoint, "aep", true, "available", null, null, EffectiveValue, [])]);
+
+        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ExtensionResponse>>([EffectiveValue]);
+
+        public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ExtensionRegistrationResource>>([]);
+
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
+                Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
+                ScopeRef = Scope,
+                Definition = new ExtensionRegistrationProperties
+                {
+                    DisplayName = "Crawl4AI Web Acquisition",
+                    Endpoint = Value.Endpoint,
+                    Source = ExtensionRegistrationSource.Manual
+                }
+            }, "\"etag-1\""));
+
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class BundleToolsClient(string state = "available", bool managedProvider = true) : IToolsClient
+    {
+        private static readonly IReadOnlyList<ToolResource> Tools =
+        [
+            Tool("web.fetch"), Tool("web.crawl"), Tool("content.extract"), Tool("content.read"), Tool("content.delete")
+        ];
+
+        private IReadOnlyList<ToolResource> Values => state switch
+        {
+            "missing" => Tools.Where(value => value.Definition.ExternalId != "web.crawl").ToArray(),
+            "conflict" => [.. Tools, Tool("web.crawl") with { Metadata = new ResourceMetadata { Name = "duplicate-crawl" } }],
+            "unavailable" => Tools.Select(value => value with
+            {
+                Definition = value.Definition with
+                { Discovery = value.Definition.Discovery! with { Available = false } }
+            }).ToArray(),
+            _ => Tools
+        };
+        public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(Values);
+        public Task<IReadOnlyList<ToolResource>> GetToolsAsync(ResourceScopeRef contextScope, string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(Values);
+        public ResourceScopeRef? RequestedProviderScope { get; private set; }
+        private ToolProviderResource Provider() => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new ResourceMetadata { Name = "crawl4ai" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Governance = managedProvider ? ResourceGovernance.Extension("registration:crawl4ai", "Crawl4AI", "1.0.0") : ResourceGovernance.User,
+            Definition = new()
+            {
+                DisplayName = "Crawl4AI provider",
+                ProviderType = ToolProviderType.Aep,
+                Aep = new() { Extension = new("crawl4ai", ResourceScopeRef.Instance, ResourceNamespace.Default) }
+            }
+        };
+        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ToolProviderResource>>([Provider()]);
+        public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ToolProviderResource>(Provider(), "\"provider-etag\""));
+        public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
+        {
+            RequestedProviderScope = scopeRef;
+            return GetProviderAsync(name, cancellationToken);
+        }
+        public Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        private static ToolResource Tool(string externalId) => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Metadata = new ResourceMetadata { Name = $"paired-crawl4ai.{externalId}" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new ToolResourceProperties
+            {
+                DisplayName = externalId,
+                ExternalId = externalId,
+                Provider = new ResourceReference("crawl4ai", ResourceScopeRef.Instance, ResourceNamespace.Default),
+                Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch }
+            }
+        };
     }
 
     private sealed class FakeExtensionsClient(bool configured, AepEnrollmentSettingsSnapshot? settings = null, bool completesPairing = false, bool source = false, bool availableEnrollment = false) : IExtensionsClient

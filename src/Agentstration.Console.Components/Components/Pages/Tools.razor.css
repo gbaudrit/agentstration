@@ -1,0 +1,131 @@
+.tool-catalog-identity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 0;
+}
+
+.tool-catalog-identity > div,
+.tool-catalog-owner {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.tool-catalog-icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+    border-radius: 10px;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.tool-catalog-icon ::deep .ui-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.tool-catalog-extension {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    width: fit-content;
+    color: var(--text);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.tool-catalog-extension:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.tool-catalog-provenance {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: .7rem;
+}
+
+.tool-catalog-provenance > span {
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface-2);
+}
+
+.tool-catalog-provenance code {
+    overflow-wrap: anywhere;
+}
+
+.tool-catalog-identity .resource-name-with-scope {
+    flex-wrap: wrap;
+}
+
+@media (max-width: 700px) {
+    .tool-catalog-grid ::deep .data-grid-wrap {
+        overflow: visible;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .tool-catalog-grid ::deep .data-grid,
+    .tool-catalog-grid ::deep .data-grid tbody {
+        display: grid;
+        gap: 14px;
+        min-width: 0;
+    }
+
+    .tool-catalog-grid ::deep .data-grid thead {
+        display: none;
+    }
+
+    .tool-catalog-grid ::deep .data-grid tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 14px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+    }
+
+    .tool-catalog-grid ::deep .data-grid td {
+        display: grid;
+        align-content: start;
+        justify-items: start;
+        gap: 7px;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        white-space: normal;
+    }
+
+    .tool-catalog-grid ::deep .data-grid td:first-child,
+    .tool-catalog-grid ::deep .data-grid td:nth-child(2),
+    .tool-catalog-grid ::deep .data-grid td:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .tool-catalog-grid ::deep .data-grid td[data-label]:not(:first-child)::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: .65rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .tool-catalog-grid ::deep .data-grid td:last-child {
+        justify-items: end;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+    }
+}

@@ -20,7 +20,7 @@
   <data name="Unavailable"><value>Indisponible</value></data>
   <data name="Yes"><value>Oui</value></data>
   <data name="No"><value>Non</value></data>
-  <data name="Details"><value>Détails →</value></data>
+  <data name="Details"><value>Détails</value></data>
   <data name="Definitions"><value>Définitions</value></data>
   <data name="DefinitionsTitle"><value>Définitions d’outils</value></data>
   <data name="DefinitionsDescription"><value>Publiez des outils MCP stables implémentés par des Flows gouvernés.</value></data>

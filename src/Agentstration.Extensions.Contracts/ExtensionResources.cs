@@ -6,8 +6,51 @@ namespace Agentstration.Extensions.Contracts;
 public static class ExtensionKinds
 {
     public const string ExtensionRegistration = "ExtensionRegistration";
+    public const string ExtensionBundleInstallation = "ExtensionBundleInstallation";
     public const string AepEnrollmentSettings = "AepEnrollmentSettings";
     public const string AepEnrollmentRequest = "AepEnrollmentRequest";
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<ExtensionBundleInstallationState>))]
+public enum ExtensionBundleInstallationState
+{
+    [JsonStringEnumMemberName("installing")] Installing,
+    [JsonStringEnumMemberName("installed")] Installed,
+    [JsonStringEnumMemberName("failed")] Failed,
+    [JsonStringEnumMemberName("degraded")] Degraded
+}
+
+public sealed record ExtensionManagedResource
+{
+    public required string Kind { get; init; }
+    public required ResourceNamespace Namespace { get; init; }
+    public required string Name { get; init; }
+    public required ResourceScopeRef ScopeRef { get; init; }
+    public Guid? Uid { get; init; }
+    public long? Generation { get; init; }
+    public string? Version { get; init; }
+    public string? DefinitionHash { get; init; }
+    public bool Published { get; init; }
+}
+
+public sealed record ExtensionBundleInstallationProperties
+{
+    public required ResourceReference Registration { get; init; }
+    public required string ExtensionId { get; init; }
+    public required string ExtensionVersion { get; init; }
+    public required string BundleId { get; init; }
+    public required string BundleVersion { get; init; }
+    public required string BundleDigest { get; init; }
+    public required ExtensionBundleInstallationState State { get; init; }
+    public IReadOnlyDictionary<string, ResourceReference> ToolBindings { get; init; } =
+        new Dictionary<string, ResourceReference>();
+    public IReadOnlyList<ExtensionManagedResource> ManagedResources { get; init; } = [];
+    public string? Diagnostic { get; init; }
+}
+
+public sealed record ExtensionBundleInstallationResource : Resource
+{
+    public ExtensionBundleInstallationProperties Definition { get; init; } = null!;
 }
 
 public enum ExtensionRegistrationSource

@@ -18,30 +18,30 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
         AepDataSourceProfileBundleContribution bundle,
         BootstrapApplicationTarget target,
         IReadOnlyDictionary<string, ResourceReference> toolBindings,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<BootstrapResourceDocument, CancellationToken, Task>? reconcileResource = null)
     {
-        if (target.WorkspaceId is null)
-            throw new InvalidOperationException("A Data Source Profile bundle requires a Workspace target.");
+        var profileScope = TargetScope(target);
         var requiredTools = bundle.RequiredTools ?? [];
         var missing = requiredTools.Where(value => !toolBindings.ContainsKey(value)).ToArray();
         if (missing.Length > 0)
             throw new InvalidOperationException($"Data Source Profile bundle '{bundle.Id}' requires Tool bindings: {string.Join(", ", missing)}.");
 
-        var documents = bundle.ResourceManifests.Select(value => Resolve(value, toolBindings)).ToArray();
+        var documents = ResolveDocuments(bundle, toolBindings);
         if (!documents.Any(value => string.Equals(value.Kind, "DataSourceProfile", StringComparison.Ordinal)))
             throw new InvalidOperationException($"Data Source Profile bundle '{bundle.Id}' does not declare a DataSourceProfile resource.");
 
         var operation = new BootstrapResourceOperationContext(
             $"aep:{bundle.Id}:{bundle.Version}",
             $"aep://{bundle.Id}/{bundle.Version}",
-            BootstrapProfileScope.Workspace,
+            profileScope,
             target);
         var planning = new BootstrapPlanningContext();
         var planned = new List<(BootstrapResourceDocument Document, IBootstrapResourceHandler Handler, BootstrapResourcePlanResult Plan)>();
         foreach (var document in documents)
         {
             var handler = handlers.SingleOrDefault(value => string.Equals(value.Kind, document.Kind, StringComparison.Ordinal)
-                && value.SupportsProfileScope(BootstrapProfileScope.Workspace))
+                && value.SupportsProfileScope(profileScope))
                 ?? throw new InvalidOperationException($"AEP bundle resource kind '{document.Kind}' is not supported.");
             var plan = await handler.PlanAsync(document, operation, planning, cancellationToken);
             if (plan.Disposition is BootstrapResourceDisposition.Invalid or BootstrapResourceDisposition.Conflict or BootstrapResourceDisposition.Failed)
@@ -60,13 +60,27 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
                 {
                     BootstrapResourceApplyResult.Created => BootstrapResourceDisposition.Create,
                     BootstrapResourceApplyResult.Skipped => BootstrapResourceDisposition.Skip,
-                    _ => BootstrapResourceDisposition.Conflict
+                    _ => throw new InvalidOperationException(
+                        $"AEP bundle resource '{item.Document.Kind}/{item.Document.Metadata.Name}' cannot be installed ({BootstrapResourceDisposition.Conflict}).")
                 };
             }
+            if (reconcileResource is not null)
+                await reconcileResource(item.Document, cancellationToken);
             results.Add(new(item.Document.Kind, item.Document.Metadata.Name, disposition));
         }
         return new(bundle.Id, bundle.Version, results);
     }
+
+    private static BootstrapProfileScope TargetScope(BootstrapApplicationTarget target)
+    {
+        if (target.WorkspaceId is not null) return BootstrapProfileScope.Workspace;
+        if (target.TenantId is not null) return BootstrapProfileScope.Tenant;
+        return BootstrapProfileScope.Instance;
+    }
+
+    internal static IReadOnlyList<BootstrapResourceDocument> ResolveDocuments(AepDataSourceProfileBundleContribution bundle,
+        IReadOnlyDictionary<string, ResourceReference> toolBindings) =>
+        bundle.ResourceManifests.Select(value => Resolve(value, toolBindings)).ToArray();
 
     private static BootstrapResourceDocument Resolve(
         string manifest,
@@ -75,6 +89,8 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
         var element = ResourceManifestSerializer.FromYaml<JsonElement>(manifest);
         var node = JsonNode.Parse(element.GetRawText())
             ?? throw new InvalidOperationException("The AEP bundle contains an empty resource manifest.");
+        if (node is JsonObject root && root.ContainsKey("scopeRef"))
+            throw new InvalidOperationException("An AEP bundle resource cannot override the enrollment scope.");
         ResolveBindings(node, toolBindings);
         return ResourceManifestSerializer.FromJsonStrict<BootstrapResourceDocument>(node.ToJsonString());
     }

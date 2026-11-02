@@ -1,0 +1,15 @@
+{
+  "module": "Agentstration.Management.Aep.Tests",
+  "status": "passed",
+  "testCount": 29,
+  "minimumExpectedTests": 29,
+  "durationSeconds": 103.194,
+  "peakWorkingSetMiB": 691.7,
+  "peakPrivateMemoryMiB": 446.2,
+  "peakAggregateDotnetWorkingSetMiB": 1944.0,
+  "warningWorkingSetMiB": 0,
+  "failureWorkingSetMiB": 0,
+  "exitCode": 0,
+  "runtime": ".NET 10.0.11",
+  "os": "Microsoft Windows 10.0.26300"
+}

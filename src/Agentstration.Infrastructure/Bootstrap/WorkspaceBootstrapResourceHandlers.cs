@@ -248,7 +248,8 @@ public sealed class ModelProfileBootstrapResourceHandler(
 public sealed class ToolSetBootstrapResourceHandler(ToolSetService service) : IBootstrapResourceHandler
 {
     public string Kind => ToolResourceKinds.ToolSet;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+    public bool SupportsProfileScope(BootstrapProfileScope profileScope) => true;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -258,7 +259,7 @@ public sealed class ToolSetBootstrapResourceHandler(ToolSetService service) : IB
     {
         var value = WorkspaceBootstrapResource.Parse<ToolSetResource>(resource) with
         {
-            ScopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value)
+            ScopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation)
         };
         if (await service.GetExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
@@ -273,7 +274,7 @@ public sealed class ToolSetBootstrapResourceHandler(ToolSetService service) : IB
     {
         var value = WorkspaceBootstrapResource.Parse<ToolSetResource>(resource) with
         {
-            ScopeRef = ResourceScopeRef.Workspace(WorkspaceBootstrapResource.Workspace(operation).Value)
+            ScopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation)
         };
         if (await service.GetExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
             return BootstrapResourceApplyResult.Skipped;

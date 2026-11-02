@@ -23,6 +23,7 @@ else
     @if (activeTab == "Overview")
     {
         <section class="metric-grid flow-metrics"><MetricCard Label="@T("CurrentVersion")" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? T("NotPublished") : T("ActiveVersion", flow.ActiveVersion))" Status="UiStatus.Info" /><MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString()" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="@T("RecentRuns")" Value="@runs.Count.ToString()" Detail="@SucceededRunCount(runs.Count(x => x.Status == FlowRunStatus.Succeeded))" Status="UiStatus.Success" /></section>
+        <ExtensionManagedResourcePanel Governance="flow.Governance" ScopeRef="FlowScopeRef" Namespace="FlowResourceNamespace" Kind="@FlowResourceKinds.Flow" Name="@flow.Id" />
         <section class="panel flow-overview-preview">
             <div class="panel-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</div>
             <FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" />

@@ -43,27 +43,30 @@ internal static class ToolSetEndpoints
             return Results.Ok(new ValueResponse<ToolSetResource>(values.ToArray()));
         });
 
-    private static Task<IResult> GetAsync(string name, string? resourceNamespace, HttpResponse response,
+    private static Task<IResult> GetAsync(string name, string? resourceNamespace, string? scopeRef, HttpResponse response,
         ToolSetService service, CancellationToken token) => ToolsApiHttp.ExecuteAsync(async () =>
     {
         var ns = ResourceNamespace.Parse(resourceNamespace);
-        var stored = await service.GetAsync(ns, name, token)
+        var stored = await (scopeRef is null ? service.GetAsync(ns, name, token)
+            : service.GetExactAsync(ResourceScopeRef.Parse(scopeRef), ns, name, token))
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolSet, name, ns));
         return ToolsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
     });
 
-    private static Task<IResult> ListVersionsAsync(string name, string? resourceNamespace,
+    private static Task<IResult> ListVersionsAsync(string name, string? resourceNamespace, string? scopeRef,
         ToolSetService service, CancellationToken token) => ToolsApiHttp.ExecuteAsync(async () =>
             Results.Ok(new ValueResponse<ToolSetVersionResource>(
-                (await service.ListVersionsAsync(ResourceNamespace.Parse(resourceNamespace), name, token))
+                (await (scopeRef is null ? service.ListVersionsAsync(ResourceNamespace.Parse(resourceNamespace), name, token)
+                    : service.ListVersionsExactAsync(ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(resourceNamespace), name, token)))
                 .Select(value => value.Value)
                 .ToArray())));
 
-    private static Task<IResult> GetVersionAsync(string name, string version, string? resourceNamespace,
+    private static Task<IResult> GetVersionAsync(string name, string version, string? resourceNamespace, string? scopeRef,
         ToolSetService service, CancellationToken token) => ToolsApiHttp.ExecuteAsync(async () =>
     {
         var ns = ResourceNamespace.Parse(resourceNamespace);
-        var stored = await service.GetVersionAsync(ns, name, version, token)
+        var stored = await (scopeRef is null ? service.GetVersionAsync(ns, name, version, token)
+            : service.GetVersionExactAsync(ResourceScopeRef.Parse(scopeRef), ns, name, version, token))
             ?? throw new ToolSetValidationException("tool_set_version_not_found", $"Published ToolSet '{ns}/{name}:{version}' was not found.");
         return Results.Ok(stored.Value);
     });
@@ -103,10 +106,13 @@ internal static class ToolSetEndpoints
             Results.Ok(await service.ResolveRouteAsync(ResourceNamespace.Parse(resourceNamespace), name,
                 body.Version, body.Capability, body.Route, token)));
 
-    private static Task<IResult> DeleteAsync(string name, string? resourceNamespace, HttpRequest request,
+    private static Task<IResult> DeleteAsync(string name, string? resourceNamespace, string? scopeRef, HttpRequest request,
         ToolSetService service, CancellationToken token) => ToolsApiHttp.ExecuteAsync(async () =>
     {
-        await service.DeleteAsync(ResourceNamespace.Parse(resourceNamespace), name, ToolsApiHttp.IfMatch(request), token);
+        if (scopeRef is null)
+            await service.DeleteAsync(ResourceNamespace.Parse(resourceNamespace), name, ToolsApiHttp.IfMatch(request), token);
+        else
+            await service.DeleteExactAsync(ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(resourceNamespace), name, ToolsApiHttp.IfMatch(request), token);
         return Results.NoContent();
     });
 }

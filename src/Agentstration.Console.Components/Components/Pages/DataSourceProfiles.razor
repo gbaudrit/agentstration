@@ -1,7 +1,9 @@
 @page "/data-source-profiles"
 @implements IDisposable
 @inject IDataSourceProfilesClient Client
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> ExtensionLocalizer
 
 <PageTitle>@T("Profiles") · Agentstration</PageTitle>
 <PageHeader Title="@T("Profiles")" Description="@T("ProfilesHelp")" TestId="resource-data-source-profiles">
@@ -13,19 +15,50 @@ else if (items.Count == 0) { <EmptyState Title="@T("Profiles")" Message="@T("Emp
 else
 {
     <DataGrid TItem="DataSourceProfileResource" Items="items">
-        <Header><tr><th>@T("Name")</th><th>@T("ActiveVersion")</th><th>@T("DraftVersion")</th><th>@T("Scope")</th><th></th></tr></Header>
-        <Row Context="item"><tr><td><strong><a class="resource-name-link" href="@Url(item)">@item.Definition.DisplayName</a></strong><code>@item.Namespace/@item.Name</code></td><td><code>@(item.ActiveVersion ?? "—")</code></td><td><code>@item.Definition.Version</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td><a class="text-button" href="@Url(item)">@T("Open")</a></td></tr></Row>
+        <Header><tr><th>@T("Name")</th><th>@ExtensionLocalizer["ManagingExtension"]</th><th>@T("ActiveVersion")</th><th>@T("DraftVersion")</th><th>@T("Scope")</th><th>@T("State")</th><th></th></tr></Header>
+        <Row Context="item"><tr>
+            <td><strong><a class="resource-name-link" href="@Url(item)">@item.Definition.DisplayName</a></strong><code>@item.Namespace/@item.Name</code></td>
+            <td>@if (Owner(item) is { } owner) {
+                <a href="@owner.ExtensionUrl">@owner.Extension.DisplayName</a><br />
+                <code>@owner.Installation.ExtensionId</code><span> · @owner.Installation.ExtensionVersion</span><br />
+                <span>@ExtensionLocalizer["Bundle"]: @owner.Installation.BundleId · @owner.Installation.BundleVersion</span>
+            } else if (item.Governance.Origin.Kind == ResourceOriginKind.Extension) {
+                <span>@item.Governance.Origin.Reference · @item.Governance.Origin.Version</span>
+            } else { <span>—</span> }</td>
+            <td><code>@(item.ActiveVersion ?? "—")</code></td><td><code>@item.Definition.Version</code></td>
+            <td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td>@T(item.Governance.IsManaged ? "ManagedReadOnly" : "Editable")</td>
+            <td><a class="text-button" href="@Url(item)">@T("Open")</a></td>
+        </tr></Row>
     </DataGrid>
 }
 
 @code {
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<DataSourceProfileResource> items = [];
+    private IReadOnlyList<ExtensionInventoryItemResponse> extensions = [];
     private bool loading = true;
     private string? error;
     private string T(string key) => Localizer[key];
     protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { items = await Client.GetAsync(cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
-    private static string Url(DataSourceProfileResource item) => $"/data-source-profiles/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}";
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            items = await Client.GetAsync(cancellation.Token);
+            extensions = [];
+            if (Services.GetService<IExtensionsClient>() is { } client)
+            {
+                try { extensions = await client.GetExtensionInventoryAsync(cancellation.Token); }
+                catch (AgentstrationApiException) { }
+            }
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+    private ExtensionManagedResourceOwner? Owner(DataSourceProfileResource item) => item.ScopeRef is { } scope
+        ? ExtensionManagedResourceOwner.Find(extensions, item.Governance, scope, item.Namespace, item.Kind, item.Name, item.Uid)
+        : null;
+    private static string Url(DataSourceProfileResource item) => $"/data-source-profiles/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
