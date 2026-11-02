@@ -365,6 +365,9 @@ public sealed class DataSourceProfileService(
 
     private async Task EnsureProtectedMutationAllowedAsync(DataSourceProfileResource resource, CancellationToken cancellationToken)
     {
+        if (IsBuiltIn(resource) && requestContext.AccessMode != ControlPlaneAccessMode.System)
+            throw Error("data_source_profile_builtin_protected",
+                $"Data Source Profile '{resource.Address}' is managed by Agentstration and cannot be modified directly.");
         try { ResourceGovernanceEnforcement.EnsureManager(resource.Governance, governanceContext?.Current); }
         catch (ResourceGovernanceViolationException exception)
         {
@@ -373,9 +376,6 @@ public sealed class DataSourceProfileService(
                 ReasonCode: exception.Code), cancellationToken);
             throw Error(exception.Code, exception.Message);
         }
-        if (IsBuiltIn(resource) && requestContext.AccessMode != ControlPlaneAccessMode.System)
-            throw Error("data_source_profile_builtin_protected",
-                $"Data Source Profile '{resource.Address}' is managed by Agentstration and cannot be modified directly.");
     }
 
     private static bool IsBuiltIn(Resource resource) =>
