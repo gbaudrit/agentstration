@@ -96,6 +96,17 @@ The resource-administration inventory renders every management list and creation
 npm run capture -- --plan examples/inspect-resource-administration.capture-plan.json --output .work/resource-administration
 ```
 
+The resource-scope inventory journey covers Instance, Tenant, and current Workspace selection, combined kind/search filtering, counted options, localized result and empty states, non-linkable resources, responsive isolated styles, and resource-name navigation:
+
+```powershell
+npm exec playwright test tests/resource-scopes.spec.ts
+npm run capture -- --plan examples/inspect-resource-scopes.capture-plan.json --output .work/resource-scopes
+```
+
+The specification runs English and French at desktop and mobile widths using the deterministic Development fixture. External captures require a selected Workspace with multiple resource kinds, a linked resource, and a resource without a detail page. Follow-up #816 was unblocked by maintainer UX validation in the implementation chat on 2026-11-02 ("tu as ma validation"); the parent implementation merged in PR #820 on 2026-10-15, commit `ca83baa`.
+
+Hierarchy selection runs in Instance administration, where the complete accessible tree is returned. The journey also verifies that Tenant administration renders its Tenant root and Workspace children without an Instance ancestor, and that Workspace context renders its selected Workspace as the only root. Filtering and navigation run in that business Workspace. These assertions cover the regression found during #816 validation, where the explorer required an Instance root even when the API correctly returned a Tenant or Workspace root.
+
 The descendant Secret and Vault journey checks that a Tenant Vault is unavailable to a Workspace Secret before an explicit grant, then saves and reloads both Vault and Secret grants without using a credential value. Its capture plan requires an existing, selected campaign Workspace named by `workspaceName`; prepare it on the same external instance before running the plan:
 
 ```powershell
