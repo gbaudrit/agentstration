@@ -57,7 +57,9 @@ The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET
 | `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2304 | 108 |
 | `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 23 |
 | `Agentstration.Management.Security.Tests` | 1193.7 | 1280 | 1536 | 59 |
-| `Agentstration.Management.Aep.Tests` | 322.1 | 450 | 700 | 11 |
+| `Agentstration.Management.Aep.Tests` | 763.4 | 832 | 1024 | 29 |
+
+The AEP budget was recalibrated during #916 after the hosted enrollment and bundle reconciliation coverage grew from the original 11-test baseline to 29 tests. All 29 tests passed in both retained runs: [Linux report](/test-diagnostics/aep-linux-2026-11-02.json) (Ubuntu 26.04.1, .NET 10.0.14) peaked at 763.4 MiB, and [Windows report](/test-diagnostics/aep-windows-2026-11-02.json) (Windows 10.0.26300, .NET 10.0.11) peaked at 691.7 MiB. The Linux report retains the original failed status because it exceeded the former 700 MiB cap despite a successful test exit. The Windows baseline was collected without memory thresholds. The revised warning/failure limits are 832/1024 MiB, and the minimum expected count is raised to 29 so missing scenarios cannot silently pass diagnostics. Only the AEP budget changes; the per-assembly worker limit remains one.
 
 ## Project classification
 
