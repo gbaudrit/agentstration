@@ -169,3 +169,69 @@ media validation, governed invocation, Runtime Worker and Console remain in the
 execution path; the scenario needs no internet or relaxation of SSRF policy.
 The checkpoint is `source-lifecycle-acquisition-failure`. External instances must
 provide an equivalent deterministic response transport themselves.
+
+## Governed Knowledge administration
+
+`administer-governed-knowledge` implements [#647](https://github.com/gbaudrit/agentstration/issues/647)
+on the current Data Source-backed UX delivered by merged PRs #648, #739 and #745.
+It composes the shared ToolSet journey with minimal ready-source preparation:
+one durable artifact, one Data Source acquisition, one Console-configured Knowledge
+Source, one projection, and bounded retrieval. It shares page-object operations with
+`project-knowledge-sources` from #732 without replaying its three acquisitions and
+four projections. The dedicated lifecycle scenario retains multi-input readiness,
+partial failure, aggregation, historical provenance and scope-denial assertions. Implementation was requested by the maintainer on 2026-11-01; the
+Data Source and projection UX validation is recorded above. The final routes are
+`/data-sources/{Name}`, `/knowledge-sources`, `/knowledge-sources/new`,
+`/knowledge-sources/{Name}/edit`, `/knowledge-sources/{Name}` (including `tools`),
+`/tools/sets`, `/tools/sets/{Name}`, `/agents/new`, `/agents/{Name}`, `/artifacts`,
+`/artifacts/durable/{Id}`, and `/artifacts/staged/{Id}`.
+
+The journey creates a dedicated Workspace Model Profile to preserve shared fixture
+usage graphs, publishes the source-specific retrieval ToolSet, inspects its immutable
+version, deploys an Agent with only the search member, and checks that saving broader
+draft grants does not alter the active revision's pinned permissions. From a Snapshot
+artifact link it inspects the durable artifact, explicitly materializes and previews
+the local copy, verifies metadata-only credentials cannot read or download content,
+extends retention, observes active-lease purge denial, revokes that fixture lease,
+and cancels then confirms deletion. The durable artifact and complete Snapshot
+history remain unchanged after local-copy purge.
+
+The composed `administer-governed-toolsets` journey implements
+[#640](https://github.com/gbaudrit/agentstration/issues/640) using the accepted
+ToolSet UX from merged PR #641. The maintainer requested its inclusion in the same
+PR on 2026-11-01. It reuses the ready-source setup and all ToolSet/Agent operations
+above, and can be captured independently without the Artifact administration tail.
+It prepares version `2.0.0` with a fourth local Flow-backed Tool through the owning
+APIs because the current Console has no later-version publication editor. The
+Console must show both immutable versions while the Agent keeps version `1.0.0`,
+its original hash, and only the selected search Tool. Saved broader draft grants
+also leave that published revision unchanged.
+
+Expected failures use separate source identities: a disabled source prevents
+publication, a ready source colliding with a foreign unpublished ToolSet shows a
+conflict, and a real same-Workspace Viewer receives visible authorization failures
+when publishing an exposure or deleting the published ToolSet. An administrator's
+confirmed deletion is rejected while the ToolSet is assigned to the Agent. Supported
+APIs verify the failure codes and unchanged resources; no fault injection or test-only
+product endpoint is used. ToolSet list and detail surfaces are now `covered` in the
+catalog. The combined desktop, mobile and French tests exercise both #640 and #647.
+
+Prerequisites are the local deterministic host, Development bootstrap, built-in
+Knowledge and Artifact Flows, and Platform-administrator access. Fixtures use local
+text only, compatible published graph-only Flows, explicit ancestor grants, and a
+real unauthorized account; no crawler, Internet content, remote model or cloud storage
+is used. External capture mutates the selected instance and requires a disposable
+campaign Workspace with these same prerequisites. The Artifact cleanup step purges only the generated local copy and preserves the
+durable Snapshot artifact.
+
+Run `npx playwright test governed-knowledge.spec.ts` from `automation/playwright`.
+The smoke lane covers desktop, 390 × 844 mobile, and French labels. CI runs the three
+Playwright projects in separate jobs with isolated product hosts and one worker per
+job; the aggregate `browser-ux` check requires all three to pass. Evidence artifacts
+include the project name and retain each project's timing report. Local
+`npm run test:smoke` still runs every project. Capture checkpoints
+are `source-lifecycle-projections`, `governed-knowledge-tools-published`,
+`governed-knowledge-agent-pinned`, and `governed-knowledge-artifact-purged`. ToolSet governance adds
+`governed-toolsets-governance-verified`. The external Local-authentication capture
+plan is `examples/administer-governed-toolsets.capture-plan.json`; provide the same
+disposable instance and campaign Workspace prerequisites as the Knowledge plan.

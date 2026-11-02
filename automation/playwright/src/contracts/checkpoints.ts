@@ -216,6 +216,12 @@ export const Checkpoints = {
     secretUnavailable: 'foundry-secret-binding-secret-unavailable',
   },
   sourceLifecycle: { acquisitionFailure: 'source-lifecycle-acquisition-failure', acquisitions: 'source-lifecycle-acquisitions', projections: 'source-lifecycle-projections' },
+  governedKnowledge: {
+    governanceVerified: 'governed-toolsets-governance-verified',
+    toolsPublished: 'governed-knowledge-tools-published',
+    agentPinned: 'governed-knowledge-agent-pinned',
+    artifactPurged: 'governed-knowledge-artifact-purged',
+  },
   schemaDrivenSources: {
     completed: 'schema-driven-sources-completed',
   },

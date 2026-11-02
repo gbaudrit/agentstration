@@ -42,8 +42,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  browser-ux:
-    name: browser-ux
+  browser-ux-tests:
+    name: browser-ux (${{ matrix.project }})
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop-chromium, mobile-chromium, locale-contracts]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -92,7 +96,7 @@ jobs:
         working-directory: automation/playwright
         env:
           AGENTSTRATION_PLAYWRIGHT_NO_BUILD: true
-        run: npm run test:smoke
+        run: npm run test:smoke -- --project=${{ matrix.project }}
       - name: Write application coverage report
         if: always()
         working-directory: automation/playwright
@@ -101,9 +105,21 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: browser-ux-evidence-${{ github.run_attempt }}
+          name: browser-ux-evidence-${{ matrix.project }}-${{ github.run_attempt }}
           path: |
             automation/playwright/test-results
             automation/playwright/playwright-report
             automation/playwright/.work/*/*.log
           if-no-files-found: ignore
+
+  # Preserve the single required check while each project has isolated hosts/data.
+  browser-ux:
+    name: browser-ux
+    if: always()
+    needs: browser-ux-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every browser project to pass
+        env:
+          BROWSER_PROJECTS_RESULT: ${{ needs.browser-ux-tests.result }}
+        run: test "$BROWSER_PROJECTS_RESULT" = success

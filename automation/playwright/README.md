@@ -196,3 +196,33 @@ media validation, governed invocation, Runtime Worker and Console remain in the
 execution path; the scenario needs no internet or relaxation of SSRF policy.
 The checkpoint is `source-lifecycle-acquisition-failure`. External instances must
 provide an equivalent deterministic response transport themselves.
+
+The governed Knowledge administration journey uses a single Data Source acquisition and
+projection, sharing page operations with the full lifecycle scenario, followed by source-specific ToolSet publication, partial Agent grants,
+immutable active-revision evidence, Snapshot artifact content authorization,
+retention, and lease-protected purge:
+
+```powershell
+npx playwright test governed-knowledge.spec.ts
+```
+
+It runs offline with local authentication on desktop, mobile, and the French
+Console. See [the scenario prerequisites and routes](../../docs/contributing/browser-automation.md#governed-knowledge-administration)
+before using `administer-governed-knowledge` in an external capture plan.
+
+For capture, point the checked-in plan at a disposable instance configured with
+Local authentication (the generic capture CLI's managed host uses Development
+authentication):
+
+```powershell
+npm run capture -- --plan examples/administer-governed-knowledge.capture-plan.json --output .work/governed-knowledge --console-url http://localhost:53400
+```
+
+The shared `administer-governed-toolsets` journey covers #640's later-version pinning,
+not-ready and conflicting sources, Viewer mutation denial, and in-use deletion
+feedback. The same desktop/mobile/French Knowledge specification exercises it;
+its independent capture plan ends before Artifact administration:
+
+```powershell
+npm run capture -- --plan examples/administer-governed-toolsets.capture-plan.json --output .work/governed-toolsets --console-url http://localhost:53400
+```

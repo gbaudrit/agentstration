@@ -40,8 +40,8 @@ interface LifecycleFixture {
   acquisitionFlow: string;
   projectionFlow: string;
   artifactId: string;
-  artifactIds: [string, string];
-  sources: [string, string];
+  artifactIds: string[];
+  sources: string[];
   knowledge: string;
 }
 
@@ -51,6 +51,7 @@ export class SourceLifecyclePage {
   private fixture!: LifecycleFixture;
   private scope!: string;
   public constructor(private readonly page: Page) {}
+  public get projectionFixture(): Readonly<LifecycleFixture> { return this.fixture; }
   public get acquisitionHistory(): Locator { return this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitions); }
   public get snapshots(): Locator { return this.page.getByTestId(TestIds.sourceLifecycle.snapshots); }
 
@@ -160,22 +161,8 @@ export class SourceLifecyclePage {
   }
 
   public async project(consoleUrl: string, scopeFixture: ExecutionScopeFixture, text: ExpectedText['sourceLifecycle']): Promise<void> {
-    await this.provision(consoleUrl, scopeFixture, true);
+    const { first, simple } = await this.projectSingleInput(consoleUrl, scopeFixture, text, false);
     const f = this.fixture;
-    const first = await this.acquire(consoleUrl, f.sources[0]);
-    await this.open(consoleUrl, '/knowledge-sources', TestIds.sourceLifecycle.knowledgeSources);
-    await this.open(consoleUrl, '/knowledge-sources/new', TestIds.schemaDrivenSources.knowledgeSourceEditor);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).fill(f.knowledge);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).blur();
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceName)).toHaveValue(f.knowledge);
-    await this.page.getByLabel(text.enabled, { exact: false }).check();
-    await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), f.projectionFlow);
-    await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
-    await this.configureBinding(0, f.sources[0], 'primary');
-    await this.saveKnowledge();
-    const simple = await this.runProjection(consoleUrl);
-    await this.assertProjection(consoleUrl, simple, [first]);
-    await this.retrieve(consoleUrl, simple);
 
     // A required input without an acquisition makes the source not ready.
     await this.editKnowledge(consoleUrl);
@@ -227,17 +214,49 @@ export class SourceLifecyclePage {
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.snapshotDetails)).toBeVisible();
   }
 
-  private async provision(consoleUrl: string, scope: ExecutionScopeFixture, sources: boolean): Promise<void> {
+  /** Minimal Console preparation; multi-input readiness and history stay in project(). */
+  public async prepareReadyKnowledge(consoleUrl: string, scope: ExecutionScopeFixture, text: ExpectedText['sourceLifecycle']): Promise<void> {
+    await this.projectSingleInput(consoleUrl, scope, text, true);
+    expect(await this.read<Acquisition[]>(consoleUrl, this.sourceApi(this.fixture.sources[0]) + '/acquisitions')).toHaveLength(1);
+    expect(await this.read<Projection[]>(consoleUrl, this.knowledgeApi() + '/projections')).toHaveLength(1);
+    await this.openKnowledge(consoleUrl, 'snapshots');
+    await expect(this.snapshots).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.snapshotDetails)).toBeVisible();
+  }
+
+  private async projectSingleInput(consoleUrl: string, scopeFixture: ExecutionScopeFixture, text: ExpectedText['sourceLifecycle'], singleSource: boolean): Promise<{ first: Acquisition; simple: Projection }> {
+    await this.provision(consoleUrl, scopeFixture, true, singleSource);
+    const f = this.fixture;
+    const first = await this.acquire(consoleUrl, f.sources[0]);
+    await this.open(consoleUrl, '/knowledge-sources', TestIds.sourceLifecycle.knowledgeSources);
+    await this.open(consoleUrl, '/knowledge-sources/new', TestIds.schemaDrivenSources.knowledgeSourceEditor);
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).fill(f.knowledge);
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).blur();
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceName)).toHaveValue(f.knowledge);
+    await this.page.getByLabel(text.enabled, { exact: false }).check();
+    await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), f.projectionFlow);
+    await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
+    await this.configureBinding(0, f.sources[0], 'primary');
+    await this.saveKnowledge();
+    const simple = await this.runProjection(consoleUrl);
+    await this.assertProjection(consoleUrl, simple, [first]);
+    await this.retrieve(consoleUrl, simple);
+
+    return { first, simple };
+  }
+
+  private async provision(consoleUrl: string, scope: ExecutionScopeFixture, sources: boolean, singleSource = false): Promise<void> {
     this.page.setDefaultTimeout(15_000);
     const suffix = Date.now().toString(36);
     const fixtures = new SourceLifecycleFixtures(this.page);
     await fixtures.grantBuiltinAccess(consoleUrl, scope.scopes.tenant);
     const artifactId = await fixtures.createDurableArtifact(consoleUrl, suffix);
-    const secondArtifactId = await fixtures.createDurableArtifact(consoleUrl, `${suffix}-secondary`);
+    const artifactIds = [artifactId];
+    if (!singleSource) artifactIds.push(await fixtures.createDurableArtifact(consoleUrl, `${suffix}-secondary`));
     this.fixture = {
-      scope: scope.scopes.workspace, artifactId, artifactIds: [artifactId, secondArtifactId],
+      scope: scope.scopes.workspace, artifactId, artifactIds,
       profile: `lifecycle-profile-${suffix}`, acquisitionFlow: `lifecycle-acquire-${suffix}`,
-      projectionFlow: `lifecycle-project-${suffix}`, sources: [`lifecycle-alpha-${suffix}`, `lifecycle-beta-${suffix}`],
+      projectionFlow: `lifecycle-project-${suffix}`, sources: [`lifecycle-alpha-${suffix}`, `lifecycle-beta-${suffix}`].slice(0, singleSource ? 1 : 2),
       knowledge: `lifecycle-knowledge-${suffix}`,
     };
     const f = this.fixture;
@@ -570,6 +589,21 @@ export class SourceLifecyclePage {
       const denied = await member.request.get(this.apiUrl(consoleUrl, resource));
       await status(denied, 403);
     } finally { await context.close(); }
+  }
+
+  public async openSnapshotArtifact(consoleUrl: string): Promise<void> {
+    await this.openKnowledge(consoleUrl, 'snapshots');
+    await this.page.getByTestId(TestIds.sourceLifecycle.snapshotDetails)
+      .getByRole('link', { name: this.fixture.artifactId, exact: true }).click();
+    await expect(this.page.getByTestId(TestIds.artifacts.durableDetails)).toBeVisible();
+  }
+
+  public async snapshotEvidence(consoleUrl: string): Promise<unknown> {
+    return await this.read(consoleUrl, this.knowledgeApi() + '/snapshots');
+  }
+
+  public async assertSnapshotEvidence(consoleUrl: string, expected: unknown): Promise<void> {
+    expect(await this.snapshotEvidence(consoleUrl)).toEqual(expected);
   }
 
   public async assertResponsive(): Promise<void> {

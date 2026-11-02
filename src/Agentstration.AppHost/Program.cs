@@ -7,6 +7,12 @@ var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOpt
     DeveloperCertificateDefaultHttpsTerminationEnabled = false
 });
 var worktreeRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
+var lanEnabled = bool.Parse(builder.Configuration["Agentstration:Lan:Enabled"] ?? "false");
+var lanHost = builder.Configuration["Agentstration:Lan:Host"] ?? Environment.MachineName;
+if (lanEnabled && Uri.CheckHostName(lanHost) == UriHostNameType.Unknown)
+{
+    throw new InvalidOperationException("Agentstration:Lan:Host must be a host name or IP address without a scheme, port or path.");
+}
 var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
 var dynamicApplicationPorts = bool.TryParse(
     builder.Configuration["Agentstration:DynamicApplicationPorts"],
@@ -332,6 +338,16 @@ var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agents
     .WithDynamicHostPorts(dynamicApplicationPorts);
 
 console.WithEnvironment("Agentstration__WorkplaceBaseUrl", workplace.GetEndpoint("http"));
+if (lanEnabled)
+{
+    // Keep service discovery on the existing loopback endpoints.
+    console.WithEnvironment("AllowedHosts", "*")
+        .WithHttpsEndpoint(port: 7101, targetPort: 7101, name: "https-lan", isProxied: false)
+        .WithEndpoint("https-lan", endpoint => endpoint.TargetHost = "0.0.0.0");
+    workplace.WithHttpsEndpoint(port: 7181, targetPort: 7181, name: "https-lan", isProxied: false)
+        .WithEndpoint("https-lan", endpoint => endpoint.TargetHost = "0.0.0.0");
+    console.WithEnvironment("Agentstration__WorkplaceBaseUrl", new UriBuilder("https", lanHost, 7181).Uri.AbsoluteUri);
+}
 await builder.Build().RunAsync();
 
 static void ConfigureSharedKeyExtension(

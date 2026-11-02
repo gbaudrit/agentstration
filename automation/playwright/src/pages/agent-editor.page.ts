@@ -62,7 +62,7 @@ export class AgentEditorPage {
       this.page.getByTestId(TestIds.agentEditor.createAndDeploy).click(),
     ]);
     await this.page.getByTestId(TestIds.agentEditor.form).waitFor({ state: 'visible' });
-    await this.page.getByTestId(TestIds.agentEditor.name).waitFor({ state: 'visible' });
+    await expect(this.form).toHaveAttribute('data-interactive', 'true');
   }
 
   public async expectModelProfileUnavailable(value: string): Promise<void> {
