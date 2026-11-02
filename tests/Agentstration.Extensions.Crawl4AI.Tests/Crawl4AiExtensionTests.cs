@@ -29,7 +29,7 @@ public sealed class Crawl4AiExtensionTests
 
         Assert.AreEqual("Agentstration.Extensions.Crawl4AI", manifest.Extension.Id);
         CollectionAssert.AreEquivalent(
-            new[] { "web.fetch", "web.crawl", "content.extract", "content.read", "content.delete" },
+            new[] { "crawl4ai.web.fetch", "crawl4ai.web.crawl", "crawl4ai.content.extract", "crawl4ai.content.read", "crawl4ai.content.delete" },
             manifest.Contributions.Tools?.Select(tool => tool.Id).ToArray());
         var bundle = manifest.Contributions.DataSourceProfileBundles?.Single();
         Assert.IsNotNull(bundle);
@@ -37,7 +37,7 @@ public sealed class Crawl4AiExtensionTests
         Assert.AreEqual("1.0.0", bundle.Version);
         Assert.HasCount(4, bundle.ResourceManifests);
         CollectionAssert.AreEquivalent(
-            new[] { "web.crawl", "content.read", "content.delete" },
+            new[] { "crawl4ai.web.crawl", "crawl4ai.content.read", "crawl4ai.content.delete" },
             bundle.RequiredTools?.ToArray());
         Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("kind: DataSourceProfile", StringComparison.Ordinal)));
         Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("flow.contract: datasource.acquisition/v1", StringComparison.Ordinal)));

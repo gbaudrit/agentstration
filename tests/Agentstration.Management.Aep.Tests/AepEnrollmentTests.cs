@@ -563,6 +563,9 @@ public sealed class AepEnrollmentTests
         Assert.AreEqual(ExtensionBundleInstallationState.Installed, installation.Definition.State);
         Assert.AreEqual("crawl4ai-web", installation.Definition.BundleId);
         Assert.HasCount(3, installation.Definition.ToolBindings);
+        Assert.IsTrue(installation.Definition.ToolBindings.All(value =>
+            value.Key.StartsWith("crawl4ai.", StringComparison.Ordinal)
+            && value.Value.Name.EndsWith("." + value.Key, StringComparison.Ordinal)));
         Assert.IsTrue(installation.Definition.ManagedResources.Any(value =>
             value.Kind == DataSourceResourceKinds.DataSourceProfile && value.Name == "crawl4ai-web"));
         Assert.IsTrue(installation.Definition.ManagedResources.All(value => value.ScopeRef == target));
@@ -1034,7 +1037,7 @@ public sealed class AepEnrollmentTests
         public Task<ToolProviderDiscoveryResult> DiscoverAsync(
             ToolProviderResource provider,
             CancellationToken cancellationToken) => Task.FromResult(new ToolProviderDiscoveryResult(
-                new[] { "web.fetch", "web.crawl", "content.extract", "content.read", "content.delete" }
+                new[] { "crawl4ai.web.fetch", "crawl4ai.web.crawl", "crawl4ai.content.extract", "crawl4ai.content.read", "crawl4ai.content.delete" }
                     .Select(id => new DiscoveredToolDescriptor(
                         id,
                         id,
@@ -1118,11 +1121,11 @@ public sealed class AepEnrollmentTests
             var tools = advertiseBundle
                 ? new[]
                 {
-                    new AepToolContribution("web.fetch", "Fetch", new AepMcpToolMapping("main", "web_fetch")),
-                    new AepToolContribution("web.crawl", "Crawl", new AepMcpToolMapping("main", "web_crawl")),
-                    new AepToolContribution("content.extract", "Extract", new AepMcpToolMapping("main", "content_extract")),
-                    new AepToolContribution("content.read", "Read", new AepMcpToolMapping("main", "content_read")),
-                    new AepToolContribution("content.delete", "Delete", new AepMcpToolMapping("main", "content_delete"))
+                    new AepToolContribution("crawl4ai.web.fetch", "Fetch", new AepMcpToolMapping("main", "web_fetch")),
+                    new AepToolContribution("crawl4ai.web.crawl", "Crawl", new AepMcpToolMapping("main", "web_crawl")),
+                    new AepToolContribution("crawl4ai.content.extract", "Extract", new AepMcpToolMapping("main", "content_extract")),
+                    new AepToolContribution("crawl4ai.content.read", "Read", new AepMcpToolMapping("main", "content_read")),
+                    new AepToolContribution("crawl4ai.content.delete", "Delete", new AepMcpToolMapping("main", "content_delete"))
                 }
                 : advertiseTool
                 ? new[] { new AepToolContribution("lookup", "Lookup", new AepMcpToolMapping("main", "lookup")) }

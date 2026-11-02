@@ -434,6 +434,35 @@ public sealed class ExtensionsConsoleTests
     }
 
     [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void ToolCatalogLinksReadableExtensionWithoutDisplayingPairingIdentity(string cultureName)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
+        context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Tools>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var owners = rendered.FindAll(".tool-catalog-owner");
+            Assert.HasCount(5, owners);
+            foreach (var owner in owners)
+            {
+                var link = owner.QuerySelector("a")!;
+                Assert.AreEqual("Crawl4AI Web Acquisition", link.TextContent.Trim());
+                Assert.AreEqual("/extensions/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance", link.GetAttribute("href"));
+                StringAssert.Contains(owner.TextContent, "Agentstration.Extensions.Crawl4AI");
+                Assert.IsFalse(owner.TextContent.Contains("paired-", StringComparison.Ordinal));
+                Assert.IsNotNull(owner.QuerySelector(".resource-scope-badge"));
+            }
+            StringAssert.Contains(rendered.Find("a[href*='/tools/paired-crawl4ai.web.crawl']").GetAttribute("href")!, "context=%2Finstance");
+        });
+    }
+
+    [TestMethod]
     [DataRow("en-US", "available", "Available", true)]
     [DataRow("en-US", "unavailable", "Unavailable", true)]
     [DataRow("en-US", "missing", "Not materialized", false)]

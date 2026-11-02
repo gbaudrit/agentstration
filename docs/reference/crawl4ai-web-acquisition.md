@@ -34,13 +34,17 @@ The extension sends a minimal `{ "urls": ["…"] }` request to Crawl4AI. Flow or
 
 | Contribution | MCP Tool | Purpose |
 | --- | --- | --- |
-| `web.fetch` | `web_fetch` | Acquire one page. |
-| `web.crawl` | `web_crawl` | Acquire a breadth-first page set within configured depth and count limits. |
-| `content.extract` | `content_extract` | Produce normalized text from previously acquired HTML or text. |
-| `content.read` | `content_read` | Read one bounded base64 chunk from temporary content. |
-| `content.delete` | `content_delete` | Idempotently remove temporary content. |
+| `crawl4ai.web.fetch` | `web_fetch` | Acquire one page. |
+| `crawl4ai.web.crawl` | `web_crawl` | Acquire a breadth-first page set within configured depth and count limits. |
+| `crawl4ai.content.extract` | `content_extract` | Produce normalized text from previously acquired HTML or text. |
+| `crawl4ai.content.read` | `content_read` | Read one bounded base64 chunk from temporary content. |
+| `crawl4ai.content.delete` | `content_delete` | Idempotently remove temporary content. |
 
-The AEP registration materializes these as ordinary governed Tools. Administrators still enable the provider and Tools, group the exact published Tools in a ToolSet when desired, and assign only the required unit Tools to an Agent or Flow.
+Contribution IDs use the `crawl4ai.` prefix, and the bundle's required-Tool declarations and binding placeholders use those exact IDs. Semantic capabilities such as `web.crawl` remain provider-neutral. Materialized Tool names additionally include the exact paired provider identity, so separate registrations do not collide at the same ownership scope. ToolSet, Flow, and Profile names use the `crawl4ai-` prefix. The Console catalog links the readable extension name and keeps the pairing identity out of list text; the exact provider remains available on details pages.
+
+Earlier preview manifests used unprefixed Tool contribution IDs. Existing immutable bundle installations are not renamed or upgraded automatically; use a fresh installation to evaluate the revised manifest and update any custom binding keys.
+
+Paired enrollment materializes these as extension-managed Tools and enables the three required by the bundle: `crawl4ai.web.crawl`, `crawl4ai.content.read`, and `crawl4ai.content.delete`. The other declared Tools remain disabled; an unavailable contribution badge can therefore mean disabled rather than a failed extension connection. Their managed configuration remains read-only. Tool availability does not grant execution rights: Agents and Flows still consume only their explicitly assigned capabilities and ToolSets.
 
 The MCP schemas expose these stable arguments and results:
 
