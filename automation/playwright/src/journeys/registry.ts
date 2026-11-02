@@ -46,7 +46,10 @@ import { exerciseScopedFlowDesigner, type ExerciseScopedFlowDesignerInput } from
 import type { Journey } from './journey.js';
 import { inspectResourceScopes, type InspectResourceScopesInput } from './inspect-resource-scopes.journey.js';
 
+import { inspectGovernedExtensionInventory, type InspectGovernedExtensionInventoryInput } from './inspect-governed-extension-inventory.journey.js';
+
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
+  'inspect-governed-extension-inventory': (context, input) => inspectGovernedExtensionInventory(context, input as InspectGovernedExtensionInventoryInput),
   'administer-governed-toolsets': (context, input) => administerGovernedToolSets(context, input),
   'administer-governed-knowledge': (context, input) => administerGovernedKnowledge(context, input),
   'inspect-resource-scopes': (context, input) => inspectResourceScopes(context, input as InspectResourceScopesInput),

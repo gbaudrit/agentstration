@@ -1,6 +1,31 @@
 export const SupportedTestLocales = ['en-US', 'fr-FR'] as const;
 export type SupportedTestLocale = typeof SupportedTestLocales[number];
 
+export const GovernedInventoryTextByLocale = {
+  'en-US': {
+    resources: 'Managed resources', contributions: 'Contributions', installed: 'Installed', degraded: 'Degraded',
+    managed: 'Managed · read-only', technical: 'Technical details', publications: 'Published versions',
+    available: 'Available', unavailable: 'Unavailable', missing: 'Not materialized', conflict: 'Conflict',
+    definition: 'Definition', revisions: 'Revisions', yaml: 'YAML', deployments: 'Deployments',
+    kinds: ['ToolSet', 'Flow', 'Data Source Profile'], scope: 'Instance',
+    bundleVersion: 'Bundle version', extensionVersion: 'Extension version',
+    mutations: ['Delete', 'Save', 'Save changes', 'Publish', 'Activate', 'Apply YAML'],
+    yamlEditor: 'Open YAML editor',
+    delete: 'Delete', save: 'Save',
+  },
+  'fr-FR': {
+    resources: 'Ressources gérées', contributions: 'Contributions', installed: 'Installée', degraded: 'Dégradée',
+    managed: 'Gérée · lecture seule', technical: 'Détails techniques', publications: 'Versions publiées',
+    available: 'Disponible', unavailable: 'Indisponible', missing: 'Non matérialisée', conflict: 'En conflit',
+    definition: 'Définition', revisions: 'Révisions', yaml: 'YAML', deployments: 'Déploiements',
+    kinds: ['ToolSet', 'Flow', 'Profil de source de données'], scope: 'Instance',
+    bundleVersion: 'Version du bundle', extensionVersion: 'Version de l’extension',
+    mutations: ['Supprimer', 'Enregistrer', 'Enregistrer les modifications', 'Publier', 'Activer', 'Appliquer le YAML'],
+    yamlEditor: 'Ouvrir l’éditeur YAML',
+    delete: 'Supprimer', save: 'Enregistrer',
+  },
+} as const;
+
 export interface ExpectedText {
   navigation: {
     main: string;

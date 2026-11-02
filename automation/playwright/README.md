@@ -96,6 +96,15 @@ The resource-administration inventory renders every management list and creation
 npm run capture -- --plan examples/inspect-resource-administration.capture-plan.json --output .work/resource-administration
 ```
 
+The governed AEP inventory journey covers the Extension catalog, exact ownership and independent bundle/extension versions, technical publication evidence without links, reciprocal Tool/Provider/Profile navigation, read-only resources, ordinary editable comparisons, and degraded/missing/conflicting contributions:
+
+```powershell
+npm exec playwright test tests/governed-extension-inventory.spec.ts
+npm run capture -- --plan examples/inspect-governed-extension-inventory.capture-plan.json --output .work/governed-extension-inventory
+```
+
+The specification runs English and French on desktop and mobile with the isolated [GovernedInventoryHost fixture](fixtures/GovernedInventoryHost/README.md), real Console/services/SQLite and deterministic in-process discovery. It does not require Docker, Crawl4AI, Internet access or an external extension. External captures require equivalent `qa-managed`, `qa-degraded` and `qa-user` resources in the disposable Instance scope and `qa-inventory` namespace; the capture does not seed an external instance. #753 was authorized by the maintainer in the Codex implementation chat on 2026-11-02 ("ok fait 753") after UX review and merge of #916 (`f7685b0`); that evidence is recorded on the child issue.
+
 The resource-scope inventory journey covers Instance, Tenant, and current Workspace selection, combined kind/search filtering, counted options, localized result and empty states, non-linkable resources, responsive isolated styles, and resource-name navigation:
 
 ```powershell

@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/automation/">
     <Project Path="automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj" />
+    <Project Path="automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj" />
   </Folder>
   <Folder Name="/aep/">
     <Project Path="aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />

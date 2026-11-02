@@ -6,6 +6,8 @@ Agentstration owns reusable Playwright journeys for browser-level UX validation 
 
 ## Setup
 
+The `inspect-governed-extension-inventory` journey (#753) uses a dedicated test-only host to seed an available enrolled extension, exact governed resources and immutable publications, contribution failure states, a degraded installation, and ordinary editable resources. It covers readable ownership and reciprocal scoped navigation in English/French on desktop/mobile. The fixture uses real Console/services/SQLite with in-process discovery and blocks network access to its fictional extension endpoint. Its readiness file is written only after seeding completes, before the browser worker starts. See `automation/playwright/examples/inspect-governed-extension-inventory.capture-plan.json` and the workspace README for capture prerequisites. The maintainer authorized this deferred scenario on 2026-11-02 after PR #916 merged.
+
 ```powershell
 npm --prefix automation/playwright ci
 npm --prefix automation/playwright run install:browsers
