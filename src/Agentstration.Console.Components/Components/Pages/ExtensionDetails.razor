@@ -151,16 +151,45 @@ else
     @if (activeTab == DetailTab.Contributions)
     {
         <section class="panel resource-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Contributions")</p><h2>@T("Contributions")</h2></div><span>@T("ContributionCount", item.Extension?.Contributions.Count ?? 0)</span></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Contributions")</p><h2>@T("Contributions")</h2><p>@T("Contributions.Description")</p></div><span>@T("ContributionCount", item.Extension?.Contributions.Count ?? 0)</span></div>
             @if (item.Extension?.Contributions.Count > 0)
             {
-                <DataGrid TItem="ExtensionContributionResponse" Items="item.Extension.Contributions">
-                    <Header><tr><th>@T("Type")</th><th>@T("Name")</th><th>@T("Actions")</th></tr></Header>
-                    <Row Context="contribution"><tr><td>@contribution.Kind</td><td><code>@contribution.Id</code></td><td>
-                        @foreach (var provider in item.Extension.Providers.Where(value => value.ContributionId == contribution.Id)) { <a class="button-secondary" href="@ProviderUrl(provider)">@T("OpenProvider", provider.Name)</a> }
-                        @if (contribution.Kind == "model-provider" && !item.Extension.Providers.Any(value => value.ContributionId == contribution.Id)) { <a class="button-primary" href="@ConfigureProviderUrl(item.Extension, contribution)">@T("ConfigureProvider", contribution.Id)</a> }
-                    </td></tr></Row>
-                </DataGrid>
+                <div class="extension-contribution-list" data-testid="extension-contribution-list">
+                    @foreach (var contribution in item.Extension.Contributions)
+                    {
+                        var resources = MaterializedResources(contribution);
+                        var tools = MaterializedTools(contribution);
+                        <article class="extension-contribution-card" data-contribution-kind="@contribution.Kind" data-contribution-id="@contribution.Id">
+                            <div class="extension-contribution-heading">
+                                <div>
+                                    <span class="extension-contribution-kind">@ContributionKindLabel(contribution.Kind)</span>
+                                    <h3>@contribution.Id</h3>
+                                    <p>@ContributionDescription(contribution, resources.Count + tools.Count)</p>
+                                </div>
+                                <div class="extension-contribution-actions">
+                                    @foreach (var provider in item.Extension.Providers.Where(value => value.ContributionId == contribution.Id)) { <a class="text-button" href="@ProviderUrl(provider)">@T("OpenProvider", provider.Name) →</a> }
+                                    @if (contribution.Kind == "model-provider" && !item.Extension.Providers.Any(value => value.ContributionId == contribution.Id)) { <a class="text-button" href="@ConfigureProviderUrl(item.Extension, contribution)">@T("ConfigureProvider", contribution.Id) →</a> }
+                                </div>
+                            </div>
+                            @if (tools.Count > 0 || resources.Count > 0)
+                            {
+                                <div class="extension-materialized-resources">
+                                    <p class="extension-materialized-label">@T("MaterializedResources", tools.Count + resources.Count)</p>
+                                    <ul class="resource-links">
+                                        @foreach (var tool in tools)
+                                        {
+                                            <li><a href="@ToolUrl(tool)"><span><strong>@tool.Definition.DisplayName</strong><code>@tool.Definition.ExternalId</code></span><span class="extension-resource-meta"><span>@T("ContributionKind.tool")</span><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span></a></li>
+                                        }
+                                        @foreach (var resource in resources)
+                                        {
+                                            <li>@if (ManagedResourceUrl(resource) is { } url) { <a href="@url"><span><strong>@resource.Name</strong><code>@resource.Namespace/@resource.Name</code></span><span class="extension-resource-meta"><span>@ManagedResourceKindLabel(resource.Kind)</span><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></span></a> }</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </article>
+                    }
+                </div>
             }
             else { <p>@T("NoContributions")</p> }
         </section>
@@ -182,7 +211,7 @@ else
                         <dl class="resource-details">
                             <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="installation.ScopeRef" /></dd>
                             <dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd>
-                            <dt>@T("ToolBindings")</dt><dd>@(installation.ToolBindings.Count == 0 ? "—" : string.Join(", ", installation.ToolBindings.Select(value => $"{value.Key} → {value.Value.Name}")))</dd>
+                            <dt>@T("ToolBindings")</dt><dd>@if (installation.ToolBindings.Count == 0) { <span>—</span> } else { <div class="table-actions">@foreach (var binding in installation.ToolBindings) { <a class="text-button" href="@ToolReferenceUrl(installation.ScopeRef, binding.Value)">@binding.Key → @binding.Value.Name</a> }</div> }</dd>
                             @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <dt>@T("Diagnostics")</dt><dd>@installation.Diagnostic</dd> }
                         </dl>
                         @if (installation.ManagedResources.Count > 0)
@@ -266,6 +295,7 @@ else
     private bool confirmDelete;
     private bool confirmUnenroll;
     private bool migrating;
+    private IReadOnlyList<ToolResource> extensionTools = [];
     private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
     private RegistrationEditForm form = new();
     private DetailTab activeTab;
@@ -288,6 +318,18 @@ else
                 ? inventory.SingleOrDefault(value => string.Equals(value.RegistrationName, RegistrationName, StringComparison.Ordinal) && string.Equals(value.RegistrationNamespace, ResourceNamespaceValue ?? ResourceNamespace.DefaultValue, StringComparison.Ordinal))
                 : inventory.SingleOrDefault(value => value.EnrollmentInstanceId == EnrollmentInstanceId);
             registration = item?.RegistrationName is null ? null : await Client.GetRegistrationAsync(ResourceNamespace.Parse(item.RegistrationNamespace), item.RegistrationName, cancellation.Token);
+            extensionTools = [];
+            if (item?.RegistrationName is not null && Services.GetService<IToolsClient>() is { } toolsClient)
+            {
+                try
+                {
+                    var candidates = item.RegistrationScopeRef is { } scopeRef
+                        ? await toolsClient.GetToolsAsync(scopeRef, cancellationToken: cancellation.Token)
+                        : await toolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
+                    extensionTools = candidates.Where(ToolBelongsToExtension).ToArray();
+                }
+                catch (AgentstrationApiException) { }
+            }
             enrollment = null;
             if (CanAdminister && item?.EnrollmentInstanceId is { } instanceId)
             {
@@ -375,6 +417,48 @@ else
     private static string ProfileUrl(ExtensionOptionUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.ProfileName)}?namespace={Uri.EscapeDataString(usage.ProfileNamespace)}";
     private static string ProviderUrl(ExtensionProviderBindingResponse provider) => $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
     private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) => $"/modelproviders/new?extension={Uri.EscapeDataString(extension.RegistrationName)}&extensionNamespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
+    private bool ToolBelongsToExtension(ToolResource tool) => item?.RegistrationName is { } registrationName
+        && string.Equals(tool.Definition.Provider?.Name, registrationName, StringComparison.Ordinal)
+        && (tool.Definition.Provider?.Namespace ?? tool.Namespace).Value == item.RegistrationNamespace
+        && (item.RegistrationScopeRef is null || tool.ScopeRef == item.RegistrationScopeRef);
+    private IReadOnlyList<ToolResource> MaterializedTools(ExtensionContributionResponse contribution) =>
+        string.Equals(contribution.Kind, "tool", StringComparison.Ordinal)
+            ? extensionTools.Where(tool => string.Equals(tool.Definition.ExternalId, contribution.Id, StringComparison.Ordinal)).ToArray()
+            : [];
+    private IReadOnlyList<ExtensionManagedResourceResponse> MaterializedResources(ExtensionContributionResponse contribution) =>
+        string.Equals(contribution.Kind, "data-source-profile-bundle", StringComparison.Ordinal)
+            ? (item?.Extension?.BundleInstallations ?? [])
+                .Where(installation => string.Equals(installation.BundleId, contribution.Id, StringComparison.Ordinal))
+                .SelectMany(installation => installation.ManagedResources)
+                .Where(resource => resource.Kind is ToolResourceKinds.ToolSet or FlowResourceKinds.Flow or DataSourceResourceKinds.DataSourceProfile)
+                .DistinctBy(resource => (resource.Kind, resource.Namespace, resource.Name, resource.ScopeRef))
+                .OrderBy(resource => ManagedResourceKindOrder(resource.Kind))
+                .ThenBy(resource => resource.Name, StringComparer.Ordinal)
+                .ToArray()
+            : [];
+    private string ContributionKindLabel(string kind)
+    {
+        var localized = Localizer[$"ContributionKind.{kind}"];
+        return localized.ResourceNotFound ? kind : localized.Value;
+    }
+    private string ContributionDescription(ExtensionContributionResponse contribution, int resourceCount) =>
+        resourceCount > 0
+            ? T("ContributionMaterialized", resourceCount)
+            : T(string.Equals(contribution.Kind, "data-source-profile-bundle", StringComparison.Ordinal) ? "ContributionAwaitingMaterialization" : "ContributionDeclared");
+    private string ManagedResourceKindLabel(string kind) => T($"ManagedResourceKind.{kind}");
+    private static int ManagedResourceKindOrder(string kind) => kind switch
+    {
+        ToolResourceKinds.ToolSet => 0,
+        DataSourceResourceKinds.DataSourceProfile => 1,
+        FlowResourceKinds.Flow => 2,
+        _ => 3
+    };
+    private static string ToolUrl(ToolResource tool) => ToolReferenceUrl(tool.ScopeRef ?? ResourceScopeRef.Instance, new ResourceReference(tool.Name, tool.ScopeRef, tool.Namespace));
+    private static string ToolReferenceUrl(ResourceScopeRef scopeRef, ResourceReference reference)
+    {
+        var @namespace = reference.Namespace ?? ResourceNamespace.Default;
+        return $"/tools/{Uri.EscapeDataString(reference.Name)}?namespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString((reference.ScopeRef ?? scopeRef).Value)}";
+    }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
     private sealed class RegistrationEditForm { [System.ComponentModel.DataAnnotations.Required] public string DisplayName { get; set; } = string.Empty; [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.Url] public string Endpoint { get; set; } = string.Empty; public string? ExpectedExtensionId { get; set; } public bool Enabled { get; set; } }
     private static UiStatus InstallationStatus(ExtensionBundleInstallationState state) => state switch
@@ -387,10 +471,11 @@ else
     private static string? ManagedResourceUrl(ExtensionManagedResourceResponse resource) => resource.Kind switch
     {
         ToolResourceKinds.ToolSet or ToolResourceKinds.ToolSetVersion => $"/tools/sets/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}",
-        FlowResourceKinds.Flow or "FlowVersion" => resource.Namespace == ResourceNamespace.DefaultValue
+        FlowResourceKinds.Flow or "FlowVersion" => (resource.Namespace == ResourceNamespace.DefaultValue
             ? $"/flows/{Uri.EscapeDataString(resource.Name)}"
-            : $"/namespaces/{Uri.EscapeDataString(resource.Namespace)}/flows/{Uri.EscapeDataString(resource.Name)}",
-        DataSourceResourceKinds.DataSourceProfile or DataSourceResourceKinds.DataSourceProfileRevision => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}",
+            : $"/namespaces/{Uri.EscapeDataString(resource.Namespace)}/flows/{Uri.EscapeDataString(resource.Name)}")
+            + $"?scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}",
+        DataSourceResourceKinds.DataSourceProfile or DataSourceResourceKinds.DataSourceProfileRevision => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}",
         _ => null
     };
     private enum DetailTab { Summary, Connection, Enrollment, Contributions, Resources, Options, Usages }

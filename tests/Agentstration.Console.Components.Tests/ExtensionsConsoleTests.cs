@@ -1,9 +1,14 @@
+using Agentstration.Api.Contracts;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Flows;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
+using Agentstration.Tools;
+using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
@@ -150,8 +155,8 @@ public sealed class ExtensionsConsoleTests
 
         rendered.WaitForAssertion(() =>
         {
-            var action = rendered.Find("table a.button-secondary");
-            Assert.AreEqual("Open llama-cpp-local provider", action.TextContent.Trim());
+            var action = rendered.Find(".extension-contribution-actions a.text-button");
+            Assert.AreEqual("Open llama-cpp-local provider →", action.TextContent.Trim());
             Assert.AreEqual("/modelproviders/llama-cpp-local?namespace=default", action.GetAttribute("href"));
         });
     }
@@ -173,9 +178,39 @@ public sealed class ExtensionsConsoleTests
 
         rendered.WaitForAssertion(() =>
         {
-            var action = rendered.Find("table a.button-primary");
-            Assert.AreEqual("Configure llama.cpp provider", action.TextContent.Trim());
+            var action = rendered.Find(".extension-contribution-actions a.text-button");
+            Assert.AreEqual("Configure llama.cpp provider →", action.TextContent.Trim());
             StringAssert.StartsWith(action.GetAttribute("href"), "/modelproviders/new?");
+        });
+    }
+
+    [TestMethod]
+    public async Task BundleContributionShowsLinkedToolSetProfileAndFlowResources()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
+        context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
+            .Add(value => value.RegistrationName, "crawl4ai"));
+        var tabs = rendered.WaitForElements("[role='tab']");
+        await tabs[3].ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(6, rendered.FindAll(".extension-contribution-card"));
+            var bundle = rendered.Find("[data-contribution-id='crawl4ai-web']");
+            StringAssert.Contains(bundle.TextContent, "3 ressource(s) gouvernée(s) matérialisée(s)");
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/tools/sets/crawl4ai-web-acquisition?namespace=default']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/data-source-profiles/crawl4ai-web?namespace=default&scopeRef=%2Finstance']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/flows/crawl4ai-web-acquisition?scopeRef=%2Finstance']"));
+
+            var tool = rendered.Find("[data-contribution-id='web.crawl']");
+            Assert.IsNotNull(tool.QuerySelector("a[href='/tools/paired-crawl4ai.web.crawl?namespace=default&scopeRef=%2Finstance']"));
         });
     }
 
@@ -396,6 +431,114 @@ public sealed class ExtensionsConsoleTests
             Assert.AreEqual("Configure Source provider git", action.TextContent.Trim());
             StringAssert.StartsWith(action.GetAttribute("href"), "/sourceproviders/new?");
         });
+    }
+
+    private sealed class BundleExtensionsClient : IExtensionsClient
+    {
+        private static readonly ResourceScopeRef Scope = ResourceScopeRef.Instance;
+        private static readonly ExtensionResponse Value = new(
+            "crawl4ai",
+            "default",
+            new Uri("http://localhost:5290/"),
+            "available",
+            new("Agentstration.Extensions.Crawl4AI", "Crawl4AI Web Acquisition", "1.0.0", "Web acquisition"),
+            [
+                new("tool", "web.fetch"),
+                new("tool", "web.crawl"),
+                new("tool", "content.extract"),
+                new("tool", "content.read"),
+                new("tool", "content.delete"),
+                new("data-source-profile-bundle", "crawl4ai-web")
+            ],
+            [],
+            [],
+            [],
+            null,
+            "aep",
+            RegistrationScopeRef: Scope,
+            BundleInstallations:
+            [
+                new(
+                    "crawl4ai-web",
+                    Scope,
+                    "Agentstration.Extensions.Crawl4AI",
+                    "1.0.0",
+                    "crawl4ai-web",
+                    "1.0.0",
+                    "digest",
+                    ExtensionBundleInstallationState.Installed,
+                    new Dictionary<string, ResourceReference>(),
+                    [
+                        new(ToolResourceKinds.ToolSet, "default", "crawl4ai-web-acquisition", Scope, Guid.NewGuid(), 1, "1.0.0", "toolset-hash", false),
+                        new(DataSourceResourceKinds.DataSourceProfile, "default", "crawl4ai-web", Scope, Guid.NewGuid(), 1, "1.0.0", "profile-hash", false),
+                        new(FlowResourceKinds.Flow, "default", "crawl4ai-web-acquisition", Scope, Guid.NewGuid(), null, "1.0.0", "flow-hash", false)
+                    ],
+                    null)
+            ]);
+
+        public Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>([new(
+                "registration:default/crawl4ai", "crawl4ai", "default", Scope, null,
+                "Crawl4AI Web Acquisition", "Agentstration.Extensions.Crawl4AI", "1.0.0",
+                Value.Endpoint, "aep", true, "available", null, null, Value, [])]);
+
+        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ExtensionResponse>>([Value]);
+
+        public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ExtensionRegistrationResource>>([]);
+
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
+                Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
+                ScopeRef = Scope,
+                Definition = new ExtensionRegistrationProperties
+                {
+                    DisplayName = "Crawl4AI Web Acquisition",
+                    Endpoint = Value.Endpoint,
+                    Source = ExtensionRegistrationSource.Manual
+                }
+            }, "\"etag-1\""));
+
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class BundleToolsClient : IToolsClient
+    {
+        private static readonly IReadOnlyList<ToolResource> Tools =
+        [
+            Tool("web.fetch"), Tool("web.crawl"), Tool("content.extract"), Tool("content.read"), Tool("content.delete")
+        ];
+
+        public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(Tools);
+        public Task<IReadOnlyList<ToolResource>> GetToolsAsync(ResourceScopeRef contextScope, string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(Tools);
+        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        private static ToolResource Tool(string externalId) => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Metadata = new ResourceMetadata { Name = $"paired-crawl4ai.{externalId}" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new ToolResourceProperties
+            {
+                DisplayName = externalId,
+                ExternalId = externalId,
+                Provider = new ResourceReference("crawl4ai", ResourceScopeRef.Instance, ResourceNamespace.Default)
+            }
+        };
     }
 
     private sealed class FakeExtensionsClient(bool configured, AepEnrollmentSettingsSnapshot? settings = null, bool completesPairing = false, bool source = false, bool availableEnrollment = false) : IExtensionsClient
