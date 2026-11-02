@@ -1,10 +1,10 @@
 import { Checkpoints } from '../contracts/checkpoints.js';
 import { ExpectedTextByLocale } from '../locales/expected-text.js';
 import type { Journey } from './journey.js';
-import { projectKnowledgeSources, type SourceLifecycleInput } from './source-lifecycle.journey.js';
+import { prepareKnowledgeSource, type SourceLifecycleInput } from './source-lifecycle.journey.js';
 
 export const administerGovernedToolSets: Journey<SourceLifecycleInput> = async (context, input) => {
-  await projectKnowledgeSources(context, input);
+  await prepareKnowledgeSource(context, input);
   const fixture = context.pages.sourceLifecycle.projectionFixture;
   const locale = input.locale ?? 'en-US';
   const text = ExpectedTextByLocale[locale].governedKnowledge;

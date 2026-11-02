@@ -174,8 +174,8 @@ Profile inputs may be an ordered array when equivalent environments use differen
 
 See [Browser automation](../../docs/contributing/browser-automation.md), [ADR-0117](../../docs/decisions/0117-product-owned-browser-journeys.md), and [ADR-0118](../../docs/decisions/0118-browser-campaigns-use-dedicated-workspaces.md) for ownership, extension, and external-consumption rules.
 
-The governed Knowledge administration journey composes the Data Source-backed
-projection scenario with source-specific ToolSet publication, partial Agent grants,
+The governed Knowledge administration journey uses a single Data Source acquisition and
+projection, sharing page operations with the full lifecycle scenario, followed by source-specific ToolSet publication, partial Agent grants,
 immutable active-revision evidence, Snapshot artifact content authorization,
 retention, and lease-protected purge:
 

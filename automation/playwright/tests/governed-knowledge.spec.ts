@@ -4,7 +4,7 @@ import { ProductPages } from '../src/pages/product.pages.js';
 import { test } from '../src/fixtures/test.js';
 
 test.use({ authenticationMode: 'Local' });
-test.setTimeout(540_000);
+test.setTimeout(180_000);
 
 test('governed Knowledge and ToolSet administration pins Agent tools and protects Snapshot artifacts @smoke', async ({ page, product }) => {
   await administerGovernedKnowledge({ ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, {});

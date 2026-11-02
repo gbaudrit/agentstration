@@ -151,9 +151,12 @@ raises the scope authorization failure consumed by the family API error handlers
 
 `administer-governed-knowledge` implements [#647](https://github.com/gbaudrit/agentstration/issues/647)
 on the current Data Source-backed UX delivered by merged PRs #648, #739 and #745.
-It composes the shared ToolSet journey and `project-knowledge-sources` from #732 rather than duplicating acquisition,
-projection readiness, partial failure, Snapshot provenance, retrieval and scope-denial
-assertions. Implementation was requested by the maintainer on 2026-11-01; the
+It composes the shared ToolSet journey with minimal ready-source preparation:
+one durable artifact, one Data Source acquisition, one Console-configured Knowledge
+Source, one projection, and bounded retrieval. It shares page-object operations with
+`project-knowledge-sources` from #732 without replaying its three acquisitions and
+four projections. The dedicated lifecycle scenario retains multi-input readiness,
+partial failure, aggregation, historical provenance and scope-denial assertions. Implementation was requested by the maintainer on 2026-11-01; the
 Data Source and projection UX validation is recorded above. The final routes are
 `/data-sources/{Name}`, `/knowledge-sources`, `/knowledge-sources/new`,
 `/knowledge-sources/{Name}/edit`, `/knowledge-sources/{Name}` (including `tools`),
@@ -199,7 +202,11 @@ campaign Workspace with these same prerequisites. The Artifact cleanup step purg
 durable Snapshot artifact.
 
 Run `npx playwright test governed-knowledge.spec.ts` from `automation/playwright`.
-The smoke lane covers desktop, 390 × 844 mobile, and French labels. Capture checkpoints
+The smoke lane covers desktop, 390 × 844 mobile, and French labels. CI runs the three
+Playwright projects in separate jobs with isolated product hosts and one worker per
+job; the aggregate `browser-ux` check requires all three to pass. Evidence artifacts
+include the project name and retain each project's timing report. Local
+`npm run test:smoke` still runs every project. Capture checkpoints
 are `source-lifecycle-projections`, `governed-knowledge-tools-published`,
 `governed-knowledge-agent-pinned`, and `governed-knowledge-artifact-purged`. ToolSet governance adds
 `governed-toolsets-governance-verified`. The external Local-authentication capture
