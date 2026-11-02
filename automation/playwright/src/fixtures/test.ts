@@ -6,6 +6,7 @@ import { isActionableConsoleError, isActionableFirstPartyFailure } from '../heal
 interface AgentstrationWorkerFixtures {
   product: ProductHosts;
   acquisitionFailureFixture: boolean;
+  governedInventoryFixture: boolean;
   authenticationMode: 'Development' | 'Local';
   aiProvider: 'Deterministic' | 'Managed';
 }
@@ -18,14 +19,15 @@ export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFi
   authenticationMode: ['Development', { option: true, scope: 'worker' }],
   aiProvider: ['Deterministic', { option: true, scope: 'worker' }],
   acquisitionFailureFixture: [false, { option: true, scope: 'worker' }],
-  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture }, use) => {
+  governedInventoryFixture: [false, { option: true, scope: 'worker' }],
+  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture }, use) => {
     const external = resolveExternalProductAddresses(process.env);
     if (external) {
       await use({ ...external, stop: async () => {} });
       return;
     }
 
-    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture);
+    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture);
     try {
       await use(product);
     } finally {

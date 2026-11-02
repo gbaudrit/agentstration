@@ -1,0 +1,14 @@
+{
+  "journey": "inspect-governed-extension-inventory",
+  "input": { "locale": "en-US" },
+  "viewport": { "width": 1440, "height": 1000 },
+  "theme": "dark",
+  "captures": [
+    { "checkpoint": "governed-extension-inventory", "file": "inventory.png", "scope": "target" },
+    { "checkpoint": "governed-extension-technical-details", "file": "technical-details.png", "scope": "target" },
+    { "checkpoint": "governed-extension-protected-resource", "file": "read-only.png", "scope": "page" },
+    { "checkpoint": "governed-extension-contributions", "file": "contributions.png", "scope": "target" },
+    { "checkpoint": "governed-extension-ordinary-resource", "file": "ordinary.png", "scope": "page" },
+    { "checkpoint": "governed-extension-degraded-installation", "file": "degraded.png", "scope": "target" }
+  ]
+}

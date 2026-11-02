@@ -202,7 +202,7 @@ else
 
     @if (activeTab == DetailTab.Resources)
     {
-        <section class="panel resource-section extension-managed-resources">
+        <section class="panel resource-section extension-managed-resources" data-testid="extension-governed-inventory">
             <div class="panel-header"><div><p class="eyebrow">@T("ManagedResources")</p><h2>@T("ManagedResources")</h2><p>@T("ManagedResources.Description")</p></div><span>@T("InstallationCount", item.Extension?.BundleInstallations?.Count ?? 0)</span></div>
             @if (item.Extension?.BundleInstallations?.Count > 0)
             {
@@ -210,7 +210,7 @@ else
                 {
                     var resources = installation.ManagedResources.Where(resource => !resource.Published).ToArray();
                     var publications = installation.ManagedResources.Where(resource => resource.Published).ToArray();
-                    <article class="resource-section extension-bundle-card">
+                    <article class="resource-section extension-bundle-card" data-testid="extension-bundle-installation" data-bundle-id="@installation.BundleId">
                         <div class="extension-bundle-heading">
                             <div class="extension-bundle-title"><span class="extension-bundle-icon" aria-hidden="true"><UiIcon Name="layers" /></span><div><p class="eyebrow">@T("Bundle")</p><h3>@installation.BundleId</h3></div></div>
                             <StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" />
@@ -223,7 +223,7 @@ else
                         @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <div class="extension-bundle-diagnostic"><strong>@T("Diagnostics")</strong><p>@installation.Diagnostic</p></div> }
                         @if (resources.Length > 0)
                         {
-                            <div class="extension-bundle-grid"><DataGrid TItem="ExtensionManagedResourceResponse" Items="resources">
+                            <div class="extension-bundle-grid" data-testid="extension-managed-resources"><DataGrid TItem="ExtensionManagedResourceResponse" Items="resources">
                                 <Header><tr><th>@T("Type")</th><th>@T("Identity")</th><th>@T("Scope")</th><th>@T("Version")</th><th>@T("State")</th></tr></Header>
                                 <Row Context="resource"><tr>
                                     <td data-label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></td>
@@ -235,11 +235,11 @@ else
                             </DataGrid></div>
                         }
                         else { <p>@T("NoManagedResources")</p> }
-                        <details class="extension-bundle-evidence"><summary>@T("TechnicalDetails")</summary><dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@installation.Name</code></dd><dt>@T("ManagingExtension")</dt><dd><code>@installation.ExtensionId</code></dd><dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd><dt>@T("ToolBindings")</dt><dd>@foreach (var binding in installation.ToolBindings) { <div><code>@binding.Key</code><br /><code>@binding.Value.Name</code></div> }</dd></dl>
+                        <details class="extension-bundle-evidence" data-testid="extension-technical-details"><summary>@T("TechnicalDetails")</summary><dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@installation.Name</code></dd><dt>@T("ManagingExtension")</dt><dd><code>@installation.ExtensionId</code></dd><dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd><dt>@T("ToolBindings")</dt><dd>@foreach (var binding in installation.ToolBindings) { <div><code>@binding.Key</code><br /><code>@binding.Value.Name</code></div> }</dd></dl>
                             @if (publications.Length > 0)
                             {
                                 <h4>@T("PublishedVersions")</h4>
-                                <ul class="extension-bundle-publications">
+                                <ul class="extension-bundle-publications" data-testid="extension-published-versions">
                                     @foreach (var publication in publications)
                                     {
                                         <li><div><strong>@ManagedResourceKindLabel(publication.Kind)</strong><code>@publication.Namespace/@publication.Name</code></div><div><ResourceScopeBadge ScopeRef="publication.ScopeRef" Compact /><span>@T("Version") <code>@(publication.Version ?? "—")</code></span></div></li>
