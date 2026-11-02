@@ -202,37 +202,38 @@ else
 
     @if (activeTab == DetailTab.Resources)
     {
-        <section class="panel resource-section">
+        <section class="panel resource-section extension-managed-resources">
             <div class="panel-header"><div><p class="eyebrow">@T("ManagedResources")</p><h2>@T("ManagedResources")</h2><p>@T("ManagedResources.Description")</p></div><span>@T("InstallationCount", item.Extension?.BundleInstallations?.Count ?? 0)</span></div>
             @if (item.Extension?.BundleInstallations?.Count > 0)
             {
                 @foreach (var installation in item.Extension.BundleInstallations)
                 {
-                    <article class="resource-section">
-                        <div class="panel-header">
-                            <div><h3>@installation.BundleId <small>@installation.BundleVersion</small></h3><p><code>@installation.Name</code> · @installation.ExtensionId @installation.ExtensionVersion</p></div>
+                    <article class="resource-section extension-bundle-card">
+                        <div class="extension-bundle-heading">
+                            <div class="extension-bundle-title"><span class="extension-bundle-icon" aria-hidden="true"><UiIcon Name="layers" /></span><div><p class="eyebrow">@T("Bundle")</p><h3>@installation.BundleId</h3></div></div>
                             <StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" />
                         </div>
-                        <dl class="resource-details">
-                            <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="installation.ScopeRef" /></dd>
-                            <dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd>
-                            <dt>@T("ToolBindings")</dt><dd>@if (installation.ToolBindings.Count == 0) { <span>—</span> } else { <div class="table-actions">@foreach (var binding in installation.ToolBindings) { <a class="text-button" href="@ToolReferenceUrl(installation.ScopeRef, binding.Value)">@binding.Key → @binding.Value.Name</a> }</div> }</dd>
-                            @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <dt>@T("Diagnostics")</dt><dd>@installation.Diagnostic</dd> }
-                        </dl>
+                        <div class="extension-bundle-meta"><span>@T("BundleVersion") <strong>@installation.BundleVersion</strong></span><ResourceScopeBadge ScopeRef="installation.ScopeRef" /><span>@T("ExtensionVersion") <strong>@installation.ExtensionVersion</strong></span></div>
+                        @if (installation.ToolBindings.Count > 0)
+                        {
+                            <div class="extension-bundle-bindings"><p class="field-label">@T("ToolBindings")</p><div class="extension-bundle-binding-list">@foreach (var binding in installation.ToolBindings) { <a href="@ToolReferenceUrl(installation.ScopeRef, binding.Value)" title="@binding.Value.Name">@binding.Key</a> }</div></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <div class="extension-bundle-diagnostic"><strong>@T("Diagnostics")</strong><p>@installation.Diagnostic</p></div> }
                         @if (installation.ManagedResources.Count > 0)
                         {
-                            <DataGrid TItem="ExtensionManagedResourceResponse" Items="installation.ManagedResources">
+                            <div class="extension-bundle-grid"><DataGrid TItem="ExtensionManagedResourceResponse" Items="installation.ManagedResources">
                                 <Header><tr><th>@T("Type")</th><th>@T("Identity")</th><th>@T("Scope")</th><th>@T("Version")</th><th>@T("State")</th></tr></Header>
                                 <Row Context="resource"><tr>
-                                    <td>@ManagedResourceKindLabel(resource.Kind)</td>
-                                    <td>@if (installation.State != ExtensionBundleInstallationState.Degraded && ManagedResourceUrl(resource) is { } url) { <a class="text-button" href="@url">@resource.Namespace/@resource.Name</a> } else { <code>@resource.Namespace/@resource.Name</code> }</td>
-                                    <td><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></td>
-                                    <td>@(resource.Version ?? "—")</td>
-                                    <td>@(resource.Published ? T("Published") : T("ManagedReadOnly"))</td>
+                                    <td data-label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></td>
+                                    <td data-label="@T("Identity")">@if (installation.State != ExtensionBundleInstallationState.Degraded && ManagedResourceUrl(resource) is { } url) { <a class="text-button" href="@url">@resource.Namespace/@resource.Name</a> } else { <code>@resource.Namespace/@resource.Name</code> }</td>
+                                    <td data-label="@T("Scope")"><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></td>
+                                    <td data-label="@T("Version")"><code>@(resource.Version ?? "—")</code></td>
+                                    <td data-label="@T("State")"><StatusBadge Text="@(resource.Published ? T("Published") : T("ManagedReadOnly"))" Status="UiStatus.Neutral" /></td>
                                 </tr></Row>
-                            </DataGrid>
+                            </DataGrid></div>
                         }
                         else { <p>@T("NoManagedResources")</p> }
+                        <details class="extension-bundle-evidence"><summary>@T("TechnicalDetails")</summary><dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@installation.Name</code></dd><dt>@T("ManagingExtension")</dt><dd><code>@installation.ExtensionId</code></dd><dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd><dt>@T("ToolBindings")</dt><dd>@foreach (var binding in installation.ToolBindings) { <div><code>@binding.Key</code><br /><code>@binding.Value.Name</code></div> }</dd></dl></details>
                     </article>
                 }
             }

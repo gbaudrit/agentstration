@@ -454,11 +454,13 @@ public sealed class ExtensionsConsoleTests
                 var link = owner.QuerySelector("a")!;
                 Assert.AreEqual("Crawl4AI Web Acquisition", link.TextContent.Trim());
                 Assert.AreEqual("/extensions/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance", link.GetAttribute("href"));
+                Assert.IsNull(link.QuerySelector("svg"));
                 StringAssert.Contains(owner.TextContent, "Agentstration.Extensions.Crawl4AI");
                 Assert.IsFalse(owner.TextContent.Contains("paired-", StringComparison.Ordinal));
                 Assert.IsNotNull(owner.QuerySelector(".resource-scope-badge"));
             }
             StringAssert.Contains(rendered.Find("a[href*='/tools/paired-crawl4ai.web.crawl']").GetAttribute("href")!, "context=%2Finstance");
+            Assert.IsFalse(rendered.Find(".tool-catalog-grid").TextContent.Contains('→'));
         });
     }
 
@@ -516,9 +518,9 @@ public sealed class ExtensionsConsoleTests
     }
 
     [TestMethod]
-    [DataRow("en-US", "Conflict")]
-    [DataRow("fr-FR", "En conflit")]
-    public async Task DegradedBundleKeepsItsEvidenceWithoutOfferingResourceNavigation(string cultureName, string label)
+    [DataRow("en-US", "Conflict", "Technical details")]
+    [DataRow("fr-FR", "En conflit", "Détails techniques")]
+    public async Task DegradedBundleKeepsItsEvidenceWithoutOfferingResourceNavigation(string cultureName, string label, string technicalDetails)
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext();
@@ -536,6 +538,11 @@ public sealed class ExtensionsConsoleTests
         await rendered.FindAll("[role='tab']")[4].ClickAsync(new());
         StringAssert.Contains(rendered.Markup, "crawl4ai-web-acquisition");
         Assert.IsEmpty(rendered.FindAll("article.resource-section td a"));
+        var evidence = rendered.Find(".extension-bundle-evidence");
+        Assert.AreEqual(technicalDetails, evidence.QuerySelector("summary")!.TextContent);
+        Assert.IsFalse(evidence.HasAttribute("open"));
+        StringAssert.Contains(evidence.TextContent, "Agentstration.Extensions.Crawl4AI");
+        StringAssert.Contains(evidence.TextContent, "digest");
     }
 
     private sealed class BundleExtensionsClient(ExtensionBundleInstallationState state = ExtensionBundleInstallationState.Installed) : IExtensionsClient

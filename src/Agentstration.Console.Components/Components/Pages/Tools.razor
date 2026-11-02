@@ -19,7 +19,7 @@ else
         <Row Context="tool"><tr><td data-label="@T("Tool")"><div class="tool-catalog-identity"><span class="tool-catalog-icon" aria-hidden="true"><UiIcon Name="wrench" /></span><div><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></div></div></td><td data-label="@T("Provider")">
             @if (ManagingExtension(tool) is { } extension)
             {
-                <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName<UiIcon Name="arrow-right" /></a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@(tool.Governance.Origin.Version ?? extension.Version)</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div></div>
+                <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName</a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@(tool.Governance.Origin.Version ?? extension.Version)</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div></div>
             }
             else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }
             </td><td data-label="@T("Availability")"><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td data-label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>

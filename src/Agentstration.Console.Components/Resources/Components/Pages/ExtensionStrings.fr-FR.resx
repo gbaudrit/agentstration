@@ -43,4 +43,5 @@
   <data name="ManagedResourceKind.ToolSetVersion"><value>Version de ToolSet</value></data>
   <data name="ManagedResourceKind.FlowVersion"><value>Version de Flow</value></data>
   <data name="ManagedResourceKind.DataSourceProfileRevision"><value>Révision de profil de source de données</value></data>
+  <data name="TechnicalDetails"><value>Détails techniques</value></data>
 </root>

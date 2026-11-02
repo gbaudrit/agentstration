@@ -44,12 +44,6 @@
     text-decoration: underline;
 }
 
-.tool-catalog-extension ::deep .ui-icon {
-    width: 14px;
-    height: 14px;
-    color: var(--primary);
-}
-
 .tool-catalog-provenance {
     display: flex;
     flex-wrap: wrap;
