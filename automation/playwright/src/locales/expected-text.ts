@@ -44,6 +44,10 @@ export interface ExpectedText {
     runTool: string;
     input: string;
   };
+  governedKnowledge: {
+    deleteToolSet: string; confirmToolSetDelete: string; draftSaved: string; publishExposure: string; openToolSet: string; pinnedHelp: string; activeHelp: string;
+    newExpiration: string; extendRetention: string; cancel: string; confirmDelete: string;
+  };
   sourceLifecycle: {
     displayName: string; technicalName: string; acquisitionFlow: string; configurationSchema: string;
     save: string; yaml: string; revisions: string; definition: string; version: string;
@@ -127,6 +131,7 @@ export const ExpectedTextByLocale = {
       runTool: 'Run this tool',
       input: 'Input',
     },
+    governedKnowledge: { deleteToolSet: 'Delete', confirmToolSetDelete: 'Delete ToolSet', draftSaved: 'saved without changing the active deployment.', publishExposure: 'Publish Tool exposure', openToolSet: 'Open ToolSet', pinnedHelp: 'Version 1.0.0 will be pinned; later additions do not extend a published Agent revision.', activeHelp: 'This immutable evidence controls the Tools available to the active Agent revision.', newExpiration: 'New expiration', extendRetention: 'Extend retention', cancel: 'Cancel', confirmDelete: 'Delete permanently' },
     sourceLifecycle: { displayName: 'Display name', technicalName: 'Technical name', acquisitionFlow: 'Acquisition Flow', configurationSchema: 'Configuration schema (JSON)', save: 'Save', yaml: 'YAML', revisions: 'Revisions', definition: 'Definition', version: 'Version', publish: 'Publish', activate: 'Activate', enabled: 'Enabled', addDataSource: 'Add a Data Source', notReady: 'Not ready' },
     schemaDrivenSources: {
       formMode: 'Form',
@@ -204,6 +209,7 @@ export const ExpectedTextByLocale = {
       runTool: 'Exécuter cet outil',
       input: 'Entrées',
     },
+    governedKnowledge: { deleteToolSet: 'Supprimer', confirmToolSetDelete: 'Supprimer le ToolSet', draftSaved: 'enregistrée sans modifier le déploiement actif.', publishExposure: 'Publier l’exposition des Tools', openToolSet: 'Ouvrir le ToolSet', pinnedHelp: 'La version 1.0.0 sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.', activeHelp: 'Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.', newExpiration: 'Nouvelle expiration', extendRetention: 'Prolonger la rétention', cancel: 'Annuler', confirmDelete: 'Supprimer définitivement' },
     sourceLifecycle: { displayName: 'Nom d’affichage', technicalName: 'Nom technique', acquisitionFlow: 'Flow d’acquisition', configurationSchema: 'Schéma de configuration (JSON)', save: 'Enregistrer', yaml: 'YAML', revisions: 'Révisions', definition: 'Définition', version: 'Version', publish: 'Publier', activate: 'Activer', enabled: 'Activée', addDataSource: 'Ajouter une source de données', notReady: 'Non prête' },
     schemaDrivenSources: {
       formMode: 'Formulaire',

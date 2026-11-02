@@ -1,0 +1,20 @@
+{
+  "journey": "administer-governed-toolsets",
+  "theme": "dark",
+  "consoleUrl": "http://localhost:53400",
+  "input": {},
+  "captures": [
+    {
+      "checkpoint": "governed-knowledge-tools-published",
+      "file": "01-source-toolset.png"
+    },
+    {
+      "checkpoint": "governed-knowledge-agent-pinned",
+      "file": "02-pinned-agent.png"
+    },
+    {
+      "checkpoint": "governed-toolsets-governance-verified",
+      "file": "03-versioned-toolsets.png"
+    }
+  ]
+}

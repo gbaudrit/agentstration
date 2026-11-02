@@ -20,3 +20,12 @@ export const projectKnowledgeSources: Journey<SourceLifecycleInput> = async (con
   await context.pages.sourceLifecycle.project(context.consoleUrl, fixture, ExpectedTextByLocale[input.locale ?? 'en-US'].sourceLifecycle);
   await context.checkpoint({ name: Checkpoints.sourceLifecycle.projections, page: context.pages.page, target: context.pages.sourceLifecycle.snapshots });
 };
+
+/** Prepare one ready source without replaying the full projection regression journey. */
+export const prepareKnowledgeSource: Journey<SourceLifecycleInput> = async (context, input) => {
+  await prepareConsoleJourney(context, input);
+  await context.pages.consoleAdministration.restoreLanguage(context.consoleUrl, input.locale ?? 'en-US');
+  const fixture = await context.pages.executionScopes.ensureFixture(context.consoleUrl);
+  await context.pages.sourceLifecycle.prepareReadyKnowledge(context.consoleUrl, fixture, ExpectedTextByLocale[input.locale ?? 'en-US'].sourceLifecycle);
+  await context.checkpoint({ name: Checkpoints.sourceLifecycle.projections, page: context.pages.page, target: context.pages.sourceLifecycle.snapshots });
+};

@@ -1,0 +1,24 @@
+{
+  "journey": "administer-governed-knowledge",
+  "theme": "dark",
+  "input": {},
+  "captures": [
+    {
+      "checkpoint": "source-lifecycle-projections",
+      "file": "01-snapshots.png"
+    },
+    {
+      "checkpoint": "governed-knowledge-tools-published",
+      "file": "02-source-toolset.png"
+    },
+    {
+      "checkpoint": "governed-knowledge-agent-pinned",
+      "file": "03-pinned-agent-grants.png"
+    },
+    {
+      "checkpoint": "governed-knowledge-artifact-purged",
+      "file": "04-local-copy-purged.png"
+    }
+  ],
+  "consoleUrl": "http://localhost:53400"
+}
