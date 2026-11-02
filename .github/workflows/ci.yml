@@ -64,7 +64,7 @@ jobs:
             $_ -match '^(src/|aep/src/|deploy/|Dockerfile$|\.dockerignore$|global\.json$|Agentstration\.slnx$|Directory\.(Build|Packages)\.(props|targets)$|\.github/workflows/ci\.yml$)'
           }).Count -gt 0
           $storage = $runEverything -or @($changedFiles | Where-Object {
-            $_ -match '^(src/Agentstration\.(Application|Flow|Infrastructure|Management|Runtime|Web|Work)|tests/Agentstration\.(Application|Performance|Web)\.Tests/|Agentstration\.Tests\.Performance\.slnx$|Directory\.(Build|Packages)\.(props|targets)$|global\.json$|\.github/workflows/(ci|storage-performance)\.yml$)'
+            $_ -match '^(src/Agentstration\.(Application|Flow|Infrastructure|Management|ResourceManagement|Runtime|Web|Work)|tests/Agentstration\.(Application|Performance|Web)\.Tests/|Agentstration\.Tests\.Performance\.slnx$|Directory\.(Build|Packages)\.(props|targets)$|global\.json$|\.github/workflows/(ci|storage-performance)\.yml$)'
           }).Count -gt 0
 
           "dotnet=$($dotnet.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT

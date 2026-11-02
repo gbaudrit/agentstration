@@ -236,8 +236,39 @@ public sealed class ControlPlaneStoreHardeningTests
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(foreign.Value.Uid, default));
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
             fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("blocked"), null, true, default));
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+        await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
             fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(ResourceScopeRef.Tenant(tenantB), ResourceNamespace.Default, "MemoryProvider", "foreign"), default));
+    }
+
+    [TestMethod]
+    public async Task WorkspaceExactReadsRejectLateralScopesWithAuthorizationFailure()
+    {
+        var tenantId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var siblingWorkspaceId = Guid.NewGuid();
+        var foreignTenantId = Guid.NewGuid();
+        var foreignWorkspaceId = Guid.NewGuid();
+        var context = new TestRequestContext();
+        context.UseSystem();
+        await using var fixture = await StoreFixture.CreateAsync(context);
+        await fixture.EnsureWorkspaceAsync(tenantId, workspaceId);
+        await fixture.EnsureWorkspaceAsync(tenantId, siblingWorkspaceId);
+        await fixture.EnsureWorkspaceAsync(foreignTenantId, foreignWorkspaceId);
+        var lateralScopes = new[]
+        {
+            ResourceScopeRef.Workspace(siblingWorkspaceId),
+            ResourceScopeRef.Workspace(foreignWorkspaceId)
+        };
+        foreach (var scope in lateralScopes)
+            await fixture.Store.PutExactAsync(scope, Resource("foreign"), null, true, default);
+
+        context.UseWorkspace(new RequestContext(Guid.NewGuid(), tenantId, workspaceId));
+        foreach (var scope in lateralScopes)
+        {
+            await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+                fixture.Store.GetExactAsync<ExtensionResource>(
+                    new ScopedResourceAddress(scope, ResourceNamespace.Default, "MemoryProvider", "foreign"), default));
+        }
     }
 
     [TestMethod]
