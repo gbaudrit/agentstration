@@ -67,6 +67,7 @@ const startupTimeoutMilliseconds = 180_000;
 export async function startProductHosts(
   authenticationMode: 'Development' | 'Local' = 'Development',
   aiProvider: 'Deterministic' | 'Managed' = 'Deterministic',
+  acquisitionFailureFixture = false,
 ): Promise<ProductHosts> {
   const runId = `${Date.now()}-${process.pid}`;
   const workDirectory = path.join(automationRoot, '.work', runId);
@@ -138,7 +139,10 @@ export async function startProductHosts(
     throw error;
   }
 
-  const consoleHost = runDotnet('src/Agentstration.Web/Agentstration.Web.csproj', path.join(workDirectory, 'console.log'), {
+  const consoleProject = acquisitionFailureFixture
+    ? 'automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj'
+    : 'src/Agentstration.Web/Agentstration.Web.csproj';
+  const consoleHost = runDotnet(consoleProject, path.join(workDirectory, 'console.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: consoleUrl,
     Logging__EventLog__LogLevel__Default: 'None',
