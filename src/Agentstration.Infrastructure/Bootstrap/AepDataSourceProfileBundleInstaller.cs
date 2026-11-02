@@ -59,7 +59,8 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
                 {
                     BootstrapResourceApplyResult.Created => BootstrapResourceDisposition.Create,
                     BootstrapResourceApplyResult.Skipped => BootstrapResourceDisposition.Skip,
-                    _ => BootstrapResourceDisposition.Conflict
+                    _ => throw new InvalidOperationException(
+                        $"AEP bundle resource '{item.Document.Kind}/{item.Document.Metadata.Name}' cannot be installed ({BootstrapResourceDisposition.Conflict}).")
                 };
             }
             results.Add(new(item.Document.Kind, item.Document.Metadata.Name, disposition));

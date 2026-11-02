@@ -96,6 +96,66 @@ public sealed class AepDataSourceProfileBundleInstallerTests
         Assert.IsEmpty(profile.Planned);
     }
 
+    [TestMethod]
+    [DataRow(BootstrapResourceDisposition.Invalid)]
+    [DataRow(BootstrapResourceDisposition.Conflict)]
+    [DataRow(BootstrapResourceDisposition.Failed)]
+    public async Task RejectsInvalidPlanBeforeApplyingAnyResource(BootstrapResourceDisposition disposition)
+    {
+        var flow = new RecordingHandler("Flow");
+        var profile = new RecordingHandler("DataSourceProfile") { PlanDisposition = disposition };
+        var installer = new AepDataSourceProfileBundleInstaller([flow, profile]);
+        var bundle = new AepDataSourceProfileBundleContribution(
+            "crawl4ai-web", "Crawl4AI Web", "1.0.0", [FlowManifest, ProfileManifest]);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => installer.InstallAsync(
+            bundle, new(), ToolBindings(), default));
+
+        StringAssert.Contains(exception.Message, "DataSourceProfile/crawl4ai-web");
+        StringAssert.Contains(exception.Message, disposition.ToString());
+        Assert.IsEmpty(flow.Applied);
+        Assert.IsEmpty(profile.Applied);
+    }
+
+    [TestMethod]
+    public async Task ApplyConflictStopsInstallationBeforeApplyingRemainingResources()
+    {
+        var flow = new RecordingHandler("Flow") { ApplyResult = BootstrapResourceApplyResult.Conflict };
+        var profile = new RecordingHandler("DataSourceProfile");
+        var installer = new AepDataSourceProfileBundleInstaller([flow, profile]);
+        var bundle = new AepDataSourceProfileBundleContribution(
+            "crawl4ai-web", "Crawl4AI Web", "1.0.0", [FlowManifest, ProfileManifest]);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => installer.InstallAsync(
+            bundle, new(), ToolBindings(), default));
+
+        StringAssert.Contains(exception.Message, "Flow/crawl4ai-web-acquisition");
+        StringAssert.Contains(exception.Message, "Conflict");
+        Assert.HasCount(1, flow.Applied);
+        Assert.IsEmpty(profile.Applied);
+    }
+
+    [TestMethod]
+    public async Task ApplySkipPreservesIdempotentInstallation()
+    {
+        var flow = new RecordingHandler("Flow") { ApplyResult = BootstrapResourceApplyResult.Skipped };
+        var profile = new RecordingHandler("DataSourceProfile");
+        var installer = new AepDataSourceProfileBundleInstaller([flow, profile]);
+        var bundle = new AepDataSourceProfileBundleContribution(
+            "crawl4ai-web", "Crawl4AI Web", "1.0.0", [FlowManifest, ProfileManifest]);
+
+        var result = await installer.InstallAsync(bundle, new(), ToolBindings(), default);
+
+        Assert.AreEqual(BootstrapResourceDisposition.Skip, result.Resources[0].Disposition);
+        Assert.AreEqual(BootstrapResourceDisposition.Create, result.Resources[1].Disposition);
+        Assert.HasCount(1, profile.Applied);
+    }
+
+    private static Dictionary<string, ResourceReference> ToolBindings() => new()
+    {
+        ["web.crawl"] = new("crawl", ResourceScopeRef.Instance, ResourceNamespace.Default)
+    };
+
     private const string FlowManifest = """
         apiVersion: agentstration.io/v1
         kind: Flow
@@ -123,6 +183,8 @@ public sealed class AepDataSourceProfileBundleInstallerTests
         public List<BootstrapResourceDocument> Applied { get; } = [];
         public List<BootstrapResourceOperationContext> Operations { get; } = [];
         public bool SupportsProfileScope(BootstrapProfileScope profileScope) => true;
+        public BootstrapResourceDisposition PlanDisposition { get; init; } = BootstrapResourceDisposition.Create;
+        public BootstrapResourceApplyResult ApplyResult { get; init; } = BootstrapResourceApplyResult.Created;
 
         public Task<BootstrapResourcePlanResult> PlanAsync(
             BootstrapResourceDocument resource,
@@ -132,7 +194,7 @@ public sealed class AepDataSourceProfileBundleInstallerTests
         {
             Planned.Add(resource);
             Operations.Add(operation);
-            return Task.FromResult(new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create));
+            return Task.FromResult(new BootstrapResourcePlanResult(PlanDisposition));
         }
 
         public Task<BootstrapResourceApplyResult> ApplyAsync(
@@ -141,7 +203,7 @@ public sealed class AepDataSourceProfileBundleInstallerTests
             CancellationToken cancellationToken)
         {
             Applied.Add(resource);
-            return Task.FromResult(BootstrapResourceApplyResult.Created);
+            return Task.FromResult(ApplyResult);
         }
     }
 }

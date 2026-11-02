@@ -78,6 +78,8 @@ The temporary Crawl4AI reference is not an Agentstration `StagedArtifact`. It is
 
 The extension contributes the `crawl4ai-web` Data Source Profile bundle. The bundle contains the exact ToolSet, bounded chunk-transfer Flow, `datasource.acquisition/v1` Flow, and Data Source Profile needed by this composition. Successful enrollment installs it through host-owned handlers at the exact extension-registration scope and retains immutable governance and installation evidence.
 
+A resource conflict during application stops installation, records a failed bundle with diagnostics, and prevents enrollment from becoming available. Retrying enrollment after resolving the conflict reuses resources already installed by that bundle without duplicating their identities or published versions.
+
 The resulting durable Artifact is independent of Knowledge. A Knowledge Source may later bind this Data Source and preserve the corpus unchanged through `knowledge-projection-builtin`, or apply an explicit `artifact.transform/v1` Flow before projection.
 
 ## Limits and destination policy

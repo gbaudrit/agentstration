@@ -9,9 +9,11 @@ using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Tools;
 using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
@@ -457,29 +459,69 @@ public sealed class AepEnrollmentTests
     }
 
     [TestMethod]
-    public async Task PairingInstallsAdvertisedBundleAndPersistsGovernedInventory()
+    [DataRow(ResourceScopeKind.Instance, false)]
+    [DataRow(ResourceScopeKind.Tenant, false)]
+    [DataRow(ResourceScopeKind.Workspace, false)]
+    [DataRow(ResourceScopeKind.Workspace, true)]
+    public async Task PairingInstallsAdvertisedBundleAndPersistsGovernedInventory(ResourceScopeKind scopeKind, bool conflictOnFirstApply)
     {
         var handler = new EnrollmentLifecycleHandler("Agentstration.Extensions.Crawl4AI", advertiseBundle: true);
+        var conflict = new BundleApplyConflict { Pending = conflictOnFirstApply };
         await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.RemoveAll<IHttpClientFactory>();
             services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IHttpMessageHandlerFactory>();
+            services.AddSingleton<IHttpMessageHandlerFactory>(new EnrollmentHttpClientFactory(handler));
             services.RemoveAll<IToolProviderDiscovery>();
             services.AddSingleton<IToolProviderDiscovery, CrawlToolDiscovery>();
+            var flowHandler = services.Single(value => value.ServiceType == typeof(IBootstrapResourceHandler)
+                && value.ImplementationType == typeof(FlowBootstrapResourceHandler));
+            services.Remove(flowHandler);
+            services.AddScoped<IBootstrapResourceHandler>(provider => new ConflictingFlowHandler(
+                ActivatorUtilities.CreateInstance<FlowBootstrapResourceHandler>(provider), conflict));
         }));
         var context = await GetBootstrapContextAsync(factory);
         var enrollment = factory.Services.GetRequiredService<AepEnrollmentService>();
         var store = factory.Services.GetRequiredService<IResourceStore>();
         var instanceId = Guid.NewGuid();
-        var target = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var target = scopeKind switch
+        {
+            ResourceScopeKind.Instance => ResourceScopeRef.Instance,
+            ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(context.TenantId),
+            _ => ResourceScopeRef.Workspace(context.WorkspaceId)
+        };
         _ = await enrollment.AnnounceAsync(new(
             instanceId,
             new AepExtensionIdentity("Agentstration.Extensions.Crawl4AI", "Crawl4AI", "1.0.0"),
             new Uri("https://crawl4ai.example/"),
             new Uri("https://crawl4ai.example/aep/enrollment/pair")), default);
+        using var ownerScope = PushOwnerScope(factory, context, target);
         await enrollment.AssignAsync(context, instanceId, target, default);
         var code = await enrollment.RotateAsync(context, instanceId, default);
         var credential = await enrollment.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+
+        StoredResource<ExtensionBundleInstallationResource>? failedInstallation = null;
+        StoredResource<ToolSetResource>? partialToolSet = null;
+        if (conflictOnFirstApply)
+        {
+            var failure = await Assert.ThrowsExactlyAsync<AepEnrollmentException>(() =>
+                enrollment.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default));
+            Assert.AreEqual("resource_provisioning_failed", failure.Code);
+            Assert.AreEqual(AepEnrollmentState.VerificationFailed,
+                (await enrollment.ListAsync(context, default)).Single().Definition.State);
+            using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+            {
+                failedInstallation = (await store.ListExactAsync<ExtensionBundleInstallationResource>(target,
+                    ExtensionKinds.ExtensionBundleInstallation, 0, 10, default)).Single();
+                Assert.AreEqual(ExtensionBundleInstallationState.Failed, failedInstallation.Value.Definition.State);
+                StringAssert.Contains(failedInstallation.Value.Definition.Diagnostic!, "Conflict");
+                partialToolSet = (await store.ListExactAsync<ToolSetResource>(target,
+                    ToolResourceKinds.ToolSet, 0, 10, default)).Single();
+            }
+            code = await enrollment.RotateAsync(context, instanceId, default);
+            credential = await enrollment.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+        }
 
         try
         {
@@ -517,6 +559,22 @@ public sealed class AepEnrollmentTests
             toolSetEvidence.Kind, toolSetEvidence.Name);
         var toolSet = await store.GetExactAsync<ToolSetResource>(toolSetAddress, default);
         Assert.IsNotNull(toolSet);
+        if (failedInstallation is not null)
+        {
+            Assert.AreEqual(failedInstallation.Value.Uid, installation.Uid);
+            Assert.AreEqual(partialToolSet!.Value.Uid, toolSet.Value.Uid);
+            Assert.AreEqual(partialToolSet.Value.Generation, toolSet.Value.Generation);
+        }
+        var registration = await store.GetExactAsync<ExtensionRegistrationResource>(ScopedResourceAddress.Create(
+            target, ResourceNamespace.Default, ExtensionKinds.ExtensionRegistration, registrationName), default);
+        Assert.IsNotNull(registration);
+        await factory.Services.GetServices<IAepEnrollmentResourceProvisioner>()
+            .OfType<AepEnrollmentBundleProvisioner>().Single()
+            .ProvisionAsync(registration.Value, handler.Manifest(), default);
+        var repeated = (await store.ListExactAsync<ExtensionBundleInstallationResource>(target,
+            ExtensionKinds.ExtensionBundleInstallation, 0, 10, default)).Single();
+        Assert.AreEqual(installations.Single().ETag, repeated.ETag);
+        Assert.AreEqual(toolSet.ETag, (await store.GetExactAsync<ToolSetResource>(toolSetAddress, default))!.ETag);
         var mutation = await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() =>
             store.PutExactAsync(target, toolSet.Value with
             {
@@ -769,9 +827,10 @@ public sealed class AepEnrollmentTests
         Assert.StartsWith("paired-", paired[0].Connections[0].RegistrationName, StringComparison.Ordinal);
     }
 
-    private sealed class EnrollmentHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
+    private sealed class EnrollmentHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory, IHttpMessageHandlerFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        public HttpMessageHandler CreateHandler(string name) => handler;
     }
 
     private static IDisposable PushOwnerScope(
@@ -854,6 +913,36 @@ public sealed class AepEnrollmentTests
                     .ToArray(),
                 new Dictionary<string, bool> { ["tools"] = true },
                 new Dictionary<string, string>()));
+    }
+
+    private sealed class BundleApplyConflict
+    {
+        public bool Pending { get; set; }
+    }
+
+    private sealed class ConflictingFlowHandler(
+        FlowBootstrapResourceHandler inner,
+        BundleApplyConflict conflict) : IBootstrapResourceHandler
+    {
+        public string Kind => inner.Kind;
+        public BootstrapProfileScope Scope => inner.Scope;
+        public bool SupportsProfileScope(BootstrapProfileScope profileScope) => inner.SupportsProfileScope(profileScope);
+
+        public Task<BootstrapResourcePlanResult> PlanAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            BootstrapPlanningContext planning,
+            CancellationToken cancellationToken) => inner.PlanAsync(resource, operation, planning, cancellationToken);
+
+        public Task<BootstrapResourceApplyResult> ApplyAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            CancellationToken cancellationToken)
+        {
+            if (!conflict.Pending) return inner.ApplyAsync(resource, operation, cancellationToken);
+            conflict.Pending = false;
+            return Task.FromResult(BootstrapResourceApplyResult.Conflict);
+        }
     }
 
     private sealed class EnrollmentLifecycleHandler(
