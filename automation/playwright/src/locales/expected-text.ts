@@ -240,3 +240,17 @@ export const ExpectedTextByLocale = {
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;
+
+// Independent browser expectations for the inventory contract.
+export const ResourceScopeTextByLocale = {
+  'en-US': {
+    count: (visible: number, total: number) => `Showing ${visible} of ${total} resources`,
+    allKinds: (total: number) => `All kinds (${total})`,
+    empty: 'No matching resources',
+  },
+  'fr-FR': {
+    count: (visible: number, total: number) => `Affichage de ${visible} ressource(s) sur ${total}`,
+    allKinds: (total: number) => `Tous les types (${total})`,
+    empty: 'Aucune ressource correspondante',
+  },
+} as const;

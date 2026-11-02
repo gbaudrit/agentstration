@@ -199,11 +199,16 @@ export class ScopedFlowDesignerPage {
     const dialog = this.page.locator('.step-settings-dialog');
     const configure = this.page.locator('.flow-node.agent .flow-node-settings');
     await expect(async () => {
-      if (!await dialog.isVisible()) await configure.click();
+      if (!await dialog.isVisible()) await configure.click({ timeout: 2_000 });
       await expect(dialog).toBeVisible({ timeout: 2_000 });
+      await dialog.getByTestId(TestIds.flowObservability.stepSettingsConfigurationTab).click({ timeout: 2_000 });
+      await expect(dialog.locator('#flow-agent-reference')).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    await this.page.getByTestId(TestIds.flowObservability.stepSettingsConfigurationTab).click();
-    await expect(this.page.locator('#flow-agent-reference')).toBeVisible();
+  }
+
+  private async closeAgentSettings(): Promise<void> {
+    await this.page.locator('.step-settings-close').click({ timeout: 15_000 });
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
   }
 
   private async expectAgentOptions(included: readonly string[], excluded: readonly string[]): Promise<void> {
@@ -212,10 +217,5 @@ export class ScopedFlowDesignerPage {
     for (const reference of included) expect(values).toContain(reference);
     for (const reference of excluded) expect(values).not.toContain(reference);
     await this.closeAgentSettings();
-  }
-
-  private async closeAgentSettings(): Promise<void> {
-    await this.page.locator('.step-settings-close').click();
-    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
   }
 }

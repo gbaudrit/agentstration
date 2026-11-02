@@ -30,15 +30,15 @@ else
     <section class="scope-explorer">
         <aside class="panel scope-tree" aria-label="@T("Hierarchy")">
             <div class="panel-header"><div><p class="eyebrow">@T("Hierarchy")</p><h2>@T("OwnershipScopes")</h2><p class="scope-tree-intro">@T("HierarchyDescription")</p></div></div>
-            @foreach (var instance in inventory.Scopes.Where(scope => scope.Kind == ResourceScopeKind.Instance))
+            @foreach (var root in inventory.Scopes.Where(scope => scope.ParentScopeRef is null))
             {
-                <ResourceScopeTreeNode Scope="instance" Depth="0" Selected="@(selectedScopeRef == instance.ScopeRef)" OnSelected="Select" />
-                @foreach (var tenant in Children(instance.ScopeRef))
+                <ResourceScopeTreeNode Scope="root" Depth="0" Selected="@(selectedScopeRef == root.ScopeRef)" OnSelected="Select" />
+                @foreach (var child in Children(root.ScopeRef))
                 {
-                    <ResourceScopeTreeNode Scope="tenant" Depth="1" Selected="@(selectedScopeRef == tenant.ScopeRef)" OnSelected="Select" />
-                    @foreach (var workspace in Children(tenant.ScopeRef))
+                    <ResourceScopeTreeNode Scope="child" Depth="1" Selected="@(selectedScopeRef == child.ScopeRef)" OnSelected="Select" />
+                    @foreach (var descendant in Children(child.ScopeRef))
                     {
-                        <ResourceScopeTreeNode Scope="workspace" Depth="2" Selected="@(selectedScopeRef == workspace.ScopeRef)" OnSelected="Select" />
+                        <ResourceScopeTreeNode Scope="descendant" Depth="2" Selected="@(selectedScopeRef == descendant.ScopeRef)" OnSelected="Select" />
                     }
                 }
             }

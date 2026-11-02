@@ -532,6 +532,7 @@ export const TestIds = {
     providerContribution: 'source-provider-contribution',
     providerSubmit: 'source-provider-submit',
   },
+  resourceScopes: { kind: 'resource-kind-filter', count: 'resource-result-count' },
   workplace: {
     shell: 'workplace-shell',
     home: 'workplace-home',

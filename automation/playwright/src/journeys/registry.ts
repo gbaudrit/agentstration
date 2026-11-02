@@ -44,10 +44,12 @@ import { exerciseModelProfileCrossScope, type ExerciseModelProfileCrossScopeInpu
 import { exerciseModelProfileFlowDiagnostic, type ExerciseModelProfileFlowDiagnosticInput } from './exercise-model-profile-flow-diagnostic.journey.js';
 import { exerciseScopedFlowDesigner, type ExerciseScopedFlowDesignerInput } from './exercise-scoped-flow-designer.journey.js';
 import type { Journey } from './journey.js';
+import { inspectResourceScopes, type InspectResourceScopesInput } from './inspect-resource-scopes.journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
   'administer-governed-toolsets': (context, input) => administerGovernedToolSets(context, input),
   'administer-governed-knowledge': (context, input) => administerGovernedKnowledge(context, input),
+  'inspect-resource-scopes': (context, input) => inspectResourceScopes(context, input as InspectResourceScopesInput),
   'authenticate-console': authenticateConsole as Journey<Record<string, unknown>>,
   'create-agent': (context, input) => createAgent(context, input as unknown as CreateAgentInput),
   'create-handoff-flow': (context, input) => createHandoffFlow(context, input as unknown as CreateHandoffFlowInput),
