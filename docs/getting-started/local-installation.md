@@ -29,6 +29,36 @@ dotnet run --project src/Agentstration.Workplace.Web
 
 The same `Agentstration.Web` process is the authoritative server for Console and Workplace APIs. The direct server defaults to the persisted managed provider configuration, which is why the explicit environment override is used in the offline commands above.
 
+## Optional Aspire LAN profile
+
+Select `https-LAN` on the `Agentstration.AppHost` startup project in Visual Studio, or run:
+
+```powershell
+dotnet run --project src/Agentstration.AppHost --launch-profile https-LAN
+```
+
+Use `https-LAN-NoBootstrap` to omit initial bootstrap. The usual `https` and `https-NoBootstrap` profiles remain local-only. The LAN profiles reuse the same instance and data directory; switching profiles does not create or reset an instance.
+
+The LAN profiles add HTTPS listeners on all IPv4 interfaces, with fixed ports:
+
+| Application | Address from another machine |
+| --- | --- |
+| Console and authoritative API | `https://<host-name-or-LAN-IP>:7101` |
+| Workplace | `https://<host-name-or-LAN-IP>:7181` |
+
+The dashboard, telemetry, extensions, Workers, and existing service-discovery endpoints retain their local bindings. The Console's Workplace link uses the host machine name by default. If that name does not resolve on the other machine, set a LAN IP or resolvable name before starting Aspire:
+
+```powershell
+$env:Agentstration__Lan__Host = "192.168.1.50"
+dotnet run --project src/Agentstration.AppHost --launch-profile https-LAN
+```
+
+`Agentstration:Lan:Host` controls the public Workplace link; it does not change the listener binding. The LAN profiles override the Console's `AllowedHosts` with `*` so requests addressed by a LAN IP or host name are accepted. The usual profiles retain the loopback-only host allowlist. Allow inbound TCP ports `7101` and `7181` in the Windows firewall only for the intended private network or test machine. No firewall rule is installed automatically. Keep the ports closed on public networks and do not forward them from an Internet router.
+
+Configure a server certificate covering the chosen host name or IP and trust its issuer on the client machine. The default development certificate is for `localhost` and will produce a certificate error when accessed using the LAN address. The additional endpoints use each application's normal Kestrel HTTPS certificate configuration; for a local PFX, supply `Kestrel__Certificates__Default__Path` and, if required, `Kestrel__Certificates__Default__Password` in the launching environment. Keep certificate files and passwords out of version control.
+
+The Development bootstrap creates the public disposable `admin / admin` fixture. Change that password before granting access to other machines. After stopping the LAN profile and restarting the usual profile, the additional listeners are absent.
+
 ## Run with Compose
 
 All Compose definitions live under `deploy/compose`. The colocated [Compose command reference](https://github.com/gbaudrit/agentstration/blob/main/deploy/compose/README.md) provides copy-ready SQLite, PostgreSQL, model-management, log, and shutdown commands. The `base.yml` topology retains the canonical deterministic extension launch without inference servers. Choose one provider-specific topology to run its inference service, AEP extension, and Utilities extension with isolated SharedKeyFile credentials.
