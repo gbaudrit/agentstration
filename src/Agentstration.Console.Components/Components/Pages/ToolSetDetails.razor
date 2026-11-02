@@ -58,6 +58,7 @@ else if (toolSet is not null)
 @code {
     [Parameter] public string Name { get; set; } = string.Empty;
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private ToolSetResource? toolSet;
     private IReadOnlyList<ToolSetVersionResource> versions = [];
@@ -74,8 +75,13 @@ else if (toolSet is not null)
         error = null;
         try
         {
-            var snapshotTask = Client.GetToolSetAsync(ResourceNamespace, Name, cancellation.Token);
-            var versionsTask = Client.GetVersionsAsync(ResourceNamespace, Name, cancellation.Token);
+            var scopeRef = string.IsNullOrWhiteSpace(ScopeRefValue) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(ScopeRefValue);
+            var snapshotTask = scopeRef is { } exact
+                ? Client.GetToolSetAsync(exact, ResourceNamespace, Name, cancellation.Token)
+                : Client.GetToolSetAsync(ResourceNamespace, Name, cancellation.Token);
+            var versionsTask = scopeRef is { } owner
+                ? Client.GetVersionsAsync(owner, ResourceNamespace, Name, cancellation.Token)
+                : Client.GetVersionsAsync(ResourceNamespace, Name, cancellation.Token);
             await Task.WhenAll(snapshotTask, versionsTask);
             var snapshot = await snapshotTask;
             toolSet = snapshot.Value;
@@ -90,13 +96,18 @@ else if (toolSet is not null)
         if (!CanMutate || etag is null || busy) return;
         busy = true;
         message = null;
-        try { await Client.DeleteAsync(ResourceNamespace, Name, etag, cancellation.Token); Navigation.NavigateTo("/tools/sets"); }
+        try
+        {
+            if (ScopeRefValue is { Length: > 0 })
+                await Client.DeleteAsync(ResourceScopeRef.Parse(ScopeRefValue), ResourceNamespace, Name, etag, cancellation.Token);
+            else await Client.DeleteAsync(ResourceNamespace, Name, etag, cancellation.Token);
+            Navigation.NavigateTo("/tools/sets");
+        }
         catch (Exception exception) { message = exception.Message; confirmDelete = false; }
         finally { busy = false; }
     }
-    private static string ToolUrl(PublishedToolSetMember member) => member.ToolNamespace.IsDefault
-        ? $"/tools/{Uri.EscapeDataString(member.ToolName)}"
-        : $"/tools/{Uri.EscapeDataString(member.ToolName)}?namespace={Uri.EscapeDataString(member.ToolNamespace.Value)}";
+    private static string ToolUrl(PublishedToolSetMember member) =>
+        $"/tools/{Uri.EscapeDataString(member.ToolName)}?namespace={Uri.EscapeDataString(member.ToolNamespace.Value)}&scopeRef={Uri.EscapeDataString(member.ToolScopeRef.Value)}&context={Uri.EscapeDataString(member.ToolScopeRef.Value)}";
     private static string Map(IReadOnlyDictionary<string, string> values) => values.Count == 0 ? "—" : string.Join(" · ", values.Select(value => $"{value.Key}={value.Value}"));
     private enum DetailsTab { Overview, Access }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

@@ -18,7 +18,8 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
         AepDataSourceProfileBundleContribution bundle,
         BootstrapApplicationTarget target,
         IReadOnlyDictionary<string, ResourceReference> toolBindings,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<BootstrapResourceDocument, CancellationToken, Task>? reconcileResource = null)
     {
         var profileScope = TargetScope(target);
         var requiredTools = bundle.RequiredTools ?? [];
@@ -26,7 +27,7 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
         if (missing.Length > 0)
             throw new InvalidOperationException($"Data Source Profile bundle '{bundle.Id}' requires Tool bindings: {string.Join(", ", missing)}.");
 
-        var documents = bundle.ResourceManifests.Select(value => Resolve(value, toolBindings)).ToArray();
+        var documents = ResolveDocuments(bundle, toolBindings);
         if (!documents.Any(value => string.Equals(value.Kind, "DataSourceProfile", StringComparison.Ordinal)))
             throw new InvalidOperationException($"Data Source Profile bundle '{bundle.Id}' does not declare a DataSourceProfile resource.");
 
@@ -63,6 +64,8 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
                         $"AEP bundle resource '{item.Document.Kind}/{item.Document.Metadata.Name}' cannot be installed ({BootstrapResourceDisposition.Conflict}).")
                 };
             }
+            if (reconcileResource is not null)
+                await reconcileResource(item.Document, cancellationToken);
             results.Add(new(item.Document.Kind, item.Document.Metadata.Name, disposition));
         }
         return new(bundle.Id, bundle.Version, results);
@@ -74,6 +77,10 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
         if (target.TenantId is not null) return BootstrapProfileScope.Tenant;
         return BootstrapProfileScope.Instance;
     }
+
+    internal static IReadOnlyList<BootstrapResourceDocument> ResolveDocuments(AepDataSourceProfileBundleContribution bundle,
+        IReadOnlyDictionary<string, ResourceReference> toolBindings) =>
+        bundle.ResourceManifests.Select(value => Resolve(value, toolBindings)).ToArray();
 
     private static BootstrapResourceDocument Resolve(
         string manifest,

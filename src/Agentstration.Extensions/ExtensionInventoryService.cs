@@ -65,17 +65,18 @@ public sealed class ExtensionInventoryService(
             .ToArray();
 
         var result = new List<ExtensionInventoryItem>(observed.Count + enrollments.Length);
-        foreach (var group in observed.GroupBy(value => EndpointKey(value.Endpoint), StringComparer.OrdinalIgnoreCase))
+        foreach (var group in observed.GroupBy(value => (value.RegistrationScopeRef, Endpoint: EndpointKey(value.Endpoint).ToUpperInvariant())))
         {
             var candidates = group.ToArray();
             var enrollment = enrollments
-                .Where(value => string.Equals(EndpointKey(value.Definition.Endpoint), group.Key, StringComparison.OrdinalIgnoreCase))
+                .Where(value => string.Equals(EndpointKey(value.Definition.Endpoint), group.Key.Endpoint, StringComparison.OrdinalIgnoreCase)
+                    && value.Definition.TargetScopeRef == group.Key.RegistrationScopeRef)
                 .OrderByDescending(value => value.Definition.AnnouncedAt)
                 .FirstOrDefault();
             var primary = candidates
                 .OrderByDescending(value => enrollment is not null
                     && string.Equals(value.RegistrationName, enrollment.Definition.RegistrationName, StringComparison.Ordinal)
-                    && value.RegistrationScopeRef == enrollment.ScopeRef)
+                    && value.RegistrationScopeRef == enrollment.Definition.TargetScopeRef)
                 .ThenByDescending(value => string.Equals(value.Status, "available", StringComparison.OrdinalIgnoreCase))
                 .ThenByDescending(value => value.RegistrationEnabled)
                 .ThenByDescending(value => value.EnrollmentMode == AepEnrollmentMode.PairingCode)

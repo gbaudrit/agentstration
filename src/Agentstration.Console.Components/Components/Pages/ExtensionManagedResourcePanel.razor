@@ -7,16 +7,19 @@
         <div class="panel-header">
             <div>
                 <p class="eyebrow">@T("ManagedReadOnly")</p>
-                <h2>@(managingExtension?.DisplayName ?? Governance.Origin.Reference)</h2>
+                <h2>@(owner?.Extension.DisplayName ?? Governance.Origin.Reference)</h2>
                 <p>@T("ManagedResourceHelp")</p>
             </div>
         </div>
         <dl class="resource-details">
-            <dt>@T("Version")</dt><dd>@Governance.Origin.Version</dd>
+            <dt>@T("ExtensionVersion")</dt><dd>@Governance.Origin.Version</dd>
             <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="ScopeRef" /></dd>
-            @if (managingExtension is not null)
+            @if (owner is not null)
             {
-                <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@ManagingExtensionUrl">@managingExtension.ExtensionId</a></dd>
+                <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@owner.ExtensionUrl">@owner.Installation.ExtensionId</a></dd>
+                <dt>@T("Bundle")</dt><dd>@owner.Installation.BundleId</dd>
+                <dt>@T("BundleVersion")</dt><dd>@owner.Installation.BundleVersion</dd>
+                <dt>@T("InstallationState")</dt><dd>@T($"InstallationState.{owner.Installation.State}")</dd>
             }
         </dl>
     </section>
@@ -30,23 +33,19 @@
     [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
     [Parameter] public Guid? Uid { get; set; }
 
-    private ExtensionInventoryItemResponse? managingExtension;
+    private ExtensionManagedResourceOwner? owner;
     private bool IsExtensionManaged => Governance.Origin.Kind == ResourceOriginKind.Extension
         && Governance.ManagedBy?.Kind == ResourceManagementAuthorityKind.ExtensionInstallation;
-    private string ManagingExtensionUrl => managingExtension?.RegistrationName is null
-        ? "/extensions"
-        : $"/extensions/{Uri.EscapeDataString(managingExtension.RegistrationName)}?namespace={Uri.EscapeDataString(managingExtension.RegistrationNamespace)}";
     private string T(string key) => Localizer[key];
 
     protected override async Task OnParametersSetAsync()
     {
-        managingExtension = null;
+        owner = null;
         if (!IsExtensionManaged || Services.GetService<IExtensionsClient>() is not { } extensions) return;
         try
         {
             var inventory = await extensions.GetExtensionInventoryAsync(default);
-            managingExtension = inventory.FirstOrDefault(item => item.Extension?.BundleInstallations?.Any(installation =>
-                installation.ManagedResources.Any(resource => Matches(resource))) == true);
+            owner = ExtensionManagedResourceOwner.Find(inventory, Governance, ScopeRef, Namespace, Kind, Name, Uid);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -54,10 +53,4 @@
         }
     }
 
-    private bool Matches(ExtensionManagedResourceResponse resource) =>
-        (Uid is not null && resource.Uid == Uid)
-        || (resource.ScopeRef == ScopeRef
-            && string.Equals(resource.Kind, Kind, StringComparison.Ordinal)
-            && string.Equals(resource.Namespace, Namespace.Value, StringComparison.Ordinal)
-            && string.Equals(resource.Name, Name, StringComparison.Ordinal));
 }

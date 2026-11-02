@@ -11,6 +11,8 @@ public interface IToolsClient
 {
     Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Exact-scope Tool Provider reads are not implemented by this client.");
     Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken);
     Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken);
@@ -32,6 +34,9 @@ public interface IToolsClient
 
 public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
 {
+    public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        ReadProviderAsync(HttpMethod.Get, ProviderPath(name) + $"?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}", null, null, cancellationToken);
     public async Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ToolProviderResource>>(httpClient, "api/toolproviders", cancellationToken)).Value;
 

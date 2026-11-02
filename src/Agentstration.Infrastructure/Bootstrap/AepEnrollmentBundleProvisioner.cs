@@ -12,9 +12,15 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
+using Agentstration.Infrastructure.Declarative;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Infrastructure.Bootstrap;
+
+public sealed class AepBundleConflictException(string code, string message) : InvalidOperationException($"{code}: {message}")
+{
+    public string Code { get; } = code;
+}
 
 public sealed class AepEnrollmentBundleProvisioner(
     IServiceScopeFactory scopes,
@@ -55,23 +61,52 @@ public sealed class AepEnrollmentBundleProvisioner(
         var digest = Digest(bundle);
         var bindings = await ResolveToolBindingsAsync(registration, bundle, scopeRef, cancellationToken);
         var existing = await store.GetExactAsync<ExtensionBundleInstallationResource>(address, cancellationToken);
-        if (existing is not null)
-        {
-            EnsureSameInstallation(existing.Value, registration, manifest, bundle, digest, bindings);
-            if (existing.Value.Definition.State == ExtensionBundleInstallationState.Installed) return;
-        }
+        if (existing is not null && existing.Value.Governance != ResourceGovernance.Extension(installationReference,
+                existing.Value.Definition.ExtensionId, existing.Value.Definition.ExtensionVersion))
+            throw Conflict("owner_conflict", $"Installation '{name}' has another management authority.");
 
         using var authorityScope = governance.Push(authority);
-        var installing = Installation(registration, manifest, bundle, scopeRef, name, digest, bindings,
+        var installing = existing?.Value ?? Installation(registration, manifest, bundle, scopeRef, name, digest, bindings,
             ExtensionBundleInstallationState.Installing, [], null);
-        var stored = await store.PutExactAsync(scopeRef, installing, existing?.ETag, existing is null, cancellationToken);
+        StoredResource<ExtensionBundleInstallationResource>? stored = existing;
+        var validated = false;
         try
         {
+            if (existing is not null)
+                EnsureSameInstallation(existing.Value, registration, manifest, bundle, digest, bindings);
             await EnsureResourcesAreOwnedOrAbsentAsync(bundle, scopeRef, installationReference, cancellationToken);
+            var current = await InventoryAsync(bundle, scopeRef, installationReference, allowMissing: true, cancellationToken);
+            if (existing is not null)
+            {
+                EnsureInventoryMatches(existing.Value.Definition.ManagedResources, current);
+            }
+            await EnsureDefinitionsMatchAsync(AepDataSourceProfileBundleInstaller.ResolveDocuments(bundle, bindings), scopeRef, cancellationToken);
+            if (existing is not null)
+            {
+                if (existing.Value.Definition.State == ExtensionBundleInstallationState.Installed)
+                {
+                    var complete = await InventoryAsync(bundle, scopeRef, installationReference, allowMissing: false, cancellationToken);
+                    if (complete.Count != existing.Value.Definition.ManagedResources.Count)
+                        throw Conflict("resource_drift", "The installed resource inventory has changed.");
+                    return;
+                }
+            }
+            validated = true;
+            installing = installing with
+            {
+                Definition = installing.Definition with
+                {
+                    State = ExtensionBundleInstallationState.Installing,
+                    ManagedResources = current,
+                    Diagnostic = null
+                }
+            };
+            stored = await store.PutExactAsync(scopeRef, installing, existing?.ETag, existing is null, cancellationToken);
             using var serviceScope = scopes.CreateScope();
             var installer = serviceScope.ServiceProvider.GetRequiredService<AepDataSourceProfileBundleInstaller>();
-            _ = await installer.InstallAsync(bundle, Target(scopeRef), bindings, cancellationToken);
-            var inventory = await InventoryAsync(bundle, scopeRef, cancellationToken);
+            _ = await installer.InstallAsync(bundle, Target(scopeRef), bindings, cancellationToken,
+                (document, token) => CompletePublicationsAsync(document, scopeRef, token));
+            var inventory = await InventoryAsync(bundle, scopeRef, installationReference, allowMissing: false, cancellationToken);
             var installed = installing with
             {
                 Definition = installing.Definition with
@@ -84,15 +119,22 @@ public sealed class AepEnrollmentBundleProvisioner(
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            var inventory = validated
+                ? await InventoryAsync(bundle, scopeRef, installationReference, allowMissing: true, cancellationToken)
+                : existing?.Value.Definition.ManagedResources ?? [];
             var failed = installing with
             {
                 Definition = installing.Definition with
                 {
-                    State = ExtensionBundleInstallationState.Failed,
+                    State = existing is not null && (exception is AepBundleConflictException
+                        || existing.Value.Definition.State is ExtensionBundleInstallationState.Installed or ExtensionBundleInstallationState.Degraded)
+                        ? ExtensionBundleInstallationState.Degraded : ExtensionBundleInstallationState.Failed,
+                    ManagedResources = inventory,
                     Diagnostic = exception.Message
                 }
             };
-            try { _ = await store.PutExactAsync(scopeRef, failed, stored.ETag, false, cancellationToken); }
+            using var failureAuthority = governance.Push(existing?.Value.Governance ?? authority);
+            try { _ = await store.PutExactAsync(scopeRef, failed, stored?.ETag, stored is null, cancellationToken); }
             catch (ResourceConcurrencyException) { }
             throw;
         }
@@ -145,7 +187,7 @@ public sealed class AepEnrollmentBundleProvisioner(
             if (resourceGovernance is not null
                 && (resourceGovernance.ManagedBy?.Kind != ResourceManagementAuthorityKind.ExtensionInstallation
                     || !string.Equals(resourceGovernance.ManagedBy.Reference, installationReference, StringComparison.Ordinal)))
-                throw new InvalidOperationException(
+                throw Conflict("owner_conflict",
                     $"AEP bundle resource '{document.Kind}/{document.Metadata.Namespace}/{document.Metadata.Name}' conflicts with an existing resource owned by another authority.");
         }
     }
@@ -153,6 +195,8 @@ public sealed class AepEnrollmentBundleProvisioner(
     private async Task<IReadOnlyList<ExtensionManagedResource>> InventoryAsync(
         AepDataSourceProfileBundleContribution bundle,
         ResourceScopeRef scopeRef,
+        string installationReference,
+        bool allowMissing,
         CancellationToken cancellationToken)
     {
         var result = new List<ExtensionManagedResource>();
@@ -162,33 +206,52 @@ public sealed class AepEnrollmentBundleProvisioner(
             if (document.Kind == ToolResourceKinds.ToolSet)
             {
                 var draft = (await toolSets.GetExactAsync(scopeRef, document.Metadata.Namespace,
-                    document.Metadata.Name, cancellationToken))!.Value;
-                result.Add(Evidence(draft, scopeRef, version,
+                    document.Metadata.Name, cancellationToken))?.Value;
+                if (draft is null || !OwnedBy(draft.Governance, installationReference))
+                {
+                    if (allowMissing) continue;
+                    throw Conflict("resource_missing", $"ToolSet '{document.Metadata.Name}' is missing or has another owner.");
+                }
+                result.Add(Evidence(draft, scopeRef, draft.Definition.Version,
                     Sha256(JsonSerializer.Serialize(draft.Definition, AepProtocol.JsonOptions)), false));
                 if (Publish(document) && version is not null)
                 {
                     var published = (await toolSets.GetVersionExactAsync(scopeRef, document.Metadata.Namespace,
-                        document.Metadata.Name, version, cancellationToken))!.Value;
-                    result.Add(Evidence(published, scopeRef, version, published.DefinitionHash, true));
+                        document.Metadata.Name, version, cancellationToken))?.Value;
+                    if (published is not null && OwnedBy(published.Governance, installationReference))
+                        result.Add(Evidence(published, scopeRef, published.Version, published.DefinitionHash, true));
+                    else if (!allowMissing) throw Conflict("resource_missing", $"ToolSet version '{document.Metadata.Name}:{version}' is missing or has another owner.");
                 }
             }
             else if (document.Kind == DataSourceResourceKinds.DataSourceProfile)
             {
                 var draft = (await profiles.GetAsync(document.Metadata.Namespace, document.Metadata.Name,
-                    scopeRef, cancellationToken))!.Value;
-                result.Add(Evidence(draft, scopeRef, version,
+                    scopeRef, cancellationToken))?.Value;
+                if (draft is null || !OwnedBy(draft.Governance, installationReference))
+                {
+                    if (allowMissing) continue;
+                    throw Conflict("resource_missing", $"Data Source Profile '{document.Metadata.Name}' is missing or has another owner.");
+                }
+                result.Add(Evidence(draft, scopeRef, draft.Definition.Version,
                     Sha256(JsonSerializer.Serialize(draft.Definition, AepProtocol.JsonOptions)), false));
                 if (version is not null)
                 {
                     var published = (await profiles.GetRevisionAsync(document.Metadata.Namespace,
-                        document.Metadata.Name, version, scopeRef, cancellationToken))!.Value;
-                    result.Add(Evidence(published, scopeRef, version, published.DefinitionHash, true));
+                        document.Metadata.Name, version, scopeRef, cancellationToken))?.Value;
+                    if (published is not null && OwnedBy(published.Governance, installationReference))
+                        result.Add(Evidence(published, scopeRef, published.Version, published.DefinitionHash, true));
+                    else if (!allowMissing) throw Conflict("resource_missing", $"Profile revision '{document.Metadata.Name}:{version}' is missing or has another owner.");
                 }
             }
             else if (document.Kind == FlowResourceKinds.Flow)
             {
                 var id = new FlowId(document.Metadata.Name, document.Metadata.Namespace);
-                var draft = (await flows.GetExactAsync(scopeRef, id, cancellationToken))!.Value;
+                var draft = (await flows.GetExactAsync(scopeRef, id, cancellationToken))?.Value;
+                if (draft is null || !OwnedBy(draft.Governance, installationReference))
+                {
+                    if (allowMissing) continue;
+                    throw Conflict("resource_missing", $"Flow '{id}' is missing or has another owner.");
+                }
                 result.Add(new ExtensionManagedResource
                 {
                     Kind = FlowResourceKinds.Flow,
@@ -196,15 +259,14 @@ public sealed class AepEnrollmentBundleProvisioner(
                     Name = id.Value,
                     ScopeRef = scopeRef,
                     Uid = draft.Uid,
-                    Version = version,
-                    DefinitionHash = draft.Graph is null
-                        ? FlowDefinitionHash.Compute(draft.Definition)
-                        : FlowDefinitionHash.Compute(draft.Graph)
+                    Version = draft.Version,
+                    DefinitionHash = Hash(new { Definition = FlowDraftHash(draft), draft.ActiveVersion })
                 });
                 if (Publish(document) && version is not null)
                 {
-                    var published = (await flows.GetVersionExactAsync(scopeRef, id, version, cancellationToken))!.Value;
-                    result.Add(new ExtensionManagedResource
+                    var published = (await flows.GetVersionExactAsync(scopeRef, id, version, cancellationToken))?.Value;
+                    if (published is not null && OwnedBy(published.Governance, installationReference))
+                        result.Add(new ExtensionManagedResource
                     {
                         Kind = "FlowVersion",
                         Namespace = id.Namespace,
@@ -213,12 +275,95 @@ public sealed class AepEnrollmentBundleProvisioner(
                         Version = version,
                         DefinitionHash = published.DefinitionHash,
                         Published = true
-                    });
+                        });
+                    else if (!allowMissing) throw Conflict("resource_missing", $"Flow version '{id}:{version}' is missing or has another owner.");
                 }
             }
         }
         return result;
     }
+
+    private async Task CompletePublicationsAsync(BootstrapResourceDocument document, ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken)
+    {
+        var version = Version(document);
+        if (version is null) return;
+        if (document.Kind == ToolResourceKinds.ToolSet && Publish(document)
+            && await toolSets.GetVersionExactAsync(scopeRef, document.Metadata.Namespace, document.Metadata.Name, version, cancellationToken) is null)
+            _ = await toolSets.PublishExactAsync(scopeRef, document.Metadata.Namespace, document.Metadata.Name, version, cancellationToken);
+        else if (document.Kind == FlowResourceKinds.Flow && Publish(document))
+        {
+            var id = new FlowId(document.Metadata.Name, document.Metadata.Namespace);
+            if (await flows.GetVersionExactAsync(scopeRef, id, version, cancellationToken) is null)
+            {
+                var activate = !document.Definition.TryGetProperty("activate", out var value) || value.ValueKind == JsonValueKind.True;
+                _ = await flows.PublishVersionExactAsync(scopeRef, id, version, activate, cancellationToken);
+            }
+        }
+        else if (document.Kind == DataSourceResourceKinds.DataSourceProfile
+            && await profiles.GetRevisionAsync(document.Metadata.Namespace, document.Metadata.Name, version, scopeRef, cancellationToken) is null)
+            _ = await profiles.PublishAsync(document.Metadata.Namespace, document.Metadata.Name, scopeRef, new(version, true), cancellationToken);
+    }
+
+    private async Task EnsureDefinitionsMatchAsync(IReadOnlyList<BootstrapResourceDocument> documents,
+        ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+    {
+        foreach (var document in documents)
+        {
+            var matches = true;
+            if (document.Kind == ToolResourceKinds.ToolSet)
+            {
+                var current = await toolSets.GetExactAsync(scopeRef, document.Metadata.Namespace, document.Metadata.Name, cancellationToken);
+                matches = current is null || Hash(current.Value.Definition) == Hash(WorkspaceBootstrapResource.Parse<ToolSetResource>(document).Definition);
+            }
+            else if (document.Kind == DataSourceResourceKinds.DataSourceProfile)
+            {
+                var current = await profiles.GetAsync(document.Metadata.Namespace, document.Metadata.Name, scopeRef, cancellationToken);
+                matches = current is null || Hash(current.Value.Definition) == Hash(WorkspaceBootstrapResource.Parse<DataSourceProfileResource>(document).Definition);
+            }
+            else if (document.Kind == FlowResourceKinds.Flow)
+            {
+                var current = await flows.GetExactAsync(scopeRef, new(document.Metadata.Name, document.Metadata.Namespace), cancellationToken);
+                if (current is not null)
+                {
+                    var desired = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeFlowDefinition>>(document).Definition;
+                    matches = FlowDraftHash(current.Value) == FlowDraftHash(current.Value with
+                    {
+                        Name = document.Metadata.Name, Description = desired.Description, Version = desired.Version,
+                        Enabled = desired.Enabled, Definition = desired.Spec, Graph = desired.Graph,
+                        Metadata = desired.Metadata, DisplayName = desired.DisplayName
+                    });
+                }
+            }
+            if (!matches) throw Conflict("resource_drift", $"Resource '{document.Kind}/{document.Metadata.Namespace}/{document.Metadata.Name}' differs from its bundle manifest.");
+        }
+    }
+
+    private static string FlowDraftHash(FlowResource value) => Hash(new
+    {
+        value.Definition, value.Graph, value.Metadata, value.Version, value.Enabled,
+        value.Name, value.Description, value.DisplayName
+    });
+
+    private static string Hash<T>(T value) => Sha256(JsonSerializer.Serialize(value, AepProtocol.JsonOptions));
+
+    private bool OwnedBy(ResourceGovernance value, string reference) =>
+        value.ManagedBy?.Kind == ResourceManagementAuthorityKind.ExtensionInstallation
+        && value.ManagedBy.Reference == reference && value == governance.Current;
+
+    private static void EnsureInventoryMatches(IReadOnlyList<ExtensionManagedResource> expected,
+        IReadOnlyList<ExtensionManagedResource> actual)
+    {
+        foreach (var resource in expected)
+        {
+            var current = actual.SingleOrDefault(value => value.Kind == resource.Kind && value.Namespace == resource.Namespace
+                && value.Name == resource.Name && value.ScopeRef == resource.ScopeRef && value.Published == resource.Published);
+            if (current != resource)
+                throw Conflict("resource_drift", $"Governed resource '{resource.Kind}/{resource.Namespace}/{resource.Name}' no longer matches its recorded identity, version or definition.");
+        }
+    }
+
+    private static AepBundleConflictException Conflict(string reason, string message) => new($"extension_bundle_{reason}", message);
 
     private static ExtensionManagedResource Evidence(
         Resource resource,
@@ -286,7 +431,7 @@ public sealed class AepEnrollmentBundleProvisioner(
             || !string.Equals(value.BundleDigest, digest, StringComparison.Ordinal)
             || value.Registration != new ResourceReference(registration.Name, registration.ScopeRef, registration.Namespace)
             || !BindingsEqual(value.ToolBindings, bindings))
-            throw new InvalidOperationException(
+            throw Conflict("installation_conflict",
                 $"AEP bundle installation '{existing.Name}' conflicts with different owner, version, definition, or Tool bindings.");
     }
 
@@ -302,7 +447,8 @@ public sealed class AepEnrollmentBundleProvisioner(
         document.Definition.TryGetProperty("version", out var version) ? version.GetString() : null;
 
     private static bool Publish(BootstrapResourceDocument document) =>
-        document.Definition.TryGetProperty("publish", out var publish) && publish.ValueKind == JsonValueKind.True;
+        document.Definition.TryGetProperty("publish", out var publish) ? publish.ValueKind == JsonValueKind.True
+            : document.Kind == FlowResourceKinds.Flow;
 
     private static BootstrapApplicationTarget Target(ResourceScopeRef scopeRef) => scopeRef.Kind switch
     {

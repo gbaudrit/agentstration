@@ -39,3 +39,7 @@ An AEP extension may contribute a declarative Data Source Profile bundle contain
 
 The optional Crawl4AI extension contributes `crawl4ai-web`. Successful enrollment installs that bundle at the exact extension-registration scope and records its governed resources in the durable extension installation inventory.
 
+The inventory records both the extension version and the independent bundle version, exact resource identities, published versions, definition evidence, and resolved Tool bindings. It remains readable when the extension is unavailable or unenrolled. The Console shows this ownership on Data Source Profile lists and details and links back to the exact managing registration.
+
+An interrupted installation retains its partial inventory and can complete missing publications on retry. An already installed bundle is a no-op only when its recorded identities, generations, versions, owners, and definition evidence still match the stored resources. A mismatch marks the installation degraded and returns a stable conflict instead of adopting, overwriting, or silently repairing the changed resource. Ordinary administration cannot mutate the managed resources or their published versions, including after unenrollment.
+

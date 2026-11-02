@@ -80,6 +80,10 @@ The extension contributes the `crawl4ai-web` Data Source Profile bundle. The bun
 
 A resource conflict during application stops installation, records a failed bundle with diagnostics, and prevents enrollment from becoming available. Retrying enrollment after resolving the conflict reuses resources already installed by that bundle without duplicating their identities or published versions.
 
+Failures retain the inventory of resources already created, including a Flow draft whose publication was interrupted. A retry verifies that evidence before completing missing publications. Re-enrollment of an installed bundle also checks the recorded inventory against the actual resources; identity, owner, version, generation, or definition drift produces an `extension_bundle_*` conflict and a degraded installation, without adopting or replacing the changed resource.
+
+The Console distinguishes available, unavailable, not-materialized, and conflicting Tool contributions. Managed-resource links retain the owner scope and destination Console context. Data Source Profile lists and details distinguish the extension version from the bundle version and retain their read-only explanation while the extension is offline or unenrolled.
+
 The resulting durable Artifact is independent of Knowledge. A Knowledge Source may later bind this Data Source and preserve the corpus unchanged through `knowledge-projection-builtin`, or apply an explicit `artifact.transform/v1` Flow before projection.
 
 ## Limits and destination policy

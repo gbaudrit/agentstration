@@ -159,6 +159,8 @@ else
                     {
                         var resources = MaterializedResources(contribution);
                         var tools = MaterializedTools(contribution);
+                        var toolState = ToolContributionState(tools);
+                        var contributionState = contribution.Kind == "tool" ? toolState : BundleContributionState(contribution);
                         <article class="extension-contribution-card" data-contribution-kind="@contribution.Kind" data-contribution-id="@contribution.Id">
                             <div class="extension-contribution-heading">
                                 <div>
@@ -167,6 +169,9 @@ else
                                     <p>@ContributionDescription(contribution, resources.Count + tools.Count)</p>
                                 </div>
                                 <div class="extension-contribution-actions">
+                                    @if (contribution.Kind is "tool" or "data-source-profile-bundle") { <StatusBadge Text="@T($"ContributionState.{contributionState}")" Status="@(contributionState == "Available" ? UiStatus.Success : contributionState == "Conflict" ? UiStatus.Danger : UiStatus.Warning)" /> }
+                                    @if (contribution.Kind == "tool" && toolState != "Conflict" && extensionToolProvider is not null)
+                                    { <a href="@ToolProviderUrl(extensionToolProvider)" class="text-button">@T("OpenProvider", extensionToolProvider.Definition.DisplayName) →</a> }
                                     @foreach (var provider in item.Extension.Providers.Where(value => value.ContributionId == contribution.Id)) { <a class="text-button" href="@ProviderUrl(provider)">@T("OpenProvider", provider.Name) →</a> }
                                     @if (contribution.Kind == "model-provider" && !item.Extension.Providers.Any(value => value.ContributionId == contribution.Id)) { <a class="text-button" href="@ConfigureProviderUrl(item.Extension, contribution)">@T("ConfigureProvider", contribution.Id) →</a> }
                                 </div>
@@ -178,7 +183,7 @@ else
                                     <ul class="resource-links">
                                         @foreach (var tool in tools)
                                         {
-                                            <li><a href="@ToolUrl(tool)"><span><strong>@tool.Definition.DisplayName</strong><code>@tool.Definition.ExternalId</code></span><span class="extension-resource-meta"><span>@T("ContributionKind.tool")</span><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span></a></li>
+                                            <li>@if (toolState != "Conflict") { <a href="@ToolUrl(tool)"><span><strong>@tool.Definition.DisplayName</strong><code>@tool.Definition.ExternalId</code></span><span class="extension-resource-meta"><span>@T("ContributionKind.tool")</span><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span></a> } else { <code>@tool.Namespace/@tool.Name</code> }</li>
                                         }
                                         @foreach (var resource in resources)
                                         {
@@ -219,8 +224,8 @@ else
                             <DataGrid TItem="ExtensionManagedResourceResponse" Items="installation.ManagedResources">
                                 <Header><tr><th>@T("Type")</th><th>@T("Identity")</th><th>@T("Scope")</th><th>@T("Version")</th><th>@T("State")</th></tr></Header>
                                 <Row Context="resource"><tr>
-                                    <td>@resource.Kind</td>
-                                    <td>@if (ManagedResourceUrl(resource) is { } url) { <a class="text-button" href="@url">@resource.Namespace/@resource.Name</a> } else { <code>@resource.Namespace/@resource.Name</code> }</td>
+                                    <td>@ManagedResourceKindLabel(resource.Kind)</td>
+                                    <td>@if (installation.State != ExtensionBundleInstallationState.Degraded && ManagedResourceUrl(resource) is { } url) { <a class="text-button" href="@url">@resource.Namespace/@resource.Name</a> } else { <code>@resource.Namespace/@resource.Name</code> }</td>
                                     <td><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></td>
                                     <td>@(resource.Version ?? "—")</td>
                                     <td>@(resource.Published ? T("Published") : T("ManagedReadOnly"))</td>
@@ -284,6 +289,7 @@ else
     [Parameter] public string? RegistrationName { get; set; }
     [Parameter] public Guid? EnrollmentInstanceId { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? ResourceNamespaceValue { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private ExtensionInventoryItemResponse? item;
     private AepEnrollmentRequestResource? enrollment;
@@ -296,12 +302,14 @@ else
     private bool confirmUnenroll;
     private bool migrating;
     private IReadOnlyList<ToolResource> extensionTools = [];
+    private ToolProviderResource? extensionToolProvider;
     private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
     private RegistrationEditForm form = new();
     private DetailTab activeTab;
     private bool CanAdminister => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state
         && state.HasPermission(AuthorizationPermissions.ResourcesWrite);
-    private bool CanEditRegistration => CanAdminister && registration?.Value.Definition.Source == ExtensionRegistrationSource.Manual;
+    private bool CanEditRegistration => CanAdminister && registration?.Value.Definition.Source == ExtensionRegistrationSource.Manual
+        && ResourceOwnershipContext.CanManage(registration.Value.ScopeRef ?? ResourceScopeRef.Instance, Services);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
     private string EnrollmentStatusLabel(AepEnrollmentState status) => T($"EnrollmentStatus.{status}");
@@ -315,10 +323,15 @@ else
         {
             var inventory = await Client.GetExtensionInventoryAsync(cancellation.Token);
             item = RegistrationName is not null
-                ? inventory.SingleOrDefault(value => string.Equals(value.RegistrationName, RegistrationName, StringComparison.Ordinal) && string.Equals(value.RegistrationNamespace, ResourceNamespaceValue ?? ResourceNamespace.DefaultValue, StringComparison.Ordinal))
+                ? inventory.SingleOrDefault(value => string.Equals(value.RegistrationName, RegistrationName, StringComparison.Ordinal)
+                    && string.Equals(value.RegistrationNamespace, ResourceNamespaceValue ?? ResourceNamespace.DefaultValue, StringComparison.Ordinal)
+                    && (ScopeRefValue is null || value.RegistrationScopeRef == ResourceScopeRef.Parse(ScopeRefValue)))
                 : inventory.SingleOrDefault(value => value.EnrollmentInstanceId == EnrollmentInstanceId);
-            registration = item?.RegistrationName is null ? null : await Client.GetRegistrationAsync(ResourceNamespace.Parse(item.RegistrationNamespace), item.RegistrationName, cancellation.Token);
+            registration = item?.RegistrationName is null ? null : ScopeRefValue is not null && item.RegistrationScopeRef is { } scope
+                ? await Client.GetRegistrationAsync(scope, ResourceNamespace.Parse(item.RegistrationNamespace), item.RegistrationName, cancellation.Token)
+                : await Client.GetRegistrationAsync(ResourceNamespace.Parse(item.RegistrationNamespace), item.RegistrationName, cancellation.Token);
             extensionTools = [];
+            extensionToolProvider = null;
             if (item?.RegistrationName is not null && Services.GetService<IToolsClient>() is { } toolsClient)
             {
                 try
@@ -327,6 +340,12 @@ else
                         ? await toolsClient.GetToolsAsync(scopeRef, cancellationToken: cancellation.Token)
                         : await toolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
                     extensionTools = candidates.Where(ToolBelongsToExtension).ToArray();
+                    extensionToolProvider = (await toolsClient.GetProvidersAsync(cancellation.Token)).SingleOrDefault(provider =>
+                        provider.Name == item.RegistrationName && provider.Namespace.Value == item.RegistrationNamespace
+                        && provider.ScopeRef == item.RegistrationScopeRef
+                        && provider.Definition.Aep?.Extension.Name == item.RegistrationName
+                        && (provider.Definition.Aep.Extension.Namespace ?? provider.Namespace).Value == item.RegistrationNamespace
+                        && (provider.Definition.Aep.Extension.ScopeRef ?? provider.ScopeRef) == item.RegistrationScopeRef);
                 }
                 catch (AgentstrationApiException) { }
             }
@@ -420,15 +439,24 @@ else
     private bool ToolBelongsToExtension(ToolResource tool) => item?.RegistrationName is { } registrationName
         && string.Equals(tool.Definition.Provider?.Name, registrationName, StringComparison.Ordinal)
         && (tool.Definition.Provider?.Namespace ?? tool.Namespace).Value == item.RegistrationNamespace
+        && (tool.Definition.Provider?.ScopeRef ?? tool.ScopeRef) == item.RegistrationScopeRef
         && (item.RegistrationScopeRef is null || tool.ScopeRef == item.RegistrationScopeRef);
     private IReadOnlyList<ToolResource> MaterializedTools(ExtensionContributionResponse contribution) =>
         string.Equals(contribution.Kind, "tool", StringComparison.Ordinal)
             ? extensionTools.Where(tool => string.Equals(tool.Definition.ExternalId, contribution.Id, StringComparison.Ordinal)).ToArray()
             : [];
+    private string ToolContributionState(IReadOnlyList<ToolResource> tools) => tools.Count switch
+    {
+        0 => "NotMaterialized",
+        > 1 => "Conflict",
+        _ => item?.AvailabilityStatus == "available" && item.RegistrationEnabled
+            && tools[0].Definition.Enabled && tools[0].Definition.Discovery?.Available == true ? "Available" : "Unavailable"
+    };
     private IReadOnlyList<ExtensionManagedResourceResponse> MaterializedResources(ExtensionContributionResponse contribution) =>
         string.Equals(contribution.Kind, "data-source-profile-bundle", StringComparison.Ordinal)
             ? (item?.Extension?.BundleInstallations ?? [])
                 .Where(installation => string.Equals(installation.BundleId, contribution.Id, StringComparison.Ordinal))
+                .Where(installation => installation.State != ExtensionBundleInstallationState.Degraded)
                 .SelectMany(installation => installation.ManagedResources)
                 .Where(resource => resource.Kind is ToolResourceKinds.ToolSet or FlowResourceKinds.Flow or DataSourceResourceKinds.DataSourceProfile)
                 .DistinctBy(resource => (resource.Kind, resource.Namespace, resource.Name, resource.ScopeRef))
@@ -436,16 +464,40 @@ else
                 .ThenBy(resource => resource.Name, StringComparer.Ordinal)
                 .ToArray()
             : [];
+    private string BundleContributionState(ExtensionContributionResponse contribution)
+    {
+        var installations = (item?.Extension?.BundleInstallations ?? [])
+            .Where(value => value.BundleId == contribution.Id).ToArray();
+        if (installations.Length == 0) return "NotMaterialized";
+        if (installations.Any(value => value.State == ExtensionBundleInstallationState.Degraded)) return "Conflict";
+        foreach (var installation in installations)
+        foreach (var binding in installation.ToolBindings)
+        {
+            var tools = extensionTools.Where(value => value.Definition.ExternalId == binding.Key).ToArray();
+            if (tools.Length > 1) return "Conflict";
+            if (tools.Length == 0 || tools[0].Name != binding.Value.Name
+                || tools[0].Namespace != (binding.Value.Namespace ?? ResourceNamespace.Default)
+                || tools[0].ScopeRef != (binding.Value.ScopeRef ?? installation.ScopeRef)
+                || !tools[0].Definition.Enabled || tools[0].Definition.Discovery?.Available != true) return "Unavailable";
+        }
+        return installations.All(value => value.State == ExtensionBundleInstallationState.Installed)
+            && item?.AvailabilityStatus == "available" && item.RegistrationEnabled ? "Available" : "Unavailable";
+    }
     private string ContributionKindLabel(string kind)
     {
         var localized = Localizer[$"ContributionKind.{kind}"];
         return localized.ResourceNotFound ? kind : localized.Value;
     }
     private string ContributionDescription(ExtensionContributionResponse contribution, int resourceCount) =>
-        resourceCount > 0
+        contribution.Kind == "data-source-profile-bundle" && BundleContributionState(contribution) == "Conflict"
+            ? T("ContributionState.Conflict") : resourceCount > 0
             ? T("ContributionMaterialized", resourceCount)
             : T(string.Equals(contribution.Kind, "data-source-profile-bundle", StringComparison.Ordinal) ? "ContributionAwaitingMaterialization" : "ContributionDeclared");
-    private string ManagedResourceKindLabel(string kind) => T($"ManagedResourceKind.{kind}");
+    private string ManagedResourceKindLabel(string kind)
+    {
+        var value = Localizer[$"ManagedResourceKind.{kind}"];
+        return value.ResourceNotFound ? kind : value.Value;
+    }
     private static int ManagedResourceKindOrder(string kind) => kind switch
     {
         ToolResourceKinds.ToolSet => 0,
@@ -454,10 +506,11 @@ else
         _ => 3
     };
     private static string ToolUrl(ToolResource tool) => ToolReferenceUrl(tool.ScopeRef ?? ResourceScopeRef.Instance, new ResourceReference(tool.Name, tool.ScopeRef, tool.Namespace));
+    private static string ToolProviderUrl(ToolProviderResource provider) => $"/tools/providers/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace.Value)}&scopeRef={Uri.EscapeDataString((provider.ScopeRef ?? ResourceScopeRef.Instance).Value)}&context={Uri.EscapeDataString((provider.ScopeRef ?? ResourceScopeRef.Instance).Value)}";
     private static string ToolReferenceUrl(ResourceScopeRef scopeRef, ResourceReference reference)
     {
         var @namespace = reference.Namespace ?? ResourceNamespace.Default;
-        return $"/tools/{Uri.EscapeDataString(reference.Name)}?namespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString((reference.ScopeRef ?? scopeRef).Value)}";
+        return $"/tools/{Uri.EscapeDataString(reference.Name)}?namespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString((reference.ScopeRef ?? scopeRef).Value)}&context={Uri.EscapeDataString((reference.ScopeRef ?? scopeRef).Value)}";
     }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
     private sealed class RegistrationEditForm { [System.ComponentModel.DataAnnotations.Required] public string DisplayName { get; set; } = string.Empty; [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.Url] public string Endpoint { get; set; } = string.Empty; public string? ExpectedExtensionId { get; set; } public bool Enabled { get; set; } }
@@ -470,12 +523,12 @@ else
     };
     private static string? ManagedResourceUrl(ExtensionManagedResourceResponse resource) => resource.Kind switch
     {
-        ToolResourceKinds.ToolSet or ToolResourceKinds.ToolSetVersion => $"/tools/sets/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}",
+        ToolResourceKinds.ToolSet or ToolResourceKinds.ToolSetVersion => $"/tools/sets/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
         FlowResourceKinds.Flow or "FlowVersion" => (resource.Namespace == ResourceNamespace.DefaultValue
             ? $"/flows/{Uri.EscapeDataString(resource.Name)}"
             : $"/namespaces/{Uri.EscapeDataString(resource.Namespace)}/flows/{Uri.EscapeDataString(resource.Name)}")
-            + $"?scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        DataSourceResourceKinds.DataSourceProfile or DataSourceResourceKinds.DataSourceProfileRevision => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}",
+            + $"?scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
+        DataSourceResourceKinds.DataSourceProfile or DataSourceResourceKinds.DataSourceProfileRevision => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
         _ => null
     };
     private enum DetailTab { Summary, Connection, Enrollment, Contributions, Resources, Options, Usages }

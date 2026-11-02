@@ -49,12 +49,15 @@ public static class ExtensionEndpoints
     private static Task<IResult> GetRegistrationAsync(
         string registrationName,
         string? resourceNamespace,
+        string? scopeRef,
         HttpResponse response,
         ExtensionRegistrationManagementService service,
         CancellationToken cancellationToken) =>
         ExtensionsApiHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.GetAsync(ExtensionsApiHttp.Namespace(resourceNamespace), registrationName, cancellationToken)
+            var stored = await (scopeRef is null
+                ? service.GetAsync(ExtensionsApiHttp.Namespace(resourceNamespace), registrationName, cancellationToken)
+                : service.GetExactAsync(ResourceScopeRef.Parse(scopeRef), ExtensionsApiHttp.Namespace(resourceNamespace), registrationName, cancellationToken))
                 ?? throw new ExtensionRegistrationNotFoundException(new(ExtensionsApiHttp.Namespace(resourceNamespace), ExtensionKinds.ExtensionRegistration, registrationName));
             return ExtensionsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });

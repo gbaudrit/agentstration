@@ -110,7 +110,11 @@ public sealed class ExtensionManagementService(
                 endpoint,
                 status,
                 inspection.Extension,
-                inspection.Contributions,
+                inspection.Contributions.Concat(installations.Select(value => new ExtensionContribution(
+                        AepContributionKinds.DataSourceProfileBundle, value.Definition.BundleId)))
+                    .Concat(installations.SelectMany(value => value.Definition.ToolBindings.Keys)
+                        .Select(value => new ExtensionContribution(AepContributionKinds.Tool, value)))
+                    .DistinctBy(value => (value.Kind, value.Id)).ToArray(),
                 inspection.OptionSets,
                 usages,
                 bindings.Select(value => new ExtensionProviderBinding(value.Name, value.Namespace.Value, value.ContributionId)).ToArray(),

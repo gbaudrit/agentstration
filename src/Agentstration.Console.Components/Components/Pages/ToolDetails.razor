@@ -50,9 +50,9 @@ else
                 <dl class="resource-details">
                     @if (managingExtension is not null)
                     {
-                        <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@ManagingExtensionUrl">@managingExtension.DisplayName</a><br /><code>@managingExtension.ExtensionId</code> · @(managingExtension.Version ?? "—") · <ResourceScopeBadge ScopeRef="managingExtension.RegistrationScopeRef" Compact /></dd>
+                        <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@ManagingExtensionUrl">@managingExtension.DisplayName</a><br /><code>@managingExtension.ExtensionId</code> · @(tool.Governance.Origin.Version ?? managingExtension.Version ?? "—") · <ResourceScopeBadge ScopeRef="managingExtension.RegistrationScopeRef" Compact /></dd>
                     }
-                    <dt>@T("TechnicalProvider")</dt><dd><code>@tool.Definition.Provider?.ResourceId</code></dd>
+                    <dt>@T("TechnicalProvider")</dt><dd>@if (provider is not null) { <a href="@ProviderUrl"><code>@tool.Definition.Provider?.ResourceId</code></a> } else { <code>@tool.Definition.Provider?.ResourceId</code> }</dd>
                     <dt>@T("ExternalName")</dt><dd><code>@tool.Definition.ExternalId</code></dd>
                     <dt>@T("Enabled")</dt><dd>@BooleanLabel(tool.Definition.Enabled)</dd>
                     <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(tool.Definition.RequiresApproval)</dd>
@@ -215,7 +215,8 @@ else
         if (Services.GetService<IExtensionsClient>() is { } extensions
             && tool.Definition.Provider is { } providerReference)
         {
-            provider = (await Client.GetProviderAsync(providerReference.Name, default)).Value;
+            provider = (await Client.GetProviderAsync(providerReference.ScopeRef ?? tool.ScopeRef ?? ResourceScopeRef.Instance,
+                providerReference.Namespace ?? tool.Namespace, providerReference.Name, default)).Value;
             if (provider.Definition.Aep?.Extension is { } extensionReference)
             {
                 managingExtension = (await extensions.GetExtensionInventoryAsync(default)).SingleOrDefault(candidate =>
@@ -236,7 +237,8 @@ else
 
     private string ManagingExtensionUrl => managingExtension?.RegistrationName is null
         ? "/extensions"
-        : $"/extensions/{Uri.EscapeDataString(managingExtension.RegistrationName)}?namespace={Uri.EscapeDataString(managingExtension.RegistrationNamespace)}";
+        : $"/extensions/{Uri.EscapeDataString(managingExtension.RegistrationName)}?namespace={Uri.EscapeDataString(managingExtension.RegistrationNamespace)}&scopeRef={Uri.EscapeDataString((managingExtension.RegistrationScopeRef ?? ResourceScopeRef.Instance).Value)}&context={Uri.EscapeDataString((managingExtension.RegistrationScopeRef ?? ResourceScopeRef.Instance).Value)}";
+    private string ProviderUrl => $"/tools/providers/{Uri.EscapeDataString(provider!.Name)}?namespace={Uri.EscapeDataString(provider.Namespace.Value)}&scopeRef={Uri.EscapeDataString((provider.ScopeRef ?? ResourceScopeRef.Instance).Value)}&context={Uri.EscapeDataString((provider.ScopeRef ?? ResourceScopeRef.Instance).Value)}";
 
     private async Task ToggleAsync()
     {

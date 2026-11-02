@@ -36,6 +36,38 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    [DataRow("default")]
+    [DataRow("shared.knowledge")]
+    public async Task ToolSetClientPreservesExactScopeForReadsVersionsAndDeletion(string namespaceValue)
+    {
+        var scope = ResourceScopeRef.Tenant(Guid.Parse("11111111-2222-3333-4444-555555555555"));
+        var ns = new ResourceNamespace(namespaceValue);
+        var requests = new List<(string Path, string? ETag)>();
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.RequestUri!.PathAndQuery, request.Headers.IfMatch.SingleOrDefault()?.ToString()));
+            if (request.Method == HttpMethod.Delete) return new(HttpStatusCode.NoContent);
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = request.RequestUri.AbsolutePath.EndsWith("/versions", StringComparison.Ordinal)
+                    ? JsonContent.Create(new ValueResponse<ToolSetVersionResource>([])) : JsonContent.Create(ToolSet("documentation", ns))
+            };
+            response.Headers.ETag = EntityTagHeaderValue.Parse("\"exact\"");
+            return response;
+        })) { BaseAddress = new("http://localhost/") };
+        var client = new ToolSetsApiClient(http);
+        var resource = await client.GetToolSetAsync(scope, ns, "documentation");
+        _ = await client.GetVersionsAsync(scope, ns, "documentation");
+        await client.DeleteAsync(scope, ns, "documentation", resource.ETag);
+        var query = ns.IsDefault ? "?" : "?resourceNamespace=shared.knowledge&";
+        query += $"scopeRef={Uri.EscapeDataString(scope.Value)}";
+        Assert.AreEqual("/api/toolsets/documentation" + query, requests[0].Path);
+        Assert.AreEqual("/api/toolsets/documentation/versions" + query, requests[1].Path);
+        Assert.AreEqual(requests[0].Path, requests[2].Path);
+        Assert.AreEqual("\"exact\"", requests[2].ETag);
+    }
+
+    [TestMethod]
     public async Task KnowledgeSourceClientPublishesExposureInTheSelectedNamespace()
     {
         Uri? requested = null;
