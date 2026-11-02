@@ -1,0 +1,63 @@
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
+
+@if (IsExtensionManaged)
+{
+    <section class="panel form-section" data-testid="extension-managed-resource">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">@T("ManagedReadOnly")</p>
+                <h2>@(managingExtension?.DisplayName ?? Governance.Origin.Reference)</h2>
+                <p>@T("ManagedResourceHelp")</p>
+            </div>
+        </div>
+        <dl class="resource-details">
+            <dt>@T("Version")</dt><dd>@Governance.Origin.Version</dd>
+            <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="ScopeRef" /></dd>
+            @if (managingExtension is not null)
+            {
+                <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@ManagingExtensionUrl">@managingExtension.ExtensionId</a></dd>
+            }
+        </dl>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public ResourceGovernance Governance { get; set; } = ResourceGovernance.User;
+    [Parameter, EditorRequired] public ResourceScopeRef ScopeRef { get; set; }
+    [Parameter, EditorRequired] public ResourceNamespace Namespace { get; set; }
+    [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter] public Guid? Uid { get; set; }
+
+    private ExtensionInventoryItemResponse? managingExtension;
+    private bool IsExtensionManaged => Governance.Origin.Kind == ResourceOriginKind.Extension
+        && Governance.ManagedBy?.Kind == ResourceManagementAuthorityKind.ExtensionInstallation;
+    private string ManagingExtensionUrl => managingExtension?.RegistrationName is null
+        ? "/extensions"
+        : $"/extensions/{Uri.EscapeDataString(managingExtension.RegistrationName)}?namespace={Uri.EscapeDataString(managingExtension.RegistrationNamespace)}";
+    private string T(string key) => Localizer[key];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        managingExtension = null;
+        if (!IsExtensionManaged || Services.GetService<IExtensionsClient>() is not { } extensions) return;
+        try
+        {
+            var inventory = await extensions.GetExtensionInventoryAsync(default);
+            managingExtension = inventory.FirstOrDefault(item => item.Extension?.BundleInstallations?.Any(installation =>
+                installation.ManagedResources.Any(resource => Matches(resource))) == true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Governance remains visible from the resource itself when the extension inventory is temporarily unavailable.
+        }
+    }
+
+    private bool Matches(ExtensionManagedResourceResponse resource) =>
+        (Uid is not null && resource.Uid == Uid)
+        || (resource.ScopeRef == ScopeRef
+            && string.Equals(resource.Kind, Kind, StringComparison.Ordinal)
+            && string.Equals(resource.Namespace, Namespace.Value, StringComparison.Ordinal)
+            && string.Equals(resource.Name, Name, StringComparison.Ordinal));
+}
