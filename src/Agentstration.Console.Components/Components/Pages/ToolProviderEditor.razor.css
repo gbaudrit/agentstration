@@ -1,3 +1,86 @@
+.provider-ownership-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 20px 22px;
+    border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+    border-left: 3px solid var(--primary);
+    border-radius: 12px;
+    background: linear-gradient(110deg, var(--primary-soft), var(--surface));
+}
+
+.provider-ownership-icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+    border-radius: 11px;
+    background: var(--surface);
+    color: var(--primary);
+}
+
+.provider-ownership-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.provider-ownership-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.provider-ownership-heading .eyebrow {
+    margin: 0 0 5px;
+}
+
+.provider-ownership-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    font-size: .9rem;
+    font-weight: 700;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.provider-ownership-link:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.provider-ownership-link ::deep .ui-icon {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    color: var(--primary);
+}
+
+.provider-ownership-help {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: .75rem;
+    line-height: 1.6;
+}
+
+@media (max-width: 700px) {
+    .provider-ownership-banner {
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .provider-ownership-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
 .tool-provider-section {
     overflow: hidden;
 }

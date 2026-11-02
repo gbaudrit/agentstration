@@ -17,9 +17,15 @@ else
     {
         @if (provider?.Definition.Aep?.Extension is { } extension)
         {
-            <section class="panel form-section">
-                <p>@ExtensionLocalizer["ManagingExtension"]: <a href="@ExtensionUrl(extension)">@provider.Definition.DisplayName</a></p>
-                @if (provider.Governance.IsManaged) { <p>@ExtensionLocalizer["ManagedReadOnly"] · @ExtensionLocalizer["ManagedResourceHelp"]</p> }
+            <section class="provider-ownership-banner">
+                <span class="provider-ownership-icon" aria-hidden="true"><UiIcon Name="shield" /></span>
+                <div class="provider-ownership-content">
+                    <div class="provider-ownership-heading">
+                        <div><p class="eyebrow">@ExtensionLocalizer["ManagingExtension"]</p><a class="provider-ownership-link" href="@ExtensionUrl(extension)">@provider.Definition.DisplayName<UiIcon Name="arrow-right" /></a></div>
+                        @if (provider.Governance.IsManaged) { <StatusBadge Text="@ExtensionLocalizer["ManagedReadOnly"]" Status="UiStatus.Neutral" /> }
+                    </div>
+                    @if (provider.Governance.IsManaged) { <p class="provider-ownership-help">@ExtensionLocalizer["ManagedResourceHelp"]</p> }
+                </div>
             </section>
         }
         <ResourceTabs Label="@T("SectionsLabel")"><button type="button" class="@(activeTab == ProviderTab.Overview ? "active" : null)" @onclick="() => activeTab = ProviderTab.Overview" data-testid="provider-overview-tab">@T("Overview")</button><button type="button" class="@(activeTab == ProviderTab.Tools ? "active" : null)" @onclick="() => activeTab = ProviderTab.Tools" data-testid="provider-tools-tab">@T("Tools")<span class="provider-tab-count">@tools.Count</span></button><button type="button" class="@(activeTab == ProviderTab.Connection ? "active" : null)" @onclick="() => activeTab = ProviderTab.Connection" data-testid="provider-connection-tab">@T("Connection")</button></ResourceTabs>
