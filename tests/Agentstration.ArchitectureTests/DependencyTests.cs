@@ -1500,6 +1500,46 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void AspireLanProfilesKeepDashboardLocalAndNetworkExposureOptIn()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        using var settings = System.Text.Json.JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repositoryRoot, "src", "Agentstration.AppHost", "Properties", "launchSettings.json")));
+        var profiles = settings.RootElement.GetProperty("profiles");
+        foreach (var profile in profiles.EnumerateObject())
+        {
+            foreach (var address in profile.Value.GetProperty("applicationUrl").GetString()!.Split(';'))
+            {
+                Assert.IsTrue(new Uri(address).IsLoopback, $"Dashboard must remain local in {profile.Name}.");
+            }
+
+            var variables = profile.Value.GetProperty("environmentVariables");
+            var enabled = variables.TryGetProperty("Agentstration__Lan__Enabled", out var lan)
+                && bool.Parse(lan.GetString()!);
+            Assert.AreEqual(profile.Name is "https-LAN" or "https-LAN-NoBootstrap", enabled);
+            Assert.AreEqual(profile.Name is "https" or "https-LAN",
+                bool.Parse(variables.GetProperty("Agentstration__Bootstrap__InitialBootstrapEnabled").GetString()!));
+
+            foreach (var key in new[] { "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL", "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL" })
+            {
+                Assert.IsTrue(new Uri(variables.GetProperty(key).GetString()!).IsLoopback);
+            }
+        }
+
+        Assert.IsTrue(profiles.TryGetProperty("https-LAN", out _));
+        Assert.IsTrue(profiles.TryGetProperty("https-LAN-NoBootstrap", out _));
+        using var webSettings = System.Text.Json.JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repositoryRoot, "src", "Agentstration.Web", "Properties", "launchSettings.json")));
+        foreach (var profile in webSettings.RootElement.GetProperty("profiles").EnumerateObject())
+        {
+            foreach (var address in profile.Value.GetProperty("applicationUrl").GetString()!.Split(';'))
+            {
+                Assert.IsTrue(new Uri(address).IsLoopback, $"Direct Web profile {profile.Name} must remain local.");
+            }
+        }
+    }
+
+    [TestMethod]
     public void AspirePostgreSqlStorageUsesThePersistentWorktreeIdentity()
     {
         var repositoryRoot = FindRepositoryRoot();
