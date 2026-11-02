@@ -215,7 +215,7 @@ export const Checkpoints = {
     secretBound: 'foundry-secret-binding-secret-bound',
     secretUnavailable: 'foundry-secret-binding-secret-unavailable',
   },
-  sourceLifecycle: { acquisitions: 'source-lifecycle-acquisitions', projections: 'source-lifecycle-projections' },
+  sourceLifecycle: { acquisitionFailure: 'source-lifecycle-acquisition-failure', acquisitions: 'source-lifecycle-acquisitions', projections: 'source-lifecycle-projections' },
   schemaDrivenSources: {
     completed: 'schema-driven-sources-completed',
   },

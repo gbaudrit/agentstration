@@ -49,9 +49,88 @@ interface LifecycleFixture {
  * immutable evidence; lifecycle actions and expected failure feedback use the Console. */
 export class SourceLifecyclePage {
   private fixture!: LifecycleFixture;
+  private scope!: string;
   public constructor(private readonly page: Page) {}
   public get acquisitionHistory(): Locator { return this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitions); }
   public get snapshots(): Locator { return this.page.getByTestId(TestIds.sourceLifecycle.snapshots); }
+
+  public get failureTopology(): Locator { return this.page.locator('.flow-run-overview-topology .topology-shell'); }
+
+  public async inspectAcquisitionFailure(consoleUrl: string, scope: ExecutionScopeFixture,
+    text: ExpectedText['acquisitionFailure']): Promise<void> {
+    // Use the built-in REST Flow and real governed Tool. The managed test host
+    // returns HTTP 200 text/html for this one reserved fixture URL, entirely offline.
+    await new SourceLifecycleFixtures(this.page).grantBuiltinAccess(consoleUrl, scope.scopes.tenant,
+      ['data-source-rest-acquisition-builtin', 'agentstration.rest.get', 'rest-builtin']);
+    const name = `rejected-rest-${Date.now().toString(36)}`;
+    this.scope = scope.scopes.workspace;
+    await this.post(consoleUrl, '/api/datasources', {
+      name, scopeRef: scope.scopes.workspace, properties: {
+        displayName: name, enabled: true, profile: { name: 'rest-builtin', scopeRef: '/instance' },
+        configuration: { url: 'https://acquisition-failure.example.test/rejected.html' },
+      },
+    }, 201);
+    await this.openSource(consoleUrl, name, 'acquisitions');
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceStartAcquisition)).toBeEnabled();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceStartAcquisition).click();
+    let acquisition!: Acquisition;
+    await expect.poll(async () => {
+      acquisition = (await this.read<Acquisition[]>(consoleUrl, this.sourceApi(name) + '/acquisitions'))[0];
+      return acquisition?.state;
+    }, { timeout: 90_000 }).toBe(5);
+    const message = "Media type 'text/html' is not allowed for this profile.";
+    const code = 'http_media_type_invalid';
+    const run = await this.read<{ status: number; error: { code: string; details: string } }>(consoleUrl,
+      `/api/flowRuns/${encodeURIComponent(acquisition.flowRunId)}`);
+    expect(run.status).toBe(4);
+    expect(run.error).toMatchObject({ code: 'acquisition_failed', details: message });
+    // Return through the acquisition history link, as an operator would.
+    await this.openSource(consoleUrl, name, 'acquisitions');
+    await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitionRow)
+      .filter({ hasText: acquisition.flowRunId }).getByRole('link').click();
+    await expect(this.page.getByTestId(TestIds.flowObservability.runDetails)).toBeVisible();
+    const summary = this.page.getByTestId(TestIds.sourceLifecycle.runError);
+    await expect(summary).toContainText('acquisition_failed');
+    await expect(summary).toContainText(message);
+    await expect(summary).not.toContainText('${transition.output}');
+    const topology = this.failureTopology;
+    await expect(topology).toBeVisible();
+    const failed = topology.locator('.topology-edge[data-edge-id="fetch-failure"]');
+    await expect(failed).toHaveClass(/failed/);
+    await expect(failed).not.toHaveClass(/observed/);
+    await expect(failed).toHaveCSS('stroke', 'rgb(228, 85, 98)');
+    const marker = await failed.getAttribute('marker-end');
+    expect(marker).toMatch(/^url\(#.+\)$/);
+    await expect(topology.locator(`${marker!.slice(4, -1)} path`)).toHaveCSS('fill', 'rgb(228, 85, 98)');
+    await expect(topology.locator('.topology-edge[data-edge-id="input-fetch"]')).toHaveClass(/observed/);
+    await expect(topology.locator('.topology-edge[data-edge-id="fetch-persist"]')).toHaveClass(/inactive/);
+    const legend = topology.locator('.topology-legend');
+    await expect(legend).toContainText(text.errorLegend);
+    await expect(legend.locator('i.failed')).toHaveCSS('border-top-color', 'rgb(228, 85, 98)');
+    if ((this.page.viewportSize()?.width ?? 1440) > 900) await expect(legend).toBeVisible();
+    else await expect(legend).toBeHidden(); // Existing responsive legend contract.
+    // Inspect the actual fetch step: its governed code survives the Worker HTTP boundary.
+    const inspectorToggle = topology.locator('button.inspector-toggle');
+    const inspector = this.page.locator('.step-inspector');
+    await expect(async () => {
+      if (!await inspector.isVisible()) await inspectorToggle.click();
+      await expect(inspector).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+    await topology.getByRole('button', { name: /Acquire source content/ }).click();
+    await expect(inspector).toContainText(code);
+    await expect(inspector).toContainText(message);
+    await expect(inspector).toContainText('fetch-failure');
+    await expect(inspector).not.toContainText('${transition.output}');
+    await this.assertResponsive();
+    const viewport = topology.locator('.topology-viewport');
+    const bounds = await viewport.boundingBox();
+    expect(bounds?.width).toBeGreaterThan(200);
+    const graph = topology.locator('.topology-canvas');
+    await expect(graph).toHaveClass(/fit/);
+    await expect(topology.locator('.topology-node')).toHaveCount(5);
+    // Nodes retain their full keyboard-accessible labels at either viewport.
+    await expect(topology.getByRole('button', { name: /Acquisition manifest/ })).toBeVisible();
+  }
 
   public async administer(consoleUrl: string, scopeFixture: ExecutionScopeFixture, text: ExpectedText['sourceLifecycle']): Promise<void> {
     await this.provision(consoleUrl, scopeFixture, false);
@@ -162,6 +241,7 @@ export class SourceLifecyclePage {
       knowledge: `lifecycle-knowledge-${suffix}`,
     };
     const f = this.fixture;
+    this.scope = f.scope;
     await fixtures.createPublishedFlow(consoleUrl, f.acquisitionFlow, f.acquisitionFlow, 'datasource.acquisition/v1', acquisitionFlowSource('${input.sourceConfiguration.artifactId}'));
     await fixtures.createPublishedFlow(consoleUrl, f.projectionFlow, f.projectionFlow, 'knowledge.projection/v1', projectionFlowSource());
     if (sources) {
@@ -518,7 +598,7 @@ export class SourceLifecyclePage {
   private sourceApi(name: string): string { return `/api/datasources/${name}`; }
   private knowledgeApi(): string { return `/api/knowledgesources/${this.fixture.knowledge}`; }
   private apiUrl(consoleUrl: string, path: string): string {
-    return `${consoleUrl}${path}?namespace=default&scopeRef=${encodeURIComponent(this.fixture.scope)}`;
+    return `${consoleUrl}${path}?namespace=default&scopeRef=${encodeURIComponent(this.scope)}`;
   }
   private async get(consoleUrl: string, path: string): Promise<APIResponse> {
     const response = await this.page.request.get(this.apiUrl(consoleUrl, path));
@@ -541,8 +621,8 @@ export class SourceLifecyclePage {
   private async open(consoleUrl: string, path: string, marker: string, view?: string): Promise<void> {
     const url = new URL(path, consoleUrl);
     url.searchParams.set('namespace', 'default');
-    url.searchParams.set('scopeRef', this.fixture.scope);
-    url.searchParams.set('context', this.fixture.scope);
+    url.searchParams.set('scopeRef', this.scope);
+    url.searchParams.set('context', this.scope);
     if (view) url.searchParams.set('view', view);
     const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
     expect(response?.status()).toBe(200);

@@ -1,3 +1,4 @@
+import { inspectAcquisitionFailure } from './inspect-acquisition-failure.journey.js';
 import { administerDataSources, projectKnowledgeSources } from './source-lifecycle.journey.js';
 import { authenticateConsole } from './authenticate-console.journey.js';
 import { createAgent, type CreateAgentInput } from './create-agent.journey.js';
@@ -69,6 +70,7 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-flow-designer-responsive': (context, input) => exerciseFlowDesignerResponsive(context, input as unknown as ExerciseFlowDesignerResponsiveInput),
   'inspect-runtime-worker-observability': (context, input) => inspectRuntimeWorkerObservability(context, input as unknown as InspectRuntimeWorkerObservabilityInput),
   'inspect-agent-instance-observability': (context, input) => inspectAgentInstanceObservability(context, input as unknown as InspectAgentInstanceObservabilityInput),
+  'inspect-acquisition-failure': (context, input) => inspectAcquisitionFailure(context, input),
   'administer-data-sources': (context, input) => administerDataSources(context, input),
   'project-knowledge-sources': (context, input) => projectKnowledgeSources(context, input),
   'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),

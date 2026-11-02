@@ -173,3 +173,26 @@ On a persistent external instance, run the workspace plan first and set `workspa
 Profile inputs may be an ordered array when equivalent environments use different resource names. The journey selects the first available candidate and reports the available options immediately when none match.
 
 See [Browser automation](../../docs/contributing/browser-automation.md), [ADR-0117](../../docs/decisions/0117-product-owned-browser-journeys.md), and [ADR-0118](../../docs/decisions/0118-browser-campaigns-use-dedicated-workspaces.md) for ownership, extension, and external-consumption rules.
+
+### Data Source acquisition failure diagnostics
+
+`inspect-acquisition-failure` covers #818 after maintainer UX validation of #817
+and merge of #819. It starts a REST acquisition in the Console, follows its Flow
+Run link, and checks the resolved safe error, preserved `http_media_type_invalid`
+code, red selected transition and arrow, inactive success branch, and English/French
+error legend. The specification runs both locales at desktop and mobile widths;
+the existing product hides its legend below 900px, while retaining the graph and
+step diagnostics.
+
+```powershell
+npm exec playwright test -- tests/acquisition-failure.spec.ts
+npm run capture -- --plan examples/inspect-acquisition-failure.capture-plan.json --output .work/acquisition-failure
+```
+
+The managed host uses the test-only `fixtures/AcquisitionFailureHost` executable
+and an in-memory HTTP 200 `text/html` response for exactly
+`https://acquisition-failure.example.test/rejected.html`. The production REST Tool,
+media validation, governed invocation, Runtime Worker and Console remain in the
+execution path; the scenario needs no internet or relaxation of SSRF policy.
+The checkpoint is `source-lifecycle-acquisition-failure`. External instances must
+provide an equivalent deterministic response transport themselves.

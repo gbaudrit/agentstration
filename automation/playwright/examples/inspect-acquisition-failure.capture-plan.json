@@ -1,0 +1,8 @@
+{
+  "journey": "inspect-acquisition-failure",
+  "input": {},
+  "locale": "en-US",
+  "captures": [
+    { "checkpoint": "source-lifecycle-acquisition-failure", "file": "acquisition-failure.png" }
+  ]
+}
