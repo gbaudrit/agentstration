@@ -595,7 +595,7 @@ public sealed class PostgreSqlResourceStore(
     private async Task EnsureCanReadAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken)
     {
         if (!await CanReadAsync(context, scope, cancellationToken))
-            throw new InvalidOperationException($"The current Control Plane context cannot read scope '{scope.Ref}'.");
+            throw new ResourceScopeAccessDeniedException(ResourceScopeRef.Parse(scope.Ref));
     }
 
     private void EnsureCanWrite(ResourceScopeRef scopeRef)
