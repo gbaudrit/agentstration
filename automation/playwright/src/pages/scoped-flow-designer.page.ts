@@ -53,12 +53,12 @@ export class ScopedFlowDesignerPage {
     const exactTenant = `${fixture.scopes.tenant}|default|${duplicateAgentName}`;
     await selector.selectOption(exactTenant);
     await expect(selector).toHaveValue(exactTenant);
-    await this.page.locator('.step-settings-close').click();
+    await this.closeAgentSettings();
     await expect(this.page.locator('.save-state.saved')).toBeVisible({ timeout: 30_000 });
     await this.page.reload({ waitUntil: 'domcontentloaded' });
     await this.openAgentSettings();
     await expect(this.page.locator('#flow-agent-reference')).toHaveValue(exactTenant);
-    await this.page.locator('.step-settings-close').click();
+    await this.closeAgentSettings();
 
     const validation = await this.page.request.post(
       `${consoleUrl}/api/flows/${workspaceFlow}/validate?scopeRef=${encodeURIComponent(fixture.scopes.workspace)}`,
@@ -211,6 +211,11 @@ export class ScopedFlowDesignerPage {
       options.map(option => (option as HTMLOptionElement).value));
     for (const reference of included) expect(values).toContain(reference);
     for (const reference of excluded) expect(values).not.toContain(reference);
+    await this.closeAgentSettings();
+  }
+
+  private async closeAgentSettings(): Promise<void> {
     await this.page.locator('.step-settings-close').click();
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
   }
 }
