@@ -18,6 +18,7 @@ export class ResourceScopesPage {
     const scope = scopeRef ?? (await shell.getAttribute('data-context-scope'))!;
     await this.page.goto(`${consoleUrl}/settings/resource-scopes?context=${encodeURIComponent(scope)}`);
     await expect(shell).toHaveAttribute('data-context-scope', scope);
+    await expect(shell).toHaveAttribute('data-preferences-ready', 'true');
     await expect(this.count).toBeVisible();
   }
 
