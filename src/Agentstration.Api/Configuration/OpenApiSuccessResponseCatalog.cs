@@ -474,6 +474,9 @@ internal static class OpenApiSuccessResponseCatalog
         if (path == "/api/identity/context/workspace") return Json<RequestContext>(200, "Select the current workspace");
         if (path == "/api/identity/administration-capabilities") return Json<IdentityAdministrationCapabilitiesResponse>(200, "Get identity administration capabilities");
         if (path == "/api/identity/preferences") return Json<PrincipalPreferencesResponse>(200, method == "PUT" ? "Update principal preferences" : "Get principal preferences");
+        if (path == "/api/identity/organization/structure") return Json<OrganizationStructureResponse>(200, "Get the organization structure for the selected Console context");
+        if (path == "/api/identity/tenants") return Json<Tenant>(201, "Create a Tenant in the Instance");
+        if (path == "/api/identity/organization/workspaces") return Json<Workspace>(201, "Create a Workspace in an explicit Tenant");
         if (path == "/api/identity/organization") return Json<OrganizationAdministrationResponse>(200, "Get organization administration details");
         if (path == "/api/identity/workspaces") return method == "POST" ? Json<Workspace>(201, "Create a workspace") : Json<IReadOnlyList<Workspace>>(200, "List identity workspaces");
         if (path.EndsWith("/memberships/{principalId}", StringComparison.OrdinalIgnoreCase)) return method == "DELETE" ? NoContent("Remove a workspace membership") : Json<WorkspaceMemberResponse>(200, "Set a workspace membership");

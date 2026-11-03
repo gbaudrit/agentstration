@@ -677,6 +677,101 @@ public sealed class IdentityFoundationTests
         Definition = new RuntimeProfileProperties { DisplayName = "Shared", RuntimeType = "Local" }
     };
 
+    [TestMethod]
+    public async Task OrganizationStructureApiCreatesUnderAnExplicitTenantFromInstanceContext()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
+        });
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(RequestContextMiddleware.ConsoleContextHeader, "/instance");
+        using var tenantResponse = await client.PostAsJsonAsync("/api/identity/tenants", new CreateTenantRequest("structure-api", "Structure API"));
+        Assert.AreEqual(HttpStatusCode.Created, tenantResponse.StatusCode);
+        var tenant = await tenantResponse.Content.ReadFromJsonAsync<Tenant>();
+        Assert.IsNotNull(tenant);
+        using var workspaceResponse = await client.PostAsJsonAsync("/api/identity/organization/workspaces", new CreateTenantWorkspaceRequest(tenant.Id, "production", "Production"));
+        Assert.AreEqual(HttpStatusCode.Created, workspaceResponse.StatusCode);
+        var workspace = await workspaceResponse.Content.ReadFromJsonAsync<Workspace>();
+        Assert.IsNotNull(workspace);
+        Assert.AreEqual(tenant.Id, workspace.TenantId);
+        var structure = await client.GetFromJsonAsync<OrganizationStructureResponse>("/api/identity/organization/structure");
+        Assert.IsNotNull(structure);
+        Assert.AreEqual(workspace.Id, structure.Tenants.Single(entry => entry.Tenant.Id == tenant.Id).Workspaces.Single().Id);
+        client.DefaultRequestHeaders.Remove(RequestContextMiddleware.ConsoleContextHeader);
+        client.DefaultRequestHeaders.Add(RequestContextMiddleware.ConsoleContextHeader, $"/workspaces/{workspace.Id:D}");
+        using var denied = await client.PostAsJsonAsync("/api/identity/organization/workspaces", new CreateTenantWorkspaceRequest(Guid.NewGuid(), "forbidden", "Forbidden"));
+        Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task OrganizationStructureRespectsAllThreeContextsAndProtectsOperationalTopology()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync(grantPlatformAdministrator: true);
+        var administration = fixture.Services.GetRequiredService<IdentityAdministrationService>();
+        var topology = fixture.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        await topology.EnsureAllAsync(default);
+        var operations = await topology.GetInstanceOperationsWorkspaceAsync(default);
+        var instanceContext = fixture.InitialContext with { TenantId = operations.TenantId, WorkspaceId = operations.Id };
+        Tenant tenant;
+        Workspace created;
+        using (fixture.Context.PushInstance(instanceContext))
+        {
+            tenant = await administration.CreateTenantAsync("structure-tenant", "Structure Tenant", default);
+            var tenantOperations = await topology.GetTenantOperationsWorkspaceAsync(tenant.Id, default);
+            Assert.AreEqual(WorkspaceKind.TenantOperations, tenantOperations.Kind);
+            created = await administration.CreateWorkspaceAsync(tenant.Id, "production", "Production", default);
+            var view = await administration.GetStructureAsync(default);
+            Assert.IsTrue(view.CanCreateTenant);
+            Assert.IsTrue(view.Tenants.All(entry => entry.Tenant.Kind == TenantKind.Standard));
+            Assert.IsTrue(view.Tenants.SelectMany(entry => entry.Workspaces).All(workspace => workspace.Kind == WorkspaceKind.Business));
+            Assert.AreEqual(created.Id, view.Tenants.Single(entry => entry.Tenant.Id == tenant.Id).Workspaces.Single().Id);
+            await Assert.ThrowsAsync<ResourceConcurrencyException>(() => administration.CreateTenantAsync(tenant.Name, "Duplicate", default));
+            await Assert.ThrowsAsync<ArgumentException>(() => administration.CreateTenantAsync(OperationalTopologyIdentities.SystemTenantName, "Reserved", default));
+            await Assert.ThrowsAsync<ArgumentException>(() => administration.CreateWorkspaceAsync(operations.TenantId, "forbidden", "Forbidden", default));
+            await Assert.ThrowsAsync<ArgumentException>(() => administration.CreateWorkspaceAsync(tenant.Id, OperationalTopologyIdentities.TenantOperationsWorkspaceName, "Reserved", default));
+        }
+        using (fixture.Context.PushTenantAdministration(fixture.InitialContext))
+        {
+            var view = await administration.GetStructureAsync(default);
+            Assert.IsFalse(view.CanCreateTenant);
+            Assert.AreEqual(fixture.InitialContext.TenantId, view.Tenants.Single().Tenant.Id);
+            Assert.IsTrue(view.Tenants.Single().Workspaces.All(workspace => workspace.TenantId == fixture.InitialContext.TenantId));
+            await Assert.ThrowsAsync<AuthorizationDeniedException>(() => administration.CreateTenantAsync("forbidden", "Forbidden", default));
+            await Assert.ThrowsAsync<AuthorizationDeniedException>(() => administration.CreateWorkspaceAsync(tenant.Id, "forbidden", "Forbidden", default));
+        }
+        using (fixture.OpenScope())
+        {
+            var sibling = await administration.CreateWorkspaceAsync("sibling", "Sibling", default);
+            var view = await administration.GetStructureAsync(default);
+            Assert.IsFalse(view.CanCreateTenant);
+            Assert.AreEqual(fixture.InitialContext.WorkspaceId, view.Tenants.Single().Workspaces.Single().Id);
+            Assert.IsFalse(view.Tenants.Single().Workspaces.Any(workspace => workspace.Id == sibling.Id));
+            await Assert.ThrowsAsync<AuthorizationDeniedException>(() => administration.CreateWorkspaceAsync(tenant.Id, "forbidden", "Forbidden", default));
+        }
+    }
+
+    [TestMethod]
+    public async Task TenantAdministratorCannotUseInstanceStructureOrCreateOtherTenantWorkspaces()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var administration = fixture.Services.GetRequiredService<IdentityAdministrationService>();
+        using (fixture.Context.PushTenantAdministration(fixture.InitialContext))
+        {
+            var view = await administration.GetStructureAsync(default);
+            Assert.IsFalse(view.CanCreateTenant);
+            Assert.IsTrue(view.Tenants.Single().CanCreateWorkspace);
+            await Assert.ThrowsAsync<AuthorizationDeniedException>(() => administration.CreateWorkspaceAsync(Guid.NewGuid(), "forbidden", "Forbidden", default));
+            await Assert.ThrowsAsync<AuthorizationDeniedException>(() => administration.CreateTenantAsync("forbidden", "Forbidden", default));
+        }
+        using (fixture.Context.PushInstance(fixture.InitialContext))
+        {
+            await Assert.ThrowsAsync<AuthorizationDeniedException>(() => administration.GetStructureAsync(default));
+            await Assert.ThrowsAsync<AuthorizationDeniedException>(() => administration.CreateTenantAsync("forbidden", "Forbidden", default));
+        }
+    }
+
     private sealed class IdentityFixture : IAsyncDisposable
     {
         private readonly string directory;

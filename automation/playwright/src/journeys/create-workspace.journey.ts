@@ -36,7 +36,7 @@ export const createWorkspace: Journey<CreateWorkspaceInput> = async (context, in
   await context.checkpoint({
     name: Checkpoints.createWorkspace.selected,
     page: context.pages.page,
-    target: context.pages.organizationWorkspaces.createForm,
+    target: context.pages.organizationWorkspaces.structure,
   });
 };
 

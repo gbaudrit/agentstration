@@ -1,82 +1,244 @@
+@page "/settings/organization/structure"
 @page "/settings/organization/workspaces"
 @implements IDisposable
-@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
+@inject IIdentityAdministrationApiClient Client
 @inject ConsoleContextState ContextState
+@inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
-<PageTitle>@T("Workspaces") · @T("Organization") · Agentstration</PageTitle>
-<PageHeader Title="@T("Workspaces")" Description="@T("Workspaces.Description")" />
+<PageTitle>@T("Structure") · @T("Organization") · Agentstration</PageTitle>
+<PageHeader Title="@T("Structure")" Description="@T($"Structure.Description.{ContextState.Current?.SelectedKind ?? ConsoleContextKind.Instance}")" />
 <OrganizationSettingsNav />
 
-@if (loading) { <LoadingState Message="@T("LoadingWorkspaces")" /> }
-else if (!string.IsNullOrWhiteSpace(loadError)) { <ErrorState Title="@T("UnableLoadWorkspaces")" Message="@loadError" /> }
-else
+<div data-testid="organization-structure" data-interactive="@(interactive ? "true" : "false")">
+@if (loading) { <LoadingState Message="@T("LoadingStructure")" /> }
+else if (!string.IsNullOrWhiteSpace(loadError)) { <ErrorState Title="@T("UnableLoadStructure")" Message="@loadError" /> }
+else if (structure is not null)
 {
-    @if (CanCreate)
-    {
-        <section class="panel workspace-create-panel" data-testid="workspace-create-form" data-interactive="@(interactive ? "true" : "false")">
-            <div class="panel-header"><h2>@T("CreateWorkspace")</h2></div>
-            <div class="workspace-create-form">
-                <ResourceIdentityFields @key="identityVersion" @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" Policy="ResourceNamePolicy.Workspace" IsNew="true" DisplayNameTestId="workspace-display-name" TechnicalNameTestId="workspace-technical-name" />
-                <button class="button-primary" @onclick="CreateAsync" disabled="@(!CanSubmit)" data-testid="workspace-create">@(busy ? T("Creating") : T("CreateWorkspace"))</button>
+    <div class="structure-toolbar">
+        <div><span class="scope-label">@T($"Scope.{ContextState.Current?.SelectedKind ?? ConsoleContextKind.Instance}")</span><h2>@ContextName</h2></div>
+        @if (structure.CanCreateTenant)
+        {
+            <button class="button-primary" @onclick="() => OpenCreate(null)" data-testid="tenant-create-open">@T("CreateTenant")</button>
+        }
+    </div>
+    <div class="structure-layout @(createOpen ? "with-creation" : null)">
+        <section class="panel structure-inventory" aria-labelledby="structure-heading">
+            <div class="inventory-header">
+                <div><h2 id="structure-heading">@T("TenantsAndWorkspaces")</h2><p>@T("Structure.Counts", structure.Tenants.Count, structure.Tenants.Sum(value => value.Workspaces.Count))</p></div>
+                <label class="structure-search"><span>@T("SearchStructure")</span><input @ref="searchInput" type="search" @bind="search" @bind:event="oninput" placeholder="@T("SearchStructure.Placeholder")" /></label>
             </div>
-            @if (!string.IsNullOrWhiteSpace(operationError)) { <p class="inline-warning" role="alert">@operationError</p> }
+            @if (structure.Tenants.Count == 0)
+            {
+                <div class="structure-empty"><h3>@T("FirstTenant")</h3><p>@T("FirstTenant.Description")</p></div>
+            }
+            else if (!VisibleTenants.Any())
+            {
+                <p class="structure-empty" role="status">@T("NoStructureResults")</p>
+            }
+            else
+            {
+                @foreach (var entry in VisibleTenants)
+                {
+                    var tenant = entry.Tenant;
+                    var currentTenant = IsCurrentTenant(tenant.Id);
+                    var expanded = !collapsed.Contains(tenant.Id) || !string.IsNullOrWhiteSpace(search);
+                    <article class="tenant-group" @key="tenant.Id" data-testid="tenant-row" data-tenant-id="@tenant.Id" data-tenant-name="@tenant.Name">
+                        <div class="tenant-heading @(currentTenant ? "is-current" : null)">
+                            <button class="tenant-toggle" aria-expanded="@expanded" aria-controls="@($"tenant-{tenant.Id:D}")" @onclick="() => Toggle(tenant.Id)"><span aria-hidden="true">@(expanded ? "▾" : "▸")</span><span><strong>@tenant.DisplayName</strong><small>@tenant.Name</small></span></button>
+                            <StatusBadge Text="@T($"Status.{tenant.Status}")" Status="@(tenant.Status == TenantStatus.Active ? UiStatus.Success : UiStatus.Neutral)" />
+                            @if (currentTenant)
+                            {
+                                <span class="current-context" aria-current="true"><UiIcon Name="check" />@T("CurrentContext")</span>
+                            }
+                            else if (ContextState.Current?.SelectedKind != ConsoleContextKind.Workspace && CanOpenTenant(tenant.Id))
+                            {
+                                <a class="scope-link" href="@ContextUrl($"/tenants/{tenant.Id:D}")" aria-label="@T("OpenTenant.Named", tenant.DisplayName)"><UiIcon Name="building" /><span>@T("OpenTenant")</span><span class="scope-link-arrow"><UiIcon Name="arrow-right" /></span></a>
+                            }
+                            @if (entry.CanCreateWorkspace)
+                            {
+                                <button class="button-secondary" @onclick="() => OpenCreate(entry)" data-testid="workspace-create-open">@T("CreateWorkspace")</button>
+                            }
+                        </div>
+                        @if (expanded)
+                        {
+                            <div class="workspace-list" id="@($"tenant-{tenant.Id:D}")">
+                                @foreach (var workspace in FilterWorkspaces(entry))
+                                {
+                                    var currentWorkspace = IsCurrentWorkspace(workspace.Id);
+                                    <div class="workspace-row @(currentWorkspace ? "is-current" : null)" data-testid="workspace-row" data-workspace-id="@workspace.Id" data-workspace-name="@workspace.Name">
+                                        <div class="workspace-identity"><strong>@workspace.DisplayName</strong><small>@workspace.Name</small></div>
+                                        <StatusBadge Text="@T($"Status.{workspace.Status}")" Status="@(workspace.Status == WorkspaceStatus.Active ? UiStatus.Success : UiStatus.Neutral)" />
+                                        @if (currentWorkspace)
+                                        {
+                                            <span class="current-context" aria-current="true"><UiIcon Name="check" />@T("CurrentContext")</span>
+                                        }
+                                        else if (workspace.Status == WorkspaceStatus.Active && CanOpen(workspace.Id))
+                                        {
+                                            <a class="scope-link" href="@ContextUrl($"/workspaces/{workspace.Id:D}")" aria-label="@T("OpenWorkspace.Named", workspace.DisplayName)"><UiIcon Name="layout-grid" /><span>@T("OpenWorkspace")</span><span class="scope-link-arrow"><UiIcon Name="arrow-right" /></span></a>
+                                        }
+                                    </div>
+                                }
+                                @if (entry.Workspaces.Count == 0)
+                                {
+                                    <p class="structure-empty">@T("NoTenantWorkspaces")</p>
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+            }
+            <p class="structure-help">@T("Structure.ParentHelp")</p>
         </section>
-    }
-    <DataGrid TItem="Agentstration.Identity.Contracts.Workspace" Items="workspaces">
-        <Header><tr><th>@T("Workspace")</th><th>@T("TechnicalName")</th><th>@T("Status")</th><th>@T("Created")</th><th>@T("Context")</th></tr></Header>
-        <Row Context="workspace"><tr data-testid="workspace-row" data-workspace-id="@workspace.Id" data-workspace-name="@workspace.Name"><td><strong>@workspace.DisplayName</strong><br /><small>@workspace.Id</small></td><td><code>@workspace.Name</code></td><td><StatusBadge Text="@T($"Status.{workspace.Status}")" Status="UiStatus.Success" /></td><td>@workspace.CreatedAt.ToLocalTime().ToString("g")</td><td>@if(workspace.Id == ContextState.Current?.WorkspaceId){<StatusBadge Text="@T("Current")" Status="UiStatus.Info" />}</td></tr></Row>
-    </DataGrid>
+        @if (createOpen)
+        {
+            <aside class="panel creation-panel" aria-labelledby="creation-heading" @onkeydown="HandleKeyDown" data-testid="workspace-create-form" data-interactive="@(interactive ? "true" : "false")">
+                <h2 id="creation-heading" tabindex="-1" @ref="creationHeading">@T(parent is null ? "CreateTenant" : "CreateWorkspace")</h2>
+                <div class="parent-context"><span>@T(parent is null ? "ParentInstance" : "ParentTenant")</span><strong>@(parent?.Tenant.DisplayName ?? T("Instance"))</strong>@if (parent is not null) { <small>@parent.Tenant.Name</small> }</div>
+                <form @onsubmit="CreateAsync" @onsubmit:preventDefault>
+                    <fieldset disabled="@busy">
+                        <div class="creation-fields">
+                            <ResourceIdentityFields @key="identityVersion" @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" Policy="@(parent is null ? ResourceNamePolicy.Tenant : ResourceNamePolicy.Workspace)" IsNew="true" DisplayNameTestId="workspace-display-name" TechnicalNameTestId="workspace-technical-name" />
+                        </div>
+                        <p class="structure-help">@T(parent is null ? "CreateTenant.Help" : "CreateWorkspace.ParentHelp", parent?.Tenant.DisplayName ?? T("Instance"))</p>
+                        @if (!string.IsNullOrWhiteSpace(operationError)) { <p class="inline-warning" role="alert">@operationError</p> }
+                        <div class="creation-actions"><button type="button" class="button-secondary" @onclick="CloseCreateAsync">@T("Cancel")</button><button type="submit" class="button-primary" disabled="@(!CanSubmit)" data-testid="workspace-create">@(busy ? T("Creating") : T(parent is null ? "CreateTenant" : "CreateWorkspace"))</button></div>
+                    </fieldset>
+                </form>
+            </aside>
+        }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(successMessage)) { <p class="structure-success" role="status"><UiIcon Name="check" />@successMessage</p> }
 }
+</div>
 
 @code {
-    private IReadOnlyList<Agentstration.Identity.Contracts.Workspace> workspaces = [];
+    private readonly CancellationTokenSource lifetime = new();
+    private OrganizationStructureResponse? structure;
+    private OrganizationTenantResponse? parent;
+    private readonly HashSet<Guid> collapsed = [];
+    private string search = string.Empty;
     private string displayName = string.Empty;
     private string technicalName = string.Empty;
     private string? loadError;
     private string? operationError;
+    private string? successMessage;
+    private string? loadedScope;
     private bool loading = true;
     private bool busy;
-    private int identityVersion;
     private bool interactive;
+    private bool createOpen;
+    private bool focusCreation;
+    private int identityVersion;
+    private ElementReference creationHeading;
+    private ElementReference searchInput;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    private bool CanCreate => ContextState.HasPermission(AuthorizationPermissions.WorkspacesWrite);
-    private bool CanSubmit => !busy && displayName.Trim().Length >= 2 && technicalName.Trim().Length >= 2;
+    private string ContextName => ContextState.Current?.SelectedKind switch
+    {
+        ConsoleContextKind.Tenant => ContextState.Current.TenantDisplayName,
+        ConsoleContextKind.Workspace => $"{ContextState.Current.TenantDisplayName} / {ContextState.Current.WorkspaceDisplayName}",
+        _ => T("Instance")
+    };
+    private bool CanSubmit => !busy && displayName.Trim().Length is >= 2 and <= 120
+        && technicalName.Trim().Length is >= 2 and <= 64
+        && technicalName.All(character => char.IsAsciiLetterOrDigit(character) || character == '-');
+    private IEnumerable<OrganizationTenantResponse> VisibleTenants => structure?.Tenants.Where(entry => Matches(entry.Tenant.DisplayName, entry.Tenant.Name) || entry.Workspaces.Any(workspace => Matches(workspace.DisplayName, workspace.Name))) ?? [];
+    private bool Matches(string name, string technical) => string.IsNullOrWhiteSpace(search) || name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase) || technical.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase);
+    private IEnumerable<Workspace> FilterWorkspaces(OrganizationTenantResponse entry) => Matches(entry.Tenant.DisplayName, entry.Tenant.Name) ? entry.Workspaces : entry.Workspaces.Where(workspace => Matches(workspace.DisplayName, workspace.Name));
+    private bool CanOpenTenant(Guid tenantId) => ContextState.Current?.Contexts.Any(option => option.Kind == ConsoleContextKind.Tenant && option.TenantId == tenantId) == true;
+    private bool CanOpen(Guid workspaceId) => ContextState.Current?.Contexts.Any(option => option.WorkspaceId == workspaceId) == true;
+    private bool IsCurrentTenant(Guid tenantId) => ContextState.Current is { SelectedKind: ConsoleContextKind.Tenant } current && current.TenantId == tenantId;
+    private bool IsCurrentWorkspace(Guid workspaceId) => ContextState.Current is { SelectedKind: ConsoleContextKind.Workspace } current && current.WorkspaceId == workspaceId;
+    private static string ContextUrl(string scope) => $"/settings/organization/structure?context={Uri.EscapeDataString(scope)}";
 
     protected override async Task OnInitializedAsync()
     {
+        await ContextState.EnsureLoadedAsync(lifetime.Token);
         ContextState.Changed += OnContextChanged;
+        loadedScope = ContextState.Current?.SelectedScopeRef;
         await ReloadAsync();
     }
-    private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
-    public void Dispose() => ContextState.Changed -= OnContextChanged;
-    protected override void OnAfterRender(bool firstRender)
+    private void OnContextChanged() => _ = InvokeAsync(async () =>
     {
-        if (!firstRender) return;
-        interactive = true;
+        if (loadedScope != ContextState.Current?.SelectedScopeRef)
+        {
+            loadedScope = ContextState.Current?.SelectedScopeRef;
+            createOpen = false;
+            search = string.Empty;
+            successMessage = null;
+            collapsed.Clear();
+            structure = null;
+            await ReloadAsync();
+        }
         StateHasChanged();
+    });
+    public void Dispose()
+    {
+        ContextState.Changed -= OnContextChanged;
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        if (focusCreation) { focusCreation = false; await creationHeading.FocusAsync(); }
     }
     private async Task ReloadAsync()
     {
-        loading = true;
+        loading = structure is null;
         loadError = null;
-        try { workspaces = (await Client.GetOrganizationAsync(default)).Workspaces; }
+        try { structure = await Client.GetStructureAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { loadError = exception.Message; }
         finally { loading = false; }
     }
-    private async Task CreateAsync()
+    private void Toggle(Guid tenantId) { if (!collapsed.Add(tenantId)) collapsed.Remove(tenantId); }
+    private void OpenCreate(OrganizationTenantResponse? entry)
     {
         if (busy) return;
-        busy = true; operationError = null;
+        parent = entry;
+        displayName = technicalName = string.Empty;
+        operationError = successMessage = null;
+        identityVersion++;
+        createOpen = focusCreation = true;
+    }
+    private async Task CloseCreateAsync()
+    {
+        if (busy) return;
+        createOpen = false;
+        await searchInput.FocusAsync();
+    }
+    private async Task HandleKeyDown(KeyboardEventArgs args) { if (args.Key == "Escape") await CloseCreateAsync(); }
+    private async Task CreateAsync()
+    {
+        if (!CanSubmit) return;
+        busy = true;
+        operationError = null;
         try
         {
-            await Client.CreateWorkspaceAsync(technicalName, displayName, default);
-            displayName = technicalName = string.Empty;
-            identityVersion++;
+            Workspace? createdWorkspace = null;
+            if (parent is null)
+                await Client.CreateTenantAsync(technicalName, displayName, lifetime.Token);
+            else
+            {
+                createdWorkspace = await Client.CreateTenantWorkspaceAsync(parent.Tenant.Id, technicalName, displayName, lifetime.Token);
+                collapsed.Remove(parent.Tenant.Id);
+            }
+            successMessage = T(parent is null ? "TenantCreated" : "WorkspaceCreated", displayName);
+            createOpen = false;
+            search = string.Empty;
             await ReloadAsync();
-            await ContextState.LoadAsync(default);
+            await ContextState.LoadAsync(lifetime.Token);
+            if (createdWorkspace is not null && ContextState.Current?.SelectedKind == ConsoleContextKind.Workspace && CanOpen(createdWorkspace.Id))
+            {
+                Navigation.NavigateTo(ContextUrl($"/workspaces/{createdWorkspace.Id:D}"), forceLoad: true);
+                return;
+            }
+            await searchInput.FocusAsync();
         }
-        catch (Exception exception) { operationError = exception.Message; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception) { operationError = T(exception.ProblemTitle switch { "tenant_conflict" => "TenantNameConflict", "workspace_conflict" => "WorkspaceNameConflict", "tenant_invalid" or "workspace_invalid" => "Structure.InvalidIdentity", "permission_denied" => "Structure.PermissionDenied", _ => "Structure.CreateFailed" }); }
+        catch (Exception) { operationError = T("Structure.CreateFailed"); }
         finally { busy = false; }
     }
 }

@@ -429,7 +429,7 @@ public sealed class EntryAdministrationComponentTests
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<Workspaces>();
 
-        Assert.AreEqual("/settings/organization/workspaces", rendered.Find("a.button-primary").GetAttribute("href"));
+        Assert.AreEqual("/settings/organization/structure", rendered.Find("a.button-primary").GetAttribute("href"));
     }
 
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];

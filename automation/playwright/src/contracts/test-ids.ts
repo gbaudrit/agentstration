@@ -483,6 +483,8 @@ export const TestIds = {
     save: 'parameter-save',
   },
   organizationWorkspaces: {
+    structure: 'organization-structure',
+    openCreate: 'workspace-create-open',
     createForm: 'workspace-create-form',
     displayName: 'workspace-display-name',
     technicalName: 'workspace-technical-name',

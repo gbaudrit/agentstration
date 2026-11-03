@@ -7,6 +7,39 @@ sidebar_position: 7
 
 This document is the consolidated description of the identity vertical implemented in Agentstration. It describes current behavior, not a target architecture. The normative decisions are ADR-0042 through ADR-0047 and ADR-0070.
 
+## Organization structure in the Console
+
+Open **Organization > Structure** (`/settings/organization/structure`). The former
+`/settings/organization/workspaces` route remains available. The global selector determines
+what is displayed:
+
+- **Instance**: ordinary Tenants, each with expandable business Workspaces. Platform
+  administrators can create a Tenant or create a Workspace under an explicit Tenant.
+- **Tenant**: the selected Tenant and its business Workspaces; Workspace creation requires
+  `workspaces/write` in the selected context.
+- **Workspace**: the current business Workspace beneath its parent Tenant. A permitted
+  Workspace creation uses that same parent and opens the created Workspace context when
+  the refreshed selector confirms access. Otherwise the current context is retained; creation
+  does not grant additional roles.
+
+Creation opens a side panel (stacked above the inventory on narrow screens). The parent
+is explicit and cannot be changed through an unrelated global selection. Technical names
+are generated from display names and can be edited before creation. Reserved topology
+names and duplicate technical names are rejected. Tenant creation provisions its protected
+operations Workspace through the existing topology lifecycle. System Tenants and operations
+Workspaces are excluded from this business inventory.
+
+The inventory uses `GET /api/identity/organization/structure`. Tenant creation uses
+`POST /api/identity/tenants` with `name` and `displayName`; explicit-parent Workspace creation
+uses `POST /api/identity/organization/workspaces` with `tenantId`, `name`, and `displayName`.
+The existing `POST /api/identity/workspaces` still creates under the current ordinary Tenant.
+Creation requires an interactive user and the applicable permission. Parent selection is validated at the application boundary: an ordinary Tenant/Workspace
+context cannot target another Tenant, even for a platform administrator. Navigation links
+carry the canonical `context` query parameter independently in each browser tab.
+The selected Tenant or Workspace replaces its opening action with a checked **Current
+context** indicator and a highlighted row. The parent Tenant is not marked as selected
+when the active context is a Workspace. Other accessible contexts retain their opening actions.
+
 ## Delivered scope
 
 Agentstration now provides:
@@ -332,7 +365,7 @@ The delivered UI includes:
 - `/logout` and `/access-denied`;
 - `/account/security`: password change and sign-out-other-sessions;
 - `/account/pat`: create, inspect and revoke Workspace-scoped personal access tokens;
-- `/settings/organization/workspaces`: Workspace administration;
+- `/settings/organization/structure`: context-aware Tenant and Workspace administration (`/settings/organization/workspaces` remains a compatibility route);
 - `/settings/organization/members`: local account creation, listing, enable/disable, and member navigation;
 - `/settings/organization/members/{principalId}`: Principal details, current Workspace role, membership removal, Platform administrator grant/revoke, and external identity link/unlink;
 - `/settings/organization/access`: effective assignments;
