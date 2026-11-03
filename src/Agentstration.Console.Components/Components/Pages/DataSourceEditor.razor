@@ -1,9 +1,10 @@
 @page "/data-sources/new"
 @page "/data-sources/{Name}"
-@implements IDisposable
+@implements IAsyncDisposable
 @inject IDataSourcesClient Client
 @inject IDataSourceProfilesClient Profiles
 @inject NavigationManager Navigation
+@inject TimeProvider Clock
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
 
@@ -15,6 +16,7 @@
 else
 {
     @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+    @if (operationsError is not null && (tab is Tab.Discovery or Tab.Acquisitions)) { <div class="form-alert form-alert-danger" role="alert" data-testid="data-source-operations-error">@operationsError</div> }
     @if (!IsNew && selectedScope is not null) { <InheritedResourceNotice OwnerScopeRef="selectedScope.Value" /> }
     @if (!IsNew) { <ResourceTabs Label="@T("DataSources")">@foreach (var value in Enum.GetValues<Tab>().Where(value => CanManage || value is not Tab.Access)) { <button type="button" role="tab" class="@(tab == value ? "active" : null)" @onclick="() => SelectTab(value)">@T(value.ToString())</button> }</ResourceTabs> }
     @if (tab == Tab.Overview && !IsNew)
@@ -46,11 +48,28 @@ else
         <section class="panel form-section" data-testid="data-source-acquisitions"><div class="panel-header"><div><p class="eyebrow">@T("Acquisitions")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || !parametersValid || readiness?.Ready != true || readiness?.Discovery is not null && string.IsNullOrWhiteSpace(selectedTarget))" @onclick="StartAsync">@T("StartAcquisition")</button></div>
         @if (readiness?.Discovery is not null) { <label class="form-field-wide"><span>@T("AcquisitionTarget")</span><select @bind="selectedTarget" data-testid="data-source-acquisition-target"><option value="">@T("SelectTarget")</option>@foreach (var item in targets.Where(value => value.Target.Enabled)) { <option value="@item.Target.Name" disabled="@item.Stale">@item.Target.DisplayName @(item.Stale ? $"· {T("Stale")}" : string.Empty)</option> }</select></label> }
         <div class="data-source-parameters" data-testid="data-source-acquisition-parameters"><span>@T("Parameters")</span><JsonSchemaInputEditor Schema="AcquisitionParametersSchema" Value="parameters" ValueChanged="value => parameters = value" ValidationChanged="state => parametersValid = state.IsValid" Disabled="busy" /><small>@T("ParametersHelp")</small></div>
-        @if (acquisitions.Count == 0) { <p class="muted">@T("NoAcquisitions")</p> } else { <DataGrid TItem="DataSourceAcquisitionResource" Items="acquisitions"><Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Version")</th></tr></Header><Row Context="item"><tr data-testid="data-source-acquisition-row"><td>@item.CreatedAt.ToLocalTime().ToString("g")</td><td><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" /></td><td><a class="text-button data-source-flow-run" href="/flow-runs/@Uri.EscapeDataString(item.FlowRunId)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td><td><code>@item.Composition.Profile.Version</code></td></tr></Row></DataGrid> }</section>
+        @if (acquisitions.Count == 0) { <p class="muted">@T("NoAcquisitions")</p> } else { <DataGrid TItem="DataSourceAcquisitionResource" Items="acquisitions"><Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Version")</th></tr></Header><Row Context="item"><tr data-testid="data-source-acquisition-row" data-state="@item.State"><td>@item.CreatedAt.ToLocalTime().ToString("g")</td><td><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" /></td><td><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td><td><code>@item.Composition.Profile.Version</code></td></tr></Row></DataGrid> }</section>
     }
     else if (tab == Tab.Discovery)
     {
-        <section class="panel form-section" data-testid="data-source-discovery"><div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("DiscoveryTargets")</h2><p>@T("DiscoveryHelp")</p></div><button class="button-primary" type="button" disabled="@(busy || readiness?.Discovery is null)" @onclick="StartDiscoveryAsync">@T("StartDiscovery")</button></div>
+        <section class="panel form-section data-source-discovery" data-testid="data-source-discovery">
+        <div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("DiscoveryTargets")</h2><p>@T("DiscoveryHelp")</p></div><div class="form-actions">
+            <button class="button-secondary" type="button" disabled="@(busy || refreshing)" data-testid="data-source-refresh-discovery" @onclick="RefreshOperationsAsync">@T("Refresh")</button>
+            <button class="button-primary" type="button" data-testid="data-source-start-discovery" disabled="@(busy || HasActiveDiscovery || readiness?.Discovery is null)" @onclick="StartDiscoveryAsync">@T("StartDiscovery")</button>
+        </div></div>
+        @if (readiness?.Discovery is { } discoveryFlow)
+        {
+            <a class="data-source-flow-card" href="@DiscoveryFlowUrl" data-testid="data-source-discovery-flow-link"><span class="data-source-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("DiscoveryFlowTitle")</small><strong>@discoveryFlow.Name</strong><code>@discoveryFlow.ScopeRef · @discoveryFlow.Namespace/@discoveryFlow.Version</code></span><UiIcon Name="arrow-right" /></a>
+        }
+        <section class="data-source-discovery-history" data-testid="data-source-discovery-history" aria-live="polite">
+            <h3>@T("DiscoveryHistory")</h3><p class="muted">@T("DiscoveryLiveUpdates")</p>
+            @if (discoveries.Count > 0)
+            {
+                <DataGrid TItem="DataSourceDiscoveryResource" Items="discoveries"><Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Version")</th></tr></Header>
+                    <Row Context="item"><tr data-testid="data-source-discovery-row" data-state="@item.State"><td data-label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</td><td data-label="@T("State")"><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@DiscoveryTone(item.State)" /></td><td data-label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td><td data-label="@T("Version")"><code>@item.Composition.Profile.Version</code></td></tr></Row>
+                </DataGrid>
+            }
+        </section>
         @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <DataGrid TItem="DataSourceDiscoveryChoice" Items="manifest.Choices"><Header><tr><th>@T("Choice")</th><th>@T("Parent")</th><th>@T("State")</th><th>@T("TargetName")</th></tr></Header><Row Context="choice"><tr data-testid="data-source-discovery-choice"><td><strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></td><td>@(choice.ParentId ?? "—")</td><td>@(choice.Eligible ? T("Eligible") : T("Ineligible"))</td><td><input value="@PromotionName(choice)" @oninput="args => promotionNames[choice.Id] = args.Value?.ToString() ?? string.Empty" aria-label="@T("TargetName")" /><button class="button-secondary" type="button" disabled="@(busy || !choice.Eligible || string.IsNullOrWhiteSpace(PromotionName(choice)) || targets.Any(value => value.Target.DiscoveryUid == LatestDiscovery.Uid && value.Target.ChoiceId == choice.Id))" @onclick="() => PromoteAsync(choice)">@T("Promote")</button></td></tr></Row></DataGrid> }
         @if (targets.Count > 0) { <h3>@T("AcquisitionTargets")</h3><DataGrid TItem="DataSourceAcquisitionTargetView" Items="targets"><Header><tr><th>@T("Name")</th><th>@T("Choice")</th><th>@T("State")</th></tr></Header><Row Context="item"><tr><td>@item.Target.DisplayName<br/><code>@item.Target.Name</code></td><td>@item.Target.ChoiceDisplayName</td><td><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></td></tr></Row></DataGrid> }</section>
     }
@@ -84,7 +103,10 @@ else
     private DataSourceResource? source;
     private DataSourceReadiness? readiness;
     private ResourceScopeRef? selectedScope;
-    private string? etag, error;
+    private string? etag, error, operationsError;
+    private Task polling = Task.CompletedTask;
+    private long operationVersion;
+    private bool refreshing, disposed;
     private string technicalName = string.Empty, displayName = string.Empty, sourceNamespace = "default", description = string.Empty, profileKey = string.Empty, rawYaml = string.Empty, selectedTarget = string.Empty;
     private JsonElement configuration = EmptyObject(), parameters = EmptyObject();
     private bool enabled = true, loading = true, busy, confirmDelete, configurationValid = true, parametersValid = true;
@@ -108,11 +130,82 @@ else
     private JsonElement? AcquisitionParametersSchema => JsonSchemaInputSchema.ObjectProperty(
         readiness?.Acquisition?.InputSchema, "parameters");
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private bool HasActiveDiscovery => discoveries.Any(item => IsActive(item.State));
+    private bool HasActiveOperation => HasActiveDiscovery || acquisitions.Any(item => item.State is
+        DataSourceAcquisitionState.Pending or DataSourceAcquisitionState.Running or DataSourceAcquisitionState.WaitingForInput or DataSourceAcquisitionState.WaitingForChild);
+    private string? DiscoveryFlowUrl
+    {
+        get
+        {
+            if (readiness?.Discovery is not { } flow) return null;
+            var path = flow.Namespace.IsDefault ? $"/flows/{Uri.EscapeDataString(flow.Name)}"
+                : $"/namespaces/{Uri.EscapeDataString(flow.Namespace.Value)}/flows/{Uri.EscapeDataString(flow.Name)}";
+            var scope = flow.ScopeRef ?? readiness.Profile?.ScopeRef ?? selectedScope;
+            return $"{path}?scopeRef={Uri.EscapeDataString(scope!.Value.Value)}&context={Uri.EscapeDataString(CurrentConsoleScope.Value)}";
+        }
+    }
+    private ResourceScopeRef CurrentConsoleScope => ResourceOwnershipContext.TryGetCurrent(Services) ?? selectedScope!.Value;
+    private string FlowRunUrl(string runId, ResourceScopeRef? executionScope, ResourceScopeRef? logicalScope) =>
+        $"/flow-runs/{Uri.EscapeDataString(runId)}?scopeRef={Uri.EscapeDataString((executionScope ?? CurrentConsoleScope).Value)}&context={Uri.EscapeDataString((logicalScope ?? CurrentConsoleScope).Value)}";
+    protected override void OnInitialized() => polling = PollOperationsAsync();
+    private async Task PollOperationsAsync()
+    {
+        var token = cancellation.Token;
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2), Clock);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                if (token.IsCancellationRequested) break;
+                await InvokeAsync(async () =>
+                {
+                    if (disposed || loading || busy || !HasActiveOperation) return;
+                    await RefreshOperationsAsync();
+                    if (!disposed) StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+    private async Task RefreshOperationsAsync()
+    {
+        if (refreshing || source is null || selectedScope is null || disposed) return;
+        refreshing = true;
+        var version = operationVersion;
+        var resource = source;
+        var ownerScope = selectedScope.Value;
+        var hasDiscovery = readiness?.Discovery is not null;
+        try
+        {
+            var refreshedAcquisitions = await Client.GetAcquisitionsAsync(resource.Namespace, resource.Name, ownerScope, cancellation.Token);
+            IReadOnlyList<DataSourceDiscoveryResource> refreshedDiscoveries = [];
+            IReadOnlyList<DataSourceAcquisitionTargetView> refreshedTargets = [];
+            if (hasDiscovery)
+            {
+                refreshedDiscoveries = await Client.GetDiscoveriesAsync(resource.Namespace, resource.Name, ownerScope, cancellation.Token);
+                // Synchronize discovery before evaluating target staleness.
+                refreshedTargets = await Client.GetAcquisitionTargetsAsync(resource.Namespace, resource.Name, ownerScope, cancellation.Token);
+            }
+            if (disposed || version != operationVersion) return;
+            acquisitions = refreshedAcquisitions.OrderByDescending(item => item.CreatedAt).ToArray();
+            discoveries = refreshedDiscoveries.OrderByDescending(item => item.CreatedAt).ToArray();
+            targets = refreshedTargets;
+            operationsError = null;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or OperationCanceledException or JsonException)
+        {
+            if (!disposed && version == operationVersion) operationsError = T("OperationalRefreshFailed");
+        }
+        finally { refreshing = false; }
+    }
     protected override Task OnParametersSetAsync() => LoadAsync();
     private async Task LoadAsync()
     {
+        operationVersion++;
         loading = true;
         error = null;
+        operationsError = null;
         readiness = null;
         acquisitions = [];
         discoveries = [];
@@ -158,9 +251,43 @@ else
     private void LoadForm() { technicalName = source!.Name; displayName = source.Definition.DisplayName; sourceNamespace = source.Namespace.Value; description = source.Definition.Description ?? string.Empty; enabled = source.Definition.Enabled; configuration = source.Definition.Configuration.Clone(); var profile = profiles.FirstOrDefault(value => value.Name == source.Definition.Profile.Name && (source.Definition.Profile.Namespace ?? source.Namespace) == value.Namespace && (source.Definition.Profile.ScopeRef is null || source.Definition.Profile.ScopeRef == value.ScopeRef)); profileKey = profile is not null ? ProfileKey(profile) : source.Definition.Profile.ScopeRef is { } profileScope ? $"{profileScope.Value}|{(source.Definition.Profile.Namespace ?? source.Namespace).Value}|{source.Definition.Profile.Name}" : string.Empty; rawYaml = ResourceManifestSerializer.ToYaml(new RawSource { ApiVersion = source.ApiVersion, Kind = source.Kind, Metadata = source.Metadata, ScopeRef = source.ScopeRef, Definition = source.Definition }); }
     private DataSourceProperties Definition() { var profile = ParseProfile(profileKey); return new() { DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Enabled = enabled, Profile = new(profile.Name, profile.Scope, profile.Namespace), Configuration = configuration.Clone() }; }
     private async Task SaveAsync() { busy = true; error = null; try { if (IsNew) { if (selectedScope is null) throw new InvalidOperationException(T("Scope")); var saved = await Client.CreateAsync(new(technicalName.Trim(), Definition(), sourceNamespace.Trim(), selectedScope), cancellation.Token); Navigation.NavigateTo(Url(saved.Value)); } else { var saved = await Client.UpdateAsync(source!.Namespace, source.Name, selectedScope!.Value, new(Definition()), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; LoadForm(); readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); } } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private async Task StartAsync() { if (!parametersValid) return; busy = true; error = null; try { await Client.StartAcquisitionAsync(source!.Namespace, source.Name, selectedScope!.Value, new() { Parameters = parameters.Clone(), DataSourceScopeRef = selectedScope, TargetName = string.IsNullOrWhiteSpace(selectedTarget) ? null : selectedTarget }, cancellation.Token); acquisitions = (await Client.GetAcquisitionsAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token)).OrderByDescending(value => value.CreatedAt).ToArray(); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private async Task StartDiscoveryAsync() { busy = true; error = null; try { await Client.StartDiscoveryAsync(source!.Namespace, source.Name, selectedScope!.Value, new() { DataSourceScopeRef = selectedScope }, cancellation.Token); discoveries = (await Client.GetDiscoveriesAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token)).OrderByDescending(value => value.CreatedAt).ToArray(); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private async Task PromoteAsync(DataSourceDiscoveryChoice choice) { busy = true; error = null; try { var name = PromotionName(choice); await Client.PromoteTargetAsync(source!.Namespace, LatestDiscovery!.Name, new(name, choice.Id, choice.DisplayName, choice.Description), cancellation.Token); targets = await Client.GetAcquisitionTargetsAsync(source.Namespace, source.Name, selectedScope!.Value, cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
+    private async Task StartAsync()
+    {
+        if (!parametersValid) return;
+        operationVersion++;
+        busy = true;
+        error = null;
+        operationsError = null;
+        try
+        {
+            var started = await Client.StartAcquisitionAsync(source!.Namespace, source.Name, selectedScope!.Value,
+                new() { Parameters = parameters.Clone(), DataSourceScopeRef = selectedScope,
+                    TargetName = string.IsNullOrWhiteSpace(selectedTarget) ? null : selectedTarget }, cancellation.Token);
+            acquisitions = acquisitions.Where(item => item.Uid != started.Value.Uid).Prepend(started.Value)
+                .OrderByDescending(item => item.CreatedAt).ToArray();
+            await RefreshOperationsAsync();
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+    private async Task StartDiscoveryAsync()
+    {
+        busy = true;
+        error = null;
+        operationsError = null;
+        operationVersion++;
+        try
+        {
+            var started = await Client.StartDiscoveryAsync(source!.Namespace, source.Name, selectedScope!.Value,
+                new() { DataSourceScopeRef = selectedScope }, cancellation.Token);
+            discoveries = discoveries.Where(item => item.Uid != started.Value.Uid).Prepend(started.Value)
+                .OrderByDescending(item => item.CreatedAt).ToArray();
+            await RefreshOperationsAsync();
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+    private async Task PromoteAsync(DataSourceDiscoveryChoice choice) { operationVersion++; busy = true; error = null; try { var name = PromotionName(choice); await Client.PromoteTargetAsync(source!.Namespace, LatestDiscovery!.Name, new(name, choice.Id, choice.DisplayName, choice.Description), cancellation.Token); targets = await Client.GetAcquisitionTargetsAsync(source.Namespace, source.Name, selectedScope!.Value, cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
     private string PromotionName(DataSourceDiscoveryChoice choice) { if (promotionNames.TryGetValue(choice.Id, out var value)) return value; value = string.Concat(choice.Id.ToLowerInvariant().Select(character => char.IsLetterOrDigit(character) || character is '.' or '-' or '_' ? character : '-')).Trim('-'); if (value.Length > 128) value = value[..128]; promotionNames[choice.Id] = value; return value; }
     private async Task SaveYamlAsync() { busy = true; error = null; try { var raw = ResourceManifestSerializer.FromYaml<RawSource>(rawYaml); if (raw.Metadata.Name != source!.Name || raw.Metadata.Namespace != source.Namespace || raw.ScopeRef != source.ScopeRef) throw new ArgumentException(T("IdentityImmutable")); var saved = await Client.UpdateAsync(source.Namespace, source.Name, selectedScope!.Value, new(raw.Definition), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; LoadForm(); readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
     private async Task DeleteAsync() { confirmDelete = false; await Client.DeleteAsync(source!.Namespace, source.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/data-sources"); }
@@ -175,5 +302,21 @@ else
     private static JsonElement EmptyObject() => JsonSerializer.SerializeToElement(new { });
     private sealed record RawSource { public required string ApiVersion { get; init; } public required string Kind { get; init; } public required ResourceMetadata Metadata { get; init; } public ResourceScopeRef? ScopeRef { get; init; } public required DataSourceProperties Definition { get; init; } }
     private enum Tab { Overview, Definition, Discovery, Acquisitions, Access, Yaml }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private static bool IsActive(DataSourceDiscoveryState state) => state is DataSourceDiscoveryState.Pending
+        or DataSourceDiscoveryState.Running or DataSourceDiscoveryState.WaitingForInput or DataSourceDiscoveryState.WaitingForChild;
+    private static UiStatus DiscoveryTone(DataSourceDiscoveryState state) => state switch
+    {
+        DataSourceDiscoveryState.Succeeded => UiStatus.Success,
+        DataSourceDiscoveryState.Failed or DataSourceDiscoveryState.TimedOut => UiStatus.Danger,
+        DataSourceDiscoveryState.Cancelled => UiStatus.Warning,
+        _ => UiStatus.Info
+    };
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed) return;
+        disposed = true;
+        await cancellation.CancelAsync();
+        await polling;
+        cancellation.Dispose();
+    }
 }

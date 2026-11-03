@@ -54,4 +54,8 @@
   <data name="Access"><value>Access</value></data>
   <data name="ManagedReadOnly"><value>Managed · read-only</value></data><data name="Editable"><value>Editable</value></data><data name="ManagedProfileHelp"><value>This profile and its published revisions are controlled by the extension installation and cannot be changed directly.</value></data><data name="ManagingExtension"><value>Managing extension</value></data>
   <data name="OperationalLoadFailed" xml:space="preserve"><value>The Data Source definition is loaded, but its operational status or history could not be loaded. Reload the page to retry.</value></data>
+  <data name="DiscoveryFlowTitle" xml:space="preserve"><value>Discovery Flow</value></data>
+  <data name="DiscoveryHistory" xml:space="preserve"><value>Discovery history</value></data>
+  <data name="DiscoveryLiveUpdates" xml:space="preserve"><value>Execution status and discovered choices update automatically while a run is active.</value></data>
+  <data name="OperationalRefreshFailed" xml:space="preserve"><value>Unable to refresh execution status. Displayed results have been retained. Use Refresh to retry.</value></data>
 </root>

@@ -54,4 +54,8 @@
   <data name="Access"><value>Accès</value></data>
   <data name="ManagedReadOnly"><value>Géré · lecture seule</value></data><data name="Editable"><value>Modifiable</value></data><data name="ManagedProfileHelp"><value>Ce profil et ses révisions publiées sont contrôlés par l’installation de l’extension et ne peuvent pas être modifiés directement.</value></data><data name="ManagingExtension"><value>Extension gestionnaire</value></data>
   <data name="OperationalLoadFailed" xml:space="preserve"><value>La définition de la source de données est chargée, mais son état opérationnel ou son historique n’a pas pu être chargé. Rechargez la page pour réessayer.</value></data>
+  <data name="DiscoveryFlowTitle" xml:space="preserve"><value>Flow de découverte</value></data>
+  <data name="DiscoveryHistory" xml:space="preserve"><value>Historique des découvertes</value></data>
+  <data name="DiscoveryLiveUpdates" xml:space="preserve"><value>L’état des exécutions et les choix découverts sont actualisés automatiquement pendant une exécution active.</value></data>
+  <data name="OperationalRefreshFailed" xml:space="preserve"><value>Impossible d’actualiser l’état des exécutions. Les résultats affichés ont été conservés. Utilisez Actualiser pour réessayer.</value></data>
 </root>

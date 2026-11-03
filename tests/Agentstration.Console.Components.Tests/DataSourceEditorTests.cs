@@ -20,6 +20,7 @@ public sealed class DataSourceEditorTests
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
@@ -75,6 +76,7 @@ public sealed class DataSourceEditorTests
         var client = new SourceClientStub();
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(client);
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
@@ -96,6 +98,7 @@ public sealed class DataSourceEditorTests
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(targeted: true));
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
@@ -118,6 +121,7 @@ public sealed class DataSourceEditorTests
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(historyFails: true));
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
@@ -138,6 +142,7 @@ public sealed class DataSourceEditorTests
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub(omitProfile: true));
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
@@ -149,6 +154,161 @@ public sealed class DataSourceEditorTests
                 rendered.Find("[data-testid=data-source-profile] option[selected]").GetAttribute("value"));
             Assert.AreEqual("https://docs.agentstration.io", rendered.Find("[data-schema-path='$.url'] input").GetAttribute("value"));
         });
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Pending", "Running", "Succeeded")]
+    [DataRow("fr-FR", "En attente", "En cours", "Réussie")]
+    public async Task DiscoveryRefreshesStatesChoicesAndTargetsWithoutNavigation(
+        string cultureName, string pending, string running, string succeeded)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var clock = new ManualTimeProvider();
+        var client = new SourceClientStub(targeted: true) { DiscoveryHistory = [] };
+        await using var context = DiscoveryContext(client, clock);
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row]").TextContent, pending);
+            Assert.IsTrue(rendered.Find("[data-testid=data-source-start-discovery]").HasAttribute("disabled"));
+            StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-flow-link]").GetAttribute("href")!, "/flows/discover?scopeRef=");
+            var runLink = rendered.Find("[data-testid=data-source-discovery-row] a").GetAttribute("href")!;
+            StringAssert.Contains(runLink, "scopeRef=" + Uri.EscapeDataString(Scope.Value));
+            StringAssert.Contains(runLink, "context=" + Uri.EscapeDataString(ResourceScopeRef.Instance.Value));
+        });
+
+        rendered.FindAll("[role=tab]").Single(value => value.TextContent == (cultureName == "fr-FR" ? "Définition" : "Definition")).Click();
+        rendered.Find("[data-schema-path='$.url'] input").Input("https://edited.example.test");
+        client.DiscoveryHistory = [client.AcceptedDiscovery with { State = DataSourceDiscoveryState.Running }];
+        await rendered.InvokeAsync(clock.Tick);
+        rendered.WaitForAssertion(() => Assert.AreEqual("https://edited.example.test",
+            rendered.Find("[data-schema-path='$.url'] input").GetAttribute("value")));
+        rendered.FindAll("[role=tab]").Single(value => value.TextContent == (cultureName == "fr-FR" ? "Découverte" : "Discovery")).Click();
+        rendered.WaitForAssertion(() => StringAssert.Contains(
+            rendered.Find("[data-testid=data-source-discovery-row]").TextContent, running));
+
+        client.DiscoveryHistory = [Discovery with { LogicalScopeRef = ResourceScopeRef.Instance }];
+        client.TargetStale = false;
+        await rendered.InvokeAsync(clock.Tick);
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row]").TextContent, succeeded);
+            Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-choice]"));
+            Assert.IsFalse(rendered.Find("[data-testid=data-source-start-discovery]").HasAttribute("disabled"));
+            Assert.DoesNotContain(cultureName == "fr-FR" ? "Obsolète" : "Stale", rendered.Markup);
+        });
+        var reads = client.DiscoveryReads;
+        await rendered.InvokeAsync(clock.Tick);
+        Assert.AreEqual(reads, client.DiscoveryReads, "Terminal operations must stop network polling.");
+        await rendered.InvokeAsync(async () => await rendered.Instance.DisposeAsync());
+        rendered.WaitForAssertion(() => Assert.IsTrue(clock.TimerDisposed));
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Unable to refresh execution status.", "Failed")]
+    [DataRow("fr-FR", "Impossible d’actualiser l’état des exécutions.", "Échec")]
+    public async Task DiscoveryRefreshRetriesAfterFailureAndRetainsExecutionLinks(
+        string cultureName, string expectedError, string failed)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var clock = new ManualTimeProvider();
+        var client = new SourceClientStub(targeted: true) { DiscoveryHistory = [] };
+        await using var context = DiscoveryContext(client, clock);
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
+        rendered.WaitForElement("[data-testid=data-source-discovery-row][data-state=Pending]");
+
+        client.DiscoveryReadFails = true;
+        await rendered.InvokeAsync(clock.Tick);
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[data-testid=data-source-operations-error]").TextContent, expectedError);
+            Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-row][data-state=Pending]"));
+        });
+        client.DiscoveryReadFails = false;
+        client.DiscoveryHistory = [client.AcceptedDiscovery with { State = DataSourceDiscoveryState.Failed }];
+        await rendered.InvokeAsync(clock.Tick);
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-operations-error]"));
+            StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row]").TextContent, failed);
+            StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row] a").GetAttribute("href")!, "/flow-runs/flowrun-discovery?");
+        });
+    }
+
+    [TestMethod]
+    public async Task LeavingDiscoveryCancelsAnActiveRefresh()
+    {
+        var clock = new ManualTimeProvider();
+        var client = new SourceClientStub(targeted: true) { DiscoveryHistory = [] };
+        await using var context = DiscoveryContext(client, clock);
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
+        rendered.WaitForElement("[data-testid=data-source-discovery-row][data-state=Pending]");
+        client.DeferredDiscoveryRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await rendered.InvokeAsync(clock.Tick);
+        rendered.WaitForAssertion(() => Assert.IsTrue(client.ReadingDeferredDiscovery));
+        await rendered.InvokeAsync(async () => await rendered.Instance.DisposeAsync());
+        rendered.WaitForAssertion(() => Assert.IsTrue(clock.TimerDisposed));
+        var reads = client.DiscoveryReads;
+        clock.Tick();
+        Assert.AreEqual(reads, client.DiscoveryReads);
+    }
+
+    [TestMethod]
+    public async Task OldRefreshDoesNotReplaceDiscoveryAfterNavigation()
+    {
+        var clock = new ManualTimeProvider();
+        var client = new SourceClientStub(targeted: true) { DiscoveryHistory = [] };
+        await using var context = DiscoveryContext(client, clock);
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
+        rendered.WaitForElement("[data-testid=data-source-discovery-row][data-state=Pending]");
+        var oldRead = new TaskCompletionSource<IReadOnlyList<DataSourceDiscoveryResource>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.DeferredDiscoveryRead = oldRead;
+        await rendered.InvokeAsync(clock.Tick);
+        rendered.WaitForAssertion(() => Assert.IsTrue(client.ReadingDeferredDiscovery));
+        client.DiscoveryHistory = [Discovery with { FlowRunId = "new-page-run" }];
+        rendered.Render(parameters => parameters.Add(component => component.Name, "other-source"));
+        rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row]").TextContent, "new-page-run"));
+        var renders = rendered.RenderCount;
+        oldRead.SetResult([client.AcceptedDiscovery]);
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsTrue(rendered.RenderCount > renders);
+            StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row]").TextContent, "new-page-run");
+        });
+    }
+
+    private static BunitContext DiscoveryContext(SourceClientStub client, TimeProvider clock)
+    {
+        var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(clock);
+        context.Services.AddSingleton<IDataSourcesClient>(client);
+        context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=discovery");
+        return context;
+    }
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private ManualTimer? timer;
+        public bool TimerDisposed => timer?.Disposed == true;
+        public void Tick() => timer?.Tick();
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+            => timer = new ManualTimer(callback, state);
+
+        private sealed class ManualTimer(TimerCallback callback, object? state) : ITimer
+        {
+            public bool Disposed { get; private set; }
+            public void Tick() { if (!Disposed) callback(state); }
+            public bool Change(TimeSpan dueTime, TimeSpan period) => !Disposed;
+            public void Dispose() => Disposed = true;
+            public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
+        }
     }
 
     private static DataSourceProfileProperties ProfileProperties => new()
@@ -247,8 +407,19 @@ public sealed class DataSourceEditorTests
     private sealed class SourceClientStub(bool targeted = false, bool historyFails = false) : IDataSourcesClient
     {
         public StartDataSourceAcquisitionRequest? StartedRequest { get; private set; }
+        public IReadOnlyList<DataSourceDiscoveryResource> DiscoveryHistory { get; set; } = [Discovery];
+        public DataSourceDiscoveryResource AcceptedDiscovery { get; } = Discovery with
+        {
+            State = DataSourceDiscoveryState.Pending, Manifest = null, CompletedAt = null,
+            LogicalScopeRef = ResourceScopeRef.Instance
+        };
+        public bool DiscoveryReadFails { get; set; }
+        public int DiscoveryReads { get; private set; }
+        public TaskCompletionSource<IReadOnlyList<DataSourceDiscoveryResource>>? DeferredDiscoveryRead { get; set; }
+        public bool ReadingDeferredDiscovery { get; private set; }
+        public bool TargetStale { get; set; } = true;
         public Task<IReadOnlyList<DataSourceResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceResource>>([Source]);
-        public Task<ResourceSnapshot<DataSourceResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new ResourceSnapshot<DataSourceResource>(Source, "\"etag\""));
+        public Task<ResourceSnapshot<DataSourceResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new ResourceSnapshot<DataSourceResource>(Source with { Metadata = Source.Metadata with { Name = name } }, "\"etag\""));
         public Task<DataSourceReadiness> GetReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new DataSourceReadiness(true, true, ResolvedProfile, [],
             new ResolvedDataSourceFlowBinding("data-source-web-acquisition-builtin", ResourceNamespace.Default,
                 "1.0.1", false, AcquisitionInputSchema, null, DataSourceFlowContracts.Acquisition,
@@ -266,8 +437,24 @@ public sealed class DataSourceEditorTests
             StartedRequest = request;
             return Task.FromResult(new ResourceSnapshot<DataSourceAcquisitionResource>(Acquisition, "\"acquisition-etag\""));
         }
-        public Task<IReadOnlyList<DataSourceDiscoveryResource>> GetDiscoveriesAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceDiscoveryResource>>([Discovery]);
-        public Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>([new(Target, true, ["New discovery"])]);
+        public async Task<IReadOnlyList<DataSourceDiscoveryResource>> GetDiscoveriesAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default)
+        {
+            DiscoveryReads++;
+            if (DiscoveryReadFails) throw new AgentstrationApiException("unavailable", "test");
+            if (DeferredDiscoveryRead is { } deferred)
+            {
+                DeferredDiscoveryRead = null;
+                ReadingDeferredDiscovery = true;
+                return await deferred.Task.WaitAsync(cancellationToken);
+            }
+            return DiscoveryHistory;
+        }
+        public Task<ResourceSnapshot<DataSourceDiscoveryResource>> StartDiscoveryAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, StartDataSourceDiscoveryRequest request, CancellationToken cancellationToken = default)
+        {
+            DiscoveryHistory = [AcceptedDiscovery];
+            return Task.FromResult(new ResourceSnapshot<DataSourceDiscoveryResource>(AcceptedDiscovery, "\"discovery-etag\""));
+        }
+        public Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>([new(Target, TargetStale, TargetStale ? ["New discovery"] : [])]);
     }
 
     private static DataSourceDiscoveryResource Discovery => new()
