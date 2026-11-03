@@ -20,6 +20,8 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class PostgreSqlStorageProfileTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     [TestMethod]
     public void ResourceManagementMigrationsMatchCurrentModel()
     {
@@ -72,6 +74,7 @@ public sealed class PostgreSqlStorageProfileTests
         using var client = host.CreateClient();
         using var response = await client.GetAsync("/health/ready");
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        await AssertRuntimeRunVersionAsync(host.Services, tenantId, workspaceId, exerciseWorkplace);
         await AssertRuntimeWorkerRegistrationAsync(host.Services);
         if (exerciseWorkplace)
         {
@@ -81,6 +84,44 @@ public sealed class PostgreSqlStorageProfileTests
             await AssertScopeReadAuthorizationAsync(host.Services, tenantId, workspaceId);
         }
         else await AssertScopedSecretsAfterRestartAsync(host.Services, tenantId, workspaceId);
+    }
+
+    private static async Task AssertRuntimeRunVersionAsync(IServiceProvider services, Guid tenantId, Guid workspaceId, bool create)
+    {
+        var store = services.GetRequiredService<IRuntimeRunStore>();
+        var scope = RuntimeRunScope.Workspace(tenantId, new(workspaceId), Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"));
+        const string runId = "canonical-api-version";
+        if (create)
+        {
+            var created = await store.CreateAsync(new RuntimeRun
+            {
+                WorkspaceId = scope.WorkspaceId,
+                Scope = scope,
+                Id = runId,
+                Name = runId,
+                Properties = new()
+                {
+                    Agent = new("test-agent", 1),
+                    Input = new() { Messages = [new(RuntimeMessageRole.User, "version test")] },
+                    Execution = new(),
+                    Scope = scope
+                },
+                Status = new() { CreatedAt = DateTimeOffset.UtcNow }
+            }, default);
+            Assert.AreEqual("agentstration.io/v1", created.Value.ApiVersion);
+            var updated = await store.UpdateAsync(created.Value with
+            {
+                Status = created.Value.Status with { State = RuntimeRunState.Cancelled }
+            }, created.ETag, default);
+            Assert.AreEqual("agentstration.io/v1", updated.Value.ApiVersion);
+        }
+
+        var restored = await store.GetExactAsync(scope.ScopeRef, runId, default);
+        Assert.IsNotNull(restored);
+        Assert.AreEqual("agentstration.io/v1", restored.Value.ApiVersion);
+        Assert.AreEqual(RuntimeRunState.Cancelled, restored.Value.Status.State);
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(restored.Value, JsonOptions));
+        Assert.AreEqual("agentstration.io/v1", document.RootElement.GetProperty("apiVersion").GetString());
     }
 
     private static async Task AssertRuntimeWorkerRegistrationAsync(IServiceProvider services)

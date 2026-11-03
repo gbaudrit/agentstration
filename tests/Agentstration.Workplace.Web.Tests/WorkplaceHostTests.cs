@@ -379,7 +379,7 @@ public sealed class WorkplaceHostTests
             id,
             id,
             WorkResourceTypes.Entries,
-            WorkplaceApiVersions.CoreV1,
+            ResourceApiVersions.CoreV1,
             displayName,
             $"Description for {displayName}",
             new EntryPresentation { Placeholder = placeholder, Icon = "sparkle" },
