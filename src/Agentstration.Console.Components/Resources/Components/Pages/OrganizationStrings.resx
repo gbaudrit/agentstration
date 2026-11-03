@@ -152,7 +152,7 @@
 <data name="FirstTenant.Description"><value>Add a Tenant, then create its Workspaces.</value></data>
 <data name="NoStructureResults"><value>No matching Tenant or Workspace.</value></data>
 <data name="OpenTenant"><value>Open Tenant</value></data>
-<data name="OpenWorkspace"><value>Open</value></data>
+<data name="OpenWorkspace"><value>Open Workspace</value></data>
 <data name="NoTenantWorkspaces"><value>This Tenant has no business Workspaces.</value></data>
 <data name="Structure.ParentHelp"><value>A Workspace always belongs to a Tenant.</value></data>
 <data name="ParentInstance"><value>PARENT INSTANCE</value></data>
@@ -167,6 +167,6 @@
 <data name="Structure.InvalidIdentity"><value>Check the names and parent. Technical names require 2–64 letters, digits or hyphens; reserved names are unavailable.</value></data>
 <data name="Structure.PermissionDenied"><value>You are not authorized to create this resource in the selected parent.</value></data>
 <data name="Structure.CreateFailed"><value>Creation failed. Refresh the structure before trying again.</value></data>
-<data name="Structure.UnsavedTitle"><value>Unsaved creation</value></data>
-<data name="Structure.UnsavedMessage"><value>Create this resource or cancel before leaving.</value></data>
+<data name="OpenTenant.Named"><value>Open Tenant {0}</value></data>
+<data name="OpenWorkspace.Named"><value>Open Workspace {0}</value></data>
 </root>

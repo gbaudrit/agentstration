@@ -152,7 +152,7 @@
 <data name="FirstTenant.Description"><value>Ajoutez un tenant, puis créez ses espaces de travail.</value></data>
 <data name="NoStructureResults"><value>Aucun tenant ou espace de travail correspondant.</value></data>
 <data name="OpenTenant"><value>Ouvrir le tenant</value></data>
-<data name="OpenWorkspace"><value>Ouvrir</value></data>
+<data name="OpenWorkspace"><value>Ouvrir l’espace</value></data>
 <data name="NoTenantWorkspaces"><value>Ce tenant ne contient aucun espace de travail métier.</value></data>
 <data name="Structure.ParentHelp"><value>Un espace de travail appartient toujours à un tenant.</value></data>
 <data name="ParentInstance"><value>INSTANCE PARENTE</value></data>
@@ -167,6 +167,6 @@
 <data name="Structure.InvalidIdentity"><value>Vérifiez les noms et le parent. Le nom technique doit contenir entre 2 et 64 lettres, chiffres ou tirets ; les noms réservés sont indisponibles.</value></data>
 <data name="Structure.PermissionDenied"><value>Vous n’êtes pas autorisé à créer cette ressource dans le parent sélectionné.</value></data>
 <data name="Structure.CreateFailed"><value>La création a échoué. Actualisez la structure avant de réessayer.</value></data>
-<data name="Structure.UnsavedTitle"><value>Création non enregistrée</value></data>
-<data name="Structure.UnsavedMessage"><value>Créez cette ressource ou annulez avant de quitter.</value></data>
+<data name="OpenTenant.Named"><value>Ouvrir le tenant {0}</value></data>
+<data name="OpenWorkspace.Named"><value>Ouvrir l’espace de travail {0}</value></data>
 </root>

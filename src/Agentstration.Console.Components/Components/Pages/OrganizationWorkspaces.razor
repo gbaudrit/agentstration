@@ -48,7 +48,7 @@ else if (structure is not null)
                             <StatusBadge Text="@T($"Status.{tenant.Status}")" Status="@(tenant.Status == TenantStatus.Active ? UiStatus.Success : UiStatus.Neutral)" />
                             @if (ContextState.Current?.SelectedKind != ConsoleContextKind.Workspace && CanOpenTenant(tenant.Id))
                             {
-                                <a class="scope-link" href="@ContextUrl($"/tenants/{tenant.Id:D}")">@T("OpenTenant")</a>
+                                <a class="scope-link" href="@ContextUrl($"/tenants/{tenant.Id:D}")" aria-label="@T("OpenTenant.Named", tenant.DisplayName)"><UiIcon Name="building" /><span>@T("OpenTenant")</span><span class="scope-link-arrow"><UiIcon Name="arrow-right" /></span></a>
                             }
                             @if (entry.CanCreateWorkspace)
                             {
@@ -69,7 +69,7 @@ else if (structure is not null)
                                         }
                                         @if (workspace.Status == WorkspaceStatus.Active && CanOpen(workspace.Id))
                                         {
-                                            <a class="scope-link" href="@ContextUrl($"/workspaces/{workspace.Id:D}")">@T("OpenWorkspace") <span aria-hidden="true">→</span></a>
+                                            <a class="scope-link" href="@ContextUrl($"/workspaces/{workspace.Id:D}")" aria-label="@T("OpenWorkspace.Named", workspace.DisplayName)"><UiIcon Name="layout-grid" /><span>@T("OpenWorkspace")</span><span class="scope-link-arrow"><UiIcon Name="arrow-right" /></span></a>
                                         }
                                     </div>
                                 }
@@ -89,7 +89,6 @@ else if (structure is not null)
             <aside class="panel creation-panel" aria-labelledby="creation-heading" @onkeydown="HandleKeyDown" data-testid="workspace-create-form" data-interactive="@(interactive ? "true" : "false")">
                 <h2 id="creation-heading" tabindex="-1" @ref="creationHeading">@T(parent is null ? "CreateTenant" : "CreateWorkspace")</h2>
                 <div class="parent-context"><span>@T(parent is null ? "ParentInstance" : "ParentTenant")</span><strong>@(parent?.Tenant.DisplayName ?? T("Instance"))</strong>@if (parent is not null) { <small>@parent.Tenant.Name</small> }</div>
-                <UnsavedChangesBar IsVisible="@(!string.IsNullOrWhiteSpace(displayName) || !string.IsNullOrWhiteSpace(technicalName))" Title="@T("Structure.UnsavedTitle")" Message="@T("Structure.UnsavedMessage")" />
                 <form @onsubmit="CreateAsync" @onsubmit:preventDefault>
                     <fieldset disabled="@busy">
                         <div class="creation-fields">

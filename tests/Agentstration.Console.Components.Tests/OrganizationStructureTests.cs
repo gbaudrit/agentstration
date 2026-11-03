@@ -28,6 +28,7 @@ public sealed class OrganizationStructureTests
         rendered.Find("[data-testid='workspace-display-name']").Input("Production");
         rendered.Find("[data-testid='workspace-technical-name']").Input("production");
         Assert.IsFalse(rendered.Find("[data-testid='workspace-create']").HasAttribute("disabled"));
+        Assert.HasCount(0, rendered.FindAll(".unsaved-changes-bar"));
         rendered.Find("form").Submit();
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
         Assert.IsNotNull(handler.Created);

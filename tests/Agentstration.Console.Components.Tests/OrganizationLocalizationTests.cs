@@ -36,6 +36,9 @@ public sealed class OrganizationLocalizationTests
             StringAssert.Contains(rendered.Markup, "/settings/organization/structure");
             Assert.AreEqual("Créer un tenant", strings["CreateTenant"].Value);
             Assert.AreEqual("TENANT PARENT", strings["ParentTenant"].Value);
+            Assert.AreEqual("Ouvrir l’espace", strings["OpenWorkspace"].Value);
+            Assert.AreEqual("Ouvrir le tenant Acme", strings["OpenTenant.Named", "Acme"].Value);
+            Assert.AreEqual("Ouvrir l’espace de travail Production", strings["OpenWorkspace.Named", "Production"].Value);
             StringAssert.Contains(rendered.Markup, "Audit de sécurité");
         }
         finally
