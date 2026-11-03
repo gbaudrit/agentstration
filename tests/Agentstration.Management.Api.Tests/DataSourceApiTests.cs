@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -9,8 +10,10 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -491,7 +494,12 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
     [DataRow(ResourceScopeKind.Tenant)]
     public async Task DiscoveryPromotesExplicitTargetsAndRediscoveryMakesThemStale(ResourceScopeKind scopeKind)
     {
-        await using var factory = Factory();
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IToolExecutionPipeline>();
+            services.AddSingleton<RecordingFlowToolPipeline>();
+            services.AddSingleton<IToolExecutionPipeline>(provider => provider.GetRequiredService<RecordingFlowToolPipeline>());
+        }));
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var context = await GetBootstrapContextAsync(factory);
         var workspace = scopeKind switch
@@ -502,7 +510,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         };
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
-            await CreatePublishedAcquisitionFlowAsync(factory.Services, context, "target-acquire", workspace);
+            await CreatePublishedAcquisitionFlowAsync(factory.Services, context, "target-acquire", workspace, routed: true);
             await CreatePublishedDiscoveryFlowAsync(factory.Services, context, "target-discover", workspace);
             var profiles = factory.Services.GetRequiredService<DataSourceProfileService>();
             var sources = factory.Services.GetRequiredService<DataSourceManagementService>();
@@ -559,6 +567,27 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var flow = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{accepted.FlowRunId}");
         Assert.IsNotNull(flow);
         Assert.AreEqual(workspace, flow.Scope.LogicalScopeRef);
+        for (var attempt = 0; attempt < 200 && accepted.State is DataSourceAcquisitionState.Pending
+                 or DataSourceAcquisitionState.Running or DataSourceAcquisitionState.WaitingForChild; attempt++)
+        {
+            await Task.Delay(50);
+            accepted = await client.GetFromJsonAsync<DataSourceAcquisitionResource>($"/api/datasourceacquisitions/{accepted.Name}")
+                ?? throw new AssertFailedException("The acquisition response must exist.");
+        }
+        Assert.AreEqual(DataSourceAcquisitionState.Succeeded, accepted.State, $"{accepted.ErrorCode}: {accepted.ErrorMessage}");
+        var pipeline = factory.Services.GetRequiredService<RecordingFlowToolPipeline>();
+        var invocation = pipeline.Invocations.Single();
+        Assert.AreEqual(new WorkspaceId(executionWorkspace), invocation.Context.WorkspaceId);
+        Assert.AreEqual(context.PrincipalId, invocation.Context.PrincipalId);
+        Assert.AreEqual(workspace, invocation.Context.ToolScopeRef);
+        Assert.AreEqual(executionWorkspace, invocation.Request.WorkspaceId);
+        Assert.AreEqual(scopeKind switch
+        {
+            ResourceScopeKind.Instance => ControlPlaneAccessMode.Instance,
+            ResourceScopeKind.Tenant => ControlPlaneAccessMode.TenantAdministration,
+            _ => ControlPlaneAccessMode.Workspace
+        }, invocation.Mode);
+
 
         if (scopeKind != ResourceScopeKind.Workspace)
         {
@@ -675,7 +704,8 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         IResourceStore store,
         ResourceScopeRef scope,
         string name,
-        ToolProviderResource provider) => store.PutExactAsync(scope, new ToolResource
+        ToolProviderResource provider,
+        ToolSchema? schema = null) => store.PutExactAsync(scope, new ToolResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.Tool,
@@ -687,6 +717,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
                 DisplayName = name,
                 Provider = new(provider.Name, provider.ScopeRef, provider.Namespace),
                 ExternalId = name,
+                Schema = schema,
                 Discovery = new()
                 {
                     Available = true,
@@ -700,7 +731,8 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         IServiceProvider services,
         RequestContext context,
         string name,
-        ResourceScopeRef? ownerScope = null)
+        ResourceScopeRef? ownerScope = null,
+        bool routed = false)
     {
         var inputSchema = JsonSerializer.SerializeToElement(new
         {
@@ -733,6 +765,26 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var output = JsonSerializer.SerializeToElement(new { artifacts = Array.Empty<object>() });
         var flows = services.GetRequiredService<FlowService>();
         var scope = ownerScope ?? ResourceScopeRef.Workspace(context.WorkspaceId);
+        if (routed)
+        {
+            var store = services.GetRequiredService<IResourceStore>();
+            var provider = await PutProviderAsync(store, scope, "route-provider");
+            _ = await PutToolAsync(store, scope, "route-fetch", provider.Value,
+                new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } }) });
+            _ = await services.GetRequiredService<ToolSetService>().CreateAsync(new ToolSetResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolSet,
+                Metadata = new() { Name = "route-tools" },
+                ScopeRef = scope,
+                Definition = new()
+                {
+                    DisplayName = "Routed acquisition Tools", Version = "1.0.0", Publish = true,
+                    Members = [new() { Tool = new("route-fetch", scope), Capability = "source.fetch", Route = "fetch" }]
+                }
+            }, default);
+        }
+
         await flows.CreateExactAsync(scope, new CreateFlowCommand(
             name, null, "1.0.0", true,
             GraphOnlyDefinition(),
@@ -745,9 +797,12 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
                 Steps =
                 [
                     new InputFlowStepDefinition { Name = "input", Schema = inputSchema },
+                    .. (routed ? new FlowStepDefinition[] { new ToolRouteFlowStepDefinition { Name = "fetch", ToolSet = new("route-tools", "1.0.0", ScopeRef: scope), Capability = "source.fetch", Route = "fetch", ArgumentsMapping = JsonSerializer.SerializeToElement(new { }) } } : []),
                     new OutputFlowStepDefinition { Name = "output", OutputMapping = output }
                 ],
-                Transitions = [new("input-output", "input", "completed", "output")]
+                Transitions = routed
+                    ? [new("input-fetch", "input", "completed", "fetch"), new("fetch-output", "fetch", "success", "output")]
+                    : [new("input-output", "input", "completed", "output")]
             }), ResourceNamespace.Default, default);
         await flows.PublishVersionExactAsync(scope, new(name), "1.0.0", true, default);
     }
@@ -800,4 +855,14 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             }), ResourceNamespace.Default, default);
         await flows.PublishVersionExactAsync(scope, new(name), "1.0.0", true, default);
     }
+    private sealed class RecordingFlowToolPipeline(ICurrentRequestContext requestContext) : IToolExecutionPipeline
+    {
+        public ConcurrentQueue<(ToolExecutionContext Context, RequestContext Request, ControlPlaneAccessMode Mode)> Invocations { get; } = new();
+        public ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            Invocations.Enqueue((context, requestContext.Current, requestContext.AccessMode));
+            return ValueTask.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new { artifacts = Array.Empty<object>() }));
+        }
+    }
+
 }

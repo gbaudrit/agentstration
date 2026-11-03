@@ -376,8 +376,19 @@ public sealed class RuntimeWorkerOperationGateway(
             _ => throw new RuntimeExecutionMaterialException("execution_scope_invalid", "The execution scope is invalid.")
         };
 
-    private IDisposable EnterScope(FlowRunScope scope) =>
-        EnterScope(scope.AccessScopeRef, scope.TenantId, scope.PrincipalId);
+    private IDisposable EnterScope(FlowRunScope scope)
+    {
+        var operational = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
+        return scope.AccessScopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => requestScopes.PushInstance(operational),
+            ResourceScopeKind.Tenant when scope.AccessScopeRef.TargetId == scope.TenantId =>
+                requestScopes.PushTenantAdministration(operational),
+            ResourceScopeKind.Workspace when scope.AccessScopeRef.TargetId == scope.WorkspaceId.Value =>
+                requestScopes.Push(operational),
+            _ => throw new RuntimeExecutionMaterialException("execution_scope_invalid", "The execution scope is invalid.")
+        };
+    }
 
     private sealed record ArtifactState(Guid ArtifactId, string Name, ArtifactReference Reference);
 }

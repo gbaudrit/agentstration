@@ -1,3 +1,6 @@
+using Agentstration.Flows;
+using Agentstration.Identity;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.ModelProviders;
@@ -90,6 +93,39 @@ public sealed class RuntimeWorkerOperationGatewayTests
         Assert.AreEqual("OK", Assert.IsInstanceOfType<RuntimeGovernedModelText>(response.Contents.Single()).Text);
         Assert.AreEqual(ResourceScopeRef.Instance, resolver.RequestedScope);
         Assert.AreEqual(ControlPlaneAccessMode.Unavailable, scopes.AccessMode);
+    }
+
+    [TestMethod]
+    [DataRow(ResourceScopeKind.Instance, ControlPlaneAccessMode.Instance)]
+    [DataRow(ResourceScopeKind.Tenant, ControlPlaneAccessMode.TenantAdministration)]
+    [DataRow(ResourceScopeKind.Workspace, ControlPlaneAccessMode.Workspace)]
+    public void FlowExecutionPreservesLogicalAndOperationalContextsAndRestoresWorkerScope(
+        ResourceScopeKind kind, ControlPlaneAccessMode expectedMode)
+    {
+        var context = new CurrentRequestContext();
+        var scope = new FlowRunScope(Guid.NewGuid(), new WorkspaceId(Guid.NewGuid()), Guid.NewGuid());
+        scope = scope with
+        {
+            LogicalScopeRef = kind switch
+            {
+                ResourceScopeKind.Instance => ResourceScopeRef.Instance,
+                ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(scope.TenantId),
+                _ => ResourceScopeRef.Workspace(scope.WorkspaceId.Value)
+            }
+        };
+        var execution = new WorkspaceFlowRunExecutionScope(null!, null!, null!, context);
+        using var worker = context.PushSystem();
+        using (execution.Enter(scope))
+        {
+            Assert.AreEqual(expectedMode, context.AccessMode);
+            Assert.AreEqual(scope.WorkspaceId.Value, context.Current.WorkspaceId);
+            Assert.AreEqual(scope.TenantId, context.Current.TenantId);
+            Assert.AreEqual(scope.PrincipalId, context.Current.PrincipalId);
+            Assert.AreEqual(scope, execution.Current);
+        }
+        Assert.AreEqual(ControlPlaneAccessMode.System, context.AccessMode);
+        Assert.IsNull(execution.Current);
+        Assert.ThrowsExactly<InvalidOperationException>(() => { _ = context.Current; });
     }
 
     private static RuntimeExecutionAgentMaterial Agent() => new(
