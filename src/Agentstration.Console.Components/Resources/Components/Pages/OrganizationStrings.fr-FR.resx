@@ -31,6 +31,7 @@
 <data name="Status"><value>Statut</value></data>
 <data name="Context"><value>Contexte</value></data>
 <data name="Current"><value>Actuel</value></data>
+<data name="CurrentContext"><value>Contexte actuel</value></data>
 <data name="SecurityAudit.Description"><value>Consultez les changements de sécurité récents dans l’instance.</value></data>
 <data name="LoadingSecurityEvents"><value>Chargement des événements de sécurité…</value></data>
 <data name="PlatformAdminRequired"><value>Administration de la plateforme requise</value></data>

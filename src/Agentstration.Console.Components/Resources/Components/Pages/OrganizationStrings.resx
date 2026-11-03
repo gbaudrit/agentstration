@@ -31,6 +31,7 @@
 <data name="Status"><value>Status</value></data>
 <data name="Context"><value>Context</value></data>
 <data name="Current"><value>Current</value></data>
+<data name="CurrentContext"><value>Current context</value></data>
 <data name="SecurityAudit.Description"><value>Review recent security-sensitive changes across the instance.</value></data>
 <data name="LoadingSecurityEvents"><value>Loading security events…</value></data>
 <data name="PlatformAdminRequired"><value>Platform administrator required</value></data>

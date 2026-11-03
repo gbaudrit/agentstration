@@ -36,6 +36,9 @@ The existing `POST /api/identity/workspaces` still creates under the current ord
 Creation requires an interactive user and the applicable permission. Parent selection is validated at the application boundary: an ordinary Tenant/Workspace
 context cannot target another Tenant, even for a platform administrator. Navigation links
 carry the canonical `context` query parameter independently in each browser tab.
+The selected Tenant or Workspace replaces its opening action with a checked **Current
+context** indicator and a highlighted row. The parent Tenant is not marked as selected
+when the active context is a Workspace. Other accessible contexts retain their opening actions.
 
 ## Delivered scope
 

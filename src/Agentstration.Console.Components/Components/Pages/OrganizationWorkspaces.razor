@@ -41,12 +41,17 @@ else if (structure is not null)
                 @foreach (var entry in VisibleTenants)
                 {
                     var tenant = entry.Tenant;
+                    var currentTenant = IsCurrentTenant(tenant.Id);
                     var expanded = !collapsed.Contains(tenant.Id) || !string.IsNullOrWhiteSpace(search);
                     <article class="tenant-group" @key="tenant.Id" data-testid="tenant-row" data-tenant-id="@tenant.Id" data-tenant-name="@tenant.Name">
-                        <div class="tenant-heading">
+                        <div class="tenant-heading @(currentTenant ? "is-current" : null)">
                             <button class="tenant-toggle" aria-expanded="@expanded" aria-controls="@($"tenant-{tenant.Id:D}")" @onclick="() => Toggle(tenant.Id)"><span aria-hidden="true">@(expanded ? "▾" : "▸")</span><span><strong>@tenant.DisplayName</strong><small>@tenant.Name</small></span></button>
                             <StatusBadge Text="@T($"Status.{tenant.Status}")" Status="@(tenant.Status == TenantStatus.Active ? UiStatus.Success : UiStatus.Neutral)" />
-                            @if (ContextState.Current?.SelectedKind != ConsoleContextKind.Workspace && CanOpenTenant(tenant.Id))
+                            @if (currentTenant)
+                            {
+                                <span class="current-context" aria-current="true"><UiIcon Name="check" />@T("CurrentContext")</span>
+                            }
+                            else if (ContextState.Current?.SelectedKind != ConsoleContextKind.Workspace && CanOpenTenant(tenant.Id))
                             {
                                 <a class="scope-link" href="@ContextUrl($"/tenants/{tenant.Id:D}")" aria-label="@T("OpenTenant.Named", tenant.DisplayName)"><UiIcon Name="building" /><span>@T("OpenTenant")</span><span class="scope-link-arrow"><UiIcon Name="arrow-right" /></span></a>
                             }
@@ -60,14 +65,15 @@ else if (structure is not null)
                             <div class="workspace-list" id="@($"tenant-{tenant.Id:D}")">
                                 @foreach (var workspace in FilterWorkspaces(entry))
                                 {
-                                    <div class="workspace-row" data-testid="workspace-row" data-workspace-id="@workspace.Id" data-workspace-name="@workspace.Name">
+                                    var currentWorkspace = IsCurrentWorkspace(workspace.Id);
+                                    <div class="workspace-row @(currentWorkspace ? "is-current" : null)" data-testid="workspace-row" data-workspace-id="@workspace.Id" data-workspace-name="@workspace.Name">
                                         <div class="workspace-identity"><strong>@workspace.DisplayName</strong><small>@workspace.Name</small></div>
                                         <StatusBadge Text="@T($"Status.{workspace.Status}")" Status="@(workspace.Status == WorkspaceStatus.Active ? UiStatus.Success : UiStatus.Neutral)" />
-                                        @if (workspace.Id == ContextState.Current?.WorkspaceId && ContextState.Current.SelectedKind == ConsoleContextKind.Workspace)
+                                        @if (currentWorkspace)
                                         {
-                                            <StatusBadge Text="@T("Current")" Status="UiStatus.Info" />
+                                            <span class="current-context" aria-current="true"><UiIcon Name="check" />@T("CurrentContext")</span>
                                         }
-                                        @if (workspace.Status == WorkspaceStatus.Active && CanOpen(workspace.Id))
+                                        else if (workspace.Status == WorkspaceStatus.Active && CanOpen(workspace.Id))
                                         {
                                             <a class="scope-link" href="@ContextUrl($"/workspaces/{workspace.Id:D}")" aria-label="@T("OpenWorkspace.Named", workspace.DisplayName)"><UiIcon Name="layout-grid" /><span>@T("OpenWorkspace")</span><span class="scope-link-arrow"><UiIcon Name="arrow-right" /></span></a>
                                         }
@@ -102,7 +108,7 @@ else if (structure is not null)
             </aside>
         }
     </div>
-    @if (!string.IsNullOrWhiteSpace(successMessage)) { <p role="status">@successMessage</p> }
+    @if (!string.IsNullOrWhiteSpace(successMessage)) { <p class="structure-success" role="status"><UiIcon Name="check" />@successMessage</p> }
 }
 </div>
 
@@ -141,6 +147,8 @@ else if (structure is not null)
     private IEnumerable<Workspace> FilterWorkspaces(OrganizationTenantResponse entry) => Matches(entry.Tenant.DisplayName, entry.Tenant.Name) ? entry.Workspaces : entry.Workspaces.Where(workspace => Matches(workspace.DisplayName, workspace.Name));
     private bool CanOpenTenant(Guid tenantId) => ContextState.Current?.Contexts.Any(option => option.Kind == ConsoleContextKind.Tenant && option.TenantId == tenantId) == true;
     private bool CanOpen(Guid workspaceId) => ContextState.Current?.Contexts.Any(option => option.WorkspaceId == workspaceId) == true;
+    private bool IsCurrentTenant(Guid tenantId) => ContextState.Current is { SelectedKind: ConsoleContextKind.Tenant } current && current.TenantId == tenantId;
+    private bool IsCurrentWorkspace(Guid workspaceId) => ContextState.Current is { SelectedKind: ConsoleContextKind.Workspace } current && current.WorkspaceId == workspaceId;
     private static string ContextUrl(string scope) => $"/settings/organization/structure?context={Uri.EscapeDataString(scope)}";
 
     protected override async Task OnInitializedAsync()

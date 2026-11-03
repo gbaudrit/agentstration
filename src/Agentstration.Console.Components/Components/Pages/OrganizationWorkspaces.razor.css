@@ -19,10 +19,15 @@ strong { overflow-wrap:anywhere; }
 .workspace-row { padding:16px 14px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
 .workspace-row:last-child { border-bottom:0; }
 .workspace-identity { flex:1; min-width:120px; }
+.is-current { background:color-mix(in srgb,var(--primary) 5%,var(--surface)); box-shadow:inset 3px 0 var(--primary); }
+.current-context { display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border-radius:8px; color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--surface)); font-size:.8rem; font-weight:650; line-height:1.4; }
+.current-context ::deep .ui-icon,.structure-success ::deep .ui-icon { width:16px; height:16px; flex:none; }
+.structure-success { display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); font-size:.88rem; line-height:1.6; }
+.structure-success ::deep .ui-icon { color:var(--primary); }
 .scope-link { display:inline-flex; align-items:center; gap:8px; box-sizing:border-box; max-width:100%; min-height:38px; padding:7px 10px; border:1px solid color-mix(in srgb,var(--primary) 18%,var(--border)); border-radius:9px; background:color-mix(in srgb,var(--primary) 6%,var(--surface)); color:var(--primary); font-size:.8rem; font-weight:650; line-height:1.4; text-decoration:none; transition:background .16s ease,border-color .16s ease,box-shadow .16s ease; }
 .scope-link:hover { background:color-mix(in srgb,var(--primary) 12%,var(--surface)); border-color:color-mix(in srgb,var(--primary) 40%,var(--border)); box-shadow:0 2px 5px color-mix(in srgb,var(--primary) 9%,transparent); }
 .scope-link ::deep .ui-icon { width:16px; height:16px; flex:none; }
-.scope-link-arrow { display:inline-flex; align-items:center; justify-content:center; width:23px; height:23px; flex:none; margin-left:2px; border-radius:6px; background:color-mix(in srgb,var(--primary) 9%,transparent); transition:transform .16s ease; }
+.scope-link-arrow { display:inline-flex; align-items:center; justify-content:center; width:23px; height:23px; flex:none; margin-left:2px; transition:transform .16s ease; }
 .scope-link:hover .scope-link-arrow { transform:translateX(2px); }
 @media(prefers-reduced-motion:reduce) { .scope-link,.scope-link-arrow { transition:none; } .scope-link:hover .scope-link-arrow { transform:none; } }
 .structure-empty { padding:24px 16px; color:var(--muted); line-height:1.6; }
