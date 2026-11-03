@@ -20,6 +20,16 @@ dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Rele
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
 
+### SQLite connection pooling regression
+
+`SqliteConnectionPoolTests` in `Agentstration.Management.Storage.Tests` exercises concurrent pooled opens with active readers. Sixteen dedicated workers check that live logical connections retain distinct native handles and independent query results across 500 alternating cold and warm waves. The test uses its own temporary database, has a bounded execution time, and clears only that database's pool between cold waves and during cleanup. Its test output records the loaded managed driver and native SQLite versions.
+
+The central `Microsoft.Data.Sqlite.Core` pin includes the upstream pooled-connection ownership correction from 10.0.13 independently of the EF Core version. Keep the SQLitePCLRaw bundle compatible with the driver. For a focused check after the Release build:
+
+```powershell
+dotnet test --project tests/Agentstration.Management.Storage.Tests --configuration Release --no-build --filter FullyQualifiedName~SqliteConnectionPoolTests --minimum-expected-tests 1
+```
+
 ## Functional coverage
 
 CI collects managed-code coverage from the required Fast and Integration inventory on two balanced runners while the uninstrumented functional lanes remain in `build-and-test`. The raw shard reports are merged into one consolidated result after both runners complete. Performance workloads, live-provider scenarios, test assemblies, generated sources, and files outside product `src` directories are excluded. Coverage is initially report-only: collection or report-generation failures fail CI, but the measured percentage does not.
