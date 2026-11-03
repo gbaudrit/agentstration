@@ -277,7 +277,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task PlatformAdministratorCanManageProviderNeutralExternalIdentityLinks()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var administrator = UnredirectedClient(factory);
         await BootstrapAsync(administrator, "external-identity-admin");
         var context = await administrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
@@ -430,7 +430,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task SecurityAuditRecordsSensitiveOperationsAndRequiresPlatformAdministrator()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var administrator = UnredirectedClient(factory);
         using var memberBrowser = UnredirectedClient(factory);
 

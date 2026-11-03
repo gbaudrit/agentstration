@@ -196,6 +196,11 @@
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Resources/">
+    <Project Path="tests/Agentstration.ResourceManagement.Tests/Agentstration.ResourceManagement.Tests.csproj" />
+    <Project Path="tests/Agentstration.Schemas.Tests/Agentstration.Schemas.Tests.csproj" />
+    <Project Path="tests/Agentstration.Secrets.Tests/Agentstration.Secrets.Tests.csproj" />
+    <Project Path="tests/Agentstration.Infrastructure.Tests/Agentstration.Infrastructure.Tests.csproj" />
+
     <Project Path="tests/Agentstration.ResourcePlanning.Tests/Agentstration.ResourcePlanning.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />

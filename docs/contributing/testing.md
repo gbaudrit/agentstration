@@ -7,7 +7,7 @@ Agentstration separates test execution by runtime cost and dependency type. The 
 Fast tests do not start an ASP.NET Core host, open a relational database, spawn a child process, or contact a remote provider. They cover architecture rules, component behavior, mapping, validation, and in-process command behavior.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 365 --max-parallel-test-modules 4
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4
 ```
 
 ## Integration lane
@@ -15,7 +15,7 @@ dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --n
 Integration tests exercise a real boundary such as `WebApplicationFactory`, SQLite, Git, persistent Identity, or runtime reconstruction. This lane remains deterministic and offline by default. Tests marked `Integration` for a live model provider are opt-in and report inconclusive unless their documented environment variables are supplied.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 524 --max-parallel-test-modules 2
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 947 --max-parallel-test-modules 2
 ```
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
@@ -78,6 +78,10 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.ArchitectureTests` | Fast | Assembly dependency rules |
 | `Agentstration.Console.Client.Tests` | Fast | HTTP and SignalR mappings, pagination, errors, retries, and credential forwarding without an authoritative server |
 | `Agentstration.Console.Components.Tests` | Fast | Console Razor behavior, presentation state, permissions, localization, and static assets with mocked clients |
+| `Agentstration.ResourceManagement.Tests` | Fast | Resource access policies and descendant-use rules with in-memory ports |
+| `Agentstration.Schemas.Tests` | Fast | Schema format selection and capability validation |
+| `Agentstration.Secrets.Tests` | Fast | Secret capability authorization, expiry and single-use redemption with fakes |
+| `Agentstration.Infrastructure.Tests` | Fast | Internal date/time tools and HTTP fetch validation with a fake handler |
 | `Agentstration.Tools.Tests` | Fast | Pure tool validation and in-memory use cases |
 | `Agentstration.Tools.SourceRegistry.Tests` | Fast | In-process CLI and manifest validation |
 | `Agentstration.Web.Components.Tests` | Fast | bUnit component behavior |
@@ -109,3 +113,24 @@ Coverage emits one assembly-named TRX per module. Collection and publication che
 Coverage jobs restore/build only their test solution graphs (plus Fast on shard A), avoiding unrelated executable and browser-fixture builds. AEP tests move to shard B based on retained collection timings (A/B: 600/321 seconds in run 41668461593). Hosted diagnostics use two isolated runners to remove the serial dependency between Management API and other modules, preserving all uninstrumented memory budgets and one worker per assembly. The unused Sources diagnostic build is removed. Build-artifact reuse is deliberately deferred: targeted builds preserve parallel startup without introducing transfer or absolute-path dependencies.
 
 Compare candidate workflow runs with the retained baseline runs 41668461593, 41646766981 and 41498304716 (17m30, 20m and 17m40 elapsed respectively). Retain source SHA, runner/runtime, job and step durations, test totals, coverage, diagnostic memory, complete elapsed time and total runner minutes. These historical runs use different revisions; they establish costs, not a controlled percentage improvement. Candidate measurements are required before claiming a speedup.
+
+## Management fixture boundaries and profiling
+
+The required inventory remains 1,724 cases: Fast now contains 777 and Integration 947 (including 11 optional cases in the reviewed baseline). Twenty-four boundary-free cases moved from Management API/Security into ResourceManagement, Schemas, Secrets and Infrastructure test projects. Their existing test names are retained. Coverage follows these inventories automatically and now expects 30 module reports.
+
+Management API retains real HTTP, MCP transport, hosted provisioning and AWP execution tests. Eleven service-only cases instead use `ManagementServiceFixture`: the production application registrations with hosted services disabled, private non-pooled SQLite stores and deterministic bootstrap. It starts no ASP.NET Core server, background scheduler or Worker, and disposes only its own provider/files. It deliberately retains real persistence, scope authorization, provisioning and the real artifact backend; those cases remain Integration tests. No host or mutable database is shared between tests.
+
+`SecurityApiTests.Factory` defaults to the existing API-only composition. Tests rendering login/bootstrap/logout, account/PAT/profile, organization or audit pages explicitly request `fullHost: true` and keep their cookie/antiforgery checks. The role/PAT matrix asserts exact statuses and endpoint-specific Problem Details or response properties. Artifact leases are successfully read before expiry, denied exactly at the controlled deadline and denied independently after revocation, without wall-clock sleeps.
+
+Set `AGENTSTRATION_TEST_HOST_METRICS` to a private output directory to collect one JSONL record per completed Management API/Security host. CI includes these files with hosted diagnostics. Records contain startup duration (the factory's `CreateHost` call), active duration (ready until stopping), shutdown-signal duration (stopping until stopped), process peak memory, runtime and OS. The shutdown signal excludes subsequent provider/file disposal; the complete module duration includes test execution and disposal. No requests, credentials or resource contents are retained. Service fixtures do not emit HTTP-host records. Keep the existing one-worker and memory limits when comparing runs; separate host-count reduction from relocation of already host-free tests.
+
+The local comparison for #981 used Debian 13 x64, SDK 10.0.300, test runtime .NET 10.0.8, one class worker and one module at a time. The baseline is `cdb9999` with the same opt-in instrumentation before fixture changes. The candidate preserves all 215 logical test names; 24 deliberately change test assembly when moved to Fast. No concurrent build or functional suite ran during either measurement.
+
+| Module | Tests before → after | HTTP hosts before → after | Module duration before → after | Peak working set before → after |
+| --- | ---: | ---: | ---: | ---: |
+| Management API | 141 → 127 | 116 → 105 | 380.656 → 358.062 s | 2471.7 → 2329.0 MiB |
+| Management Security | 74 → 64 | 37 → 37 | 148.336 → 143.611 s | 1516.2 → 1298.4 MiB |
+
+API host startup summed to 262.246 → 234.186 s; Security startup summed to 62.068 → 59.402 s. These are single-run observations, not a speed guarantee. The diagnostic wrapper's runtime field describes PowerShell; the host records identify the actual test runtime. Full disposal is included in module elapsed time but is not isolated by the host shutdown signal. Both modules remain above their warning thresholds and below unchanged failure limits. Pure-test relocation removes no host starts by itself.
+
+Negative controls deliberately changed an authorized Model Provider operation to return an unexpected 404, and disabled valid Artifact lease recognition. The matrix and pre-expiry read each failed, then passed after restoring the source and rebuilding. Neither mutation is part of the change.

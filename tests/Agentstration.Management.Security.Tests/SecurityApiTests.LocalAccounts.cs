@@ -19,7 +19,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task LocalAuthenticationPagesBootstrapAndLoginWithAntiforgery()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
@@ -102,7 +102,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task LogoutAndAccessDeniedPagesAreAvailableAtTheAuthenticationBoundary()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
@@ -120,7 +120,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task LocalAccountCanChangePasswordAndOtherSessionsAreInvalidated()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var currentBrowser = UnredirectedClient(factory);
         using var otherBrowser = UnredirectedClient(factory);
         await BootstrapAsync(currentBrowser, "security-user");
@@ -178,7 +178,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task LocalAccountCanSignOutOtherSessionsWithoutEndingCurrentSession()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var currentBrowser = UnredirectedClient(factory);
         using var otherBrowser = UnredirectedClient(factory);
         await BootstrapAsync(currentBrowser, "session-user");
@@ -282,7 +282,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task PlatformAdministratorCanOpenMembersFromTenantContext()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var client = UnredirectedClient(factory);
         await BootstrapAsync(client, "tenant-members-admin");
 

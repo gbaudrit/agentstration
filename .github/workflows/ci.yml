@@ -144,11 +144,11 @@ jobs:
         if: needs.changes.outputs.dotnet == 'true'
         shell: pwsh
         run: |
-          dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 365 --max-parallel-test-modules 4
+          dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4
           if ($LASTEXITCODE -ne 0) {
             throw 'Fast functional lane failed.'
           }
-          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 524 --max-parallel-test-modules 2
+          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 947 --max-parallel-test-modules 2
           if ($LASTEXITCODE -ne 0) {
             throw 'Integration functional lane failed.'
           }
@@ -208,6 +208,8 @@ jobs:
             }
           }
       - name: Capture hosted module diagnostics
+        env:
+          AGENTSTRATION_TEST_HOST_METRICS: ${{ github.workspace }}/artifacts/test-diagnostics/hosts
         shell: pwsh
         run: |
           @(
@@ -218,9 +220,9 @@ jobs:
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
             @{ Name = 'Agentstration.Api.Tests'; Tests = 211; Warning = 2048; Failure = 2432 },
-            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 108; Warning = 1920; Failure = 2560 },
+            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 127; Warning = 1920; Failure = 2560 },
             @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 31; Warning = 500; Failure = 700 },
-            @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 63; Warning = 1280; Failure = 1664 },
+            @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 64; Warning = 1280; Failure = 1664 },
             @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 29; Warning = 832; Failure = 1024 }
           )
           $modules = @($modules | Where-Object { ($_.Name -eq 'Agentstration.Management.Api.Tests') -eq ('${{ matrix.group }}' -eq 'management-api') })
@@ -237,7 +239,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: hosted-test-module-diagnostics-${{ matrix.group }}
-          path: artifacts/test-diagnostics/*.json
+          path: |
+            artifacts/test-diagnostics/*.json
+            artifacts/test-diagnostics/hosts/*.jsonl
           if-no-files-found: warn
 
   functional-coverage:
