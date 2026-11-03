@@ -20,12 +20,6 @@ dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Rele
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
 
-### SQLite connection ownership
-
-The centrally pinned `Microsoft.Data.Sqlite.Core` 10.0.13 includes Microsoft's [pooled connection ownership fix](https://github.com/dotnet/efcore/pull/39012). Earlier versions could lend one native connection to concurrent owners, producing intermittent failures while registering or removing functions and collations. Keep the explicit pin until the EF Core dependency already selects a version with that correction.
-
-`SqlitePoolOwnershipTests` exercises concurrent pooled opens while readers remain active and checks that every owner holds a distinct native handle. It clears only its own database pool between waves, so it does not interrupt other tests' connections.
-
 ## Functional coverage
 
 CI collects managed-code coverage from the required Fast and Integration inventory on two balanced runners while the uninstrumented functional lanes remain in `build-and-test`. The raw shard reports are merged into one consolidated result after both runners complete. Performance workloads, live-provider scenarios, test assemblies, generated sources, and files outside product `src` directories are excluded. Coverage is initially report-only: collection or report-generation failures fail CI, but the measured percentage does not.
