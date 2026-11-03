@@ -35,13 +35,14 @@ public static partial class ToolInputSchemaValidator
         if (schema.ValueKind != JsonValueKind.Object)
             throw Error("tool_input_schema_invalid", path, "The Tool input schema must contain JSON objects.");
 
+        var types = ReadTypes(schema, path);
         if (schema.TryGetProperty("enum", out var allowed) && allowed.ValueKind == JsonValueKind.Array
             && !allowed.EnumerateArray().Any(item => JsonElement.DeepEquals(item, value)))
             throw Error("tool_argument_enum_invalid", path, $"Value at '{path}' is not one of the allowed values.");
 
-        var type = Text(schema, "type") ?? (schema.TryGetProperty("properties", out _) ? "object" : null);
-        if (type is not null && !Matches(value, type))
-            throw Error("tool_argument_type_invalid", path, $"Value at '{path}' does not match schema type '{type}'.");
+        var type = types?.FirstOrDefault(candidate => Matches(value, candidate));
+        if (types is not null && type is null)
+            throw Error("tool_argument_type_invalid", path, $"Value at '{path}' does not match schema type '{string.Join(" or ", types)}'.");
 
         switch (type)
         {
@@ -147,6 +148,33 @@ public static partial class ToolInputSchemaValidator
             throw Error("tool_argument_maximum_length", path, $"Value at '{path}' must contain at most {max} {unit}.");
     }
 
+    private static IReadOnlyList<string>? ReadTypes(JsonElement schema, string path)
+    {
+        if (!schema.TryGetProperty("type", out var declaration))
+            return schema.TryGetProperty("properties", out _) ? ["object"] : null;
+
+        if (declaration.ValueKind == JsonValueKind.String && IsType(declaration.GetString()))
+            return [declaration.GetString()!];
+
+        if (declaration.ValueKind == JsonValueKind.Array && declaration.GetArrayLength() > 0)
+        {
+            var types = new List<string>();
+            foreach (var item in declaration.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String || !IsType(item.GetString()) || types.Contains(item.GetString()!))
+                    throw InvalidType(path);
+                types.Add(item.GetString()!);
+            }
+            return types;
+        }
+
+        throw InvalidType(path);
+    }
+
+    private static bool IsType(string? type) => type is "object" or "array" or "string" or "integer" or "number" or "boolean" or "null";
+    private static ToolInputValidationException InvalidType(string path) => Error("tool_input_schema_invalid", path,
+        $"The Tool input type at '{path}' must be a supported type name or a non-empty array of distinct supported type names.");
+
     private static bool Matches(JsonElement value, string type) => type switch
     {
         "object" => value.ValueKind == JsonValueKind.Object,
@@ -156,7 +184,7 @@ public static partial class ToolInputSchemaValidator
         "number" => value.ValueKind == JsonValueKind.Number,
         "boolean" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
         "null" => value.ValueKind == JsonValueKind.Null,
-        _ => true
+        _ => false
     };
 
     private static string PropertyPath(string path, string property) => $"{path}.{property}";
