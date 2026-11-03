@@ -10,6 +10,19 @@ npm run test:smoke
 
 The smoke gate runs three Chromium projects: the desktop suite, focused responsive checks at a mobile viewport, and the independent `en-US`/`fr-FR` locale contract. Every product test also fails on unhandled page errors, actionable console errors, first-party request failures, or a visible fatal Blazor state. CI publishes the Playwright diagnostics and typed application-surface coverage report on every run.
 
+To reuse Release outputs locally, finish these builds from the repository root before starting the browser suite:
+
+```powershell
+dotnet build Agentstration.slnx --configuration Release
+dotnet build automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj --configuration Release
+dotnet build automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj --configuration Release
+$env:AGENTSTRATION_PLAYWRIGHT_NO_BUILD = 'true'
+cd automation/playwright
+npm run test:smoke
+```
+
+Keep build outputs unchanged until every browser host has stopped, including when running component tests in another terminal. Rebuilding a referenced Razor library can change fingerprinted CSS bundles while a host still serves the previous static-asset manifest. Rebuild the hosts together before restarting validation. The page-health guard reports failed first-party stylesheet and script responses directly, including HTTP 404 responses that may otherwise look like unrelated layout failures.
+
 To use Playwright UI against an already-running instance:
 
 ```powershell
