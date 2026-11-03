@@ -2,7 +2,7 @@
 
 ## Versions
 
-The protocol version is `2026-09-22`. Protocol, SDK, extension, and consuming-product versions are independent.
+The protocol version is `agentstration.io/v1`. Protocol, SDK, extension, and consuming-product versions are independent.
 
 ## Discovery
 
@@ -16,7 +16,7 @@ The response is an `AepManifest` containing `protocolVersion`, extension identit
 
 ```json
 {
-  "protocolVersion": "2026-09-22",
+  "protocolVersion": "agentstration.io/v1",
   "extension": { "id": "sample.hello", "name": "Hello", "version": "1.0.0" },
   "capabilities": {
     "aep.health": { "version": "1.0", "endpoint": "/aep/health" }

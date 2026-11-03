@@ -81,6 +81,7 @@ public sealed class RuntimeExecutionScopePersistenceTests
                     default);
 
                 Assert.IsNotNull(stored);
+                Assert.AreEqual("agentstration.io/v1", stored.Value.ApiVersion);
                 Assert.AreEqual(scope.ScopeRef, stored.Value.ExecutionScopeRef);
                 Assert.HasCount(1, events);
                 Assert.AreEqual(scope.ScopeRef, events[0].ScopeRef);
@@ -94,6 +95,32 @@ public sealed class RuntimeExecutionScopePersistenceTests
         {
             if (File.Exists(databasePath)) File.Delete(databasePath);
         }
+    }
+
+    [TestMethod]
+    public void RunSerializationRoundTripsOnlyTheCanonicalVersion()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var expected = Run(RuntimeRunScope.Instance(Guid.NewGuid()), "versioned-run");
+        var json = JsonSerializer.Serialize(expected, options);
+        using var document = JsonDocument.Parse(json);
+        Assert.AreEqual("agentstration.io/v1", document.RootElement.GetProperty("apiVersion").GetString());
+        Assert.AreEqual("agentstration.io/v1", JsonSerializer.Deserialize<RuntimeRun>(json, options)!.ApiVersion);
+    }
+
+    [TestMethod]
+    [DataRow("2026-08-01")]
+    [DataRow("2026-09-22")]
+    public void RunRejectsDatedVersionsOnConstructionAndDeserialization(string version)
+    {
+        var run = Run(RuntimeRunScope.Instance(Guid.NewGuid()), "unsupported-version");
+        var exception = Assert.ThrowsExactly<RuntimeRunValidationException>(() => _ = run with { ApiVersion = version });
+        Assert.AreEqual("api_version_not_supported", exception.Code);
+
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var json = JsonSerializer.Serialize(run, options).Replace("agentstration.io/v1", version, StringComparison.Ordinal);
+        exception = Assert.ThrowsExactly<RuntimeRunValidationException>(() => JsonSerializer.Deserialize<RuntimeRun>(json, options));
+        Assert.AreEqual("api_version_not_supported", exception.Code);
     }
 
     private static RuntimeRun Run(RuntimeRunScope scope, string id) => new()

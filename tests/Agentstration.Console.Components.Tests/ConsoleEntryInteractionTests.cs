@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
@@ -205,7 +206,7 @@ public sealed class ConsoleEntryInteractionTests
     }
 
     private static EntryResponse Entry(bool canInvoke, string name = "assistant") => new(
-        WorkspaceId, name, name, WorkResourceTypes.Entries, WorkplaceApiVersions.CoreV1,
+        WorkspaceId, name, name, WorkResourceTypes.Entries, ResourceApiVersions.CoreV1,
         name, "Generic Entry interaction", new EntryPresentation
         {
             Kind = EntryPresentationKind.Prompt,

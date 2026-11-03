@@ -24,7 +24,7 @@ public sealed record WorkplaceDashboard
     public required WorkspaceId WorkspaceId { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Dashboards;
-    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
+    public string ApiVersion { get; init; } = ResourceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public string? Icon { get; init; }
@@ -40,7 +40,7 @@ public sealed record WorkplaceDashboardDraft
     public required WorkspaceId WorkspaceId { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Dashboards;
-    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
+    public string ApiVersion { get; init; } = ResourceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public string? Icon { get; init; }

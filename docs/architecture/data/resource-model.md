@@ -6,7 +6,7 @@ Agent definitions, revisions, and deployments remain separate durable concepts. 
 
 The [interactive L3 view](../interactive.mdx) owns the structural relationship between resource-family services, storage, Runtime, and reconciliation. This page owns the data invariants rather than a second structural diagram.
 
-`apiVersion` selects the schema and currently equals `agentstration.io/v1`. Exact logical identity is `(scope, namespace, kind, name)`. References use `name` plus optional `scopeRef` and `namespace`; omitted scope uses the authorized current scope, while an omitted namespace inherits the owner's namespace. Reference resolution never grants cross-scope use by itself. ETags protect concurrent mutations. See the [resource reference](../../reference/resources/overview.md) and [versioning strategy](../../reference/versioning.md).
+`apiVersion` selects the schema and equals `agentstration.io/v1`, including Runtime Run documents. Autonomous AEP uses the same wire identifier in `protocolVersion` through its own constant. Dated identifiers have no compatibility or migration path; see [ADR-0188](../../decisions/0188-canonical-agentstration-api-version.md). Exact logical identity is `(scope, namespace, kind, name)`. References use `name` plus optional `scopeRef` and `namespace`; omitted scope uses the authorized current scope, while an omitted namespace inherits the owner's namespace. Reference resolution never grants cross-scope use by itself. ETags protect concurrent mutations. See the [resource reference](../../reference/resources/overview.md) and [versioning strategy](../../reference/versioning.md).
 
 ## Implemented scope matrix
 
