@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Artifacts;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
@@ -21,6 +23,71 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class DataSourceApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    [DataRow(ResourceScopeKind.Workspace)]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    public async Task AcquisitionHistorySynchronizesNonemptyArtifactManifestsInTheExecutionWorkspace(ResourceScopeKind kind)
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IDataSourceAcquisitionFlowGateway>();
+            services.AddSingleton<CompletedArtifactFlowGateway>();
+            services.AddSingleton<IDataSourceAcquisitionFlowGateway>(provider => provider.GetRequiredService<CompletedArtifactFlowGateway>());
+        }));
+        var bootstrap = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var workspace = kind switch
+        {
+            ResourceScopeKind.Instance => await topology.GetInstanceOperationsWorkspaceAsync(default),
+            ResourceScopeKind.Tenant => await topology.GetTenantOperationsWorkspaceAsync(bootstrap.TenantId, default),
+            _ => null
+        };
+        var context = workspace is null ? bootstrap : new RequestContext(bootstrap.PrincipalId, workspace.TenantId, workspace.Id);
+        var owner = kind switch
+        {
+            ResourceScopeKind.Instance => ResourceScopeRef.Instance,
+            ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(bootstrap.TenantId),
+            _ => ResourceScopeRef.Workspace(bootstrap.WorkspaceId)
+        };
+        string artifactId;
+        using (scopes.Push(context))
+        {
+            var artifact = await factory.Services.GetRequiredService<ArtifactManagementService>().CreateStagedAsync(
+                new("acquisition.txt", "text/plain", new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "artifact-producer" }), default);
+            artifactId = artifact.Value.ArtifactId.ToString();
+        }
+        factory.Services.GetRequiredService<CompletedArtifactFlowGateway>().ArtifactId = artifactId;
+        using (scopes.PushSystem())
+        {
+            await CreatePublishedAcquisitionFlowAsync(factory.Services, context, "artifact-acquire", owner);
+            var profile = Profile() with { AcquisitionFlow = new() { Name = "artifact-acquire", UseActiveVersion = true } };
+            var profiles = factory.Services.GetRequiredService<DataSourceProfileService>();
+            _ = await profiles.CreateAsync(ProfileResource("artifact-profile", owner, profile), default);
+            _ = await profiles.PublishAsync(ResourceNamespace.Default, "artifact-profile", owner, new("1.0.0"), default);
+            _ = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
+                SourceResource("artifact-origin", owner, new("artifact-profile", owner)), default);
+        }
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, owner);
+        var url = $"/api/datasources/artifact-origin/acquisitions?scopeRef={Uri.EscapeDataString(owner.Value)}";
+        using var started = await client.PostAsJsonAsync(url, new StartDataSourceAcquisitionRequest { DataSourceScopeRef = owner });
+        Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode);
+        using var historyResponse = await client.GetAsync(url);
+        Assert.AreEqual(HttpStatusCode.OK, historyResponse.StatusCode, await historyResponse.Content.ReadAsStringAsync());
+        var history = await historyResponse.Content.ReadFromJsonAsync<DataSourceAcquisitionResource[]>();
+        var acquisition = history!.Single();
+        Assert.AreEqual(DataSourceAcquisitionState.Succeeded, acquisition.State, acquisition.ErrorMessage);
+        Assert.AreEqual(artifactId, acquisition.Manifest!.Artifacts.Single().ArtifactId);
+        if (kind != ResourceScopeKind.Workspace)
+        {
+            SelectConsoleContext(client, ResourceScopeRef.Workspace(bootstrap.WorkspaceId));
+            using var hidden = await client.GetAsync($"/api/datasourceacquisitions/{acquisition.Name}");
+            Assert.AreEqual(HttpStatusCode.NotFound, hidden.StatusCode);
+        }
+    }
+
     [TestMethod]
     public async Task DataSourceProfilesSupportAllScopesAndDescendantVisibility()
     {
@@ -951,6 +1018,20 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             }
         }
         if (recovered) Assert.IsTrue(JsonElement.DeepEquals(requests[0].Input, requests[1].Input));
+    }
+
+    private sealed class CompletedArtifactFlowGateway : IDataSourceAcquisitionFlowGateway
+    {
+        public string ArtifactId { get; set; } = string.Empty;
+        public Task<DataSourceFlowRunSnapshot> StartAsync(DataSourceFlowRunRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(Snapshot(request.RunId));
+        public Task<DataSourceFlowRunSnapshot?> GetAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId, CancellationToken cancellationToken) =>
+            Task.FromResult<DataSourceFlowRunSnapshot?>(Snapshot(runId));
+        public Task<DataSourceFlowRunSnapshot> CancelAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+        private DataSourceFlowRunSnapshot Snapshot(string runId) => new(runId, DataSourceAcquisitionState.Succeeded,
+            JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = ArtifactId, kind = "Staged", disposition = "Intermediate" } } }),
+            null, null, null);
     }
 
     // Simulates a durable Pending operation whose dispatch did not reach Flow.

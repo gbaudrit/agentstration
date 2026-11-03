@@ -256,7 +256,7 @@ public sealed class DataSourceDiscoveryService(
             try
             {
                 manifest = ParseManifest(run.Output);
-                await artifacts.ValidateAsync(context.WorkspaceId, manifest.Artifacts, cancellationToken);
+                await execution.InWorkspaceAsync(() => artifacts.ValidateAsync(context.WorkspaceId, manifest.Artifacts, cancellationToken));
             }
             catch (DataSourceAcquisitionException exception)
             { state = DataSourceDiscoveryState.Failed; errorCode = exception.Code; errorMessage = exception.Message; }

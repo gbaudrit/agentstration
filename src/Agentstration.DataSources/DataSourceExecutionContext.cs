@@ -39,6 +39,12 @@ internal sealed class DataSourceExecutionContext(
         throw new ResourceScopeAccessDeniedException(scope);
     }
 
+    public Task InWorkspaceAsync(Func<Task> operation) => InWorkspaceAsync(async () =>
+    {
+        await operation();
+        return true;
+    });
+
     public async Task<T> InWorkspaceAsync<T>(Func<Task<T>> operation)
     {
         // Recovery workers already enter the trusted system scope explicitly.
