@@ -20,6 +20,8 @@ dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Rele
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
 
+API integration tests run in four independent test assemblies: `Agentstration.Api.Flows.Tests` (74 cases), `Agentstration.Api.Execution.Tests` (58), `Agentstration.Api.Resources.Tests` (80), and `Agentstration.Api.Tests` (23). These preserve the former consolidated module's 235 cases and test names. Each assembly owns its fixtures and runs its cases sequentially. The diagnostic job runs these assemblies one after another in separate processes so process memory is released between groups. The Integration lane and coverage shard B include all four projects.
+
 ### SQLite connection pooling regression
 
 `SqliteConnectionPoolTests` in `Agentstration.Management.Storage.Tests` exercises concurrent pooled opens with active readers. Sixteen dedicated workers check that live logical connections retain distinct native handles and independent query results across 500 alternating cold and warm waves. The test uses its own temporary database, has a bounded execution time, and clears only that database's pool between cold waves and during cleanup. Its test output records the loaded managed driver and native SQLite versions.
@@ -63,11 +65,16 @@ The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET
 
 | Module | Baseline peak (MiB) | Warning (MiB) | Failure (MiB) | Minimum tests |
 | --- | ---: | ---: | ---: | ---: |
-| `Agentstration.Api.Tests` | 1503.7 | 1700 | 2048 | 191 |
+| `Agentstration.Api.Tests` | Pending after split | 2048 | 2432 | 23 |
+| `Agentstration.Api.Flows.Tests` | Pending after split | 2048 | 2432 | 74 |
+| `Agentstration.Api.Execution.Tests` | Pending after split | 2048 | 2432 | 58 |
+| `Agentstration.Api.Resources.Tests` | Pending after split | 2048 | 2432 | 80 |
 | `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2304 | 108 |
 | `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 23 |
 | `Agentstration.Management.Security.Tests` | 1193.7 | 1280 | 1536 | 59 |
 | `Agentstration.Management.Aep.Tests` | 763.4 | 832 | 1024 | 29 |
+
+The four API modules inherit the consolidated module's current CI warning/failure limits of 2048/2432 MiB. These are retained ceilings, not measured baselines for the new assemblies. In main run `41710631042`, the consolidated module passed all 235 tests but exceeded its failure ceiling at 2464.2 MiB; the preceding run measured 2417.3 MiB. Retain measurements of the split modules before recalibrating their budgets or claiming a memory or duration improvement.
 
 The AEP budget was recalibrated during #916 after the hosted enrollment and bundle reconciliation coverage grew from the original 11-test baseline to 29 tests. All 29 tests passed in both retained runs: [Linux report](/test-diagnostics/aep-linux-2026-11-02.json) (Ubuntu 26.04.1, .NET 10.0.14) peaked at 763.4 MiB, and [Windows report](/test-diagnostics/aep-windows-2026-11-02.json) (Windows 10.0.26300, .NET 10.0.11) peaked at 691.7 MiB. The Linux report retains the original failed status because it exceeded the former 700 MiB cap despite a successful test exit. The Windows baseline was collected without memory thresholds. The revised warning/failure limits are 832/1024 MiB, and the minimum expected count is raised to 29 so missing scenarios cannot silently pass diagnostics. Only the AEP budget changes; the per-assembly worker limit remains one.
 
@@ -90,7 +97,10 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Application.Tests` | Integration | Application use cases and their SQLite-backed contracts without the executable host |
 | `Agentstration.Management.Storage.Tests` | Integration | SQLite control-plane, Identity persistence, secrets, audit, and trigger storage |
 | `Agentstration.Management.Sources.Tests` | Integration | Source provider, registry transport, and Pack composition behavior without the executable host |
-| `Agentstration.Api.Tests` | Integration | Hosted HTTP, authentication, OpenAPI, MCP, SignalR, Flow, Runtime, Work, and cross-cutting transport behavior |
+| `Agentstration.Api.Tests` | Integration | Cross-cutting authentication registration, OpenAPI, MCP catalog, and Tool audit transport behavior |
+| `Agentstration.Api.Flows.Tests` | Integration | Flow authoring, persistence, execution, recovery, scope isolation, and hosted Flow APIs |
+| `Agentstration.Api.Execution.Tests` | Integration | Hosted Work, Workplace, Runtime Run, SignalR, and AWP worker execution boundaries |
+| `Agentstration.Api.Resources.Tests` | Integration | Sources, Source Registry, and Pack integration and transport behavior |
 | `Agentstration.Management.Api.Tests` | Integration | Hosted Management API tests using the API-only test profile |
 | `Agentstration.Management.Bootstrap.Tests` | Integration | Declarative bootstrap catalog, application, and hosted startup scenarios using the API-only test profile |
 | `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
@@ -116,7 +126,7 @@ Compare candidate workflow runs with the retained baseline runs 41668461593, 416
 
 ## Management fixture boundaries and profiling
 
-The required inventory remains 1,724 cases: Fast now contains 777 and Integration 947 (including 11 optional cases in the reviewed baseline). Twenty-four boundary-free cases moved from Management API/Security into ResourceManagement, Schemas, Secrets and Infrastructure test projects. Their existing test names are retained. Coverage follows these inventories automatically and now expects 30 module reports.
+The required inventory remains 1,724 cases: Fast now contains 777 and Integration 947 (including 11 optional cases in the reviewed baseline). Twenty-four boundary-free cases moved from Management API/Security into ResourceManagement, Schemas, Secrets and Infrastructure test projects. Their existing test names are retained. Coverage follows these inventories automatically and expects 33 module reports after splitting the API integration assembly.
 
 Management API retains real HTTP, MCP transport, hosted provisioning and AWP execution tests. Eleven service-only cases instead use `ManagementServiceFixture`: the production application registrations with hosted services disabled, private non-pooled SQLite stores and deterministic bootstrap. It starts no ASP.NET Core server, background scheduler or Worker, and disposes only its own provider/files. It deliberately retains real persistence, scope authorization, provisioning and the real artifact backend; those cases remain Integration tests. No host or mutable database is shared between tests.
 

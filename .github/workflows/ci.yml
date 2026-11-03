@@ -195,6 +195,9 @@ jobs:
         run: |
           $modules = @(
             'Agentstration.Api.Tests',
+            'Agentstration.Api.Flows.Tests',
+            'Agentstration.Api.Execution.Tests',
+            'Agentstration.Api.Resources.Tests',
             'Agentstration.Management.Api.Tests',
             'Agentstration.Management.Bootstrap.Tests',
             'Agentstration.Management.Security.Tests',
@@ -219,7 +222,10 @@ jobs:
             '| --- | ---: | ---: | ---: | ---: | ---: | --- |'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
-            @{ Name = 'Agentstration.Api.Tests'; Tests = 211; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.Tests'; Tests = 23; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.Flows.Tests'; Tests = 74; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.Execution.Tests'; Tests = 58; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.Resources.Tests'; Tests = 80; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 127; Warning = 1920; Failure = 2560 },
             @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 31; Warning = 500; Failure = 700 },
             @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 64; Warning = 1280; Failure = 1664 },
