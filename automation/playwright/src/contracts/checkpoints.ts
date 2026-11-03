@@ -1,4 +1,16 @@
 export const Checkpoints = {
+  organizationStructure: {
+    instance: 'organization-structure-instance',
+    tenantCreated: 'organization-structure-tenant-created',
+    parentSelected: 'organization-structure-parent-selected',
+    workspaceCreated: 'organization-structure-workspace-created',
+    tenantContext: 'organization-structure-tenant-context',
+    workspaceContext: 'organization-structure-workspace-context',
+    validation: 'organization-structure-validation',
+    tenantAdmin: 'organization-structure-tenant-admin',
+    workspaceAdmin: 'organization-structure-workspace-admin',
+    viewer: 'organization-structure-viewer',
+  },
   resourceScopes: { hierarchy: 'resource-scopes-hierarchy', tenantRoot: 'resource-scopes-tenant-root', filtered: 'resource-scopes-filtered', navigated: 'resource-scopes-navigated' },
   console: {
     home: 'console-home',

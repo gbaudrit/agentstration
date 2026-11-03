@@ -67,6 +67,7 @@ jobs:
         run: |
           dotnet restore automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+          dotnet restore automation/playwright/fixtures/OrganizationStructureHost/OrganizationStructureHost.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Web/Agentstration.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
@@ -78,6 +79,7 @@ jobs:
         run: |
           dotnet build automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj --configuration Release --no-restore
           dotnet build automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj --configuration Release --no-restore
+          dotnet build automation/playwright/fixtures/OrganizationStructureHost/OrganizationStructureHost.csproj --configuration Release --no-restore
           dotnet build src/Agentstration.Web/Agentstration.Web.csproj --configuration Release --no-restore
           dotnet build src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj --configuration Release --no-restore
           dotnet build src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj --configuration Release --no-restore
