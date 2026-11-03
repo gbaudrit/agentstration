@@ -61,8 +61,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Assert.IsFalse(output.GetProperty("properties").TryGetProperty("recovered", out _));
         Assert.AreEqual(2, output.GetProperty("oneOf").GetArrayLength());
 
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        await using var factory = await ManagementServiceFixture.CreateAsync();
+        var context = factory.Context;
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var handler = factory.Services.GetServices<IInternalMcpToolHandler>()
             .Single(value => value.Definition.Name == AgentstrationInternalTools.NotificationCreate);
@@ -166,8 +166,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task InternalNotificationProjectionRefreshesContractWithoutEnablingDisabledTool()
     {
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        await using var factory = await ManagementServiceFixture.CreateAsync();
+        var context = factory.Context;
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
         var projection = factory.Services.GetRequiredService<InternalMcpToolProjectionService>();

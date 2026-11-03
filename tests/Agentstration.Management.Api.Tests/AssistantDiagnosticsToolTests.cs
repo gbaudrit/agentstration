@@ -12,8 +12,8 @@ public sealed class AssistantDiagnosticsToolTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task WorkspaceInspectionIsBoundedReadOnlyAndRejectsUndeclaredArguments()
     {
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        await using var factory = await ManagementServiceFixture.CreateAsync();
+        var context = factory.Context;
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var tool = factory.Services.GetServices<IInternalMcpToolHandler>()
             .Single(value => value.Definition.Name == AgentstrationInternalTools.AssistantDiagnosticsInspect);
@@ -41,8 +41,8 @@ public sealed class AssistantDiagnosticsToolTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task FlowRunInspectionRequiresAnIdentifier()
     {
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        await using var factory = await ManagementServiceFixture.CreateAsync();
+        var context = factory.Context;
         var tool = factory.Services.GetServices<IInternalMcpToolHandler>()
             .Single(value => value.Definition.Name == AgentstrationInternalTools.AssistantDiagnosticsInspect);
         var invocation = new InternalMcpToolInvocation(

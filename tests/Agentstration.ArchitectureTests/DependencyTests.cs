@@ -1364,6 +1364,10 @@ public sealed class DependencyTests
                 if (string.IsNullOrWhiteSpace(include) || include.Contains("$(", StringComparison.Ordinal)
                     || string.Equals(include.Replace('\\', '/'), "../ApiModuleGlobalUsings.cs", StringComparison.Ordinal)) continue;
 
+                // This opt-in instrumentation is owned by the test root, not another module.
+                if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
+
                 var normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
                 var sourcePath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));
                 var relativePath = Path.GetRelativePath(projectDirectory, sourcePath);
@@ -1405,6 +1409,10 @@ public sealed class DependencyTests
                      "Agentstration.Application.Tests",
                      "Agentstration.Runtime.Tests",
                      "Agentstration.Tools.Tests",
+                     "Agentstration.ResourceManagement.Tests",
+                     "Agentstration.Schemas.Tests",
+                     "Agentstration.Secrets.Tests",
+                     "Agentstration.Infrastructure.Tests",
                      "Agentstration.Management.Sources.Tests",
                      "Agentstration.Management.Storage.Tests"
                  })

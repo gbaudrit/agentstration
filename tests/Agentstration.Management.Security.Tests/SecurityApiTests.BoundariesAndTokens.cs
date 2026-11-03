@@ -53,11 +53,14 @@ public sealed partial class SecurityApiTests
         patClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", pat);
         patClient.DefaultRequestHeaders.Add("X-Agentstration-Workspace", context.Context.WorkspaceId.ToString("D"));
 
-        var resourceRead = new AccessProbe("resources/read", () => new(HttpMethod.Get, "/api/modelproviders"));
-        var resourceWrite = new AccessProbe("resources/write", () => Json(HttpMethod.Post, "/api/modelproviders", "{}"));
-        var resourceDelete = new AccessProbe("resources/delete", () => new(HttpMethod.Delete, "/api/modelproviders/missing"));
-        var runsExecute = new AccessProbe("runs/execute", () => new(HttpMethod.Post, "/api/triggers/missing/run"));
-        var hubRead = new AccessProbe("SignalR runs/read", () => new(HttpMethod.Post, "/hubs/workplace/negotiate?negotiateVersion=1") { Content = new ByteArrayContent([]) });
+        var resourceRead = new AccessProbe("resources/read", () => new(HttpMethod.Get, "/api/modelproviders"), ResponseProperty: "value");
+        var resourceWrite = new AccessProbe("resources/write", () => Json(HttpMethod.Post, "/api/modelproviders",
+            """{"name":"","properties":{"displayName":"Probe","extension":{"name":"missing"},"contributionId":"missing"}}"""),
+            HttpStatusCode.BadRequest, "Invalid request", "https://agentstration.dev/problems/validation-failed");
+        var resourceDelete = new AccessProbe("resources/delete", () => new(HttpMethod.Delete, "/api/modelproviders/missing"), HttpStatusCode.NotFound,
+            "Model provider not found", "https://agentstration.dev/problems/model-provider-not-found");
+        var runsExecute = new AccessProbe("runs/execute", () => new(HttpMethod.Post, "/api/triggers/missing/run"), HttpStatusCode.NotFound, "resource_not_found");
+        var hubRead = new AccessProbe("SignalR runs/read", () => new(HttpMethod.Post, "/hubs/workplace/negotiate?negotiateVersion=1") { Content = new ByteArrayContent([]) }, ResponseProperty: "connectionId");
         var probes = new[] { resourceRead, resourceWrite, resourceDelete, runsExecute, hubRead };
 
         await AssertAccessMatrixAsync(anonymous, probes, [false, false, false, false, false]);
@@ -74,12 +77,10 @@ public sealed partial class SecurityApiTests
         using var platformAccess = await viewerClient.GetAsync("/api/identity/platform");
         Assert.AreEqual(HttpStatusCode.OK, platformAccess.StatusCode);
         using var platformWorkspaceWrite = await viewerClient.SendAsync(resourceWrite.Request());
-        Assert.AreNotEqual(HttpStatusCode.Unauthorized, platformWorkspaceWrite.StatusCode);
-        Assert.AreNotEqual(HttpStatusCode.Forbidden, platformWorkspaceWrite.StatusCode,
-            "PlatformAdmin must authorize resources in every active Workspace.");
+        await AssertAllowedAsync(platformWorkspaceWrite, resourceWrite);
         using var vaultInitialization = await viewerClient.PostAsync("/api/vaults/missing/initialize", null);
-        Assert.AreNotEqual(HttpStatusCode.Unauthorized, vaultInitialization.StatusCode);
-        Assert.AreNotEqual(HttpStatusCode.Forbidden, vaultInitialization.StatusCode);
+        await AssertAllowedAsync(vaultInitialization, new("vault initialization", () => new(),
+            HttpStatusCode.NotFound, "Vault not found"));
     }
 
     [TestMethod]
@@ -136,7 +137,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task PersonalAccessTokenPageUsesAntiforgeryAndNeverDisplaysExistingSecrets()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var browser = UnredirectedClient(factory);
         await BootstrapAsync(browser, "pat-page-user");
 
@@ -193,7 +194,7 @@ public sealed partial class SecurityApiTests
     [TestMethod]
     public async Task CultureCookieLocalizesTheAuthenticatedProfilePage()
     {
-        await using var factory = Factory("Local");
+        await using var factory = Factory("Local", fullHost: true);
         using var browser = UnredirectedClient(factory);
         await BootstrapAsync(browser, "localized-profile-user");
 

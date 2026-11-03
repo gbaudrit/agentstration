@@ -13,8 +13,8 @@ public sealed class ResourcePlanningMcpToolTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task PlanningToolsUseTrustedScopeAndRejectResourceArguments()
     {
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        await using var factory = await ManagementServiceFixture.CreateAsync();
+        var context = factory.Context;
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var handlers = factory.Services.GetServices<IInternalMcpToolHandler>().ToArray();
         var create = handlers.Single(value => value.Definition.Name == AgentstrationInternalTools.ResourcePlanCreate);
