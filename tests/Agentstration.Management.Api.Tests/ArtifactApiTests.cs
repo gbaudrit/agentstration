@@ -27,6 +27,68 @@ namespace Agentstration.Management.Tests;
 public sealed class ArtifactApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    public async Task ArtifactConsoleApiUsesItsOperationalWorkspaceIncludingStreamedContent(ResourceScopeKind kind)
+    {
+        await using var factory = Factory();
+        var bootstrap = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var workspace = kind == ResourceScopeKind.Instance
+            ? await topology.GetInstanceOperationsWorkspaceAsync(default)
+            : await topology.GetTenantOperationsWorkspaceAsync(bootstrap.TenantId, default);
+        var context = new RequestContext(bootstrap.PrincipalId, workspace.TenantId, workspace.Id);
+        var service = factory.Services.GetRequiredService<ArtifactManagementService>();
+        var bytes = Encoding.UTF8.GetBytes("portal artifact");
+        StagedArtifactId operationalId;
+        FlowRunArtifactId durableId;
+        using (scopes.Push(context))
+        {
+            var staged = await service.CreateStagedAsync(new("portal.txt", "text/plain",
+                new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "portal", FlowRunId = "portal-flow" }), default);
+            operationalId = staged.Value.ArtifactId;
+            _ = await service.WriteAsync(operationalId, 0, bytes, default);
+            var sealedArtifact = await service.SealAsync(operationalId, default);
+            var durable = await service.CompleteFlowRunArtifactAsync(operationalId, new("portal-flow", "portal-step", new()
+            {
+                StorageFlowRunId = "portal-storage", OpaqueReference = "portal-reference",
+                MediaType = sealedArtifact.Value.MediaType, Length = sealedArtifact.Value.Length, Sha256 = sealedArtifact.Value.Sha256!
+            }), default);
+            durableId = durable.Value.ArtifactId;
+        }
+        StagedArtifactId businessId;
+        using (scopes.Push(bootstrap))
+        {
+            businessId = (await service.CreateStagedAsync(new("business.txt", "text/plain",
+                new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "business" }), default)).Value.ArtifactId;
+        }
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, kind == ResourceScopeKind.Instance ? ResourceScopeRef.Instance : ResourceScopeRef.Tenant(bootstrap.TenantId));
+        using var stagedResponse = await client.GetAsync("/api/artifacts/staged");
+        Assert.AreEqual(HttpStatusCode.OK, stagedResponse.StatusCode, await stagedResponse.Content.ReadAsStringAsync());
+        var stagedViews = await stagedResponse.Content.ReadFromJsonAsync<StagedArtifactView[]>();
+        Assert.IsNotNull(stagedViews);
+        Assert.IsTrue(stagedViews.Any(value => value.ArtifactId == operationalId));
+        Assert.IsFalse(stagedViews.Any(value => value.ArtifactId == businessId));
+        var durableViews = await client.GetFromJsonAsync<FlowRunArtifactResource[]>("/api/artifacts/flow-run-artifacts");
+        Assert.IsTrue(durableViews!.Any(value => value.ArtifactId == durableId));
+        using var download = await client.GetAsync($"/api/artifacts/staged/{operationalId}/download");
+        Assert.AreEqual(HttpStatusCode.OK, download.StatusCode);
+        CollectionAssert.AreEqual(bytes, await download.Content.ReadAsByteArrayAsync());
+        using var createdResponse = await client.PostAsJsonAsync("/api/artifacts/staged", new CreateStagedArtifactRequest(
+            "from-api.txt", "text/plain", new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "api" }));
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode, await createdResponse.Content.ReadAsStringAsync());
+        SelectConsoleContext(client, ResourceScopeRef.Workspace(bootstrap.WorkspaceId));
+        var businessViews = await client.GetFromJsonAsync<StagedArtifactView[]>("/api/artifacts/staged");
+        Assert.IsNotNull(businessViews);
+        Assert.IsTrue(businessViews.Any(value => value.ArtifactId == businessId));
+        Assert.IsFalse(businessViews.Any(value => value.ArtifactId == operationalId));
+        using var hidden = await client.GetAsync($"/api/artifacts/staged/{operationalId}");
+        Assert.AreEqual(HttpStatusCode.NotFound, hidden.StatusCode);
+    }
+
+    [TestMethod]
     [DataRow(ResourceScopeKind.Workspace)]
     [DataRow(ResourceScopeKind.Instance)]
     [DataRow(ResourceScopeKind.Tenant)]
