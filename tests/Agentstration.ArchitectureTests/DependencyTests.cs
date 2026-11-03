@@ -1388,6 +1388,9 @@ public sealed class DependencyTests
         foreach (var project in new[]
                  {
                      "Agentstration.Api.Tests",
+                     "Agentstration.Api.Flows.Tests",
+                     "Agentstration.Api.Execution.Tests",
+                     "Agentstration.Api.Resources.Tests",
                      "Agentstration.Console.Client.Tests",
                      "Agentstration.Console.Components.Tests",
                      "Agentstration.Console.Web.Tests",
