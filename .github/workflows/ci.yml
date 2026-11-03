@@ -45,7 +45,7 @@ jobs:
           if (-not $runEverything -and
               -not [string]::IsNullOrWhiteSpace($baseRevision) -and
               $baseRevision -notmatch '^0+$') {
-            $changedFiles = @(git diff --name-only --diff-filter=ACDMRT $baseRevision HEAD)
+            $changedFiles = @(git diff --no-renames --name-only --diff-filter=ACDMRT $baseRevision HEAD)
             if ($LASTEXITCODE -ne 0) {
               throw "Could not determine changed files from '$baseRevision'."
             }
@@ -55,17 +55,12 @@ jobs:
             $runEverything = $true
           }
 
-          $documentationOnlyPattern = '^(docs/|README\.md$|CONTRIBUTING\.md$|CODE_OF_CONDUCT\.md$|SECURITY\.md$|NOTICE$|LICENSE$|\.github/(CODEOWNERS$|ISSUE_TEMPLATE/|pull_request_template\.md$|rulesets/|workflows/(documentation|publish-documentation)\.yml$))'
-          $dotnet = $runEverything -or @($changedFiles | Where-Object { $_ -notmatch $documentationOnlyPattern }).Count -gt 0
-          $aep = $runEverything -or @($changedFiles | Where-Object {
-            $_ -match '^(aep/|global\.json$|\.github/workflows/ci\.yml$|scripts/ci/)'
-          }).Count -gt 0
-          $container = $runEverything -or @($changedFiles | Where-Object {
-            $_ -match '^(src/|aep/src/|deploy/|Dockerfile$|\.dockerignore$|global\.json$|Agentstration\.slnx$|Directory\.(Build|Packages)\.(props|targets)$|\.github/workflows/ci\.yml$)'
-          }).Count -gt 0
-          $storage = $runEverything -or @($changedFiles | Where-Object {
-            $_ -match '^(src/Agentstration\.(Application|Flow|Infrastructure|Management|ResourceManagement|Runtime|Web|Work)|tests/Agentstration\.(Application|Performance|Web)\.Tests/|Agentstration\.Tests\.Performance\.slnx$|Directory\.(Build|Packages)\.(props|targets)$|global\.json$|\.github/workflows/(ci|storage-performance)\.yml$)'
-          }).Count -gt 0
+          ./scripts/ci/test-ci-contracts.ps1
+          $classification = ./scripts/ci/classify-changes.ps1 -Paths $changedFiles -RunEverything:$runEverything
+          $dotnet = $classification.dotnet
+          $aep = $classification.aep
+          $container = $classification.container
+          $storage = $classification.storage
 
           "dotnet=$($dotnet.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "aep=$($aep.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
@@ -170,7 +165,11 @@ jobs:
         run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 33 --max-parallel-test-modules 2
 
   hosted-module-diagnostics:
-    name: hosted-module-diagnostics
+    name: hosted-module-diagnostics-${{ matrix.group }}
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [management-api, other]
     runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.dotnet == 'true'
@@ -199,9 +198,9 @@ jobs:
             'Agentstration.Management.Api.Tests',
             'Agentstration.Management.Bootstrap.Tests',
             'Agentstration.Management.Security.Tests',
-            'Agentstration.Management.Aep.Tests',
-            'Agentstration.Management.Sources.Tests'
+            'Agentstration.Management.Aep.Tests'
           )
+          $modules = @($modules | Where-Object { ($_ -eq 'Agentstration.Management.Api.Tests') -eq ('${{ matrix.group }}' -eq 'management-api') })
           foreach ($module in $modules) {
             dotnet build "tests/$module/$module.csproj" --configuration Release --no-restore
             if ($LASTEXITCODE -ne 0) {
@@ -224,6 +223,7 @@ jobs:
             @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 63; Warning = 1280; Failure = 1664 },
             @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 29; Warning = 832; Failure = 1024 }
           )
+          $modules = @($modules | Where-Object { ($_.Name -eq 'Agentstration.Management.Api.Tests') -eq ('${{ matrix.group }}' -eq 'management-api') })
           foreach ($module in $modules) {
             ./scripts/ci/run-test-module-with-diagnostics.ps1 `
               -AssemblyPath "tests/$($module.Name)/bin/Release/net10.0/$($module.Name).dll" `
@@ -236,7 +236,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hosted-test-module-diagnostics
+          name: hosted-test-module-diagnostics-${{ matrix.group }}
           path: artifacts/test-diagnostics/*.json
           if-no-files-found: warn
 
@@ -264,10 +264,17 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
           restore-keys: |
             nuget-${{ runner.os }}-
-      - name: Restore Agentstration
-        run: dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
-      - name: Build Agentstration
-        run: dotnet build Agentstration.slnx --configuration Release --no-restore
+      - name: Restore coverage test graphs
+        shell: pwsh
+        run: |
+          $solutions = @("Agentstration.Tests.Coverage$('${{ matrix.shard }}'.ToUpperInvariant()).slnx")
+          if ('${{ matrix.shard }}' -eq 'a') { $solutions += 'Agentstration.Tests.Fast.slnx' }
+          foreach ($solution in $solutions) {
+            dotnet restore $solution -p:NuGetAudit=true -p:NuGetAuditMode=all
+            if ($LASTEXITCODE -ne 0) { throw "Restore failed for $solution." }
+            dotnet build $solution --configuration Release --no-restore
+            if ($LASTEXITCODE -ne 0) { throw "Build failed for $solution." }
+          }
       - name: Collect functional coverage shard ${{ matrix.shard }}
         shell: pwsh
         run: ./scripts/ci/run-functional-coverage.ps1 -Configuration Release -NoBuild -Shard ${{ matrix.shard }} -SkipPublish

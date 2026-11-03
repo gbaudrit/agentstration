@@ -13,6 +13,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot 'coverage-inventory.ps1')
+Assert-CoverageInventory $repositoryRoot
 $coverageRoot = Join-Path $repositoryRoot 'artifacts/coverage'
 $artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
 $coveragePrefix = $artifactsRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
@@ -98,6 +100,7 @@ try {
             '--max-parallel-test-modules', $lane.ParallelModules,
             '--coverage',
             '--coverage-output-format', 'cobertura',
+            '--report-trx', '--report-trx-filename', '{asm}.trx',
             '--coverage-settings', $settingsPath,
             '--results-directory', $lane.ResultsDirectory
         )
@@ -105,6 +108,7 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "$($lane.Name) coverage execution exited with code $LASTEXITCODE."
         }
+        Assert-CoverageReports $lane.ResultsDirectory (Get-TestProjects $repositoryRoot $lane.Solution) | Out-Null
     }
 
     if (-not $SkipPublish) {
