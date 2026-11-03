@@ -5,6 +5,7 @@ on:
     paths:
       - automation/playwright/**
       - deploy/bootstrap/profiles/**
+      - src/Agentstration.Console.*/**
       - src/Agentstration.Web/**
       - src/Agentstration.Web.Components/**
       - src/Agentstration.Web.FlowDesigner/**
@@ -21,6 +22,7 @@ on:
     paths:
       - automation/playwright/**
       - deploy/bootstrap/profiles/**
+      - src/Agentstration.Console.*/**
       - src/Agentstration.Web/**
       - src/Agentstration.Web.Components/**
       - src/Agentstration.Web.FlowDesigner/**
