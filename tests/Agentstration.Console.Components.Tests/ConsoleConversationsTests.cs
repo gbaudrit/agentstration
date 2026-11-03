@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
@@ -124,7 +125,7 @@ public sealed class ConsoleConversationsTests
     }
 
     private static EntryResponse Entry(string name, string displayName) => new(
-        WorkspaceId, name, name, WorkResourceTypes.Entries, WorkplaceApiVersions.CoreV1, displayName, null,
+        WorkspaceId, name, name, WorkResourceTypes.Entries, ResourceApiVersions.CoreV1, displayName, null,
         new EntryPresentation { Kind = EntryPresentationKind.Prompt, Fields = [new() { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }] },
         new EntryExposure { Surfaces = [EntryExposureSurface.Console], WorkplacePlacements = [] },
         new("flow", "1.0.0"), new(), 1, Now)

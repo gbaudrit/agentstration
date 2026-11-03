@@ -4,6 +4,10 @@
 
 Accepted — 2026-08-11
 
+## Version identifier amendment
+
+[ADR-0188](0188-canonical-agentstration-api-version.md) supersedes the dated protocol identifier below with `agentstration.io/v1`, without backward compatibility. AEP retains ownership of its autonomous protocol constant and dependency boundary. The original decision is preserved below for historical context.
+
 ## Context
 
 AEP began as projects inside Agentstration. Although its core assemblies had neutral dependencies, repository placement, tests, versioning, and discovery vocabulary still presented it as an internal API. Extension developers need to build and validate an extension without cloning or running Agentstration, and an Inspector must infer all behavior from the protocol rather than product or provider knowledge.

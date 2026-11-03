@@ -7,7 +7,12 @@ public static class RuntimeEndpoints
     public static IEndpointRouteBuilder MapAgentstrationRuntimeApi(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/runtime/runs")
-            .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
+            .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated)
+            .AddEndpointFilter(async (context, next) => await RuntimeHttp.ExecuteAsync(async () =>
+            {
+                RuntimeHttp.RequireApiVersion(context.HttpContext.Request);
+                return (IResult)(await next(context))!;
+            }));
         CreateRuntimeRunEndpoint.Map(group);
         ListRuntimeRunsEndpoint.Map(group);
         GetRuntimeRunEndpoint.Map(group);

@@ -106,7 +106,7 @@ public sealed record EntryDraft
     public required EntryId Id { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Entries;
-    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
+    public string ApiVersion { get; init; } = ResourceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
@@ -124,7 +124,7 @@ public sealed record EntryResource
     public required EntryId Id { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Entries;
-    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
+    public string ApiVersion { get; init; } = ResourceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
