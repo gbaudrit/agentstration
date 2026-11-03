@@ -22,6 +22,10 @@ The Web and REST implementations accept a response of at most 1 MiB, follow at m
 
 Data Sources and Data Source Profiles may be owned at instance, tenant, or Workspace scope. A Data Source may reference only a profile visible through the ancestor-only scope rules and an explicit descendant-use grant. The three core built-ins, their acquisition Flows, Tools, Tool Providers, ToolSets, and staging composition are instance-owned; their tenant grants propagate discovery and use to descendant Workspaces. Acquisition records, Flow Runs, staged content, and durable Artifacts remain isolated in the consuming Workspace.
 
+When the Console context is Instance or Tenant, acquisition and discovery use the governed Instance operations or Tenant operations Workspace. The selected administrative scope remains the logical consumer for authorization; the operational Workspace is only the storage and execution destination. Acquisitions and discoveries retain that logical scope alongside the exact source and profile evidence, including when pending work is recovered. Their history and promoted targets are not shared with business Workspaces.
+
+At the resource owner context, the **Access** tab administers descendant discovery and use grants independently of definition protection. This remains available for extension-managed profiles: changing a local access policy does not edit the contributed definition, revision, hash, or provenance. Profile policies identify the mutable profile by UID and generation; a published revision version is not a version of that resource identity.
+
 The `-builtin` identities are owned by Agentstration and cannot be edited, republished, reactivated, deleted, or replaced through YAML. Their metadata includes:
 
 ```yaml

@@ -14,6 +14,7 @@ public sealed class DataSourceDiscoveryService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     IAuthorizationService authorization,
     ISecurityAuditWriter audit,
     DataSourceManagementService sources,
@@ -23,6 +24,7 @@ public sealed class DataSourceDiscoveryService(
     IDataSourceArtifactReferenceValidator artifacts,
     TimeProvider timeProvider)
 {
+    private readonly DataSourceExecutionContext execution = new(requestContext, requestScopes);
     private readonly ConcurrentDictionary<(Guid WorkspaceId, Guid SourceUid), SemaphoreSlim> startGates = new();
     public const int MaximumChoices = 1_000;
     public const int MaximumSelectorBytes = 16 * 1024;
@@ -33,14 +35,15 @@ public sealed class DataSourceDiscoveryService(
         JsonElement parameters, string? correlationId, string? idempotencyKey, CancellationToken cancellationToken)
     {
         var context = RequireContext();
+        var logicalScope = execution.ConsumerScope;
         DataSourceAcquisitionService.ValidateBoundedRequest(parameters, idempotencyKey, "Discovery");
         if (sourceScope is { } requestedScope)
-            DataSourceAcquisitionService.EnsureVisible(requestedScope, context);
+            execution.EnsureVisible(requestedScope);
         var executionScope = ResourceScopeRef.Workspace(context.WorkspaceId);
         var source = await sources.ResolveForUseAsync(sourceNamespace, sourceName, sourceScope,
-            executionScope, cancellationToken);
+            execution.ConsumerScope, cancellationToken);
         var ownerScope = source.Value.ScopeRef ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
-        DataSourceAcquisitionService.EnsureVisible(ownerScope, context);
+        execution.EnsureVisible(ownerScope);
         var gate = startGates.GetOrAdd((context.WorkspaceId, source.Value.Uid), _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken);
         try
@@ -66,8 +69,8 @@ public sealed class DataSourceDiscoveryService(
                 composition.Policies,
                 parameters
             }));
-            var existing = await store.ListExactAsync<DataSourceDiscoveryResource>(executionScope,
-                DataSourceResourceKinds.DataSourceDiscovery, 0, 1_000, cancellationToken);
+            var existing = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceDiscoveryResource>(executionScope,
+                DataSourceResourceKinds.DataSourceDiscovery, 0, 1_000, cancellationToken));
             if (!string.IsNullOrWhiteSpace(idempotencyKey))
             {
                 var match = existing.SingleOrDefault(value => value.Value.DataSourceUid == source.Value.Uid
@@ -115,9 +118,10 @@ public sealed class DataSourceDiscoveryService(
                 CreatedBy = context.PrincipalId,
                 TenantId = context.TenantId,
                 WorkspaceId = context.WorkspaceId,
+                LogicalScopeRef = logicalScope,
                 CreatedAt = timeProvider.GetUtcNow()
             };
-            var stored = await scopeOperations.WriteAsync(resource, executionScope, AuthorizationPermissions.RunsExecute,
+            var stored = await execution.InWorkspaceAsync(() => scopeOperations.WriteAsync(resource, executionScope, AuthorizationPermissions.RunsExecute,
                 async token =>
                 {
                     var created = await store.PutExactAsync(executionScope, resource, null, true, token);
@@ -125,7 +129,7 @@ public sealed class DataSourceDiscoveryService(
                     {
                         _ = await flowRuns.StartAsync(new(runId, composition.Flow, input,
                             context.PrincipalId.ToString("D"), effectiveCorrelationId, idempotencyKey,
-                            context.TenantId, context.WorkspaceId, context.PrincipalId), token);
+                            context.TenantId, context.WorkspaceId, context.PrincipalId) { LogicalScopeRef = logicalScope }, token);
                         return created;
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -142,7 +146,7 @@ public sealed class DataSourceDiscoveryService(
                         _ = await store.PutExactAsync(executionScope, failed, created.ETag, false, token);
                         throw;
                     }
-                }, cancellationToken);
+                }, cancellationToken));
             await AuditAsync(SecurityAuditActions.DataSourceDiscoveryStarted, stored.Value.Name, context, cancellationToken);
             return stored;
         }
@@ -155,12 +159,12 @@ public sealed class DataSourceDiscoveryService(
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
         if (sourceScope is { } requestedScope)
-            DataSourceAcquisitionService.EnsureVisible(requestedScope, context);
+            execution.EnsureVisible(requestedScope);
         var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
-        DataSourceAcquisitionService.EnsureVisible(source.Value.ScopeRef!.Value, context);
-        var stored = await store.ListExactAsync<DataSourceDiscoveryResource>(ResourceScopeRef.Workspace(context.WorkspaceId),
-            DataSourceResourceKinds.DataSourceDiscovery, 0, 1_000, cancellationToken);
+        execution.EnsureVisible(source.Value.ScopeRef!.Value);
+        var stored = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceDiscoveryResource>(ResourceScopeRef.Workspace(context.WorkspaceId),
+            DataSourceResourceKinds.DataSourceDiscovery, 0, 1_000, cancellationToken));
         var result = new List<DataSourceDiscoveryResource>();
         foreach (var item in stored.Where(value => value.Value.DataSourceUid == source.Value.Uid)
                      .OrderByDescending(value => value.Value.CreatedAt))
@@ -173,8 +177,8 @@ public sealed class DataSourceDiscoveryService(
     {
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
-        var stored = await store.GetExactAsync<DataSourceDiscoveryResource>(ScopedResourceAddress.Create(
-            ResourceScopeRef.Workspace(context.WorkspaceId), ns, DataSourceResourceKinds.DataSourceDiscovery, id), cancellationToken)
+        var stored = await execution.InWorkspaceAsync(() => store.GetExactAsync<DataSourceDiscoveryResource>(ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(context.WorkspaceId), ns, DataSourceResourceKinds.DataSourceDiscovery, id), cancellationToken))
             ?? throw Error("data_source_discovery_not_found", $"Discovery '{id}' was not found.");
         return await SynchronizeAsync(stored, context, cancellationToken);
     }
@@ -217,7 +221,7 @@ public sealed class DataSourceDiscoveryService(
             {
                 _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Composition.Flow, input,
                 value.CreatedBy.ToString("D"), value.CorrelationId, value.IdempotencyKey, value.TenantId,
-                workspaceId, value.CreatedBy), cancellationToken);
+                workspaceId, value.CreatedBy) { LogicalScopeRef = value.LogicalScopeRef }, cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -230,7 +234,7 @@ public sealed class DataSourceDiscoveryService(
                     ErrorMessage = exception.Message,
                     Status = Failed()
                 };
-                try { _ = await store.PutExactAsync(value.ScopeRef.Value, failed, stored.ETag, false, cancellationToken); }
+                try { _ = await execution.InWorkspaceAsync(() => store.PutExactAsync(value.ScopeRef.Value, failed, stored.ETag, false, cancellationToken)); }
                 catch (ResourceConcurrencyException) { }
             }
         }
@@ -267,11 +271,11 @@ public sealed class DataSourceDiscoveryService(
             CompletedAt = IsTerminal(state) ? run.CompletedAt ?? timeProvider.GetUtcNow() : null,
             Status = state == DataSourceDiscoveryState.Succeeded ? Succeeded() : IsTerminal(state) ? Failed() : Accepted()
         };
-        try { return await store.PutExactAsync(updated.ScopeRef!.Value, updated, stored.ETag, false, cancellationToken); }
+        try { return await execution.InWorkspaceAsync(() => store.PutExactAsync(updated.ScopeRef!.Value, updated, stored.ETag, false, cancellationToken)); }
         catch (ResourceConcurrencyException)
         {
-            return await store.GetExactAsync<DataSourceDiscoveryResource>(ScopedResourceAddress.Create(
-                updated.ScopeRef!.Value, updated.Namespace, updated.Kind, updated.Name), cancellationToken) ?? stored;
+            return await execution.InWorkspaceAsync(() => store.GetExactAsync<DataSourceDiscoveryResource>(ScopedResourceAddress.Create(
+                updated.ScopeRef!.Value, updated.Namespace, updated.Kind, updated.Name), cancellationToken)) ?? stored;
         }
     }
 
@@ -365,8 +369,7 @@ public sealed class DataSourceDiscoveryService(
             CorrelationId = correlationId,
             DiscoveryId = id
         });
-    private RequestContext RequireContext() => requestContext.IsInitialized ? requestContext.Current
-        : throw Error("data_source_discovery_context_required", "A Workspace request context is required.");
+    private RequestContext RequireContext() => execution.RequireContext("data_source_discovery_context_required");
     private Task AuditAsync(string action, string reason, RequestContext context, CancellationToken token) =>
         audit.WriteAsync(new(action, ActorPrincipalId: context.PrincipalId, TenantId: context.TenantId,
             WorkspaceId: context.WorkspaceId, ReasonCode: reason), token);
@@ -388,30 +391,33 @@ public sealed class DataSourceAcquisitionTargetService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     IAuthorizationService authorization,
     ISecurityAuditWriter audit,
     DataSourceManagementService sources,
     DataSourceProfileService profiles,
     TimeProvider timeProvider)
 {
+    private readonly DataSourceExecutionContext execution = new(requestContext, requestScopes);
+
     public async Task<IReadOnlyList<DataSourceAcquisitionTargetView>> ListAsync(ResourceNamespace sourceNamespace,
         string sourceName, ResourceScopeRef? sourceScope, CancellationToken cancellationToken)
     {
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.ResourcesRead, cancellationToken);
         if (sourceScope is { } requestedScope)
-            DataSourceAcquisitionService.EnsureVisible(requestedScope, context);
+            execution.EnsureVisible(requestedScope);
         var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
-        DataSourceAcquisitionService.EnsureVisible(source.Value.ScopeRef!.Value, context);
+        execution.EnsureVisible(source.Value.ScopeRef!.Value);
         var profile = await profiles.ResolveActiveAsync(source.Value.ScopeRef!.Value, source.Value.Namespace,
             source.Value.Definition.Profile, cancellationToken);
-        var discoveries = await store.ListExactAsync<DataSourceDiscoveryResource>(ResourceScopeRef.Workspace(context.WorkspaceId),
-            DataSourceResourceKinds.DataSourceDiscovery, 0, 1_000, cancellationToken);
+        var discoveries = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceDiscoveryResource>(ResourceScopeRef.Workspace(context.WorkspaceId),
+            DataSourceResourceKinds.DataSourceDiscovery, 0, 1_000, cancellationToken));
         var latestDiscovery = discoveries.Where(value => value.Value.DataSourceUid == source.Value.Uid
             && value.Value.State == DataSourceDiscoveryState.Succeeded).OrderByDescending(value => value.Value.CompletedAt).FirstOrDefault();
-        var targets = await store.ListExactAsync<DataSourceAcquisitionTargetResource>(ResourceScopeRef.Workspace(context.WorkspaceId),
-            DataSourceResourceKinds.DataSourceAcquisitionTarget, 0, 1_000, cancellationToken);
+        var targets = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceAcquisitionTargetResource>(ResourceScopeRef.Workspace(context.WorkspaceId),
+            DataSourceResourceKinds.DataSourceAcquisitionTarget, 0, 1_000, cancellationToken));
         return targets.Where(value => value.Value.DataSourceUid == source.Value.Uid)
             .Select(value => View(value.Value, source.Value, profile, latestDiscovery?.Value)).ToArray();
     }
@@ -422,8 +428,8 @@ public sealed class DataSourceAcquisitionTargetService(
         var context = RequireContext();
         ValidateName(request.Name);
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var discovery = await store.GetExactAsync<DataSourceDiscoveryResource>(ScopedResourceAddress.Create(scope, ns,
-            DataSourceResourceKinds.DataSourceDiscovery, discoveryId), cancellationToken)
+        var discovery = await execution.InWorkspaceAsync(() => store.GetExactAsync<DataSourceDiscoveryResource>(ScopedResourceAddress.Create(scope, ns,
+            DataSourceResourceKinds.DataSourceDiscovery, discoveryId), cancellationToken))
             ?? throw Error("data_source_discovery_not_found", $"Discovery '{discoveryId}' was not found.");
         if (discovery.Value.State != DataSourceDiscoveryState.Succeeded || discovery.Value.Manifest is null)
             throw Error("data_source_discovery_not_ready", $"Discovery '{discoveryId}' is not successful.");
@@ -455,8 +461,8 @@ public sealed class DataSourceAcquisitionTargetService(
             PromotedAt = timeProvider.GetUtcNow(),
             PromotedBy = context.PrincipalId
         };
-        var stored = await scopeOperations.WriteAsync(target, scope, AuthorizationPermissions.ResourcesWrite,
-            token => store.PutExactAsync(scope, target, null, true, token), cancellationToken);
+        var stored = await execution.InWorkspaceAsync(() => scopeOperations.WriteAsync(target, scope, AuthorizationPermissions.ResourcesWrite,
+            token => store.PutExactAsync(scope, target, null, true, token), cancellationToken));
         await AuditAsync(SecurityAuditActions.DataSourceAcquisitionTargetPromoted, target.Name, context, cancellationToken);
         return stored;
     }
@@ -467,8 +473,8 @@ public sealed class DataSourceAcquisitionTargetService(
         RequireEtag(ifMatch);
         var context = RequireContext();
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var existing = await store.GetExactAsync<DataSourceAcquisitionTargetResource>(ScopedResourceAddress.Create(scope, ns,
-            DataSourceResourceKinds.DataSourceAcquisitionTarget, name), cancellationToken)
+        var existing = await execution.InWorkspaceAsync(() => store.GetExactAsync<DataSourceAcquisitionTargetResource>(ScopedResourceAddress.Create(scope, ns,
+            DataSourceResourceKinds.DataSourceAcquisitionTarget, name), cancellationToken))
             ?? throw Error("data_source_acquisition_target_not_found", $"Acquisition target '{name}' was not found.");
         if (string.IsNullOrWhiteSpace(request.DisplayName) || request.DisplayName.Length > 200 || request.Description?.Length > 2_000)
             throw Error("data_source_acquisition_target_metadata_invalid", "Target display name or description is invalid.");
@@ -479,8 +485,8 @@ public sealed class DataSourceAcquisitionTargetService(
             Description = request.Description,
             Enabled = request.Enabled
         };
-        return await scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
-            token => store.PutExactAsync(scope, updated, ifMatch, false, token), cancellationToken);
+        return await execution.InWorkspaceAsync(() => scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
+            token => store.PutExactAsync(scope, updated, ifMatch, false, token), cancellationToken));
     }
 
     public async Task<StoredResource<DataSourceAcquisitionTargetResource>> ReconcileAsync(ResourceNamespace ns, string name,
@@ -489,11 +495,11 @@ public sealed class DataSourceAcquisitionTargetService(
         RequireEtag(ifMatch);
         var context = RequireContext();
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var existing = await store.GetExactAsync<DataSourceAcquisitionTargetResource>(ScopedResourceAddress.Create(scope, ns,
-            DataSourceResourceKinds.DataSourceAcquisitionTarget, name), cancellationToken)
+        var existing = await execution.InWorkspaceAsync(() => store.GetExactAsync<DataSourceAcquisitionTargetResource>(ScopedResourceAddress.Create(scope, ns,
+            DataSourceResourceKinds.DataSourceAcquisitionTarget, name), cancellationToken))
             ?? throw Error("data_source_acquisition_target_not_found", $"Acquisition target '{name}' was not found.");
-        var discovery = await store.GetExactAsync<DataSourceDiscoveryResource>(ScopedResourceAddress.Create(scope, ns,
-            DataSourceResourceKinds.DataSourceDiscovery, request.DiscoveryId), cancellationToken)
+        var discovery = await execution.InWorkspaceAsync(() => store.GetExactAsync<DataSourceDiscoveryResource>(ScopedResourceAddress.Create(scope, ns,
+            DataSourceResourceKinds.DataSourceDiscovery, request.DiscoveryId), cancellationToken))
             ?? throw Error("data_source_discovery_not_found", $"Discovery '{request.DiscoveryId}' was not found.");
         if (discovery.Value.State != DataSourceDiscoveryState.Succeeded || discovery.Value.Manifest is null)
             throw Error("data_source_discovery_not_ready", $"Discovery '{request.DiscoveryId}' is not successful.");
@@ -516,8 +522,8 @@ public sealed class DataSourceAcquisitionTargetService(
             PromotedAt = timeProvider.GetUtcNow(),
             PromotedBy = context.PrincipalId
         };
-        var stored = await scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
-            token => store.PutExactAsync(scope, updated, ifMatch, false, token), cancellationToken);
+        var stored = await execution.InWorkspaceAsync(() => scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
+            token => store.PutExactAsync(scope, updated, ifMatch, false, token), cancellationToken));
         await AuditAsync(SecurityAuditActions.DataSourceAcquisitionTargetReconciled, stored.Value.Name, context, cancellationToken);
         return stored;
     }
@@ -527,9 +533,9 @@ public sealed class DataSourceAcquisitionTargetService(
         RequireEtag(ifMatch);
         var context = RequireContext();
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
-        await scopeOperations.WriteAsync(DataSourceResourceKinds.DataSourceAcquisitionTarget, scope,
+        await execution.InWorkspaceAsync(() => scopeOperations.WriteAsync(DataSourceResourceKinds.DataSourceAcquisitionTarget, scope,
             AuthorizationPermissions.ResourcesDelete, async token =>
-            { await store.DeleteExactAsync(ScopedResourceAddress.Create(scope, ns, DataSourceResourceKinds.DataSourceAcquisitionTarget, name), ifMatch, token); return true; }, cancellationToken);
+            { await store.DeleteExactAsync(ScopedResourceAddress.Create(scope, ns, DataSourceResourceKinds.DataSourceAcquisitionTarget, name), ifMatch, token); return true; }, cancellationToken));
     }
 
     private static DataSourceAcquisitionTargetView View(DataSourceAcquisitionTargetResource target,
@@ -545,8 +551,7 @@ public sealed class DataSourceAcquisitionTargetService(
             reasons.Add("A newer successful discovery exists; explicitly reconcile or promote a new target.");
         return new(target, reasons.Count != 0, reasons);
     }
-    private RequestContext RequireContext() => requestContext.IsInitialized ? requestContext.Current
-        : throw Error("data_source_target_context_required", "A Workspace request context is required.");
+    private RequestContext RequireContext() => execution.RequireContext("data_source_target_context_required");
     private Task AuditAsync(string action, string reason, RequestContext context, CancellationToken token) => audit.WriteAsync(
         new(action, ActorPrincipalId: context.PrincipalId, TenantId: context.TenantId, WorkspaceId: context.WorkspaceId, ReasonCode: reason), token);
     private static void ValidateName(string value)

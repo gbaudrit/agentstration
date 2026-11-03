@@ -110,6 +110,47 @@ public sealed class DataSourceEditorTests
         });
     }
 
+    [TestMethod]
+    [DataRow("en-US", "operational status or history could not be loaded")]
+    [DataRow("fr-FR", "son état opérationnel ou son historique n’a pas pu être chargé")]
+    public void HistoryFailureKeepsDefinitionAndYamlLoaded(string cultureName, string expectedMessage)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(historyFails: true));
+        context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=definition");
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[role=alert]").TextContent, expectedMessage);
+            Assert.AreEqual("https://docs.agentstration.io", rendered.Find("[data-schema-path='$.url'] input").GetAttribute("value"));
+            Assert.IsFalse(rendered.Find("fieldset").HasAttribute("disabled"));
+        });
+        rendered.FindAll("[role=tab]").Single(value => value.TextContent == "YAML").Click();
+        rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Find(".data-source-yaml-field").OuterHtml, "docs.agentstration.io"));
+    }
+
+    [TestMethod]
+    public void ReadinessKeepsPinnedProfileSelectableWhenCatalogueOmitsIt()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
+        context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub(omitProfile: true));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=definition");
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual($"{Scope.Value}|default|web-builtin",
+                rendered.Find("[data-testid=data-source-profile] option[selected]").GetAttribute("value"));
+            Assert.AreEqual("https://docs.agentstration.io", rendered.Find("[data-schema-path='$.url'] input").GetAttribute("value"));
+        });
+    }
+
     private static DataSourceProfileProperties ProfileProperties => new()
     {
         DisplayName = "Web Builtin",
@@ -203,7 +244,7 @@ public sealed class DataSourceEditorTests
         Manifest = new() { Artifacts = [new() { ArtifactId = "artifact-1", Kind = DataSourceArtifactKind.Durable, Disposition = DataSourceArtifactDisposition.Publishable }] }
     };
 
-    private sealed class SourceClientStub(bool targeted = false) : IDataSourcesClient
+    private sealed class SourceClientStub(bool targeted = false, bool historyFails = false) : IDataSourcesClient
     {
         public StartDataSourceAcquisitionRequest? StartedRequest { get; private set; }
         public Task<IReadOnlyList<DataSourceResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceResource>>([Source]);
@@ -216,7 +257,7 @@ public sealed class DataSourceEditorTests
             targeted ? new("discover", ResourceNamespace.Default, "1.0.0", false, null, null,
                 DataSourceFlowContracts.Discovery, "sha256:discovery")
             { ScopeRef = Scope } : null));
-        public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceAcquisitionResource>>([Acquisition]);
+        public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => historyFails ? throw new InvalidOperationException("history unavailable") : Task.FromResult<IReadOnlyList<DataSourceAcquisitionResource>>([Acquisition]);
         public Task<ResourceSnapshot<DataSourceResource>> CreateAsync(CreateDataSourceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -279,10 +320,10 @@ public sealed class DataSourceEditorTests
         PromotedBy = Guid.Empty
     };
 
-    private sealed class ProfileClientStub : IDataSourceProfilesClient
+    private sealed class ProfileClientStub(bool omitProfile = false) : IDataSourceProfilesClient
     {
         private static readonly DataSourceProfileResource Profile = new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceProfile, Metadata = new() { Name = "web-builtin" }, ScopeRef = Scope, Definition = ProfileProperties, ActiveVersion = "1.0.1" };
-        public Task<IReadOnlyList<DataSourceProfileResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileResource>>([Profile]);
+        public Task<IReadOnlyList<DataSourceProfileResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileResource>>(omitProfile ? [] : [Profile]);
         public Task<ResourceSnapshot<DataSourceProfileResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<DataSourceProfileRevisionResource>> GetRevisionsAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileRevisionResource>>([new()
         {

@@ -30,6 +30,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var instance = targets.Single(target => target.Kind == ResourceScopeKind.Instance).ScopeRef;
         var workspace = targets.Single(target => target.Kind == ResourceScopeKind.Workspace).ScopeRef;
         var context = await GetBootstrapContextAsync(factory);
+        var tenant = ResourceScopeRef.Tenant(context.TenantId);
 
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
@@ -49,7 +50,8 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
                 new(new(profile.Value.Uid, instance, profile.Value.Namespace,
                         DataSourceResourceKinds.DataSourceProfile, profile.Value.Generation),
-                    [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+                    [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use]),
+                        new(tenant, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
         }
 
         using var createdSource = await client.PostAsJsonAsync("/api/datasources",
@@ -70,6 +72,22 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         Assert.IsTrue(readiness.Ready);
         Assert.AreEqual(instance, readiness.Profile?.ScopeRef);
         Assert.AreEqual("1.0.0", readiness.Profile?.Version);
+
+        SelectConsoleContext(client, tenant);
+        using var tenantSource = await client.PostAsJsonAsync("/api/datasources",
+            new CreateDataSourceRequest("tenant-docs", new()
+            {
+                DisplayName = "Tenant documentation",
+                Profile = new("shared-http", instance),
+                Configuration = JsonSerializer.SerializeToElement(new { url = "https://docs.example.test" })
+            }, ScopeRef: tenant));
+        Assert.AreEqual(HttpStatusCode.Created, tenantSource.StatusCode, await tenantSource.Content.ReadAsStringAsync());
+        var tenantReadiness = await client.GetFromJsonAsync<DataSourceReadiness>(
+            $"/api/datasources/tenant-docs/readiness?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        Assert.IsNotNull(tenantReadiness);
+        Assert.IsTrue(tenantReadiness.Ready);
+        Assert.AreEqual(instance, tenantReadiness.Profile?.ScopeRef);
+
     }
 
     [TestMethod]
@@ -468,16 +486,24 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
-    public async Task DiscoveryPromotesExplicitTargetsAndRediscoveryMakesThemStale()
+    [DataRow(ResourceScopeKind.Workspace)]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    public async Task DiscoveryPromotesExplicitTargetsAndRediscoveryMakesThemStale(ResourceScopeKind scopeKind)
     {
         await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var context = await GetBootstrapContextAsync(factory);
-        var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var workspace = scopeKind switch
+        {
+            ResourceScopeKind.Instance => ResourceScopeRef.Instance,
+            ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(context.TenantId),
+            _ => ResourceScopeRef.Workspace(context.WorkspaceId)
+        };
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
-            await CreatePublishedAcquisitionFlowAsync(factory.Services, context, "target-acquire");
-            await CreatePublishedDiscoveryFlowAsync(factory.Services, context, "target-discover");
+            await CreatePublishedAcquisitionFlowAsync(factory.Services, context, "target-acquire", workspace);
+            await CreatePublishedDiscoveryFlowAsync(factory.Services, context, "target-discover", workspace);
             var profiles = factory.Services.GetRequiredService<DataSourceProfileService>();
             var sources = factory.Services.GetRequiredService<DataSourceManagementService>();
             var definition = Profile() with
@@ -491,6 +517,16 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         }
 
         using var client = factory.CreateClient();
+        SelectConsoleContext(client, workspace);
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var executionWorkspace = scopeKind switch
+        {
+            ResourceScopeKind.Instance => (await topology.GetInstanceOperationsWorkspaceAsync(default)).Id,
+            ResourceScopeKind.Tenant => (await topology.GetTenantOperationsWorkspaceAsync(context.TenantId, default)).Id,
+            _ => context.WorkspaceId
+        };
+        var history = await client.GetFromJsonAsync<DataSourceAcquisitionResource[]>($"/api/datasources/targeted-origin/acquisitions?scopeRef={Uri.EscapeDataString(workspace.Value)}");
+        Assert.IsEmpty(history!);
         using var missingTarget = await client.PostAsJsonAsync(
             $"/api/datasources/targeted-origin/acquisitions?scopeRef={Uri.EscapeDataString(workspace.Value)}",
             new StartDataSourceAcquisitionRequest { DataSourceScopeRef = workspace });
@@ -513,7 +549,26 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             $"/api/datasources/targeted-origin/acquisitions?scopeRef={Uri.EscapeDataString(workspace.Value)}",
             new StartDataSourceAcquisitionRequest { DataSourceScopeRef = workspace, TargetName = "documents" });
         Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode);
-        Assert.AreEqual(promoted?.Uid, (await started.Content.ReadFromJsonAsync<DataSourceAcquisitionResource>())?.Target?.Uid);
+        var accepted = await started.Content.ReadFromJsonAsync<DataSourceAcquisitionResource>();
+        Assert.AreEqual(promoted?.Uid, accepted?.Target?.Uid);
+        Assert.IsNotNull(accepted);
+        Assert.AreEqual(ResourceScopeRef.Workspace(executionWorkspace), accepted.ScopeRef);
+        Assert.AreEqual(workspace, accepted.LogicalScopeRef);
+        Assert.AreEqual(workspace, discovery.LogicalScopeRef);
+        Assert.AreEqual(executionWorkspace, discovery.WorkspaceId);
+        var flow = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{accepted.FlowRunId}");
+        Assert.IsNotNull(flow);
+        Assert.AreEqual(workspace, flow.Scope.LogicalScopeRef);
+
+        if (scopeKind != ResourceScopeKind.Workspace)
+        {
+            SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
+            using var hiddenAcquisition = await client.GetAsync($"/api/datasourceacquisitions/{accepted.Name}");
+            Assert.AreEqual(HttpStatusCode.NotFound, hiddenAcquisition.StatusCode);
+            using var hiddenDiscovery = await client.GetAsync($"/api/datasourcediscoveries/{discovery.Name}");
+            Assert.AreEqual(HttpStatusCode.NotFound, hiddenDiscovery.StatusCode);
+            SelectConsoleContext(client, workspace);
+        }
 
         var rediscovery = await StartAndAwaitDiscoveryAsync(client, workspace);
         var targets = await client.GetFromJsonAsync<DataSourceAcquisitionTargetView[]>(
@@ -702,7 +757,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         [new FlowNode("input", FlowNodeKind.Input)],
         []);
 
-    private static async Task CreatePublishedDiscoveryFlowAsync(IServiceProvider services, RequestContext context, string name)
+    private static async Task CreatePublishedDiscoveryFlowAsync(IServiceProvider services, RequestContext context, string name, ResourceScopeRef? ownerScope = null)
     {
         var inputSchema = JsonSerializer.SerializeToElement(new
         {
@@ -730,8 +785,8 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             artifacts = Array.Empty<object>()
         });
         var flows = services.GetRequiredService<FlowService>();
-        var workspace = new WorkspaceId(context.WorkspaceId);
-        await flows.CreateAsync(workspace, new CreateFlowCommand(name, null, "1.0.0", true,
+        var scope = ownerScope ?? ResourceScopeRef.Workspace(context.WorkspaceId);
+        await flows.CreateExactAsync(scope, new CreateFlowCommand(name, null, "1.0.0", true,
             GraphOnlyDefinition(),
             new Dictionary<string, string> { [FlowMetadataKeys.Contract] = DataSourceFlowContracts.Discovery },
             new FlowGraphDefinition
@@ -742,7 +797,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
                 Steps = [new InputFlowStepDefinition { Name = "input", Schema = inputSchema },
                     new OutputFlowStepDefinition { Name = "output", OutputMapping = output }],
                 Transitions = [new("input-output", "input", "completed", "output")]
-            }), default, default);
-        await flows.PublishVersionAsync(workspace, new(name), "1.0.0", true, default);
+            }), ResourceNamespace.Default, default);
+        await flows.PublishVersionExactAsync(scope, new(name), "1.0.0", true, default);
     }
 }

@@ -53,4 +53,5 @@
   <data name="DiscoveryToolBindings" xml:space="preserve"><value>Associations d’outils de découverte (JSON)</value></data>
   <data name="Access"><value>Accès</value></data>
   <data name="ManagedReadOnly"><value>Géré · lecture seule</value></data><data name="Editable"><value>Modifiable</value></data><data name="ManagedProfileHelp"><value>Ce profil et ses révisions publiées sont contrôlés par l’installation de l’extension et ne peuvent pas être modifiés directement.</value></data><data name="ManagingExtension"><value>Extension gestionnaire</value></data>
+  <data name="OperationalLoadFailed" xml:space="preserve"><value>La définition de la source de données est chargée, mais son état opérationnel ou son historique n’a pas pu être chargé. Rechargez la page pour réessayer.</value></data>
 </root>

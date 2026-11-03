@@ -53,4 +53,5 @@
   <data name="DiscoveryToolBindings" xml:space="preserve"><value>Discovery Tool bindings (JSON)</value></data>
   <data name="Access"><value>Access</value></data>
   <data name="ManagedReadOnly"><value>Managed · read-only</value></data><data name="Editable"><value>Editable</value></data><data name="ManagedProfileHelp"><value>This profile and its published revisions are controlled by the extension installation and cannot be changed directly.</value></data><data name="ManagingExtension"><value>Managing extension</value></data>
+  <data name="OperationalLoadFailed" xml:space="preserve"><value>The Data Source definition is loaded, but its operational status or history could not be loaded. Reload the page to retry.</value></data>
 </root>
