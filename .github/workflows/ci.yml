@@ -148,7 +148,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'Fast functional lane failed.'
           }
-          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 947 --max-parallel-test-modules 2
+          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2
           if ($LASTEXITCODE -ne 0) {
             throw 'Integration functional lane failed.'
           }
@@ -219,7 +219,7 @@ jobs:
             '| --- | ---: | ---: | ---: | ---: | ---: | --- |'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
-            @{ Name = 'Agentstration.Api.Tests'; Tests = 211; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.Tests'; Tests = 217; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 127; Warning = 1920; Failure = 2560 },
             @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 31; Warning = 500; Failure = 700 },
             @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 64; Warning = 1280; Failure = 1664 },
@@ -369,8 +369,8 @@ jobs:
         run: |
           dotnet build tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --no-restore
           dotnet build tests/Agentstration.Performance.Tests/Agentstration.Performance.Tests.csproj --configuration Release --no-restore
-      - name: Run PostgreSQL migration and restart test
-        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart" --minimum-expected-tests 1 --progress off
+      - name: Run PostgreSQL migration, restart and Flow recovery tests
+        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart|Name=FlowRecoveryRepairsLegacyStatusesAndDrainsChangingPages" --minimum-expected-tests 2 --progress off
       - name: Run PostgreSQL storage concurrency benchmark
         env:
           AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER: PostgreSql

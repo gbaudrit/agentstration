@@ -75,7 +75,7 @@ $lanes = switch ($Shard.ToLowerInvariant()) {
             @{
                 Name = 'Integration'
                 Solution = 'Agentstration.Tests.Integration.slnx'
-                MinimumTests = 947
+                MinimumTests = 954
                 ParallelModules = 2
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/integration'
             }
