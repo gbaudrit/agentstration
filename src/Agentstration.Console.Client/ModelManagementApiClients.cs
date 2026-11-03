@@ -79,6 +79,8 @@ public interface IExtensionsClient
                 value.Status)])).ToArray();
     Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Exact-scope Extension Registration reads are not implemented by this client.");
     Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken);
     Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken);
@@ -119,6 +121,10 @@ public interface IExtensionsClient
 
 public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClient
 {
+    public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        ReadRegistrationAsync(HttpMethod.Get,
+            $"api/extensionregistrations/{Uri.EscapeDataString(name)}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}", null, null, cancellationToken);
     public async Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ExtensionResponse>>(httpClient, "api/extensions", cancellationToken)).Value;
 

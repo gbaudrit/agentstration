@@ -10,7 +10,7 @@ public static class Crawl4AiDataSourceProfileBundle
         "1.0.0",
         [ToolSet, TransferFlow, AcquisitionFlow, Profile],
         "Acquires any allowed Web origin through Crawl4AI and publishes one governed durable corpus Artifact.",
-        ["web.crawl", "content.read", "content.delete"]);
+        ["crawl4ai.web.crawl", "crawl4ai.content.read", "crawl4ai.content.delete"]);
 
     private const string ToolSet = """
         apiVersion: agentstration.io/v1
@@ -24,9 +24,9 @@ public static class Crawl4AiDataSourceProfileBundle
           version: 1.0.0
           publish: true
           members:
-            - { tool: { binding: web.crawl }, capability: web.crawl, route: default }
-            - { tool: { binding: content.read }, capability: content.read, route: default }
-            - { tool: { binding: content.delete }, capability: content.delete, route: default }
+            - { tool: { binding: crawl4ai.web.crawl }, capability: web.crawl, route: default }
+            - { tool: { binding: crawl4ai.content.read }, capability: content.read, route: default }
+            - { tool: { binding: crawl4ai.content.delete }, capability: content.delete, route: default }
         """;
 
     private const string TransferFlow = """
@@ -208,9 +208,9 @@ public static class Crawl4AiDataSourceProfileBundle
             additionalProperties: false
           acquisitionFlow: { name: crawl4ai-web-acquisition, version: 1.0.0, useActiveVersion: false }
           toolBindings:
-            - { name: crawl, capability: web.crawl, tool: { binding: web.crawl } }
-            - { name: read, capability: content.read, tool: { binding: content.read } }
-            - { name: delete, capability: content.delete, tool: { binding: content.delete } }
+            - { name: crawl, capability: web.crawl, tool: { binding: crawl4ai.web.crawl } }
+            - { name: read, capability: content.read, tool: { binding: crawl4ai.content.read } }
+            - { name: delete, capability: content.delete, tool: { binding: crawl4ai.content.delete } }
           limits: { maximumPages: 1000, maximumDepth: 10 }
           policies: { publicNetworkOnly: true }
         """;

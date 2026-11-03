@@ -23,6 +23,7 @@ else
     @if (tab == Tab.Overview && !IsNew)
     {
         <section class="metric-grid"><MetricCard Label="@T("ActiveVersion")" Value="@(profile?.ActiveVersion ?? "—")" Detail="@T("Published")" Status="@(profile?.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@T("DraftVersion")" Value="@version" Detail="@T(enabled ? "Enabled" : "Disabled")" Status="@(enabled ? UiStatus.Success : UiStatus.Warning)" /></section>
+        <ExtensionManagedResourcePanel Governance="profile!.Governance" ScopeRef="profile.ScopeRef!.Value" Namespace="profile.Namespace" Kind="@DataSourceResourceKinds.DataSourceProfile" Name="@profile.Name" Uid="profile.Uid" />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Flow")</p><h2>@profile!.Definition.AcquisitionFlow.Name</h2></div></div><ResourceScopeBadge ScopeRef="profile.ScopeRef" /></section>
     }
     else if (tab == Tab.Definition || IsNew)
@@ -78,7 +79,7 @@ else
     private bool enabled = true, loading = true, busy, confirmDelete;
     private Tab tab = Tab.Definition;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool CanManage => IsNew || selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
+    private bool CanManage => IsNew || profile?.Governance.IsManaged != true && selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
     private string T(string key) => Localizer[key];
     protected override Task OnParametersSetAsync() => LoadAsync();
     private async Task LoadAsync() { loading = true; error = null; try { flows = await Flows.GetFlowsAsync(cancellation.Token); if (!IsNew) { selectedScope = ResourceScopeRef.Parse(ScopeRef!); var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, selectedScope.Value, cancellation.Token); profile = snapshot.Value; etag = snapshot.ETag; revisions = await Client.GetRevisionsAsync(profile.Namespace, profile.Name, selectedScope.Value, cancellation.Token); LoadForm(); tab = Tab.Overview; } } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }

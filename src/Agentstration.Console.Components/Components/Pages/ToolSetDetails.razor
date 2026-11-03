@@ -7,7 +7,7 @@
 
 <PageTitle>@(toolSet?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 <PageHeader Title="@(toolSet?.Definition.DisplayName ?? Name)" Description="@(toolSet?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-toolset-details">
-    <Actions><a class="button-secondary" href="/tools/sets">@T("Back")</a>@if (toolSet is not null && CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+    <Actions><a class="button-secondary" href="/tools/sets">@T("Back")</a>@if (toolSet is not null && CanMutate) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
@@ -24,6 +24,7 @@ else if (toolSet is not null)
         <MetricCard Label="@T("Members")" Value="@toolSet.Definition.Members.Count.ToString()" Detail="@T("GovernedIndividually")" Status="UiStatus.Neutral" />
         <MetricCard Label="@T("PublishedVersions")" Value="@versions.Count.ToString()" Detail="@T("Immutable")" Status="UiStatus.Success" />
     </section>
+    <ExtensionManagedResourcePanel Governance="toolSet.Governance" ScopeRef="@(toolSet.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="toolSet.Namespace" Kind="@ToolResourceKinds.ToolSet" Name="@toolSet.Name" Uid="toolSet.Uid" />
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("Metadata")</p><h2>@T("DescriptiveMetadata")</h2><p>@T("MetadataHelp")</p></div></div>
         <dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@toolSet.Namespace/@toolSet.Name</code></dd><dt>@T("Category")</dt><dd>@(toolSet.Definition.Category?.Name ?? "—")</dd><dt>@T("Tags")</dt><dd>@Map(toolSet.Metadata.Tags)</dd><dt>@T("Annotations")</dt><dd>@Map(toolSet.Metadata.Annotations)</dd></dl>
@@ -57,6 +58,7 @@ else if (toolSet is not null)
 @code {
     [Parameter] public string Name { get; set; } = string.Empty;
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private ToolSetResource? toolSet;
     private IReadOnlyList<ToolSetVersionResource> versions = [];
@@ -65,6 +67,7 @@ else if (toolSet is not null)
     private DetailsTab activeTab;
     private ResourceNamespace ResourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private bool CanManage => toolSet is not null && ResourceOwnershipContext.CanManage(toolSet.ScopeRef ?? ResourceScopeRef.Instance, Services);
+    private bool CanMutate => CanManage && toolSet?.Governance.IsManaged == false;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     protected override async Task OnParametersSetAsync()
     {
@@ -72,8 +75,13 @@ else if (toolSet is not null)
         error = null;
         try
         {
-            var snapshotTask = Client.GetToolSetAsync(ResourceNamespace, Name, cancellation.Token);
-            var versionsTask = Client.GetVersionsAsync(ResourceNamespace, Name, cancellation.Token);
+            var scopeRef = string.IsNullOrWhiteSpace(ScopeRefValue) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(ScopeRefValue);
+            var snapshotTask = scopeRef is { } exact
+                ? Client.GetToolSetAsync(exact, ResourceNamespace, Name, cancellation.Token)
+                : Client.GetToolSetAsync(ResourceNamespace, Name, cancellation.Token);
+            var versionsTask = scopeRef is { } owner
+                ? Client.GetVersionsAsync(owner, ResourceNamespace, Name, cancellation.Token)
+                : Client.GetVersionsAsync(ResourceNamespace, Name, cancellation.Token);
             await Task.WhenAll(snapshotTask, versionsTask);
             var snapshot = await snapshotTask;
             toolSet = snapshot.Value;
@@ -85,16 +93,21 @@ else if (toolSet is not null)
     }
     private async Task DeleteAsync()
     {
-        if (!CanManage || etag is null || busy) return;
+        if (!CanMutate || etag is null || busy) return;
         busy = true;
         message = null;
-        try { await Client.DeleteAsync(ResourceNamespace, Name, etag, cancellation.Token); Navigation.NavigateTo("/tools/sets"); }
+        try
+        {
+            if (ScopeRefValue is { Length: > 0 })
+                await Client.DeleteAsync(ResourceScopeRef.Parse(ScopeRefValue), ResourceNamespace, Name, etag, cancellation.Token);
+            else await Client.DeleteAsync(ResourceNamespace, Name, etag, cancellation.Token);
+            Navigation.NavigateTo("/tools/sets");
+        }
         catch (Exception exception) { message = exception.Message; confirmDelete = false; }
         finally { busy = false; }
     }
-    private static string ToolUrl(PublishedToolSetMember member) => member.ToolNamespace.IsDefault
-        ? $"/tools/{Uri.EscapeDataString(member.ToolName)}"
-        : $"/tools/{Uri.EscapeDataString(member.ToolName)}?namespace={Uri.EscapeDataString(member.ToolNamespace.Value)}";
+    private static string ToolUrl(PublishedToolSetMember member) =>
+        $"/tools/{Uri.EscapeDataString(member.ToolName)}?namespace={Uri.EscapeDataString(member.ToolNamespace.Value)}&scopeRef={Uri.EscapeDataString(member.ToolScopeRef.Value)}&context={Uri.EscapeDataString(member.ToolScopeRef.Value)}";
     private static string Map(IReadOnlyDictionary<string, string> values) => values.Count == 0 ? "—" : string.Join(" · ", values.Select(value => $"{value.Key}={value.Value}"));
     private enum DetailsTab { Overview, Access }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

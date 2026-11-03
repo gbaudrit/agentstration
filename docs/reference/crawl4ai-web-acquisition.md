@@ -34,13 +34,17 @@ The extension sends a minimal `{ "urls": ["…"] }` request to Crawl4AI. Flow or
 
 | Contribution | MCP Tool | Purpose |
 | --- | --- | --- |
-| `web.fetch` | `web_fetch` | Acquire one page. |
-| `web.crawl` | `web_crawl` | Acquire a breadth-first page set within configured depth and count limits. |
-| `content.extract` | `content_extract` | Produce normalized text from previously acquired HTML or text. |
-| `content.read` | `content_read` | Read one bounded base64 chunk from temporary content. |
-| `content.delete` | `content_delete` | Idempotently remove temporary content. |
+| `crawl4ai.web.fetch` | `web_fetch` | Acquire one page. |
+| `crawl4ai.web.crawl` | `web_crawl` | Acquire a breadth-first page set within configured depth and count limits. |
+| `crawl4ai.content.extract` | `content_extract` | Produce normalized text from previously acquired HTML or text. |
+| `crawl4ai.content.read` | `content_read` | Read one bounded base64 chunk from temporary content. |
+| `crawl4ai.content.delete` | `content_delete` | Idempotently remove temporary content. |
 
-The AEP registration materializes these as ordinary governed Tools. Administrators still enable the provider and Tools, group the exact published Tools in a ToolSet when desired, and assign only the required unit Tools to an Agent or Flow.
+Contribution IDs use the `crawl4ai.` prefix, and the bundle's required-Tool declarations and binding placeholders use those exact IDs. Semantic capabilities such as `web.crawl` remain provider-neutral. Materialized Tool names additionally include the exact paired provider identity, so separate registrations do not collide at the same ownership scope. ToolSet, Flow, and Profile names use the `crawl4ai-` prefix. The Console catalog links the readable extension name and keeps the pairing identity out of list text; the exact provider remains available on details pages.
+
+Earlier preview manifests used unprefixed Tool contribution IDs. Existing immutable bundle installations are not renamed or upgraded automatically; use a fresh installation to evaluate the revised manifest and update any custom binding keys.
+
+Paired enrollment materializes these as extension-managed Tools and enables the three required by the bundle: `crawl4ai.web.crawl`, `crawl4ai.content.read`, and `crawl4ai.content.delete`. The other declared Tools remain disabled; an unavailable contribution badge can therefore mean disabled rather than a failed extension connection. Their managed configuration remains read-only. Tool availability does not grant execution rights: Agents and Flows still consume only their explicitly assigned capabilities and ToolSets.
 
 The MCP schemas expose these stable arguments and results:
 
@@ -76,7 +80,13 @@ Data Source identity, resolved profile evidence, and acquisition parameters
 
 The temporary Crawl4AI reference is not an Agentstration `StagedArtifact`. It is intentionally local to the extension and expires. A Flow must transfer content through the governed staging Tools before handing it to a remote Agent, another Flow, or durable storage. On retry, `content_delete` is safe to repeat; an expired reference requires acquisition to restart.
 
-The extension contributes the `crawl4ai-web` Data Source Profile bundle. The bundle contains the exact ToolSet, bounded chunk-transfer Flow, `datasource.acquisition/v1` Flow, and Data Source Profile needed by this composition. Bundle installation is host-owned and explicit today; automatic installation in the extension's scope during enrollment is tracked by [#696](https://github.com/gbaudrit/agentstration/issues/696).
+The extension contributes the `crawl4ai-web` Data Source Profile bundle. The bundle contains the exact ToolSet, bounded chunk-transfer Flow, `datasource.acquisition/v1` Flow, and Data Source Profile needed by this composition. Successful enrollment installs it through host-owned handlers at the exact extension-registration scope and retains immutable governance and installation evidence.
+
+A resource conflict during application stops installation, records a failed bundle with diagnostics, and prevents enrollment from becoming available. Retrying enrollment after resolving the conflict reuses resources already installed by that bundle without duplicating their identities or published versions.
+
+Failures retain the inventory of resources already created, including a Flow draft whose publication was interrupted. A retry verifies that evidence before completing missing publications. Re-enrollment of an installed bundle also checks the recorded inventory against the actual resources; identity, owner, version, generation, or definition drift produces an `extension_bundle_*` conflict and a degraded installation, without adopting or replacing the changed resource.
+
+The Console distinguishes available, unavailable, not-materialized, and conflicting Tool contributions. Managed-resource links retain the owner scope and destination Console context. Data Source Profile lists and details distinguish the extension version from the bundle version and retain their read-only explanation while the extension is offline or unenrolled.
 
 The resulting durable Artifact is independent of Knowledge. A Knowledge Source may later bind this Data Source and preserve the corpus unchanged through `knowledge-projection-builtin`, or apply an explicit `artifact.transform/v1` Flow before projection.
 

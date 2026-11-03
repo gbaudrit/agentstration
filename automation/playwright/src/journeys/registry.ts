@@ -1,3 +1,4 @@
+import { inspectAcquisitionFailure } from './inspect-acquisition-failure.journey.js';
 import { administerGovernedToolSets } from './administer-governed-toolsets.journey.js';
 import { administerGovernedKnowledge } from './administer-governed-knowledge.journey.js';
 import { administerDataSources, projectKnowledgeSources } from './source-lifecycle.journey.js';
@@ -43,10 +44,15 @@ import { exerciseModelProfileCrossScope, type ExerciseModelProfileCrossScopeInpu
 import { exerciseModelProfileFlowDiagnostic, type ExerciseModelProfileFlowDiagnosticInput } from './exercise-model-profile-flow-diagnostic.journey.js';
 import { exerciseScopedFlowDesigner, type ExerciseScopedFlowDesignerInput } from './exercise-scoped-flow-designer.journey.js';
 import type { Journey } from './journey.js';
+import { inspectResourceScopes, type InspectResourceScopesInput } from './inspect-resource-scopes.journey.js';
+
+import { inspectGovernedExtensionInventory, type InspectGovernedExtensionInventoryInput } from './inspect-governed-extension-inventory.journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
+  'inspect-governed-extension-inventory': (context, input) => inspectGovernedExtensionInventory(context, input as InspectGovernedExtensionInventoryInput),
   'administer-governed-toolsets': (context, input) => administerGovernedToolSets(context, input),
   'administer-governed-knowledge': (context, input) => administerGovernedKnowledge(context, input),
+  'inspect-resource-scopes': (context, input) => inspectResourceScopes(context, input as InspectResourceScopesInput),
   'authenticate-console': authenticateConsole as Journey<Record<string, unknown>>,
   'create-agent': (context, input) => createAgent(context, input as unknown as CreateAgentInput),
   'create-handoff-flow': (context, input) => createHandoffFlow(context, input as unknown as CreateHandoffFlowInput),
@@ -73,6 +79,7 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'exercise-flow-designer-responsive': (context, input) => exerciseFlowDesignerResponsive(context, input as unknown as ExerciseFlowDesignerResponsiveInput),
   'inspect-runtime-worker-observability': (context, input) => inspectRuntimeWorkerObservability(context, input as unknown as InspectRuntimeWorkerObservabilityInput),
   'inspect-agent-instance-observability': (context, input) => inspectAgentInstanceObservability(context, input as unknown as InspectAgentInstanceObservabilityInput),
+  'inspect-acquisition-failure': (context, input) => inspectAcquisitionFailure(context, input),
   'administer-data-sources': (context, input) => administerDataSources(context, input),
   'project-knowledge-sources': (context, input) => projectKnowledgeSources(context, input),
   'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),

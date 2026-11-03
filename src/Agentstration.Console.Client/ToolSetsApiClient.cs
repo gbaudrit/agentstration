@@ -10,13 +10,45 @@ public interface IToolSetsClient
 {
     Task<IReadOnlyList<ToolSetResource>> GetToolSetsAsync(CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<ToolSetResource>> GetToolSetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default);
+    Task<ResourceSnapshot<ToolSetResource>> GetToolSetAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Exact-scope ToolSet reads are not implemented by this client.");
     Task<IReadOnlyList<ToolSetVersionResource>> GetVersionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ToolSetVersionResource>> GetVersionsAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Exact-scope ToolSet version reads are not implemented by this client.");
     Task<ToolSetVersionResource> GetVersionAsync(ResourceNamespace @namespace, string name, string version, CancellationToken cancellationToken = default);
     Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default);
+    Task DeleteAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Exact-scope ToolSet deletion is not implemented by this client.");
 }
 
 public sealed class ToolSetsApiClient(HttpClient httpClient) : IToolSetsClient
 {
+    public async Task DeleteAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name,
+        string etag, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, ScopedPath(@namespace, name, scopeRef));
+        request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+    public async Task<ResourceSnapshot<ToolSetResource>> GetToolSetAsync(ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(ScopedPath(@namespace, name, scopeRef), cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return new((await response.Content.ReadFromJsonAsync<ToolSetResource>(cancellationToken))!,
+            response.Headers.ETag?.ToString() ?? throw new InvalidOperationException("Missing ETag."));
+    }
+
+    public async Task<IReadOnlyList<ToolSetVersionResource>> GetVersionsAsync(ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ToolSetVersionResource>>(httpClient,
+            ChildPath(@namespace, name, "versions") + (@namespace.IsDefault ? "?" : "&")
+                + $"scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken)).Value;
+
+    private static string ScopedPath(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef) =>
+        Path(@namespace, name) + (@namespace.IsDefault ? "?" : "&") + $"scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
+
     public async Task<IReadOnlyList<ToolSetResource>> GetToolSetsAsync(CancellationToken cancellationToken = default) =>
         (await ApiResponse.ReadAsync<ValueResponse<ToolSetResource>>(httpClient, "api/toolsets", cancellationToken)).Value;
 

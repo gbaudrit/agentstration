@@ -24,7 +24,8 @@ public sealed class DataSourceProfileService(
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes,
     ISecurityAuditWriter audit,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IResourceGovernanceContext? governanceContext = null)
 {
     public const int MaximumConfigurationSchemaBytes = 64 * 1024;
 
@@ -44,7 +45,7 @@ public sealed class DataSourceProfileService(
         DataSourceProfileResource resource,
         CancellationToken cancellationToken)
     {
-        EnsureProtectedMutationAllowed(resource);
+        await EnsureProtectedMutationAllowedAsync(resource, cancellationToken);
         var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(DataSourceResourceKinds.DataSourceProfile);
         var desired = resource with
         {
@@ -69,7 +70,7 @@ public sealed class DataSourceProfileService(
         CancellationToken cancellationToken)
     {
         var existing = await GetAsync(@namespace, name, scopeRef, cancellationToken) ?? throw NotFound(name, @namespace);
-        EnsureProtectedMutationAllowed(existing.Value);
+        await EnsureProtectedMutationAllowedAsync(existing.Value, cancellationToken);
         var exact = RequireScope(existing.Value);
         var updated = existing.Value with
         {
@@ -120,7 +121,7 @@ public sealed class DataSourceProfileService(
     {
         ValidateVersion(request.Version);
         var profile = await GetAsync(@namespace, name, scopeRef, cancellationToken) ?? throw NotFound(name, @namespace);
-        EnsureProtectedMutationAllowed(profile.Value);
+        await EnsureProtectedMutationAllowedAsync(profile.Value, cancellationToken);
         var exact = RequireScope(profile.Value);
         var definition = profile.Value.Definition with { Version = request.Version };
         var hash = Hash(definition);
@@ -201,7 +202,7 @@ public sealed class DataSourceProfileService(
         CancellationToken cancellationToken)
     {
         var profile = await GetAsync(@namespace, name, scopeRef, cancellationToken) ?? throw NotFound(name, @namespace);
-        EnsureProtectedMutationAllowed(profile.Value);
+        await EnsureProtectedMutationAllowedAsync(profile.Value, cancellationToken);
         var exact = RequireScope(profile.Value);
         _ = await GetRevisionCoreAsync(profile.Value, request.Version, cancellationToken)
             ?? throw Error("data_source_profile_revision_not_found",
@@ -277,7 +278,7 @@ public sealed class DataSourceProfileService(
         string? ifMatch, CancellationToken cancellationToken)
     {
         var profile = await GetAsync(@namespace, name, scopeRef, cancellationToken) ?? throw NotFound(name, @namespace);
-        EnsureProtectedMutationAllowed(profile.Value);
+        await EnsureProtectedMutationAllowedAsync(profile.Value, cancellationToken);
         var exact = RequireScope(profile.Value);
         var usages = (await store.ListAllAsync<DataSourceResource>(DataSourceResourceKinds.DataSource, cancellationToken))
             .Where(value => value.Value.Definition.Profile.Name == profile.Value.Name
@@ -362,11 +363,19 @@ public sealed class DataSourceProfileService(
             ReasonCode: reason.Length <= 64 ? reason : reason[..64]), cancellationToken);
     }
 
-    private void EnsureProtectedMutationAllowed(DataSourceProfileResource resource)
+    private async Task EnsureProtectedMutationAllowedAsync(DataSourceProfileResource resource, CancellationToken cancellationToken)
     {
         if (IsBuiltIn(resource) && requestContext.AccessMode != ControlPlaneAccessMode.System)
             throw Error("data_source_profile_builtin_protected",
                 $"Data Source Profile '{resource.Address}' is managed by Agentstration and cannot be modified directly.");
+        try { ResourceGovernanceEnforcement.EnsureManager(resource.Governance, governanceContext?.Current); }
+        catch (ResourceGovernanceViolationException exception)
+        {
+            await audit.WriteAsync(new(SecurityAuditActions.ManagedResourceMutationDenied, SecurityAuditOutcome.Failed,
+                WorkspaceId: resource.ScopeRef?.Kind == ResourceScopeKind.Workspace ? resource.ScopeRef.Value.TargetId : null,
+                ReasonCode: exception.Code), cancellationToken);
+            throw Error(exception.Code, exception.Message);
+        }
     }
 
     private static bool IsBuiltIn(Resource resource) =>

@@ -78,9 +78,9 @@ public sealed class AgentstrationDocumentationEndToEndTests
         var management = services.GetRequiredService<BootstrapProfileManagementService>();
         var toolBindings = new Dictionary<string, ResourceReference>
         {
-            ["web.crawl"] = ToolReference(FixtureCrawlTool.Name, workspace.Id),
-            ["content.read"] = ToolReference(FixtureReadTool.Name, workspace.Id),
-            ["content.delete"] = ToolReference(FixtureDeleteTool.Name, workspace.Id)
+            ["crawl4ai.web.crawl"] = ToolReference(FixtureCrawlTool.Name, workspace.Id),
+            ["crawl4ai.content.read"] = ToolReference(FixtureReadTool.Name, workspace.Id),
+            ["crawl4ai.content.delete"] = ToolReference(FixtureDeleteTool.Name, workspace.Id)
         };
         _ = await services.GetRequiredService<AepDataSourceProfileBundleInstaller>().InstallAsync(
             Crawl4AiDataSourceProfileBundle.Create(), target, toolBindings, default);

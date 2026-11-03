@@ -301,6 +301,7 @@ public static class DependencyInjection
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentToolProvisioner>();
+        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentBundleProvisioner>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ISchemaFormatHandler, BuiltinJsonSchemaFormatHandler>();

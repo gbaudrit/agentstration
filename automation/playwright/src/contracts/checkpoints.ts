@@ -1,4 +1,5 @@
 export const Checkpoints = {
+  resourceScopes: { hierarchy: 'resource-scopes-hierarchy', tenantRoot: 'resource-scopes-tenant-root', filtered: 'resource-scopes-filtered', navigated: 'resource-scopes-navigated' },
   console: {
     home: 'console-home',
   },
@@ -215,13 +216,18 @@ export const Checkpoints = {
     secretBound: 'foundry-secret-binding-secret-bound',
     secretUnavailable: 'foundry-secret-binding-secret-unavailable',
   },
+  sourceLifecycle: { acquisitionFailure: 'source-lifecycle-acquisition-failure', acquisitions: 'source-lifecycle-acquisitions', projections: 'source-lifecycle-projections' },
+  governedInventory: {
+    inventory: 'governed-extension-inventory', technical: 'governed-extension-technical-details',
+    protected: 'governed-extension-protected-resource', contributions: 'governed-extension-contributions',
+    ordinary: 'governed-extension-ordinary-resource', degraded: 'governed-extension-degraded-installation',
+  },
   governedKnowledge: {
     governanceVerified: 'governed-toolsets-governance-verified',
     toolsPublished: 'governed-knowledge-tools-published',
     agentPinned: 'governed-knowledge-agent-pinned',
     artifactPurged: 'governed-knowledge-artifact-purged',
   },
-  sourceLifecycle: { acquisitions: 'source-lifecycle-acquisitions', projections: 'source-lifecycle-projections' },
   schemaDrivenSources: {
     completed: 'schema-driven-sources-completed',
   },

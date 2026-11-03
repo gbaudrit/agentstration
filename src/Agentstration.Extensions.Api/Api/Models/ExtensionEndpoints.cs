@@ -49,12 +49,15 @@ public static class ExtensionEndpoints
     private static Task<IResult> GetRegistrationAsync(
         string registrationName,
         string? resourceNamespace,
+        string? scopeRef,
         HttpResponse response,
         ExtensionRegistrationManagementService service,
         CancellationToken cancellationToken) =>
         ExtensionsApiHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.GetAsync(ExtensionsApiHttp.Namespace(resourceNamespace), registrationName, cancellationToken)
+            var stored = await (scopeRef is null
+                ? service.GetAsync(ExtensionsApiHttp.Namespace(resourceNamespace), registrationName, cancellationToken)
+                : service.GetExactAsync(ResourceScopeRef.Parse(scopeRef), ExtensionsApiHttp.Namespace(resourceNamespace), registrationName, cancellationToken))
                 ?? throw new ExtensionRegistrationNotFoundException(new(ExtensionsApiHttp.Namespace(resourceNamespace), ExtensionKinds.ExtensionRegistration, registrationName));
             return ExtensionsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
@@ -154,7 +157,28 @@ public static class ExtensionEndpoints
             requirement.Protection,
             requirement.Description,
             requirement.Format,
-            requirement.AllowedValues)).ToArray());
+            requirement.AllowedValues)).ToArray(),
+        view.BundleInstallations.Select(installation => new ExtensionBundleInstallationResponse(
+            installation.Name,
+            installation.ScopeRef!.Value,
+            installation.Definition.ExtensionId,
+            installation.Definition.ExtensionVersion,
+            installation.Definition.BundleId,
+            installation.Definition.BundleVersion,
+            installation.Definition.BundleDigest,
+            installation.Definition.State,
+            installation.Definition.ToolBindings,
+            installation.Definition.ManagedResources.Select(resource => new ExtensionManagedResourceResponse(
+                resource.Kind,
+                resource.Namespace.Value,
+                resource.Name,
+                resource.ScopeRef,
+                resource.Uid,
+                resource.Generation,
+                resource.Version,
+                resource.DefinitionHash,
+                resource.Published)).ToArray(),
+            installation.Definition.Diagnostic)).ToArray());
 
     private static ExtensionInventoryItemResponse MapInventory(ExtensionInventoryItem item) => new(
         item.Key,

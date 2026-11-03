@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Agents;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -14,6 +15,67 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ToolSetApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task ExactToolSetReadsPreserveScopeAndRejectAnUnrelatedWorkspace()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var sibling = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var siblingWorkspace = new Workspace(sibling.TargetId!.Value, context.TenantId, "toolset-isolation",
+            "ToolSet isolation", WorkspaceStatus.Initializing, DateTimeOffset.UnixEpoch);
+        await factory.Services.GetRequiredService<IIdentityStore>().AddWorkspaceAsync(siblingWorkspace, default);
+        await factory.Services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(siblingWorkspace, default);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        Guid ownedUid;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            var owned = await store.PutExactAsync(scope, ToolSet(scope, "exact-navigation", "1.0.0", []), null, true, default);
+            ownedUid = owned.Value.Uid;
+            _ = await store.PutExactAsync(sibling, ToolSet(sibling, "exact-navigation", "2.0.0", []), null, true, default);
+            foreach (var target in new[] { scope, sibling })
+            {
+                _ = await store.PutExactAsync(target, new ToolProviderResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ToolResourceKinds.ToolProvider,
+                    Metadata = new ResourceMetadata { Name = "exact-navigation-provider" },
+                    ScopeRef = target,
+                    Definition = new()
+                    {
+                        DisplayName = "Exact provider",
+                        ProviderType = ToolProviderType.Mcp,
+                        Mcp = new() { Internal = true }
+                    }
+                }, null, true, default);
+                _ = await store.PutExactAsync(target, new ExtensionRegistrationResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ExtensionKinds.ExtensionRegistration,
+                    Metadata = new ResourceMetadata { Name = "exact-navigation-extension" },
+                    ScopeRef = target,
+                    Definition = new() { DisplayName = "Exact extension", Endpoint = new("https://fixture.invalid/") }
+                }, null, true, default);
+            }
+        }
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, scope);
+        using var own = await client.GetAsync($"/api/toolsets/exact-navigation?scopeRef={Uri.EscapeDataString(scope.Value)}");
+        Assert.AreEqual(HttpStatusCode.OK, own.StatusCode, await own.Content.ReadAsStringAsync());
+        Assert.AreEqual(ownedUid, (await own.Content.ReadFromJsonAsync<ToolSetResource>())!.Uid);
+        using var denied = await client.GetAsync($"/api/toolsets/exact-navigation?scopeRef={Uri.EscapeDataString(sibling.Value)}");
+        Assert.IsTrue(denied.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound);
+        using var versions = await client.GetAsync($"/api/toolsets/exact-navigation/versions?scopeRef={Uri.EscapeDataString(sibling.Value)}");
+        Assert.IsTrue(versions.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound);
+        foreach (var path in new[] { "/api/toolproviders/exact-navigation-provider", "/api/extensionregistrations/exact-navigation-extension" })
+        {
+            using var ownResource = await client.GetAsync($"{path}?scopeRef={Uri.EscapeDataString(scope.Value)}");
+            Assert.AreEqual(HttpStatusCode.OK, ownResource.StatusCode, await ownResource.Content.ReadAsStringAsync());
+            using var otherResource = await client.GetAsync($"{path}?scopeRef={Uri.EscapeDataString(sibling.Value)}");
+            Assert.IsTrue(otherResource.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound);
+        }
+    }
+
     [TestMethod]
     public async Task PublishedToolSetRoutesDeterministicallyAndDetectsAmbiguousAndStaleMembers()
     {

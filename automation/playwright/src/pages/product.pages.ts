@@ -39,9 +39,13 @@ import { ModelProviderAccessPage } from './model-provider-access.page.js';
 import { InheritedResourceReadOnlyPage } from './inherited-resource-readonly.page.js';
 import { ModelProfileCrossScopePage } from './model-profile-cross-scope.page.js';
 import { ScopedFlowDesignerPage } from './scoped-flow-designer.page.js';
+import { ResourceScopesPage } from './resource-scopes.page.js';
+import { GovernedExtensionInventoryPage } from './governed-extension-inventory.page.js';
 
 export class ProductPages {
+  public readonly governedExtensionInventory: GovernedExtensionInventoryPage;
   public readonly governedKnowledge: GovernedKnowledgePage;
+  public readonly resourceScopes: ResourceScopesPage;
   public readonly agentEditor: AgentEditorPage;
   public readonly flowEditor: FlowEditorPage;
   public readonly flowDesigner: FlowDesignerPage;
@@ -82,7 +86,9 @@ export class ProductPages {
   public readonly scopedFlowDesigner: ScopedFlowDesignerPage;
 
   public constructor(public readonly page: Page) {
+    this.governedExtensionInventory = new GovernedExtensionInventoryPage(page);
     this.governedKnowledge = new GovernedKnowledgePage(page);
+    this.resourceScopes = new ResourceScopesPage(page);
     this.agentEditor = new AgentEditorPage(page);
     this.flowEditor = new FlowEditorPage(page);
     this.flowDesigner = new FlowDesignerPage(page);

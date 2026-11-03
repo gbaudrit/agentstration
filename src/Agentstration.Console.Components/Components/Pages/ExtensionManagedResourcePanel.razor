@@ -1,0 +1,56 @@
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
+
+@if (IsExtensionManaged)
+{
+    <section class="panel form-section" data-testid="extension-managed-resource">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">@T("ManagedReadOnly")</p>
+                <h2>@(owner?.Extension.DisplayName ?? Governance.Origin.Reference)</h2>
+                <p>@T("ManagedResourceHelp")</p>
+            </div>
+        </div>
+        <dl class="resource-details">
+            <dt>@T("ExtensionVersion")</dt><dd>@Governance.Origin.Version</dd>
+            <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="ScopeRef" /></dd>
+            @if (owner is not null)
+            {
+                <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@owner.ExtensionUrl">@owner.Installation.ExtensionId</a></dd>
+                <dt>@T("Bundle")</dt><dd>@owner.Installation.BundleId</dd>
+                <dt>@T("BundleVersion")</dt><dd>@owner.Installation.BundleVersion</dd>
+                <dt>@T("InstallationState")</dt><dd>@T($"InstallationState.{owner.Installation.State}")</dd>
+            }
+        </dl>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public ResourceGovernance Governance { get; set; } = ResourceGovernance.User;
+    [Parameter, EditorRequired] public ResourceScopeRef ScopeRef { get; set; }
+    [Parameter, EditorRequired] public ResourceNamespace Namespace { get; set; }
+    [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter] public Guid? Uid { get; set; }
+
+    private ExtensionManagedResourceOwner? owner;
+    private bool IsExtensionManaged => Governance.Origin.Kind == ResourceOriginKind.Extension
+        && Governance.ManagedBy?.Kind == ResourceManagementAuthorityKind.ExtensionInstallation;
+    private string T(string key) => Localizer[key];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        owner = null;
+        if (!IsExtensionManaged || Services.GetService<IExtensionsClient>() is not { } extensions) return;
+        try
+        {
+            var inventory = await extensions.GetExtensionInventoryAsync(default);
+            owner = ExtensionManagedResourceOwner.Find(inventory, Governance, ScopeRef, Namespace, Kind, Name, Uid);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Governance remains visible from the resource itself when the extension inventory is temporarily unavailable.
+        }
+    }
+
+}

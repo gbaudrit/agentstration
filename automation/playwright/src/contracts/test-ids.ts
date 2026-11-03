@@ -134,6 +134,7 @@ export const TestIds = {
     stagedRetentionTab: 'staged-artifact-retention-tab',
   },
   sourceLifecycle: {
+    runError: 'flow-run-error',
     profiles: 'resource-data-source-profiles', profileEditor: 'data-source-profile-editor', sources: 'resource-data-sources',
     knowledgeSources: 'resource-knowledge-sources', knowledgeDetails: 'resource-knowledge-source-details',
     projectionProvenance: 'knowledge-projection-provenance', snapshots: 'knowledge-snapshots',
@@ -531,6 +532,12 @@ export const TestIds = {
     providerContribution: 'source-provider-contribution',
     providerSubmit: 'source-provider-submit',
   },
+  governedInventory: {
+    inventory: 'extension-governed-inventory', installation: 'extension-bundle-installation',
+    resources: 'extension-managed-resources', evidence: 'extension-technical-details', publications: 'extension-published-versions',
+    managed: 'extension-managed-resource', contributions: 'extension-contribution-list',
+  },
+  resourceScopes: { kind: 'resource-kind-filter', count: 'resource-result-count' },
   workplace: {
     shell: 'workplace-shell',
     home: 'workplace-home',

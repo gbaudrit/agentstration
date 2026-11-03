@@ -14,7 +14,8 @@ public sealed class ToolSetService(
     IResourceScopeOperations scopeOperations,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
-    IEnumerable<IToolSetDeletionGuard>? deletionGuards = null)
+    IEnumerable<IToolSetDeletionGuard>? deletionGuards = null,
+    IResourceGovernanceContext? governanceContext = null)
 {
     public Task<IReadOnlyList<StoredResource<ToolSetResource>>> ListAsync(CancellationToken cancellationToken) =>
         store.ListAllAsync<ToolSetResource>(ToolResourceKinds.ToolSet, cancellationToken);
@@ -38,6 +39,17 @@ public sealed class ToolSetService(
         CancellationToken cancellationToken) =>
         (await store.ListAsync<ToolSetVersionResource>(@namespace, ToolResourceKinds.ToolSetVersion, 0, 1000, cancellationToken))
         .Where(value => string.Equals(value.Value.ToolSetName, name, StringComparison.Ordinal))
+        .OrderBy(value => value.Value.Version, StringComparer.Ordinal)
+        .ToArray();
+
+    public async Task<IReadOnlyList<StoredResource<ToolSetVersionResource>>> ListVersionsExactAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        CancellationToken cancellationToken) =>
+        (await store.ListExactAsync<ToolSetVersionResource>(scopeRef, ToolResourceKinds.ToolSetVersion,
+            0, 1000, cancellationToken))
+        .Where(value => value.Value.Namespace == @namespace && value.Value.ToolSetName == name)
         .OrderBy(value => value.Value.Version, StringComparer.Ordinal)
         .ToArray();
 
@@ -85,7 +97,7 @@ public sealed class ToolSetService(
             token => store.PutExactAsync(scopeRef, desired, null, true, token), cancellationToken);
         await AuditAsync(SecurityAuditActions.ToolSetCreated, scopeRef, cancellationToken);
         if (stored.Value.Definition.Publish)
-            _ = await PublishAsync(stored.Value.Namespace, stored.Value.Name, stored.Value.Definition.Version, cancellationToken);
+            _ = await PublishExactAsync(scopeRef, stored.Value.Namespace, stored.Value.Name, stored.Value.Definition.Version, cancellationToken);
         return stored;
     }
 
@@ -98,6 +110,7 @@ public sealed class ToolSetService(
     {
         var existing = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolSet, name, @namespace));
+        await EnsureManagerAsync(existing.Value, cancellationToken);
         var scopeRef = RequiredScope(existing.Value);
         var desired = existing.Value with
         {
@@ -111,7 +124,7 @@ public sealed class ToolSetService(
             token => store.PutExactAsync(scopeRef, desired, ifMatch, false, token), cancellationToken);
         await AuditAsync(SecurityAuditActions.ToolSetUpdated, scopeRef, cancellationToken);
         if (stored.Value.Definition.Publish)
-            _ = await PublishAsync(stored.Value.Namespace, stored.Value.Name, stored.Value.Definition.Version, cancellationToken);
+            _ = await PublishExactAsync(scopeRef, stored.Value.Namespace, stored.Value.Name, stored.Value.Definition.Version, cancellationToken);
         return stored;
     }
 
@@ -123,10 +136,26 @@ public sealed class ToolSetService(
     {
         var existing = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolSet, name, @namespace));
+        await DeleteCoreAsync(existing, ifMatch, cancellationToken);
+    }
+
+    public async Task DeleteExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name,
+        string? ifMatch, CancellationToken cancellationToken)
+    {
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolSet, name, @namespace));
+        await DeleteCoreAsync(existing, ifMatch, cancellationToken);
+    }
+
+    private async Task DeleteCoreAsync(StoredResource<ToolSetResource> existing, string? ifMatch, CancellationToken cancellationToken)
+    {
+        await EnsureManagerAsync(existing.Value, cancellationToken);
+        var @namespace = existing.Value.Namespace;
+        var name = existing.Value.Name;
         var scopeRef = RequiredScope(existing.Value);
         foreach (var guard in deletionGuards ?? [])
             await guard.ValidateDeleteAsync(scopeRef, @namespace, name, cancellationToken);
-        var versions = await ListVersionsAsync(@namespace, name, cancellationToken);
+        var versions = await ListVersionsExactAsync(scopeRef, @namespace, name, cancellationToken);
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
             foreach (var version in versions)
@@ -144,9 +173,27 @@ public sealed class ToolSetService(
         string version,
         CancellationToken cancellationToken)
     {
-        ValidateVersion(version);
         var source = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolSet, name, @namespace));
+        return await PublishCoreAsync(source, version, cancellationToken);
+    }
+
+    public async Task<StoredResource<ToolSetVersionResource>> PublishExactAsync(
+        ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, string version,
+        CancellationToken cancellationToken)
+    {
+        var source = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolSet, name, @namespace));
+        return await PublishCoreAsync(source, version, cancellationToken);
+    }
+
+    private async Task<StoredResource<ToolSetVersionResource>> PublishCoreAsync(
+        StoredResource<ToolSetResource> source, string version, CancellationToken cancellationToken)
+    {
+        await EnsureManagerAsync(source.Value, cancellationToken);
+        ValidateVersion(version);
+        var @namespace = source.Value.Namespace;
+        var name = source.Value.Name;
         if (!source.Value.Definition.Enabled)
             throw new ToolSetValidationException("tool_set_disabled", "A disabled ToolSet cannot be published.");
         if (!string.Equals(source.Value.Definition.Version, version, StringComparison.Ordinal))
@@ -154,7 +201,7 @@ public sealed class ToolSetService(
         var scopeRef = RequiredScope(source.Value);
         var members = await ResolveMembersAsync(source.Value, scopeRef, cancellationToken);
         var hash = DefinitionHash(source.Value, members);
-        if (await GetVersionAsync(@namespace, name, version, cancellationToken) is { } existing)
+        if (await GetVersionExactAsync(scopeRef, @namespace, name, version, cancellationToken) is { } existing)
         {
             if (string.Equals(existing.Value.DefinitionHash, hash, StringComparison.Ordinal)) return existing;
             throw new ToolSetValidationException("tool_set_version_immutable", $"Published ToolSet version '{version}' is immutable.");
@@ -231,6 +278,18 @@ public sealed class ToolSetService(
         var selected = candidates[0];
         await ValidatePinnedMemberAsync(selected, cancellationToken);
         return new(name, @namespace, version, selected);
+    }
+
+    private async Task EnsureManagerAsync(ToolSetResource resource, CancellationToken cancellationToken)
+    {
+        try { ResourceGovernanceEnforcement.EnsureManager(resource.Governance, governanceContext?.Current); }
+        catch (ResourceGovernanceViolationException exception)
+        {
+            await audit.WriteAsync(new(SecurityAuditActions.ManagedResourceMutationDenied, SecurityAuditOutcome.Failed,
+                WorkspaceId: resource.ScopeRef?.Kind == ResourceScopeKind.Workspace ? resource.ScopeRef.Value.TargetId : null,
+                ReasonCode: exception.Code), cancellationToken);
+            throw new ToolSetValidationException(exception.Code, exception.Message);
+        }
     }
 
     private async Task<IReadOnlyList<PublishedToolSetMember>> ResolveMembersAsync(

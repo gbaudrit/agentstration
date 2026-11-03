@@ -6,14 +6,14 @@ interface FlowRunWire { id: string; status: number; output?: { flowRunArtifactId
 
 export class SourceLifecycleFixtures {
   public constructor(private readonly page: Page) {}
-  public async grantBuiltinAccess(consoleUrl: string, tenantScope: string): Promise<void> {
+  public async grantBuiltinAccess(consoleUrl: string, tenantScope: string, additionalNames: readonly string[] = []): Promise<void> {
     const headers = { 'X-Agentstration-Context': '/instance' };
     const response = await this.page.request.get(`${consoleUrl}/api/resource-scopes`, { headers });
     await expectApi(response, 200, 'read built-in resource identities');
     const inventory = await response.json() as { scopes: { scopeRef: string; resources: { uid: string; name: string; kind: string; namespace: string; generation?: number }[] }[] };
     const names = new Set(['knowledge-projection-builtin', 'knowledge-retrieval-builtin',
       'data-source-artifact-import-acquisition-builtin',
-      'artifact.import', 'knowledge.retrieval.search', 'knowledge.retrieval.query', 'knowledge.retrieval.read']);
+      'artifact.import', 'knowledge.retrieval.search', 'knowledge.retrieval.query', 'knowledge.retrieval.read', ...additionalNames]);
     const resources = inventory.scopes.find(scope => scope.scopeRef === '/instance')!.resources.filter(resource => names.has(resource.name));
     expect(resources.some(resource => resource.kind === 'Flow' && resource.name === 'knowledge-retrieval-builtin')).toBe(true);
     for (const resource of resources) {

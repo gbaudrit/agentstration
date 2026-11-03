@@ -283,7 +283,13 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredOperationalTriggers('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], ['name']),
 
   coveredDistribution('extensions', `${consolePages}/Extensions.razor`, ['/extensions']),
-  coveredDistribution('extension-details', `${consolePages}/ExtensionDetails.razor`, ['/extensions/{RegistrationName}', '/extensions/enrollment/{EnrollmentInstanceId:guid}'], ['registrationName', 'enrollmentInstanceId']),
+  {
+    id: 'extension-details', host: 'console', source: `${consolePages}/ExtensionDetails.razor`,
+    routes: ['/extensions/{RegistrationName}', '/extensions/enrollment/{EnrollmentInstanceId:guid}'],
+    fixtureKeys: ['registrationName', 'enrollmentInstanceId'],
+    pageObject: 'src/pages/governed-extension-inventory.page.ts', journey: 'inspect-governed-extension-inventory',
+    specification: 'tests/governed-extension-inventory.spec.ts', coverage: 'covered', trackingIssue: 753,
+  },
   coveredDistribution('source-providers', `${consolePages}/SourceProviders.razor`, ['/sourceproviders']),
   coveredDistribution('source-provider-details', `${consolePages}/SourceProviderDetails.razor`, ['/sourceproviders/new', '/sourceproviders/{Name}'], ['name']),
   coveredDistribution('source-registries', `${consolePages}/SourceRegistries.razor`, ['/settings/source-registries', '/settings/source-registries/new', '/settings/source-registries/{Name}'], ['name']),
@@ -315,7 +321,12 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   coveredDistribution('packs', `${consolePages}/Packs.razor`, ['/packs']),
   coveredDistribution('pack-composer', `${consolePages}/PackComposer.razor`, ['/pack-projects/new'], [], 'create-pack-project'),
   coveredDistribution('pack-project-details', `${consolePages}/PackProjectDetails.razor`, ['/pack-projects/{ProjectId:guid}'], ['projectId'], 'create-pack-project'),
-  coveredDistribution('resource-scopes', `${consolePages}/ResourceScopes.razor`, ['/settings/resource-scopes']),
+  {
+    id: 'resource-scopes', host: 'console', source: `${consolePages}/ResourceScopes.razor`,
+    routes: ['/settings/resource-scopes'], fixtureKeys: [],
+    pageObject: 'src/pages/resource-scopes.page.ts', journey: 'inspect-resource-scopes',
+    specification: 'tests/resource-scopes.spec.ts', coverage: 'covered',
+  },
 
   coveredOperations('management', `${consolePages}/Management.razor`, ['/management']),
   coveredOperations('cleanup', `${consolePages}/Cleanup.razor`, ['/cleanup']),

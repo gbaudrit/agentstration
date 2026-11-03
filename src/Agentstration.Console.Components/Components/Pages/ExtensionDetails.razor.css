@@ -1,0 +1,371 @@
+.extension-bundle-publications {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.extension-bundle-publications li {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+}
+
+.extension-bundle-publications li > div {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.extension-bundle-publications strong {
+    color: var(--text);
+    font-size: .72rem;
+}
+
+.extension-managed-resources > .panel-header > span {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: .75rem;
+}
+
+.extension-bundle-grid ::deep .data-grid {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.extension-bundle-grid ::deep th:nth-child(1) { width: 20%; }
+.extension-bundle-grid ::deep th:nth-child(2) { width: 40%; }
+.extension-bundle-grid ::deep th:nth-child(3) { width: 11%; }
+.extension-bundle-grid ::deep th:nth-child(4) { width: 8%; }
+.extension-bundle-grid ::deep th:nth-child(5) { width: 21%; }
+
+.extension-bundle-grid ::deep td,
+.extension-bundle-grid .text-button {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.extension-bundle-card {
+    margin-top: 20px;
+    padding: 22px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: linear-gradient(120deg, var(--primary-soft), var(--surface) 45%);
+}
+
+.extension-bundle-heading,
+.extension-bundle-title,
+.extension-bundle-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.extension-bundle-heading {
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.extension-bundle-title {
+    min-width: 0;
+}
+
+.extension-bundle-title .eyebrow {
+    margin: 0 0 5px;
+}
+
+.extension-bundle-title h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    overflow-wrap: anywhere;
+}
+
+.extension-bundle-icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+    border-radius: 11px;
+    background: var(--surface);
+    color: var(--primary);
+}
+
+.extension-bundle-meta {
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin: 18px 0;
+    color: var(--muted);
+    font-size: .74rem;
+}
+
+.extension-bundle-meta strong {
+    margin-left: 5px;
+    color: var(--text);
+}
+
+.extension-bundle-bindings {
+    margin: 20px 0;
+}
+
+.extension-bundle-binding-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.extension-bundle-binding-list a {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--primary);
+    font-size: .74rem;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.extension-bundle-binding-list a:hover {
+    border-color: var(--primary);
+    text-decoration: underline;
+}
+
+.extension-bundle-kind {
+    color: var(--muted);
+    font-size: .75rem;
+    font-weight: 600;
+}
+
+.extension-bundle-evidence {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: .75rem;
+}
+
+.extension-bundle-evidence summary {
+    width: fit-content;
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.extension-bundle-evidence .resource-details {
+    margin: 16px 0 0;
+}
+
+.extension-bundle-evidence code {
+    overflow-wrap: anywhere;
+}
+
+.extension-bundle-evidence dd > div + div {
+    margin-top: 10px;
+}
+
+.extension-bundle-diagnostic {
+    margin: 16px 0;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+    .extension-managed-resources > .panel-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .extension-bundle-card {
+        padding: 16px;
+    }
+
+    .extension-bundle-grid ::deep .data-grid-wrap {
+        overflow: visible;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .extension-bundle-grid ::deep .data-grid,
+    .extension-bundle-grid ::deep .data-grid tbody {
+        display: grid;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .extension-bundle-grid ::deep .data-grid thead {
+        display: none;
+    }
+
+    .extension-bundle-grid ::deep .data-grid tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: var(--surface);
+    }
+
+    .extension-bundle-grid ::deep .data-grid td {
+        display: grid;
+        justify-items: start;
+        align-content: start;
+        gap: 6px;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .extension-bundle-grid ::deep .data-grid td:nth-child(2),
+    .extension-bundle-grid ::deep .data-grid td:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .extension-bundle-grid ::deep .data-grid td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: .62rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .extension-bundle-evidence .resource-details {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.extension-contribution-list {
+    display: grid;
+    gap: 12px;
+}
+
+.extension-contribution-card {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-2);
+}
+
+.extension-contribution-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 20px;
+}
+
+.extension-contribution-heading h3,
+.extension-contribution-heading p,
+.extension-materialized-label {
+    margin: 0;
+}
+
+.extension-contribution-heading h3 {
+    margin-top: 5px;
+    font-size: 1rem;
+}
+
+.extension-contribution-heading p {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: .82rem;
+}
+
+.extension-contribution-kind {
+    color: var(--primary);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+}
+
+.extension-contribution-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.extension-materialized-resources {
+    padding: 14px 20px 18px;
+    border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface-2) 70%, var(--primary-soft));
+}
+
+.extension-materialized-label {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.extension-materialized-resources .resource-links {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    margin: 0;
+}
+
+.extension-materialized-resources .resource-links li {
+    min-width: 0;
+}
+
+.extension-materialized-resources .resource-links a {
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.extension-materialized-resources .resource-links a:hover {
+    border-color: var(--primary);
+    box-shadow: 0 7px 18px rgba(15, 23, 42, .08);
+    transform: translateY(-1px);
+}
+
+.extension-resource-meta {
+    display: grid;
+    justify-items: end;
+    gap: 6px;
+    color: var(--muted);
+    font-size: .72rem;
+}
+
+@media (max-width: 720px) {
+    .extension-contribution-heading {
+        display: grid;
+    }
+
+    .extension-contribution-actions {
+        justify-content: flex-start;
+    }
+
+    .extension-materialized-resources .resource-links {
+        grid-template-columns: 1fr;
+    }
+}

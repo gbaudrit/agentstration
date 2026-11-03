@@ -6,6 +6,8 @@ Agentstration owns reusable Playwright journeys for browser-level UX validation 
 
 ## Setup
 
+The `inspect-governed-extension-inventory` journey (#753) uses a dedicated test-only host to seed an available enrolled extension, exact governed resources and immutable publications, contribution failure states, a degraded installation, and ordinary editable resources. It covers readable ownership and reciprocal scoped navigation in English/French on desktop/mobile. The fixture uses real Console/services/SQLite with in-process discovery and blocks network access to its fictional extension endpoint. Its readiness file is written only after seeding completes, before the browser worker starts. See `automation/playwright/examples/inspect-governed-extension-inventory.capture-plan.json` and the workspace README for capture prerequisites. The maintainer authorized this deferred scenario on 2026-11-02 after PR #916 merged.
+
 ```powershell
 npm --prefix automation/playwright ci
 npm --prefix automation/playwright run install:browsers
@@ -146,6 +148,29 @@ Browser UX CI lane. The capture checkpoints are `source-lifecycle-acquisitions`
 and `source-lifecycle-projections`. Both journeys own their corresponding routes in the application coverage catalog.
 Explicit reads of another Workspace’s resources must return HTTP 403; storage
 raises the scope authorization failure consumed by the family API error handlers.
+
+### Data Source acquisition failure diagnostics
+
+`inspect-acquisition-failure` covers #818 after maintainer UX validation of #817
+and merge of #819. It starts a REST acquisition in the Console, follows its Flow
+Run link, and checks the resolved safe error, preserved `http_media_type_invalid`
+code, red selected transition and arrow, inactive success branch, and English/French
+error legend. The specification runs both locales at desktop and mobile widths;
+the existing product hides its legend below 900px, while retaining the graph and
+step diagnostics.
+
+```powershell
+npm exec playwright test -- tests/acquisition-failure.spec.ts
+npm run capture -- --plan examples/inspect-acquisition-failure.capture-plan.json --output .work/acquisition-failure
+```
+
+The managed host uses the test-only `fixtures/AcquisitionFailureHost` executable
+and an in-memory HTTP 200 `text/html` response for exactly
+`https://acquisition-failure.example.test/rejected.html`. The production REST Tool,
+media validation, governed invocation, Runtime Worker and Console remain in the
+execution path; the scenario needs no internet or relaxation of SSRF policy.
+The checkpoint is `source-lifecycle-acquisition-failure`. External instances must
+provide an equivalent deterministic response transport themselves.
 
 ## Governed Knowledge administration
 

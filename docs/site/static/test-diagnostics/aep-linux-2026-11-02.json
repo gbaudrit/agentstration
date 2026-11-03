@@ -1,0 +1,15 @@
+{
+  "module": "Agentstration.Management.Aep.Tests",
+  "status": "failed",
+  "testCount": 29,
+  "minimumExpectedTests": 11,
+  "durationSeconds": 85.472,
+  "peakWorkingSetMiB": 763.4,
+  "peakPrivateMemoryMiB": 824.3,
+  "peakAggregateDotnetWorkingSetMiB": 763.4,
+  "warningWorkingSetMiB": 450,
+  "failureWorkingSetMiB": 700,
+  "exitCode": 0,
+  "runtime": ".NET 10.0.14",
+  "os": "Ubuntu 26.04.1 LTS"
+}

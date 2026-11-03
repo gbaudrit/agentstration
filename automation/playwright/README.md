@@ -96,6 +96,26 @@ The resource-administration inventory renders every management list and creation
 npm run capture -- --plan examples/inspect-resource-administration.capture-plan.json --output .work/resource-administration
 ```
 
+The governed AEP inventory journey covers the Extension catalog, exact ownership and independent bundle/extension versions, technical publication evidence without links, reciprocal Tool/Provider/Profile navigation, read-only resources, ordinary editable comparisons, and degraded/missing/conflicting contributions:
+
+```powershell
+npm exec playwright test tests/governed-extension-inventory.spec.ts
+npm run capture -- --plan examples/inspect-governed-extension-inventory.capture-plan.json --output .work/governed-extension-inventory
+```
+
+The specification runs English and French on desktop and mobile with the isolated [GovernedInventoryHost fixture](fixtures/GovernedInventoryHost/README.md), real Console/services/SQLite and deterministic in-process discovery. It does not require Docker, Crawl4AI, Internet access or an external extension. External captures require equivalent `qa-managed`, `qa-degraded` and `qa-user` resources in the disposable Instance scope and `qa-inventory` namespace; the capture does not seed an external instance. #753 was authorized by the maintainer in the Codex implementation chat on 2026-11-02 ("ok fait 753") after UX review and merge of #916 (`f7685b0`); that evidence is recorded on the child issue.
+
+The resource-scope inventory journey covers Instance, Tenant, and current Workspace selection, combined kind/search filtering, counted options, localized result and empty states, non-linkable resources, responsive isolated styles, and resource-name navigation:
+
+```powershell
+npm exec playwright test tests/resource-scopes.spec.ts
+npm run capture -- --plan examples/inspect-resource-scopes.capture-plan.json --output .work/resource-scopes
+```
+
+The specification runs English and French at desktop and mobile widths using the deterministic Development fixture. External captures require a selected Workspace with multiple resource kinds, a linked resource, and a resource without a detail page. Follow-up #816 was unblocked by maintainer UX validation in the implementation chat on 2026-11-02 ("tu as ma validation"); the parent implementation merged in PR #820 on 2026-10-15, commit `ca83baa`.
+
+Hierarchy selection runs in Instance administration, where the complete accessible tree is returned. The journey also verifies that Tenant administration renders its Tenant root and Workspace children without an Instance ancestor, and that Workspace context renders its selected Workspace as the only root. Filtering and navigation run in that business Workspace. These assertions cover the regression found during #816 validation, where the explorer required an Instance root even when the API correctly returned a Tenant or Workspace root.
+
 The descendant Secret and Vault journey checks that a Tenant Vault is unavailable to a Workspace Secret before an explicit grant, then saves and reloads both Vault and Secret grants without using a credential value. Its capture plan requires an existing, selected campaign Workspace named by `workspaceName`; prepare it on the same external instance before running the plan:
 
 ```powershell
@@ -173,6 +193,29 @@ On a persistent external instance, run the workspace plan first and set `workspa
 Profile inputs may be an ordered array when equivalent environments use different resource names. The journey selects the first available candidate and reports the available options immediately when none match.
 
 See [Browser automation](../../docs/contributing/browser-automation.md), [ADR-0117](../../docs/decisions/0117-product-owned-browser-journeys.md), and [ADR-0118](../../docs/decisions/0118-browser-campaigns-use-dedicated-workspaces.md) for ownership, extension, and external-consumption rules.
+
+### Data Source acquisition failure diagnostics
+
+`inspect-acquisition-failure` covers #818 after maintainer UX validation of #817
+and merge of #819. It starts a REST acquisition in the Console, follows its Flow
+Run link, and checks the resolved safe error, preserved `http_media_type_invalid`
+code, red selected transition and arrow, inactive success branch, and English/French
+error legend. The specification runs both locales at desktop and mobile widths;
+the existing product hides its legend below 900px, while retaining the graph and
+step diagnostics.
+
+```powershell
+npm exec playwright test -- tests/acquisition-failure.spec.ts
+npm run capture -- --plan examples/inspect-acquisition-failure.capture-plan.json --output .work/acquisition-failure
+```
+
+The managed host uses the test-only `fixtures/AcquisitionFailureHost` executable
+and an in-memory HTTP 200 `text/html` response for exactly
+`https://acquisition-failure.example.test/rejected.html`. The production REST Tool,
+media validation, governed invocation, Runtime Worker and Console remain in the
+execution path; the scenario needs no internet or relaxation of SSRF policy.
+The checkpoint is `source-lifecycle-acquisition-failure`. External instances must
+provide an equivalent deterministic response transport themselves.
 
 The governed Knowledge administration journey uses a single Data Source acquisition and
 projection, sharing page operations with the full lifecycle scenario, followed by source-specific ToolSet publication, partial Agent grants,

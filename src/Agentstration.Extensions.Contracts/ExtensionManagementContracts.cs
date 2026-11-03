@@ -12,6 +12,28 @@ public sealed record PutExtensionRegistrationRequest(ExtensionRegistrationProper
 public sealed record ExtensionDiscoveryResponse(int Sources, int Created, int Updated, int Unchanged);
 public sealed record ExtensionIdentityResponse(string Id, string Name, string Version, string? Description);
 public sealed record ExtensionContributionResponse(string Kind, string Id);
+public sealed record ExtensionManagedResourceResponse(
+    string Kind,
+    string Namespace,
+    string Name,
+    ResourceScopeRef ScopeRef,
+    Guid? Uid,
+    long? Generation,
+    string? Version,
+    string? DefinitionHash,
+    bool Published);
+public sealed record ExtensionBundleInstallationResponse(
+    string Name,
+    ResourceScopeRef ScopeRef,
+    string ExtensionId,
+    string ExtensionVersion,
+    string BundleId,
+    string BundleVersion,
+    string BundleDigest,
+    ExtensionBundleInstallationState State,
+    IReadOnlyDictionary<string, ResourceReference> ToolBindings,
+    IReadOnlyList<ExtensionManagedResourceResponse> ManagedResources,
+    string? Diagnostic);
 public sealed record ExtensionValueRequirementResponse(
     string ContributionKind,
     string ContributionId,
@@ -56,7 +78,8 @@ public sealed record ExtensionResponse(
     bool RegistrationEnabled = true,
     AepEnrollmentMode EnrollmentMode = AepEnrollmentMode.Disabled,
     ResourceScopeRef? RegistrationScopeRef = null,
-    IReadOnlyList<ExtensionValueRequirementResponse>? ValueRequirements = null);
+    IReadOnlyList<ExtensionValueRequirementResponse>? ValueRequirements = null,
+    IReadOnlyList<ExtensionBundleInstallationResponse>? BundleInstallations = null);
 public sealed record ExtensionInventoryItemResponse(
     string Key,
     string? RegistrationName,

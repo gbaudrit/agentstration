@@ -38,11 +38,13 @@ internal static class ToolProviderEndpoints
             return Results.Ok(new ValueResponse<ToolProviderResource>((await service.ListProvidersAsync(cancellationToken)).Select(value => value.Value).ToArray()));
         });
 
-    private static Task<IResult> GetProviderAsync(string providerName, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetProviderAsync(string providerName, string? scopeRef, string? resourceNamespace, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var id = ToolManagementService.ToolProviderId(providerName);
-            var stored = await service.GetProviderAsync(id, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolProvider, providerName));
+            var stored = await (scopeRef is null ? service.GetProviderAsync(id, cancellationToken)
+                : service.GetProviderExactAsync(ResourceScopeRef.Parse(scopeRef), providerName, ResourceNamespace.Parse(resourceNamespace), cancellationToken))
+                ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolProvider, providerName));
             return ToolsApiHttp.ResourceResult(stored, response, 200);
         });
 

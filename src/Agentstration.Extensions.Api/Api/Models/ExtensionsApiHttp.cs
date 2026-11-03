@@ -9,6 +9,7 @@ internal static class ExtensionsApiHttp
     public static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
         try { return await action(); }
+        catch (ResourceScopeAccessDeniedException exception) { return Results.Problem(statusCode: 403, title: "resource-scope-access-denied", detail: exception.Message); }
         catch (ExtensionRegistrationNotFoundException exception) { return Results.Problem(statusCode: 404, title: "extension-registration-not-found", detail: exception.Message); }
         catch (ExtensionRegistrationInUseException exception) { return Results.Problem(statusCode: 409, title: "extension-registration-in-use", detail: exception.Message); }
         catch (ExtensionRegistrationValidationException exception) { return Results.Problem(statusCode: 422, title: "extension-registration-invalid", detail: exception.Message); }

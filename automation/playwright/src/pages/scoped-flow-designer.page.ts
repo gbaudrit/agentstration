@@ -53,12 +53,12 @@ export class ScopedFlowDesignerPage {
     const exactTenant = `${fixture.scopes.tenant}|default|${duplicateAgentName}`;
     await selector.selectOption(exactTenant);
     await expect(selector).toHaveValue(exactTenant);
-    await this.page.locator('.step-settings-close').click();
+    await this.closeAgentSettings();
     await expect(this.page.locator('.save-state.saved')).toBeVisible({ timeout: 30_000 });
     await this.page.reload({ waitUntil: 'domcontentloaded' });
     await this.openAgentSettings();
     await expect(this.page.locator('#flow-agent-reference')).toHaveValue(exactTenant);
-    await this.page.locator('.step-settings-close').click();
+    await this.closeAgentSettings();
 
     const validation = await this.page.request.post(
       `${consoleUrl}/api/flows/${workspaceFlow}/validate?scopeRef=${encodeURIComponent(fixture.scopes.workspace)}`,
@@ -199,11 +199,16 @@ export class ScopedFlowDesignerPage {
     const dialog = this.page.locator('.step-settings-dialog');
     const configure = this.page.locator('.flow-node.agent .flow-node-settings');
     await expect(async () => {
-      if (!await dialog.isVisible()) await configure.click();
+      if (!await dialog.isVisible()) await configure.click({ timeout: 2_000 });
       await expect(dialog).toBeVisible({ timeout: 2_000 });
+      await dialog.getByTestId(TestIds.flowObservability.stepSettingsConfigurationTab).click({ timeout: 2_000 });
+      await expect(dialog.locator('#flow-agent-reference')).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    await this.page.getByTestId(TestIds.flowObservability.stepSettingsConfigurationTab).click();
-    await expect(this.page.locator('#flow-agent-reference')).toBeVisible();
+  }
+
+  private async closeAgentSettings(): Promise<void> {
+    await this.page.locator('.step-settings-close').click({ timeout: 15_000 });
+    await expect(this.page.locator('.step-settings-dialog')).toBeHidden();
   }
 
   private async expectAgentOptions(included: readonly string[], excluded: readonly string[]): Promise<void> {
@@ -211,6 +216,6 @@ export class ScopedFlowDesignerPage {
       options.map(option => (option as HTMLOptionElement).value));
     for (const reference of included) expect(values).toContain(reference);
     for (const reference of excluded) expect(values).not.toContain(reference);
-    await this.page.locator('.step-settings-close').click();
+    await this.closeAgentSettings();
   }
 }

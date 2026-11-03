@@ -312,6 +312,22 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
+    public void ExtensionManagedFlowShowsManagementNoticeAndRemainsReadOnly()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(
+            scopeRef: ResourceScopeRef.Instance,
+            extensionManaged: true));
+        AddConsoleContext(context);
+
+        var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "crawl4ai-web-acquisition"));
+
+        StringAssert.Contains(rendered.Find("[data-testid=extension-managed-resource]").TextContent, "Agentstration.Extensions.Crawl4AI");
+        Assert.HasCount(0, rendered.FindAll(".page-header .flow-header-designer"));
+    }
+
+    [TestMethod]
     public void WorkspaceDefinitionRejectsEmptyDisplayNameWithoutSaving()
     {
         using var context = new BunitContext();
@@ -617,9 +633,10 @@ public sealed class FlowDetailsDesignerTests
         private readonly ResourceScopeRef scopeRef;
         private readonly FlowRun? run;
         private readonly bool managed;
+        private readonly bool extensionManaged;
         private readonly FlowRunCausalityPageResponse? causality;
         private FlowDraftResponse? storedDraft;
-        public FlowClientStub(bool orchestration = false, FlowRun? run = null, FlowRunCausalityPageResponse? causality = null, ResourceScopeRef? scopeRef = null, bool managed = false)
+        public FlowClientStub(bool orchestration = false, FlowRun? run = null, FlowRunCausalityPageResponse? causality = null, ResourceScopeRef? scopeRef = null, bool managed = false, bool extensionManaged = false)
         {
             definition = orchestration
                 ? new OrchestrationFlowDefinition([new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")], new SequentialOrchestrationPattern())
@@ -628,6 +645,7 @@ public sealed class FlowDetailsDesignerTests
             this.causality = causality;
             this.scopeRef = scopeRef ?? ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
             this.managed = managed;
+            this.extensionManaged = extensionManaged;
         }
         public ResourceScopeRef ScopeRef => scopeRef;
         public ResourceNamespace RequestedNamespace { get; private set; }
@@ -646,9 +664,11 @@ public sealed class FlowDetailsDesignerTests
             {
                 Namespace = @namespace,
                 ScopeRef = scopeRef,
-                Governance = managed
-                    ? ResourceGovernance.Pack("/instances/local/InstalledPack/sample", "publisher/sample", "1.0.0")
-                    : ResourceGovernance.User
+                Governance = extensionManaged
+                    ? ResourceGovernance.Extension("/instance/ExtensionBundleInstallation/crawl4ai", "Agentstration.Extensions.Crawl4AI", "1.0.0")
+                    : managed
+                        ? ResourceGovernance.Pack("/instances/local/InstalledPack/sample", "publisher/sample", "1.0.0")
+                        : ResourceGovernance.User
             });
         }
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>

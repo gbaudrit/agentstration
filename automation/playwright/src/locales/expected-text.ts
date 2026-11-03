@@ -1,6 +1,31 @@
 export const SupportedTestLocales = ['en-US', 'fr-FR'] as const;
 export type SupportedTestLocale = typeof SupportedTestLocales[number];
 
+export const GovernedInventoryTextByLocale = {
+  'en-US': {
+    resources: 'Managed resources', contributions: 'Contributions', installed: 'Installed', degraded: 'Degraded',
+    managed: 'Managed · read-only', technical: 'Technical details', publications: 'Published versions',
+    available: 'Available', unavailable: 'Unavailable', missing: 'Not materialized', conflict: 'Conflict',
+    definition: 'Definition', revisions: 'Revisions', yaml: 'YAML', deployments: 'Deployments',
+    kinds: ['ToolSet', 'Flow', 'Data Source Profile'], scope: 'Instance',
+    bundleVersion: 'Bundle version', extensionVersion: 'Extension version',
+    mutations: ['Delete', 'Save', 'Save changes', 'Publish', 'Activate', 'Apply YAML'],
+    yamlEditor: 'Open YAML editor',
+    delete: 'Delete', save: 'Save',
+  },
+  'fr-FR': {
+    resources: 'Ressources gérées', contributions: 'Contributions', installed: 'Installée', degraded: 'Dégradée',
+    managed: 'Gérée · lecture seule', technical: 'Détails techniques', publications: 'Versions publiées',
+    available: 'Disponible', unavailable: 'Indisponible', missing: 'Non matérialisée', conflict: 'En conflit',
+    definition: 'Définition', revisions: 'Révisions', yaml: 'YAML', deployments: 'Déploiements',
+    kinds: ['ToolSet', 'Flow', 'Profil de source de données'], scope: 'Instance',
+    bundleVersion: 'Version du bundle', extensionVersion: 'Version de l’extension',
+    mutations: ['Supprimer', 'Enregistrer', 'Enregistrer les modifications', 'Publier', 'Activer', 'Appliquer le YAML'],
+    yamlEditor: 'Ouvrir l’éditeur YAML',
+    delete: 'Supprimer', save: 'Enregistrer',
+  },
+} as const;
+
 export interface ExpectedText {
   navigation: {
     main: string;
@@ -44,6 +69,7 @@ export interface ExpectedText {
     runTool: string;
     input: string;
   };
+  acquisitionFailure: { errorLegend: string };
   governedKnowledge: {
     deleteToolSet: string; confirmToolSetDelete: string; draftSaved: string; publishExposure: string; openToolSet: string; pinnedHelp: string; activeHelp: string;
     newExpiration: string; extendRetention: string; cancel: string; confirmDelete: string;
@@ -131,6 +157,7 @@ export const ExpectedTextByLocale = {
       runTool: 'Run this tool',
       input: 'Input',
     },
+    acquisitionFailure: { errorLegend: 'Error' },
     governedKnowledge: { deleteToolSet: 'Delete', confirmToolSetDelete: 'Delete ToolSet', draftSaved: 'saved without changing the active deployment.', publishExposure: 'Publish Tool exposure', openToolSet: 'Open ToolSet', pinnedHelp: 'Version 1.0.0 will be pinned; later additions do not extend a published Agent revision.', activeHelp: 'This immutable evidence controls the Tools available to the active Agent revision.', newExpiration: 'New expiration', extendRetention: 'Extend retention', cancel: 'Cancel', confirmDelete: 'Delete permanently' },
     sourceLifecycle: { displayName: 'Display name', technicalName: 'Technical name', acquisitionFlow: 'Acquisition Flow', configurationSchema: 'Configuration schema (JSON)', save: 'Save', yaml: 'YAML', revisions: 'Revisions', definition: 'Definition', version: 'Version', publish: 'Publish', activate: 'Activate', enabled: 'Enabled', addDataSource: 'Add a Data Source', notReady: 'Not ready' },
     schemaDrivenSources: {
@@ -209,6 +236,7 @@ export const ExpectedTextByLocale = {
       runTool: 'Exécuter cet outil',
       input: 'Entrées',
     },
+    acquisitionFailure: { errorLegend: 'Erreur' },
     governedKnowledge: { deleteToolSet: 'Supprimer', confirmToolSetDelete: 'Supprimer le ToolSet', draftSaved: 'enregistrée sans modifier le déploiement actif.', publishExposure: 'Publier l’exposition des Tools', openToolSet: 'Ouvrir le ToolSet', pinnedHelp: 'La version 1.0.0 sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.', activeHelp: 'Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.', newExpiration: 'Nouvelle expiration', extendRetention: 'Prolonger la rétention', cancel: 'Annuler', confirmDelete: 'Supprimer définitivement' },
     sourceLifecycle: { displayName: 'Nom d’affichage', technicalName: 'Nom technique', acquisitionFlow: 'Flow d’acquisition', configurationSchema: 'Schéma de configuration (JSON)', save: 'Enregistrer', yaml: 'YAML', revisions: 'Révisions', definition: 'Définition', version: 'Version', publish: 'Publier', activate: 'Activer', enabled: 'Activée', addDataSource: 'Ajouter une source de données', notReady: 'Non prête' },
     schemaDrivenSources: {
@@ -237,3 +265,17 @@ export const ExpectedTextByLocale = {
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;
+
+// Independent browser expectations for the inventory contract.
+export const ResourceScopeTextByLocale = {
+  'en-US': {
+    count: (visible: number, total: number) => `Showing ${visible} of ${total} resources`,
+    allKinds: (total: number) => `All kinds (${total})`,
+    empty: 'No matching resources',
+  },
+  'fr-FR': {
+    count: (visible: number, total: number) => `Affichage de ${visible} ressource(s) sur ${total}`,
+    allKinds: (total: number) => `Tous les types (${total})`,
+    empty: 'Aucune ressource correspondante',
+  },
+} as const;
