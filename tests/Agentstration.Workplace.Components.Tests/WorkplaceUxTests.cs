@@ -605,7 +605,7 @@ public sealed class WorkplaceUxTests
         },
         ResolvedTarget = new EntryResolvedTarget("report", "1.0.0"),
         Behavior = new EntryBehavior(),
-        ApiVersion = WorkplaceApiVersions.CoreV1,
+        ApiVersion = ResourceApiVersions.CoreV1,
         Type = WorkResourceTypes.Entries
     };
 

@@ -1,5 +1,5 @@
 type: Agentstration.Agents/agentTypes
-apiVersion: 2026-08-01
+apiVersion: agentstration.io/v1
 name: readonly-expert
 resourceGroup: default
 location: local

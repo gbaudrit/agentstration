@@ -5,11 +5,6 @@ using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
-public static class WorkplaceApiVersions
-{
-    public const string CoreV1 = "agentstration.io/v1";
-}
-
 public static class WorkResourceTypes
 {
     public const string Dashboards = "Agentstration.Work/dashboards";

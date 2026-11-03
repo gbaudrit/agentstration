@@ -4,11 +4,6 @@ using Agentstration.Resources;
 
 namespace Agentstration.Runtime.Abstractions;
 
-public static class RuntimeApiVersions
-{
-    public const string V20260801 = "2026-08-01";
-}
-
 public static class RuntimeResourceTypes
 {
     public const string Runs = "Agentstration.Runtime/runs";
@@ -145,7 +140,15 @@ public sealed record RuntimeRun
     public required string Id { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = RuntimeResourceTypes.Runs;
-    public string ApiVersion { get; init; } = RuntimeApiVersions.V20260801;
+    public string ApiVersion
+    {
+        get => ResourceApiVersions.CoreV1;
+        init
+        {
+            if (!string.Equals(value, ResourceApiVersions.CoreV1, StringComparison.Ordinal))
+                throw new RuntimeRunValidationException("api_version_not_supported", $"Only apiVersion={ResourceApiVersions.CoreV1} is supported.");
+        }
+    }
     public required RuntimeRunProperties Properties { get; init; }
     public required RuntimeRunStatus Status { get; init; }
     public string? ETag { get; init; }

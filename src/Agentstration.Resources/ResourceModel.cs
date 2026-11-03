@@ -7,7 +7,6 @@ public interface IImmutableResource { }
 public static class ResourceApiVersions
 {
     public const string CoreV1 = "agentstration.io/v1";
-    public const string V20260801 = CoreV1;
 }
 
 public sealed record ResourceMetadata

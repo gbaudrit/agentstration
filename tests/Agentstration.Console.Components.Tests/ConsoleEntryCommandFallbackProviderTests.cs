@@ -73,7 +73,7 @@ public sealed class ConsoleEntryCommandFallbackProviderTests
         name,
         name,
         WorkResourceTypes.Entries,
-        WorkplaceApiVersions.CoreV1,
+        ResourceApiVersions.CoreV1,
         name == "assistant" ? "Assistant" : name,
         null,
         new EntryPresentation(),

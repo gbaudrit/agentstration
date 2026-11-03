@@ -1,6 +1,6 @@
 {
   "type": "Agentstration.Agents/agents",
-  "apiVersion": "2026-08-01",
+  "apiVersion": "agentstration.io/v1",
   "name": "sql-expert",
   "resourceGroup": "default",
   "location": "local",
