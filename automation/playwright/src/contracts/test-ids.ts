@@ -153,6 +153,8 @@ export const TestIds = {
     dataSourceRefreshDiscovery: 'data-source-refresh-discovery',
     dataSourceDiscoveryFlowLink: 'data-source-discovery-flow-link',
     dataSourceDiscoveryHistory: 'data-source-discovery-history',
+    dataSourceAcquisitionTargetRow: 'data-source-acquisition-target-row',
+    dataSourceReconcileTarget: 'data-source-reconcile-target',
     dataSourceDiscoveryResultsTab: 'data-source-discovery-results-tab',
     dataSourceDiscoveryHistoryTab: 'data-source-discovery-history-tab',
     dataSourceDiscoveryRow: 'data-source-discovery-row',

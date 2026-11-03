@@ -320,6 +320,82 @@ public sealed class DataSourceEditorTests
         Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-row]"));
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Reconcile", "Current", "documents")]
+    [DataRow("fr-FR", "Réconcilier", "À jour", "catalog-documents")]
+    public async Task RediscoveryReconcilesExistingTargetInsteadOfPromotingItsNameAgain(string cultureName, string reconcile, string current, string targetName)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var client = new SourceClientStub(targeted: true);
+        client.TargetResource = client.TargetResource with { Metadata = client.TargetResource.Metadata with { Name = targetName } };
+        client.DiscoveryHistory = [Discovery with { Uid = Guid.NewGuid(), Metadata = Discovery.Metadata with { Name = "discovery-2" } }];
+        await using var context = DiscoveryContext(client, new ManualTimeProvider());
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid=data-source-discovery-choice]");
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        rendered.Find("[data-testid=data-source-discovery-choice] input").Input("documents-v2");
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        rendered.Find("[data-testid=data-source-discovery-choice] input").Input(targetName);
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        var button = rendered.Find("[data-testid=data-source-reconcile-target]");
+        Assert.AreEqual(reconcile, button.TextContent);
+        Assert.IsFalse(button.HasAttribute("disabled"));
+        button.Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(client.Reconciled);
+            Assert.AreEqual(targetName, client.Reconciled.Value.Name);
+            Assert.AreEqual("discovery-2", client.Reconciled.Value.Request.DiscoveryId);
+            Assert.AreEqual("documents", client.Reconciled.Value.Request.ChoiceId);
+            Assert.AreEqual("\"target-v1\"", client.Reconciled.Value.ETag);
+            StringAssert.Contains(rendered.Find("[data-testid=data-source-acquisition-target-row]").TextContent, current);
+            var promotedButton = rendered.Find("[data-testid=data-source-discovery-choice] button");
+            Assert.AreEqual(cultureName == "fr-FR" ? "Déjà promu" : "Already promoted", promotedButton.TextContent);
+            Assert.IsTrue(promotedButton.HasAttribute("disabled"));
+            Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-reconcile-target]"));
+        });
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Refresh")]
+    [DataRow("fr-FR", "Actualisez")]
+    public async Task ReconciliationConflictKeepsStaleTargetAndReportsLocalizedRecovery(string cultureName, string recovery)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var client = new SourceClientStub(targeted: true) { ReconcileFails = true };
+        client.DiscoveryHistory = [Discovery with { Uid = Guid.NewGuid() }];
+        await using var context = DiscoveryContext(client, new ManualTimeProvider());
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid=data-source-reconcile-target]").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[role=alert]").TextContent, recovery);
+            Assert.IsTrue(client.TargetStale);
+            Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-reconcile-target]"));
+        });
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ReconciliationRequiresAnEligibleChoiceInTheNewDiscovery(bool ineligible)
+    {
+        var client = new SourceClientStub(targeted: true);
+        client.DiscoveryHistory = [Discovery with
+        {
+            Uid = Guid.NewGuid(),
+            Manifest = new() { Choices = ineligible ? [new() { Id = "documents", DisplayName = "Documents", Eligible = false }] : [] }
+        }];
+        await using var context = DiscoveryContext(client, new ManualTimeProvider());
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid=data-source-acquisition-target-row]");
+        if (ineligible)
+            Assert.IsTrue(rendered.Find("[data-testid=data-source-reconcile-target]").HasAttribute("disabled"));
+        else
+            Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-reconcile-target]"));
+        Assert.IsNull(client.Reconciled);
+    }
+
     private static BunitContext DiscoveryContext(SourceClientStub client, TimeProvider clock)
     {
         var context = new BunitContext();
@@ -452,6 +528,18 @@ public sealed class DataSourceEditorTests
             State = DataSourceDiscoveryState.Pending, Manifest = null, CompletedAt = null,
             LogicalScopeRef = ResourceScopeRef.Instance
         };
+        public DataSourceAcquisitionTargetResource TargetResource { get; set; } = Target with { ETag = "\"target-v1\"" };
+        public (string Name, ReconcileDataSourceAcquisitionTargetRequest Request, string ETag)? Reconciled { get; private set; }
+        public bool ReconcileFails { get; set; }
+        public Task<ResourceSnapshot<DataSourceAcquisitionTargetResource>> ReconcileTargetAsync(ResourceNamespace ns, string name,
+            ReconcileDataSourceAcquisitionTargetRequest request, string etag, CancellationToken cancellationToken = default)
+        {
+            Reconciled = (name, request, etag);
+            if (ReconcileFails) throw new AgentstrationApiException("Conflict", "test", System.Net.HttpStatusCode.Conflict, "Resource version conflict");
+            TargetStale = false;
+            TargetResource = TargetResource with { DiscoveryId = request.DiscoveryId, DiscoveryUid = DiscoveryHistory[0].Uid };
+            return Task.FromResult(new ResourceSnapshot<DataSourceAcquisitionTargetResource>(TargetResource, "\"target-v2\""));
+        }
         public bool DiscoveryReadFails { get; set; }
         public int DiscoveryReads { get; private set; }
         public TaskCompletionSource<IReadOnlyList<DataSourceDiscoveryResource>>? DeferredDiscoveryRead { get; set; }
@@ -493,7 +581,7 @@ public sealed class DataSourceEditorTests
             DiscoveryHistory = [AcceptedDiscovery];
             return Task.FromResult(new ResourceSnapshot<DataSourceDiscoveryResource>(AcceptedDiscovery, "\"discovery-etag\""));
         }
-        public Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>([new(Target, TargetStale, TargetStale ? ["New discovery"] : [])]);
+        public Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>([new(TargetResource, TargetStale, TargetStale ? ["New discovery"] : [])]);
     }
 
     private static DataSourceDiscoveryResource Discovery => new()

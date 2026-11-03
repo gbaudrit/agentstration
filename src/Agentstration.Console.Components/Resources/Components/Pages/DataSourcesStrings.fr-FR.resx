@@ -60,4 +60,11 @@
   <data name="OperationalRefreshFailed" xml:space="preserve"><value>Impossible d’actualiser l’état des exécutions. Les résultats affichés ont été conservés. Utilisez Actualiser pour réessayer.</value></data>
   <data name="DiscoveryResultsTab" xml:space="preserve"><value>Résultats</value></data>
   <data name="DiscoveryHistoryTab" xml:space="preserve"><value>Historique</value></data>
+  <data name="ReconcileTarget" xml:space="preserve"><value>Réconcilier</value></data>
+  <data name="ReconcileHelp" xml:space="preserve"><value>Après une redécouverte, réconciliez une cible existante pour adopter explicitement le nouveau choix tout en conservant son identité et son historique d’acquisition.</value></data>
+  <data name="ReconcileUnavailable" xml:space="preserve"><value>Lancez une nouvelle découverte réussie contenant ce choix éligible, puis actualisez les résultats.</value></data>
+  <data name="TargetNameInUse" xml:space="preserve"><value>Ce nom de cible existe déjà. Réconciliez la cible existante ci-dessous, ou choisissez un autre nom pour une nouvelle cible.</value></data>
+  <data name="TargetConcurrencyConflict" xml:space="preserve"><value>La cible a été modifiée depuis son chargement. Actualisez les résultats, vérifiez la cible, puis réessayez.</value></data>
+  <data name="TargetPromoted" xml:space="preserve"><value>Déjà promu</value></data>
+  <data name="TargetNameUsed" xml:space="preserve"><value>Nom déjà utilisé</value></data>
 </root>

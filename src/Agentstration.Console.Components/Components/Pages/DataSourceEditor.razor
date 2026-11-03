@@ -82,8 +82,15 @@ else
         }
         else
         {
-        @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <DataGrid TItem="DataSourceDiscoveryChoice" Items="manifest.Choices"><Header><tr><th>@T("Choice")</th><th>@T("Parent")</th><th>@T("State")</th><th>@T("TargetName")</th></tr></Header><Row Context="choice"><tr data-testid="data-source-discovery-choice"><td><strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></td><td>@(choice.ParentId ?? "—")</td><td>@(choice.Eligible ? T("Eligible") : T("Ineligible"))</td><td><input value="@PromotionName(choice)" @oninput="args => promotionNames[choice.Id] = args.Value?.ToString() ?? string.Empty" aria-label="@T("TargetName")" /><button class="button-secondary" type="button" disabled="@(busy || !choice.Eligible || string.IsNullOrWhiteSpace(PromotionName(choice)) || targets.Any(value => value.Target.DiscoveryUid == LatestDiscovery.Uid && value.Target.ChoiceId == choice.Id))" @onclick="() => PromoteAsync(choice)">@T("Promote")</button></td></tr></Row></DataGrid> }
-        @if (targets.Count > 0) { <h3>@T("AcquisitionTargets")</h3><DataGrid TItem="DataSourceAcquisitionTargetView" Items="targets"><Header><tr><th>@T("Name")</th><th>@T("Choice")</th><th>@T("State")</th></tr></Header><Row Context="item"><tr><td>@item.Target.DisplayName<br/><code>@item.Target.Name</code></td><td>@item.Target.ChoiceDisplayName</td><td><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></td></tr></Row></DataGrid> }
+        @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <DataGrid TItem="DataSourceDiscoveryChoice" Items="manifest.Choices"><Header><tr><th>@T("Choice")</th><th>@T("Parent")</th><th>@T("State")</th><th>@T("TargetName")</th></tr></Header><Row Context="choice"><tr data-testid="data-source-discovery-choice"><td><strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></td><td>@(choice.ParentId ?? "—")</td><td>@(choice.Eligible ? T("Eligible") : T("Ineligible"))</td><td><input value="@PromotionName(choice)" @oninput="args => promotionNames[choice.Id] = args.Value?.ToString() ?? string.Empty" aria-label="@T("TargetName")" /><button class="button-secondary" type="button" disabled="@(!CanApplyChoice(choice))" data-testid="@(MatchingTarget(choice) is { Stale: true } ? "data-source-reconcile-target" : null)" title="@ChoiceActionHelp(choice)" @onclick="() => ApplyChoiceAsync(choice)">@T(ChoiceActionLabel(choice))</button></td></tr></Row></DataGrid> }
+        @if (targets.Count > 0)
+        {
+            <h3>@T("AcquisitionTargets")</h3>
+            @if (targets.Any(item => item.Stale)) { <p class="muted">@T("ReconcileHelp")</p> }
+            <DataGrid TItem="DataSourceAcquisitionTargetView" Items="targets"><Header><tr><th>@T("Name")</th><th>@T("Choice")</th><th>@T("State")</th></tr></Header>
+                <Row Context="item"><tr data-testid="data-source-acquisition-target-row"><td>@item.Target.DisplayName<br/><code>@item.Target.Name</code></td><td>@item.Target.ChoiceDisplayName</td><td title="@(item.Stale && !CanReconcile(item) ? T("ReconcileUnavailable") : null)"><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></td></tr></Row>
+            </DataGrid>
+        }
         }
         </div>
         </section>
@@ -226,6 +233,7 @@ else
         acquisitions = [];
         discoveries = [];
         targets = [];
+        promotionNames.Clear();
         try
         {
             await LoadProfilesAsync();
@@ -303,8 +311,77 @@ else
         catch (Exception exception) { error = exception.Message; }
         finally { busy = false; }
     }
-    private async Task PromoteAsync(DataSourceDiscoveryChoice choice) { operationVersion++; busy = true; error = null; try { var name = PromotionName(choice); await Client.PromoteTargetAsync(source!.Namespace, LatestDiscovery!.Name, new(name, choice.Id, choice.DisplayName, choice.Description), cancellation.Token); targets = await Client.GetAcquisitionTargetsAsync(source.Namespace, source.Name, selectedScope!.Value, cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private string PromotionName(DataSourceDiscoveryChoice choice) { if (promotionNames.TryGetValue(choice.Id, out var value)) return value; value = string.Concat(choice.Id.ToLowerInvariant().Select(character => char.IsLetterOrDigit(character) || character is '.' or '-' or '_' ? character : '-')).Trim('-'); if (value.Length > 128) value = value[..128]; promotionNames[choice.Id] = value; return value; }
+    private bool PromotionNameInUse(DataSourceDiscoveryChoice choice) =>
+        targets.Any(item => string.Equals(item.Target.Name, PromotionName(choice), StringComparison.OrdinalIgnoreCase));
+    private bool ChoiceAlreadyPromoted(DataSourceDiscoveryChoice choice) =>
+        targets.Any(item => item.Target.DiscoveryUid == LatestDiscovery?.Uid && item.Target.ChoiceId == choice.Id);
+    private DataSourceAcquisitionTargetView? MatchingTarget(DataSourceDiscoveryChoice choice) =>
+        targets.FirstOrDefault(item => item.Target.ChoiceId == choice.Id
+            && string.Equals(item.Target.Name, PromotionName(choice), StringComparison.OrdinalIgnoreCase));
+    private string ChoiceActionLabel(DataSourceDiscoveryChoice choice) =>
+        MatchingTarget(choice) is { Stale: true } ? "ReconcileTarget"
+        : ChoiceAlreadyPromoted(choice) ? "TargetPromoted"
+        : PromotionNameInUse(choice) ? "TargetNameUsed" : "Promote";
+    private string? ChoiceActionHelp(DataSourceDiscoveryChoice choice) =>
+        MatchingTarget(choice) is { Stale: true } item ? T(CanReconcile(item) ? "ReconcileHelp" : "ReconcileUnavailable")
+        : PromotionNameInUse(choice) && !ChoiceAlreadyPromoted(choice) ? T("TargetNameInUse") : null;
+    private bool CanApplyChoice(DataSourceDiscoveryChoice choice) =>
+        MatchingTarget(choice) is { Stale: true } item
+            ? !busy && !HasActiveDiscovery && choice.Eligible && CanReconcile(item)
+            : CanPromote(choice);
+    private Task ApplyChoiceAsync(DataSourceDiscoveryChoice choice) =>
+        MatchingTarget(choice) is { Stale: true } item ? ReconcileTargetAsync(item) : PromoteAsync(choice);
+    private bool CanPromote(DataSourceDiscoveryChoice choice) =>
+        !busy && !HasActiveDiscovery && choice.Eligible && LatestDiscovery?.State == DataSourceDiscoveryState.Succeeded
+        && !string.IsNullOrWhiteSpace(PromotionName(choice)) && !PromotionNameInUse(choice)
+        && !ChoiceAlreadyPromoted(choice);
+    private bool CanReconcile(DataSourceAcquisitionTargetView item) =>
+        item.Stale && !string.IsNullOrWhiteSpace(item.Target.ETag)
+        && LatestDiscovery is { State: DataSourceDiscoveryState.Succeeded, Manifest: { } manifest } discovery
+        && discovery.Uid != item.Target.DiscoveryUid
+        && manifest.Choices.Any(choice => choice.Id == item.Target.ChoiceId && choice.Eligible);
+    private async Task PromoteAsync(DataSourceDiscoveryChoice choice)
+    {
+        if (!CanPromote(choice)) return;
+        operationVersion++;
+        busy = true;
+        error = null;
+        try
+        {
+            await Client.PromoteTargetAsync(source!.Namespace, LatestDiscovery!.Name,
+                new(PromotionName(choice), choice.Id, choice.DisplayName, choice.Description), cancellation.Token);
+            targets = await Client.GetAcquisitionTargetsAsync(source.Namespace, source.Name, selectedScope!.Value, cancellation.Token);
+        }
+        catch (AgentstrationApiException exception) when (exception.IsConcurrencyConflict) { error = T("TargetNameInUse"); }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+    private async Task ReconcileTargetAsync(DataSourceAcquisitionTargetView item)
+    {
+        if (busy || HasActiveDiscovery || !CanReconcile(item)) return;
+        operationVersion++;
+        busy = true;
+        error = null;
+        try
+        {
+            await Client.ReconcileTargetAsync(item.Target.Namespace, item.Target.Name,
+                new(LatestDiscovery!.Name, item.Target.ChoiceId), item.Target.ETag!, cancellation.Token);
+            targets = await Client.GetAcquisitionTargetsAsync(source!.Namespace, source.Name, selectedScope!.Value, cancellation.Token);
+        }
+        catch (AgentstrationApiException exception) when (exception.IsConcurrencyConflict) { error = T("TargetConcurrencyConflict"); }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+    private string PromotionName(DataSourceDiscoveryChoice choice)
+    {
+        if (promotionNames.TryGetValue(choice.Id, out var value)) return value;
+        var existing = targets.Where(item => item.Target.ChoiceId == choice.Id).Take(2).ToArray();
+        value = existing.Length == 1 ? existing[0].Target.Name
+            : string.Concat(choice.Id.ToLowerInvariant().Select(character => char.IsLetterOrDigit(character) || character is '.' or '-' or '_' ? character : '-')).Trim('-');
+        if (value.Length > 128) value = value[..128];
+        promotionNames[choice.Id] = value;
+        return value;
+    }
     private async Task SaveYamlAsync() { busy = true; error = null; try { var raw = ResourceManifestSerializer.FromYaml<RawSource>(rawYaml); if (raw.Metadata.Name != source!.Name || raw.Metadata.Namespace != source.Namespace || raw.ScopeRef != source.ScopeRef) throw new ArgumentException(T("IdentityImmutable")); var saved = await Client.UpdateAsync(source.Namespace, source.Name, selectedScope!.Value, new(raw.Definition), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; LoadForm(); readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
     private async Task DeleteAsync() { confirmDelete = false; await Client.DeleteAsync(source!.Namespace, source.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/data-sources"); }
     private void SelectTab(Tab value) { tab = value; if (value == Tab.Yaml && source is not null) LoadForm(); }

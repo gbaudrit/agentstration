@@ -37,6 +37,8 @@ Data Source discovery and acquisition Flow inputs use camelCase for typed contra
 
 In the Console, **Discovery** opens on **Results**, which contains discovered choices and promoted acquisition targets. **History** shows discovery runs, their states, and scoped Flow Run links. Switching between these views keeps automatic updates active while a discovery is running.
 
+The choice button shows **Promote** for a new target, **Already promoted** (disabled) for a current target, and **Reconcile** for an obsolete matching target after a new successful discovery. Reconciliation adopts the eligible choice while retaining the target identity. A name used by another choice remains unavailable. Updates use the target's observed ETag: after a concurrent change, refresh and review the target before retrying. Existing acquisition snapshots retain their original discovery evidence.
+
 ## Project one or more Data Sources
 
 An Instance-, Tenant-, or Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. The definition pins the exact Data Source and active profile identity plus the exact projection, retrieval, and optional transformation Flow versions and integrity hashes from its owner scope. Protected ancestor dependencies require explicit descendant-use authorization; ambiguous or stale references fail closed. Each named binding can use its latest successful Workspace acquisition or an explicitly selected successful acquisition. Omitting the transformation Flow is an identity transformation: the acquired Artifact references pass through unchanged.

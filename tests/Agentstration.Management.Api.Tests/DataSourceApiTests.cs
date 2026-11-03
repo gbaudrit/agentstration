@@ -651,15 +651,32 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, stale.StatusCode);
         StringAssert.Contains(await stale.Content.ReadAsStringAsync(), "data_source_acquisition_target_stale");
 
+        var observedTarget = targets!.Single().Target;
+        Assert.IsNotNull(observedTarget.ETag, "The listed target must expose its observed concurrency token.");
+        using var conflictingRequest = new HttpRequestMessage(HttpMethod.Post,
+            "/api/datasourceacquisitiontargets/documents/reconcile")
+        { Content = JsonContent.Create(new ReconcileDataSourceAcquisitionTargetRequest(rediscovery.Name, "documents")) };
+        conflictingRequest.Headers.TryAddWithoutValidation("If-Match", "\"outdated-target\"");
+        using var conflictingResponse = await client.SendAsync(conflictingRequest);
+        Assert.AreEqual(HttpStatusCode.Conflict, conflictingResponse.StatusCode);
+
         using var reconcileRequest = new HttpRequestMessage(HttpMethod.Post,
             "/api/datasourceacquisitiontargets/documents/reconcile")
         { Content = JsonContent.Create(new ReconcileDataSourceAcquisitionTargetRequest(rediscovery.Name, "documents")) };
-        reconcileRequest.Headers.TryAddWithoutValidation("If-Match", promotedResponse.Headers.ETag?.ToString());
+        reconcileRequest.Headers.TryAddWithoutValidation("If-Match", observedTarget.ETag);
         using var reconciledResponse = await client.SendAsync(reconcileRequest);
         Assert.AreEqual(HttpStatusCode.OK, reconciledResponse.StatusCode);
         var currentTargets = await client.GetFromJsonAsync<DataSourceAcquisitionTargetView[]>(
             $"/api/datasources/targeted-origin/acquisition-targets?scopeRef={Uri.EscapeDataString(workspace.Value)}");
         Assert.IsFalse(currentTargets?.Single().Stale);
+        var reconciledTarget = currentTargets!.Single().Target;
+        Assert.AreEqual(observedTarget.Uid, reconciledTarget.Uid);
+        Assert.AreEqual(observedTarget.Name, reconciledTarget.Name);
+        Assert.AreEqual(rediscovery.Uid, reconciledTarget.DiscoveryUid);
+        Assert.IsGreaterThan(observedTarget.Generation, reconciledTarget.Generation);
+        var historicalAcquisition = await client.GetFromJsonAsync<DataSourceAcquisitionResource>(
+            $"/api/datasourceacquisitions/{accepted.Name}");
+        Assert.AreEqual(discovery.Uid, historicalAcquisition!.Target!.DiscoveryUid);
     }
 
     private static async Task<DataSourceDiscoveryResource> StartAndAwaitDiscoveryAsync(HttpClient client, ResourceScopeRef workspace,

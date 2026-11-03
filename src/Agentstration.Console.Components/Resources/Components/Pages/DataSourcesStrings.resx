@@ -60,4 +60,11 @@
   <data name="OperationalRefreshFailed" xml:space="preserve"><value>Unable to refresh execution status. Displayed results have been retained. Use Refresh to retry.</value></data>
   <data name="DiscoveryResultsTab" xml:space="preserve"><value>Results</value></data>
   <data name="DiscoveryHistoryTab" xml:space="preserve"><value>History</value></data>
+  <data name="ReconcileTarget" xml:space="preserve"><value>Reconcile</value></data>
+  <data name="ReconcileHelp" xml:space="preserve"><value>After rediscovery, reconcile an existing target to explicitly adopt the new choice while preserving its identity and acquisition history.</value></data>
+  <data name="ReconcileUnavailable" xml:space="preserve"><value>Run a new successful discovery containing this eligible choice, then refresh the results.</value></data>
+  <data name="TargetNameInUse" xml:space="preserve"><value>This target name already exists. Reconcile the existing target below, or choose another name for a new target.</value></data>
+  <data name="TargetConcurrencyConflict" xml:space="preserve"><value>The target changed since it was loaded. Refresh the results, review the target, and retry.</value></data>
+  <data name="TargetPromoted" xml:space="preserve"><value>Already promoted</value></data>
+  <data name="TargetNameUsed" xml:space="preserve"><value>Name in use</value></data>
 </root>
