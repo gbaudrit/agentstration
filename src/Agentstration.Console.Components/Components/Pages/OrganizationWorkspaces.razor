@@ -209,16 +209,12 @@ else if (structure is not null)
         operationError = null;
         try
         {
+            Workspace? createdWorkspace = null;
             if (parent is null)
                 await Client.CreateTenantAsync(technicalName, displayName, lifetime.Token);
             else
             {
-                var workspace = await Client.CreateTenantWorkspaceAsync(parent.Tenant.Id, technicalName, displayName, lifetime.Token);
-                if (ContextState.Current?.SelectedKind == ConsoleContextKind.Workspace)
-                {
-                    Navigation.NavigateTo(ContextUrl($"/workspaces/{workspace.Id:D}"), forceLoad: true);
-                    return;
-                }
+                createdWorkspace = await Client.CreateTenantWorkspaceAsync(parent.Tenant.Id, technicalName, displayName, lifetime.Token);
                 collapsed.Remove(parent.Tenant.Id);
             }
             successMessage = T(parent is null ? "TenantCreated" : "WorkspaceCreated", displayName);
@@ -226,6 +222,11 @@ else if (structure is not null)
             search = string.Empty;
             await ReloadAsync();
             await ContextState.LoadAsync(lifetime.Token);
+            if (createdWorkspace is not null && ContextState.Current?.SelectedKind == ConsoleContextKind.Workspace && CanOpen(createdWorkspace.Id))
+            {
+                Navigation.NavigateTo(ContextUrl($"/workspaces/{createdWorkspace.Id:D}"), forceLoad: true);
+                return;
+            }
             await searchInput.FocusAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }

@@ -38,6 +38,26 @@ public sealed class OrganizationStructureTests
     }
 
     [TestMethod]
+    public void WorkspaceCreationDoesNotNavigateToAnUnavailableContext()
+    {
+        using var context = new BunitContext();
+        var tenant = new Tenant(Guid.NewGuid(), "acme", "Acme", TenantStatus.Active, DateTimeOffset.UnixEpoch);
+        var handler = new StructureHandler(tenant);
+        Register(context, handler, ConsoleContextKind.Workspace);
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        var originalUri = navigation.Uri;
+        var rendered = context.Render<OrganizationWorkspaces>();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='workspace-create-open']")));
+        rendered.Find("[data-testid='workspace-create-open']").Click();
+        rendered.Find("[data-testid='workspace-display-name']").Input("Production");
+        rendered.Find("[data-testid='workspace-technical-name']").Input("production");
+        rendered.Find("form").Submit();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
+        rendered.WaitForAssertion(() => Assert.HasCount(0, rendered.FindAll("[data-testid='workspace-create-form']")));
+        Assert.AreEqual(originalUri, navigation.Uri);
+    }
+
+    [TestMethod]
     public void SearchCollapseAndReadOnlyActionsReflectTheStructureResponse()
     {
         using var context = new BunitContext();

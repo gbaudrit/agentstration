@@ -18,7 +18,9 @@ what is displayed:
 - **Tenant**: the selected Tenant and its business Workspaces; Workspace creation requires
   `workspaces/write` in the selected context.
 - **Workspace**: the current business Workspace beneath its parent Tenant. A permitted
-  Workspace creation uses that same parent and opens the created Workspace context.
+  Workspace creation uses that same parent and opens the created Workspace context when
+  the refreshed selector confirms access. Otherwise the current context is retained; creation
+  does not grant additional roles.
 
 Creation opens a side panel (stacked above the inventory on narrow screens). The parent
 is explicit and cannot be changed through an unrelated global selection. Technical names
