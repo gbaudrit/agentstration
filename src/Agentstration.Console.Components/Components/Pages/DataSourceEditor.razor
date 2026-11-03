@@ -61,17 +61,32 @@ else
         {
             <a class="data-source-flow-card" href="@DiscoveryFlowUrl" data-testid="data-source-discovery-flow-link"><span class="data-source-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("DiscoveryFlowTitle")</small><strong>@discoveryFlow.Name</strong><code>@discoveryFlow.ScopeRef · @discoveryFlow.Namespace/@discoveryFlow.Version</code></span><UiIcon Name="arrow-right" /></a>
         }
+        <p class="muted">@T("DiscoveryLiveUpdates")</p>
+        <nav class="section-tabs" role="tablist" aria-label="@T("Discovery")">
+            <button id="discovery-results-tab" type="button" role="tab" aria-selected="@(!discoveryHistorySelected ? "true" : "false")" aria-controls="discovery-panel" class="@(!discoveryHistorySelected ? "active" : null)" data-testid="data-source-discovery-results-tab" @onclick="() => discoveryHistorySelected = false">@T("DiscoveryResultsTab")</button>
+            <button id="discovery-history-tab" type="button" role="tab" aria-selected="@(discoveryHistorySelected ? "true" : "false")" aria-controls="discovery-panel" class="@(discoveryHistorySelected ? "active" : null)" data-testid="data-source-discovery-history-tab" @onclick="() => discoveryHistorySelected = true">@T("DiscoveryHistoryTab")</button>
+        </nav>
+        <div id="discovery-panel" role="tabpanel" aria-labelledby="@(discoveryHistorySelected ? "discovery-history-tab" : "discovery-results-tab")" tabindex="0">
+        @if (discoveryHistorySelected)
+        {
         <section class="data-source-discovery-history" data-testid="data-source-discovery-history" aria-live="polite">
-            <h3>@T("DiscoveryHistory")</h3><p class="muted">@T("DiscoveryLiveUpdates")</p>
+            <h3>@T("DiscoveryHistory")</h3>
             @if (discoveries.Count > 0)
             {
                 <DataGrid TItem="DataSourceDiscoveryResource" Items="discoveries"><Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Version")</th></tr></Header>
                     <Row Context="item"><tr data-testid="data-source-discovery-row" data-state="@item.State"><td data-label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</td><td data-label="@T("State")"><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@DiscoveryTone(item.State)" /></td><td data-label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td><td data-label="@T("Version")"><code>@item.Composition.Profile.Version</code></td></tr></Row>
                 </DataGrid>
             }
+            else { <p class="muted">@T("NoDiscovery")</p> }
         </section>
+        }
+        else
+        {
         @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <DataGrid TItem="DataSourceDiscoveryChoice" Items="manifest.Choices"><Header><tr><th>@T("Choice")</th><th>@T("Parent")</th><th>@T("State")</th><th>@T("TargetName")</th></tr></Header><Row Context="choice"><tr data-testid="data-source-discovery-choice"><td><strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></td><td>@(choice.ParentId ?? "—")</td><td>@(choice.Eligible ? T("Eligible") : T("Ineligible"))</td><td><input value="@PromotionName(choice)" @oninput="args => promotionNames[choice.Id] = args.Value?.ToString() ?? string.Empty" aria-label="@T("TargetName")" /><button class="button-secondary" type="button" disabled="@(busy || !choice.Eligible || string.IsNullOrWhiteSpace(PromotionName(choice)) || targets.Any(value => value.Target.DiscoveryUid == LatestDiscovery.Uid && value.Target.ChoiceId == choice.Id))" @onclick="() => PromoteAsync(choice)">@T("Promote")</button></td></tr></Row></DataGrid> }
-        @if (targets.Count > 0) { <h3>@T("AcquisitionTargets")</h3><DataGrid TItem="DataSourceAcquisitionTargetView" Items="targets"><Header><tr><th>@T("Name")</th><th>@T("Choice")</th><th>@T("State")</th></tr></Header><Row Context="item"><tr><td>@item.Target.DisplayName<br/><code>@item.Target.Name</code></td><td>@item.Target.ChoiceDisplayName</td><td><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></td></tr></Row></DataGrid> }</section>
+        @if (targets.Count > 0) { <h3>@T("AcquisitionTargets")</h3><DataGrid TItem="DataSourceAcquisitionTargetView" Items="targets"><Header><tr><th>@T("Name")</th><th>@T("Choice")</th><th>@T("State")</th></tr></Header><Row Context="item"><tr><td>@item.Target.DisplayName<br/><code>@item.Target.Name</code></td><td>@item.Target.ChoiceDisplayName</td><td><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></td></tr></Row></DataGrid> }
+        }
+        </div>
+        </section>
     }
     else if (tab == Tab.Access && CanManage)
     {
@@ -111,6 +126,7 @@ else
     private JsonElement configuration = EmptyObject(), parameters = EmptyObject();
     private bool enabled = true, loading = true, busy, confirmDelete, configurationValid = true, parametersValid = true;
     private Tab tab = Tab.Definition;
+    private bool discoveryHistorySelected;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private bool CanManage => IsNew || selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
     private DataSourceAcquisitionResource? LatestAcquisition => acquisitions.OrderByDescending(value => value.CreatedAt).FirstOrDefault();

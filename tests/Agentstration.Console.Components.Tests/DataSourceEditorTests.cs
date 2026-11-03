@@ -168,6 +168,7 @@ public sealed class DataSourceEditorTests
         await using var context = DiscoveryContext(client, clock);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
+        rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row]").TextContent, pending);
@@ -194,10 +195,11 @@ public sealed class DataSourceEditorTests
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row]").TextContent, succeeded);
-            Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-choice]"));
             Assert.IsFalse(rendered.Find("[data-testid=data-source-start-discovery]").HasAttribute("disabled"));
             Assert.DoesNotContain(cultureName == "fr-FR" ? "Obsolète" : "Stale", rendered.Markup);
         });
+        rendered.Find("[data-testid=data-source-discovery-results-tab]").Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-choice]"));
         var reads = client.DiscoveryReads;
         await rendered.InvokeAsync(clock.Tick);
         Assert.AreEqual(reads, client.DiscoveryReads, "Terminal operations must stop network polling.");
@@ -217,6 +219,7 @@ public sealed class DataSourceEditorTests
         await using var context = DiscoveryContext(client, clock);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
+        rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
         rendered.WaitForElement("[data-testid=data-source-discovery-row][data-state=Pending]");
 
         client.DiscoveryReadFails = true;
@@ -245,6 +248,7 @@ public sealed class DataSourceEditorTests
         await using var context = DiscoveryContext(client, clock);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
+        rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
         rendered.WaitForElement("[data-testid=data-source-discovery-row][data-state=Pending]");
         client.DeferredDiscoveryRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
         await rendered.InvokeAsync(clock.Tick);
@@ -264,6 +268,7 @@ public sealed class DataSourceEditorTests
         await using var context = DiscoveryContext(client, clock);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
+        rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
         rendered.WaitForElement("[data-testid=data-source-discovery-row][data-state=Pending]");
         var oldRead = new TaskCompletionSource<IReadOnlyList<DataSourceDiscoveryResource>>(TaskCreationOptions.RunContinuationsAsynchronously);
         client.DeferredDiscoveryRead = oldRead;
@@ -279,6 +284,40 @@ public sealed class DataSourceEditorTests
             Assert.IsTrue(rendered.RenderCount > renders);
             StringAssert.Contains(rendered.Find("[data-testid=data-source-discovery-row]").TextContent, "new-page-run");
         });
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Results", "History")]
+    [DataRow("fr-FR", "Résultats", "Historique")]
+    public async Task DiscoveryDefaultsToResultsAndRefreshesWhileHistoryIsHidden(string cultureName, string results, string history)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var clock = new ManualTimeProvider();
+        var client = new SourceClientStub(targeted: true)
+        {
+            DiscoveryHistory = Enumerable.Range(0, 50).Select(index => Discovery with { Metadata = Discovery.Metadata with { Name = $"discovery-{index}" } }).ToArray()
+        };
+        await using var context = DiscoveryContext(client, clock);
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid=data-source-discovery-choice]");
+        var resultsTab = rendered.Find("[data-testid=data-source-discovery-results-tab]");
+        Assert.AreEqual(results, resultsTab.TextContent);
+        Assert.AreEqual("true", resultsTab.GetAttribute("aria-selected"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-discovery-row]"));
+        var historyTab = rendered.Find("[data-testid=data-source-discovery-history-tab]");
+        Assert.AreEqual(history, historyTab.TextContent);
+        historyTab.Click();
+        Assert.HasCount(50, rendered.FindAll("[data-testid=data-source-discovery-row]"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-discovery-choice]"));
+        Assert.AreEqual("discovery-history-tab", rendered.Find("#discovery-panel").GetAttribute("aria-labelledby"));
+        rendered.Find("[data-testid=data-source-discovery-results-tab]").Click();
+        rendered.Find("[data-testid=data-source-start-discovery]").Click();
+        Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-discovery-row]"));
+        client.DiscoveryHistory = [Discovery];
+        await rendered.InvokeAsync(clock.Tick);
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-choice]")));
+        rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-row]"));
     }
 
     private static BunitContext DiscoveryContext(SourceClientStub client, TimeProvider clock)

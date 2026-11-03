@@ -58,4 +58,6 @@
   <data name="DiscoveryHistory" xml:space="preserve"><value>Historique des découvertes</value></data>
   <data name="DiscoveryLiveUpdates" xml:space="preserve"><value>L’état des exécutions et les choix découverts sont actualisés automatiquement pendant une exécution active.</value></data>
   <data name="OperationalRefreshFailed" xml:space="preserve"><value>Impossible d’actualiser l’état des exécutions. Les résultats affichés ont été conservés. Utilisez Actualiser pour réessayer.</value></data>
+  <data name="DiscoveryResultsTab" xml:space="preserve"><value>Résultats</value></data>
+  <data name="DiscoveryHistoryTab" xml:space="preserve"><value>Historique</value></data>
 </root>

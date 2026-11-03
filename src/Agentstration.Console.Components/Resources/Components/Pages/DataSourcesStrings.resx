@@ -58,4 +58,6 @@
   <data name="DiscoveryHistory" xml:space="preserve"><value>Discovery history</value></data>
   <data name="DiscoveryLiveUpdates" xml:space="preserve"><value>Execution status and discovered choices update automatically while a run is active.</value></data>
   <data name="OperationalRefreshFailed" xml:space="preserve"><value>Unable to refresh execution status. Displayed results have been retained. Use Refresh to retry.</value></data>
+  <data name="DiscoveryResultsTab" xml:space="preserve"><value>Results</value></data>
+  <data name="DiscoveryHistoryTab" xml:space="preserve"><value>History</value></data>
 </root>
