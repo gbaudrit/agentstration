@@ -126,3 +126,15 @@ public static class BuiltInIdentityRoleNames
     public const string Viewer = "Viewer";
     public static IReadOnlyList<string> All { get; } = [Owner, Admin, Member, Viewer];
 }
+
+public sealed record OrganizationStructureResponse(
+    IReadOnlyList<OrganizationTenantResponse> Tenants,
+    bool CanCreateTenant);
+
+public sealed record OrganizationTenantResponse(
+    Tenant Tenant,
+    IReadOnlyList<Workspace> Workspaces,
+    bool CanCreateWorkspace);
+
+public sealed record CreateTenantRequest(string Name, string DisplayName);
+public sealed record CreateTenantWorkspaceRequest(Guid TenantId, string Name, string DisplayName);

@@ -18,7 +18,9 @@ export class OrganizationWorkspacesPage {
     if (scopeRef) target.searchParams.set('context', scopeRef);
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Organization workspaces page returned HTTP ${response?.status() ?? 'no response'}.`);
-    await this.page.locator(`[data-testid="${TestIds.organizationWorkspaces.createForm}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    await this.page.locator(`[data-testid="${TestIds.organizationWorkspaces.structure}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.organizationWorkspaces.openCreate).click();
+    await this.page.getByTestId(TestIds.organizationWorkspaces.createForm).waitFor({ state: 'visible' });
   }
 
   public async fillIdentity(workspace: WorkspaceDefinition): Promise<void> {
@@ -127,6 +129,8 @@ export class OrganizationWorkspacesPage {
       `[data-testid="${TestIds.organizationWorkspaces.row}"][data-workspace-name="${name}"]`,
     );
   }
+
+  public get structure(): Locator { return this.page.getByTestId(TestIds.organizationWorkspaces.structure); }
 
   public get createForm(): Locator { return this.page.getByTestId(TestIds.organizationWorkspaces.createForm); }
 

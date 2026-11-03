@@ -86,7 +86,7 @@ public partial class MainLayout
         new("Nav.Organization", "/settings/organization", "building", "Group.System", "tenant organization organisation"),
         new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload", "Group.System", "bootstrap profiles configuration profils configuration"),
         new("Nav.RuntimeWorkers", "/settings/runtime-workers", "server", "Group.System", "runtime workers AWP sessions capacity capacité"),
-        new("Command.OrganizationWorkspaces", "/settings/organization/workspaces", "layout-grid", "Group.System", "tenant workspaces espaces"),
+        new("Command.OrganizationWorkspaces", "/settings/organization/structure", "layout-grid", "Group.System", "structure tenant workspaces espaces"),
         new("Command.OrganizationMembers", "/settings/organization/members", "users", "Group.System", "users memberships roles membres rôles")
     ];
 

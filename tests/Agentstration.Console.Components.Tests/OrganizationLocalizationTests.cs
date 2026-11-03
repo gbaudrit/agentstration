@@ -32,6 +32,10 @@ public sealed class OrganizationLocalizationTests
             Assert.AreEqual("Compte local alice créé.", strings["AccountCreated", "alice"].Value);
             StringAssert.Contains(rendered.Markup, "Paramètres de l’organisation");
             StringAssert.Contains(rendered.Markup, "Contrôle d’accès");
+            StringAssert.Contains(rendered.Markup, "Structure");
+            StringAssert.Contains(rendered.Markup, "/settings/organization/structure");
+            Assert.AreEqual("Créer un tenant", strings["CreateTenant"].Value);
+            Assert.AreEqual("TENANT PARENT", strings["ParentTenant"].Value);
             StringAssert.Contains(rendered.Markup, "Audit de sécurité");
         }
         finally

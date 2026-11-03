@@ -27,6 +27,11 @@ public static class IdentityEndpoints
         group.MapPost("/pat", CreatePersonalAccessTokenAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapDelete("/pat", RevokeAllPersonalAccessTokensAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapDelete("/pat/{tokenId:guid}", RevokePersonalAccessTokenAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        group.MapGet("/organization/structure", async (IdentityAdministrationService service, CancellationToken token) =>
+            Results.Ok(await service.GetStructureAsync(token))).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
+        group.MapPost("/tenants", CreateTenantAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        // The service authorizes the explicit parent in Instance, Tenant and Workspace contexts.
+        group.MapPost("/organization/workspaces", CreateTenantWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapGet("/organization", async (IdentityAdministrationService service, CancellationToken token) =>
             Results.Ok(ToResponse(await service.GetCurrentAsync(token)))).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
         group.MapGet("/workspaces", async (IdentityAdministrationService service, CancellationToken token) =>
@@ -358,6 +363,50 @@ public static class IdentityEndpoints
         {
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden,
                 title: "console_context_access_denied", detail: exception.Message);
+        }
+    }
+
+    private static async Task<IResult> CreateTenantAsync(
+        CreateTenantRequest request, IdentityAdministrationService service, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenant = await service.CreateTenantAsync(request.Name, request.DisplayName, cancellationToken);
+            return Results.Created($"/api/identity/organization/structure", tenant);
+        }
+        catch (AuthorizationDeniedException exception)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "permission_denied", detail: exception.Message);
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "tenant_invalid", detail: exception.Message);
+        }
+        catch (ResourceConcurrencyException exception)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "tenant_conflict", detail: exception.Message);
+        }
+    }
+
+    private static async Task<IResult> CreateTenantWorkspaceAsync(
+        CreateTenantWorkspaceRequest request, IdentityAdministrationService service, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workspace = await service.CreateWorkspaceAsync(request.TenantId, request.Name, request.DisplayName, cancellationToken);
+            return Results.Created($"/api/identity/workspaces/{workspace.Id:D}", workspace);
+        }
+        catch (AuthorizationDeniedException exception)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "permission_denied", detail: exception.Message);
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "workspace_invalid", detail: exception.Message);
+        }
+        catch (ResourceConcurrencyException exception)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "workspace_conflict", detail: exception.Message);
         }
     }
 
