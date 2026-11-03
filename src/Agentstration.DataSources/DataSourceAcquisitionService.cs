@@ -239,7 +239,7 @@ public sealed class DataSourceAcquisitionService(
                 AcquisitionId = acquisitionId
                 ,
                 Target = target
-            });
+            }, JsonSerializerOptions.Web);
             var resource = new DataSourceAcquisitionResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -408,7 +408,7 @@ public sealed class DataSourceAcquisitionService(
                 AcquisitionId = value.Name
                 ,
                 Target = value.Target
-            });
+            }, JsonSerializerOptions.Web);
             try
             {
                 _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Composition.Flow, input,

@@ -216,7 +216,7 @@ public sealed class DataSourceDiscoveryService(
                 Caller = new(value.CreatedBy, value.TenantId, workspaceId),
                 CorrelationId = value.CorrelationId,
                 DiscoveryId = value.Name
-            });
+            }, JsonSerializerOptions.Web);
             try
             {
                 _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Composition.Flow, input,
@@ -368,7 +368,7 @@ public sealed class DataSourceDiscoveryService(
             Caller = new(context.PrincipalId, context.TenantId, context.WorkspaceId),
             CorrelationId = correlationId,
             DiscoveryId = id
-        });
+        }, JsonSerializerOptions.Web);
     private RequestContext RequireContext() => execution.RequireContext("data_source_discovery_context_required");
     private Task AuditAsync(string action, string reason, RequestContext context, CancellationToken token) =>
         audit.WriteAsync(new(action, ActorPrincipalId: context.PrincipalId, TenantId: context.TenantId,

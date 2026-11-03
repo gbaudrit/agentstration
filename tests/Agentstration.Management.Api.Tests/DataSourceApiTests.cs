@@ -7,6 +7,7 @@ using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -489,13 +490,20 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
-    [DataRow(ResourceScopeKind.Workspace)]
-    [DataRow(ResourceScopeKind.Instance)]
-    [DataRow(ResourceScopeKind.Tenant)]
-    public async Task DiscoveryPromotesExplicitTargetsAndRediscoveryMakesThemStale(ResourceScopeKind scopeKind)
+    [DataRow(ResourceScopeKind.Workspace, false)]
+    [DataRow(ResourceScopeKind.Instance, false)]
+    [DataRow(ResourceScopeKind.Tenant, false)]
+    [DataRow(ResourceScopeKind.Workspace, true)]
+    [DataRow(ResourceScopeKind.Instance, true)]
+    [DataRow(ResourceScopeKind.Tenant, true)]
+    public async Task DiscoveryPromotesExplicitTargetsAndRediscoveryMakesThemStale(ResourceScopeKind scopeKind, bool recoverPending)
     {
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
+            services.RemoveAll<IDataSourceAcquisitionFlowGateway>();
+            services.AddSingleton<DataSourceAcquisitionFlowGateway>();
+            services.AddSingleton<RecordingDataSourceFlowGateway>();
+            services.AddSingleton<IDataSourceAcquisitionFlowGateway>(provider => provider.GetRequiredService<RecordingDataSourceFlowGateway>());
             services.RemoveAll<IToolExecutionPipeline>();
             services.AddSingleton<RecordingFlowToolPipeline>();
             services.AddSingleton<IToolExecutionPipeline>(provider => provider.GetRequiredService<RecordingFlowToolPipeline>());
@@ -517,11 +525,26 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             var definition = Profile() with
             {
                 AcquisitionFlow = new() { Name = "target-acquire", UseActiveVersion = true },
-                DiscoveryFlow = new() { Name = "target-discover", UseActiveVersion = true }
+                DiscoveryFlow = new() { Name = "target-discover", UseActiveVersion = true },
+                ConfigurationSchema = JsonSerializer.SerializeToElement(new
+                {
+                    type = "object",
+                    properties = new { url = new { type = "string" }, ExtensionData = new { type = "object" } },
+                    required = new[] { "url" },
+                    additionalProperties = false,
+                    ExtensionHints = OpaquePayload
+                })
             };
             _ = await profiles.CreateAsync(ProfileResource("targeted", workspace, definition), default);
             _ = await profiles.PublishAsync(ResourceNamespace.Default, "targeted", workspace, new("1.0.0"), default);
-            _ = await sources.CreateAsync(SourceResource("targeted-origin", workspace, new("targeted", workspace)), default);
+            var source = SourceResource("targeted-origin", workspace, new("targeted", workspace));
+            _ = await sources.CreateAsync(source with
+            {
+                Definition = source.Definition with
+                {
+                    Configuration = JsonSerializer.SerializeToElement(new { url = "https://docs.example.test", ExtensionData = OpaquePayload })
+                }
+            }, default);
         }
 
         using var client = factory.CreateClient();
@@ -541,7 +564,15 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, missingTarget.StatusCode);
         StringAssert.Contains(await missingTarget.Content.ReadAsStringAsync(), "data_source_acquisition_target_required");
 
-        var discovery = await StartAndAwaitDiscoveryAsync(client, workspace, "discover-once");
+        var gateway = factory.Services.GetRequiredService<RecordingDataSourceFlowGateway>();
+        gateway.DeferStarts = recoverPending;
+        var discovery = await StartAndAwaitDiscoveryAsync(client, workspace, "discover-once", async () =>
+        {
+            if (!recoverPending) return;
+            gateway.DeferStarts = false;
+            using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            await factory.Services.GetRequiredService<DataSourceDiscoveryService>().RecoverPendingAsync(default);
+        });
         Assert.AreEqual(DataSourceDiscoveryState.Succeeded, discovery.State);
         Assert.AreEqual("documents", discovery.Manifest?.Choices.Single().Id);
         var repeatedDiscovery = await StartAndAwaitDiscoveryAsync(client, workspace, "discover-once");
@@ -553,9 +584,10 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var promoted = await promotedResponse.Content.ReadFromJsonAsync<DataSourceAcquisitionTargetResource>();
         Assert.AreEqual(discovery.Uid, promoted?.DiscoveryUid);
 
+        gateway.DeferStarts = recoverPending;
         using var started = await client.PostAsJsonAsync(
             $"/api/datasources/targeted-origin/acquisitions?scopeRef={Uri.EscapeDataString(workspace.Value)}",
-            new StartDataSourceAcquisitionRequest { DataSourceScopeRef = workspace, TargetName = "documents" });
+            new StartDataSourceAcquisitionRequest { DataSourceScopeRef = workspace, TargetName = "documents", Parameters = OpaquePayload });
         Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode);
         var accepted = await started.Content.ReadFromJsonAsync<DataSourceAcquisitionResource>();
         Assert.AreEqual(promoted?.Uid, accepted?.Target?.Uid);
@@ -564,6 +596,12 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual(workspace, accepted.LogicalScopeRef);
         Assert.AreEqual(workspace, discovery.LogicalScopeRef);
         Assert.AreEqual(executionWorkspace, discovery.WorkspaceId);
+        if (recoverPending)
+        {
+            gateway.DeferStarts = false;
+            using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            await factory.Services.GetRequiredService<DataSourceAcquisitionService>().RecoverPendingAsync(default);
+        }
         var flow = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{accepted.FlowRunId}");
         Assert.IsNotNull(flow);
         Assert.AreEqual(workspace, flow.Scope.LogicalScopeRef);
@@ -577,6 +615,10 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         Assert.AreEqual(DataSourceAcquisitionState.Succeeded, accepted.State, $"{accepted.ErrorCode}: {accepted.ErrorMessage}");
         var pipeline = factory.Services.GetRequiredService<RecordingFlowToolPipeline>();
         var invocation = pipeline.Invocations.Single();
+        Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, invocation.Context.Arguments!.Value.GetProperty("selector")));
+        Assert.AreEqual("targeted", invocation.Context.Arguments.Value.GetProperty("profileName").GetString());
+        AssertFlowInputContract(gateway, discovery.FlowRunId, recoverPending, acquisition: false);
+        AssertFlowInputContract(gateway, accepted.FlowRunId, recoverPending, acquisition: true);
         Assert.AreEqual(new WorkspaceId(executionWorkspace), invocation.Context.WorkspaceId);
         Assert.AreEqual(context.PrincipalId, invocation.Context.PrincipalId);
         Assert.AreEqual(workspace, invocation.Context.ToolScopeRef);
@@ -621,16 +663,17 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
     }
 
     private static async Task<DataSourceDiscoveryResource> StartAndAwaitDiscoveryAsync(HttpClient client, ResourceScopeRef workspace,
-        string? idempotencyKey = null)
+        string? idempotencyKey = null, Func<Task>? afterStart = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post,
             $"/api/datasources/targeted-origin/discoveries?scopeRef={Uri.EscapeDataString(workspace.Value)}")
-        { Content = JsonContent.Create(new StartDataSourceDiscoveryRequest { DataSourceScopeRef = workspace }) };
+        { Content = JsonContent.Create(new StartDataSourceDiscoveryRequest { DataSourceScopeRef = workspace, Parameters = OpaquePayload }) };
         if (idempotencyKey is not null) request.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
         using var response = await client.SendAsync(request);
         Assert.AreEqual(HttpStatusCode.Accepted, response.StatusCode);
         var current = await response.Content.ReadFromJsonAsync<DataSourceDiscoveryResource>()
             ?? throw new AssertFailedException("Discovery response missing.");
+        if (afterStart is not null) await afterStart();
         for (var attempt = 0; attempt < 50 && current.State is DataSourceDiscoveryState.Pending
                  or DataSourceDiscoveryState.Running or DataSourceDiscoveryState.WaitingForChild; attempt++)
         {
@@ -770,7 +813,12 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             var store = services.GetRequiredService<IResourceStore>();
             var provider = await PutProviderAsync(store, scope, "route-provider");
             _ = await PutToolAsync(store, scope, "route-fetch", provider.Value,
-                new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } }) });
+                new ToolSchema { Input = JsonSerializer.SerializeToElement(new
+                {
+                    type = "object",
+                    properties = new { selector = new { type = "object" }, profileName = new { type = "string" } },
+                    required = new[] { "selector", "profileName" }
+                }) });
             _ = await services.GetRequiredService<ToolSetService>().CreateAsync(new ToolSetResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -797,7 +845,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
                 Steps =
                 [
                     new InputFlowStepDefinition { Name = "input", Schema = inputSchema },
-                    .. (routed ? new FlowStepDefinition[] { new ToolRouteFlowStepDefinition { Name = "fetch", ToolSet = new("route-tools", "1.0.0", ScopeRef: scope), Capability = "source.fetch", Route = "fetch", ArgumentsMapping = JsonSerializer.SerializeToElement(new { }) } } : []),
+                    .. (routed ? new FlowStepDefinition[] { new ToolRouteFlowStepDefinition { Name = "fetch", ToolSet = new("route-tools", "1.0.0", ScopeRef: scope), Capability = "source.fetch", Route = "fetch", ArgumentsMapping = JsonSerializer.SerializeToElement(new { selector = "${input.target.selector}", profileName = "${input.profile.name}" }) } } : []),
                     new OutputFlowStepDefinition { Name = "output", OutputMapping = output }
                 ],
                 Transitions = routed
@@ -836,7 +884,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         { type = "object", properties = new { choices = new { type = "array" }, artifacts = new { type = "array" } }, required = new[] { "choices" } });
         var output = JsonSerializer.SerializeToElement(new
         {
-            choices = new[] { new { id = "documents", displayName = "Documents", selector = new { collection = "documents" } } },
+            choices = new[] { new { id = "documents", displayName = "Documents", selector = OpaquePayload } },
             artifacts = Array.Empty<object>()
         });
         var flows = services.GetRequiredService<FlowService>();
@@ -855,6 +903,60 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             }), ResourceNamespace.Default, default);
         await flows.PublishVersionExactAsync(scope, new(name), "1.0.0", true, default);
     }
+    private static JsonElement OpaquePayload => JsonSerializer.SerializeToElement(new Dictionary<string, object?>
+    {
+        ["PascalCase"] = new Dictionary<string, object?> { ["InnerKey"] = new object?[] { "value", 42, true, null } },
+        ["pascalCase"] = "distinct",
+        ["UPPER_CASE"] = false
+    });
+
+    private static void AssertFlowInputContract(RecordingDataSourceFlowGateway gateway, string runId, bool recovered, bool acquisition)
+    {
+        var requests = gateway.Requests.Where(request => request.RunId == runId).ToArray();
+        Assert.AreEqual(recovered ? 2 : 1, requests.Length);
+        foreach (var request in requests)
+        {
+            var input = request.Input;
+            var profile = input.GetProperty("profile");
+            Assert.AreEqual("targeted", profile.GetProperty("name").GetString());
+            Assert.AreEqual("target-acquire", profile.GetProperty("acquisitionFlow").GetProperty("name").GetString());
+            Assert.IsFalse(profile.TryGetProperty("Name", out _));
+            var schema = profile.GetProperty("definition").GetProperty("configurationSchema");
+            Assert.IsTrue(schema.GetProperty("properties").TryGetProperty("ExtensionData", out _));
+            Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, schema.GetProperty("ExtensionHints")));
+            Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, input.GetProperty("sourceConfiguration").GetProperty("ExtensionData")));
+            Assert.IsTrue(input.GetProperty("caller").TryGetProperty("principalId", out _));
+            Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, input.GetProperty("parameters")));
+            if (acquisition)
+            {
+                Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, input.GetProperty("target").GetProperty("selector")));
+                Assert.IsTrue(JsonElement.DeepEquals(profile, input.GetProperty("target").GetProperty("profile")));
+            }
+        }
+        if (recovered) Assert.IsTrue(JsonElement.DeepEquals(requests[0].Input, requests[1].Input));
+    }
+
+    // Simulates a durable Pending operation whose dispatch did not reach Flow.
+    private sealed class RecordingDataSourceFlowGateway(DataSourceAcquisitionFlowGateway inner) : IDataSourceAcquisitionFlowGateway
+    {
+        public bool DeferStarts { get; set; }
+        public ConcurrentQueue<DataSourceFlowRunRequest> Requests { get; } = new();
+
+        public Task<DataSourceFlowRunSnapshot> StartAsync(DataSourceFlowRunRequest request, CancellationToken cancellationToken)
+        {
+            Requests.Enqueue(request);
+            return DeferStarts
+                ? Task.FromResult(new DataSourceFlowRunSnapshot(request.RunId, DataSourceAcquisitionState.Pending, null, null, null, null))
+                : inner.StartAsync(request, cancellationToken);
+        }
+
+        public Task<DataSourceFlowRunSnapshot?> GetAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId,
+            CancellationToken cancellationToken) => inner.GetAsync(workspaceId, runId, tenantId, principalId, cancellationToken);
+
+        public Task<DataSourceFlowRunSnapshot> CancelAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId,
+            CancellationToken cancellationToken) => inner.CancelAsync(workspaceId, runId, tenantId, principalId, cancellationToken);
+    }
+
     private sealed class RecordingFlowToolPipeline(ICurrentRequestContext requestContext) : IToolExecutionPipeline
     {
         public ConcurrentQueue<(ToolExecutionContext Context, RequestContext Request, ControlPlaneAccessMode Mode)> Invocations { get; } = new();
