@@ -7,6 +7,7 @@ interface AgentstrationWorkerFixtures {
   product: ProductHosts;
   acquisitionFailureFixture: boolean;
   governedInventoryFixture: boolean;
+  organizationStructureFixture: boolean;
   authenticationMode: 'Development' | 'Local';
   aiProvider: 'Deterministic' | 'Managed';
 }
@@ -20,14 +21,15 @@ export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFi
   aiProvider: ['Deterministic', { option: true, scope: 'worker' }],
   acquisitionFailureFixture: [false, { option: true, scope: 'worker' }],
   governedInventoryFixture: [false, { option: true, scope: 'worker' }],
-  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture }, use) => {
+  organizationStructureFixture: [false, { option: true, scope: 'worker' }],
+  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture }, use) => {
     const external = resolveExternalProductAddresses(process.env);
     if (external) {
       await use({ ...external, stop: async () => {} });
       return;
     }
 
-    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture);
+    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture);
     try {
       await use(product);
     } finally {

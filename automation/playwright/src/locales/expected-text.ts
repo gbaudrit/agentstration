@@ -279,3 +279,23 @@ export const ResourceScopeTextByLocale = {
     empty: 'Aucune ressource correspondante',
   },
 } as const;
+
+
+export const OrganizationStructureTextByLocale = {
+  'en-US': {
+    tenantConflict: 'A Tenant with this technical name already exists.', workspaceConflict: 'A Workspace with this technical name already exists in this Tenant.',
+    invalid: 'Check the names and parent. Technical names require 2–64 letters, digits or hyphens; reserved names are unavailable.',
+    title: 'Structure', current: 'Current context', parentInstance: 'PARENT INSTANCE', parentTenant: 'PARENT TENANT',
+    search: 'Search the structure', empty: 'This Tenant has no business Workspaces.',
+    openTenant: (name: string) => `Open Tenant ${name}`,
+    openWorkspace: (name: string) => `Open Workspace ${name}`,
+  },
+  'fr-FR': {
+    tenantConflict: 'Un tenant portant ce nom technique existe déjà.', workspaceConflict: 'Un espace de travail portant ce nom technique existe déjà dans ce tenant.',
+    invalid: 'Vérifiez les noms et le parent. Le nom technique doit contenir entre 2 et 64 lettres, chiffres ou tirets ; les noms réservés sont indisponibles.',
+    title: 'Structure', current: 'Contexte actuel', parentInstance: 'INSTANCE PARENTE', parentTenant: 'TENANT PARENT',
+    search: 'Rechercher dans la structure', empty: 'Ce tenant ne contient aucun espace de travail métier.',
+    openTenant: (name: string) => `Ouvrir le tenant ${name}`,
+    openWorkspace: (name: string) => `Ouvrir l’espace de travail ${name}`,
+  },
+} as const;

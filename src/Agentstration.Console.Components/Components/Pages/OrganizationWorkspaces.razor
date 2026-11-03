@@ -45,7 +45,7 @@ else if (structure is not null)
                     var expanded = !collapsed.Contains(tenant.Id) || !string.IsNullOrWhiteSpace(search);
                     <article class="tenant-group" @key="tenant.Id" data-testid="tenant-row" data-tenant-id="@tenant.Id" data-tenant-name="@tenant.Name">
                         <div class="tenant-heading @(currentTenant ? "is-current" : null)">
-                            <button class="tenant-toggle" aria-expanded="@expanded" aria-controls="@($"tenant-{tenant.Id:D}")" @onclick="() => Toggle(tenant.Id)"><span aria-hidden="true">@(expanded ? "▾" : "▸")</span><span><strong>@tenant.DisplayName</strong><small>@tenant.Name</small></span></button>
+                            <button class="tenant-toggle" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@($"tenant-{tenant.Id:D}")" @onclick="() => Toggle(tenant.Id)"><span aria-hidden="true">@(expanded ? "▾" : "▸")</span><span><strong>@tenant.DisplayName</strong><small>@tenant.Name</small></span></button>
                             <StatusBadge Text="@T($"Status.{tenant.Status}")" Status="@(tenant.Status == TenantStatus.Active ? UiStatus.Success : UiStatus.Neutral)" />
                             @if (currentTenant)
                             {

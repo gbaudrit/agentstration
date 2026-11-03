@@ -484,6 +484,8 @@ export const TestIds = {
   },
   organizationWorkspaces: {
     structure: 'organization-structure',
+    tenantRow: 'tenant-row',
+    openTenantCreate: 'tenant-create-open',
     openCreate: 'workspace-create-open',
     createForm: 'workspace-create-form',
     displayName: 'workspace-display-name',

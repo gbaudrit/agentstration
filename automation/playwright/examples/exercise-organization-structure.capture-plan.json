@@ -1,0 +1,66 @@
+{
+  "journey": "exercise-organization-structure",
+  "input": {
+    "locale": "fr-FR",
+    "username": "admin",
+    "password": "Fixture973!Admin"
+  },
+  "locale": "fr-FR",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "theme": "dark",
+  "captures": [
+    {
+      "checkpoint": "organization-structure-instance",
+      "file": "instance.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-tenant-created",
+      "file": "tenant-created.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-parent-selected",
+      "file": "parent-selected.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-workspace-created",
+      "file": "workspace-created.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-tenant-context",
+      "file": "tenant-context.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-workspace-context",
+      "file": "workspace-context.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-validation",
+      "file": "validation.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-tenant-admin",
+      "file": "tenant-admin.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-workspace-admin",
+      "file": "workspace-admin.png",
+      "scope": "page"
+    },
+    {
+      "checkpoint": "organization-structure-viewer",
+      "file": "viewer.png",
+      "scope": "page"
+    }
+  ]
+}

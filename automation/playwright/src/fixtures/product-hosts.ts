@@ -69,8 +69,9 @@ export async function startProductHosts(
   aiProvider: 'Deterministic' | 'Managed' = 'Deterministic',
   acquisitionFailureFixture = false,
   governedInventoryFixture = false,
+  organizationStructureFixture = false,
 ): Promise<ProductHosts> {
-  if (acquisitionFailureFixture && governedInventoryFixture) throw new Error('Browser fixture hosts are mutually exclusive.');
+  if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
   const runId = `${Date.now()}-${process.pid}`;
   const workDirectory = path.join(automationRoot, '.work', runId);
   const dataDirectory = path.join(workDirectory, 'data');
@@ -78,7 +79,7 @@ export async function startProductHosts(
 
   const [consolePort, workplacePort, workerPort, extensionPort, gitExtensionPort, foundryExtensionPort, utilitiesExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), freePort()]);
   const consoleUrl = `http://127.0.0.1:${consolePort}`;
-  const governedReadyFile = path.join(workDirectory, 'governed-inventory.ready');
+  const fixtureReadyFile = path.join(workDirectory, 'browser-fixture.ready');
   const workplaceUrl = `http://127.0.0.1:${workplacePort}`;
   const workerUrl = `http://127.0.0.1:${workerPort}`;
   const extensionUrl = `http://127.0.0.1:${extensionPort}`;
@@ -142,13 +143,16 @@ export async function startProductHosts(
     throw error;
   }
 
-  const consoleProject = governedInventoryFixture
+  const consoleProject = organizationStructureFixture
+    ? 'automation/playwright/fixtures/OrganizationStructureHost/OrganizationStructureHost.csproj'
+    : governedInventoryFixture
     ? 'automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj'
     : acquisitionFailureFixture
     ? 'automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj'
     : 'src/Agentstration.Web/Agentstration.Web.csproj';
   const consoleHost = runDotnet(consoleProject, path.join(workDirectory, 'console.log'), {
-    ...(governedInventoryFixture ? { GOVERNED_INVENTORY_READY_FILE: governedReadyFile } : {}),
+    ...(organizationStructureFixture ? { ORGANIZATION_STRUCTURE_READY_FILE: fixtureReadyFile } : {}),
+    ...(governedInventoryFixture ? { GOVERNED_INVENTORY_READY_FILE: fixtureReadyFile } : {}),
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: consoleUrl,
     Logging__EventLog__LogLevel__Default: 'None',
@@ -208,12 +212,12 @@ export async function startProductHosts(
   };
   try {
     await waitUntilHealthy(`${consoleUrl}/health/ready`, consoleHost);
-    if (governedInventoryFixture) {
+    if (governedInventoryFixture || organizationStructureFixture) {
       const deadline = Date.now() + startupTimeoutMilliseconds;
       while (true) {
-        if (consoleHost.child.exitCode !== null) throw new Error(`Governed fixture exited.\n${consoleHost.output.join('')}`);
-        try { await fs.access(governedReadyFile); break; } catch { /* Seed is still running. */ }
-        if (Date.now() >= deadline) throw new Error(`Governed fixture seed timed out.\n${consoleHost.output.join('')}`);
+        if (consoleHost.child.exitCode !== null) throw new Error(`Browser fixture exited.\n${consoleHost.output.join('')}`);
+        try { await fs.access(fixtureReadyFile); break; } catch { /* Seed is still running. */ }
+        if (Date.now() >= deadline) throw new Error(`Browser fixture seed timed out.\n${consoleHost.output.join('')}`);
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }

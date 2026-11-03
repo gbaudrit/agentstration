@@ -246,3 +246,14 @@ its independent capture plan ends before Artifact administration:
 ```powershell
 npm run capture -- --plan examples/administer-governed-toolsets.capture-plan.json --output .work/governed-toolsets --console-url http://localhost:53400
 ```
+
+Organization Structure uses the merged #972 UX and the reusable #973 journey, including both `/settings/organization/structure` and the legacy `/settings/organization/workspaces` route:
+
+```sh
+npm exec playwright test -- tests/organization-structure.spec.ts
+npm run capture -- --plan examples/exercise-organization-structure.capture-plan.json --output .work/organization-structure
+```
+
+The local capture automatically selects the `OrganizationStructureHost` fixture with Local authentication. Its disposable platform administrator is `admin / Fixture973!Admin`; `tenant-admin`, `workspace-admin`, and `structure-viewer` share `Fixture973!Access`. The fixture provisions accounts through the existing identity services and grants only `tenant-admin` a Tenant-scoped Admin role. It exposes no product test endpoint. Every run uses isolated SQLite storage and unique Tenant/Workspace names.
+
+The journey covers explicit parent selection, empty Tenant expansion, search, keyboard creation, required/invalid/duplicate/reserved names, context opening links and URLs, the localized checked Current context indicator, Tenant/Workspace global selection, restricted inventory and cross-Tenant creation denial, and viewport bounds. A Workspace-scoped Admin also verifies successful sibling creation without an implicit access grant or context switch. The specification runs the same journey in English/French on desktop/mobile. For an external disposable instance, provide equivalent accounts using the journey's `tenantAdminUsername`, `workspaceAdminUsername`, `viewerUsername`, and `restrictedPassword` inputs and override the platform credentials; the fixture is never seeded into external instances.
