@@ -45,6 +45,8 @@ The technical discovery Tool returns exact contract content by default. The cont
 
 Acquisition requires a current enabled target. The extension refetches the selected contract and verifies the exact SHA-256 digest before invoking the selected server, operation, method, and path. Knowledge Sources select the named target and consume only its durable acquisition Artifacts; they never call the external origin.
 
+Operation selectors use the MCP field names `contractUri`, `contractDigest`, `server`, `operationId`, `method`, and `path`. If an earlier discovery retained PascalCase selector fields such as `ContractUri`, restart the updated extension, run discovery again, and explicitly reconcile the existing acquisition target with the new choice before acquiring. Existing opaque selectors are not rewritten automatically.
+
 ## Credentials
 
 Data Source and acquisition inputs carry only `credentialId`. Operator configuration maps that identity to a header or query credential. Inject the value through the host's protected configuration provider, environment-secret facility, or secret mount; do not commit it to configuration files. Credential values are excluded from discovery results, outputs, errors, and structured logs.

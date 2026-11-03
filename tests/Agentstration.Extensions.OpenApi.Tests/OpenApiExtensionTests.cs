@@ -6,8 +6,11 @@ using Agentstration.Aep.Client;
 using Agentstration.Extensions.OpenApi;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using ModelContextProtocol.Client;
 
 namespace Agentstration.Extensions.OpenApi.Tests;
 
@@ -157,6 +160,46 @@ public sealed class OpenApiExtensionTests
         Assert.IsFalse(contract.Eligible);
         Assert.IsTrue(operation.Eligible);
         Assert.AreEqual(contract.Id, operation.ParentId);
+    }
+
+    [TestMethod]
+    public async Task DiscoveredOperationSelectorMatchesMcpSchemaAndCanBeInvokedUnchanged()
+    {
+        HttpRequestMessage? invoked = null;
+        var service = Service((request, _) =>
+        {
+            if (request.RequestUri!.Host == "origin.example.test")
+                return Task.FromResult(Response(JsonContract, "application/json"));
+            invoked = Clone(request);
+            return Task.FromResult(Response("{\"id\":\"42\"}", "application/json"));
+        });
+        await using var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("OpenApi:AllowedDomains:0", "example.test");
+            builder.ConfigureServices(services => services.AddSingleton(service));
+        });
+        using var http = factory.CreateClient();
+        var transport = new HttpClientTransport(
+            new HttpClientTransportOptions { Endpoint = new Uri(http.BaseAddress!, "mcp"), Name = "openapi-selector-test" },
+            http, NullLoggerFactory.Instance, ownsHttpClient: false);
+        await using var mcp = await McpClient.CreateAsync(transport, loggerFactory: NullLoggerFactory.Instance);
+        var invoke = (await mcp.ListToolsAsync()).Single(tool => tool.Name == "openapi_invoke");
+        var discovery = await service.DiscoverAsync("https://origin.example.test", ["/openapi.json"],
+            includeContracts: false, "selector-round-trip", default);
+        var selector = discovery.Choices.Single(choice => choice.Eligible).Selector;
+        var schema = invoke.JsonSchema.GetProperty("properties").GetProperty("selector");
+        foreach (var required in schema.GetProperty("required").EnumerateArray())
+            Assert.IsTrue(selector.TryGetProperty(required.GetString()!, out _),
+                $"The discovered selector must contain the MCP field '{required.GetString()}'.");
+
+        await invoke.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+        {
+            ["selector"] = selector,
+            ["arguments"] = JsonSerializer.SerializeToElement(new { path = new { id = "42" } })
+        }));
+
+        Assert.IsNotNull(invoked);
+        Assert.AreEqual("https://api.example.test/orders/42", invoked.RequestUri!.AbsoluteUri);
     }
 
     [TestMethod]

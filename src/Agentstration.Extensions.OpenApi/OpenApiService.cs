@@ -157,7 +157,7 @@ public sealed class OpenApiService(
                 operation.OperationId ?? string.Empty, operation.Method, operation.Path);
             yield return new(id, operation.Summary ?? operation.OperationId ?? $"{operation.Method} {operation.Path}",
                 operation.Diagnostics.Count == 0 ? null : string.Join(' ', operation.Diagnostics.Select(value => value.Message)),
-                contractId, operation.Eligible, JsonSerializer.SerializeToElement(selector),
+                contractId, operation.Eligible, JsonSerializer.SerializeToElement(selector, JsonSerializerOptions.Web),
                 new Dictionary<string, string>
                 {
                     ["kind"] = "operation",
