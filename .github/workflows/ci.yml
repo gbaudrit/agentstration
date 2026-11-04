@@ -220,14 +220,17 @@ jobs:
           AEP_RESULT: ${{ needs.aep-tests.result }}
         run: |
           test "$CLASSIFICATION_RESULT" = success
-          if [ "$DOTNET_SELECTED" != true ]; then
+          if [ "$DOTNET_SELECTED" = false ]; then
             echo 'No product or build inputs changed; .NET validation is not required.'
             exit 0
           fi
+          test "$DOTNET_SELECTED" = true
           test "$BUILD_RESULT" = success
           test "$FUNCTIONAL_RESULT" = success
           if [ "$AEP_SELECTED" = true ]; then
             test "$AEP_RESULT" = success
+          else
+            test "$AEP_SELECTED" = false
           fi
 
   hosted-module-diagnostics:
