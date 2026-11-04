@@ -58,7 +58,7 @@ public sealed class ToolDefinitionService(
             throw new ToolDefinitionValidationException("tool_definition_name_reserved", $"ToolDefinition name '{resource.Name}' is reserved by an internal Agentstration MCP Tool.");
         var scopeRef = resource.ScopeRef!.Value;
         var contracts = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
-        var existing = await GetAsync(resource.Name, resource.Namespace, cancellationToken);
+        var existing = await GetExactAsync(resource.Name, resource.Namespace, scopeRef, cancellationToken);
         if (fromAcquisition && existing is not null)
             throw new ResourceConcurrencyException("If-None-Match prevented replacement of an existing resource.");
         if (!fromAcquisition && (resource.Definition.Acquisition != existing?.Value.Definition.Acquisition
@@ -189,8 +189,8 @@ public sealed class ToolDefinitionService(
     {
         if (resource.Kind != ToolResourceKinds.ToolDefinition || resource.ApiVersion != ResourceApiVersions.CoreV1)
             throw new ToolDefinitionValidationException("tool_definition_identity_invalid", "ToolDefinition kind and apiVersion are required.");
-        if (resource.ScopeRef is not { Kind: ResourceScopeKind.Workspace })
-            throw new ToolDefinitionValidationException("tool_definition_scope_invalid", "A ToolDefinition must belong to a Workspace scope.");
+        if (resource.ScopeRef is null || resource.Definition.Acquisition is null && resource.ScopeRef.Value.Kind != ResourceScopeKind.Workspace)
+            throw new ToolDefinitionValidationException("tool_definition_scope_invalid", "A ToolDefinition without an acquisition binding must belong to a Workspace.");
         if (string.IsNullOrWhiteSpace(resource.Name) || resource.Name.Length > 128
             || resource.Name.Any(character => !char.IsLetterOrDigit(character) && character is not '.' and not '-' and not '_'))
             throw new ToolDefinitionValidationException("tool_definition_name_invalid", "ToolDefinition names must contain only letters, digits, '.', '-' or '_'.");

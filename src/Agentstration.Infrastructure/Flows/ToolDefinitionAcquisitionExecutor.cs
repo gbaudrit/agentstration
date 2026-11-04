@@ -37,6 +37,15 @@ public sealed class ToolDefinitionAcquisitionExecutor(
         return stored?.Value.Definition.Acquisition is not null ? stored : null;
     }
 
+    internal bool OwnsAdministrativeInvocation(ToolDefinitionResource definition, ToolDefinitionInvocation invocation) =>
+        definition.Definition.Acquisition is not null && MatchingContext(invocation) is { } context
+        && definition.ScopeRef == (requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(context.TenantId),
+            _ => (ResourceScopeRef?)null
+        }) && definition.ScopeRef is not null;
+
     public async Task<ToolDefinitionInvocationResult> ExecuteAsync(
         ToolDefinitionResource definition,
         ToolDefinitionAcquisitionTarget target,

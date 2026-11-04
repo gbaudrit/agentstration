@@ -37,8 +37,14 @@ public sealed class ToolRunnerService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
         var workspaceScope = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
-        if (scopeRef is { } target && target != workspaceScope)
-            throw new ToolRunException("tool_scope_mismatch", 403, "The Tool does not belong to the current Workspace.");
+        var administrativeScope = current?.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(requestContext.TenantId),
+            _ => (ResourceScopeRef?)null
+        };
+        if (scopeRef is { } target && target != workspaceScope && target != administrativeScope)
+            throw new ToolRunException("tool_scope_mismatch", 403, "The Tool does not belong to the current scope.");
         var (tool, provider) = await ResolveAsync(toolNamespace, toolName, requestContext, scopeRef, cancellationToken);
 
         var arguments = request.Arguments;
@@ -155,15 +161,24 @@ public sealed class ToolRunnerService(
         CancellationToken cancellationToken)
     {
         var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var ownerScope = scopeRef ?? workspaceScope;
         using var operationalScope = scopeRef == workspaceScope
             && current is { AccessMode: ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration }
             && current.Current == context && context.PrincipalId != Guid.Empty && context.TenantId != Guid.Empty
             ? requestScopes?.Push(context)
             : null;
         var tool = (await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
-            workspaceScope, toolNamespace, ToolResourceKinds.Tool, toolName), cancellationToken))?.Value
+            ownerScope, toolNamespace, ToolResourceKinds.Tool, toolName), cancellationToken))?.Value
             ?? throw new ToolRunException("tool_not_found", 404, $"Tool '{toolNamespace}/{toolName}' was not found.");
-        EnsureWorkspaceScope(tool, context.WorkspaceId);
+        EnsureOwnerScope(tool, ownerScope);
+        if (ownerScope != workspaceScope)
+        {
+            var definition = await store.GetExactAsync<ToolDefinitionResource>(ScopedResourceAddress.Create(
+                ownerScope, toolNamespace, ToolResourceKinds.ToolDefinition, tool.Definition.ExternalId ?? toolName), cancellationToken);
+            if (definition?.Value.Definition.Acquisition is null
+                || AgentstrationToolProvider.ToolResourceName(definition.Value.Name) != tool.Name)
+                throw new ToolRunException("tool_scope_mismatch", 403, "The Tool does not support administrative execution.");
+        }
         if (!tool.Definition.Enabled)
             throw new ToolRunException("tool_disabled", 409, $"Tool '{tool.Address}' is disabled.");
         if (tool.Definition.Discovery?.Available != true)
@@ -171,11 +186,11 @@ public sealed class ToolRunnerService(
         var providerReference = tool.Definition.Provider
             ?? throw new ToolRunException("tool_mapping_invalid", 422, $"Tool '{tool.Address}' has no provider mapping.");
         var providerNamespace = providerReference.Namespace ?? tool.Namespace;
-        var providerScope = providerReference.ScopeRef ?? workspaceScope;
+        var providerScope = providerReference.ScopeRef ?? ownerScope;
         var provider = (await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
             providerScope, providerNamespace, ToolResourceKinds.ToolProvider, providerReference.Name), cancellationToken))?.Value
             ?? throw new ToolRunException("tool_provider_not_found", 404, $"ToolProvider '{providerNamespace}/{providerReference.Name}' was not found.");
-        EnsureWorkspaceScope(provider, context.WorkspaceId);
+        EnsureOwnerScope(provider, ownerScope);
         if (!provider.Definition.Enabled)
             throw new ToolRunException("tool_provider_disabled", 409, $"ToolProvider '{provider.Address}' is disabled.");
         return (tool, provider);
@@ -192,9 +207,9 @@ public sealed class ToolRunnerService(
             : new ToolRunReceipt(workItemId, flowRunId, correlationId);
     }
 
-    private static void EnsureWorkspaceScope(Resource resource, Guid workspaceId)
+    private static void EnsureOwnerScope(Resource resource, ResourceScopeRef ownerScope)
     {
-        if (resource.ScopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } target } || target != workspaceId)
-            throw new ToolRunException("tool_scope_mismatch", 403, $"Resource '{resource.Address}' does not belong to the current Workspace.");
+        if (resource.ScopeRef != ownerScope)
+            throw new ToolRunException("tool_scope_mismatch", 403, $"Resource '{resource.Address}' does not belong to the current Tool scope.");
     }
 }

@@ -164,7 +164,7 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             new { name = "catalog", displayName = "Catalog", artifactId = originalArtifact.ArtifactId });
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
         var tool = (await created.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
-        Assert.AreEqual(workspace, tool.ScopeRef);
+        Assert.AreEqual(owner, tool.ScopeRef);
         Assert.AreEqual(original.Name, tool.Definition.Acquisition!.TemplateId);
         var listedDefinitions = await client.GetFromJsonAsync<JsonElement>("/api/tooldefinitions");
         Assert.IsTrue(listedDefinitions.GetProperty("value").EnumerateArray().Any(value =>
@@ -176,9 +176,9 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         using var details = await client.GetAsync(created.Headers.Location);
         Assert.AreEqual(HttpStatusCode.OK, details.StatusCode, await details.Content.ReadAsStringAsync());
         using var projection = await client.GetAsync(
-            $"/api/tools/agentstration.catalog?scopeRef={Uri.EscapeDataString(workspace.Value)}");
+            $"/api/tools/agentstration.catalog?scopeRef={Uri.EscapeDataString(owner.Value)}");
         Assert.AreEqual(HttpStatusCode.OK, projection.StatusCode, await projection.Content.ReadAsStringAsync());
-        var toolPath = $"/api/tools/agentstration.catalog/run?scopeRef={Uri.EscapeDataString(workspace.Value)}";
+        var toolPath = $"/api/tools/agentstration.catalog/run?scopeRef={Uri.EscapeDataString(owner.Value)}";
         using var overrideResponse = await client.PostAsJsonAsync(toolPath,
             new RunToolRequest(JsonSerializer.SerializeToElement(new { limit = 100 }), ToolRunMode.Execute));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, overrideResponse.StatusCode, await overrideResponse.Content.ReadAsStringAsync());

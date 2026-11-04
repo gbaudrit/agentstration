@@ -12,7 +12,6 @@ public sealed class ToolDefinitionAcquisitionFactory(
     DataSourceManagementService sources,
     ToolDefinitionService definitions,
     ICurrentRequestContext current,
-    IRequestContextScopeFactory requestScopes,
     IAuthorizationService authorization) : IToolDefinitionAcquisitionFactory
 {
     public async Task<StoredResource<ToolDefinitionResource>> CreateAsync(
@@ -55,13 +54,12 @@ public sealed class ToolDefinitionAcquisitionFactory(
             throw Invalid("tool_definition_acquisition_artifact_ambiguous", "The selected artifact must be identifiable by its kind and name.");
 
         var flow = template.Composition.Flow;
-        using var workspace = requestScopes.Push(context);
         return await definitions.CreateFromAcquisitionAsync(new ToolDefinitionResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolDefinition,
             Metadata = new ResourceMetadata { Name = name, Namespace = template.Namespace },
-            ScopeRef = workspaceScope,
+            ScopeRef = logicalScope,
             Definition = new ToolDefinitionProperties
             {
                 DisplayName = displayName,

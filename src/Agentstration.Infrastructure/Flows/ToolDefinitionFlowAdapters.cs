@@ -339,14 +339,14 @@ public sealed class ToolDefinitionExecutor(
 
     private async Task<StoredResource<ToolDefinitionResource>> ValidateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
-        var stored = (acquisitions is null ? null
+        var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
+            ?? (acquisitions is null ? null
                 : await acquisitions.FindInOperationalWorkspaceAsync(definitions, invocation, cancellationToken))
-            ?? await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
             ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", $"ToolDefinition '{invocation.Namespace}/{invocation.ToolName}' was not found.");
         if (!stored.Value.Definition.Enabled)
             throw new ToolDefinitionInvocationException("tool_definition_disabled", $"ToolDefinition '{stored.Value.Address}' is disabled.");
-        if (stored.Value.ScopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } ownerWorkspace }
-            || ownerWorkspace != invocation.WorkspaceId.Value)
+        if (stored.Value.ScopeRef != ResourceScopeRef.Workspace(invocation.WorkspaceId.Value)
+            && acquisitions?.OwnsAdministrativeInvocation(stored.Value, invocation) != true)
             throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is not owned by the invocation Workspace.");
         if (invocation.Arguments.GetRawText().Length > 65_536)
             throw new ToolDefinitionInvocationException("tool_definition_input_too_large", "ToolDefinition input cannot exceed 65536 JSON characters.");

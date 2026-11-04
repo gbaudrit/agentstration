@@ -97,7 +97,13 @@ internal static class ToolDefinitionEndpoints
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var ns = ResourceNamespace.Parse(@namespace);
-            var resource = Resource(name, ns, body.Properties, ResourceScopeRef.Workspace(context.Current.WorkspaceId));
+            var owner = body.Properties.Acquisition is null ? null : context.AccessMode switch
+            {
+                ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+                ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(context.Current.TenantId),
+                _ => (ResourceScopeRef?)null
+            };
+            var resource = Resource(name, ns, body.Properties, owner ?? ResourceScopeRef.Workspace(context.Current.WorkspaceId));
             return ToolsApiHttp.ResourceResult(
                 await service.PutAsync(resource, ToolsApiHttp.IfMatch(request), false, cancellationToken), response, 200);
         });
