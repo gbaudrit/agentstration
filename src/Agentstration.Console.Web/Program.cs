@@ -5,45 +5,11 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Console;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-builder.Services.AddRazorPages();
+builder.Services.AddAgentstrationConsolePresentation(builder.Configuration);
 builder.Services.AddAgentstrationConsoleHost(builder.Configuration);
-builder.Services.AddAgentstrationLocalization(builder.Configuration);
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddAuthentication(ConsoleAuthenticationDefaults.Scheme)
-    .AddCookie(ConsoleAuthenticationDefaults.Scheme, options =>
-    {
-        options.Cookie.Name = ConsoleAuthenticationDefaults.Cookie;
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.IsEssential = true;
-        options.LoginPath = "/login";
-        options.ReturnUrlParameter = "returnUrl";
-    });
-builder.Services.AddAuthorization();
-builder.Services.AddProblemDetails();
-builder.Services.AddHealthChecks();
-
-var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("Agentstration.Console.Web"))
-    .WithTracing(tracing =>
-    {
-        tracing.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation();
-        if (otlpEnabled) tracing.AddOtlpExporter();
-    })
-    .WithMetrics(metrics =>
-    {
-        metrics.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation();
-        if (otlpEnabled) metrics.AddOtlpExporter();
-    });
+builder.Services.AddAgentstrationConsoleObservability(builder.Configuration);
 
 var app = builder.Build();
 app.UseExceptionHandler();

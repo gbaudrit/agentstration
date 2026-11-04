@@ -22,8 +22,25 @@ public static class IdentityApiModule
         IConfiguration configuration,
         IHostEnvironment environment)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
         services.AddOptions<AgentstrationApiOptions>()
             .Bind(configuration.GetSection(AgentstrationApiOptions.SectionName));
+        var options = configuration.GetSection($"{AgentstrationApiOptions.SectionName}:Authentication")
+            .Get<ApiAuthenticationOptions>() ?? new();
+        services.AddHttpContextAccessor();
+        services.AddAgentstrationWorkloadTrust(configuration);
+        services.AddAgentstrationEnrollmentRateLimiting();
+        services.AddAgentstrationApiAuthentication(options, environment);
+        services.AddAgentstrationApiAuthorization();
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationWorkloadTrust(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
         services.AddOptions<BffWorkloadTrustOptions>()
             .Bind(configuration.GetSection(BffWorkloadTrustOptions.SectionName))
             .Validate(value => value.Validate(), "BFF workload trust configuration is invalid.")
@@ -40,6 +57,13 @@ public static class IdentityApiModule
         services.AddScoped<InternalDelegationService>();
         services.AddSingleton<IBffWorkloadReplayCache, BffWorkloadReplayCache>();
         services.AddSingleton<IAwpWorkerReplayCache, AwpWorkerReplayCache>();
+        services.AddScoped<BffSessionAuthorityService>();
+        services.AddHostedService<BffWorkloadTrustAuditService>();
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationEnrollmentRateLimiting(this IServiceCollection services)
+    {
         services.AddRateLimiter(rateLimiting =>
         {
             rateLimiting.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -53,12 +77,6 @@ public static class IdentityApiModule
                         QueueLimit = 0
                     }));
         });
-        services.AddScoped<BffSessionAuthorityService>();
-        services.AddHostedService<BffWorkloadTrustAuditService>();
-        var options = configuration.GetSection($"{AgentstrationApiOptions.SectionName}:Authentication")
-            .Get<ApiAuthenticationOptions>() ?? new();
-        services.AddHttpContextAccessor();
-        AddSecurity(services, options, environment);
         return services;
     }
 
@@ -72,8 +90,8 @@ public static class IdentityApiModule
         return endpoints;
     }
 
-    private static void AddSecurity(
-        IServiceCollection services,
+    internal static IServiceCollection AddAgentstrationApiAuthentication(
+        this IServiceCollection services,
         ApiAuthenticationOptions options,
         IHostEnvironment environment)
     {
@@ -204,6 +222,11 @@ public static class IdentityApiModule
                     _ => { });
         }
 
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationApiAuthorization(this IServiceCollection services)
+    {
         services.AddSingleton<IAuthorizationHandler, WorkspacePermissionHandler>();
         services.AddSingleton<IAuthorizationHandler, WorkspaceResourcePermissionHandler>();
         services.AddSingleton<IAuthorizationHandler, PlatformAdministratorHandler>();
@@ -248,6 +271,7 @@ public static class IdentityApiModule
             .AddPolicy(AgentstrationPolicies.CanReadRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsRead))
             .AddPolicy(AgentstrationPolicies.CanExecuteRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute))
             .AddPolicy(AgentstrationPolicies.CanDeleteRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsDelete));
+        return services;
     }
 
     private static void WorkspacePolicy(AuthorizationPolicyBuilder policy, string permission)
