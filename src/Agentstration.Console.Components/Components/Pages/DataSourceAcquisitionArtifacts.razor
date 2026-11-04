@@ -1,0 +1,44 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+<section class="acquired-artifacts" data-testid="data-source-acquisition-artifacts">
+    @if (Artifacts.Count > 1)
+    {
+        <label class="form-field-wide">
+            <span>@Localizer["AcquiredArtifacts"]</span>
+            <select @bind="selectedIndex" data-testid="data-source-acquisition-artifact-select">
+                @for (var index = 0; index < Artifacts.Count; index++)
+                {
+                    <option value="@index">@ArtifactName(Artifacts[index])</option>
+                }
+            </select>
+        </label>
+    }
+    @{
+        var selected = Artifacts[selectedIndex];
+    }
+    <h3>@ArtifactName(selected)</h3>
+    @if (Guid.TryParseExact(selected.ArtifactId, "N", out var id))
+    {
+        @if (selected.Kind == DataSourceArtifactKind.Staged)
+        {
+            <StagedArtifactContent @key="selected" ArtifactId="@(new StagedArtifactId(id))" ContextScope="ContextScope" ReadOnOpen="true" />
+        }
+        else
+        {
+            <DurableArtifactContent @key="selected" ArtifactId="@(new FlowRunArtifactId(id))" ContextScope="ContextScope" InlinePreview="true" />
+        }
+    }
+    else
+    {
+        <p class="muted">@Localizer["AcquiredArtifactUnavailable"]</p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<DataSourceAcquisitionArtifact> Artifacts { get; set; } = [];
+    [Parameter, EditorRequired] public ResourceScopeRef ContextScope { get; set; }
+
+    private int selectedIndex;
+    private static string ArtifactName(DataSourceAcquisitionArtifact artifact) =>
+        string.IsNullOrWhiteSpace(artifact.Name) ? artifact.ArtifactId : artifact.Name;
+}

@@ -67,4 +67,8 @@
   <data name="TargetConcurrencyConflict" xml:space="preserve"><value>The target changed since it was loaded. Refresh the results, review the target, and retry.</value></data>
   <data name="TargetPromoted" xml:space="preserve"><value>Already promoted</value></data>
   <data name="TargetNameUsed" xml:space="preserve"><value>Name in use</value></data>
+  <data name="AcquiredArtifacts" xml:space="preserve"><value>Acquired artifacts</value></data>
+  <data name="ViewAcquiredArtifacts" xml:space="preserve"><value>View artifacts</value></data>
+  <data name="HideAcquiredArtifacts" xml:space="preserve"><value>Hide artifacts</value></data>
+  <data name="AcquiredArtifactUnavailable" xml:space="preserve"><value>This artifact is unavailable.</value></data>
 </root>

@@ -1,0 +1,16 @@
+.acquired-artifacts {
+    contain: inline-size;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .75rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.acquired-artifacts h3 {
+    margin: 0;
+}
+
+.acquired-artifacts select {
+    max-width: 100%;
+}

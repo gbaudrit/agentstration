@@ -45,10 +45,46 @@ else
     }
     else if (tab == Tab.Acquisitions)
     {
-        <section class="panel form-section" data-testid="data-source-acquisitions"><div class="panel-header"><div><p class="eyebrow">@T("Acquisitions")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || !parametersValid || readiness?.Ready != true || readiness?.Discovery is not null && string.IsNullOrWhiteSpace(selectedTarget))" @onclick="StartAsync">@T("StartAcquisition")</button></div>
+        <section class="panel form-section data-source-acquisitions" data-testid="data-source-acquisitions"><div class="panel-header"><div><p class="eyebrow">@T("Acquisitions")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || !parametersValid || readiness?.Ready != true || readiness?.Discovery is not null && string.IsNullOrWhiteSpace(selectedTarget))" @onclick="StartAsync">@T("StartAcquisition")</button></div>
         @if (readiness?.Discovery is not null) { <label class="form-field-wide"><span>@T("AcquisitionTarget")</span><select @bind="selectedTarget" data-testid="data-source-acquisition-target"><option value="">@T("SelectTarget")</option>@foreach (var item in targets.Where(value => value.Target.Enabled)) { <option value="@item.Target.Name" disabled="@item.Stale">@item.Target.DisplayName @(item.Stale ? $"· {T("Stale")}" : string.Empty)</option> }</select></label> }
         <div class="data-source-parameters" data-testid="data-source-acquisition-parameters"><span>@T("Parameters")</span><JsonSchemaInputEditor Schema="AcquisitionParametersSchema" Value="parameters" ValueChanged="value => parameters = value" ValidationChanged="state => parametersValid = state.IsValid" Disabled="busy" /><small>@T("ParametersHelp")</small></div>
-        @if (acquisitions.Count == 0) { <p class="muted">@T("NoAcquisitions")</p> } else { <DataGrid TItem="DataSourceAcquisitionResource" Items="acquisitions"><Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Version")</th></tr></Header><Row Context="item"><tr data-testid="data-source-acquisition-row" data-state="@item.State"><td>@item.CreatedAt.ToLocalTime().ToString("g")</td><td><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" /></td><td><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td><td><code>@item.Composition.Profile.Version</code></td></tr></Row></DataGrid> }</section>
+        @if (acquisitions.Count == 0)
+        {
+            <p class="muted">@T("NoAcquisitions")</p>
+        }
+        else
+        {
+            <DataGrid TItem="DataSourceAcquisitionResource" Items="acquisitions">
+                <Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Version")</th><th>@T("AcquiredArtifacts")</th></tr></Header>
+                <Row Context="item">
+                    <tr data-testid="data-source-acquisition-row" data-state="@item.State">
+                        <td data-label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</td>
+                        <td data-label="@T("State")"><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" /></td>
+                        <td data-label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td>
+                        <td data-label="@T("Version")"><code>@item.Composition.Profile.Version</code></td>
+                        <td data-label="@T("AcquiredArtifacts")">
+                            @if (item.Manifest is { Artifacts.Count: > 0 })
+                            {
+                                <button class="button-secondary" type="button" aria-expanded="@(previewAcquisition == item.Uid ? "true" : "false")" data-testid="data-source-acquisition-preview" @onclick="() => ToggleAcquisitionPreview(item.Uid)">
+                                    @T(previewAcquisition == item.Uid ? "HideAcquiredArtifacts" : "ViewAcquiredArtifacts")
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="muted">—</span>
+                            }
+                        </td>
+                    </tr>
+                    @if (previewAcquisition == item.Uid && item.Manifest is { Artifacts.Count: > 0 } manifest)
+                    {
+                        <tr class="data-source-acquisition-preview-row"><td colspan="5">
+                            <DataSourceAcquisitionArtifacts @key="item.Uid" Artifacts="manifest.Artifacts" ContextScope="CurrentConsoleScope" />
+                        </td></tr>
+                    }
+                </Row>
+            </DataGrid>
+        }
+        </section>
     }
     else if (tab == Tab.Discovery)
     {
@@ -134,6 +170,7 @@ else
     private bool enabled = true, loading = true, busy, confirmDelete, configurationValid = true, parametersValid = true;
     private Tab tab = Tab.Definition;
     private bool discoveryHistorySelected;
+    private Guid? previewAcquisition;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private bool CanManage => IsNew || selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
     private DataSourceAcquisitionResource? LatestAcquisition => acquisitions.OrderByDescending(value => value.CreatedAt).FirstOrDefault();
@@ -226,6 +263,7 @@ else
     private async Task LoadAsync()
     {
         operationVersion++;
+        previewAcquisition = null;
         loading = true;
         error = null;
         operationsError = null;
@@ -384,6 +422,8 @@ else
     }
     private async Task SaveYamlAsync() { busy = true; error = null; try { var raw = ResourceManifestSerializer.FromYaml<RawSource>(rawYaml); if (raw.Metadata.Name != source!.Name || raw.Metadata.Namespace != source.Namespace || raw.ScopeRef != source.ScopeRef) throw new ArgumentException(T("IdentityImmutable")); var saved = await Client.UpdateAsync(source.Namespace, source.Name, selectedScope!.Value, new(raw.Definition), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; LoadForm(); readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
     private async Task DeleteAsync() { confirmDelete = false; await Client.DeleteAsync(source!.Namespace, source.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/data-sources"); }
+    private void ToggleAcquisitionPreview(Guid uid) => previewAcquisition = previewAcquisition == uid ? null : uid;
+
     private void SelectTab(Tab value) { tab = value; if (value == Tab.Yaml && source is not null) LoadForm(); }
     private void ChangeProfile(ChangeEventArgs arguments) => profileKey = arguments.Value?.ToString() ?? string.Empty;
     private static string ProfileKey(DataSourceProfileResource item) => $"{item.ScopeRef!.Value.Value}|{item.Namespace.Value}|{item.Name}";

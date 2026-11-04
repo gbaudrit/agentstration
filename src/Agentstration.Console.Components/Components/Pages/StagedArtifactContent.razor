@@ -1,0 +1,144 @@
+@implements IDisposable
+@inject IArtifactsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
+
+<section class="panel form-section artifact-content-panel" data-testid="staged-artifact-content-panel">
+    <div class="panel-header">
+        <div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("ArtifactContent")</h2><p>@T("ContentHelp", MaximumDisplayBytes)</p></div>
+    </div>
+
+    @if (error is not null)
+    {
+        <div class="form-alert form-alert-danger" role="alert">@error</div>
+    }
+    @if (loading)
+    {
+        <LoadingState Message="@T("Loading")" />
+    }
+    @if (artifact is not null)
+    {
+        <div class="artifact-content-actions">
+            <button class="button-secondary" type="button" disabled="@busy" data-testid="staged-artifact-read-preview" @onclick="() => ReadContentAsync(false)">@T("ReadPreview")</button>
+            <button class="button-primary" type="button" disabled="@(busy || !CanReadFullContent)" data-testid="staged-artifact-read-full" @onclick="() => ReadContentAsync(true)">@T("ReadFullContent")</button>
+            <a class="button-secondary" href="@DownloadUrl" download data-enhance-nav="false" data-testid="staged-artifact-download">@T("Download")</a>
+        </div>
+
+        @if (!CanReadFullContent)
+        {
+            <p class="inline-warning" data-testid="staged-artifact-full-content-limit">@T("FullContentTooLarge", artifact.Length, MaximumDisplayBytes)</p>
+        }
+
+        @if (content is not null)
+        {
+            <p class="artifact-content-status" data-testid="staged-artifact-content-status">
+                @T(contentComplete ? "CompleteContentLoaded" : "PreviewContentLoaded", contentBytes, artifact.Length)
+            </p>
+            <div class="artifact-content-scroll" data-testid="staged-artifact-content-scroll">
+                <pre class="artifact-content-view" data-testid="staged-artifact-content">@content</pre>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private const int PreviewBytes = 8 * 1024;
+    private const int ReadChunkBytes = 256 * 1024;
+    private const int MaximumDisplayBytes = 4 * 1024 * 1024;
+
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+
+    [Parameter, EditorRequired] public StagedArtifactId ArtifactId { get; set; }
+    [Parameter] public StagedArtifactView? Metadata { get; set; }
+    [Parameter] public ResourceScopeRef? ContextScope { get; set; }
+    [Parameter] public bool ReadOnOpen { get; set; }
+
+    private readonly CancellationTokenSource cancellation = new();
+    private StagedArtifactView? artifact;
+    private bool loading, busy, contentComplete;
+    private int contentBytes;
+    private string? error, content;
+    private bool CanReadFullContent => artifact is not null && artifact.Length is >= 0 and <= MaximumDisplayBytes;
+    private string DownloadUrl => ContextScope is { } scope
+        ? $"{Client.GetDownloadUrl(ArtifactId)}?context={Uri.EscapeDataString(scope.Value)}"
+        : Client.GetDownloadUrl(ArtifactId);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+
+    protected override async Task OnInitializedAsync()
+    {
+        loading = true;
+        try
+        {
+            artifact = Metadata ?? await Client.GetStagedAsync(ArtifactId, cancellation.Token);
+            if (artifact is null) error = T("NotFound");
+            else if (ReadOnOpen) await ReadContentAsync(artifact.Length <= PreviewBytes);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+
+    private async Task ReadContentAsync(bool full)
+    {
+        if (busy || artifact is null || (full && !CanReadFullContent)) return;
+        busy = true;
+        error = null;
+        content = null;
+        try
+        {
+            var maximum = full ? checked((int)artifact.Length) : checked((int)Math.Min(PreviewBytes, artifact.Length));
+            using var output = new MemoryStream(maximum);
+            long offset = 0;
+            var endOfContent = artifact.Length == 0;
+            while (output.Length < maximum && !endOfContent)
+            {
+                var requested = Math.Min(ReadChunkBytes, maximum - checked((int)output.Length));
+                var chunk = await Client.ReadContentAsync(ArtifactId, offset, requested, cancellation.Token);
+                if (chunk.Offset != offset) throw new InvalidOperationException(T("ContentReadOffsetMismatch", offset, chunk.Offset));
+                var bytes = Convert.FromBase64String(chunk.ContentBase64);
+                if (bytes.Length == 0 && !chunk.EndOfContent) throw new InvalidOperationException(T("ContentReadNoProgress"));
+                if (bytes.Length > requested) throw new InvalidOperationException(T("ContentReadTooLarge", requested));
+                await output.WriteAsync(bytes, cancellation.Token);
+                offset += bytes.Length;
+                endOfContent = chunk.EndOfContent;
+            }
+
+            if ((endOfContent && output.Length != artifact.Length)
+                || (full && !endOfContent))
+                throw new InvalidOperationException(T("ContentLengthMismatch", artifact.Length, output.Length));
+
+            var value = output.ToArray();
+            contentBytes = value.Length;
+            contentComplete = endOfContent && output.Length == artifact.Length;
+            content = IsTextMediaType(artifact.MediaType)
+                ? FormatText(artifact.MediaType, value, contentComplete)
+                : $"{T("BinaryContent", value.Length)}\n{Convert.ToBase64String(value)}";
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private static string FormatText(string mediaType, byte[] bytes, bool complete)
+    {
+        var text = System.Text.Encoding.UTF8.GetString(bytes);
+        if (!complete || !mediaType.Contains("json", StringComparison.OrdinalIgnoreCase)) return text;
+        try
+        {
+            using var document = JsonDocument.Parse(text.TrimStart('\uFEFF'));
+            return JsonSerializer.Serialize(document.RootElement, IndentedJson);
+        }
+        catch (JsonException) { return text; }
+    }
+
+    private static bool IsTextMediaType(string mediaType) => mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
+        || mediaType.Contains("json", StringComparison.OrdinalIgnoreCase)
+        || mediaType.Contains("xml", StringComparison.OrdinalIgnoreCase)
+        || mediaType.Contains("yaml", StringComparison.OrdinalIgnoreCase)
+        || mediaType.Contains("javascript", StringComparison.OrdinalIgnoreCase);
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

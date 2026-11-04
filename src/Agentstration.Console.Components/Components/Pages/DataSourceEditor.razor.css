@@ -193,11 +193,13 @@
     margin-bottom: 1.25rem;
 }
 
+.data-source-acquisitions,
 .data-source-discovery {
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
 }
 
+.data-source-acquisitions ::deep .data-grid-wrap,
 .data-source-discovery ::deep .data-grid-wrap {
     min-width: 0;
     max-width: 100%;
@@ -214,21 +216,26 @@
         justify-content: flex-start;
     }
 
+    .data-source-acquisitions ::deep .data-grid,
+    .data-source-acquisitions ::deep .data-grid tbody,
     .data-source-discovery-history ::deep .data-grid,
     .data-source-discovery-history ::deep .data-grid tbody {
         display: block;
         white-space: normal;
     }
 
+    .data-source-acquisitions ::deep .data-grid thead,
     .data-source-discovery-history ::deep .data-grid thead {
         display: none;
     }
 
+    .data-source-acquisitions tr,
     .data-source-discovery-history tr {
         display: grid;
         padding: .4rem 0;
     }
 
+    .data-source-acquisitions tr[data-state] td,
     .data-source-discovery-history td {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
@@ -236,6 +243,15 @@
         padding: .65rem .8rem;
     }
 
+    .data-source-acquisitions .panel-header {
+        flex-wrap: wrap;
+    }
+
+    .data-source-acquisitions .data-source-flow-run {
+        overflow-wrap: anywhere;
+    }
+
+    .data-source-acquisitions tr[data-state] td::before,
     .data-source-discovery-history td::before {
         content: attr(data-label);
         color: var(--muted);

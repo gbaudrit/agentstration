@@ -70,6 +70,68 @@ public sealed class DataSourceEditorTests
     }
 
     [TestMethod]
+    public void AcquisitionOpensFormattedArtifactsOnDemandInTheSameTab()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        const string json = """{"Result":{"items":[1,2]}}""";
+        var artifacts = new ArtifactAdministrationComponentTests.ArtifactClient(json, mediaType: "application/vnd.example+json");
+        var client = new SourceClientStub
+        {
+            AcquisitionResult = Acquisition with
+            {
+                Manifest = new()
+                {
+                    Artifacts =
+                    [
+                        new() { Name = "local.json", ArtifactId = artifacts.Artifact.ArtifactId.ToString(), Kind = DataSourceArtifactKind.Staged, Disposition = DataSourceArtifactDisposition.Publishable },
+                        new() { Name = "durable.json", ArtifactId = artifacts.Durable.ArtifactId.ToString(), Kind = DataSourceArtifactKind.Durable, Disposition = DataSourceArtifactDisposition.Publishable },
+                        new() { Name = "missing.json", ArtifactId = Guid.NewGuid().ToString("N"), Kind = DataSourceArtifactKind.Staged, Disposition = DataSourceArtifactDisposition.Publishable }
+                    ]
+                }
+            }
+        };
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IDataSourcesClient>(client);
+        context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
+        context.Services.AddSingleton<IArtifactsClient>(artifacts);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=acquisitions");
+
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        const string toggle = "[data-testid='data-source-acquisition-preview']";
+        const string viewer = "[data-testid='staged-artifact-content']";
+        const string select = "[data-testid='data-source-acquisition-artifact-select']";
+        var show = rendered.WaitForElement(toggle);
+        Assert.AreEqual("Voir les artefacts", show.TextContent.Trim());
+        Assert.AreEqual(0, artifacts.ContentReadCount);
+        Assert.HasCount(0, rendered.FindAll(viewer));
+
+        show.Click();
+        var formatted = rendered.WaitForElement(viewer).TextContent;
+        StringAssert.Contains(formatted, "\n  \"Result\": {");
+        using var document = JsonDocument.Parse(formatted);
+        Assert.AreEqual(2, document.RootElement.GetProperty("Result").GetProperty("items").GetArrayLength());
+        Assert.AreEqual(1, artifacts.ContentReadCount);
+        StringAssert.Contains(rendered.Find("[data-testid='staged-artifact-download']").GetAttribute("href"),
+            $"context={Uri.EscapeDataString(Scope.Value)}");
+
+        rendered.Find(select).Change("1");
+        Assert.IsNotNull(rendered.WaitForElement("[data-testid='durable-artifact-content-panel']"));
+        Assert.AreEqual(formatted, rendered.WaitForElement(viewer).TextContent);
+        Assert.AreEqual(2, artifacts.ContentReadCount);
+
+        rendered.Find(select).Change("2");
+        Assert.IsNotNull(rendered.WaitForElement("[data-testid='staged-artifact-content-panel'] [role='alert']"));
+        Assert.HasCount(0, rendered.FindAll(viewer));
+        Assert.AreEqual(2, artifacts.ContentReadCount);
+
+        rendered.Find(toggle).Click();
+        Assert.HasCount(0, rendered.FindAll("[data-testid='data-source-acquisition-artifacts']"));
+    }
+
+    [TestMethod]
     public void AcquisitionSubmitsParametersProducedByTheResolvedFlowSchema()
     {
         using var culture = new TestCultureScope("en-US");
@@ -521,6 +583,7 @@ public sealed class DataSourceEditorTests
 
     private sealed class SourceClientStub(bool targeted = false, bool historyFails = false) : IDataSourcesClient
     {
+        public DataSourceAcquisitionResource AcquisitionResult { get; init; } = Acquisition;
         public StartDataSourceAcquisitionRequest? StartedRequest { get; private set; }
         public IReadOnlyList<DataSourceDiscoveryResource> DiscoveryHistory { get; set; } = [Discovery];
         public DataSourceDiscoveryResource AcceptedDiscovery { get; } = Discovery with
@@ -555,7 +618,7 @@ public sealed class DataSourceEditorTests
             targeted ? new("discover", ResourceNamespace.Default, "1.0.0", false, null, null,
                 DataSourceFlowContracts.Discovery, "sha256:discovery")
             { ScopeRef = Scope } : null));
-        public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => historyFails ? throw new InvalidOperationException("history unavailable") : Task.FromResult<IReadOnlyList<DataSourceAcquisitionResource>>([Acquisition]);
+        public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => historyFails ? throw new InvalidOperationException("history unavailable") : Task.FromResult<IReadOnlyList<DataSourceAcquisitionResource>>([AcquisitionResult]);
         public Task<ResourceSnapshot<DataSourceResource>> CreateAsync(CreateDataSourceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();

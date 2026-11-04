@@ -67,4 +67,8 @@
   <data name="TargetConcurrencyConflict" xml:space="preserve"><value>La cible a été modifiée depuis son chargement. Actualisez les résultats, vérifiez la cible, puis réessayez.</value></data>
   <data name="TargetPromoted" xml:space="preserve"><value>Déjà promu</value></data>
   <data name="TargetNameUsed" xml:space="preserve"><value>Nom déjà utilisé</value></data>
+  <data name="AcquiredArtifacts" xml:space="preserve"><value>Artefacts acquis</value></data>
+  <data name="ViewAcquiredArtifacts" xml:space="preserve"><value>Voir les artefacts</value></data>
+  <data name="HideAcquiredArtifacts" xml:space="preserve"><value>Masquer les artefacts</value></data>
+  <data name="AcquiredArtifactUnavailable" xml:space="preserve"><value>Cet artefact est indisponible.</value></data>
 </root>
