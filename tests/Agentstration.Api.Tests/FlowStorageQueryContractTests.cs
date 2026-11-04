@@ -10,6 +10,25 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    public async Task SqliteFlowRunEventsHaveUniqueSequencesDuringConcurrentAppends()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        const string runId = "concurrent-events";
+        const int count = 24;
+        var scope = TestScope.ScopeRef;
+        var writes = Enumerable.Range(0, count).Select(index => Task.Run(() =>
+            fixture.Repository.AppendRunEventAsync(new FlowRunEvent(scope, runId, 0, FlowRunEventType.FlowRunCreated,
+                null, JsonSerializer.SerializeToElement(index), Now), default))).ToArray();
+
+        await Task.WhenAll(writes);
+        var stored = await fixture.Repository.ListRunEventsExactAsync(scope, runId, 0, default);
+        CollectionAssert.AreEqual(Enumerable.Range(1, count).Select(value => (long)value).ToArray(),
+            stored.Select(value => value.Sequence).ToArray());
+        CollectionAssert.AreEquivalent(Enumerable.Range(0, count).ToArray(),
+            stored.Select(value => value.Payload!.Value.GetInt32()).ToArray());
+    }
+
+    [TestMethod]
     public async Task SqliteFlowRunPaginationFiltersAndBoundsEveryPageInSql()
     {
         var commands = new FlowCommandInterceptor();
