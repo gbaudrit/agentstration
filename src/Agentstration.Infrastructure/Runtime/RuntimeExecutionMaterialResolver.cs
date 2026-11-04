@@ -88,7 +88,8 @@ public sealed class RuntimeExecutionMaterialResolver(
             stored.Value.Properties.Execution,
             agent)
         {
-            ScopeRef = stored.Value.ExecutionScopeRef
+            ScopeRef = stored.Value.ExecutionScopeRef,
+            LogicalScopeRef = stored.Value.Scope.LogicalScopeRef
         };
     }
 
@@ -174,6 +175,7 @@ public sealed class RuntimeExecutionMaterialResolver(
             flowOptions.Value.OrchestrationTimeout)
         {
             ScopeRef = run.ExecutionScopeRef,
+            LogicalScopeRef = run.Scope.LogicalScopeRef,
             FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value
         };
     }

@@ -97,6 +97,8 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.RemoveAll<IDataSourceAcquisitionFlowGateway>();
+            // The callback below supplies verified execution material without creating a Runtime Run.
+            services.RemoveAll<IToolExecutionEventSink>();
             services.AddSingleton<AcquisitionToolFlowGateway>();
             services.AddSingleton<IDataSourceAcquisitionFlowGateway>(provider =>
                 provider.GetRequiredService<AcquisitionToolFlowGateway>());
@@ -217,6 +219,31 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
 
         if (instanceContext)
         {
+            var projectedTool = (await projection.Content.ReadFromJsonAsync<ToolResource>())!;
+            var runtimeTool = new RuntimeExecutionToolMaterial(projectedTool.Name, projectedTool.Namespace,
+                projectedTool.Definition.DisplayName, null, ToolDefinitionAcquisitionTarget.InputSchema,
+                ToolDefinitionAcquisitionTarget.OutputSchema, false, AgentstrationToolProvider.Name,
+                projectedTool.Namespace, projectedTool.Definition.ExternalId)
+            {
+                ScopeRef = projectedTool.ScopeRef,
+                Uid = projectedTool.Uid,
+                Generation = projectedTool.Generation,
+                ProviderScopeRef = projectedTool.Definition.Provider!.ScopeRef
+            };
+            var agent = new RuntimeExecutionAgentMaterial("material", "agent", Guid.NewGuid(), "catalog-agent", 1,
+                "revision", "hash", "handler", "Catalog agent", "", "", "model", ResourceNamespace.Default, [runtimeTool]);
+            var callback = new RuntimeGovernedToolRequest(agent, runtimeTool, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+                null, context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId, "catalog-agent-run",
+                JsonSerializer.SerializeToElement(new { }), null)
+            {
+                ExecutionScopeRef = workspace,
+                LogicalScopeRef = owner
+            };
+            gateway.ArtifactIds.Enqueue(originalArtifact.ArtifactId);
+            var operationGateway = factory.Services.GetRequiredService<IRuntimeWorkerOperationGateway>();
+            var output = await operationGateway.InvokeToolAsync(callback, default);
+            Assert.AreEqual(originalArtifact.ArtifactId, output!.Value.GetProperty("artifact").GetProperty("artifactId").GetString());
+
             SelectConsoleContext(client, ResourceScopeRef.Workspace(bootstrap.WorkspaceId));
             using var hidden = await client.PostAsJsonAsync(createUrl,
                 new { name = "catalog", displayName = "Catalog", artifactId = originalArtifact.ArtifactId });

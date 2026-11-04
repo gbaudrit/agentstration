@@ -63,6 +63,7 @@ public sealed record RuntimeGovernedToolRequest(
         : TenantId != Guid.Empty
             ? ResourceScopeRef.Tenant(TenantId)
             : ResourceScopeRef.Instance;
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
 }
 
 public sealed record RuntimeGovernedArtifact(
