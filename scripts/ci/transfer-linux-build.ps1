@@ -51,7 +51,7 @@ try {
         $list = Join-Path $archiveDirectoryPath 'directories.list'
         [IO.File]::WriteAllText($list, ($directories -join "`0") + "`0")
         $timer = [Diagnostics.Stopwatch]::StartNew()
-        & tar '--use-compress-program=zstd -T2 -3 --long=27' -cf $archive --null -T $list
+        & tar '--use-compress-program=zstd -T2 -3 --long=28' -cf $archive --null -T $list
         if ($LASTEXITCODE -ne 0) { throw 'Could not archive the Linux build.' }
         Remove-Item -LiteralPath $list
         $context | ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding utf8
@@ -70,7 +70,7 @@ try {
             }
         }
         if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw 'The Linux build archive is missing.' }
-        & tar --zstd -xf $archive
+        & tar '--use-compress-program=zstd -d --long=28' -xf $archive
         if ($LASTEXITCODE -ne 0) { throw 'Could not extract the Linux build.' }
         Write-Host "Restored Linux build for $revision with SDK $sdk."
     }
