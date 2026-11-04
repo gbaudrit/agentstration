@@ -1,0 +1,43 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+<div class="resource-plan-application-summary @(Application.Status == ResourceChangeSetApplicationStatus.Applied ? "is-applied" : Application.Status == ResourceChangeSetApplicationStatus.Applying ? "is-applying" : "is-failed")" role="status">
+    <span class="resource-plan-application-symbol" aria-hidden="true">@(Application.Status == ResourceChangeSetApplicationStatus.Applied ? "✓" : Application.Status == ResourceChangeSetApplicationStatus.Applying ? "…" : "!")</span>
+    <div><p class="resource-plan-validation-kicker">@T("ApplicationResult")</p><h3>@T($"ApplicationSummary.{Application.Status}")</h3><p>@T($"ApplicationDescription.{Application.Status}")</p>
+        <div class="resource-plan-validation-meta"><StatusBadge Text="@T($"Application.{Application.Status}")" Status="@(Application.Status == ResourceChangeSetApplicationStatus.Applied ? UiStatus.Success : Application.Status == ResourceChangeSetApplicationStatus.Applying ? UiStatus.Warning : UiStatus.Danger)" /><span>@T("ApplicationAttempts", Application.Attempts)</span>@if (Application.CompletedAt is { } completedAt) { <span>@T("ApplicationCompletedAt") <time datetime="@completedAt.ToString("O")">@completedAt.ToLocalTime().ToString("g")</time></span> }</div>
+    </div>
+</div>
+<div class="resource-plan-application-counts" aria-label="@T("ApplicationProgress")"><div><strong>@Application.Operations.Count(value => value.Outcome is ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied)</strong><span>@T("ApplicationAppliedCount")</span></div><div><strong>@Application.Operations.Count(value => value.Outcome == ResourceChangeApplicationOutcome.Skipped)</strong><span>@T("ApplicationSkippedCount")</span></div><div><strong>@Application.Operations.Count(value => value.Outcome == ResourceChangeApplicationOutcome.Failed)</strong><span>@T("ApplicationFailedCount")</span></div></div>
+<section class="resource-plan-application-operations" aria-label="@T("ApplicationOperations")">
+    <h3>@T("ApplicationOperations")</h3>
+    @if (Application.Operations.Count == 0) { <p class="resource-plan-validation-empty">@T("ApplicationNoOperations")</p> }
+    else
+    {
+        <ol>
+            @foreach (var operation in Application.Operations.OrderBy(value => value.Order))
+            {
+                var change = ChangeSet?.Changes.FirstOrDefault(value => value.LogicalId == operation.LogicalId);
+                var resourceUrl = ResourcePlanReviewProjection.AppliedResourceUrl(change, operation);
+                var resourceName = change is null ? operation.LogicalId : ResourcePlanReviewProjection.DisplayName(change);
+                <li>
+                    <span class="resource-plan-application-order">@(operation.Order + 1)</span>
+                    <div class="resource-plan-application-resource">
+                        @if (resourceUrl is not null) { <a class="resource-name-link" href="@resourceUrl">@resourceName</a> } else { <strong>@resourceName</strong> }
+                        <small>@(change is null ? operation.LogicalId : $"{Presentation.ResourceKindLabel(change.Proposed.Kind)} · {operation.LogicalId}")</small>
+                        @if (!string.IsNullOrWhiteSpace(operation.ErrorMessage)) { <p class="resource-plan-application-error">@operation.ErrorMessage</p> }
+                    </div>
+                    <StatusBadge Text="@T($"Outcome.{operation.Outcome}")" Status="@ApplicationOutcomeTone(operation.Outcome)" />
+                </li>
+            }
+        </ol>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ResourceChangeSetApplication Application { get; set; } = default!;
+    [Parameter] public ResourceChangeSet? ChangeSet { get; set; }
+    private ResourcePlanReviewPresentation? presentation;
+    private ResourcePlanReviewPresentation Presentation => presentation ??= new(Localizer);
+    private static UiStatus ApplicationOutcomeTone(ResourceChangeApplicationOutcome outcome) => outcome switch { ResourceChangeApplicationOutcome.Applied or ResourceChangeApplicationOutcome.AlreadyApplied => UiStatus.Success, ResourceChangeApplicationOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+}

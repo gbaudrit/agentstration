@@ -141,6 +141,12 @@ public sealed class ResourcePlanReviewTests
         rendered.Find(".topology-node").Click();
         Assert.Contains("Resource type", rendered.Find(".resource-plan-graph-details").TextContent, StringComparison.Ordinal);
         Assert.Contains("triage", rendered.Find(".resource-plan-graph-details").TextContent, StringComparison.Ordinal);
+        rendered.Find(".resource-plan-graph-details header button").Click();
+        Assert.IsEmpty(rendered.FindAll(".resource-plan-graph-details"));
+        rendered.Find(".topology-node").Click();
+        rendered.Find("#tab-Changes").Click();
+        rendered.Find("#tab-Graph").Click();
+        Assert.Contains("triage", rendered.Find(".resource-plan-graph-details").TextContent, StringComparison.Ordinal);
         rendered.Find("#tab-Validation").Click();
         Assert.Contains("Verification is stale", rendered.Markup, StringComparison.Ordinal);
         rendered.Find("#tab-Activity").Click();
