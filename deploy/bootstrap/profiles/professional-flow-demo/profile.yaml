@@ -1,0 +1,19 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: professional-flow-demo
+definition:
+  displayName: Démonstration — Flows professionnels
+  description: Crée deux processus métier en français qui réutilisent un catalogue commun de Flows composables dans le Workspace sélectionné.
+  targetScope: workspace
+  bindings:
+    - name: demo-model
+      targetKind: modelProfile
+      displayName: Modèle de démonstration
+      description: Profil de modèle partagé par les Agents de la démonstration.
+      required: true
+    - name: demo-runtime
+      targetKind: runtimeProfile
+      displayName: Runtime de démonstration
+      description: Profil de runtime partagé par les Agents de la démonstration.
+      required: true
