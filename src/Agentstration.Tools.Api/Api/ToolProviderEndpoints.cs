@@ -100,13 +100,26 @@ internal static class ToolProviderEndpoints
             return Results.Ok(new ValueResponse<ToolResource>(tools.Where(value => value.Value.Definition.Provider?.Name == providerId).Select(value => value.Value).ToArray()));
         });
 
-    private static Task<IResult> ListToolsAsync(bool? enabled, bool? available, string? scopeRef, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListToolsAsync(bool? enabled, bool? available, string? scopeRef, ToolManagementService service,
+        ToolDefinitionService definitions, ICurrentRequestContext current, IRequestContextScopeFactory scopes, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var stored = string.IsNullOrWhiteSpace(scopeRef)
                 ? await service.ListToolsAsync(cancellationToken)
                 : await service.ListVisibleToolsAsync(ResourceScopeRef.Parse(scopeRef), cancellationToken);
             var values = stored.Select(value => value.Value);
+            if (string.IsNullOrWhiteSpace(scopeRef))
+            {
+                var operational = await ToolsApiHttp.ListOperationalAcquisitionToolsAsync(definitions, current, scopes, cancellationToken);
+                if (operational.Length > 0)
+                {
+                    var workspace = operational[0].ScopeRef!.Value;
+                    using var access = ToolsApiHttp.EnterOperationalWorkspace(workspace, current, scopes);
+                    var names = operational.Select(value => (value.Namespace, AgentstrationToolProvider.ToolResourceName(value.Name))).ToHashSet();
+                    values = values.Concat((await service.ListToolsAsync(cancellationToken)).Select(value => value.Value)
+                        .Where(value => value.ScopeRef == workspace && names.Contains((value.Namespace, value.Name)))).DistinctBy(value => (value.ScopeRef, value.Address));
+                }
+            }
             if (enabled.HasValue) values = values.Where(value => value.Definition.Enabled == enabled.Value);
             if (available.HasValue) values = values.Where(value => value.Definition.Discovery?.Available == available.Value);
             return Results.Ok(new ValueResponse<ToolResource>(values.ToArray()));

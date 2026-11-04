@@ -40,6 +40,19 @@ internal static class ToolsApiHttp
     public static string? IfMatch(HttpRequest request) => request.Headers.IfMatch.FirstOrDefault();
     public static ResourceNamespace Namespace(string? value) => ResourceNamespace.Parse(value);
 
+    public static async Task<ToolDefinitionResource[]> ListOperationalAcquisitionToolsAsync(
+        ToolDefinitionService definitions, ICurrentRequestContext current, IRequestContextScopeFactory scopes, CancellationToken token)
+    {
+        if (current.AccessMode is not (ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration)
+            || current.Current.WorkspaceId == Guid.Empty)
+            return [];
+        using var workspace = EnterOperationalWorkspace(ResourceScopeRef.Workspace(current.Current.WorkspaceId), current, scopes);
+        if (workspace is null) return [];
+        return (await definitions.ListAsync(token)).Select(item => item.Value)
+            .Where(item => item.Definition.Acquisition is not null && item.ScopeRef == ResourceScopeRef.Workspace(current.Current.WorkspaceId))
+            .ToArray();
+    }
+
     public static IDisposable? EnterOperationalWorkspace(
         ResourceScopeRef? scopeRef, ICurrentRequestContext current, IRequestContextScopeFactory scopes)
     {

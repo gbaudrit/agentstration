@@ -287,7 +287,8 @@ else
         catch (Exception exception)
         {
             runResult = null;
-            runError = exception.Message;
+            runError = exception is AgentstrationApiException { ProblemType: "https://agentstration.dev/problems/data_source_acquisition_target_stale" }
+                ? T("AcquisitionTargetStale") : exception.Message;
         }
         finally
         {

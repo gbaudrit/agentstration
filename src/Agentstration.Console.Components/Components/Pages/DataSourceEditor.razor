@@ -75,6 +75,11 @@ else
                                             @T("CreateAcquisitionTool")
                                         </button>
                                     }
+                                    @foreach (var linkedTool in acquisitionTools.Where(value => value.Definition.Acquisition is { } binding
+                                        && binding.TemplateId == item.Name && binding.TemplateNamespace == item.Namespace))
+                                    {
+                                        <a class="button-secondary" href="@AcquisitionToolUrl(linkedTool)" data-testid="data-source-linked-tool">@linkedTool.Definition.DisplayName</a>
+                                    }
                                 </div>
                             }
                             else
@@ -186,6 +191,9 @@ else
     private bool discoveryHistorySelected;
     private Guid? previewAcquisition;
     private DataSourceAcquisitionResource? toolAcquisition;
+    private IReadOnlyList<ToolDefinitionResource> acquisitionTools = [];
+    private string AcquisitionToolUrl(ToolDefinitionResource tool) =>
+        $"/tools/{Uri.EscapeDataString(AgentstrationToolProvider.ToolResourceName(tool.Name))}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}&scopeRef={Uri.EscapeDataString(tool.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(CurrentConsoleScope.Value)}&view=execution";
     private ConsoleContextSnapshot? ConsoleContext => Services.GetService<ConsoleContextState>()?.Current;
     private bool CanCreateAcquisitionTool(DataSourceAcquisitionResource item) =>
         item.State == DataSourceAcquisitionState.Succeeded
@@ -295,6 +303,7 @@ else
         targets = [];
         promotionNames.Clear();
         toolAcquisition = null;
+        acquisitionTools = [];
         try
         {
             await LoadProfilesAsync();
@@ -316,6 +325,9 @@ else
                     readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token);
                     acquisitions = (await Client.GetAcquisitionsAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token))
                         .OrderByDescending(value => value.CreatedAt).ToArray();
+                    if (acquisitions.Count > 0 && Services.GetService<IToolDefinitionsClient>() is { } definitions)
+                        acquisitionTools = (await definitions.GetAsync(cancellation.Token))
+                            .Where(value => value.Definition.Acquisition is not null).ToArray();
                     if (readiness.Discovery is not null)
                     {
                         discoveries = (await Client.GetDiscoveriesAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token))

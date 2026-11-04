@@ -166,6 +166,12 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var tool = (await created.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
         Assert.AreEqual(workspace, tool.ScopeRef);
         Assert.AreEqual(original.Name, tool.Definition.Acquisition!.TemplateId);
+        var listedDefinitions = await client.GetFromJsonAsync<JsonElement>("/api/tooldefinitions");
+        Assert.IsTrue(listedDefinitions.GetProperty("value").EnumerateArray().Any(value =>
+            value.GetProperty("metadata").GetProperty("name").GetString() == "catalog"));
+        var listedTools = await client.GetFromJsonAsync<JsonElement>("/api/tools");
+        Assert.IsTrue(listedTools.GetProperty("value").EnumerateArray().Any(value =>
+            value.GetProperty("metadata").GetProperty("name").GetString() == "agentstration.catalog"));
 
         using var details = await client.GetAsync(created.Headers.Location);
         Assert.AreEqual(HttpStatusCode.OK, details.StatusCode, await details.Content.ReadAsStringAsync());
@@ -193,11 +199,21 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             Assert.AreEqual(original.Target!.Uid, input.GetProperty("target").GetProperty("uid").GetGuid());
             Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, input.GetProperty("target").GetProperty("selector")));
         }
-        _ = await StartAndAwaitDiscoveryAsync(client, owner);
+        var latestDiscovery = await StartAndAwaitDiscoveryAsync(client, owner);
         using var stale = await client.PostAsJsonAsync(toolPath, request);
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, stale.StatusCode);
         StringAssert.Contains(await stale.Content.ReadAsStringAsync(), "data_source_acquisition_target_stale");
         Assert.HasCount(3, gateway.AcquisitionInputs);
+        var targets = await client.GetFromJsonAsync<DataSourceAcquisitionTargetView[]>(
+            $"/api/datasources/targeted-origin/acquisition-targets?scopeRef={Uri.EscapeDataString(owner.Value)}");
+        using var reconcile = new HttpRequestMessage(HttpMethod.Post, "/api/datasourceacquisitiontargets/documents/reconcile")
+        { Content = JsonContent.Create(new ReconcileDataSourceAcquisitionTargetRequest(latestDiscovery.Name, "documents")) };
+        reconcile.Headers.TryAddWithoutValidation("If-Match", targets!.Single().Target.ETag);
+        using var reconciled = await client.SendAsync(reconcile);
+        Assert.AreEqual(HttpStatusCode.OK, reconciled.StatusCode, await reconciled.Content.ReadAsStringAsync());
+        gateway.ArtifactIds.Enqueue(originalArtifact.ArtifactId);
+        using var replayed = await client.PostAsJsonAsync(toolPath, request);
+        Assert.AreEqual(HttpStatusCode.OK, replayed.StatusCode, await replayed.Content.ReadAsStringAsync());
 
         if (instanceContext)
         {

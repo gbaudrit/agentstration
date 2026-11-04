@@ -51,11 +51,18 @@ else
             && value.RegistrationNamespace == (extension.Namespace ?? provider!.Namespace).Value
             && value.RegistrationScopeRef == (extension.ScopeRef ?? provider!.ScopeRef));
     }
-    private static string ToolUrl(ToolResource tool)
+    private string ToolUrl(ToolResource tool)
     {
         var query = new List<string>();
         if (!tool.Namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(tool.Namespace.Value)}");
-        if (tool.ScopeRef is { } scopeRef) { query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value)}"); query.Add($"context={Uri.EscapeDataString(scopeRef.Value)}"); }
+        if (tool.ScopeRef is { } scopeRef)
+        {
+            var context = scopeRef.Kind == ResourceScopeKind.Workspace
+                && Services.GetService<ConsoleContextState>()?.Current?.WorkspaceId == scopeRef.TargetId
+                ? ResourceOwnershipContext.TryGetCurrent(Services) ?? scopeRef : scopeRef;
+            query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value)}");
+            query.Add($"context={Uri.EscapeDataString(context.Value)}");
+        }
         var path = $"/tools/{Uri.EscapeDataString(tool.Name)}";
         return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
     }

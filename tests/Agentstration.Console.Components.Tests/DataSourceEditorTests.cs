@@ -111,6 +111,8 @@ public sealed class DataSourceEditorTests
 
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid='data-source-acquisition-row']");
+        var linkedTool = rendered.WaitForElement("[data-testid='data-source-linked-tool']");
+        StringAssert.Contains(linkedTool.GetAttribute("href"), "/tools/agentstration.saved-acquisition");
         if (!canWrite)
         {
             Assert.HasCount(0, rendered.FindAll("[data-testid='data-source-create-tool']"));
@@ -684,6 +686,27 @@ public sealed class DataSourceEditorTests
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.Method == HttpMethod.Get)
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { value = new[]
+                    {
+                        new ToolDefinitionResource
+                        {
+                            ApiVersion = ResourceApiVersions.CoreV1,
+                            Kind = ToolResourceKinds.ToolDefinition,
+                            Metadata = new ResourceMetadata { Name = "saved-acquisition" },
+                            ScopeRef = Scope,
+                            Definition = new ToolDefinitionProperties
+                            {
+                                DisplayName = "Saved acquisition",
+                                Acquisition = new(Acquisition.Name, Acquisition.Namespace, "catalog.json", "staged"),
+                                InputSchema = ToolDefinitionAcquisitionTarget.InputSchema,
+                                Flow = new ToolDefinitionFlowTarget { Name = "acquisition" }
+                            }
+                        }
+                    } })
+                };
             Assert.AreEqual(HttpMethod.Post, request.Method);
             Path = request.RequestUri!.PathAndQuery;
             Request = await request.Content!.ReadFromJsonAsync<CreateToolDefinitionFromAcquisitionRequest>(cancellationToken);

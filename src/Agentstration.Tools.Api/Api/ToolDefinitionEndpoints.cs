@@ -43,10 +43,12 @@ internal static class ToolDefinitionEndpoints
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
 
-    private static Task<IResult> ListAsync(string? @namespace, ToolDefinitionService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListAsync(string? @namespace, ToolDefinitionService service, ICurrentRequestContext current,
+        IRequestContextScopeFactory scopes, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
-            var values = (await service.ListAsync(cancellationToken)).Select(value => value.Value);
+            var values = (await service.ListAsync(cancellationToken)).Select(value => value.Value)
+                .Concat(await ToolsApiHttp.ListOperationalAcquisitionToolsAsync(service, current, scopes, cancellationToken));
             if (!string.IsNullOrWhiteSpace(@namespace))
             {
                 var parsed = ResourceNamespace.Parse(@namespace);

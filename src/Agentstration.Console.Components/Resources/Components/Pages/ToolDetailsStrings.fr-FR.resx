@@ -85,4 +85,5 @@
   <data name="RunCheck.execution"><value>L’exécution de l’outil est terminée.</value></data>
   <data name="ManagingExtension"><value>Extension gestionnaire</value></data><data name="TechnicalProvider"><value>Fournisseur technique</value></data>
   <data name="OpenReturnedArtifact"><value>Ouvrir l’artefact</value></data>
+  <data name="AcquisitionTargetStale" xml:space="preserve"><value>Une nouvelle découverte est disponible. Ouvre la source, réconcilie la cible dans Découverte, puis relance le Tool. Si l’opération a changé, lance une nouvelle acquisition et crée un Tool à partir de celle-ci.</value></data>
 </root>
