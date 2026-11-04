@@ -1,0 +1,46 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <label>@T("TransformMapping")<textarea data-testid="transform-mapping" disabled="@ReadOnly" value="@JsonText(Step.Mapping)" @onchange="UpdateTransformMappingAsync"></textarea></label>
+}
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Input" Source="@T("ContractSource.IncomingTransition")" />
+        @if (EffectiveIncomingSchema is { } incomingSchema)
+        {
+            <SchemaDocumentEditor Value="incomingSchema" ReadOnly="true" />
+        }
+        else
+        {
+            <p class="step-contract-empty muted">@IncomingContractUnavailableText</p>
+        }
+    </section>
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Output" Source="@T("ContractSource.Step")" />
+        <SchemaBindingEditor Title="@T("OutputSchema")" TestId="transform-output-schema"
+            Binding="@Step.SchemaBinding" LegacySchema="@Step.Schema" SchemaVersions="SchemaVersions"
+            ValueChanged="UpdateTransformSchemaBindingAsync" ReadOnly="ReadOnly"
+            DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public TransformFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public JsonElement? EffectiveIncomingSchema { get; set; }
+    [Parameter] public string IncomingContractUnavailableText { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; set; } = [];
+    [Parameter] public EventCallback<ChangeEventArgs> UpdateTransformMappingAsync { get; set; }
+    [Parameter] public EventCallback<SchemaBindingEditorValue> UpdateTransformSchemaBindingAsync { get; set; }
+    [Parameter] public Func<ValidateSchemaDefinitionRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaDefinitionAsync { get; set; }
+    [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaInstanceAsync { get; set; }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}
