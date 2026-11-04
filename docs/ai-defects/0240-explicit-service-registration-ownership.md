@@ -59,4 +59,11 @@ Registration-contract tests inspect service types, lifetimes, implementation sel
 - `npm run decisions:validate`: passed; 187 ADR identifiers/index entries validated.
 - LikeC4 validation and web-component generation: passed during documentation prebuild.
 - `npm run build` in `docs/site`: passed; Docusaurus generated the complete static site.
-- Build, contract tests, functional lanes, and formatting validation are pending completion of the corrective implementation. This CAR remains Open until their actual results are recorded.
+- `dotnet restore Agentstration.slnx`: passed.
+- Full Release solution build: passed with zero warnings and zero errors.
+- Fast functional lane: 789 passed, zero failed or skipped.
+- Integration functional lane: 956 total, 943 passed, 11 optional integrations skipped and two failed. `AepSchemaFormatContributionValidatesThroughGovernedMcpWithoutBecomingAnAgentTool` failed with an HTTP 499 cancellation; `WhoAmISamplePreviewsAndInstallsFiveRepresentativeResources` failed awaiting a Worker assignment with a SQLite uniqueness error in its logs. Both passed separate isolated reruns (1/1 each). Their intermittent failures are recorded rather than attributing a cause without baseline evidence.
+- Complete Web host suite: 48 passed and one optional live PostgreSQL case skipped, including all six validated composition graphs and worker lifecycle tests. Infrastructure: 15 passed, including request/ambient scope behavior. Architecture: 100 passed. Console: 21 passed.
+- `dotnet format Agentstration.slnx --verify-no-changes --no-restore --include <changed C# files>`: passed. This invokes the underlying formatter directly; PowerShell is unavailable for the repository wrapper.
+- Deterministic standalone smoke: `/health` and `/bootstrap` returned HTTP 200 and the host shut down cleanly.
+- This CAR remains Open and the corrective PR remains draft because the complete Integration invocation was not green, despite both failed cases passing isolated reruns.
