@@ -148,7 +148,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'Fast functional lane failed.'
           }
-          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 947 --max-parallel-test-modules 2
+          dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2
           if ($LASTEXITCODE -ne 0) {
             throw 'Integration functional lane failed.'
           }
@@ -223,7 +223,7 @@ jobs:
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
             @{ Name = 'Agentstration.Api.Tests'; Tests = 23; Warning = 2048; Failure = 2432 },
-            @{ Name = 'Agentstration.Api.Flows.Tests'; Tests = 74; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.Flows.Tests'; Tests = 80; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Execution.Tests'; Tests = 58; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Resources.Tests'; Tests = 80; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 127; Warning = 1920; Failure = 2560 },
@@ -375,8 +375,8 @@ jobs:
         run: |
           dotnet build tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --no-restore
           dotnet build tests/Agentstration.Performance.Tests/Agentstration.Performance.Tests.csproj --configuration Release --no-restore
-      - name: Run PostgreSQL migration and restart test
-        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart" --minimum-expected-tests 1 --progress off
+      - name: Run PostgreSQL migration, restart and Flow recovery tests
+        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart|Name=FlowRecoveryRepairsLegacyStatusesAndDrainsChangingPages" --minimum-expected-tests 2 --progress off
       - name: Run PostgreSQL storage concurrency benchmark
         env:
           AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER: PostgreSql

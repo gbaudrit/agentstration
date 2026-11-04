@@ -1,0 +1,70 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+<header class="resource-plan-intent">
+    <h2>@T("FunctionalIntent")</h2>
+    <p class="resource-plan-goal">@Plan.Goal</p>
+    @if (!string.IsNullOrWhiteSpace(Plan.Description)) { <p class="resource-plan-description">@Plan.Description</p> }
+    <div class="resource-plan-overview-meta" aria-label="@T("PlanIdentity")">
+        <StatusBadge Text="@T($"Status.{Plan.Status}")" Status="@Tone(Plan.Status)" />
+        <span>@T("Revision", Plan.Revision)</span>
+        <span>@T("Workspace") <code>@Plan.Scope.WorkspaceId.Value.ToString("D")</code></span>
+        <span>@T("Updated") <time datetime="@Plan.UpdatedAt.ToString("O")">@Plan.UpdatedAt.ToLocalTime().ToString("g")</time></span>
+        @if (IsStale)
+        {
+            <StatusBadge Text="@T("StaleChangeSet")" Status="UiStatus.Warning" />
+        }
+    </div>
+</header>
+@if (FunctionalPlan is not null)
+{
+    <div class="resource-plan-overview-main">
+        <article class="resource-plan-solution">
+            <h3>@T("Solution")</h3>
+            <p>@FunctionalPlan.Solution.Summary</p>
+            @if (FunctionalPlan.Solution.Outcomes.Count > 0)
+            {
+                <ul class="resource-plan-outcomes">@foreach (var outcome in FunctionalPlan.Solution.Outcomes) { <li>@outcome</li> }</ul>
+            }
+        </article>
+        <div class="resource-plan-overview-details">
+            <article class="resource-plan-detail-card">
+                <h3>@T("Roles") <span class="resource-plan-count">@FunctionalPlan.Roles.Count</span></h3>
+                @if (FunctionalPlan.Roles.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                else { <ol>@foreach (var role in FunctionalPlan.Roles) { <li><strong>@role.DisplayName</strong><span>@role.Purpose</span></li> }</ol> }
+            </article>
+            <article class="resource-plan-detail-card">
+                <h3>@T("Workflows") <span class="resource-plan-count">@FunctionalPlan.Workflows.Count</span></h3>
+                @if (FunctionalPlan.Workflows.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+                else { <ol>@foreach (var workflow in FunctionalPlan.Workflows) { <li><strong>@workflow.DisplayName</strong><span>@workflow.Objective</span></li> }</ol> }
+            </article>
+        </div>
+    </div>
+    <div class="resource-plan-overview-secondary">
+        <article class="resource-plan-secondary-card">
+            <h3>@T("Integrations") <span class="resource-plan-count">@FunctionalPlan.Integrations.Count</span></h3>
+            @if (FunctionalPlan.Integrations.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+            else { <ul>@foreach (var integration in FunctionalPlan.Integrations) { <li><strong>@integration.DisplayName</strong><span>@integration.Purpose</span></li> }</ul> }
+        </article>
+        <article class="resource-plan-secondary-card">
+            <h3>@T("Experiences") <span class="resource-plan-count">@FunctionalPlan.Experiences.Count</span></h3>
+            @if (FunctionalPlan.Experiences.Count == 0) { <p class="resource-plan-empty">@T("NothingPlanned")</p> }
+            else { <ul>@foreach (var experience in FunctionalPlan.Experiences) { <li><strong>@experience.DisplayName</strong><span>@experience.Purpose</span></li> }</ul> }
+        </article>
+        @if (FunctionalPlan.Retirements is { Count: > 0 } retirements)
+        {
+            <article class="resource-plan-secondary-card">
+                <h3>@T("Retirements") <span class="resource-plan-count">@retirements.Count</span></h3>
+                <ul>@foreach (var retirement in retirements) { <li><strong>@T($"Retirement.{retirement.Element}") · @retirement.LogicalId</strong><span>@retirement.Reason</span></li> }</ul>
+            </article>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public ResourcePlan Plan { get; set; } = default!;
+    [Parameter] public FunctionalResourcePlanV1? FunctionalPlan { get; set; }
+    [Parameter] public bool IsStale { get; set; }
+    private static UiStatus Tone(ResourcePlanStatus status) => status switch { ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success, ResourcePlanStatus.Failed or ResourcePlanStatus.Cancelled => UiStatus.Danger, ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized => UiStatus.Info, _ => UiStatus.Neutral };
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+}

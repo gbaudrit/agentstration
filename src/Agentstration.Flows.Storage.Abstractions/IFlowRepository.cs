@@ -48,7 +48,12 @@ public interface IFlowRepository
     Task<StoredFlowRun?> GetRunAsync(FlowRunScope scope, string runId, CancellationToken cancellationToken);
     Task<FlowRunPage> ListRunsAsync(FlowRunScope scope, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken);
-    Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken);
+    /// <summary>
+    /// Lists recoverable runs after an exclusive, immutable run key in storage order. Pass null for
+    /// the first page and the last returned key for the next page. Status and update-time changes
+    /// must not move unvisited runs behind the cursor. Intended for trusted system processing.
+    /// </summary>
+    Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(FlowRunKey? after, int take, CancellationToken cancellationToken);
     Task<StoredFlowRun> UpdateRunAsync(FlowRun run, string expectedETag, CancellationToken cancellationToken);
     Task DeleteRunExactAsync(ResourceScopeRef executionScopeRef, string runId, string expectedETag, CancellationToken cancellationToken);
     Task DeleteRunAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken) =>

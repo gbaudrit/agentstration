@@ -10,6 +10,51 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    public async Task SqliteRecoveryPagesFilterInSqlAndKeepTheirCursorAfterUpdatesAndDeletion()
+    {
+        var commands = new FlowCommandInterceptor();
+        var clock = new AdvancingTimeProvider(Now);
+        await using var fixture = await FlowFixture.CreateAsync(commands, clock);
+        var expected = new List<FlowRunKey>();
+        foreach (var scope in new[] { TestScope, FlowRunScope.Instance(TestScope.PrincipalId), FlowRunScope.Tenant(TestScope.TenantId, TestScope.PrincipalId) })
+        {
+            for (var index = 0; index < 32; index++)
+            {
+                var status = (FlowRunStatus)(index % Enum.GetValues<FlowRunStatus>().Length);
+                var run = CreateStoredRun($"same-id-{index:D4}", new("recovery"), status) with { Scope = scope, WorkspaceId = scope.WorkspaceId };
+                await fixture.Repository.CreateRunAsync(run, default);
+                if (!status.IsTerminal()) expected.Add(new(scope.ScopeRef, run.Id));
+            }
+        }
+
+        var actual = new List<FlowRunKey>();
+        FlowRunKey? after = null;
+        while (true)
+        {
+            commands.Reset();
+            var page = await fixture.Repository.ListRecoverableRunsAsync(after, 7, default);
+            Assert.HasCount(1, commands.CommandTexts);
+            var sql = commands.CommandTexts[0];
+            StringAssert.Contains(sql, "LIMIT");
+            StringAssert.Contains(sql, "\"Status\"");
+            Assert.IsFalse(sql.Contains("\"Payload\"", StringComparison.Ordinal), "Recovery pages should only read keys, not run payloads.");
+            Assert.IsFalse(sql.Contains("OFFSET", StringComparison.Ordinal));
+            actual.AddRange(page);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            foreach (var key in page)
+            {
+                var run = (await fixture.Repository.GetRunExactAsync(key.ScopeRef, key.RunId, default))!;
+                var terminal = await fixture.Repository.UpdateRunAsync(run.Value with { Status = FlowRunStatus.Succeeded }, run.ETag, default);
+                await fixture.Repository.DeleteRunExactAsync(key.ScopeRef, key.RunId, terminal.ETag, default);
+            }
+            if (page.Count < 7) break;
+            after = page[^1];
+        }
+
+        CollectionAssert.AreEquivalent(expected.ToArray(), actual.ToArray());
+    }
+
+    [TestMethod]
     public async Task SqliteFlowRunPaginationFiltersAndBoundsEveryPageInSql()
     {
         var commands = new FlowCommandInterceptor();

@@ -13,9 +13,10 @@ public sealed partial class FlowRunService
     {
         const int pageSize = 200;
         var now = timeProvider.GetUtcNow();
-        for (var skip = 0; ; skip += pageSize)
+        FlowRunKey? after = null;
+        while (true)
         {
-            var keys = await repository.ListRecoverableRunsAsync(skip, pageSize, cancellationToken);
+            var keys = await repository.ListRecoverableRunsAsync(after, pageSize, cancellationToken);
             foreach (var key in keys)
             {
                 var run = await repository.GetRunExactAsync(key.ScopeRef, key.RunId, cancellationToken)
@@ -63,6 +64,7 @@ public sealed partial class FlowRunService
                     await queue.EnqueueAsync(new(run.Value.Id, run.Value.Scope), cancellationToken);
             }
             if (keys.Count < pageSize) break;
+            after = keys[^1];
         }
     }
 
@@ -238,9 +240,10 @@ public sealed partial class FlowRunService
     {
         var now = timeProvider.GetUtcNow();
         const int pageSize = 200;
-        for (var skip = 0; ; skip += pageSize)
+        FlowRunKey? after = null;
+        while (true)
         {
-            var keys = await repository.ListRecoverableRunsAsync(skip, pageSize, cancellationToken);
+            var keys = await repository.ListRecoverableRunsAsync(after, pageSize, cancellationToken);
             foreach (var key in keys)
             {
                 var run = await repository.GetRunExactAsync(key.ScopeRef, key.RunId, cancellationToken);
@@ -250,6 +253,7 @@ public sealed partial class FlowRunService
                 if (expired is not null) await ExpireInputAsync(run, expired, now, cancellationToken);
             }
             if (keys.Count < pageSize) break;
+            after = keys[^1];
         }
     }
 

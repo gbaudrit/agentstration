@@ -1,0 +1,40 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+    <div class="resource-plan-validation-summary @(Validation.Readiness == ResourceChangeSetReadiness.Ready ? "is-ready" : "is-blocked")" role="status">
+        <span class="resource-plan-validation-symbol" aria-hidden="true">@(Validation.Readiness == ResourceChangeSetReadiness.Ready ? "✓" : "!")</span>
+        <div><p class="resource-plan-validation-kicker">@T("ValidationState")</p><h3>@(Validation.Readiness == ResourceChangeSetReadiness.Ready ? T("ValidationReadyTitle") : Validation.Issues.Count == 1 ? T("ValidationIssueSingular") : T("ValidationIssuePlural", Validation.Issues.Count))</h3><p>@(Validation.Readiness == ResourceChangeSetReadiness.Ready ? T("ValidationReadyDescription") : T("ValidationBlockedDescription"))</p>
+            <div class="resource-plan-validation-meta"><StatusBadge Text="@T($"Readiness.{Validation.Readiness}")" Status="@(Validation.Readiness == ResourceChangeSetReadiness.Ready ? UiStatus.Success : UiStatus.Danger)" /><span>@T("ValidatedAt") <time datetime="@Validation.ValidatedAt.ToString("O")">@Validation.ValidatedAt.ToLocalTime().ToString("g")</time></span>@if (ResourcePlanReviewProjection.IsStale(Plan, ChangeSet, Validation)) { <StatusBadge Text="@T("StaleValidation")" Status="UiStatus.Warning" /> }</div>
+        </div>
+    </div>
+    @if (Validation.Issues.Count == 0) { <p class="resource-plan-validation-empty">@T("NoIssues")</p> }
+    else
+    {
+        <ol class="resource-plan-issues">
+        @foreach (var issue in Validation.Issues)
+        {
+            var affected = ResourcePlanReviewProjection.ChangeForIssue(ChangeSet, issue);
+            <li class="@(issue.Severity == ResourceChangeSetValidationSeverity.Warning ? "is-warning" : "is-error")"><span class="resource-plan-issue-symbol" aria-hidden="true">!</span><div class="resource-plan-issue-content"><p class="resource-plan-issue-category">@T($"Severity.{issue.Severity}")@if (affected is not null) { <span> · @Presentation.ResourceKindLabel(affected.Proposed.Kind)</span> }</p><h3>@Presentation.IssueTitle(issue.Code)</h3>
+                @if (affected is not null) { <p class="resource-plan-issue-resource">@ResourcePlanReviewProjection.DisplayName(affected) <code>@affected.LogicalId</code></p> }
+                <p>@Presentation.IssueDescription(issue.Code, affected)</p>
+                @if (issue.Code == "resource_change_model_profile_invalid") { <p class="resource-plan-issue-action">@T("Issue.ModelProfile.Action")</p> }
+                <details class="resource-plan-issue-technical"><summary>@T("TechnicalDetails")</summary><code>@issue.Code</code><code>@issue.Path</code><p>@issue.Message</p></details>
+            </div></li>
+        }
+        </ol>
+}
+    @if (Validation.Readiness == ResourceChangeSetReadiness.Ready && !ResourcePlanReviewProjection.IsStale(Plan, ChangeSet, Validation))
+    {
+        <div class="resource-plan-validation-next"><div><strong>@T("ValidationNextTitle")</strong><p>@T("ValidationNextDescription")</p></div><button class="button-secondary" type="button" @onclick="ShowApplication">@T("OpenApplication")</button></div>
+    }
+
+@code {
+    [Parameter, EditorRequired] public ResourcePlan Plan { get; set; } = default!;
+    [Parameter, EditorRequired] public ResourceChangeSet ChangeSet { get; set; } = default!;
+    [Parameter, EditorRequired] public ResourceChangeSetValidation Validation { get; set; } = default!;
+    [Parameter] public EventCallback OpenApplication { get; set; }
+    private ResourcePlanReviewPresentation? presentation;
+    private ResourcePlanReviewPresentation Presentation => presentation ??= new(Localizer);
+    private Task ShowApplication() => OpenApplication.InvokeAsync();
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+}
