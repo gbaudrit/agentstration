@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Text.Json;
 using Agentstration.Flows;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -9,6 +10,32 @@ namespace Agentstration.Application.Tests;
 
 public sealed partial class FlowTests
 {
+    [TestMethod]
+    public async Task SqliteConcurrentFlowRunCreationDoesNotSubmitDuplicateInserts()
+    {
+        var commands = new FlowCommandInterceptor();
+        await using var fixture = await FlowFixture.CreateAsync(commands);
+        var run = CreateStoredRun($"flowrun-root-{Guid.NewGuid():N}", new FlowId("catalog"), FlowRunStatus.Pending);
+        commands.Reset();
+
+        var outcomes = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(async () =>
+        {
+            try
+            {
+                await fixture.Repository.CreateRunAsync(run, default);
+                return true;
+            }
+            catch (FlowConcurrencyException)
+            {
+                return false;
+            }
+        })));
+
+        Assert.AreEqual(1, outcomes.Count(created => created));
+        Assert.AreEqual(1, commands.CommandTexts.Count(sql => sql.StartsWith("INSERT INTO \"FlowResources\"", StringComparison.Ordinal)));
+        Assert.IsNotNull(await fixture.Repository.GetRunExactAsync(run.Scope.ScopeRef, run.Id, default));
+    }
+
     [TestMethod]
     public async Task SqliteFlowRunEventsHaveUniqueSequencesDuringConcurrentAppends()
     {

@@ -184,13 +184,18 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     public async Task<StoredFlowRun> CreateRunAsync(FlowRun run, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var key = RunKey(run.Scope.ScopeRef, run.Id);
+        if (await context.Documents.AnyAsync(value => value.Key == key, cancellationToken))
+            throw new FlowConcurrencyException("A Flow Run with this identity already exists.");
         var now = timeProvider.GetUtcNow();
-        var document = Document(run.Scope.ScopeRef, RunKey(run.Scope.ScopeRef, run.Id), RunKind, run.FlowId, run.FlowVersion, run, now);
+        var document = Document(run.Scope.ScopeRef, key, RunKind, run.FlowId, run.FlowVersion, run, now);
         document.TenantId = run.Scope.TenantId;
         document.PrincipalId = run.Scope.PrincipalId;
         document.Status = run.Status;
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return new StoredFlowRun(run, document.ETag, now);
     }
 
