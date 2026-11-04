@@ -100,6 +100,24 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var workspace = await CreateAsync(workspaceScope, "workspace-knowledge");
 
         using (var client = factory.CreateClient())
+        {
+            foreach (var sourceInContext in new[] { instance.Value, tenant.Value })
+            {
+                SelectConsoleContext(client, sourceInContext.ScopeRef!.Value);
+                var route = $"/api/knowledgesources/{sourceInContext.Name}";
+                foreach (var suffix in new[] { "", "/readiness", "/projections", "/snapshots" })
+                {
+                    using var response = await client.GetAsync(route + suffix);
+                    Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, $"{route}{suffix} {await response.Content.ReadAsStringAsync()}");
+                }
+                using var exposure = await client.GetAsync(route + "/tool-exposure");
+                var problem = await exposure.Content.ReadAsStringAsync();
+                Assert.AreEqual(HttpStatusCode.UnprocessableEntity, exposure.StatusCode, problem);
+                StringAssert.Contains(problem, "knowledge_source_tool_exposure_not_found");
+            }
+        }
+
+        using (var client = factory.CreateClient())
         using (var request = new HttpRequestMessage(HttpMethod.Post, "/api/knowledgesources")
         {
             Content = JsonContent.Create(new CreateKnowledgeSourceRequest(

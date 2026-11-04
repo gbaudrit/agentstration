@@ -78,6 +78,7 @@ public sealed class KnowledgeProjectionService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     IAuthorizationService authorization,
     KnowledgeSourceManagementService sources,
     IKnowledgeFlowResolver flows,
@@ -261,16 +262,19 @@ public sealed class KnowledgeProjectionService(
         KnowledgeSourceId? sourceId,
         CancellationToken cancellationToken)
     {
-        var context = RequireContext();
+        var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
+        var context = administrative ?? RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
         var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
         Guid? sourceUid = null;
         if (sourceId is { } requested)
         {
-            try { sourceUid = (await sources.ResolveForUseAsync(requested, scopeRef, cancellationToken)).Value.Uid; }
+            try { sourceUid = (await sources.ResolveForUseAsync(requested,
+                KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef, cancellationToken)).Value.Uid; }
             catch (KnowledgeSourceNotFoundException)
             { throw Error("knowledge_projection_source_not_found", $"KnowledgeSource '{requested}' was not found."); }
         }
+        using var operational = administrative is null ? null : requestScopes.Push(context);
         var values = await store.ListExactAsync<KnowledgeProjectionResource>(scopeRef,
             KnowledgeResourceKinds.KnowledgeProjection, 0, 1000, cancellationToken);
         return values.Select(value => value.Value)
@@ -283,8 +287,10 @@ public sealed class KnowledgeProjectionService(
         ResourceNamespace @namespace,
         CancellationToken cancellationToken)
     {
-        var context = RequireContext();
+        var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
+        var context = administrative ?? RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
+        using var operational = administrative is null ? null : requestScopes.Push(context);
         return await store.GetExactAsync<KnowledgeProjectionResource>(ScopedResourceAddress.Create(
             ResourceScopeRef.Workspace(context.WorkspaceId), @namespace, KnowledgeResourceKinds.KnowledgeProjection, id),
             cancellationToken) ?? throw Error("knowledge_projection_not_found", $"Knowledge projection '{id}' was not found.");
