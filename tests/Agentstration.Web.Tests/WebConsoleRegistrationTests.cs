@@ -1,9 +1,9 @@
 using Agentstration.Identity.Contracts;
+using Agentstration.Web;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Console;
-using Agentstration.Web;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

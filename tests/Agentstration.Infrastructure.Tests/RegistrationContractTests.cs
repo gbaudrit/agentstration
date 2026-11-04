@@ -93,7 +93,7 @@ public sealed class RegistrationContractTests
         var accessors = provider.GetServices<IWorkExecutionScopeAccessor>().ToArray();
         Assert.HasCount(2, accessors);
         Assert.IsInstanceOfType<CurrentWorkExecutionScopeAccessor>(accessors[0]);
-        Assert.AreSame(provider.GetRequiredService<IFlowRunExecutionScope>(), accessors[1]);
+        Assert.AreSame<object>(provider.GetRequiredService<IFlowRunExecutionScope>(), accessors[1]);
         var context = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
         var requestScope = new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId);
 
