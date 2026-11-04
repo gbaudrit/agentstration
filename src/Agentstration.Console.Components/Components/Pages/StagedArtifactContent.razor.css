@@ -39,6 +39,12 @@
     white-space: pre;
 }
 
+.inline-content .artifact-content-view {
+    width: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
     .artifact-content-scroll { max-height: 58vh; }
 }

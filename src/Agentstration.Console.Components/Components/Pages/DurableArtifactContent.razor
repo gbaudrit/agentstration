@@ -2,70 +2,94 @@
 @inject IArtifactsClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
 
-<section class="panel form-section durable-content-notice" data-testid="durable-artifact-content-panel">
-    <div class="panel-header"><div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("DurableContentTitle")</h2><p>@T("DurableContentHelp")</p></div></div>
-    @if (materializationError is not null)
-    {
-        <div class="form-alert form-alert-danger" role="alert">@materializationError</div>
-    }
-    <div class="artifact-content-actions">
-        @if (materializedArtifactId is { } stagedId)
-        {
-            <a class="button-secondary" href="@StagedUrl(stagedId)" data-testid="durable-artifact-open-materialized">@T("OpenMaterializedArtifact")</a>
-            <a class="button-secondary" href="@DownloadUrl(stagedId)" download data-enhance-nav="false" data-testid="durable-artifact-download">@T("Download")</a>
-        }
-        else
-        {
-            <button class="button-primary" type="button" disabled="@(loading || materializing)" data-testid="durable-artifact-materialize" @onclick="MaterializeAsync">
-                @(materializing ? T("MaterializingContent") : T("MaterializeContent"))
-            </button>
-        }
-    </div>
-    @if (materialization is not null)
-    {
-        <p class="muted" data-testid="durable-artifact-materialization-status">@T("MaterializationStatus", MaterializationStatus(materialization.Status)) · <a class="text-button" href="@FlowRunUrl(materialization.FlowRunId)">@materialization.FlowRunId</a></p>
-    }
-</section>
-
-@if (InlinePreview && materializedArtifactId is { } previewId)
+@if (InlinePreview)
 {
-    <StagedArtifactContent @key="previewId" ArtifactId="previewId" ContextScope="ContextScope" ReadOnOpen="true" />
-}
-
-<section class="panel form-section" data-testid="durable-artifact-materialization-history">
-    <div class="panel-header"><div><p class="eyebrow">@T("Materialization")</p><h2>@T("MaterializationHistory")</h2><p>@T("MaterializationHistoryHelp")</p></div></div>
-    @if (materializations.Count == 0)
+    @if (materializedArtifactId is { } previewId)
     {
-        <p class="muted">@T("NoMaterializations")</p>
+        <StagedArtifactContent @key="previewId" ArtifactId="previewId" ContextScope="ContextScope" InlinePreview="true" />
     }
     else
     {
-        <DataGrid TItem="FlowRunArtifactMaterialization" Items="materializations">
-            <Header><tr><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Artifact")</th><th>@T("Expires")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
-            <Row Context="item"><tr>
-                <td>@MaterializationStatus(item.Status)</td>
-                <td><a class="text-button" href="@FlowRunUrl(item.FlowRunId)"><code>@item.FlowRunId</code></a></td>
-                <td>
-                    @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } stagedArtifactId })
-                    {
-                        <a class="text-button" href="@StagedUrl(stagedArtifactId)"><code>@stagedArtifactId</code></a>
-                    }
-                    else
-                    {
-                        <span class="muted">@T("MaterializationUnavailable")</span>
-                    }
-                </td>
-                <td>@FormatDate(item.StagedArtifactExpiresAt)</td>
-                <td>
-                    @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } downloadableArtifactId })
-                    {
-                        <a class="icon-button" href="@DownloadUrl(downloadableArtifactId)" download data-enhance-nav="false" aria-label="@T("DownloadMaterializedArtifact")" title="@T("DownloadMaterializedArtifact")" data-testid="durable-artifact-history-download"><UiIcon Name="download" /></a>
-                    }
-                </td>
-            </tr></Row>
-        </DataGrid>
+        @if (materializationError is not null)
+        {
+            <div class="form-alert form-alert-danger" role="alert">@materializationError</div>
+        }
+        @if (loading)
+        {
+            <p class="muted" role="status">@T("Loading")</p>
+        }
+        else
+        {
+            <div class="artifact-content-actions">
+                <button class="button-primary" type="button" disabled="@materializing" data-testid="durable-artifact-materialize" @onclick="MaterializeAsync">
+                    @(materializing ? T("MaterializingContent") : T("MaterializeContent"))
+                </button>
+            </div>
+        }
     }
-</section>
+}
+else
+{
+    <section class="panel form-section durable-content-notice" data-testid="durable-artifact-content-panel">
+        <div class="panel-header"><div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("DurableContentTitle")</h2><p>@T("DurableContentHelp")</p></div></div>
+        @if (materializationError is not null)
+        {
+            <div class="form-alert form-alert-danger" role="alert">@materializationError</div>
+        }
+        <div class="artifact-content-actions">
+            @if (materializedArtifactId is { } stagedId)
+            {
+                <a class="button-secondary" href="@StagedUrl(stagedId)" data-testid="durable-artifact-open-materialized">@T("OpenMaterializedArtifact")</a>
+                <a class="button-secondary" href="@DownloadUrl(stagedId)" download data-enhance-nav="false" data-testid="durable-artifact-download">@T("Download")</a>
+            }
+            else
+            {
+                <button class="button-primary" type="button" disabled="@(loading || materializing)" data-testid="durable-artifact-materialize" @onclick="MaterializeAsync">
+                    @(materializing ? T("MaterializingContent") : T("MaterializeContent"))
+                </button>
+            }
+        </div>
+        @if (materialization is not null)
+        {
+            <p class="muted" data-testid="durable-artifact-materialization-status">@T("MaterializationStatus", MaterializationStatus(materialization.Status)) · <a class="text-button" href="@FlowRunUrl(materialization.FlowRunId)">@materialization.FlowRunId</a></p>
+        }
+    </section>
+
+    <section class="panel form-section" data-testid="durable-artifact-materialization-history">
+        <div class="panel-header"><div><p class="eyebrow">@T("Materialization")</p><h2>@T("MaterializationHistory")</h2><p>@T("MaterializationHistoryHelp")</p></div></div>
+        @if (materializations.Count == 0)
+        {
+            <p class="muted">@T("NoMaterializations")</p>
+        }
+        else
+        {
+            <DataGrid TItem="FlowRunArtifactMaterialization" Items="materializations">
+                <Header><tr><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Artifact")</th><th>@T("Expires")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
+                <Row Context="item"><tr>
+                    <td>@MaterializationStatus(item.Status)</td>
+                    <td><a class="text-button" href="@FlowRunUrl(item.FlowRunId)"><code>@item.FlowRunId</code></a></td>
+                    <td>
+                        @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } stagedArtifactId })
+                        {
+                            <a class="text-button" href="@StagedUrl(stagedArtifactId)"><code>@stagedArtifactId</code></a>
+                        }
+                        else
+                        {
+                            <span class="muted">@T("MaterializationUnavailable")</span>
+                        }
+                    </td>
+                    <td>@FormatDate(item.StagedArtifactExpiresAt)</td>
+                    <td>
+                        @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } downloadableArtifactId })
+                        {
+                            <a class="icon-button" href="@DownloadUrl(downloadableArtifactId)" download data-enhance-nav="false" aria-label="@T("DownloadMaterializedArtifact")" title="@T("DownloadMaterializedArtifact")" data-testid="durable-artifact-history-download"><UiIcon Name="download" /></a>
+                        }
+                    </td>
+                </tr></Row>
+            </DataGrid>
+        }
+    </section>
+}
 
 @code {
     [Parameter, EditorRequired] public FlowRunArtifactId ArtifactId { get; set; }

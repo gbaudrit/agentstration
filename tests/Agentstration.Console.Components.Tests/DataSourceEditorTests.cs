@@ -70,12 +70,17 @@ public sealed class DataSourceEditorTests
     }
 
     [TestMethod]
-    public void AcquisitionOpensFormattedArtifactsOnDemandInTheSameTab()
+    [DataRow(true)]
+    [DataRow(false)]
+    public void AcquisitionOpensFormattedArtifactsOnDemandInTheSameTab(bool hasLocalCopy)
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
-        const string json = """{"Result":{"items":[1,2]}}""";
-        var artifacts = new ArtifactAdministrationComponentTests.ArtifactClient(json, mediaType: "application/vnd.example+json");
+        var json = JsonSerializer.Serialize(new { Result = new { items = new[] { 1, 2 }, text = new string('a', 47_000) } });
+        var artifacts = new ArtifactAdministrationComponentTests.ArtifactClient(json, mediaType: "application/vnd.example+json")
+        {
+            HasLocalCopy = hasLocalCopy
+        };
         var client = new SourceClientStub
         {
             AcquisitionResult = Acquisition with
@@ -113,14 +118,23 @@ public sealed class DataSourceEditorTests
         StringAssert.Contains(formatted, "\n  \"Result\": {");
         using var document = JsonDocument.Parse(formatted);
         Assert.AreEqual(2, document.RootElement.GetProperty("Result").GetProperty("items").GetArrayLength());
+        Assert.AreEqual(47_000, document.RootElement.GetProperty("Result").GetProperty("text").GetString()?.Length);
         Assert.AreEqual(1, artifacts.ContentReadCount);
         StringAssert.Contains(rendered.Find("[data-testid='staged-artifact-download']").GetAttribute("href"),
             $"context={Uri.EscapeDataString(Scope.Value)}");
 
         rendered.Find(select).Change("1");
-        Assert.IsNotNull(rendered.WaitForElement("[data-testid='durable-artifact-content-panel']"));
+        if (!hasLocalCopy)
+        {
+            Assert.HasCount(0, rendered.FindAll(viewer));
+            rendered.WaitForElement("[data-testid='durable-artifact-materialize']").Click();
+        }
+
         Assert.AreEqual(formatted, rendered.WaitForElement(viewer).TextContent);
         Assert.AreEqual(2, artifacts.ContentReadCount);
+        Assert.HasCount(1, rendered.FindAll("[data-testid='data-source-acquisition-artifacts'] a[download]"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='staged-artifact-read-full'], [data-testid='staged-artifact-read-preview']"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='durable-artifact-content-panel'], [data-testid='durable-artifact-materialization-history']"));
 
         rendered.Find(select).Change("2");
         Assert.IsNotNull(rendered.WaitForElement("[data-testid='staged-artifact-content-panel'] [role='alert']"));

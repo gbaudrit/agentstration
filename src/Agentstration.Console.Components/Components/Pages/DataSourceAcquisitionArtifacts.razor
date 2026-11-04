@@ -21,7 +21,7 @@
     {
         @if (selected.Kind == DataSourceArtifactKind.Staged)
         {
-            <StagedArtifactContent @key="selected" ArtifactId="@(new StagedArtifactId(id))" ContextScope="ContextScope" ReadOnOpen="true" />
+            <StagedArtifactContent @key="selected" ArtifactId="@(new StagedArtifactId(id))" ContextScope="ContextScope" InlinePreview="true" />
         }
         else
         {

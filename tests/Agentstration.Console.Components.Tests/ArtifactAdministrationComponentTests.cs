@@ -301,6 +301,7 @@ public sealed class ArtifactAdministrationComponentTests
         public StagedArtifactView Artifact { get; }
         public FlowRunArtifactResource Durable { get; }
         public int ContentReadCount { get; private set; }
+        public bool HasLocalCopy { get; set; } = true;
 
         public Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<StagedArtifactView>>([Artifact]);
@@ -336,15 +337,19 @@ public sealed class ArtifactAdministrationComponentTests
             Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);
 
         public Task<FlowRunArtifactMaterialization> StartMaterializationAsync(FlowRunArtifactId id,
-            CancellationToken cancellationToken = default) => Task.FromResult(new FlowRunArtifactMaterialization(
+            CancellationToken cancellationToken = default)
+        {
+            HasLocalCopy = true;
+            return Task.FromResult(new FlowRunArtifactMaterialization(
                 "flowrun-materialize-1", "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
                 StagedArtifactExpiresAt: Artifact.ExpiresAt));
+        }
 
         public Task<IReadOnlyList<FlowRunArtifactMaterialization>> GetMaterializationsAsync(FlowRunArtifactId id,
-            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FlowRunArtifactMaterialization>>([
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FlowRunArtifactMaterialization>>(HasLocalCopy ? [
                 new("flowrun-materialize-1", "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
                     StagedArtifactExpiresAt: Artifact.ExpiresAt)
-            ]);
+            ] : []);
 
         public Task<FlowRunArtifactMaterialization?> GetMaterializationAsync(FlowRunArtifactId id, string flowRunId,
             CancellationToken cancellationToken = default) => Task.FromResult<FlowRunArtifactMaterialization?>(new(

@@ -2,10 +2,13 @@
 @inject IArtifactsClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
 
-<section class="panel form-section artifact-content-panel" data-testid="staged-artifact-content-panel">
-    <div class="panel-header">
-        <div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("ArtifactContent")</h2><p>@T("ContentHelp", MaximumDisplayBytes)</p></div>
-    </div>
+<section class="artifact-content-panel @(InlinePreview ? "inline-content" : "panel form-section")" data-testid="staged-artifact-content-panel">
+    @if (!InlinePreview)
+    {
+        <div class="panel-header">
+            <div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("ArtifactContent")</h2><p>@T("ContentHelp", MaximumDisplayBytes)</p></div>
+        </div>
+    }
 
     @if (error is not null)
     {
@@ -18,12 +21,18 @@
     @if (artifact is not null)
     {
         <div class="artifact-content-actions">
-            <button class="button-secondary" type="button" disabled="@busy" data-testid="staged-artifact-read-preview" @onclick="() => ReadContentAsync(false)">@T("ReadPreview")</button>
-            <button class="button-primary" type="button" disabled="@(busy || !CanReadFullContent)" data-testid="staged-artifact-read-full" @onclick="() => ReadContentAsync(true)">@T("ReadFullContent")</button>
+            @if (!InlinePreview || (error is not null && !CanReadFullContent))
+            {
+                <button class="button-secondary" type="button" disabled="@busy" data-testid="staged-artifact-read-preview" @onclick="() => ReadContentAsync(false)">@T("ReadPreview")</button>
+            }
+            @if (!InlinePreview || (CanReadFullContent && !contentComplete))
+            {
+                <button class="button-primary" type="button" disabled="@(busy || !CanReadFullContent)" data-testid="staged-artifact-read-full" @onclick="() => ReadContentAsync(true)">@T("ReadFullContent")</button>
+            }
             <a class="button-secondary" href="@DownloadUrl" download data-enhance-nav="false" data-testid="staged-artifact-download">@T("Download")</a>
         </div>
 
-        @if (!CanReadFullContent)
+        @if (!CanReadFullContent && (!InlinePreview || !loading))
         {
             <p class="inline-warning" data-testid="staged-artifact-full-content-limit">@T("FullContentTooLarge", artifact.Length, MaximumDisplayBytes)</p>
         }
@@ -42,6 +51,7 @@
 
 @code {
     private const int PreviewBytes = 8 * 1024;
+    private const int AutomaticFullReadBytes = 256 * 1024;
     private const int ReadChunkBytes = 256 * 1024;
     private const int MaximumDisplayBytes = 4 * 1024 * 1024;
 
@@ -50,7 +60,7 @@
     [Parameter, EditorRequired] public StagedArtifactId ArtifactId { get; set; }
     [Parameter] public StagedArtifactView? Metadata { get; set; }
     [Parameter] public ResourceScopeRef? ContextScope { get; set; }
-    [Parameter] public bool ReadOnOpen { get; set; }
+    [Parameter] public bool InlinePreview { get; set; }
 
     private readonly CancellationTokenSource cancellation = new();
     private StagedArtifactView? artifact;
@@ -70,7 +80,7 @@
         {
             artifact = Metadata ?? await Client.GetStagedAsync(ArtifactId, cancellation.Token);
             if (artifact is null) error = T("NotFound");
-            else if (ReadOnOpen) await ReadContentAsync(artifact.Length <= PreviewBytes);
+            else if (InlinePreview) await ReadContentAsync(artifact.Length <= AutomaticFullReadBytes);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception) { error = exception.Message; }
@@ -83,6 +93,7 @@
         busy = true;
         error = null;
         content = null;
+        contentComplete = false;
         try
         {
             var maximum = full ? checked((int)artifact.Length) : checked((int)Math.Min(PreviewBytes, artifact.Length));
