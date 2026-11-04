@@ -387,7 +387,8 @@ public sealed class McpToolInvoker(
     ToolProviderAdapter providers,
     IRequestContextScopeFactory? requestScopes = null,
     Lazy<IToolDefinitionExecutor>? internalTools = null,
-    Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null) : IToolInvoker
+    Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null,
+    ICurrentRequestContext? requestContext = null) : IToolInvoker
 {
     public async ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
         (await InvokeDetailedAsync(context, cancellationToken)).Output;
@@ -435,12 +436,14 @@ public sealed class McpToolInvoker(
                 callerKind,
                 callerId,
                 InvocationContext(context)), cancellationToken);
-            return new ToolInvocationResult(result.Output?.Clone(), new Dictionary<string, string>(StringComparer.Ordinal)
+            var receipt = new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["workItemId"] = result.Receipt.WorkItemId,
                 ["flowRunId"] = result.Receipt.FlowRunId,
                 ["correlationId"] = result.Receipt.CorrelationId
-            });
+            };
+            if (result.Receipt.WorkItemId is { } workItemId)
+                receipt["workItemId"] = workItemId;
+            return new ToolInvocationResult(result.Output?.Clone(), receipt);
         }
         return new ToolInvocationResult(await providers.InvokeAsync(provider, tool, context.Arguments, cancellationToken), null);
     }
@@ -513,6 +516,14 @@ public sealed class McpToolInvoker(
             || context.PrincipalId is not { } principalId || context.ToolUid is null
             || context.ToolGeneration is null)
             return null;
+        if (scopeRef.Kind == ResourceScopeKind.Workspace
+            && requestContext is { AccessMode: ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration })
+        {
+            var current = requestContext.Current;
+            if (current.PrincipalId == principalId && current.TenantId == context.TenantId
+                && current.WorkspaceId == scopeRef.TargetId && current.WorkspaceId == context.WorkspaceId?.Value)
+                return requestScopes.Push(current);
+        }
         var operational = new RequestContext(
             principalId,
             context.TenantId ?? Guid.Empty,

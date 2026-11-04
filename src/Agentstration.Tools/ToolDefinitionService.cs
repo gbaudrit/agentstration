@@ -29,10 +29,28 @@ public sealed class ToolDefinitionService(
         CancellationToken cancellationToken) =>
         store.GetAsync<ToolDefinitionResource>(new ResourceKey(ToolResourceKinds.ToolDefinition, name, @namespace), cancellationToken);
 
-    public async Task<StoredResource<ToolDefinitionResource>> PutAsync(
+    public Task<StoredResource<ToolDefinitionResource>?> GetExactAsync(
+        string name, ResourceNamespace @namespace, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        store.GetExactAsync<ToolDefinitionResource>(
+            ScopedResourceAddress.Create(scopeRef, @namespace, ToolResourceKinds.ToolDefinition, name), cancellationToken);
+
+    public Task<StoredResource<ToolDefinitionResource>> PutAsync(
         ToolDefinitionResource resource,
         string? ifMatch,
         bool ifNoneMatch,
+        CancellationToken cancellationToken) =>
+        PutCoreAsync(resource, ifMatch, ifNoneMatch, fromAcquisition: false, cancellationToken);
+
+    public Task<StoredResource<ToolDefinitionResource>> CreateFromAcquisitionAsync(
+        ToolDefinitionResource resource,
+        CancellationToken cancellationToken) =>
+        PutCoreAsync(resource, null, true, fromAcquisition: true, cancellationToken);
+
+    private async Task<StoredResource<ToolDefinitionResource>> PutCoreAsync(
+        ToolDefinitionResource resource,
+        string? ifMatch,
+        bool ifNoneMatch,
+        bool fromAcquisition,
         CancellationToken cancellationToken)
     {
         Validate(resource);
@@ -40,9 +58,18 @@ public sealed class ToolDefinitionService(
             throw new ToolDefinitionValidationException("tool_definition_name_reserved", $"ToolDefinition name '{resource.Name}' is reserved by an internal Agentstration MCP Tool.");
         var scopeRef = resource.ScopeRef!.Value;
         var contracts = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
-        var resolved = await flows.ResolveAsync(scopeRef, resource.Namespace, resource.Definition.Flow, cancellationToken);
-        ValidateContract(contracts.Definition, resolved);
         var existing = await GetAsync(resource.Name, resource.Namespace, cancellationToken);
+        if (fromAcquisition && existing is not null)
+            throw new ResourceConcurrencyException("If-None-Match prevented replacement of an existing resource.");
+        if (!fromAcquisition && (resource.Definition.Acquisition != existing?.Value.Definition.Acquisition
+            || (resource.Definition.Acquisition is not null && resource.Definition.Flow != existing?.Value.Definition.Flow)))
+            throw new ToolDefinitionValidationException("tool_definition_acquisition_binding_fixed",
+                "The acquisition binding of a ToolDefinition can only be set during creation from an acquisition.");
+        if (resource.Definition.Acquisition is null)
+        {
+            var resolved = await flows.ResolveAsync(scopeRef, resource.Namespace, resource.Definition.Flow, cancellationToken);
+            ValidateContract(contracts.Definition, resolved);
+        }
         var value = resource with
         {
             Definition = contracts.Definition,
@@ -53,7 +80,8 @@ public sealed class ToolDefinitionService(
         };
 
         await EnsureProviderAsync(scopeRef, resource.Namespace, cancellationToken);
-        var stored = await store.PutAsync(value, ifMatch, ifNoneMatch, cancellationToken);
+        var stored = await store.PutAsync(value, ifMatch ?? existing?.ETag,
+            ifNoneMatch || (existing is null && ifMatch is null), cancellationToken);
         await MaterializeAsync(stored.Value, cancellationToken);
         return stored;
     }
@@ -184,6 +212,17 @@ public sealed class ToolDefinitionService(
             throw new ToolDefinitionValidationException("tool_definition_fixed_arguments_invalid", "ToolDefinition fixed arguments must be a JSON object.");
         if (resource.Definition.InvocationTimeoutSeconds is < 1 or > 900)
             throw new ToolDefinitionValidationException("tool_definition_timeout_invalid", "Tool invocation timeout must be between 1 and 900 seconds.");
+        if (resource.Definition.Acquisition is { } acquisition
+            && (string.IsNullOrWhiteSpace(acquisition.TemplateId)
+                || acquisition.ArtifactKind is not ("staged" or "durable")
+                || resource.Definition.Flow.UseActiveVersion
+                || resource.Definition.FixedArguments is not null
+                || resource.Definition.InputSchemaBinding is not null
+                || resource.Definition.OutputSchemaBinding is not null
+                || !SameSchema(resource.Definition.InputSchema, ToolDefinitionAcquisitionTarget.InputSchema)
+                || !SameSchema(resource.Definition.OutputSchema, ToolDefinitionAcquisitionTarget.OutputSchema)))
+            throw new ToolDefinitionValidationException("tool_definition_acquisition_contract_invalid",
+                "An acquisition ToolDefinition requires a fixed acquisition binding and the artifact output contract.");
     }
 
     private static void ValidateBinding(SchemaBinding? binding, string direction)

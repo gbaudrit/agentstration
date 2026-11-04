@@ -38,12 +38,17 @@ internal static class ToolProviderEndpoints
             return Results.Ok(new ValueResponse<ToolProviderResource>((await service.ListProvidersAsync(cancellationToken)).Select(value => value.Value).ToArray()));
         });
 
-    private static Task<IResult> GetProviderAsync(string providerName, string? scopeRef, string? resourceNamespace, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetProviderAsync(string providerName, string? scopeRef, string? resourceNamespace,
+        HttpResponse response, ToolManagementService service, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
+        CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var id = ToolManagementService.ToolProviderId(providerName);
-            var stored = await (scopeRef is null ? service.GetProviderAsync(id, cancellationToken)
-                : service.GetProviderExactAsync(ResourceScopeRef.Parse(scopeRef), providerName, ResourceNamespace.Parse(resourceNamespace), cancellationToken))
+            var target = scopeRef is null ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(scopeRef);
+            using var operationalScope = ToolsApiHttp.EnterOperationalWorkspace(target, current, scopes);
+            var stored = await (target is { } exact
+                ? service.GetProviderExactAsync(exact, providerName, ResourceNamespace.Parse(resourceNamespace), cancellationToken)
+                : service.GetProviderAsync(id, cancellationToken))
                 ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolProvider, providerName));
             return ToolsApiHttp.ResourceResult(stored, response, 200);
         });
@@ -107,14 +112,18 @@ internal static class ToolProviderEndpoints
             return Results.Ok(new ValueResponse<ToolResource>(values.ToArray()));
         });
 
-    private static Task<IResult> GetToolAsync(string toolName, string? @namespace, string? scopeRef, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetToolAsync(string toolName, string? @namespace, string? scopeRef,
+        HttpResponse response, ToolManagementService service, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
+        CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var id = ToolManagementService.ToolId(toolName);
             var ns = ResourceNamespace.Parse(@namespace);
-            var stored = string.IsNullOrWhiteSpace(scopeRef)
-                ? await service.GetToolAsync(id, ns, cancellationToken)
-                : await service.GetToolExactAsync(ResourceScopeRef.Parse(scopeRef), id, ns, cancellationToken);
+            var target = string.IsNullOrWhiteSpace(scopeRef) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(scopeRef);
+            using var operationalScope = ToolsApiHttp.EnterOperationalWorkspace(target, current, scopes);
+            var stored = target is { } exact
+                ? await service.GetToolExactAsync(exact, id, ns, cancellationToken)
+                : await service.GetToolAsync(id, ns, cancellationToken);
             if (stored is null) throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, toolName, ns));
             return ToolsApiHttp.ResourceResult(stored, response, 200);
         });
@@ -126,16 +135,17 @@ internal static class ToolProviderEndpoints
     private static Task<IResult> RunToolAsync(
         string toolName,
         string? @namespace,
+        string? scopeRef,
         RunToolRequest body,
         ToolRunnerService runner,
         ICurrentRequestContext context,
         CancellationToken cancellationToken) =>
-        ToolsApiHttp.ExecuteAsync(async () => Results.Ok(await runner.RunAsync(
-            ResourceNamespace.Parse(@namespace),
-            toolName,
-            body,
-            context.Current,
-            cancellationToken)));
+        ToolsApiHttp.ExecuteAsync(async () =>
+        {
+            var target = string.IsNullOrWhiteSpace(scopeRef) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(scopeRef);
+            return Results.Ok(await runner.RunAsync(ResourceNamespace.Parse(@namespace), toolName, body,
+                context.Current, target, cancellationToken));
+        });
 
     private static ToolProviderResource Resource(string name, ToolProviderProperties properties) => new()
     {

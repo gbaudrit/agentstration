@@ -102,7 +102,7 @@ public sealed class DataSourceAcquisitionService(
         JsonElement parameters, string? correlationId, string? idempotencyKey, CancellationToken cancellationToken) =>
         StartAsync(sourceNamespace, sourceName, sourceScope, parameters, correlationId, idempotencyKey, null, cancellationToken);
 
-    public async Task<StoredResource<DataSourceAcquisitionResource>> StartAsync(
+    public Task<StoredResource<DataSourceAcquisitionResource>> StartAsync(
         ResourceNamespace sourceNamespace,
         string sourceName,
         ResourceScopeRef? sourceScope,
@@ -110,6 +110,38 @@ public sealed class DataSourceAcquisitionService(
         string? correlationId,
         string? idempotencyKey,
         string? targetName,
+        CancellationToken cancellationToken) =>
+        StartCoreAsync(sourceNamespace, sourceName, sourceScope, parameters, correlationId, idempotencyKey,
+            targetName, null, cancellationToken);
+
+    public async Task<StoredResource<DataSourceAcquisitionResource>> StartFromSuccessfulAcquisitionAsync(
+        ResourceNamespace templateNamespace,
+        string templateId,
+        string? correlationId,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var context = RequireContext();
+        await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
+        var template = (await GetAsync(templateNamespace, templateId, cancellationToken)).Value;
+        if (template.State != DataSourceAcquisitionState.Succeeded)
+            throw Error("data_source_acquisition_template_not_successful", "Only a successful acquisition can be used as a template.");
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+            throw Error("data_source_acquisition_idempotency_key_required", "Replaying an acquisition requires an idempotency key.");
+
+        return await StartCoreAsync(template.DataSourceNamespace, template.DataSourceName, template.DataSourceScopeRef,
+            template.Parameters, correlationId, idempotencyKey, template.Target?.Name, template, cancellationToken);
+    }
+
+    private async Task<StoredResource<DataSourceAcquisitionResource>> StartCoreAsync(
+        ResourceNamespace sourceNamespace,
+        string sourceName,
+        ResourceScopeRef? sourceScope,
+        JsonElement parameters,
+        string? correlationId,
+        string? idempotencyKey,
+        string? targetName,
+        DataSourceAcquisitionResource? template,
         CancellationToken cancellationToken)
     {
         var context = RequireContext();
@@ -121,6 +153,8 @@ public sealed class DataSourceAcquisitionService(
         var sourceOwnerScope = source.Value.ScopeRef
             ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
         execution.EnsureVisible(sourceOwnerScope);
+        if (template is not null && source.Value.Uid != template.DataSourceUid)
+            throw Error("data_source_acquisition_template_source_changed", "The original Data Source was replaced.");
         var gate = startGates.GetOrAdd((context.WorkspaceId, source.Value.Uid), _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken);
         try
@@ -149,6 +183,8 @@ public sealed class DataSourceAcquisitionService(
                 target = targetStored.Value;
                 if (target.DataSourceUid != source.Value.Uid || target.DataSourceScopeRef != sourceOwnerScope)
                     throw Error("data_source_acquisition_target_mismatch", $"Acquisition target '{targetName}' belongs to another Data Source.");
+                if (template is not null && target.Uid != template.Target?.Uid)
+                    throw Error("data_source_acquisition_template_target_changed", "The original acquisition target was replaced.");
                 if (!target.Enabled)
                     throw Error("data_source_acquisition_target_disabled", $"Acquisition target '{targetName}' is disabled.");
                 var targetViews = await targets.ListAsync(source.Value.Namespace,
@@ -156,6 +192,11 @@ public sealed class DataSourceAcquisitionService(
                 var view = targetViews.Single(value => value.Target.Uid == target.Uid);
                 if (view.Stale)
                     throw Error("data_source_acquisition_target_stale", string.Join(' ', view.StalenessReasons));
+                if (template?.Target is { } originalTarget
+                    && (!string.Equals(target.ChoiceId, originalTarget.ChoiceId, StringComparison.Ordinal)
+                        || !JsonElement.DeepEquals(target.Selector, originalTarget.Selector)))
+                    throw Error("data_source_acquisition_template_target_changed",
+                        "The original acquisition target now selects a different operation.");
             }
             else if (!string.IsNullOrWhiteSpace(targetName))
                 throw Error("data_source_acquisition_target_not_supported", "This Data Source profile does not define discovery.");

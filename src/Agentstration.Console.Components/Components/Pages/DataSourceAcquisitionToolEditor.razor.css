@@ -1,0 +1,33 @@
+.acquisition-tool-dialog {
+    width: min(38rem, 100%);
+    max-width: none;
+    max-height: calc(100dvh - 2.5rem);
+    overflow: auto;
+}
+
+.acquisition-tool-dialog fieldset {
+    min-width: 0;
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.acquisition-tool-recipe dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.acquisition-tool-recipe select {
+    width: 100%;
+}
+
+.acquisition-tool-recipe pre {
+    max-height: 10rem;
+    overflow: auto;
+    margin: 0;
+    padding: .5rem;
+    border: 1px solid var(--border);
+    border-radius: .45rem;
+    background: var(--surface-2);
+    white-space: pre-wrap;
+}

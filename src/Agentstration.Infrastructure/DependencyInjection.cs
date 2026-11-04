@@ -523,6 +523,8 @@ public static class DependencyInjection
         services.AddSingleton<FlowDraftService>();
         services.AddSingleton<FlowRunService>();
         services.AddSingleton<RootFlowSubmissionService>();
+        services.AddSingleton<IToolDefinitionAcquisitionFactory, ToolDefinitionAcquisitionFactory>();
+        services.AddSingleton<ToolDefinitionAcquisitionExecutor>();
         services.AddSingleton<IToolDefinitionExecutor, ToolDefinitionExecutor>();
         services.AddSingleton(provider => new Lazy<IToolDefinitionExecutor>(provider.GetRequiredService<IToolDefinitionExecutor>));
         return services;

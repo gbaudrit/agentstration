@@ -84,4 +84,5 @@
   <data name="RunCheck.no_execution"><value>Le fournisseur n’a pas été appelé et aucune ressource d’exécution n’a été créée.</value></data>
   <data name="RunCheck.execution"><value>L’exécution de l’outil est terminée.</value></data>
   <data name="ManagingExtension"><value>Extension gestionnaire</value></data><data name="TechnicalProvider"><value>Fournisseur technique</value></data>
+  <data name="OpenReturnedArtifact"><value>Ouvrir l’artefact</value></data>
 </root>

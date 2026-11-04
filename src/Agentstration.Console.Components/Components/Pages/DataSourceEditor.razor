@@ -65,9 +65,17 @@ else
                         <td data-label="@T("AcquiredArtifacts")">
                             @if (item.Manifest is { Artifacts.Count: > 0 })
                             {
-                                <button class="button-secondary" type="button" aria-expanded="@(previewAcquisition == item.Uid ? "true" : "false")" data-testid="data-source-acquisition-preview" @onclick="() => ToggleAcquisitionPreview(item.Uid)">
-                                    @T(previewAcquisition == item.Uid ? "HideAcquiredArtifacts" : "ViewAcquiredArtifacts")
-                                </button>
+                                <div class="data-source-acquisition-actions">
+                                    <button class="button-secondary" type="button" aria-expanded="@(previewAcquisition == item.Uid ? "true" : "false")" data-testid="data-source-acquisition-preview" @onclick="() => ToggleAcquisitionPreview(item.Uid)">
+                                        @T(previewAcquisition == item.Uid ? "HideAcquiredArtifacts" : "ViewAcquiredArtifacts")
+                                    </button>
+                                    @if (CanCreateAcquisitionTool(item))
+                                    {
+                                        <button class="button-secondary" type="button" aria-haspopup="dialog" data-testid="data-source-create-tool" @onclick="() => toolAcquisition = item">
+                                            @T("CreateAcquisitionTool")
+                                        </button>
+                                    }
+                                </div>
                             }
                             else
                             {
@@ -85,6 +93,12 @@ else
             </DataGrid>
         }
         </section>
+        @if (toolAcquisition is { } template)
+        {
+            <DataSourceAcquisitionToolEditor @key="template.Uid" Acquisition="template"
+                SourceDisplayName="@source!.Definition.DisplayName" WorkspaceDisplayName="@ConsoleContext?.WorkspaceDisplayName"
+                ContextScope="CurrentConsoleScope" OnCancel="() => toolAcquisition = null" />
+        }
     }
     else if (tab == Tab.Discovery)
     {
@@ -171,6 +185,14 @@ else
     private Tab tab = Tab.Definition;
     private bool discoveryHistorySelected;
     private Guid? previewAcquisition;
+    private DataSourceAcquisitionResource? toolAcquisition;
+    private ConsoleContextSnapshot? ConsoleContext => Services.GetService<ConsoleContextState>()?.Current;
+    private bool CanCreateAcquisitionTool(DataSourceAcquisitionResource item) =>
+        item.State == DataSourceAcquisitionState.Succeeded
+        && item.Manifest?.Artifacts.Any(artifact => artifact.Disposition == DataSourceArtifactDisposition.Publishable) == true
+        && ConsoleContext is { } context
+        && context.WorkspaceId == item.WorkspaceId
+        && context.Permissions.Contains(AuthorizationPermissions.ResourcesWrite);
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private bool CanManage => IsNew || selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
     private DataSourceAcquisitionResource? LatestAcquisition => acquisitions.OrderByDescending(value => value.CreatedAt).FirstOrDefault();
@@ -272,6 +294,7 @@ else
         discoveries = [];
         targets = [];
         promotionNames.Clear();
+        toolAcquisition = null;
         try
         {
             await LoadProfilesAsync();

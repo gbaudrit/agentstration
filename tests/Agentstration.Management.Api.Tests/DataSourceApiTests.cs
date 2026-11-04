@@ -15,6 +15,7 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
+using Agentstration.Tools.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -84,6 +85,125 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         {
             SelectConsoleContext(client, ResourceScopeRef.Workspace(bootstrap.WorkspaceId));
             using var hidden = await client.GetAsync($"/api/datasourceacquisitions/{acquisition.Name}");
+            Assert.AreEqual(HttpStatusCode.NotFound, hidden.StatusCode);
+        }
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task AcquisitionToolReplaysTheFixedTargetAndReturnsTheNewArtifact(bool instanceContext)
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IDataSourceAcquisitionFlowGateway>();
+            services.AddSingleton<AcquisitionToolFlowGateway>();
+            services.AddSingleton<IDataSourceAcquisitionFlowGateway>(provider =>
+                provider.GetRequiredService<AcquisitionToolFlowGateway>());
+        }));
+        var bootstrap = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var context = bootstrap;
+        if (instanceContext)
+        {
+            var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+            var operations = await topology.GetInstanceOperationsWorkspaceAsync(default);
+            context = new RequestContext(bootstrap.PrincipalId, operations.TenantId, operations.Id);
+        }
+        var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var owner = instanceContext ? ResourceScopeRef.Instance : workspace;
+        var gateway = factory.Services.GetRequiredService<AcquisitionToolFlowGateway>();
+        using (scopes.Push(context))
+        {
+            var artifacts = factory.Services.GetRequiredService<ArtifactManagementService>();
+            for (var index = 0; index < 3; index++)
+            {
+                var artifact = await artifacts.CreateStagedAsync(new("catalog.json", "application/json",
+                    new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = $"catalog-{index}" }), default);
+                await artifacts.WriteAsync(artifact.Value.ArtifactId, 0, "{}"u8.ToArray(), default);
+                await artifacts.SealAsync(artifact.Value.ArtifactId, default);
+                gateway.ArtifactIds.Enqueue(artifact.Value.ArtifactId.ToString());
+            }
+        }
+        using (scopes.PushSystem())
+        {
+            await CreatePublishedAcquisitionFlowAsync(factory.Services, context, "tool-acquire", owner);
+            await CreatePublishedDiscoveryFlowAsync(factory.Services, context, "tool-discover", owner);
+            var profiles = factory.Services.GetRequiredService<DataSourceProfileService>();
+            _ = await profiles.CreateAsync(ProfileResource("tool-profile", owner, Profile() with
+            {
+                AcquisitionFlow = new() { Name = "tool-acquire", UseActiveVersion = true },
+                DiscoveryFlow = new() { Name = "tool-discover", UseActiveVersion = true }
+            }), default);
+            _ = await profiles.PublishAsync(ResourceNamespace.Default, "tool-profile", owner, new("1.0.0"), default);
+            _ = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
+                SourceResource("targeted-origin", owner, new("tool-profile", owner)), default);
+        }
+
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, owner);
+        var discovery = await StartAndAwaitDiscoveryAsync(client, owner);
+        using var promoted = await client.PostAsJsonAsync($"/api/datasourcediscoveries/{discovery.Name}/targets",
+            new PromoteDataSourceAcquisitionTargetRequest("documents", "documents"));
+        Assert.AreEqual(HttpStatusCode.Created, promoted.StatusCode, await promoted.Content.ReadAsStringAsync());
+
+        using var started = await client.PostAsJsonAsync(
+            $"/api/datasources/targeted-origin/acquisitions?scopeRef={Uri.EscapeDataString(owner.Value)}",
+            new StartDataSourceAcquisitionRequest { DataSourceScopeRef = owner, TargetName = "documents", Parameters = OpaquePayload });
+        Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode, await started.Content.ReadAsStringAsync());
+        var pending = (await started.Content.ReadFromJsonAsync<DataSourceAcquisitionResource>())!;
+        var original = (await client.GetFromJsonAsync<DataSourceAcquisitionResource>($"/api/datasourceacquisitions/{pending.Name}"))!;
+        Assert.AreEqual(DataSourceAcquisitionState.Succeeded, original.State);
+        var originalArtifact = original.Manifest!.Artifacts.Single();
+
+        var createUrl = $"/api/tooldefinitions/from-acquisition/{original.Name}";
+        using var invalid = await client.PostAsJsonAsync(createUrl,
+            new { name = "catalog", displayName = "Catalog", artifactId = Guid.NewGuid().ToString("N") });
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+        using var created = await client.PostAsJsonAsync(createUrl,
+            new { name = "catalog", displayName = "Catalog", artifactId = originalArtifact.ArtifactId });
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
+        var tool = (await created.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
+        Assert.AreEqual(workspace, tool.ScopeRef);
+        Assert.AreEqual(original.Name, tool.Definition.Acquisition!.TemplateId);
+
+        using var details = await client.GetAsync(created.Headers.Location);
+        Assert.AreEqual(HttpStatusCode.OK, details.StatusCode, await details.Content.ReadAsStringAsync());
+        using var projection = await client.GetAsync(
+            $"/api/tools/agentstration.catalog?scopeRef={Uri.EscapeDataString(workspace.Value)}");
+        Assert.AreEqual(HttpStatusCode.OK, projection.StatusCode, await projection.Content.ReadAsStringAsync());
+        var toolPath = $"/api/tools/agentstration.catalog/run?scopeRef={Uri.EscapeDataString(workspace.Value)}";
+        using var overrideResponse = await client.PostAsJsonAsync(toolPath,
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { limit = 100 }), ToolRunMode.Execute));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, overrideResponse.StatusCode, await overrideResponse.Content.ReadAsStringAsync());
+        var request = new RunToolRequest(JsonSerializer.SerializeToElement(new { }), ToolRunMode.Execute);
+        var artifactIds = new HashSet<string>(StringComparer.Ordinal) { originalArtifact.ArtifactId };
+        for (var call = 0; call < 2; call++)
+        {
+            using var response = await client.PostAsJsonAsync(toolPath, request);
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
+            var output = (await response.Content.ReadFromJsonAsync<RunToolResponse>())!.Output!.Value;
+            Assert.IsTrue(artifactIds.Add(output.GetProperty("artifact").GetProperty("artifactId").GetString()!));
+            Assert.AreNotEqual(original.Name, output.GetProperty("acquisitionId").GetString());
+        }
+        Assert.HasCount(3, gateway.AcquisitionInputs);
+        foreach (var input in gateway.AcquisitionInputs)
+        {
+            Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, input.GetProperty("parameters")));
+            Assert.AreEqual(original.Target!.Uid, input.GetProperty("target").GetProperty("uid").GetGuid());
+            Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, input.GetProperty("target").GetProperty("selector")));
+        }
+        _ = await StartAndAwaitDiscoveryAsync(client, owner);
+        using var stale = await client.PostAsJsonAsync(toolPath, request);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, stale.StatusCode);
+        StringAssert.Contains(await stale.Content.ReadAsStringAsync(), "data_source_acquisition_target_stale");
+        Assert.HasCount(3, gateway.AcquisitionInputs);
+
+        if (instanceContext)
+        {
+            SelectConsoleContext(client, ResourceScopeRef.Workspace(bootstrap.WorkspaceId));
+            using var hidden = await client.PostAsJsonAsync(createUrl,
+                new { name = "catalog", displayName = "Catalog", artifactId = originalArtifact.ArtifactId });
             Assert.AreEqual(HttpStatusCode.NotFound, hidden.StatusCode);
         }
     }
@@ -1032,6 +1152,45 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         private DataSourceFlowRunSnapshot Snapshot(string runId) => new(runId, DataSourceAcquisitionState.Succeeded,
             JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = ArtifactId, kind = "Staged", disposition = "Intermediate" } } }),
             null, null, null);
+    }
+
+    private sealed class AcquisitionToolFlowGateway : IDataSourceAcquisitionFlowGateway
+    {
+        private readonly ConcurrentDictionary<string, DataSourceFlowRunSnapshot> completed = new(StringComparer.Ordinal);
+        private int sequence;
+        public ConcurrentQueue<string> ArtifactIds { get; } = new();
+        public ConcurrentQueue<JsonElement> AcquisitionInputs { get; } = new();
+
+        public Task<DataSourceFlowRunSnapshot> StartAsync(DataSourceFlowRunRequest request, CancellationToken cancellationToken)
+        {
+            JsonElement output;
+            if (request.Flow.Name == "tool-discover")
+            {
+                output = JsonSerializer.SerializeToElement(new
+                {
+                    choices = new[] { new { id = "documents", displayName = "Documents", selector = OpaquePayload } }
+                });
+            }
+            else
+            {
+                AcquisitionInputs.Enqueue(request.Input);
+                Assert.IsTrue(ArtifactIds.TryDequeue(out var artifactId));
+                output = JsonSerializer.SerializeToElement(new
+                {
+                    artifacts = new[] { new { artifactId, kind = "Staged", disposition = "Publishable", name = "catalog.json", mediaType = "application/json" } }
+                });
+            }
+            var snapshot = new DataSourceFlowRunSnapshot(request.RunId, DataSourceAcquisitionState.Succeeded,
+                output, null, null, DateTimeOffset.UnixEpoch.AddSeconds(Interlocked.Increment(ref sequence)));
+            completed[request.RunId] = snapshot;
+            return Task.FromResult(snapshot);
+        }
+
+        public Task<DataSourceFlowRunSnapshot?> GetAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId,
+            CancellationToken cancellationToken) => Task.FromResult(completed.GetValueOrDefault(runId));
+
+        public Task<DataSourceFlowRunSnapshot> CancelAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     // Simulates a durable Pending operation whose dispatch did not reach Flow.

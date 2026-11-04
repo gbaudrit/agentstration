@@ -71,4 +71,15 @@
   <data name="ViewAcquiredArtifacts" xml:space="preserve"><value>View artifacts</value></data>
   <data name="HideAcquiredArtifacts" xml:space="preserve"><value>Hide artifacts</value></data>
   <data name="AcquiredArtifactUnavailable" xml:space="preserve"><value>This artifact is unavailable.</value></data>
+  <data name="CreateAcquisitionTool"><value>Create a Tool</value></data>
+  <data name="CreateAcquisitionToolHelp"><value>Each call runs a new acquisition with the target and parameters shown below, then returns an artifact reference.</value></data>
+  <data name="AcquisitionToolSource"><value>Data Source</value></data>
+  <data name="AcquisitionToolSuggestedName"><value>{0} · {1}</value></data>
+  <data name="AcquisitionToolWorkspace"><value>Create in</value></data>
+  <data name="AcquisitionToolParameters"><value>Fixed parameters</value></data>
+  <data name="AcquisitionToolOutput"><value>Artifact output</value></data>
+  <data name="AcquisitionToolConflict"><value>A Tool with this name already exists. Choose a different technical name.</value></data>
+  <data name="AcquisitionToolForbidden"><value>You do not have permission to create a Tool from this acquisition.</value></data>
+  <data name="AcquisitionToolCreateFailed"><value>The Tool could not be created from this acquisition.</value></data>
+  <data name="Cancel"><value>Cancel</value></data>
 </root>

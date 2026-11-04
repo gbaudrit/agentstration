@@ -1,7 +1,13 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.DataSources.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
+using Agentstration.Tools;
+using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -67,6 +73,74 @@ public sealed class DataSourceEditorTests
             Assert.IsTrue(rendered.Find(".data-source-yaml-field").QuerySelector("textarea") is not null);
             StringAssert.Contains(rendered.Markup, "YAML de la source de données");
         });
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task AcquisitionToolUsesSavedRecipeAndSelectsOnePublishableArtifact(bool canWrite)
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        var acquisition = Acquisition with
+        {
+            Target = Target,
+            Parameters = JsonSerializer.SerializeToElement(new { query = "mobilité", limit = 20 }),
+            Manifest = new()
+            {
+                Artifacts =
+                [
+                    new() { ArtifactId = "catalogue", Name = "catalogue.json", Kind = DataSourceArtifactKind.Durable, Disposition = DataSourceArtifactDisposition.Publishable },
+                    new() { ArtifactId = "results", Name = "results.json", Kind = DataSourceArtifactKind.Staged, Disposition = DataSourceArtifactDisposition.Publishable },
+                    new() { ArtifactId = "diagnostic", Name = "diagnostic.json", Kind = DataSourceArtifactKind.Staged, Disposition = DataSourceArtifactDisposition.Diagnostic }
+                ]
+            }
+        };
+        using var handler = new CreateAcquisitionToolHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://agentstration.test/") };
+        var state = new ConsoleContextState(new AcquisitionConsoleContextProvider(acquisition, canWrite));
+        await state.EnsureLoadedAsync(default);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton(state);
+        context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub { AcquisitionResult = acquisition });
+        context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
+        context.Services.AddSingleton<IToolDefinitionsClient>(new ToolDefinitionsApiClient(http));
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo($"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=acquisitions");
+
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        rendered.WaitForElement("[data-testid='data-source-acquisition-row']");
+        if (!canWrite)
+        {
+            Assert.HasCount(0, rendered.FindAll("[data-testid='data-source-create-tool']"));
+            return;
+        }
+
+        rendered.Find("[data-testid='data-source-create-tool']").Click();
+        var dialog = rendered.Find("[role='dialog']");
+        StringAssert.Contains(dialog.TextContent, "Créer un Tool");
+        StringAssert.Contains(dialog.TextContent, acquisition.Target!.DisplayName);
+        var fixedParameters = rendered.Find("[data-testid='acquisition-tool-parameters']").TextContent;
+        using var parameters = JsonDocument.Parse(fixedParameters);
+        Assert.AreEqual("mobilité", parameters.RootElement.GetProperty("query").GetString());
+        Assert.AreEqual(20, parameters.RootElement.GetProperty("limit").GetInt32());
+        var select = rendered.Find("[data-testid='acquisition-tool-artifact']");
+        Assert.HasCount(3, select.QuerySelectorAll("option"));
+        Assert.IsFalse(select.TextContent.Contains("diagnostic.json", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find("[data-testid='acquisition-tool-create']").HasAttribute("disabled"));
+
+        rendered.Find("[data-testid='acquisition-tool-display-name']").Input("Catalogue mobilité");
+        rendered.Find("[data-testid='acquisition-tool-name']").Input("catalogue-mobilite");
+        select.Change("results");
+        rendered.Find("[data-testid='acquisition-tool-editor'] form").Submit();
+
+        rendered.WaitForAssertion(() => Assert.AreEqual(
+            new CreateToolDefinitionFromAcquisitionRequest("catalogue-mobilite", "Catalogue mobilité", "results"), handler.Request));
+        Assert.AreEqual("/api/tooldefinitions/from-acquisition/acquisition-1?namespace=default", handler.Path);
+        var scope = Uri.EscapeDataString(Scope.Value);
+        Assert.AreEqual($"/tools/agentstration.catalogue-mobilite?namespace=default&scopeRef={scope}&context={scope}&view=execution",
+            new Uri(navigation.Uri).PathAndQuery);
     }
 
     [TestMethod]
@@ -594,6 +668,44 @@ public sealed class DataSourceEditorTests
         CompletedAt = new DateTimeOffset(2026, 10, 8, 9, 58, 0, TimeSpan.Zero),
         Manifest = new() { Artifacts = [new() { ArtifactId = "artifact-1", Kind = DataSourceArtifactKind.Durable, Disposition = DataSourceArtifactDisposition.Publishable }] }
     };
+
+    private sealed class AcquisitionConsoleContextProvider(DataSourceAcquisitionResource acquisition, bool canWrite) : IConsoleContextProvider
+    {
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new ConsoleContextSnapshot(acquisition.CreatedBy, "Administrator", acquisition.TenantId,
+                "example", "Example", acquisition.WorkspaceId, "catalog", "Catalog",
+                canWrite ? new HashSet<string> { AuthorizationPermissions.ResourcesWrite } : new HashSet<string>(), []));
+    }
+
+    private sealed class CreateAcquisitionToolHandler : HttpMessageHandler
+    {
+        public CreateToolDefinitionFromAcquisitionRequest? Request { get; private set; }
+        public string? Path { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Assert.AreEqual(HttpMethod.Post, request.Method);
+            Path = request.RequestUri!.PathAndQuery;
+            Request = await request.Content!.ReadFromJsonAsync<CreateToolDefinitionFromAcquisitionRequest>(cancellationToken);
+            Assert.IsNotNull(Request);
+            return new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = JsonContent.Create(new ToolDefinitionResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ToolResourceKinds.ToolDefinition,
+                    Metadata = new ResourceMetadata { Name = Request.Name },
+                    ScopeRef = Scope,
+                    Definition = new ToolDefinitionProperties
+                    {
+                        DisplayName = Request.DisplayName,
+                        InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
+                        Flow = new ToolDefinitionFlowTarget { Name = "acquisition" }
+                    }
+                })
+            };
+        }
+    }
 
     private sealed class SourceClientStub(bool targeted = false, bool historyFails = false) : IDataSourcesClient
     {

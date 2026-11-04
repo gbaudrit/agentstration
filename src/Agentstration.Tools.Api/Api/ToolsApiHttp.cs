@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -14,6 +15,7 @@ internal static class ToolsApiHttp
     public static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
         try { return await action(); }
+        catch (AuthorizationDeniedException exception) { return Problem("permission-denied", "Permission denied", 403, exception.Message); }
         catch (ResourceScopeAccessDeniedException exception) { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }
         catch (ResourceNotFoundException exception) { return Problem("tool-resource-not-found", "Resource not found", 404, exception.Message); }
         catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
@@ -37,6 +39,19 @@ internal static class ToolsApiHttp
 
     public static string? IfMatch(HttpRequest request) => request.Headers.IfMatch.FirstOrDefault();
     public static ResourceNamespace Namespace(string? value) => ResourceNamespace.Parse(value);
+
+    public static IDisposable? EnterOperationalWorkspace(
+        ResourceScopeRef? scopeRef, ICurrentRequestContext current, IRequestContextScopeFactory scopes)
+    {
+        if (scopeRef is not { Kind: ResourceScopeKind.Workspace } requested
+            || current.AccessMode is not (ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration))
+            return null;
+        var context = current.Current;
+        return context.PrincipalId != Guid.Empty && context.TenantId != Guid.Empty
+            && context.WorkspaceId != Guid.Empty && requested.TargetId == context.WorkspaceId
+            ? scopes.Push(context)
+            : null;
+    }
 
     private static IResult Problem(string type, string title, int status, string detail)
     {

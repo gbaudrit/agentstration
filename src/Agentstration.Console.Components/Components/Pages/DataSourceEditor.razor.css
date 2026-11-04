@@ -205,6 +205,12 @@
     max-width: 100%;
 }
 
+.data-source-acquisition-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
 @media (max-width: 620px) {
     .data-source-discovery .panel-header {
         flex-direction: column;
