@@ -8,7 +8,7 @@ Open — 2026-11-04
 
 - Issue: [#240](https://github.com/gbaudrit/agentstration/issues/240)
 - Introducing change: Unknown. The issue describes incremental growth; no single introducing change has been established.
-- Corrective pull request: Pending publication of the corrective branch.
+- Corrective pull request: [#1021](https://github.com/gbaudrit/agentstration/pull/1021).
 - Related ADRs: [ADR-0189](../decisions/0189-service-registration-has-explicit-module-ownership.md), [ADR-0032](../decisions/0032-single-authoritative-standalone-server.md)
 - Registration ownership: [Composition and service registration](../architecture/implementation/service-registration.md)
 
