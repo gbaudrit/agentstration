@@ -68,6 +68,9 @@ src/
 tests/
   Agentstration.Awp.Tests/
   Agentstration.Api.Tests/
+  Agentstration.Api.Flows.Tests/
+  Agentstration.Api.Execution.Tests/
+  Agentstration.Api.Resources.Tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
   Agentstration.Console.Client.Tests/
