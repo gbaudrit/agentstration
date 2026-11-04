@@ -1,0 +1,55 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+<div class="resource-plan-change-summary" aria-label="@T("ChangeSummary")">
+    @foreach (var operation in Enum.GetValues<ResourceChangeOperation>())
+    {
+        var count = Changes.Count(value => value.Operation == operation);
+        <div><strong>@count</strong><span>@Presentation.OperationCountLabel(operation, count)</span></div>
+    }
+</div>
+@if (Bindings is { Count: > 0 } reviewedBindings)
+{
+    <div class="resource-plan-reviewed-bindings">
+        <h3>@T("ReviewedBindings")</h3>
+        @foreach (var binding in reviewedBindings.OrderBy(value => value.LogicalId, StringComparer.Ordinal).ThenBy(value => value.Field, StringComparer.Ordinal))
+        {
+            <p><strong>@binding.LogicalId</strong><span>@T(binding.Field switch { "modelProfile" => "ModelProfile", "runtimeProfile" => "RuntimeProfile", "tool" => "ToolBinding", _ => "BindingsTitle" })</span><code>@(binding.Reference.Namespace ?? ResourceNamespace.Default)/@binding.Reference.Name</code></p>
+        }
+    </div>
+}
+@foreach (var change in Changes.OrderBy(value => value.Order))
+{
+    var reviewFields = ResourcePlanReviewProjection.ReviewFields(change);
+    <article class="resource-plan-change">
+        <header><div class="resource-plan-change-identity"><span class="resource-plan-change-number">@(change.Order + 1)</span><div><p class="resource-plan-change-kind">@Presentation.ResourceKindLabel(change.Proposed.Kind)</p><h3>@ResourcePlanReviewProjection.DisplayName(change)</h3><small>@change.Proposed.Metadata.Namespace/@change.Proposed.Metadata.Name</small></div></div><StatusBadge Text="@T($"Operation.{change.Operation}")" Status="@ResourcePlanReviewPresentation.OperationTone(change.Operation)" /></header>
+        @if (ResourcePlanReviewProjection.Description(change) is { Length: > 0 } description) { <p class="resource-plan-change-description">@description</p> }
+        @if (change.DependsOn.Count > 0) { <p class="resource-plan-change-dependencies"><strong>@T("DependsOn")</strong> @string.Join(", ", change.DependsOn)</p> }
+        @if (change.Operation == ResourceChangeOperation.NoOp) { <p class="resource-plan-change-empty">@T("NoDifferences")</p> }
+        else
+        {
+            <div class="resource-plan-change-highlights">
+                @foreach (var difference in ResourcePlanReviewProjection.HighlightFields(change))
+                {
+                    <div><span>@Presentation.FieldLabel(difference.Path)</span><strong>@Presentation.DisplayValue(difference.Path, difference.Proposed)</strong></div>
+                }
+            </div>
+            <details class="resource-plan-change-diff"><summary>@(reviewFields.Count == 1 ? T("ShowField") : T("ShowFields", reviewFields.Count))</summary>
+                <div class="resource-plan-table-scroll"><table><thead><tr><th>@T("Field")</th><th>@T("Current")</th><th>@T("Proposed")</th></tr></thead><tbody>
+                @foreach (var difference in reviewFields)
+                {
+                    <tr><th scope="row"><strong>@Presentation.FieldLabel(difference.Path)</strong><code>@difference.Path</code></th><td><span class="resource-plan-diff-value">@Presentation.DisplayValue(difference.Path, difference.Current)</span></td><td><span class="resource-plan-diff-value">@Presentation.DisplayValue(difference.Path, difference.Proposed)</span></td></tr>
+                }
+                </tbody></table></div>
+            </details>
+        }
+    </article>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ResourceChange> Changes { get; set; } = [];
+    [Parameter] public IReadOnlyList<ResourcePlanResolvedBinding>? Bindings { get; set; }
+    private ResourcePlanReviewPresentation? presentation;
+    private ResourcePlanReviewPresentation Presentation => presentation ??= new(Localizer);
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+}

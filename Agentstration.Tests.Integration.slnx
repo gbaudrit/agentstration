@@ -3,6 +3,9 @@
     <Project Path="tests/Agentstration.ResourcePlanning.Tests/Agentstration.ResourcePlanning.Tests.csproj" />
     <Project Path="tests/Agentstration.Console.Web.Tests/Agentstration.Console.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Flows.Tests/Agentstration.Api.Flows.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Execution.Tests/Agentstration.Api.Execution.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Resources.Tests/Agentstration.Api.Resources.Tests.csproj" />
     <Project Path="tests/Agentstration.Application.Tests/Agentstration.Application.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />

@@ -1,0 +1,38 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+<div class="resource-plan-section-heading"><div><p class="eyebrow">@T("ActivityKicker")</p><h2>@T("Activity")</h2><p>@T("ActivityIntro")</p></div></div>
+<div class="resource-plan-activity-layout">
+    <section class="resource-plan-origin-card" aria-label="@T("OriginTitle")">
+        <div class="resource-plan-activity-card-heading"><span class="resource-plan-origin-symbol" aria-hidden="true">◎</span><div><h3>@T("OriginTitle")</h3><p>@T("OriginDescription")</p></div></div>
+        <dl class="resource-plan-origin">
+            <div><dt>@T("Principal")</dt><dd>@if (PrincipalDisplayName(Plan.Origin.PrincipalId) is { } creatorName) { <strong>@creatorName</strong> }<code>@Plan.Origin.PrincipalId</code></dd></div>
+            @if (Activities.Where(value => value.Type == ResourcePlanActivityType.Applied).OrderByDescending(value => value.CreatedAt).FirstOrDefault() is { } appliedActivity) { <div><dt>@T("AppliedBy")</dt><dd>@if (PrincipalDisplayName(appliedActivity.ActorPrincipalId) is { } appliedByName) { <strong>@appliedByName</strong> }<code>@appliedActivity.ActorPrincipalId</code></dd></div> }
+            @if (!string.IsNullOrWhiteSpace(Plan.Origin.WorkItemId)) { <div><dt>@T("Work")</dt><dd><a href="@($"/api/work/workitems/{Uri.EscapeDataString(Plan.Origin.WorkItemId)}")">@Plan.Origin.WorkItemId</a></dd></div> }
+            @if (!string.IsNullOrWhiteSpace(Plan.Origin.FlowRunId)) { <div><dt>@T("FlowRun")</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(Plan.Origin.FlowRunId)}")">@Plan.Origin.FlowRunId</a></dd></div> }
+            @if (!string.IsNullOrWhiteSpace(Plan.Origin.CorrelationId)) { <div><dt>@T("Correlation")</dt><dd><code>@Plan.Origin.CorrelationId</code></dd></div> }
+        </dl>
+    </section>
+    <section class="resource-plan-history" aria-label="@T("HistoryTitle")">
+        <div class="resource-plan-history-heading"><div><h3>@T("HistoryTitle")</h3><p>@T("HistoryDescription")</p></div><span class="resource-plan-history-count">@T("HistoryCount", Activities.Count)</span></div>
+        @if (Activities.Count == 0) { <p class="resource-plan-history-empty">@T("HistoryEmpty")</p> }
+        else
+        {
+            <ol class="resource-plan-timeline">
+                @foreach (var activity in Activities.OrderByDescending(value => value.CreatedAt))
+                {
+                    <li class="@ActivityToneClass(activity.Type)"><span class="resource-plan-timeline-marker" aria-hidden="true"></span><article><div class="resource-plan-timeline-heading"><strong>@T($"Activity.{activity.Type}")</strong><span>@T("Revision", activity.PlanRevision)</span></div><time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("g")</time>@if (!string.IsNullOrWhiteSpace(activity.Detail)) { <p>@activity.Detail</p> }</article></li>
+                }
+            </ol>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ResourcePlan Plan { get; set; } = default!;
+    [Parameter] public IReadOnlyList<ResourcePlanActivity> Activities { get; set; } = [];
+    [Parameter] public IReadOnlyDictionary<Guid, string> PrincipalNames { get; set; } = new Dictionary<Guid, string>();
+    private string? PrincipalDisplayName(Guid id) => PrincipalNames.TryGetValue(id, out var name) && !string.IsNullOrWhiteSpace(name) ? name : null;
+    private static string ActivityToneClass(ResourcePlanActivityType type) => type switch { ResourcePlanActivityType.Applied => "is-success", ResourcePlanActivityType.Failed or ResourcePlanActivityType.Cancelled => "is-danger", ResourcePlanActivityType.StatusChanged or ResourcePlanActivityType.Validated or ResourcePlanActivityType.Materialized => "is-info", _ => "is-neutral" };
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+}
