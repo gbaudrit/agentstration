@@ -64,7 +64,6 @@ public sealed class StandaloneRegistrationContractTests
 
             AssertProductDescriptorCardinality(services);
             AssertSingleDescriptor<IRuntimeRunExecutionScope>(services, ServiceLifetime.Singleton);
-            AssertSingleDescriptor<IWorkExecutionScopeAccessor>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<IModelProfileReferenceValidator>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<IChatClientResolver>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<IFlowRunEventSink>(services, ServiceLifetime.Singleton);
@@ -126,7 +125,8 @@ public sealed class StandaloneRegistrationContractTests
             [typeof(IInternalMcpToolDefinitionProvider)] = 33,
             [typeof(IInternalMcpToolHandler)] = 33,
             [typeof(IFlowVersionActivationGuard)] = 4,
-            [typeof(IFlowDeletionGuard)] = 3
+            [typeof(IFlowDeletionGuard)] = 3,
+            [typeof(IWorkExecutionScopeAccessor)] = 2
         };
         foreach (var (contract, count) in contributions)
         {

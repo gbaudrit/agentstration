@@ -408,6 +408,12 @@ public sealed class DependencyTests
         var srcRoot = Path.Combine(repositoryRoot, "src");
         var program = File.ReadAllText(Path.Combine(hostRoot, "Program.cs"));
         var composition = File.ReadAllText(Path.Combine(hostRoot, "Hosting", "StandaloneHostComposition.cs"));
+        var serviceRegistration = File.ReadAllText(Path.Combine(hostRoot, "Hosting", "StandaloneHostServiceCollectionExtensions.cs"));
+        var hostSources = string.Join(Environment.NewLine, Directory
+            .EnumerateFiles(hostRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Select(File.ReadAllText));
         var apiTransport = string.Join(Environment.NewLine, Directory
             .EnumerateDirectories(srcRoot, "Agentstration.*.Api")
             .Append(Path.Combine(srcRoot, "Agentstration.Api"))
@@ -424,25 +430,43 @@ public sealed class DependencyTests
         Assert.DoesNotContain("MapAgentstrationApi", program, StringComparison.Ordinal);
         Assert.DoesNotContain("InitializeAsync", program, StringComparison.Ordinal);
 
-        Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationApi("));
+        Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationServerPresentation("));
+        Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationBackgroundWorkers("));
+        Assert.DoesNotContain("AddAgentstrationApi(", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService<", composition, StringComparison.Ordinal);
+        Assert.AreEqual(1, CountOccurrences(RegistrationMethod("AddAgentstrationServerPresentation"), "AddAgentstrationApi("));
+        Assert.AreEqual(1, CountOccurrences(hostSources, "AddAgentstrationApi("));
         Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationWebConsole("));
+        Assert.AreEqual(1, CountOccurrences(hostSources, ".AddAgentstrationWebConsole("));
         Assert.AreEqual(1, CountOccurrences(composition, "MapAgentstrationApi("));
+        Assert.AreEqual(1, CountOccurrences(hostSources, "MapAgentstrationApi("));
         foreach (var worker in new[]
                  {
                      "LocalWorkExecutionWorker",
+                     "RuntimeAssignmentLeaseReaper",
                      "FlowRunRecoveryWorker",
                      "SourceRefreshWorker"
                  })
         {
-            Assert.AreEqual(1, CountOccurrences(composition, $"AddHostedService<{worker}>"), worker);
+            Assert.AreEqual(1, CountOccurrences(RegistrationMethod("AddAgentstrationBackgroundWorkers"), $"AddHostedService<{worker}>"), worker);
+            Assert.AreEqual(1, CountOccurrences(hostSources, $"AddHostedService<{worker}>"), worker);
         }
-        Assert.DoesNotContain("AddHostedService<RuntimeRunExecutionWorker>", composition, StringComparison.Ordinal);
-        Assert.DoesNotContain("AddHostedService<FlowRunExecutionWorker>", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService<RuntimeRunExecutionWorker>", hostSources, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService<FlowRunExecutionWorker>", hostSources, StringComparison.Ordinal);
 
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddSignalR("));
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddMcpServer("));
         Assert.AreEqual(2, CountOccurrences(apiTransport, "MapHub<"));
         Assert.AreEqual(1, CountOccurrences(apiTransport, "MapMcp("));
+
+        string RegistrationMethod(string method)
+        {
+            var start = serviceRegistration.IndexOf($"IServiceCollection {method}(", StringComparison.Ordinal);
+            Assert.IsGreaterThanOrEqualTo(0, start, method);
+            var end = serviceRegistration.IndexOf("\n    }", start, StringComparison.Ordinal);
+            Assert.IsGreaterThan(start, end, method);
+            return serviceRegistration[start..end];
+        }
     }
 
     [TestMethod]

@@ -1,5 +1,6 @@
 using Agentstration.Agents;
 using Agentstration.Extensions.Aep;
+using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
@@ -11,6 +12,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Packs.Contracts;
 using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
@@ -40,7 +42,8 @@ public sealed class RegistrationContractTests
             [typeof(IInternalMcpToolDefinitionProvider)] = (33, ServiceLifetime.Singleton),
             [typeof(IInternalMcpToolHandler)] = (33, ServiceLifetime.Singleton),
             [typeof(IFlowVersionActivationGuard)] = (4, ServiceLifetime.Singleton),
-            [typeof(IFlowDeletionGuard)] = (3, ServiceLifetime.Singleton)
+            [typeof(IFlowDeletionGuard)] = (3, ServiceLifetime.Singleton),
+            [typeof(IWorkExecutionScopeAccessor)] = (2, ServiceLifetime.Singleton)
         };
 
         foreach (var (contract, expected) in contributions)
@@ -62,7 +65,6 @@ public sealed class RegistrationContractTests
             .ToArray();
         Assert.HasCount(0, accidentalDuplicates, string.Join(Environment.NewLine, accidentalDuplicates));
         AssertSingleton<IRuntimeRunExecutionScope>(services, typeof(WorkspaceRuntimeRunExecutionScope));
-        AssertSingleton<IWorkExecutionScopeAccessor>(services);
         AssertSingleton<ICurrentRequestContext>(services);
         AssertSingleton<IRequestContextScopeFactory>(services);
         AssertSingleton<TimeProvider>(services);
@@ -74,6 +76,43 @@ public sealed class RegistrationContractTests
             null // EntryResourceDeletionGuard aliases its shared resource-deletion singleton.
         }, services.Where(descriptor => descriptor.ServiceType == typeof(IFlowDeletionGuard))
             .Select(descriptor => descriptor.ImplementationType).ToArray());
+        CollectionAssert.AreEqual(new Type?[]
+        {
+            typeof(CurrentWorkExecutionScopeAccessor),
+            null // WorkspaceFlowRunExecutionScope aliases its shared ambient execution scope.
+        }, services.Where(descriptor => descriptor.ServiceType == typeof(IWorkExecutionScopeAccessor))
+            .Select(descriptor => descriptor.ImplementationType).ToArray());
+    }
+
+    [TestMethod]
+    public async Task WorkExecutionScopesRetainRequestFallbackAndAmbientLogicalScope()
+    {
+        var services = CreateServices("Deterministic", false);
+        services.AddLogging();
+        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        var accessors = provider.GetServices<IWorkExecutionScopeAccessor>().ToArray();
+        Assert.HasCount(2, accessors);
+        Assert.IsInstanceOfType<CurrentWorkExecutionScopeAccessor>(accessors[0]);
+        Assert.AreSame(provider.GetRequiredService<IFlowRunExecutionScope>(), accessors[1]);
+        var context = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var requestScope = new FlowRunScope(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId);
+
+        using (provider.GetRequiredService<IRequestContextScopeFactory>().Push(context))
+        {
+            Assert.AreEqual(requestScope, accessors[0].Current);
+            Assert.IsNull(accessors[1].Current);
+            var logicalScope = requestScope with { LogicalScopeRef = ResourceScopeRef.Workspace(context.WorkspaceId) };
+            using (provider.GetRequiredService<IFlowRunExecutionScope>().Enter(logicalScope))
+            {
+                Assert.AreEqual(requestScope, accessors[0].Current);
+                Assert.AreSame(logicalScope, accessors[1].Current);
+                Assert.IsNotNull(accessors[1].Current?.LogicalScopeRef);
+            }
+            Assert.AreEqual(requestScope, accessors[0].Current);
+            Assert.IsNull(accessors[1].Current);
+        }
+        Assert.IsNull(accessors[0].Current);
+        Assert.IsNull(accessors[1].Current);
     }
 
     [TestMethod]

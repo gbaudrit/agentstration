@@ -14,7 +14,7 @@ Open — 2026-11-04
 
 ## Defect
 
-The application could resolve services while its composition contained accidental duplicate descriptors and implicit replacement rules. The current-main review at `6c8570fecc087a546427cb26b71acac78514c5e8` found two registrations of `IRuntimeRunExecutionScope` in Infrastructure, competing `IWorkExecutionScopeAccessor` descriptors, repeated `TimeProvider.System` defaults, fallback and configured GenAI observability registrations, and a deferred model-profile validator superseded by the host's later model-management registration.
+The application could resolve services while its composition contained accidental duplicate descriptors and implicit replacement rules. The main-branch review at `6c8570fecc087a546427cb26b71acac78514c5e8` found two registrations of `IRuntimeRunExecutionScope` in Infrastructure, repeated `TimeProvider.System` defaults, fallback and configured GenAI observability registrations, and a deferred model-profile validator superseded by the host's later model-management registration.
 
 Infrastructure's registration method also mixed storage, identity, bootstrap, resource families, tools, scheduling, execution, and client fallback concerns. The standalone host and both Console compositions contained further registration responsibilities. Successful startup alone did not establish correct descriptor cardinality, explicit ownership, or safe composition order.
 
@@ -46,7 +46,7 @@ There was no comprehensive registration ownership map and no contract that inspe
 
 ## Resolution
 
-The corrective work decomposes Infrastructure and host composition into named extension methods, introduces a validated composition-options façade with the existing overload retained, and records ownership in the architecture documentation. Explicit default and replacement semantics remove accidental duplicate selections while preserving intentional handler, provider, hook, sink, and hosted-service contributions. Registration remains separate from endpoint mapping and ordered initialization.
+The corrective work decomposes Infrastructure and host composition into named extension methods, introduces a validated composition-options façade with the existing overload retained, and records ownership in the architecture documentation. Explicit default and replacement semantics remove accidental duplicate selections while preserving intentional handler, provider, hook, sink, scope-accessor and hosted-service contributions. In particular, Work deliberately consumes both the HTTP request accessor and ambient Flow accessor through `IEnumerable<IWorkExecutionScopeAccessor>`, in that order. These complementary registrations are preserved. Registration remains separate from endpoint mapping and ordered initialization.
 
 ## Prevention
 

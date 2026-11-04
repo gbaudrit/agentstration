@@ -32,6 +32,8 @@ internal static class FlowPlaneServiceCollectionExtensions
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.AddSingleton<WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IFlowRunExecutionScope>(provider => provider.GetRequiredService<WorkspaceFlowRunExecutionScope>());
+        // HTTP request and ambient Flow scopes are complementary, ordered contributions.
+        services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
         services.AddSingleton<IWorkExecutionScopeAccessor>(provider => provider.GetRequiredService<WorkspaceFlowRunExecutionScope>());
         services.AddSingleton<IRootFlowTargetResolver, RootFlowTargetResolver>();
         services.AddSingleton<IRootFlowRunGateway, RootFlowRunGateway>();

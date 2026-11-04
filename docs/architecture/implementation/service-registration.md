@@ -24,7 +24,7 @@ Each row assigns the **complete registration body** of its methods, including al
 | `TriggerScheduling` | `AddAgentstrationTriggerScheduling` | Schedule/context/target/authorization/Work adapters, management/firing, Quartz persistence and ordered optional scheduler hosting. |
 | `RuntimeRuns` | `AddAgentstrationRuntimeRuns` | AWP queue/scope, Run state/lifecycle, Worker lease/dispatch options/signals/guards, assignment projection, execution material/operation gateways and observability. |
 | `Artifacts` | `AddAgentstrationArtifacts` | Artifact filesystems, staging executor, management/materialization, built-in provisioners, cleanup options and optional worker. |
-| `WorkPlane` | `AddAgentstrationWorkPlane` | Execution gateway/queue aliases, Work/Workplace lifecycle/projections/discovery/operations, Task deletion, Entries/Dashboards, shared Entry deletion guard and Flow input projection/response. |
+| `WorkPlane` | `AddAgentstrationWorkPlane` | Execution gateway/queue aliases, Work/Workplace lifecycle/projections/discovery/operations, Task deletion, Entries/Dashboards, concrete Entry deletion guard and its resource-guard alias, and Flow input projection/response. |
 | `InternalTools` | `AddAgentstrationInternalTools` | Notification Tool, documentation catalog, all explicit diagnostics/time/planning/artifact/acquisition/retrieval Tool contributions, projection and lazy collection. `AddInternalTool<TTool>` owns each concrete Tool and its definition/handler aliases. |
 | `DataAndKnowledge` | `AddAgentstrationDataAndKnowledge` | Data Source profiles/discovery/targets/acquisition, HTTP fetcher, Knowledge management/projection/retrieval/Snapshots/exposure, Flow/artifact adapters, AEP bundle installer and optional recovery worker. |
 | `FlowPlane` | `AddAgentstrationFlowPlane` | Scope/discovery/Agent/Tool resolution, guards/retention, Run queue/cancellation/scope/accessor, root submission, default sink, expression parser aliases, validation/artifact capture/drafts/Runs. |
@@ -116,7 +116,7 @@ Other family API extensions aggregate owned endpoints without relocating applica
 
 ## Defaults, selections and contributions
 
-Exactly-one contracts have one descriptor in the standard graph. Clock/context/GenAI defaults, the deferred profile validator, single-client resolver and Flow no-op sink use `TryAdd*`. Model management explicitly replaces the validator; configured Model Providers replace AEP security/GenAI options and the Managed resolver, while capture uses `TryAddTransient`. API composition replaces the Flow sink with its composite. Concrete Console providers/clients replace shared-component empty defaults. The independent BFF explicitly selects its scoped `IHttpClientFactory` adapter while retaining the framework singleton `IHttpMessageHandlerFactory` that owns named handlers. Runtime Run execution has one scope descriptor; Flow execution and the Work scope accessor alias share `WorkspaceFlowRunExecutionScope`.
+Exactly-one contracts have one descriptor in the standard graph. Clock/context/GenAI defaults, the deferred profile validator, single-client resolver and Flow no-op sink use `TryAdd*`. Model management explicitly replaces the validator; configured Model Providers replace AEP security/GenAI options and the Managed resolver, while capture uses `TryAddTransient`. API composition replaces the Flow sink with its composite. Concrete Console providers/clients replace shared-component empty defaults. The independent BFF explicitly selects its scoped `IHttpClientFactory` adapter while retaining the framework singleton `IHttpMessageHandlerFactory` that owns named handlers. Runtime Run execution has one scope descriptor. Flow execution shares `WorkspaceFlowRunExecutionScope` with the ambient member of Work's ordered scope-accessor collection.
 
 Multiple registrations below are intentional enumerable or framework contributions:
 
@@ -128,7 +128,8 @@ Multiple registrations below are intentional enumerable or framework contributio
 | `IAepEnrollmentResourceProvisioner` | Tool and bundle provisioners in Tools. |
 | `IToolExecutionEventSink` | Runtime and Flow sinks in Tools. |
 | `IFlowVersionActivationGuard` | Tool Definition, Knowledge, Artifact transformation and Data Source guards in Flow. |
-| `IFlowDeletionGuard` | Entry guard from Work plus Tool Definition/Knowledge guards from Flow. |
+| `IFlowDeletionGuard` | Flow composition registers Tool Definition, Knowledge and Entry guards in that order; Work owns the concrete shared Entry guard. |
+| `IWorkExecutionScopeAccessor` | Flow composition preserves the HTTP request accessor `CurrentWorkExecutionScopeAccessor`, then the ambient `WorkspaceFlowRunExecutionScope` alias. Work submission services consume this ordered collection to support request and background execution contexts. |
 | Internal MCP definition/handler ports | Notification plus every explicitly listed internal Tool, sharing concrete singletons through aliases. |
 | Model provider/validation/discovery/capability and extension inspection ports | AEP contributions in Model Providers preserve provider-neutral collection contracts. |
 | `IParameterUsageProvider` | Model Provider reference checks from Model management. |
