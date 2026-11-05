@@ -11,6 +11,7 @@ using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Infrastructure.Runtime;
 
@@ -25,7 +26,8 @@ public sealed class RuntimeWorkerOperationGateway(
     IFlowStepArtifactCapture flowArtifactCapture,
     FlowRunService flowRuns,
     TimeProvider timeProvider,
-    IRequestContextScopeFactory requestScopes) : IRuntimeWorkerOperationGateway
+    IRequestContextScopeFactory requestScopes,
+    ILogger<RuntimeWorkerOperationGateway> logger) : IRuntimeWorkerOperationGateway
 {
     private const string ArtifactRuntimeType = "awp-artifact-v1";
 
@@ -118,6 +120,9 @@ public sealed class RuntimeWorkerOperationGateway(
         }
         catch (ToolDefinitionInvocationException exception)
         {
+            logger.LogWarning("Governed Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, Run {RunId}, Agent {AgentId}, Tool {ToolId}, ToolCall {ToolCallId}, TurnAttempt {TurnAttemptId}",
+                exception.Code, exception.Message, request.ExecutionScopeRef.Value, request.LogicalScopeRef?.Value,
+                request.RunId, request.Agent.AgentId, request.Tool.Id, request.ToolCallId, request.TurnAttemptId);
             throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
         }
     }
@@ -196,6 +201,9 @@ public sealed class RuntimeWorkerOperationGateway(
         }
         catch (ToolDefinitionInvocationException exception)
         {
+            logger.LogWarning("Governed Flow Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, FlowRun {FlowRunId}, Step {StepDefinitionId}, Attempt {StepAttempt}",
+                exception.Code, exception.Message, run.ExecutionScopeRef.Value, run.Scope.LogicalScopeRef?.Value,
+                run.Id, stepDefinitionId, attempt);
             throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
         }
         return new(

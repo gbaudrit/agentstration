@@ -7,6 +7,10 @@ using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Agentstration.Tools;
+using System.Text.Json;
 
 namespace Agentstration.Runtime.Tests;
 
@@ -22,7 +26,8 @@ public sealed class RuntimeWorkerOperationGatewayTests
         var scopes = new RecordingRequestContextScopes();
         var resolver = new ContextAssertingChatClientResolver(scopes, tenantId, workspaceId.Value, principalId);
         var gateway = new RuntimeWorkerOperationGateway(
-            resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System, scopes);
+            resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System, scopes,
+            NullLogger<RuntimeWorkerOperationGateway>.Instance);
 
         var response = await gateway.InvokeModelAsync(new RuntimeGovernedModelRequest(
             Agent(),
@@ -49,7 +54,8 @@ public sealed class RuntimeWorkerOperationGatewayTests
         var scopes = new RecordingRequestContextScopes();
         var resolver = new ContextAssertingChatClientResolver(scopes, tenantId, workspaceId.Value, principalId);
         var gateway = new RuntimeWorkerOperationGateway(
-            resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System, scopes);
+            resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System, scopes,
+            NullLogger<RuntimeWorkerOperationGateway>.Instance);
         var updates = new List<RuntimeGovernedModelUpdate>();
 
         await foreach (var update in gateway.StreamModelAsync(new RuntimeGovernedModelRequest(
@@ -78,7 +84,8 @@ public sealed class RuntimeWorkerOperationGatewayTests
         var scopes = new RecordingRequestContextScopes();
         var resolver = new AccessModeAssertingChatClientResolver(scopes, ControlPlaneAccessMode.System);
         var gateway = new RuntimeWorkerOperationGateway(
-            resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System, scopes);
+            resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System, scopes,
+            NullLogger<RuntimeWorkerOperationGateway>.Instance);
         var agent = Agent() with { ModelProfileScopeRef = ResourceScopeRef.Instance };
 
         var response = await gateway.InvokeModelAsync(new RuntimeGovernedModelRequest(
@@ -126,6 +133,60 @@ public sealed class RuntimeWorkerOperationGatewayTests
         Assert.AreEqual(ControlPlaneAccessMode.System, context.AccessMode);
         Assert.IsNull(execution.Current);
         Assert.ThrowsExactly<InvalidOperationException>(() => { _ = context.Current; });
+    }
+
+    [TestMethod]
+    public async Task ToolFailureIsLoggedWithCorrelationAndWithoutArgumentsOrInnerException()
+    {
+        var logger = new RecordingLogger();
+        var scopes = new RecordingRequestContextScopes();
+        var gateway = new RuntimeWorkerOperationGateway(null!, new FailingToolPipeline(), null!, null!, null!,
+            null!, null!, null!, null!, TimeProvider.System, scopes, logger);
+        var tool = new RuntimeExecutionToolMaterial("catalog-tool", ResourceNamespace.Default, "Catalog Tool", null,
+            JsonSerializer.SerializeToElement(new { }), null, false, "provider", ResourceNamespace.Default, "external");
+        var request = new RuntimeGovernedToolRequest(Agent(), tool, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            null, Guid.NewGuid(), new WorkspaceId(Guid.NewGuid()), Guid.NewGuid(), "runtime-run",
+            JsonSerializer.SerializeToElement(new { credential = "private-tool-argument" }), null);
+
+        var error = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => gateway.InvokeToolAsync(request, default));
+
+        Assert.AreEqual("tool_definition_timed_out", error.Code);
+        Assert.AreEqual(LogLevel.Warning, logger.Level);
+        Assert.AreEqual("tool_definition_timed_out", logger.Properties["ErrorCode"]);
+        Assert.AreEqual("Acquisition exceeded its timeout.", logger.Properties["ErrorDetail"]);
+        Assert.AreEqual(request.RunId, logger.Properties["RunId"]);
+        Assert.AreEqual(request.ToolCallId, logger.Properties["ToolCallId"]);
+        Assert.AreEqual(request.TurnAttemptId, logger.Properties["TurnAttemptId"]);
+        Assert.AreEqual(request.ExecutionScopeRef.Value, logger.Properties["ExecutionScopeRef"]);
+        Assert.AreEqual(tool.Id, logger.Properties["ToolId"]);
+        Assert.IsFalse(logger.Message.Contains("private-tool-argument", StringComparison.Ordinal));
+        Assert.IsFalse(logger.Message.Contains("private-inner-detail", StringComparison.Ordinal));
+        Assert.IsNull(logger.Exception);
+    }
+
+    private sealed class FailingToolPipeline : IToolExecutionPipeline
+    {
+        public ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
+            ValueTask.FromException<JsonElement?>(new ToolDefinitionInvocationException("tool_definition_timed_out",
+                "Acquisition exceeded its timeout.", new InvalidOperationException("private-inner-detail")));
+    }
+
+    private sealed class RecordingLogger : ILogger<RuntimeWorkerOperationGateway>
+    {
+        public LogLevel Level { get; private set; }
+        public string Message { get; private set; } = "";
+        public Exception? Exception { get; private set; }
+        public Dictionary<string, object?> Properties { get; private set; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Level = logLevel;
+            Message = formatter(state, exception);
+            Exception = exception;
+            Properties = ((IEnumerable<KeyValuePair<string, object?>>)state!).ToDictionary(pair => pair.Key, pair => pair.Value);
+        }
     }
 
     private static RuntimeExecutionAgentMaterial Agent() => new(
