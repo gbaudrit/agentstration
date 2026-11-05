@@ -70,6 +70,7 @@ internal sealed class AwpAssignmentExecutor(
                 AgentGeneration = material.Agent.Generation,
                 PersistArguments = material.Execution.PersistToolArguments
             }), cancellationToken);
+        WarnIfEmptyResponse(material.RunId, material.Agent.ParticipantId, result, chatClient);
         if (!string.IsNullOrEmpty(result.Output))
             await session.AppendEventAsync(AwpExecutionEventKind.ResponseDelta, location,
                 JsonSerializer.SerializeToElement(new { content = result.Output }), null, cancellationToken);
@@ -80,6 +81,9 @@ internal sealed class AwpAssignmentExecutor(
                 model = result.ModelName,
                 inputTokens = result.Usage?.InputTokens,
                 outputTokens = result.Usage?.OutputTokens,
+                finishReason = chatClient.LastFinishReason,
+                responseContentCount = chatClient.LastResponseContentCount,
+                responseTextLength = chatClient.LastResponseTextLength,
                 totalTokens = result.Usage?.TotalTokens
             }), null, cancellationToken);
         return JsonSerializer.SerializeToElement(result.Output);
@@ -650,6 +654,7 @@ internal sealed class AwpAssignmentExecutor(
                 FlowStepId = step.StepExecutionId.Value.ToString("D"),
                 AgentGeneration = agent.Generation
             }), cancellationToken);
+        WarnIfEmptyResponse(material.RunId, agent.ParticipantId, result, chatClient);
         if (!string.IsNullOrEmpty(result.Output))
             await session.AppendEventAsync(AwpExecutionEventKind.ResponseDelta, location,
                 JsonSerializer.SerializeToElement(new { content = result.Output }), null, cancellationToken);
@@ -667,9 +672,20 @@ internal sealed class AwpAssignmentExecutor(
                 provider = effective.ProviderType,
                 inputTokens = effective.Usage?.InputTokens,
                 outputTokens = effective.Usage?.OutputTokens,
+                finishReason = chatClient.LastFinishReason,
+                responseContentCount = chatClient.LastResponseContentCount,
+                responseTextLength = chatClient.LastResponseTextLength,
                 totalTokens = effective.Usage?.TotalTokens
             }), null, cancellationToken);
         return effective;
+    }
+
+    private void WarnIfEmptyResponse(string runId, string participantId, AgentExecutionResult result, AwpModelChatClient chatClient)
+    {
+        if (string.IsNullOrWhiteSpace(result.Output))
+            logger.LogWarning("Agent produced no final text. Run {RunId}, Participant {ParticipantId}, Model {ModelId}, FinishReason {FinishReason}, ResponseContentCount {ResponseContentCount}, ResponseTextLength {ResponseTextLength}, OutputTokens {OutputTokens}",
+                runId, participantId, chatClient.LastModelId, chatClient.LastFinishReason,
+                chatClient.LastResponseContentCount, chatClient.LastResponseTextLength, result.Usage?.OutputTokens);
     }
 
     private async Task<AwpFlowStepLocation> OpenStepAsync(AwpAssignmentSession session,
