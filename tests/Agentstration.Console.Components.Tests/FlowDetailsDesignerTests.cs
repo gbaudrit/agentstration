@@ -25,6 +25,63 @@ namespace Agentstration.Web.Tests;
 public sealed class FlowDetailsDesignerTests
 {
     [TestMethod]
+    [DataRow("/instance")]
+    [DataRow("/tenants/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")]
+    [DataRow("/workspaces/11111111-1111-1111-1111-111111111111")]
+    public void FlowRunRealtimeConnectionPreservesNavigationContext(string scopeRef)
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspaceId = new WorkspaceId(Guid.NewGuid());
+        var flowId = new FlowId("live-flow");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var run = new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = "live-run",
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Running,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.NewGuid(), workspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, flowId, "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        var realtime = new CapturingRealtimeConfigurator();
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(realtime);
+        context.Services.AddSingleton(TimeProvider.System);
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo($"/flow-runs/live-run?context={Uri.EscapeDataString(scopeRef)}");
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+
+        rendered.WaitForAssertion(() => Assert.IsNotNull(realtime.Endpoint));
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(realtime.Endpoint!.Query);
+        Assert.AreEqual(scopeRef, query["context"].ToString());
+        Assert.AreNotEqual(run.ExecutionScopeRef.Value, query["context"].ToString());
+    }
+
+    private sealed class CapturingRealtimeConfigurator : IConsoleRealtimeConnectionConfigurator
+    {
+        public Uri? Endpoint { get; private set; }
+
+        public void Configure(Uri endpoint, HttpConnectionOptions options)
+        {
+            Endpoint = endpoint;
+            options.HttpMessageHandlerFactory = _ => new OfflineHubHandler();
+        }
+    }
+
+    private sealed class OfflineHubHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromException<HttpResponseMessage>(new HttpRequestException("Offline test hub."));
+    }
+
+    [TestMethod]
     public void FlowRunSummaryDistinguishesDefinitionAndExecutionScopes()
     {
         using var context = new BunitContext();
