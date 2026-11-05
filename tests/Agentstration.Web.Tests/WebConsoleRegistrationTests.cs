@@ -1,6 +1,7 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Web;
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Components;
@@ -43,6 +44,38 @@ public sealed class WebConsoleRegistrationTests
         Assert.IsInstanceOfType<HttpAgentstrationEventStream>(scope.ServiceProvider.GetRequiredService<IAgentstrationEventStream>());
         Assert.IsInstanceOfType<ConsoleResourceSearchProvider>(scope.ServiceProvider.GetRequiredService<IResourceSearchProvider>());
     }
+
+    [TestMethod]
+    public void ConsoleReplacesComponentFallbacksAndPreservesTheConfiguredClock()
+    {
+        var services = new ServiceCollection();
+        var clock = new TestTimeProvider();
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddAgentstrationWebConsole(new ConfigurationBuilder().Build(), new TestHostEnvironment());
+        // Reusable components can be composed before or after their host selections.
+        services.AddAgentstrationWebComponents();
+
+        foreach (var contract in new[]
+        {
+            typeof(TimeProvider),
+            typeof(IConsoleContextProvider),
+            typeof(IResourceSearchProvider),
+            typeof(ICommandPaletteFallbackProvider),
+            typeof(IPlatformStatusProvider),
+            typeof(IUserPreferencesClient),
+            typeof(IConsoleRealtimeConnectionConfigurator),
+            typeof(IConsoleContextHttpClientFactory),
+            typeof(IAgentstrationEventStream),
+            typeof(IWorkOperationsRealtimeClient)
+        })
+        {
+            Assert.HasCount(1, services.Where(descriptor => descriptor.ServiceType == contract).ToArray(), contract.FullName);
+        }
+        Assert.AreSame(clock, services.Single(descriptor => descriptor.ServiceType == typeof(TimeProvider)).ImplementationInstance);
+        Assert.AreEqual(ServiceLifetime.Scoped, services.Single(descriptor => descriptor.ServiceType == typeof(IUserPreferencesClient)).Lifetime);
+    }
+
+    private sealed class TestTimeProvider : TimeProvider;
 
     private sealed class TestHostEnvironment : IHostEnvironment
     {
