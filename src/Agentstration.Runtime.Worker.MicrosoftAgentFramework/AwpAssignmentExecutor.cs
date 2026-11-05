@@ -86,6 +86,7 @@ internal sealed class AwpAssignmentExecutor(
                 responseTextLength = chatClient.LastResponseTextLength,
                 totalTokens = result.Usage?.TotalTokens
             }), null, cancellationToken);
+        EnsureFinalResponse(result, chatClient);
         return JsonSerializer.SerializeToElement(result.Output);
     }
 
@@ -677,6 +678,7 @@ internal sealed class AwpAssignmentExecutor(
                 responseTextLength = chatClient.LastResponseTextLength,
                 totalTokens = effective.Usage?.TotalTokens
             }), null, cancellationToken);
+        EnsureFinalResponse(result, chatClient);
         return effective;
     }
 
@@ -686,6 +688,16 @@ internal sealed class AwpAssignmentExecutor(
             logger.LogWarning("Agent produced no final text. Run {RunId}, Participant {ParticipantId}, Model {ModelId}, FinishReason {FinishReason}, ResponseContentCount {ResponseContentCount}, ResponseTextLength {ResponseTextLength}, OutputTokens {OutputTokens}",
                 runId, participantId, chatClient.LastModelId, chatClient.LastFinishReason,
                 chatClient.LastResponseContentCount, chatClient.LastResponseTextLength, result.Usage?.OutputTokens);
+    }
+
+    private static void EnsureFinalResponse(AgentExecutionResult result, AwpModelChatClient chatClient)
+    {
+        if (!string.IsNullOrWhiteSpace(result.Output)) return;
+        var tokenLimit = string.Equals(chatClient.LastFinishReason, "length", StringComparison.OrdinalIgnoreCase);
+        throw new AwpExecutionNotSupportedException(tokenLimit ? "model_output_token_limit" : "model_empty_response",
+            tokenLimit
+                ? "The model reached its generation token limit without producing a final answer. Increase the output token budget or review the reasoning settings."
+                : "The model completed without producing a final answer. Review the model response and generation settings.");
     }
 
     private async Task<AwpFlowStepLocation> OpenStepAsync(AwpAssignmentSession session,

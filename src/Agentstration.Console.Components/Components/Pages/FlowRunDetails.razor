@@ -586,8 +586,13 @@ else
     }
 
     private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
-    private string RunErrorMessage(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
-        ? T("Error.AgentModelProfileUnavailable") : error.Message;
+    private string RunErrorMessage(FlowRunError error) => error.Code switch
+    {
+        "agent_model_profile_unavailable" => T("Error.AgentModelProfileUnavailable"),
+        "model_output_token_limit" => T("Error.ModelOutputTokenLimit"),
+        "model_empty_response" => T("Error.ModelEmptyResponse"),
+        _ => error.Message
+    };
     private static string? RunErrorDetail(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
         ? error.Message : error.Details;
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });

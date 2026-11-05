@@ -76,8 +76,13 @@ else
     private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
     private void SetInspectorVisible(bool value) => inspectorVisible = value;
     private string T(string key) => Localizer[key];
-    private string RunErrorMessage(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
-        ? T("Error.AgentModelProfileUnavailable") : error.Message;
+    private string RunErrorMessage(FlowRunError error) => error.Code switch
+    {
+        "agent_model_profile_unavailable" => T("Error.AgentModelProfileUnavailable"),
+        "model_output_token_limit" => T("Error.ModelOutputTokenLimit"),
+        "model_empty_response" => T("Error.ModelEmptyResponse"),
+        _ => error.Message
+    };
     private static string? RunErrorDetail(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
         ? error.Message : error.Details;
     private string Label(string prefix, object value) { var raw = value.ToString() ?? string.Empty; var localized = Localizer[$"{prefix}.{raw}"]; return localized.ResourceNotFound ? raw : localized.Value; }

@@ -195,4 +195,6 @@
   <data name="ToolCalls"><value>Tool calls</value></data>
   <data name="LogicalCall"><value>Logical call</value></data>
   <data name="GovernanceEvaluations"><value>Governance ({0})</value></data>
+  <data name="Error.ModelOutputTokenLimit"><value>The model reached its generation token limit without producing a final answer. Increase the output token budget or review the reasoning settings.</value></data>
+  <data name="Error.ModelEmptyResponse"><value>The model completed without producing a final answer. Review the model response and generation settings.</value></data>
 </root>
