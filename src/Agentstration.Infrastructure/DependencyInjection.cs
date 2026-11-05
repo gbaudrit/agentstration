@@ -399,6 +399,7 @@ public static class DependencyInjection
         services.AddSingleton<IArtifactStagingToolExecutor, ToolSetArtifactStagingExecutor>();
         services.AddSingleton<ArtifactManagementService>();
         services.AddSingleton<IArtifactContentMaterializationGateway, ArtifactContentMaterializationGateway>();
+        services.AddSingleton<DurableArtifactContentReader>();
         services.AddSingleton<ArtifactPlatformResourceProvisioner>();
         services.AddSingleton<KnowledgePlatformResourceProvisioner>();
         services.AddHttpClient<IHttpContentFetcher, SafeHttpContentFetcher>(client =>
@@ -441,6 +442,7 @@ public static class DependencyInjection
         AddInternalTool<StagedArtifactSealMcpTool>(services);
         AddInternalTool<StagedArtifactInspectMcpTool>(services);
         AddInternalTool<StagedArtifactReadContentMcpTool>(services);
+        AddInternalTool<DurableArtifactReadContentMcpTool>(services);
         AddInternalTool<StagedArtifactCreateLeaseMcpTool>(services);
         AddInternalTool<StagedArtifactHandoffMcpTool>(services);
         AddInternalTool<StagedArtifactManageRetentionMcpTool>(services);

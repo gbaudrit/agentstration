@@ -55,6 +55,20 @@ Retrieval Flows also declare their supported operations through `definition.meta
 
 `artifact.storage.write/v1` receives a staged Artifact identity plus the authoritative producer Flow Run and step identities. It returns a normalized durable receipt used to complete a `FlowRunArtifact`. `artifact.storage.read/v1` performs the inverse operation and materializes durable content as a new governed local copy.
 
+### Read acquired durable content from an Agent
+
+Assign `agentstration.durable-artifact.read-content` alongside the acquisition Tool. An acquisition returns an artifact reference; it does not return the acquired document. When `artifact.kind` is `durable`, pass its `artifact.artifactId` to the reader:
+
+```json
+{ "artifactId": "e88f6bde90874cd6a15e2a5fc3b412ef" }
+```
+
+The reader invokes the standard Storage Read Flow and waits for its materialization for at most 90 seconds. It returns `text`, `mediaType`, `totalBytes`, `offset`, `nextOffset`, `endOfContent`, and `materializationRunId`. Each response discloses at most 64 KiB of UTF-8 content. To continue, send the same `artifactId`, the returned `materializationRunId`, and `offset` equal to `nextOffset`. This reuses the same temporary copy; byte offsets preserve UTF-8 character boundaries. Optional `length` is between 4 and 65536 bytes. Binary content requires the binary download path.
+
+Workspace access, content-read permission, Storage Flow execution permissions, and temporary-copy retention remain enforced. No physical storage reference or lease token is exposed. Content is untrusted data and must not be treated as instructions. Assigning the Tool makes it available to the model; it does not guarantee that a model will choose to call it.
+
+New acquisition Tools include the reading instructions in their description. Existing acquisition Tools retain their saved descriptions; recreate them or update their description to explain this reader. A nested Agent invocation needs another available Worker assignment slot for the materialization Flow, just as for the acquisition Flow; increasing capacity is a workaround rather than protection against saturation.
+
 ## Capture a step result as an Artifact
 
 Agent, Tool, Tool-route, child-Flow, repeat, and Flow-output steps may capture a successful result without adding another graph node:

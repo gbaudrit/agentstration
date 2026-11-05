@@ -334,7 +334,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
         var source = await service.CreateStagedAsync(new("report.txt", "text/plain",
             new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "producer", FlowRunId = "producer-run", FlowStepId = "render" }), default);
-        var bytes = Encoding.UTF8.GetBytes("durable data");
+        const string durableText = "abcé😀{\"records\":[1,2]}";
+        var bytes = Encoding.UTF8.GetBytes(durableText);
         _ = await service.WriteAsync(source.Value.ArtifactId, 0, bytes, default);
         _ = await service.SealAsync(source.Value.ArtifactId, default);
 
@@ -408,6 +409,57 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         Assert.AreEqual(started.FlowRunId, history[0].FlowRunId);
         Assert.AreEqual(completed.StagedArtifactId, history[0].StagedArtifactId);
         Assert.IsTrue(history[0].StagedArtifactAvailable);
+
+        var publicReader = factory.Services.GetRequiredService<DurableArtifactReadContentMcpTool>();
+        Assert.IsTrue(publicReader.Definition.ExposeThroughMcp);
+        var firstRead = await publicReader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
+        {
+            artifactId = durableId.ToString(), length = 4
+        }), "public-read"), default);
+        Assert.IsNotNull(firstRead);
+        Assert.AreEqual("abc", firstRead.Value.GetProperty("text").GetString());
+        Assert.AreEqual(3L, firstRead.Value.GetProperty("nextOffset").GetInt64());
+        Assert.IsFalse(firstRead.Value.GetProperty("endOfContent").GetBoolean());
+        var readRun = firstRead.Value.GetProperty("materializationRunId").GetString();
+        Assert.IsFalse(firstRead.Value.GetRawText().Contains("opaqueReference", StringComparison.OrdinalIgnoreCase));
+        foreach (var mode in new[] { ControlPlaneAccessMode.Workspace, ControlPlaneAccessMode.Instance, ControlPlaneAccessMode.TenantAdministration })
+        {
+            var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+            using var readScope = mode switch
+            {
+                ControlPlaneAccessMode.Instance => scopes.PushInstance(context),
+                ControlPlaneAccessMode.TenantAdministration => scopes.PushTenantAdministration(context),
+                _ => scopes.Push(context)
+            };
+            var rest = await publicReader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
+            {
+                artifactId = durableId.ToString(), materializationRunId = readRun, offset = 3, length = 64
+            }), "public-read-next"), default);
+            Assert.IsNotNull(rest);
+            Assert.AreEqual(durableText, "abc" + rest.Value.GetProperty("text").GetString());
+            Assert.IsTrue(rest.Value.GetProperty("endOfContent").GetBoolean());
+        }
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(restricted))
+            _ = await Assert.ThrowsAsync<AuthorizationDeniedException>(() => publicReader.ExecuteAsync(
+                Invocation(restricted, JsonSerializer.SerializeToElement(new { artifactId = durableId.ToString(), materializationRunId = readRun }), "denied-read"), default));
+        var otherWorkspace = await factory.Services.GetRequiredService<IOperationalTopologyProvisioner>()
+            .GetInstanceOperationsWorkspaceAsync(default);
+        var foreign = context with { TenantId = otherWorkspace.TenantId, WorkspaceId = otherWorkspace.Id };
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(foreign))
+        {
+            var missing = await Assert.ThrowsAsync<ArtifactValidationException>(() => publicReader.ExecuteAsync(
+                Invocation(foreign, JsonSerializer.SerializeToElement(new { artifactId = durableId.ToString(), materializationRunId = readRun }), "foreign-read"), default));
+            Assert.AreEqual("flow_run_artifact_not_found", missing.Code);
+        }
+        foreach (var length in new[] { 0, 65537 })
+        {
+            var invalidRange = await Assert.ThrowsAsync<ArtifactValidationException>(() => publicReader.ExecuteAsync(
+                Invocation(context, JsonSerializer.SerializeToElement(new { artifactId = durableId.ToString(), length }), "invalid-read"), default));
+            Assert.AreEqual("durable_artifact_read_range_invalid", invalidRange.Code);
+        }
+        var wrongRun = await Assert.ThrowsAsync<ArtifactValidationException>(() => publicReader.ExecuteAsync(
+            Invocation(context, JsonSerializer.SerializeToElement(new { artifactId = durableId.ToString(), materializationRunId = "nonexistent-run" }), "wrong-read"), default));
+        Assert.AreEqual("artifact_materialization_not_found", wrongRun.Code);
 
         var flows = factory.Services.GetRequiredService<FlowService>();
         var writeFlow = await flows.GetExactAsync(ResourceScopeRef.Instance,

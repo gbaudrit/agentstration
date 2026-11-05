@@ -168,6 +168,8 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
         var tool = (await created.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
         Assert.AreEqual(owner, tool.ScopeRef);
         Assert.AreEqual(original.Name, tool.Definition.Acquisition!.TemplateId);
+        StringAssert.Contains(tool.Definition.Description!, "artifact reference, not the acquired data");
+        StringAssert.Contains(tool.Definition.Description!, "Do not infer the acquired content");
         var listedDefinitions = await client.GetFromJsonAsync<JsonElement>("/api/tooldefinitions");
         Assert.IsTrue(listedDefinitions.GetProperty("value").EnumerateArray().Any(value =>
             value.GetProperty("metadata").GetProperty("name").GetString() == "catalog"));
