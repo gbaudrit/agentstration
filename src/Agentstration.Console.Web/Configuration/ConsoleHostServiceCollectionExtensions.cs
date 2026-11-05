@@ -8,6 +8,7 @@ using Agentstration.Web.Console;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.DependencyInjection;
 using Microsoft.AspNetCore.Http.Connections.Client;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Agentstration.Console.Web.Configuration;
@@ -18,34 +19,45 @@ public static class ConsoleHostServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.AddAgentstrationConsoleOptions(configuration);
+        services.AddAgentstrationConsoleComponents();
+        var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
+        services.AddAgentstrationConsoleApiClients(configured);
+        services.AddAgentstrationConsoleRealtimeClient(configured.WorkApi);
+        services.AddAgentstrationConsoleBffAuthentication(configuration, configured.ManagementApi);
+        services.AddAgentstrationConsoleAuthorization();
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleOptions(this IServiceCollection services, IConfiguration configuration)
+    {
         services.AddOptions<AgentstrationWebOptions>()
             .Bind(configuration.GetSection(AgentstrationWebOptions.SectionName))
             .Validate(Validate, "API base addresses must be absolute HTTP(S) URIs and timeouts must be between 1 and 120 seconds.")
             .ValidateOnStart();
-        services.AddOptions<BffWorkloadClientOptions>()
-            .Bind(configuration.GetSection(BffWorkloadClientOptions.SectionName))
-            .Validate(value => value.Validate(), "BFF workload client configuration is invalid.")
-            .ValidateOnStart();
-        services.AddOptions<BffSessionOptions>()
-            .Bind(configuration.GetSection(BffSessionOptions.SectionName))
-            .Validate(value => value.Validate(), "BFF session configuration is invalid.")
-            .ValidateOnStart();
-        services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<IBffServerSessionStore, InMemoryBffSessionStore>();
-        services.AddSingleton<BffDelegationTokenCache>();
-        services.AddScoped<BffDelegationTokenProvider>();
-        services.AddSingleton<IPostConfigureOptions<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>, BffCookieConfiguration>();
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleComponents(this IServiceCollection services)
+    {
+        services.TryAddSingleton(TimeProvider.System);
         services.AddAgentstrationWebComponents();
-        services.AddSingleton<IConsoleRealtimeConnectionConfigurator, NoOpConsoleRealtimeConnectionConfigurator>();
-        services.AddScoped<IConsoleContextProvider, ConsoleContextProvider>();
-        services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
+        services.Replace(ServiceDescriptor.Scoped<IConsoleContextProvider, ConsoleContextProvider>());
+        services.Replace(ServiceDescriptor.Scoped<IResourceSearchProvider, ConsoleResourceSearchProvider>());
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
-        services.AddScoped<IPlatformStatusProvider>(provider => provider.GetRequiredService<PlatformDashboardService>());
+        services.Replace(ServiceDescriptor.Scoped<IPlatformStatusProvider>(provider => provider.GetRequiredService<PlatformDashboardService>()));
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
-        var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleApiClients(this IServiceCollection services, AgentstrationWebOptions configured)
+    {
         AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
         AddClient(services, CleanupApiClient.RuntimeClient, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
         AddClient(services, CleanupApiClient.FlowClient, configured.FlowApi, InternalDelegationAudiences.Flow);
@@ -55,10 +67,6 @@ public static class ConsoleHostServiceCollectionExtensions
         services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi, InternalDelegationAudiences.Work);
         AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi, InternalDelegationAudiences.Work);
-        services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
-            new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
-            provider.GetRequiredService<IConsoleRealtimeConnectionConfigurator>(),
-            provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
         AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi, InternalDelegationAudiences.Flow);
         AddClient<ToolGovernanceAuditApiClient, IToolGovernanceAuditClient>(services, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
         AddClient<ManagementApiClient, IManagementApiClient>(services, configured.ManagementApi);
@@ -86,29 +94,79 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi, resilient: false);
         AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi, resilient: false);
         AddClient<SchemasApiClient, ISchemasClient>(services, configured.ManagementApi, resilient: false);
-        services.AddTransient<BffWorkloadSigningHandler>();
-        Configure(
-            services.AddHttpClient<IBffWorkloadTrustClient, BffWorkloadTrustClient>()
-                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
-            configured.ManagementApi,
-            resilient: false);
-        Configure(
-            services.AddHttpClient<IBffSessionAuthorityClient, BffSessionAuthorityClient>()
-                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
-            configured.ManagementApi,
-            resilient: false);
-        Configure(
-            services.AddHttpClient<IBffDelegationClient, BffDelegationClient>()
-                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
-            configured.ManagementApi,
-            resilient: false);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ResourceAccessPolicyApiClient, IResourceAccessPolicyClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi, InternalDelegationAudiences.Runtime);
         services.AddScoped<BffDelegatingHttpClientFactory>();
-        services.AddScoped<IHttpClientFactory>(provider => provider.GetRequiredService<BffDelegatingHttpClientFactory>());
+        // The BFF factory decorates the framework's pooled handlers with per-request
+        // delegation. Select it explicitly rather than retaining a shadowed default.
+        services.Replace(ServiceDescriptor.Scoped<IHttpClientFactory>(provider => provider.GetRequiredService<BffDelegatingHttpClientFactory>()));
         services.AddScoped<IConsoleContextHttpClientFactory>(provider => provider.GetRequiredService<BffDelegatingHttpClientFactory>());
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleRealtimeClient(this IServiceCollection services, ApiEndpointOptions workApi)
+    {
+        services.AddSingleton<IConsoleRealtimeConnectionConfigurator, NoOpConsoleRealtimeConnectionConfigurator>();
+        services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
+            new Uri(new Uri(workApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
+            provider.GetRequiredService<IConsoleRealtimeConnectionConfigurator>(),
+            provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleBffAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        ApiEndpointOptions managementApi)
+    {
+        services.AddOptions<BffWorkloadClientOptions>()
+            .Bind(configuration.GetSection(BffWorkloadClientOptions.SectionName))
+            .Validate(value => value.Validate(), "BFF workload client configuration is invalid.")
+            .ValidateOnStart();
+        services.AddOptions<BffSessionOptions>()
+            .Bind(configuration.GetSection(BffSessionOptions.SectionName))
+            .Validate(value => value.Validate(), "BFF session configuration is invalid.")
+            .ValidateOnStart();
+        services.AddSingleton<IBffServerSessionStore, InMemoryBffSessionStore>();
+        services.AddSingleton<BffDelegationTokenCache>();
+        services.AddScoped<BffDelegationTokenProvider>();
+        services.AddSingleton<IPostConfigureOptions<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>, BffCookieConfiguration>();
+        services.AddTransient<BffWorkloadSigningHandler>();
+        Configure(
+            services.AddHttpClient<IBffWorkloadTrustClient, BffWorkloadTrustClient>()
+                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
+            managementApi,
+            resilient: false);
+        Configure(
+            services.AddHttpClient<IBffSessionAuthorityClient, BffSessionAuthorityClient>()
+                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
+            managementApi,
+            resilient: false);
+        Configure(
+            services.AddHttpClient<IBffDelegationClient, BffDelegationClient>()
+                .AddHttpMessageHandler<BffWorkloadSigningHandler>(),
+            managementApi,
+            resilient: false);
+        services.AddHttpContextAccessor();
+        services.AddAuthentication(ConsoleAuthenticationDefaults.Scheme)
+            .AddCookie(ConsoleAuthenticationDefaults.Scheme, options =>
+            {
+                options.Cookie.Name = ConsoleAuthenticationDefaults.Cookie;
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.IsEssential = true;
+                options.LoginPath = "/login";
+                options.ReturnUrlParameter = "returnUrl";
+            });
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleAuthorization(this IServiceCollection services)
+    {
+        services.AddAuthorization();
         return services;
     }
 
@@ -123,11 +181,11 @@ public static class ConsoleHostServiceCollectionExtensions
         var name = typeof(TContract).Name;
         Configure(services.AddHttpClient(name), options, resilient);
         services.AddSingleton(new BffDelegationTarget(name, audience, new Uri(options.BaseAddress, UriKind.Absolute)));
-        services.AddScoped<TContract>(provider =>
+        services.Replace(ServiceDescriptor.Scoped<TContract>(provider =>
         {
             var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name);
             return ActivatorUtilities.CreateInstance<TImplementation>(provider, client);
-        });
+        }));
     }
 
     private static void AddClient(IServiceCollection services, string name, ApiEndpointOptions options, string audience)

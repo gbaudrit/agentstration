@@ -1,0 +1,60 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+
+<h2>@T("Graph")</h2>
+@if (Changes is not { } graphChanges) { <p>@T(PendingPreview ? "PendingPreviewDescription" : "NoChangeSets")</p> }
+else
+{
+    var graph = ResourcePlanReviewProjection.Graph(graphChanges);
+    <div class="resource-plan-graph-layout @(SelectedGraphChange is not null ? "has-selection" : null)">
+        <div class="resource-plan-graph-canvas">
+            <FlowTopologyViewer Graph="@GraphTopology(graph)" SelectedKey="selectedGraphKey" SelectedKeyChanged="SelectNodeAsync" InitiallyFit="true" ShowStateLegend="false" />
+            <p class="resource-plan-graph-hint">@T("GraphHint")</p>
+        </div>
+        @if (SelectedGraphChange is { } change)
+        {
+            <aside class="resource-plan-graph-details" aria-live="polite">
+                <header><h3>@change.LogicalId</h3><button type="button" @onclick="() => SelectedKeyChanged.InvokeAsync(null)" aria-label="@T("CloseNodeDetails")">×</button></header>
+                <dl>
+                    <dt>@T("ResourceKind")</dt><dd>@change.Proposed.Kind</dd>
+                    <dt>@T("Operation")</dt><dd><StatusBadge Text="@T($"Operation.{change.Operation}")" Status="@ResourcePlanReviewPresentation.OperationTone(change.Operation)" /></dd>
+                    <dt>@T("ResourceName")</dt><dd><code>@change.Proposed.Metadata.Name</code></dd>
+                    <dt>@T("DependsOn")</dt><dd>@(change.DependsOn.Count == 0 ? T("NoDependencies") : string.Join(", ", change.DependsOn))</dd>
+                </dl>
+            </aside>
+        }
+    </div>
+    <ol class="sr-only">@foreach (var graphChange in graphChanges.OrderBy(value => value.Order)) { <li>@graphChange.LogicalId · @graphChange.Proposed.Kind @if (graphChange.DependsOn.Count > 0) { <span>@T("DependsOn") @string.Join(", ", graphChange.DependsOn)</span> }</li> }</ol>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ResourceChange>? Changes { get; set; }
+    [Parameter] public bool PendingPreview { get; set; }
+    [Parameter] public string? SelectedKey { get; set; }
+    [Parameter] public EventCallback<string?> SelectedKeyChanged { get; set; }
+    private Task SelectNodeAsync(string key) => SelectedKeyChanged.InvokeAsync(key);
+    private ResourceChange? SelectedGraphChange
+    {
+        get
+        {
+            if (Changes is not { } displayedChanges || SelectedKey is null || !SelectedKey.StartsWith("resource:", StringComparison.Ordinal)
+                || !int.TryParse(SelectedKey.AsSpan("resource:".Length), out var index)) return null;
+            return displayedChanges.OrderBy(value => value.Order).ElementAtOrDefault(index);
+        }
+    }
+    private FlowTopologyGraph GraphTopology(ResourcePlanGraph graph)
+    {
+        var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var nodes = graph.Nodes.Select((node, index) =>
+        {
+            var id = $"resource:{index}";
+            ids.TryAdd(node.LogicalId, id);
+            return new FlowTopologyNode(id, id, node.LogicalId, node.Kind, node.X, node.Y, T($"Operation.{node.Operation}"));
+        }).ToArray();
+        var edges = graph.Edges.Where(edge => ids.ContainsKey(edge.From) && ids.ContainsKey(edge.To))
+            .Select((edge, index) => new FlowTopologyEdge($"dependency:{index}", ids[edge.From], ids[edge.To]))
+            .ToArray();
+        return new(nodes, edges, "resource-plan", T("GraphLabel"));
+    }
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+}

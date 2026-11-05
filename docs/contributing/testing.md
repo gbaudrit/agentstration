@@ -15,7 +15,7 @@ dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --n
 Integration tests exercise a real boundary such as `WebApplicationFactory`, SQLite, Git, persistent Identity, or runtime reconstruction. This lane remains deterministic and offline by default. Tests marked `Integration` for a live model provider are opt-in and report inconclusive unless their documented environment variables are supplied.
 
 ```powershell
-dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 947 --max-parallel-test-modules 2
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2
 ```
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
@@ -124,9 +124,13 @@ Coverage jobs restore/build only their test solution graphs (plus Fast on shard 
 
 Compare candidate workflow runs with the retained baseline runs 41668461593, 41646766981 and 41498304716 (17m30, 20m and 17m40 elapsed respectively). Retain source SHA, runner/runtime, job and step durations, test totals, coverage, diagnostic memory, complete elapsed time and total runner minutes. These historical runs use different revisions; they establish costs, not a controlled percentage improvement. Candidate measurements are required before claiming a speedup.
 
+Browser UX runs Desktop Chromium in two Playwright shards on separate runners; Mobile Chromium and locale contracts each use one runner. Every runner retains one Playwright worker and isolated product hosts/data. The required `browser-ux` check waits for all four matrix jobs to succeed, and evidence artifacts include the project and shard index. Each runner restores the NuGet package cache using the same key and OS fallback as the main build job; `dotnet restore` and NuGet auditing still run on cache hits. The npm cache remains keyed by the browser workspace's lockfile. Compare complete elapsed time and total runner minutes against Browser UX runs 41733014469 and 41734413136 before claiming a measured speedup; the latter includes a mobile rerun tracked in #997.
+
 ## Management fixture boundaries and profiling
 
-The required inventory remains 1,724 cases: Fast now contains 777 and Integration 947 (including 11 optional cases in the reviewed baseline). Twenty-four boundary-free cases moved from Management API/Security into ResourceManagement, Schemas, Secrets and Infrastructure test projects. Their existing test names are retained. Coverage follows these inventories automatically and expects 33 module reports after splitting the API integration assembly.
+The required inventory contains 1,731 cases: Fast contains 777 and Integration 954 (including 12 optional cases without live-provider or PostgreSQL configuration). Twenty-four boundary-free cases moved from Management API/Security into ResourceManagement, Schemas, Secrets and Infrastructure test projects. Their existing test names are retained. Coverage follows these inventories automatically and expects 33 module reports after splitting the API integration assembly.
+
+Flow recovery regressions cover terminal history, multiple active pages, equal update times, exact Instance/Tenant/Workspace keys, active leases, and input expiry while earlier runs become terminal. SQLite query checks require bounded, status-filtered key reads without loading payloads. The PostgreSQL CI lane also runs `FlowRecoveryRepairsLegacyStatusesAndDrainsChangingPages`: it creates a disposable database, upgrades stale status metadata without changing payloads, ETags or update times, and drains pages while visited runs are updated and deleted. Its test connection therefore needs permission to create and drop that disposable database; the default offline lane skips it when `AGENTSTRATION_TEST_POSTGRES` is absent.
 
 Management API retains real HTTP, MCP transport, hosted provisioning and AWP execution tests. Eleven service-only cases instead use `ManagementServiceFixture`: the production application registrations with hosted services disabled, private non-pooled SQLite stores and deterministic bootstrap. It starts no ASP.NET Core server, background scheduler or Worker, and disposes only its own provider/files. It deliberately retains real persistence, scope authorization, provisioning and the real artifact backend; those cases remain Integration tests. No host or mutable database is shared between tests.
 

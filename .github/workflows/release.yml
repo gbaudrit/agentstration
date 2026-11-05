@@ -57,7 +57,7 @@ jobs:
       - name: Test fast lane
         run: dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4
       - name: Test integration lane
-        run: dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 947 --max-parallel-test-modules 2
+        run: dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2
       - name: Restore autonomous AEP SDK
         run: dotnet restore aep/Aep.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
       - name: Build autonomous AEP SDK

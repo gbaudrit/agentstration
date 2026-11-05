@@ -27,9 +27,7 @@ public sealed class QuartzHostLifecycleTests
         var hostedServiceNames = factory.Services.GetServices<IHostedService>()
             .Select(service => service.GetType().Name)
             .ToArray();
-        Assert.IsFalse(hostedServiceNames.Contains("AgentDeploymentReconciliationWorker", StringComparer.Ordinal));
-        Assert.IsFalse(hostedServiceNames.Contains("FlowRunExecutionWorker", StringComparer.Ordinal));
-        Assert.IsFalse(hostedServiceNames.Contains("QuartzHostedService", StringComparer.Ordinal));
+        AssertApplicationWorkers(hostedServiceNames, enabled: false);
         Assert.IsFalse(hostedServiceNames.Contains("TelemetryHostedService", StringComparer.Ordinal));
 
         var directory = factory.Services.GetRequiredService<IConfiguration>()["Data:Directory"];
@@ -59,6 +57,8 @@ public sealed class QuartzHostLifecycleTests
                     using var client = factory.CreateClient();
                     Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
                     Assert.IsTrue(File.Exists(Path.Combine(directory, "scheduler.db")));
+                    AssertApplicationWorkers(factory.Services.GetServices<IHostedService>()
+                        .Select(service => service.GetType().Name).ToArray(), enabled: true);
                 }
 
                 Directory.Delete(directory, recursive: true);
@@ -85,6 +85,27 @@ public sealed class QuartzHostLifecycleTests
             .ToArray();
 
         Assert.IsTrue(hostedServiceNames.Contains("TelemetryHostedService", StringComparer.Ordinal));
+    }
+
+    private static void AssertApplicationWorkers(string[] hostedServices, bool enabled)
+    {
+        string[] applicationWorkers =
+        [
+            "QuartzLoggingInitializer",
+            "QuartzSqliteSchemaInitializer",
+            "QuartzHostedService",
+            "TriggerSchedulerReconciler",
+            "StagedArtifactCleanupWorker",
+            "DataSourceAcquisitionRecoveryWorker",
+            "LocalWorkExecutionWorker",
+            "RuntimeAssignmentLeaseReaper",
+            "FlowRunRecoveryWorker",
+            "SourceRefreshWorker"
+        ];
+        foreach (var worker in applicationWorkers)
+        {
+            Assert.AreEqual(enabled ? 1 : 0, hostedServices.Count(name => name == worker), worker);
+        }
     }
 
     private static WebApplicationFactory<global::Program> Factory(string dataDirectory) =>

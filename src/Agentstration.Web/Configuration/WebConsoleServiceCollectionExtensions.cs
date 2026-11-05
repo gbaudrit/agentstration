@@ -6,6 +6,7 @@ using Agentstration.Web.Features.Flows.Designer;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.DependencyInjection;
 using Agentstration.Web.Security;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Web.Configuration;
 
@@ -16,39 +17,51 @@ public static class WebConsoleServiceCollectionExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
         services.AddOptions<AgentstrationWebOptions>()
             .Bind(configuration.GetSection(AgentstrationWebOptions.SectionName))
             .Validate(Validate, "API base addresses must be absolute HTTP(S) URIs and timeouts must be between 1 and 120 seconds.")
             .ValidateOnStart();
+        var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
         services.AddHttpContextAccessor();
-        services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddAgentstrationConsoleComponents();
+        services.AddAgentstrationConsoleApiClients(configured);
+        services.AddAgentstrationConsoleRealtime(configured);
+        // Authentication and authorization belong to the authoritative Identity API composition.
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleComponents(this IServiceCollection services)
+    {
         services.AddAgentstrationWebComponents();
-        services.AddSingleton<ConsoleRealtimeSession>();
-        services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(provider => provider.GetRequiredService<ConsoleRealtimeSession>());
-        services.AddScoped<IConsoleContextProvider, ConsoleContextProvider>();
-        services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
-        services.AddScoped<ICommandPaletteFallbackProvider, ConsoleEntryCommandFallbackProvider>();
+        services.Replace(ServiceDescriptor.Scoped<IConsoleContextProvider, ConsoleContextProvider>());
+        services.Replace(ServiceDescriptor.Scoped<IResourceSearchProvider, ConsoleResourceSearchProvider>());
+        services.Replace(ServiceDescriptor.Scoped<ICommandPaletteFallbackProvider, ConsoleEntryCommandFallbackProvider>());
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
-        services.AddScoped<IPlatformStatusProvider>(provider => provider.GetRequiredService<PlatformDashboardService>());
+        services.Replace(ServiceDescriptor.Scoped<IPlatformStatusProvider>(provider => provider.GetRequiredService<PlatformDashboardService>()));
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
-        var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleApiClients(
+        this IServiceCollection services,
+        AgentstrationWebOptions configured)
+    {
         AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
         AddClient(services, CleanupApiClient.RuntimeClient, configured.RuntimeApi);
         AddClient(services, CleanupApiClient.FlowClient, configured.FlowApi);
         AddClient(services, CleanupApiClient.ManagementClient, configured.ManagementApi);
         AddClient(services, CleanupApiClient.WorkClient, configured.WorkApi);
         services.AddScoped<ICleanupApiClient, CleanupApiClient>();
-        services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
         AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi);
         AddClient<ConsoleEntryInteractionApiClient, IConsoleEntryInteractionApiClient>(services, configured.WorkApi);
-        services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
-            new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
-            provider.GetRequiredService<ConsoleRealtimeSession>(),
-            provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
         AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
         AddClient<ToolGovernanceAuditApiClient, IToolGovernanceAuditClient>(services, configured.RuntimeApi);
         AddClient<ManagementApiClient, IManagementApiClient>(services, configured.ManagementApi);
@@ -86,15 +99,29 @@ public static class WebConsoleServiceCollectionExtensions
         return services;
     }
 
+    internal static IServiceCollection AddAgentstrationConsoleRealtime(
+        this IServiceCollection services,
+        AgentstrationWebOptions configured)
+    {
+        services.AddSingleton<ConsoleRealtimeSession>();
+        services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(provider => provider.GetRequiredService<ConsoleRealtimeSession>());
+        services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
+        services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
+            new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
+            provider.GetRequiredService<ConsoleRealtimeSession>(),
+            provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
+        return services;
+    }
+
     private static void AddClient<TImplementation, TContract>(IServiceCollection services, ApiEndpointOptions options)
         where TImplementation : class, TContract
         where TContract : class
     {
         var name = typeof(TContract).Name;
         Configure(services.AddHttpClient(name), options);
-        services.AddScoped<TContract>(provider => ActivatorUtilities.CreateInstance<TImplementation>(
+        services.Replace(ServiceDescriptor.Scoped<TContract>(provider => ActivatorUtilities.CreateInstance<TImplementation>(
             provider,
-            provider.GetRequiredService<IConsoleContextHttpClientFactory>().CreateClient(name)));
+            provider.GetRequiredService<IConsoleContextHttpClientFactory>().CreateClient(name))));
     }
 
     private static void AddClient(IServiceCollection services, string name, ApiEndpointOptions options) =>
@@ -106,9 +133,9 @@ public static class WebConsoleServiceCollectionExtensions
     {
         var name = typeof(TContract).Name;
         ConfigureClient(services.AddHttpClient(name), options);
-        services.AddScoped<TContract>(provider => ActivatorUtilities.CreateInstance<TImplementation>(
+        services.Replace(ServiceDescriptor.Scoped<TContract>(provider => ActivatorUtilities.CreateInstance<TImplementation>(
             provider,
-            provider.GetRequiredService<IConsoleContextHttpClientFactory>().CreateClient(name)));
+            provider.GetRequiredService<IConsoleContextHttpClientFactory>().CreateClient(name))));
     }
 
     private static void Configure(IHttpClientBuilder builder, ApiEndpointOptions options)

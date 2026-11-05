@@ -23,6 +23,7 @@ using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Hosting;
 using Agentstration.Work.Api;
 using Agentstration.Workplace.Api;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Web.Configuration;
 
@@ -56,20 +57,38 @@ public static class ApiTransportServiceCollectionExtensions
         services.AddToolsApi();
         services.AddWorkApi();
         services.AddWorkplaceApi();
+        services.AddAgentstrationBootstrapTransport();
+        services.AddAgentstrationConsoleResourceQueries();
+        services.AddAgentstrationRealtimeProjection();
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationBootstrapTransport(this IServiceCollection services)
+    {
         services.AddSingleton<BootstrapProfileCatalog>();
         services.AddSingleton<SourceBootstrapProfileLoader>();
         services.AddSingleton<BootstrapApplicationLock>();
         services.AddScoped<BootstrapProfileManagementService>();
         services.AddScoped<IBootstrapProfileApiService>(provider => provider.GetRequiredService<BootstrapProfileManagementService>());
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationConsoleResourceQueries(this IServiceCollection services)
+    {
         services.AddScoped<SourceConsoleManagementService>();
         services.AddScoped<ISourceConsoleQueryService>(provider => provider.GetRequiredService<SourceConsoleManagementService>());
         services.AddScoped<IResourceScopeApiService, ResourceScopeApiService>();
+        return services;
+    }
+
+    internal static IServiceCollection AddAgentstrationRealtimeProjection(this IServiceCollection services)
+    {
         services.AddSingleton<WorkplaceFlowConversationProjectionSink>();
-        services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRunEventSink(
+        services.Replace(ServiceDescriptor.Singleton<IFlowRunEventSink>(provider => new CompositeFlowRunEventSink(
         [
             provider.GetRequiredService<WorkplaceFlowConversationProjectionSink>(),
             provider.GetRequiredService<SignalRFlowRunEventSink>()
-        ]));
+        ])));
         return services;
     }
 
