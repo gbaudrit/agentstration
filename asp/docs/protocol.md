@@ -78,7 +78,8 @@ parameters such as `store`. The Agent sees only the remaining permitted paramete
 the product must inject fixed values, reject overrides and enforce its authorization
 and constraints before calling the original generic Tool. This mechanism applies
 to arbitrary Tools, including ASP Tools. It is owned by Agentstration, **not** the
-ASP protocol or SDK. #1040 owns this product capability and its Storage use.
+ASP protocol or SDK. #1044 owns the generic relay capability; #1040 owns
+Storage integration and reuses that relay where fixed-parameter exposure is needed.
 Direct use of an authorized generic ASP Tool remains valid.
 
 Authorization is mandatory on both direct and relayed ASP calls. The SDK invokes

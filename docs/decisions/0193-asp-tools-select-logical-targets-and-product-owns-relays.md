@@ -42,7 +42,8 @@ Tools select configured targets and cannot create or remap them through argument
 Only implemented operation profiles are advertised. SQL placement does not imply
 a query capability, and this delivery still implements only `asp.content/1`.
 
-Agentstration's parameter relay is a generic product Tool capability owned by #1040. It may fix
+Agentstration's parameter relay is a generic product Tool capability tracked in #1044.
+Storage integration #1040 reuses it where fixed-parameter exposure is needed. It may fix
 ASP target selection or parameters of unrelated Tools, hide fixed parameters from
 Agent input, reject overrides and invoke the original Tool under normal governance.
 ASP supplies no relay component, product Tool model or automatic publication. An
