@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Typed ASP MCP client.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+</Project>

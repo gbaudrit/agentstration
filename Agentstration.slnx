@@ -1,4 +1,11 @@
 <Solution>
+  <Folder Name="/asp/">
+    <Project Path="asp/src/Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
+    <Project Path="asp/src/Agentstration.Asp.Server/Agentstration.Asp.Server.csproj" />
+    <Project Path="asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
+    <Project Path="asp/samples/LocalStorage/LocalStorage.csproj" />
+    <Project Path="asp/tests/Agentstration.Asp.Tests/Agentstration.Asp.Tests.csproj" />
+  </Folder>
   <Folder Name="/automation/">
     <Project Path="automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj" />
     <Project Path="automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj" />

@@ -61,6 +61,8 @@ Packs form a distribution layer above these boundaries. The repository produces 
 
 The Agentstration Extension Protocol SDK, conformance validator, CLI, samples and standalone Inspector are staged autonomously in [`aep/`](aep/README.md). AEP gives extensions versioned discovery, capability and option contracts without leaking provider-specific concerns into portable Agentstration resources.
 
+The standalone Agentstration Storage Protocol SDK is staged in [`asp/`](asp/README.md): neutral bounded content contracts, MCP client/server adapters, an offline sample and conformance tests. It does not yet integrate product Storage resources or promise durable Snapshot retention.
+
 Read the [architecture overview](https://docs.agentstration.io/architecture/overview) and [current capabilities reference](https://docs.agentstration.io/reference/current-capabilities) for the detailed boundaries and guarantees.
 
 ## Quick start
