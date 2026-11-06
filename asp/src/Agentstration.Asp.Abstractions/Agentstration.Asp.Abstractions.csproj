@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Neutral Agentstration Storage Protocol contracts and schemas.</Description></PropertyGroup>
+</Project>
