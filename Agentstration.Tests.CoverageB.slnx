@@ -7,5 +7,11 @@
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Flows.Tests/Agentstration.Api.Flows.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Execution.Tests/Agentstration.Api.Execution.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Resources.Tests/Agentstration.Api.Resources.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Aep.Tests/Agentstration.Management.Aep.Tests.csproj" />
+    <Project Path="tests/Agentstration.ResourcePlanning.Tests/Agentstration.ResourcePlanning.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
   </Folder>
 </Solution>

@@ -154,8 +154,8 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   },
   {
     id: 'organization-workspaces', host: 'console', source: `${consolePages}/OrganizationWorkspaces.razor`,
-    routes: ['/settings/organization/workspaces'], fixtureKeys: [], pageObject: 'src/pages/organization-workspaces.page.ts',
-    journey: 'create-workspace', specification: 'tests/create-workspace.spec.ts', coverage: 'covered',
+    routes: ['/settings/organization/workspaces', '/settings/organization/structure'], fixtureKeys: [], pageObject: 'src/pages/organization-workspaces.page.ts',
+    journey: 'exercise-organization-structure', specification: 'tests/organization-structure.spec.ts', coverage: 'covered',
   },
   {
     id: 'agent-editor', host: 'console', source: `${consolePages}/AgentEditor.razor`,

@@ -78,6 +78,7 @@ public sealed class RuntimeRunTests
 
         var created = await fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 3), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Console, "operator", default);
 
+        Assert.AreEqual("agentstration.io/v1", created.Value.ApiVersion);
         Assert.AreEqual(RuntimeRunState.Pending, created.Value.Status.State);
         Assert.AreEqual(3L, created.Value.Properties.Agent.Version);
         Assert.AreEqual("Optimize this query.", created.Value.Properties.Input.Messages[0].Content);
@@ -337,6 +338,19 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    [DataRow("2026-08-01")]
+    [DataRow("2026-09-22")]
+    public async Task RuntimeApiRejectsDatedVersionQueries(string version)
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync($"/api/runtime/runs?api-version={version}");
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.AreEqual("api_version_not_supported", payload.RootElement.GetProperty("title").GetString());
+    }
+
+    [TestMethod]
     public async Task RuntimeApiDispatchesRunWithoutExecutingItInWebOrCreatingWorkItem()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -357,10 +371,13 @@ public sealed class RuntimeRunTests
         };
 
         var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?generation={agent.Generation}");
-        using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", request);
+        using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs?api-version=agentstration.io%2Fv1", request);
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
         var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
         Assert.IsNotNull(created);
+        Assert.AreEqual("agentstration.io/v1", created.ApiVersion);
+        using var payload = JsonDocument.Parse(await createdResponse.Content.ReadAsStringAsync());
+        Assert.AreEqual("agentstration.io/v1", payload.RootElement.GetProperty("apiVersion").GetString());
         var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         Assert.AreEqual(new RuntimeRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId), created.Properties.Scope);
         Assert.AreEqual(current.PrincipalId.ToString("D"), created.Properties.Initiator);
@@ -375,7 +392,8 @@ public sealed class RuntimeRunTests
         var assignment = await factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>()
             .GetByTargetAsync(new(current.WorkspaceId), RuntimeAssignmentTargetKind.RuntimeRun, created.Id, default);
 
-        Assert.AreEqual(RuntimeRunState.Pending, dispatched!.Status.State);
+        Assert.AreEqual("agentstration.io/v1", dispatched!.ApiVersion);
+        Assert.AreEqual(RuntimeRunState.Pending, dispatched.Status.State);
         Assert.IsNotNull(assignment);
         Assert.AreEqual(RuntimeAssignmentState.Pending, assignment.Value.State);
         Assert.IsTrue(readiness?.Ready);

@@ -9,6 +9,9 @@ public interface IIdentityAdministrationApiClient
     Task<IdentityConsoleContextResponse> GetContextAsync(CancellationToken cancellationToken);
     Task SelectWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken);
     Task SelectConsoleContextAsync(string scopeRef, CancellationToken cancellationToken);
+    Task<OrganizationStructureResponse> GetStructureAsync(CancellationToken cancellationToken);
+    Task<Tenant> CreateTenantAsync(string name, string displayName, CancellationToken cancellationToken);
+    Task<Workspace> CreateTenantWorkspaceAsync(Guid tenantId, string name, string displayName, CancellationToken cancellationToken);
     Task<OrganizationAdministrationResponse> GetOrganizationAsync(CancellationToken cancellationToken);
     Task<Workspace> CreateWorkspaceAsync(string name, string displayName, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkspaceMemberResponse>> GetWorkspaceMembersAsync(Guid workspaceId, CancellationToken cancellationToken);
@@ -47,6 +50,25 @@ public sealed class IdentityAdministrationApiClient(HttpClient httpClient) : IId
             new SelectConsoleContextRequest(scopeRef),
             cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<OrganizationStructureResponse> GetStructureAsync(CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<OrganizationStructureResponse>(httpClient, "api/identity/organization/structure", cancellationToken);
+
+    public async Task<Tenant> CreateTenantAsync(string name, string displayName, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync("api/identity/tenants", new CreateTenantRequest(name, displayName), cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<Tenant>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty response.", Guid.NewGuid().ToString("N"));
+    }
+
+    public async Task<Workspace> CreateTenantWorkspaceAsync(Guid tenantId, string name, string displayName, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync("api/identity/organization/workspaces", new CreateTenantWorkspaceRequest(tenantId, name, displayName), cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<Workspace>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty response.", Guid.NewGuid().ToString("N"));
     }
 
     public Task<OrganizationAdministrationResponse> GetOrganizationAsync(CancellationToken cancellationToken) =>

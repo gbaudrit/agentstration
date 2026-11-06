@@ -239,15 +239,23 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         return new FlowRunPage(documents.Take(take).Select(ToRun).ToArray(), documents.Length > take);
     }
 
-    public async Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(FlowRunKey? after, int take, CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var documents = await context.Documents.AsNoTracking().Where(value => value.Kind == RunKind)
-            .OrderBy(value => value.UpdatedAt).Skip(skip).Take(Math.Min(take, 1000)).ToArrayAsync(cancellationToken);
-        return documents.Select(ToRun).Where(value => value.Value.Status is FlowRunStatus.Pending or FlowRunStatus.Running or FlowRunStatus.WaitingForInput or FlowRunStatus.WaitingForChild)
-            .Select(value => new FlowRunKey(value.Value.Scope.ScopeRef, value.Value.Id)).ToArray();
+        var documentsQuery = after is { } cursor
+            ? context.Documents.FromSqlInterpolated($"""SELECT * FROM "FlowResources" WHERE "Key" > {RunKey(cursor.ScopeRef, cursor.RunId)}""")
+            : context.Documents;
+        var query = documentsQuery.AsNoTracking().Where(value => value.Kind == RunKind
+            && (value.Status == FlowRunStatus.Pending || value.Status == FlowRunStatus.Running
+                || value.Status == FlowRunStatus.WaitingForInput || value.Status == FlowRunStatus.WaitingForChild));
+        var documents = await query.OrderBy(value => value.Key).Take(Math.Min(take, 1000))
+            .Select(value => new { value.ScopeRef, value.Key }).ToArrayAsync(cancellationToken);
+        return documents.Select(value =>
+        {
+            var scopeRef = ResourceScopeRef.Parse(value.ScopeRef);
+            return new FlowRunKey(scopeRef, value.Key[RunKey(scopeRef, string.Empty).Length..]);
+        }).ToArray();
     }
 
     public async Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken)

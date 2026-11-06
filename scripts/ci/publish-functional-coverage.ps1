@@ -5,6 +5,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot 'coverage-inventory.ps1')
+Assert-CoverageInventory $repositoryRoot
 $artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
 $resolvedCoverageRoot = if ([System.IO.Path]::IsPathRooted($CoverageRoot)) {
     [System.IO.Path]::GetFullPath($CoverageRoot)
@@ -29,6 +31,9 @@ $coverageFiles = @($inputRoots | ForEach-Object {
 if ($coverageFiles.Count -eq 0) {
     throw "No Cobertura inputs were found below '$rawRoot'."
 }
+
+$expectedProjects = @(Get-TestProjects $repositoryRoot 'Agentstration.Tests.Fast.slnx') + @(Get-TestProjects $repositoryRoot 'Agentstration.Tests.Integration.slnx')
+$coverageFiles = @(Assert-CoverageReports $rawRoot $expectedProjects)
 
 New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
 $reports = ($coverageFiles.FullName -join ';')

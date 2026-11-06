@@ -528,8 +528,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ProvisioningDemotesLegacyBuiltInDefaultBindingWithoutBreakingCompatibility()
     {
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        await using var factory = await ManagementServiceFixture.CreateAsync();
+        var context = factory.Context;
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var store = factory.Services.GetRequiredService<IResourceStore>();
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
@@ -571,8 +571,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task HandoffCopiesAcrossBindingsAndRecoversByOperationId()
     {
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        await using var factory = await ManagementServiceFixture.CreateAsync();
+        var context = factory.Context;
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
         _ = await service.CreateBindingAsync(ResourceNamespace.Default, "filesystem-secondary", new ArtifactStagingBindingProperties
@@ -614,8 +614,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task StagedArtifactsAreWorkspaceIsolatedBoundedAndProtectedByActiveLeases()
     {
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        await using var factory = await ManagementServiceFixture.CreateAsync();
+        var context = factory.Context;
         var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
         var otherWorkspaceId = Guid.NewGuid();
@@ -686,8 +686,9 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ExpiredLeasesStaleBindingsAndIntegrityMismatchesAreRejected()
     {
-        await using var factory = Factory();
-        var context = await GetBootstrapContextAsync(factory);
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero));
+        await using var factory = await ManagementServiceFixture.CreateAsync(clock);
+        var context = factory.Context;
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
         var bytes = Encoding.UTF8.GetBytes("integrity");
@@ -709,17 +710,28 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         Assert.AreEqual("artifact_storage_receipt_mismatch", integrity.Code);
 
         var lease = (await service.CreateLeaseAsync(created.Value.ArtifactId,
-            new("agent", "remote", [ArtifactLeaseOperation.Read], DateTimeOffset.UtcNow.AddMilliseconds(100)), default)).Value.Leases.Single();
-        await Task.Delay(150);
+            new("agent", "remote", [ArtifactLeaseOperation.Read], clock.GetUtcNow().AddMinutes(1)), default)).Value.Leases.Single();
         var restricted = context with
         {
             Restriction = new AuthorizationRestriction(Guid.NewGuid(), context.WorkspaceId, new HashSet<string>(StringComparer.Ordinal))
         };
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(restricted))
         {
+            var active = await service.ReadAsync(created.Value.ArtifactId, 0, bytes.Length, lease.Id, default);
+            CollectionAssert.AreEqual(bytes, Convert.FromBase64String(active.ContentBase64));
+            clock.Advance(TimeSpan.FromMinutes(1));
             _ = await Assert.ThrowsAsync<AuthorizationDeniedException>(async () =>
                 await service.ReadAsync(created.Value.ArtifactId, 0, bytes.Length, lease.Id, default));
         }
+
+        var revocable = (await service.CreateLeaseAsync(created.Value.ArtifactId,
+            new("agent", "remote", [ArtifactLeaseOperation.Read], clock.GetUtcNow().AddMinutes(1)), default)).Value.Leases.Last();
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(restricted))
+            _ = await service.ReadAsync(created.Value.ArtifactId, 0, bytes.Length, revocable.Id, default);
+        _ = await service.RevokeLeaseAsync(created.Value.ArtifactId, revocable.Id, default);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(restricted))
+            _ = await Assert.ThrowsAsync<AuthorizationDeniedException>(async () =>
+                await service.ReadAsync(created.Value.ArtifactId, 0, bytes.Length, revocable.Id, default));
 
         var binding = await service.GetBindingAsync(ResourceNamespace.Default, ArtifactPlatformResourceProvisioner.DefaultBindingName, default);
         Assert.IsNotNull(binding);
@@ -738,16 +750,14 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ExpirationRetriesProviderFailureAndHonorsCancellation()
     {
-        var clock = new MutableTimeProvider(DateTimeOffset.UtcNow);
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero));
         var backend = new FaultingArtifactStagingExecutor();
-        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        await using var factory = await ManagementServiceFixture.CreateAsync(clock, services =>
         {
-            services.RemoveAll<TimeProvider>();
-            services.AddSingleton<TimeProvider>(clock);
             services.RemoveAll<IArtifactStagingToolExecutor>();
             services.AddSingleton<IArtifactStagingToolExecutor>(backend);
-        }));
-        var context = await GetBootstrapContextAsync(factory);
+        });
+        var context = factory.Context;
         var requestScopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
         StoredResource<StagedArtifactResource> created;

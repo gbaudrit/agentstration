@@ -53,8 +53,65 @@ public sealed class IdentityAdministrationService(
     ICurrentRequestContext requestContext,
     IAuthorizationService authorization,
     TimeProvider timeProvider,
-    IWorkspaceProvisioner workspaceProvisioner)
+    IWorkspaceProvisioner workspaceProvisioner,
+    IOperationalTopologyProvisioner operationalTopology)
 {
+    public async Task<OrganizationStructureResponse> GetStructureAsync(CancellationToken cancellationToken)
+    {
+        var context = requestContext.Current;
+        await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.AuthorizationRead, cancellationToken);
+        var instance = requestContext.AccessMode == ControlPlaneAccessMode.Instance;
+        if (instance) await EnsureInstanceAdministratorAsync(cancellationToken);
+        var tenants = instance
+            ? await store.ListTenantsAsync(cancellationToken)
+            : [await store.GetTenantAsync(context.TenantId, cancellationToken)
+                ?? throw new AuthorizationDeniedException(AuthorizationPermissions.TenantsRead)];
+        var result = new List<OrganizationTenantResponse>();
+        foreach (var tenant in tenants.Where(value => value.Kind == TenantKind.Standard).OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            var workspaces = (await store.ListWorkspacesAsync(tenant.Id, cancellationToken))
+                .Where(value => value.Kind == WorkspaceKind.Business
+                    && (requestContext.AccessMode != ControlPlaneAccessMode.Workspace || value.Id == context.WorkspaceId))
+                .OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray();
+            var canCreate = tenant.Status == TenantStatus.Active
+                && await authorization.HasPermissionAsync(context, AuthorizationPermissions.WorkspacesWrite, cancellationToken);
+            result.Add(new(tenant, workspaces, canCreate));
+        }
+        return new(result, instance
+            && await authorization.HasPermissionAsync(context, AuthorizationPermissions.TenantsManage, cancellationToken));
+    }
+
+    public async Task<Tenant> CreateTenantAsync(string name, string displayName, CancellationToken cancellationToken)
+    {
+        await EnsureInstanceAdministratorAsync(cancellationToken);
+        await authorization.EnsurePermissionAsync(requestContext.Current, AuthorizationPermissions.TenantsManage, cancellationToken);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(displayName);
+        name = name.Trim().ToLowerInvariant();
+        displayName = displayName.Trim();
+        if (name.Length is < 2 or > 64 || name.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '-')))
+            throw new ArgumentException("Tenant names must contain 2-64 lowercase letters, digits, or hyphens.", nameof(name));
+        if (displayName.Length is < 2 or > 120)
+            throw new ArgumentException("Tenant display names must contain 2-120 characters.", nameof(displayName));
+        if (OperationalTopologyIdentities.IsReservedTenantName(name))
+            throw new ArgumentException("The Tenant name is reserved for Agentstration operations.", nameof(name));
+        var tenant = await store.FindTenantByNameAsync(name, cancellationToken);
+        if (tenant is not null)
+            throw new ResourceConcurrencyException($"Tenant '{name}' already exists.");
+        tenant = new Tenant(Guid.NewGuid(), name, displayName, TenantStatus.Active, timeProvider.GetUtcNow());
+        await store.AddTenantAsync(tenant, cancellationToken);
+        _ = await operationalTopology.EnsureTenantAsync(tenant, cancellationToken);
+        return tenant;
+    }
+
+    private async Task EnsureInstanceAdministratorAsync(CancellationToken cancellationToken)
+    {
+        if (requestContext.AccessMode != ControlPlaneAccessMode.Instance
+            || requestContext.Current.Restriction is not null
+            || !await store.IsPlatformAdministratorAsync(requestContext.Current.PrincipalId, cancellationToken))
+            throw new AuthorizationDeniedException(AuthorizationPermissions.TenantsManage);
+    }
+
     public async Task<TenantAdministrationView> GetCurrentAsync(CancellationToken cancellationToken)
     {
         var context = requestContext.Current;
@@ -82,10 +139,22 @@ public sealed class IdentityAdministrationService(
         return new TenantAdministrationView(tenant, workspaces, members);
     }
 
-    public async Task<Workspace> CreateWorkspaceAsync(string name, string displayName, CancellationToken cancellationToken)
+    public Task<Workspace> CreateWorkspaceAsync(string name, string displayName, CancellationToken cancellationToken) =>
+        CreateWorkspaceAsync(requestContext.Current.TenantId, name, displayName, cancellationToken);
+
+    public async Task<Workspace> CreateWorkspaceAsync(Guid tenantId, string name, string displayName, CancellationToken cancellationToken)
     {
         var context = requestContext.Current;
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.WorkspacesWrite, cancellationToken);
+        if (requestContext.AccessMode == ControlPlaneAccessMode.Instance)
+            await EnsureInstanceAdministratorAsync(cancellationToken);
+        else if (tenantId != context.TenantId)
+            throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesWrite);
+        var tenant = await store.GetTenantAsync(tenantId, cancellationToken);
+        if (tenant is not { Kind: TenantKind.Standard, Status: TenantStatus.Active })
+            throw new ArgumentException("An active ordinary Tenant is required.", nameof(tenantId));
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(displayName);
         name = name.Trim().ToLowerInvariant();
         displayName = displayName.Trim();
         if (name.Length is < 2 or > 64 || name.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '-')))
@@ -93,10 +162,10 @@ public sealed class IdentityAdministrationService(
         if (displayName.Length is < 2 or > 120) throw new ArgumentException("Workspace display names must contain 2-120 characters.", nameof(displayName));
         if (OperationalTopologyIdentities.IsReservedWorkspaceName(name))
             throw new ArgumentException("The Workspace name is reserved for Agentstration operations.", nameof(name));
-        if (await store.FindWorkspaceByNameAsync(context.TenantId, name, cancellationToken) is not null)
+        if (await store.FindWorkspaceByNameAsync(tenantId, name, cancellationToken) is not null)
             throw new ResourceConcurrencyException($"Workspace '{name}' already exists in the current tenant.");
         var now = timeProvider.GetUtcNow();
-        var workspace = new Workspace(Guid.NewGuid(), context.TenantId, name, displayName, WorkspaceStatus.Initializing, now);
+        var workspace = new Workspace(Guid.NewGuid(), tenantId, name, displayName, WorkspaceStatus.Initializing, now);
         await store.AddWorkspaceAsync(workspace, cancellationToken);
         if (!await store.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken))
             await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), workspace.Id, context.PrincipalId, MembershipStatus.Active, now), cancellationToken);

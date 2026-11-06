@@ -1,3 +1,4 @@
+import { exerciseOrganizationStructure, type ExerciseOrganizationStructureInput } from './exercise-organization-structure.journey.js';
 import { inspectAcquisitionFailure } from './inspect-acquisition-failure.journey.js';
 import { administerGovernedToolSets } from './administer-governed-toolsets.journey.js';
 import { administerGovernedKnowledge } from './administer-governed-knowledge.journey.js';
@@ -57,6 +58,7 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'create-agent': (context, input) => createAgent(context, input as unknown as CreateAgentInput),
   'create-handoff-flow': (context, input) => createHandoffFlow(context, input as unknown as CreateHandoffFlowInput),
   'create-entry': (context, input) => createEntry(context, input as unknown as CreateEntryInput),
+  'exercise-organization-structure': (context, input) => exerciseOrganizationStructure(context, input as unknown as ExerciseOrganizationStructureInput),
   'create-workspace': (context, input) => createWorkspace(context, input as unknown as CreateWorkspaceInput),
   'submit-workplace-prompt': (context, input) => submitWorkplacePrompt(context, input as unknown as SubmitWorkplacePromptInput),
   'expose-entry-on-dashboard': (context, input) => exposeEntryOnDashboard(context, input as unknown as ExposeEntryOnDashboardInput),

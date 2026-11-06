@@ -28,15 +28,20 @@ public sealed partial class SecurityApiTests
     private const string LocalPassword = "A-strong-local-password-42!";
     private const string ChangedLocalPassword = "A-changed-local-password-84!";
 
-    private static WebApplicationFactory<Program> Factory(string mode) => new SecurityWebApplicationFactory(mode);
+    private static WebApplicationFactory<Program> Factory(string mode, bool fullHost = false) => new SecurityWebApplicationFactory(mode, fullHost);
 
-    private sealed class SecurityWebApplicationFactory(string mode) : WebApplicationFactory<Program>
+    private sealed class SecurityWebApplicationFactory(string mode, bool fullHost) : WebApplicationFactory<Program>
     {
+        protected override Microsoft.Extensions.Hosting.IHost CreateHost(Microsoft.Extensions.Hosting.IHostBuilder builder) =>
+            Agentstration.Tests.TestHostMetrics.Start("Management.Security", () => base.CreateHost(builder));
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:ApiOnly", (!fullHost).ToString());
             builder.UseSetting("Agentstration:Authentication:Mode", mode);
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
+            if (!fullHost) return;
             builder.ConfigureTestServices(services =>
             {
                 Func<HttpMessageHandler> handlerFactory = () => Server.CreateHandler();
@@ -117,8 +122,7 @@ public sealed partial class SecurityApiTests
             using var response = await client.SendAsync(probes[index].Request());
             if (expected[index])
             {
-                Assert.AreNotEqual(HttpStatusCode.Unauthorized, response.StatusCode, $"{probes[index].Name} unexpectedly required authentication.");
-                Assert.AreNotEqual(HttpStatusCode.Forbidden, response.StatusCode, $"{probes[index].Name} unexpectedly denied authorization.");
+                await AssertAllowedAsync(response, probes[index]);
             }
             else
             {
@@ -128,7 +132,26 @@ public sealed partial class SecurityApiTests
         }
     }
 
-    private sealed record AccessProbe(string Name, Func<HttpRequestMessage> Request);
+    private static async Task AssertAllowedAsync(HttpResponseMessage response, AccessProbe probe)
+    {
+        Assert.AreEqual(probe.AllowedStatus, response.StatusCode, $"{probe.Name}: {await response.Content.ReadAsStringAsync()}");
+        if (probe.ProblemTitle is not null)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+            Assert.IsNotNull(problem);
+            Assert.AreEqual(probe.ProblemTitle, problem.Title, probe.Name);
+            if (probe.ProblemType is not null) Assert.AreEqual(probe.ProblemType, problem.Type, probe.Name);
+        }
+        if (probe.ResponseProperty is not null)
+        {
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            Assert.IsTrue(document.RootElement.TryGetProperty(probe.ResponseProperty, out _), probe.Name);
+        }
+    }
+
+    private sealed record AccessProbe(string Name, Func<HttpRequestMessage> Request,
+        HttpStatusCode AllowedStatus = HttpStatusCode.OK, string? ProblemTitle = null,
+        string? ProblemType = null, string? ResponseProperty = null);
 
     private static FormUrlEncodedContent ChangePasswordForm(
         string? antiforgeryToken,

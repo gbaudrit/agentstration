@@ -2,6 +2,7 @@
   <Folder Name="/automation/">
     <Project Path="automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj" />
     <Project Path="automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj" />
+    <Project Path="automation/playwright/fixtures/OrganizationStructureHost/OrganizationStructureHost.csproj" />
   </Folder>
   <Folder Name="/aep/">
     <Project Path="aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
@@ -172,6 +173,9 @@
   </Folder>
   <Folder Name="/tests/Api/">
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Flows.Tests/Agentstration.Api.Flows.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Execution.Tests/Agentstration.Api.Execution.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.Resources.Tests/Agentstration.Api.Resources.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Application/">
     <Project Path="tests/Agentstration.Application.Tests/Agentstration.Application.Tests.csproj" />
@@ -195,6 +199,11 @@
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Resources/">
+    <Project Path="tests/Agentstration.ResourceManagement.Tests/Agentstration.ResourceManagement.Tests.csproj" />
+    <Project Path="tests/Agentstration.Schemas.Tests/Agentstration.Schemas.Tests.csproj" />
+    <Project Path="tests/Agentstration.Secrets.Tests/Agentstration.Secrets.Tests.csproj" />
+    <Project Path="tests/Agentstration.Infrastructure.Tests/Agentstration.Infrastructure.Tests.csproj" />
+
     <Project Path="tests/Agentstration.ResourcePlanning.Tests/Agentstration.ResourcePlanning.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />

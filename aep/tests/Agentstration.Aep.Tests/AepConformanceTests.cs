@@ -129,7 +129,9 @@ public sealed class AepConformanceTests
         var capabilities = await client.GetCapabilitiesAsync();
         var health = await client.GetHealthAsync();
 
-        Assert.AreEqual(AepProtocol.Version, manifest.ProtocolVersion);
+        Assert.AreEqual("agentstration.io/v1", manifest.ProtocolVersion);
+        using var discovery = JsonDocument.Parse(await httpClient.GetStringAsync(AepProtocol.DiscoveryPath));
+        Assert.AreEqual("agentstration.io/v1", discovery.RootElement.GetProperty("protocolVersion").GetString());
         Assert.AreEqual("sample.hello", manifest.Extension.Id);
         Assert.AreEqual("1.0", capabilities[AepCapabilityNames.Health].Version);
         Assert.IsNull(manifest.ValueRequirements);

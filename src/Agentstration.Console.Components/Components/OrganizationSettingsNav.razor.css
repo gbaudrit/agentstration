@@ -1,4 +1,4 @@
-.organization-tabs { display:flex; gap:22px; margin:0 0 24px; overflow-x:auto; border-bottom:1px solid var(--border); }
+.organization-tabs { display:flex; gap:22px; margin:0 0 24px; overflow-x:auto; overflow-y:hidden; border-bottom:1px solid var(--border); }
 .organization-tabs ::deep .organization-tab { position:relative; flex:0 0 auto; padding:10px 2px 12px; color:var(--muted); text-decoration:none; font-size:.86rem; font-weight:650; }
 .organization-tabs ::deep .organization-tab:hover,.organization-tabs ::deep .organization-tab:focus-visible { color:var(--text); }
 .organization-tabs ::deep .organization-tab.active { color:var(--primary); }

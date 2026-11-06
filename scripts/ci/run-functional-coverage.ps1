@@ -13,6 +13,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot 'coverage-inventory.ps1')
+Assert-CoverageInventory $repositoryRoot
 $coverageRoot = Join-Path $repositoryRoot 'artifacts/coverage'
 $artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
 $coveragePrefix = $artifactsRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
@@ -37,7 +39,7 @@ $lanes = switch ($Shard.ToLowerInvariant()) {
             @{
                 Name = 'Fast'
                 Solution = 'Agentstration.Tests.Fast.slnx'
-                MinimumTests = 365
+                MinimumTests = 777
                 ParallelModules = 4
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/a/fast'
             },
@@ -55,7 +57,7 @@ $lanes = switch ($Shard.ToLowerInvariant()) {
             @{
                 Name = 'Integration coverage shard B'
                 Solution = 'Agentstration.Tests.CoverageB.slnx'
-                MinimumTests = 372
+                MinimumTests = 379
                 ParallelModules = 2
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/b/integration'
             }
@@ -66,14 +68,14 @@ $lanes = switch ($Shard.ToLowerInvariant()) {
             @{
                 Name = 'Fast'
                 Solution = 'Agentstration.Tests.Fast.slnx'
-                MinimumTests = 365
+                MinimumTests = 777
                 ParallelModules = 4
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/fast'
             },
             @{
                 Name = 'Integration'
                 Solution = 'Agentstration.Tests.Integration.slnx'
-                MinimumTests = 524
+                MinimumTests = 954
                 ParallelModules = 2
                 ResultsDirectory = Join-Path $resolvedCoverageRoot 'raw/integration'
             }
@@ -98,6 +100,7 @@ try {
             '--max-parallel-test-modules', $lane.ParallelModules,
             '--coverage',
             '--coverage-output-format', 'cobertura',
+            '--report-trx', '--report-trx-filename', '{asm}.trx',
             '--coverage-settings', $settingsPath,
             '--results-directory', $lane.ResultsDirectory
         )
@@ -105,6 +108,7 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "$($lane.Name) coverage execution exited with code $LASTEXITCODE."
         }
+        Assert-CoverageReports $lane.ResultsDirectory (Get-TestProjects $repositoryRoot $lane.Solution) | Out-Null
     }
 
     if (-not $SkipPublish) {

@@ -6,7 +6,8 @@ Several independent versions coexist in Agentstration. They must not be substitu
 | --- | --- | --- |
 | Product version | `0.3.0-alpha.1` | A product release under Semantic Versioning. |
 | HTTP API version | Current unversioned `/api` routes | A breaking HTTP contract change, not every product release. |
-| Resource `apiVersion` | `agentstration.io/v1` | The schema of a declarative Management resource. |
+| Resource `apiVersion` | `agentstration.io/v1` | The schema of an Agentstration resource, including Runtime Runs. |
+| AEP `protocolVersion` | `agentstration.io/v1` | The autonomous extension protocol schema. |
 | Resource revision/generation | Agent generation `3` | A change to one resource instance or immutable snapshot. |
 | Pack version | `agentstration/price-watch/1.2.0` | A release of one coherent distribution bundle. |
 | Documentation version | `Next`, later `1.x` | A supported major documentation line. |
@@ -25,11 +26,17 @@ Product prereleases use annotated Git tags named `v<version>`. Pushing a matchin
 
 An HTTP API version represents a compatibility boundary. Product `1.0`, `1.5`, and even `2.0` could continue to expose the same API version if the contract remains compatible.
 
-The current API is not uniformly path-versioned. Management uses short `/api/...` routes and carries its schema version in the resource document. Workplace retains its own contract versioning. Introducing `/api/v1` remains a separate future HTTP decision.
+The current API is not uniformly path-versioned. Management uses short `/api/...` routes and carries its schema version in the resource document. Workplace resources use the same resource schema identifier. Introducing `/api/v1` remains a separate future HTTP decision.
 
 ## Resource apiVersion
 
-`apiVersion` identifies a resource schema, not the Agentstration release and not an instance revision. The Management schema is `agentstration.io/v1`.
+`apiVersion` identifies a resource schema, not the Agentstration release and not an instance revision. The only accepted and emitted Agentstration resource schema is `agentstration.io/v1`, including Runtime Run documents. Agentstration assemblies use `ResourceApiVersions.CoreV1` directly; no dated aliases are retained. Explicit `api-version` queries on Runtime Run routes accept only this value.
+
+## AEP protocol version
+
+AEP discovery uses `protocolVersion: agentstration.io/v1`. The autonomous AEP SDK owns its own `AepProtocol.Version` constant with that wire value and does not reference Agentstration resource assemblies. Capability versions such as `aep.model-provider` version `1.0` remain independent.
+
+Dated resource and AEP identifiers are unsupported. No fallback negotiation or migration is provided because no prior contract has shipped. Rebuild development peers together and recreate disposable Runtime data containing dated versions. See [ADR-0188](../decisions/0188-canonical-agentstration-api-version.md).
 
 ## Resource revision and generation
 

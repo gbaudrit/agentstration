@@ -213,4 +213,6 @@ Use **Proposed** when implementation or repository evidence does not establish a
 185. [ADR-0185 — Administrative execution uses governed operational Workspaces](0185-administrative-execution-uses-governed-operational-workspaces.md)
 186. [ADR-0186 — Triggers use operational Workspaces for administrative contexts](0186-triggers-use-operational-workspaces-for-administrative-contexts.md)
 187. [ADR-0187 - Console navigation context is URL-authoritative](0187-console-navigation-context-is-url-authoritative.md)
-188. [ADR-0188 — ToolDefinitions replay governed Data Source acquisitions](0188-tool-definitions-replay-governed-data-source-acquisitions.md)
+188. [ADR-0188 — Agentstration resources and AEP use agentstration.io/v1](0188-canonical-agentstration-api-version.md)
+189. [ADR-0189 — Service registration has explicit module ownership](0189-service-registration-has-explicit-module-ownership.md)
+190. [ADR-0190 — ToolDefinitions replay governed Data Source acquisitions](0190-tool-definitions-replay-governed-data-source-acquisitions.md)

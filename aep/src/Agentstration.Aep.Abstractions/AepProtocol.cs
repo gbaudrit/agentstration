@@ -7,7 +7,7 @@ namespace Agentstration.Aep.Abstractions;
 
 public static class AepProtocol
 {
-    public const string Version = "2026-09-22";
+    public const string Version = "agentstration.io/v1";
     public const string DiscoveryPath = "/.well-known/aep";
     public const string LegacyDiscoveryPath = "/.well-known/agentstration";
     public const string HealthPath = "/aep/health";

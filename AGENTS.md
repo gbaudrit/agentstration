@@ -61,6 +61,10 @@ src/
 awp/
   src/Agentstration.Awp.Abstractions/ Provider-neutral AWP wire contracts
 tests/
+  Agentstration.ResourceManagement.Tests/ Fast resource-policy and scope rules
+  Agentstration.Schemas.Tests/    Fast schema-format registry behavior
+  Agentstration.Secrets.Tests/    Fast secret-capability behavior
+  Agentstration.Infrastructure.Tests/ Fast internal-tool and adapter behavior
   Agentstration.Awp.Tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
@@ -219,8 +223,8 @@ Run from the repository root:
 ```powershell
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
-dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 365 --max-parallel-test-modules 4
-dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 524 --max-parallel-test-modules 2
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2
 ```
 
 The two test solutions together form the required deterministic, offline functional suite. Performance and live-provider workloads are explicit opt-ins documented in `docs/contributing/testing.md`. For a focused iteration, run the affected test project first, then run both functional lanes before handoff. Do not suppress warnings or disable analyzers to make a change pass.

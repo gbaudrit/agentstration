@@ -106,6 +106,7 @@ const sidebars = {
           items: [
             'architecture/implementation/project-structure',
             'architecture/implementation/dependency-rules',
+            'architecture/implementation/service-registration',
             'architecture/implementation/current-state',
             'architecture/implementation/reconciliation-baseline-2026-09-28',
             'architecture/implementation/knowledge-reconciliation-2026-10-08',
