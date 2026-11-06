@@ -53,6 +53,8 @@ The `SourceProviderExtension` sample demonstrates the native `aep.source-provide
 
 Extensions may also publish `schema-format` contributions through `aep.schema-formats`. A contribution declares format metadata and maps `validateDefinition` and `validateInstance` to MCP operations. These mappings are consumer service operations, not Agent Tool contributions; consumers validate their bounded structured results and decide how providers participate in format resolution.
 
+Extensions may publish immutable `connected-service-type` contributions through `aep.connected-service-types`. Each type declares a preferred version and exact versions containing a JSON configuration schema and digest, typed/protected inputs and typed/protected exports. AEP describes types only: the consuming product owns configured instances, scope, references, lifecycle and Secret resolution. Register descriptors through `AepExtensionOptions.ConnectedServiceTypes`; changing a schema requires a new version.
+
 ## Authenticate AEP traffic
 
 The client accepts a request-scoped credential provider. It applies the Bearer to each request without changing shared `HttpClient.DefaultRequestHeaders`:

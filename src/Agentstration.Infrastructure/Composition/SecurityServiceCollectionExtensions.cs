@@ -1,5 +1,7 @@
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
+using Agentstration.ConnectedServices;
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
@@ -30,6 +32,9 @@ internal static class SecurityServiceCollectionExtensions
         services.AddSingleton<IResourceAccessPolicyService>(provider => provider.GetRequiredService<ResourceAccessPolicyService>());
         services.AddSingleton<ParameterManagementService>();
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
+        services.AddSingleton<ConnectedServiceManagementService>();
+        services.AddSingleton<IConnectedServiceResolver>(provider => provider.GetRequiredService<ConnectedServiceManagementService>());
+        services.AddSingleton<IParameterUsageProvider, ConnectedServiceParameterUsageProvider>();
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<ISecretAccessAuthorizer>(provider => provider.GetRequiredService<SecretManagementService>());

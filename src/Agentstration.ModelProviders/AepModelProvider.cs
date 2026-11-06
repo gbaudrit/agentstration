@@ -1,6 +1,7 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Models;
 using Agentstration.Parameters;
@@ -17,7 +18,7 @@ public sealed class AepModelProvider(
     ISecretResolver? secrets = null,
     ISecretCapabilityService? capabilities = null,
     IParameterResolver? parameters = null,
-    IConfiguration? configuration = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
+    IConfiguration? configuration = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator, IConnectedServiceTypeProvider
 {
     public const string AdapterType = "aep";
     public string ProviderType => AdapterType;
@@ -245,6 +246,83 @@ public sealed class AepModelProvider(
 
     public bool CanInspectEndpoint(Uri endpoint) => endpoint.Scheme is "http" or "https";
 
+    bool IConnectedServiceTypeProvider.CanInspect(Uri endpoint) => CanInspectEndpoint(endpoint);
+
+    async ValueTask<ConnectedServiceTypeCatalogInspection> IConnectedServiceTypeProvider.InspectAsync(
+        ExtensionRegistrationResource registration,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        try
+        {
+            var manifest = await CreateClient(registration).DiscoverAsync(cancellationToken);
+            return new ConnectedServiceTypeCatalogInspection(
+                "available",
+                new ConnectedServiceExtensionIdentity(
+                    manifest.Extension.Id,
+                    manifest.Extension.Name,
+                    manifest.Extension.Version),
+                (manifest.Contributions.ConnectedServiceTypes ?? []).Select(MapConnectedServiceType).ToArray());
+        }
+        catch (AepProtocolException exception)
+        {
+            return new ConnectedServiceTypeCatalogInspection(
+                exception.Code == "protocol_incompatible" ? "incompatible" : "unavailable",
+                null,
+                [],
+                exception.Message);
+        }
+        catch (HttpRequestException exception)
+        {
+            return new ConnectedServiceTypeCatalogInspection("unavailable", null, [], exception.Message);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return new ConnectedServiceTypeCatalogInspection("unavailable", null, [], exception.Message);
+        }
+    }
+
+    private static ConnectedServiceTypeDescriptor MapConnectedServiceType(
+        AepConnectedServiceTypeContribution type) => new(
+        type.Id,
+        type.DisplayName,
+        type.PreferredVersion,
+        type.Versions.Select(version => new ConnectedServiceTypeVersionDescriptor(
+            version.Version,
+            version.SchemaDigest,
+            version.Schema.Clone(),
+            version.Inputs.Select(input => new ConnectedServiceInputDescriptor(
+                input.Id,
+                input.Required,
+                Map(input.Type),
+                Map(input.Protection),
+                input.Format,
+                input.Description)).ToArray(),
+            version.Exports.Select(export => new ConnectedServiceExportDescriptor(
+                export.Id,
+                Map(export.Type),
+                Map(export.Protection),
+                export.Format,
+                export.Description)).ToArray(),
+            version.Deprecated)).ToArray(),
+        type.Description);
+
+    private static ConnectedServiceValueType Map(AepValueType type) => type switch
+    {
+        AepValueType.Text => ConnectedServiceValueType.Text,
+        AepValueType.WholeNumber => ConnectedServiceValueType.WholeNumber,
+        AepValueType.DecimalNumber => ConnectedServiceValueType.DecimalNumber,
+        AepValueType.Logical => ConnectedServiceValueType.Logical,
+        _ => throw new ArgumentOutOfRangeException(nameof(type))
+    };
+
+    private static ConnectedServiceValueProtection Map(AepValueProtection protection) => protection switch
+    {
+        AepValueProtection.Standard => ConnectedServiceValueProtection.Standard,
+        AepValueProtection.Secured => ConnectedServiceValueProtection.Secured,
+        _ => throw new ArgumentOutOfRangeException(nameof(protection))
+    };
+
     public async ValueTask<ExtensionInspection> InspectAsync(
         ModelProviderConfiguration provider,
         CancellationToken cancellationToken = default)
@@ -300,6 +378,8 @@ public sealed class AepModelProvider(
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.DataSourceProfileBundle, value.Id)))
                     .Concat((manifest.Contributions.SchemaFormats ?? [])
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.SchemaFormat, value.Id)))
+                    .Concat((manifest.Contributions.ConnectedServiceTypes ?? [])
+                        .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.ConnectedServiceType, value.Id)))
                     .ToArray(),
                 catalog.OptionSets.Select(Map).ToArray(),
                 ValueRequirements: manifest.ValueRequirements);

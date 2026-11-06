@@ -1,4 +1,5 @@
 using Agentstration.Aep.Client;
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Sources.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,7 @@ public static class ModelProviderServiceCollectionExtensions
         services.AddSingleton<IModelProviderDiscovery>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IModelProviderCapabilitiesResolver>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IExtensionInspector>(services => services.GetRequiredService<AepModelProvider>());
+        services.AddSingleton<IConnectedServiceTypeProvider>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IExtensionOptionsMigrator>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<ISourceProviderMaterializer, AepSourceProviderMaterializer>();
         services.AddSingleton<IModelProviderResolver, ModelProviderResolver>();

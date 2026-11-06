@@ -19,6 +19,7 @@ public static class AepProtocol
     public const string BoundValuesCapabilityVersion = "1.0";
     public const string SecretAccessVersion = "1.0";
     public const string ModelProviderCapabilityVersion = "1.0";
+    public const string ConnectedServiceTypesCapabilityVersion = "1.0";
     public const string SecretAccessPath = "/api/aep/secrets/redeem";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
@@ -42,6 +43,7 @@ public static class AepCapabilityNames
     public const string BoundValues = "aep.bound-values";
     public const string SecretAccess = "aep.secret-access";
     public const string SchemaFormats = "aep.schema-formats";
+    public const string ConnectedServiceTypes = "aep.connected-service-types";
 }
 
 public sealed record AepExtensionIdentity(string Id, string Name, string Version, string? Description = null);
@@ -58,6 +60,7 @@ public static class AepContributionKinds
     public const string Tool = "tool";
     public const string DataSourceProfileBundle = "data-source-profile-bundle";
     public const string SchemaFormat = "schema-format";
+    public const string ConnectedServiceType = "connected-service-type";
 }
 
 public static class AepOptionScopes
@@ -407,7 +410,48 @@ public sealed record AepContributions(
     IReadOnlyList<AepToolContribution>? Tools = null,
     IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null,
     IReadOnlyList<AepDataSourceProfileBundleContribution>? DataSourceProfileBundles = null,
-    IReadOnlyList<AepSchemaFormatContribution>? SchemaFormats = null);
+    IReadOnlyList<AepSchemaFormatContribution>? SchemaFormats = null,
+    IReadOnlyList<AepConnectedServiceTypeContribution>? ConnectedServiceTypes = null);
+
+public sealed record AepConnectedServiceInputDescriptor(
+    string Id,
+    [property: JsonRequired] bool Required,
+    AepValueType Type = AepValueType.Text,
+    AepValueProtection Protection = AepValueProtection.Standard,
+    string? Format = null,
+    string? Description = null);
+
+public sealed record AepConnectedServiceExportDescriptor(
+    string Id,
+    AepValueType Type = AepValueType.Text,
+    AepValueProtection Protection = AepValueProtection.Standard,
+    string? Format = null,
+    string? Description = null);
+
+public sealed record AepConnectedServiceTypeVersionDescriptor(
+    string Version,
+    string SchemaDigest,
+    JsonElement Schema,
+    IReadOnlyList<AepConnectedServiceInputDescriptor> Inputs,
+    IReadOnlyList<AepConnectedServiceExportDescriptor> Exports,
+    bool Deprecated = false)
+{
+    public static AepConnectedServiceTypeVersionDescriptor Create(
+        string version,
+        JsonElement schema,
+        IReadOnlyList<AepConnectedServiceInputDescriptor>? inputs = null,
+        IReadOnlyList<AepConnectedServiceExportDescriptor>? exports = null,
+        bool deprecated = false) =>
+        new(version, AepSchemaDigest.Compute(schema), schema.Clone(), inputs ?? [], exports ?? [], deprecated);
+}
+
+public sealed record AepConnectedServiceTypeContribution(
+    string Id,
+    string DisplayName,
+    string PreferredVersion,
+    IReadOnlyList<AepConnectedServiceTypeVersionDescriptor> Versions,
+    string? Description = null,
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
 
 public sealed record AepSchemaFormatOperations(
     AepMcpToolMapping ValidateDefinition,
@@ -554,6 +598,7 @@ public static class AepDescriptorValidator
             errors.Add($"Schema formats capability version '{schemaCapability.Version}' is not supported.");
         if (hasSchemaCapability && !hasSchemaFormats)
             errors.Add("The aep.schema-formats capability needs at least one Schema format contribution.");
+        ValidateConnectedServiceTypes(descriptor, errors);
         var sourceProviders = new HashSet<string>(StringComparer.Ordinal);
         foreach (var provider in descriptor.Contributions.SourceProviders ?? [])
         {
@@ -663,7 +708,90 @@ public static class AepDescriptorValidator
         || string.Equals(kind, AepContributionKinds.DataSourceProfileBundle, StringComparison.Ordinal)
             && (contributions.DataSourceProfileBundles ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
         || string.Equals(kind, AepContributionKinds.SchemaFormat, StringComparison.Ordinal)
-            && (contributions.SchemaFormats ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+            && (contributions.SchemaFormats ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.ConnectedServiceType, StringComparison.Ordinal)
+            && (contributions.ConnectedServiceTypes ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    private static void ValidateConnectedServiceTypes(AepManifest descriptor, List<string> errors)
+    {
+        var types = descriptor.Contributions.ConnectedServiceTypes ?? [];
+        var hasCapability = descriptor.Capabilities.TryGetValue(AepCapabilityNames.ConnectedServiceTypes, out var capability);
+        if (types.Count > 0 && !hasCapability)
+            errors.Add("Connected Service type contributions need the aep.connected-service-types capability.");
+        if (hasCapability && !string.Equals(capability!.Version, AepProtocol.ConnectedServiceTypesCapabilityVersion, StringComparison.Ordinal))
+            errors.Add($"Connected Service types capability version '{capability.Version}' is not supported.");
+        if (hasCapability && types.Count == 0)
+            errors.Add("The aep.connected-service-types capability needs at least one Connected Service type contribution.");
+        if (types.Count > 128)
+            errors.Add("A manifest may contain at most 128 Connected Service type contributions.");
+
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var type in types)
+        {
+            if (type is null)
+            {
+                errors.Add("A Connected Service type contribution cannot be null.");
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(type.Id)) errors.Add("Connected Service type contribution id is required.");
+            else if (!ids.Add(type.Id)) errors.Add($"Connected Service type contribution '{type.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(type.DisplayName))
+                errors.Add($"Connected Service type contribution '{type.Id}' displayName is required.");
+            if (type.DisplayName?.Length > 256 || type.Description?.Length > 2_000)
+                errors.Add($"Connected Service type contribution '{type.Id}' exceeds text limits.");
+            var versions = type.Versions ?? [];
+            if (versions.Count == 0
+                || !versions.Any(value => value is not null
+                    && string.Equals(value.Version, type.PreferredVersion, StringComparison.Ordinal)))
+                errors.Add($"Connected Service type contribution '{type.Id}' must contain its preferred version.");
+            if (versions.Count > 32)
+                errors.Add($"Connected Service type contribution '{type.Id}' may contain at most 32 versions.");
+            if (versions.Where(value => value is not null).Select(value => value!.Version)
+                    .Distinct(StringComparer.Ordinal).Count() != versions.Count)
+                errors.Add($"Connected Service type contribution '{type.Id}' contains duplicate versions.");
+            foreach (var version in versions)
+            {
+                if (version is null)
+                {
+                    errors.Add($"Connected Service type contribution '{type.Id}' contains a null version.");
+                    continue;
+                }
+                if (string.IsNullOrWhiteSpace(version.Version))
+                    errors.Add($"Connected Service type contribution '{type.Id}' contains an empty version.");
+                if (version.Schema.ValueKind != JsonValueKind.Object)
+                    errors.Add($"Connected Service type contribution '{type.Id}' version '{version.Version}' requires an object JSON schema.");
+                else if (JsonSerializer.SerializeToUtf8Bytes(version.Schema, AepProtocol.JsonOptions).Length > 256 * 1024)
+                    errors.Add($"Connected Service type contribution '{type.Id}' version '{version.Version}' schema is too large.");
+                else if (!string.Equals(version.SchemaDigest, AepSchemaDigest.Compute(version.Schema), StringComparison.Ordinal))
+                    errors.Add($"Connected Service type contribution '{type.Id}' version '{version.Version}' has an invalid schema digest.");
+                if (version.Inputs is null || version.Inputs.Count > 64)
+                    errors.Add($"Connected Service type '{type.Id}' version '{version.Version}' may contain at most 64 inputs.");
+                if (version.Exports is null || version.Exports.Count > 64)
+                    errors.Add($"Connected Service type '{type.Id}' version '{version.Version}' may contain at most 64 exports.");
+                ValidateConnectedServiceMembers(type.Id, version.Version, "input",
+                    (version.Inputs ?? []).Select(value => value?.Id), errors);
+                ValidateConnectedServiceMembers(type.Id, version.Version, "export",
+                    (version.Exports ?? []).Select(value => value?.Id), errors);
+            }
+        }
+    }
+
+    private static void ValidateConnectedServiceMembers(
+        string typeId,
+        string version,
+        string memberKind,
+        IEnumerable<string?> memberIds,
+        List<string> errors)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var id in memberIds)
+        {
+            if (!IsValidValueRequirementId(id))
+                errors.Add($"Connected Service type '{typeId}' version '{version}' {memberKind} id '{id}' is invalid.");
+            else if (!ids.Add(id!))
+                errors.Add($"Connected Service type '{typeId}' version '{version}' {memberKind} '{id}' is duplicated.");
+        }
+    }
 
     private static void ValidateSchemaOperation(
         string contributionId,

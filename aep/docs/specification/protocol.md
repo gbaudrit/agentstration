@@ -39,6 +39,7 @@ Initial registered names are:
 - `aep.source-provider`
 - `aep.tools`
 - `aep.schema-formats`
+- `aep.connected-service-types`
 - `aep.configuration`
 - `aep.value-requirements`
 - `aep.bound-values`
@@ -47,6 +48,22 @@ Initial registered names are:
 Unknown names are preserved. Each capability evolves through its own version and may declare an endpoint and metadata. The manifest is the only input an Inspector needs to decide which explorers to display.
 
 The model-provider capability currently uses `/aep/model-providers`. AEP tool contributions may map to MCP servers; MCP remains authoritative for tool schema and invocation.
+
+### Connected Service types
+
+An extension that advertises `aep.connected-service-types` version `1.0` declares
+one or more `connected-service-type` contributions in its manifest. A contribution
+has a stable id, display name, preferred version and one or more immutable versions.
+Each version carries a JSON configuration schema, its canonical SHA-256 digest,
+typed/protected input declarations and typed/protected export declarations. Input
+and export identifiers follow the Value Requirement identifier grammar and are
+unique within their respective list.
+
+The manifest defines a type contract only. It contains no configured service
+instance, product scope, Parameter or Secret resource reference, resolved value or
+consumer binding. A consumer pins the exact contribution version and digest and
+owns instance lifecycle. A changed schema requires a new version; a digest mismatch
+is invalid and must not be interpreted as a compatible update.
 
 ### Schema formats
 

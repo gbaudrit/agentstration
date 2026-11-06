@@ -60,7 +60,7 @@ public static class ResourceScopePolicy
         "SourceRegistryRegistration" or "SourceRegistryObservedState" or "SourceRegistryRefreshRecord" => InstanceOnly,
         "Source" or "SourceVersion" or "SourceConfiguration" or "SourceObservedState" or "SourceImportRecord"
             or "SourceChannelSnapshot" or "SourceChannelObservedState" or "SourceChannelRefreshRecord" => InstanceTenantWorkspace,
-        "Vault" or "Secret" or "Parameter" or "Schema" or "SchemaVersion" or "DataSource"
+        "Vault" or "Secret" or "Parameter" or "ConnectedService" or "Schema" or "SchemaVersion" or "DataSource"
             or "DataSourceProfile" or "DataSourceProfileRevision" or "KnowledgeSource" => InstanceTenantWorkspace,
         "ToolProvider" or "Tool" or "ToolSet" or "ToolSetVersion" or "ToolDefinition" => InstanceTenantWorkspace,
         "ToolCategory" or "ToolExecutionHook" or "DataSourceAcquisition"
