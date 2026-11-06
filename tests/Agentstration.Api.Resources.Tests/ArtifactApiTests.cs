@@ -24,7 +24,7 @@ using ModelContextProtocol.Client;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class ArtifactApiTests : ModelManagementApiTestBase
+public sealed class ArtifactApiTests : ResourceManagementApiTestBase
 {
     [TestMethod]
     [DataRow(ResourceScopeKind.Instance)]
@@ -535,7 +535,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ProvisioningDemotesLegacyBuiltInDefaultBindingWithoutBreakingCompatibility()
     {
-        await using var factory = await ManagementServiceFixture.CreateAsync();
+        await using var factory = await ResourceServiceFixture.CreateAsync();
         var context = factory.Context;
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var store = factory.Services.GetRequiredService<IResourceStore>();
@@ -578,7 +578,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task HandoffCopiesAcrossBindingsAndRecoversByOperationId()
     {
-        await using var factory = await ManagementServiceFixture.CreateAsync();
+        await using var factory = await ResourceServiceFixture.CreateAsync();
         var context = factory.Context;
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
@@ -621,7 +621,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task StagedArtifactsAreWorkspaceIsolatedBoundedAndProtectedByActiveLeases()
     {
-        await using var factory = await ManagementServiceFixture.CreateAsync();
+        await using var factory = await ResourceServiceFixture.CreateAsync();
         var context = factory.Context;
         var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
@@ -694,7 +694,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     public async Task ExpiredLeasesStaleBindingsAndIntegrityMismatchesAreRejected()
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero));
-        await using var factory = await ManagementServiceFixture.CreateAsync(clock);
+        await using var factory = await ResourceServiceFixture.CreateAsync(clock);
         var context = factory.Context;
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
@@ -759,7 +759,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero));
         var backend = new FaultingArtifactStagingExecutor();
-        await using var factory = await ManagementServiceFixture.CreateAsync(clock, services =>
+        await using var factory = await ResourceServiceFixture.CreateAsync(clock, services =>
         {
             services.RemoveAll<IArtifactStagingToolExecutor>();
             services.AddSingleton<IArtifactStagingToolExecutor>(backend);

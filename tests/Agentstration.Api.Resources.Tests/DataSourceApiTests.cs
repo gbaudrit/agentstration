@@ -22,7 +22,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class DataSourceApiTests : ModelManagementApiTestBase
+public sealed class DataSourceApiTests : ResourceManagementApiTestBase
 {
     [TestMethod]
     [DataRow(ResourceScopeKind.Workspace)]
