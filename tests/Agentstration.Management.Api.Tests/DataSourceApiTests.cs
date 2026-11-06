@@ -1062,12 +1062,15 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
             var store = services.GetRequiredService<IResourceStore>();
             var provider = await PutProviderAsync(store, scope, "route-provider");
             _ = await PutToolAsync(store, scope, "route-fetch", provider.Value,
-                new ToolSchema { Input = JsonSerializer.SerializeToElement(new
+                new ToolSchema
                 {
-                    type = "object",
-                    properties = new { selector = new { type = "object" }, profileName = new { type = "string" } },
-                    required = new[] { "selector", "profileName" }
-                }) });
+                    Input = JsonSerializer.SerializeToElement(new
+                    {
+                        type = "object",
+                        properties = new { selector = new { type = "object" }, profileName = new { type = "string" } },
+                        required = new[] { "selector", "profileName" }
+                    })
+                });
             _ = await services.GetRequiredService<ToolSetService>().CreateAsync(new ToolSetResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -1076,7 +1079,9 @@ public sealed class DataSourceApiTests : ModelManagementApiTestBase
                 ScopeRef = scope,
                 Definition = new()
                 {
-                    DisplayName = "Routed acquisition Tools", Version = "1.0.0", Publish = true,
+                    DisplayName = "Routed acquisition Tools",
+                    Version = "1.0.0",
+                    Publish = true,
                     Members = [new() { Tool = new("route-fetch", scope), Capability = "source.fetch", Route = "fetch" }]
                 }
             }, default);

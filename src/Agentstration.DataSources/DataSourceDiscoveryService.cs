@@ -129,7 +129,8 @@ public sealed class DataSourceDiscoveryService(
                     {
                         _ = await flowRuns.StartAsync(new(runId, composition.Flow, input,
                             context.PrincipalId.ToString("D"), effectiveCorrelationId, idempotencyKey,
-                            context.TenantId, context.WorkspaceId, context.PrincipalId) { LogicalScopeRef = logicalScope }, token);
+                            context.TenantId, context.WorkspaceId, context.PrincipalId)
+                        { LogicalScopeRef = logicalScope }, token);
                         return created;
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -221,7 +222,8 @@ public sealed class DataSourceDiscoveryService(
             {
                 _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Composition.Flow, input,
                 value.CreatedBy.ToString("D"), value.CorrelationId, value.IdempotencyKey, value.TenantId,
-                workspaceId, value.CreatedBy) { LogicalScopeRef = value.LogicalScopeRef }, cancellationToken);
+                workspaceId, value.CreatedBy)
+                { LogicalScopeRef = value.LogicalScopeRef }, cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

@@ -29,7 +29,8 @@ public sealed class DurableArtifactReadContentMcpTool(
                 offset = new { type = "integer", minimum = 0, description = "Byte offset. Default 0; use nextOffset from the previous result." },
                 length = new { type = "integer", minimum = 4, maximum = DurableArtifactContentReader.MaximumTextBytes }
             },
-            required = new[] { "artifactId" }, additionalProperties = false
+            required = new[] { "artifactId" },
+            additionalProperties = false
         }), InitialCategory: new("artifacts", "Artifacts", "Governed Artifact content access."));
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)

@@ -84,7 +84,7 @@ public sealed class RuntimeWorkerOperationGateway(
         using var requestScope = request.ExecutionScopeRef.Kind == ResourceScopeKind.Workspace
             && request.ExecutionScopeRef.TargetId == request.WorkspaceId.Value
             ? EnterScope(new FlowRunScope(request.TenantId, request.WorkspaceId, request.PrincipalId)
-                { LogicalScopeRef = request.LogicalScopeRef })
+            { LogicalScopeRef = request.LogicalScopeRef })
             : EnterScope(request.ExecutionScopeRef, request.TenantId, request.PrincipalId);
         try
         {

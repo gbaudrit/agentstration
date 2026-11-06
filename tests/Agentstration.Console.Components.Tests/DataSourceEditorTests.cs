@@ -689,7 +689,9 @@ public sealed class DataSourceEditorTests
             if (request.Method == HttpMethod.Get)
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = JsonContent.Create(new { value = new[]
+                    Content = JsonContent.Create(new
+                    {
+                        value = new[]
                     {
                         new ToolDefinitionResource
                         {
@@ -705,7 +707,8 @@ public sealed class DataSourceEditorTests
                                 Flow = new ToolDefinitionFlowTarget { Name = "acquisition" }
                             }
                         }
-                    } })
+                    }
+                    })
                 };
             Assert.AreEqual(HttpMethod.Post, request.Method);
             Path = request.RequestUri!.PathAndQuery;
@@ -737,7 +740,9 @@ public sealed class DataSourceEditorTests
         public IReadOnlyList<DataSourceDiscoveryResource> DiscoveryHistory { get; set; } = [Discovery];
         public DataSourceDiscoveryResource AcceptedDiscovery { get; } = Discovery with
         {
-            State = DataSourceDiscoveryState.Pending, Manifest = null, CompletedAt = null,
+            State = DataSourceDiscoveryState.Pending,
+            Manifest = null,
+            CompletedAt = null,
             LogicalScopeRef = ResourceScopeRef.Instance
         };
         public DataSourceAcquisitionTargetResource TargetResource { get; set; } = Target with { ETag = "\"target-v1\"" };

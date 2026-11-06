@@ -269,8 +269,11 @@ public sealed class KnowledgeProjectionService(
         Guid? sourceUid = null;
         if (sourceId is { } requested)
         {
-            try { sourceUid = (await sources.ResolveForUseAsync(requested,
-                KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef, cancellationToken)).Value.Uid; }
+            try
+            {
+                sourceUid = (await sources.ResolveForUseAsync(requested,
+                KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef, cancellationToken)).Value.Uid;
+            }
             catch (KnowledgeSourceNotFoundException)
             { throw Error("knowledge_projection_source_not_found", $"KnowledgeSource '{requested}' was not found."); }
         }

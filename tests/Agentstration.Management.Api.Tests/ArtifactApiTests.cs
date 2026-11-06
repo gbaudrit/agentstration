@@ -52,8 +52,11 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
             var sealedArtifact = await service.SealAsync(operationalId, default);
             var durable = await service.CompleteFlowRunArtifactAsync(operationalId, new("portal-flow", "portal-step", new()
             {
-                StorageFlowRunId = "portal-storage", OpaqueReference = "portal-reference",
-                MediaType = sealedArtifact.Value.MediaType, Length = sealedArtifact.Value.Length, Sha256 = sealedArtifact.Value.Sha256!
+                StorageFlowRunId = "portal-storage",
+                OpaqueReference = "portal-reference",
+                MediaType = sealedArtifact.Value.MediaType,
+                Length = sealedArtifact.Value.Length,
+                Sha256 = sealedArtifact.Value.Sha256!
             }), default);
             durableId = durable.Value.ArtifactId;
         }
@@ -414,7 +417,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         Assert.IsTrue(publicReader.Definition.ExposeThroughMcp);
         var firstRead = await publicReader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
         {
-            artifactId = durableId.ToString(), length = 4
+            artifactId = durableId.ToString(),
+            length = 4
         }), "public-read"), default);
         Assert.IsNotNull(firstRead);
         Assert.AreEqual("abc", firstRead.Value.GetProperty("text").GetString());
@@ -433,7 +437,10 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
             };
             var rest = await publicReader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
             {
-                artifactId = durableId.ToString(), materializationRunId = readRun, offset = 3, length = 64
+                artifactId = durableId.ToString(),
+                materializationRunId = readRun,
+                offset = 3,
+                length = 64
             }), "public-read-next"), default);
             Assert.IsNotNull(rest);
             Assert.AreEqual(durableText, "abc" + rest.Value.GetProperty("text").GetString());
