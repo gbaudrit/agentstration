@@ -252,6 +252,9 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('secret-editor', `${consolePages}/SecretEditor.razor`, ['/secrets/new', '/secrets/{Name}'], 417, ['name']),
   partialResourceAdministration('vaults', `${consolePages}/Vaults.razor`, ['/vaults'], 418),
   partialResourceAdministration('vault-editor', `${consolePages}/VaultEditor.razor`, ['/vaults/new', '/vaults/{Name}'], 419, ['name']),
+  partialResourceAdministration('connected-services', `${consolePages}/ConnectedServices.razor`, ['/connected-services'], 1048),
+  partialResourceAdministration('connected-service-details', `${consolePages}/ConnectedServiceDetails.razor`, ['/connected-services/{Name}'], 1048, ['name']),
+  partialResourceAdministration('connected-service-editor', `${consolePages}/ConnectedServiceEditor.razor`, ['/connected-services/new', '/connected-services/{Name}/edit'], 1048, ['name']),
   partialResourceAdministration('tools', `${consolePages}/Tools.razor`, ['/tools'], 420),
   {
     id: 'tool-sets', host: 'console', source: `${consolePages}/ToolSets.razor`, routes: ['/tools/sets'], fixtureKeys: [],

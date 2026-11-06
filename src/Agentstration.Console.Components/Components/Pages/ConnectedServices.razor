@@ -1,0 +1,46 @@
+@page "/connected-services"
+@implements IDisposable
+@inject IConnectedServicesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+
+<PageTitle>@T("ConnectedServices") · Agentstration</PageTitle>
+<PageHeader Title="@T("ConnectedServices")" Description="@T("List.Description")" TestId="connected-services">
+    <Actions><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button><a class="button-primary" href="/connected-services/new" data-testid="connected-service-create">@T("Create")</a></Actions>
+</PageHeader>
+<div class="form-alert form-alert-info"><strong>@T("ConfiguredInstances")</strong><span>@T("ExtensionDistinction")</span></div>
+<div class="toolbar">
+    <input @bind="search" @bind:event="oninput" placeholder="@T("Search")" aria-label="@T("Search")" />
+    <select @bind="typeFilter" aria-label="@T("TypeFilter")"><option value="">@T("AllTypes")</option>@foreach (var type in Types) { <option value="@type">@type</option> }</select>
+    <select @bind="statusFilter" aria-label="@T("StatusFilter")"><option value="">@T("AllStatuses")</option>@foreach (var status in Enum.GetValues<ConnectedServiceAvailability>()) { <option value="@status">@StatusLabel(status)</option> }</select>
+</div>
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <ErrorState Message="@error.Message"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
+else if (Filtered.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("Empty.Message")" /> }
+else
+{
+    <DataGrid TItem="ConnectedServiceResource" Items="Filtered">
+        <Header><tr><th>@T("Name")</th><th>@T("Type")</th><th>@T("Status")</th><th>@T("Scope")</th><th></th></tr></Header>
+        <Row Context="item"><tr data-testid="connected-service-row"><td><strong>@item.Definition.DisplayName</strong><br /><code>@item.Name</code></td><td><strong>@item.Definition.Type.Type.Name</strong><br /><small>@item.Definition.Type.Version</small></td><td><StatusBadge Text="@StatusLabel(Availability(item))" Status="@StatusColor(Availability(item))" /></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /></td><td><a class="text-button" href="@DetailsUrl(item)">@T("InspectArrow")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ConnectedServiceResource> items = [];
+    private bool loading = true;
+    private Exception? error;
+    private string search = string.Empty, typeFilter = string.Empty, statusFilter = string.Empty;
+    private IReadOnlyList<string> Types => items.Select(value => value.Definition.Type.Type.Name).Distinct(StringComparer.Ordinal).Order().ToArray();
+    private IReadOnlyList<ConnectedServiceResource> Filtered => items.Where(item =>
+        (string.IsNullOrWhiteSpace(search) || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || item.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(typeFilter) || item.Definition.Type.Type.Name == typeFilter) &&
+        (string.IsNullOrWhiteSpace(statusFilter) || Availability(item).ToString() == statusFilter)).ToArray();
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string StatusLabel(ConnectedServiceAvailability status) => T($"Availability.{status}");
+    private static ConnectedServiceAvailability Availability(ConnectedServiceResource item) => item.ObservedState?.Availability ?? (item.Definition.Enabled ? ConnectedServiceAvailability.Stale : ConnectedServiceAvailability.Disabled);
+    private static UiStatus StatusColor(ConnectedServiceAvailability status) => status switch { ConnectedServiceAvailability.Ready => UiStatus.Success, ConnectedServiceAvailability.Stale => UiStatus.Warning, ConnectedServiceAvailability.Unavailable => UiStatus.Danger, _ => UiStatus.Neutral };
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync() { loading = true; error = null; try { items = await Client.GetConnectedServicesAsync(cancellation.Token); } catch (Exception exception) { error = exception; } finally { loading = false; } }
+    private static string DetailsUrl(ConnectedServiceResource resource) => $"/connected-services/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -13,6 +13,7 @@ public sealed class ConnectedServiceManagementService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     DescendantResourceUseAuthorizer useAuthorizer,
+    IEnumerable<IConnectedServiceUsageProvider> usageProviders,
     IParameterResolver parameters,
     ISecretResolver secrets,
     TimeProvider timeProvider) : IConnectedServiceResolver
@@ -33,6 +34,18 @@ public sealed class ConnectedServiceManagementService(
         CancellationToken cancellationToken) =>
         store.GetExactAsync<ConnectedServiceResource>(Scoped(scopeRef, name), cancellationToken);
 
+    public async Task<IReadOnlyList<ConnectedServiceUsage>> GetUsagesAsync(
+        ResourceScopeRef scopeRef,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        _ = await GetExactAsync(scopeRef, name, cancellationToken)
+            ?? throw new ConnectedServiceNotFoundException(name);
+        var usages = new List<ConnectedServiceUsage>();
+        foreach (var provider in usageProviders)
+            usages.AddRange(await provider.GetUsagesAsync(Scoped(scopeRef, name), cancellationToken));
+        return usages;
+    }
     public async Task<StoredResource<ConnectedServiceResource>> CreateAsync(
         ConnectedServiceResource resource,
         CancellationToken cancellationToken)
