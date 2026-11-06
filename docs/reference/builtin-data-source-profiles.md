@@ -47,3 +47,5 @@ The inventory records both the extension version and the independent bundle vers
 
 An interrupted installation retains its partial inventory and can complete missing publications on retry. An already installed bundle is a no-op only when its recorded identities, generations, versions, owners, and definition evidence still match the stored resources. A mismatch marks the installation degraded and returns a stable conflict instead of adopting, overwriting, or silently repairing the changed resource. Ordinary administration cannot mutate the managed resources or their published versions, including after unenrollment.
 
+The optional OpenAPI extension contributes `openapi-governed`. Its discovery Flow returns bounded hierarchical operation choices, and its acquisition Flow requires an explicitly promoted current target before invoking and persisting a response. See [Governed OpenAPI extension](openapi-extension.md).
+
