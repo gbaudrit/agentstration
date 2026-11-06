@@ -9,11 +9,11 @@ public static class AspSchemas
 {
     public static JsonElement Input(string operation) => operation switch
     {
-        "describe" => For<AspDescribeRequest>(),
-        "list" => For<AspListRequest>(),
-        "stat" => For<AspReferenceRequest>(),
-        "read" => For<AspReadRequest>(),
-        "write" => For<AspWriteRequest>(),
+        "describe" => For<AspInvocation<AspDescribeRequest>>(),
+        "list" => For<AspInvocation<AspListRequest>>(),
+        "stat" => For<AspInvocation<AspReferenceRequest>>(),
+        "read" => For<AspInvocation<AspReadRequest>>(),
+        "write" => For<AspInvocation<AspWriteRequest>>(),
         _ => throw new AspException("unsupported_operation", "Unknown ASP operation mapping.")
     };
 

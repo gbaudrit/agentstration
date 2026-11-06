@@ -28,8 +28,9 @@ public static class AspProtocol
     }
 }
 
-// These identities are resolved by the host, never accepted in Tool business arguments.
+// Callers select a logical target; only the extension resolves and authorizes it.
 public sealed record AspStoreRef(string StoreId, string BindingId, string Revision);
+public sealed record AspInvocation<T>(AspStoreRef Store, T Arguments);
 public sealed record AspAccessPolicy(
     bool CanList, bool CanStat, bool CanRead, bool CanWrite,
     string Prefix, int MaxReadBytes, int MaxWriteBytes, int MaxPageSize,

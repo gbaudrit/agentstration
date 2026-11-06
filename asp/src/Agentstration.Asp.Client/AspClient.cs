@@ -8,14 +8,14 @@ namespace Agentstration.Asp.Client;
 public sealed class AspClient
 {
     private readonly McpClient mcp;
-    private readonly string binding;
+    private readonly string toolPrefix;
     private readonly TimeSpan timeout;
     public AspDescription Description { get; }
 
-    private AspClient(McpClient mcp, string binding, AspDescription description, TimeSpan timeout)
-    { this.mcp = mcp; this.binding = binding; Description = description; this.timeout = timeout; }
+    private AspClient(McpClient mcp, string toolPrefix, AspDescription description, TimeSpan timeout)
+    { this.mcp = mcp; this.toolPrefix = toolPrefix; Description = description; this.timeout = timeout; }
 
-    public static async Task<AspClient> ConnectAsync(McpClient mcp, string binding, AspStoreRef expectedStore,
+    public static async Task<AspClient> ConnectAsync(McpClient mcp, string toolPrefix, AspStoreRef expectedStore,
         TimeSpan? timeout = null, string? expectedProviderId = null, string? expectedProviderVersion = null,
         CancellationToken cancellationToken = default)
     {
@@ -26,10 +26,10 @@ public sealed class AspClient
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(duration);
         var tools = await mcp.ListToolsAsync(cancellationToken: deadline.Token);
-        var describeTool = tools.SingleOrDefault(value => value.Name == $"{binding}_describe")
+        var describeTool = tools.SingleOrDefault(value => value.Name == $"{toolPrefix}_describe")
             ?? throw new AspException("unsupported_operation", "The ASP describe mapping is missing.");
         ValidateSchema(describeTool, "describe");
-        var description = await InvokeAsync<AspDescription>(mcp, binding, "describe", new AspDescribeRequest(Guid.NewGuid().ToString("N")), deadline.Token);
+        var description = await InvokeAsync<AspDescription>(mcp, toolPrefix, "describe", new AspDescribeRequest(Guid.NewGuid().ToString("N")), expectedStore, deadline.Token);
         ValidateDescription(description, expectedStore);
         AspValidation.Require((expectedProviderId is null || description.ProviderId == expectedProviderId)
             && (expectedProviderVersion is null || description.ProviderVersion == expectedProviderVersion), "incompatible_provider", "Provider identity or version differs from the pinned provider.");
@@ -38,11 +38,11 @@ public sealed class AspClient
         {
             var supported = operation switch { "list" => capabilities.List, "stat" => capabilities.Stat, "read" => capabilities.Read, _ => capabilities.Write };
             if (!supported) continue;
-            var tool = tools.SingleOrDefault(value => value.Name == $"{binding}_{operation}")
+            var tool = tools.SingleOrDefault(value => value.Name == $"{toolPrefix}_{operation}")
                 ?? throw new AspException("unsupported_operation", "An advertised ASP mapping is missing.");
             ValidateSchema(tool, operation);
         }
-        return new(mcp, binding, description, duration);
+        return new(mcp, toolPrefix, description, duration);
     }
 
     public async Task<AspListResult> ListAsync(AspListRequest request, CancellationToken cancellationToken = default)
@@ -100,15 +100,16 @@ public sealed class AspClient
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(timeout);
-        return await InvokeAsync<T>(mcp, binding, operation, args, deadline.Token);
+        return await InvokeAsync<T>(mcp, toolPrefix, operation, args, Description.Store, deadline.Token);
     }
 
-    private static async Task<T> InvokeAsync<T>(McpClient mcp, string binding, string operation, object args, CancellationToken ct)
+    private static async Task<T> InvokeAsync<T>(McpClient mcp, string toolPrefix, string operation, object args, AspStoreRef store, CancellationToken ct)
     {
         var json = JsonSerializer.SerializeToElement(args, AspProtocol.JsonOptions);
         var requestId = json.GetProperty("requestId").GetString();
-        var arguments = json.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value.Clone(), StringComparer.Ordinal);
-        var result = await mcp.CallToolAsync($"{binding}_{operation}", arguments, cancellationToken: ct);
+        var wire = JsonSerializer.SerializeToElement(new AspInvocation<JsonElement>(store, json), AspProtocol.JsonOptions);
+        var arguments = wire.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value.Clone(), StringComparer.Ordinal);
+        var result = await mcp.CallToolAsync($"{toolPrefix}_{operation}", arguments, cancellationToken: ct);
         AspValidation.Require(result.StructuredContent is { ValueKind: JsonValueKind.Object }, "invalid_result", "Structured ASP content is required.");
         AspValidation.Require(result.StructuredContent.Value.GetRawText().Length <= 200_000, "invalid_result", "ASP result exceeds the wire limit.");
         AspReply<T> reply;
@@ -138,7 +139,7 @@ public sealed class AspClient
     {
         AspValidation.Require(value.AspVersion == AspProtocol.Version && value.Profile == AspProtocol.Profile,
             "incompatible_version", "Unsupported ASP profile or version.");
-        AspValidation.Require(value.Store == expected, "forbidden", "The effective store differs from the pinned binding.");
+        AspValidation.Require(value.Store == expected, "forbidden", "The described target differs from the selected storage.");
         AspValidation.Require(!string.IsNullOrWhiteSpace(value.ProviderId) && value.ProviderId.Length <= 128
             && !string.IsNullOrWhiteSpace(value.ProviderVersion) && value.ProviderVersion.Length <= 128
             && value.ConfigurationSchema.ValueKind == JsonValueKind.Object && value.Capabilities is not null
@@ -154,6 +155,6 @@ public sealed class AspClient
     {
         AspValidation.Require(item is not null && item.Reference is { Length: > 0 and <= 4096 }, "invalid_result", "Invalid object reference.");
         AspValidation.Item(new(item.Key, item.Version, item.Length, item.Sha256));
-        AspValidation.Require(AspValidation.Allows(Description.Policy, item.Key), "invalid_result", "Object is outside the fixed policy.");
+        AspValidation.Require(AspValidation.Allows(Description.Policy, item.Key), "invalid_result", "Object is outside the authorized target policy.");
     }
 }

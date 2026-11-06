@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded
+
+Superseded by [ADR-0193](0193-asp-tools-select-logical-targets-and-product-owns-relays.md).
 
 ## Context
 

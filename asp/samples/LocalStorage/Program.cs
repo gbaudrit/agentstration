@@ -18,21 +18,24 @@ public sealed class SampleAccess
     public string Revision { get; set; } = "grant-1";
     public static AspStoreRef FirstStore { get; } = new("first", "memory", "binding-1");
     public static AspStoreRef SecondStore { get; } = new("second", "memory", "binding-1");
+    public static AspStoreRef ReadOnlyStore { get; } = new("readonly", "memory", "binding-1");
     public static AspAccessPolicy Policy { get; } = new(true, true, true, true, "notes/", 4096, 4096, 10);
 
-    public IEnumerable<AspToolBinding> Bindings(IAspObjectReader provider)
+    public IEnumerable<AspStoreBinding> Bindings(IAspObjectReader provider)
     {
-        yield return Binding("first", FirstStore, Policy, provider);
-        yield return Binding("second", SecondStore, Policy, provider);
-        yield return Binding("readonly", FirstStore, Policy with { CanWrite = false }, new ReadOnlyObjectProvider(provider));
+        yield return Binding(FirstStore, Policy, provider);
+        yield return Binding(SecondStore, Policy, provider);
+        yield return Binding(ReadOnlyStore, Policy with { CanWrite = false }, new ReadOnlyObjectProvider(provider));
     }
 
-    private AspToolBinding Binding(string name, AspStoreRef store, AspAccessPolicy policy, IAspObjectReader provider) =>
-        new(name, store, policy, provider, (request, ct) =>
+    private AspStoreBinding Binding(AspStoreRef store, AspAccessPolicy policy, IAspObjectReader provider) =>
+        new(store, policy, provider, (request, ct) =>
         {
             ct.ThrowIfCancellationRequested();
             AspValidation.Require(Enabled && request.User?.Identity?.IsAuthenticated == true, "forbidden", "Access is not authorized.");
             var subject = request.User!.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            AspValidation.Require(subject != "other-subject" || store == FirstStore,
+                "forbidden", "The caller is not authorized for the selected logical target.");
             return ValueTask.FromResult(new AspAccessContext(store, subject, Revision, policy));
         });
 }
@@ -84,13 +87,13 @@ public sealed class Program
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", app.Services.GetRequiredService<SampleAccess>().Token);
             await using var mcp = await McpClient.CreateAsync(new HttpClientTransport(new()
                 { Endpoint = new Uri(app.Urls.Single() + "/mcp") }, http));
-            var client = await AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore);
+            var client = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore);
             var bytes = Encoding.UTF8.GetBytes("{\"Opaque_KEY\":{\"Value\":42}}");
             var written = await client.WriteAsync(new("demo-write", DateTimeOffset.UtcNow.AddMinutes(2), "notes/example.json", Convert.ToBase64String(bytes)));
             var page = await client.ListAsync(new("demo-list", "notes/", 1));
             var metadata = await client.StatAsync(new("demo-stat", written.Item.Reference));
             var content = await client.ReadAsync(new("demo-read", page.Objects.Single().Reference, 0, 4096));
-            var readonlyClient = await AspClient.ConnectAsync(mcp, "readonly", SampleAccess.FirstStore);
+            var readonlyClient = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.ReadOnlyStore);
             Console.WriteLine($"ASP {client.Description.AspVersion}: {metadata.Length} bytes, write={client.Description.Capabilities.Write}, readonly.write={readonlyClient.Description.Capabilities.Write}");
             Console.WriteLine(Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)));
         }

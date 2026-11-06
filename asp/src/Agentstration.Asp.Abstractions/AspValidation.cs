@@ -29,13 +29,18 @@ public static class AspValidation
             || string.CompareOrdinal(policy.KeyFrom, policy.KeyBefore) < 0, "invalid_policy", "Invalid key range.");
     }
 
+    public static void Store(AspStoreRef store)
+    {
+        Require(store is not null, "invalid_request", "A logical storage target is required.");
+        RequestId(store.StoreId);
+        RequestId(store.BindingId);
+        RequestId(store.Revision);
+    }
+
     public static void Context(AspAccessContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(context.Store);
-        RequestId(context.Store.StoreId);
-        RequestId(context.Store.BindingId);
-        RequestId(context.Store.Revision);
+        Store(context.Store);
         RequestId(context.Subject);
         RequestId(context.AuthorizationRevision);
         Policy(context.Policy);

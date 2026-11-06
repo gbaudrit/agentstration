@@ -34,7 +34,7 @@ public sealed class AspAdversarialTests
         await using var factory = FaultyFactory(mode);
         using var http = AuthorizedHttp(factory);
         await using var mcp = await ConnectAsync(http);
-        await AspConformanceTests.ErrorAsync(expectedCode, () => AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore));
+        await AspConformanceTests.ErrorAsync(expectedCode, () => AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore));
     }
 
     [TestMethod]
@@ -45,7 +45,7 @@ public sealed class AspAdversarialTests
             await using var factory = FaultyFactory(mode);
             using var http = AuthorizedHttp(factory);
             await using var mcp = await ConnectAsync(http);
-            var client = await AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore);
+            var client = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore);
             if (mode is "writeDigest" or "nullItem")
                 await AspConformanceTests.ErrorAsync("invalid_result", () => client.WriteAsync(AspConformanceTests.Write("notes/a", "a")));
             else
@@ -67,7 +67,7 @@ public sealed class AspAdversarialTests
         }));
         using var http = AuthorizedHttp(factory);
         await using var mcp = await ConnectAsync(http);
-        var client = await AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore);
+        var client = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore);
         var request = AspConformanceTests.Write("notes/commit", "once");
         await AspConformanceTests.ErrorAsync("cancelled", () => client.WriteAsync(request));
         var retry = await client.WriteAsync(request);
@@ -86,7 +86,7 @@ public sealed class AspAdversarialTests
         }));
         using var http = AuthorizedHttp(factory);
         await using var mcp = await ConnectAsync(http);
-        var client = await AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore);
+        var client = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore);
         await AspConformanceTests.ErrorAsync("forbidden", () => client.ListAsync(new("outside", "notes/", 10)));
     }
 
@@ -97,7 +97,7 @@ public sealed class AspAdversarialTests
         var broad = SampleAccess.Policy with { Prefix = "", MaxWriteBytes = 65536 };
         var fixedPolicy = SampleAccess.Policy with { KeyFrom = "notes/b", KeyBefore = "notes/d", MaxWriteBytes = 2 };
         var provider = new MemoryObjectProvider(TimeProvider.System);
-        var server = new AspMcpServer([new("first", store, fixedPolicy, provider,
+        var server = new AspMcpServer([new(store, fixedPolicy, provider,
             (_, _) => ValueTask.FromResult(new AspAccessContext(store, "subject", "grant", broad)))]);
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
@@ -106,7 +106,7 @@ public sealed class AspAdversarialTests
         }));
         using var http = AuthorizedHttp(factory);
         await using var mcp = await ConnectAsync(http);
-        var client = await AspClient.ConnectAsync(mcp, "first", store);
+        var client = await AspClient.ConnectAsync(mcp, "asp", store);
         Assert.AreEqual("notes/", client.Description.Policy.Prefix);
         Assert.AreEqual(2, client.Description.Policy.MaxWriteBytes);
         await AspConformanceTests.ErrorAsync("forbidden", () => client.WriteAsync(AspConformanceTests.Write("notes/a", "a")));
@@ -127,7 +127,7 @@ public sealed class AspAdversarialTests
         }));
         using var http = AuthorizedHttp(factory);
         await using var mcp = await ConnectAsync(http);
-        var client = await AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore, timeout: TimeSpan.FromSeconds(1));
+        var client = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore, timeout: TimeSpan.FromSeconds(1));
         try
         {
             await client.ListAsync(new("timeout", "notes/", 1));
@@ -149,7 +149,7 @@ public sealed class AspAdversarialTests
         }));
         using var http = AuthorizedHttp(factory);
         await using var mcp = await ConnectAsync(http);
-        var client = await AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore);
+        var client = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore);
         await client.WriteAsync(AspConformanceTests.Write("notes/a", "a") with { NotAfter = clock.Now.AddMinutes(2) });
         await client.WriteAsync(AspConformanceTests.Write("notes/b", "b") with { NotAfter = clock.Now.AddMinutes(2) });
         var page = await client.ListAsync(new("page", "notes/", 1));
@@ -157,6 +157,33 @@ public sealed class AspAdversarialTests
         await AspConformanceTests.ErrorAsync("invalid_reference", () => client.StatAsync(new("expired-object", page.Objects[0].Reference)));
         await AspConformanceTests.ErrorAsync("invalid_reference", () => client.ListAsync(new("expired-cursor", "notes/", 1, page.Cursor)));
         Assert.HasCount(2, (await client.ListAsync(new("new-list", "notes/", 10))).Objects);
+    }
+
+    [TestMethod]
+    public async Task LogicalTargetCanResolveToDifferentProviderInstancesWithoutChangingToolContracts()
+    {
+        var firstBackend = new MemoryObjectProvider(TimeProvider.System);
+        var secondBackend = new MemoryObjectProvider(TimeProvider.System);
+        AspStoreBinding Configure(AspStoreRef store, IAspObjectReader provider) => new(store, SampleAccess.Policy, provider,
+            (_, _) => ValueTask.FromResult(new AspAccessContext(store, "authorized-subject", "grant-1", SampleAccess.Policy)));
+        var server = new AspMcpServer([Configure(SampleAccess.FirstStore, firstBackend), Configure(SampleAccess.SecondStore, secondBackend)]);
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<AspMcpServer>();
+            services.AddSingleton(server);
+        }));
+        using var http = AuthorizedHttp(factory);
+        await using var mcp = await ConnectAsync(http);
+        var first = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore);
+        var second = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.SecondStore);
+        await first.WriteAsync(AspConformanceTests.Write("notes/a", "backend-one"));
+        Assert.IsEmpty((await second.ListAsync(new("second-empty", "notes/", 1))).Objects);
+        await second.WriteAsync(AspConformanceTests.Write("notes/a", "backend-two"));
+        var firstObject = (await first.ListAsync(new("first-list", "notes/", 1))).Objects.Single();
+        var secondObject = (await second.ListAsync(new("second-list", "notes/", 1))).Objects.Single();
+        Assert.AreNotEqual(firstObject.Sha256, secondObject.Sha256);
+        await AspConformanceTests.ErrorAsync("invalid_reference", () => second.ReadAsync(new("cross-physical", firstObject.Reference, 0, 100)));
+        Assert.HasCount(5, await mcp.ListToolsAsync());
     }
 
     private sealed class AdjustableClock : TimeProvider
@@ -188,15 +215,15 @@ public sealed class AspAdversarialTests
             options.Handlers.ListToolsHandler = async (request, ct) =>
             {
                 var result = await list(request, ct);
-                if (mode == "schema") result.Tools.Single(tool => tool.Name == "first_describe").InputSchema = JsonSerializer.SerializeToElement(new { type = "object" });
-                if (mode == "mapping") result.Tools = result.Tools.Where(tool => tool.Name != "first_list").ToList();
+                if (mode == "schema") result.Tools.Single(tool => tool.Name == "asp_describe").InputSchema = JsonSerializer.SerializeToElement(new { type = "object" });
+                if (mode == "mapping") result.Tools = result.Tools.Where(tool => tool.Name != "asp_list").ToList();
                 return result;
             };
             var call = options.Handlers.CallToolHandler!;
             options.Handlers.CallToolHandler = async (request, ct) =>
             {
                 var result = await call(request, ct);
-                if (request.Params!.Name == "first_describe")
+                if (request.Params!.Name == "asp_describe")
                 {
                     var node = JsonNode.Parse(result.StructuredContent!.Value.GetRawText())!.AsObject();
                     switch (mode)
@@ -213,13 +240,13 @@ public sealed class AspAdversarialTests
                     }
                     result.StructuredContent = JsonSerializer.SerializeToElement(node);
                 }
-                else if (request.Params.Name == "first_read" && mode == "readDigest")
+                else if (request.Params.Name == "asp_read" && mode == "readDigest")
                 {
                     var node = JsonNode.Parse(result.StructuredContent!.Value.GetRawText())!;
                     node["data"]!["contentBase64"] = "Yg==";
                     result.StructuredContent = JsonSerializer.SerializeToElement(node);
                 }
-                else if (request.Params.Name == "first_write" && mode is "writeDigest" or "nullItem")
+                else if (request.Params.Name == "asp_write" && mode is "writeDigest" or "nullItem")
                 {
                     var node = JsonNode.Parse(result.StructuredContent!.Value.GetRawText())!;
                     if (mode == "writeDigest") node["data"]!["item"]!["sha256"] = new string('0', 64);

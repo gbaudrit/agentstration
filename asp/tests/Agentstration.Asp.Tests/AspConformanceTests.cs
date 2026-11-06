@@ -29,7 +29,7 @@ public sealed class AspConformanceTests
         access = factory.Services.GetRequiredService<SampleAccess>();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", access.Token);
         mcp = await McpClient.CreateAsync(new HttpClientTransport(new() { Endpoint = new("http://localhost/mcp") }, http));
-        client = await AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore);
+        client = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore);
     }
 
     [TestCleanup]
@@ -81,7 +81,7 @@ public sealed class AspConformanceTests
     [TestMethod]
     public async Task SharedPhysicalProviderDoesNotShareLogicalStoreAuthority()
     {
-        var second = await AspClient.ConnectAsync(mcp, "second", SampleAccess.SecondStore);
+        var second = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.SecondStore);
         var firstObject = await client.WriteAsync(Write("notes/shared", "first"));
         var secondObject = await second.WriteAsync(Write("notes/shared", "second"));
         await ErrorAsync("invalid_reference", () => second.ReadAsync(new("cross-read", firstObject.Item.Reference, 0, 100)));
@@ -91,8 +91,9 @@ public sealed class AspConformanceTests
         await client.WriteAsync(Write("notes/z", "z"));
         var cursor = (await client.ListAsync(new("page", "notes/", 1))).Cursor;
         await ErrorAsync("invalid_reference", () => second.ListAsync(new("cross-cursor", "notes/", 1, cursor)));
-        await ErrorAsync("forbidden", () => AspClient.ConnectAsync(mcp, "first", SampleAccess.SecondStore));
-        await ErrorAsync("forbidden", () => AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore with { Revision = "binding-2" }));
+        Assert.AreEqual(SampleAccess.SecondStore, second.Description.Store);
+        Assert.HasCount(1, (await second.ListAsync(new("second-list", "notes/", 10))).Objects);
+        await ErrorAsync("forbidden", () => AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore with { Revision = "binding-2" }));
     }
 
     [TestMethod]
@@ -111,31 +112,32 @@ public sealed class AspConformanceTests
     }
 
     [TestMethod]
-    public async Task ReadonlyVariantHasNoWriteMappingOrDurabilityClaims()
+    public async Task ReadonlyTargetCannotWriteThroughTheGenericToolOrClaimDurability()
     {
         await client.WriteAsync(Write("notes/a", "a"));
-        var readOnly = await AspClient.ConnectAsync(mcp, "readonly", SampleAccess.FirstStore);
+        var readOnly = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.ReadOnlyStore);
         Assert.IsFalse(readOnly.Description.Capabilities.Write);
         Assert.IsFalse(readOnly.Description.Capabilities.StableVersions);
         Assert.IsFalse(readOnly.Description.Capabilities.Retention);
         Assert.IsFalse(readOnly.Description.Capabilities.Delete);
-        Assert.HasCount(1, (await readOnly.ListAsync(new("ro-list", "notes/", 10))).Objects);
+        Assert.IsEmpty((await readOnly.ListAsync(new("ro-list", "notes/", 10))).Objects);
         await ErrorAsync("unsupported_operation", () => readOnly.WriteAsync(Write("notes/b", "b")));
-        await RawErrorAsync("readonly_write", Write("notes/b", "b"), "unsupported_operation");
-        await RawErrorAsync("first_delete", new { requestId = "delete" }, "unsupported_operation");
+        await RawErrorAsync("asp_write", Write("notes/b", "b"), "unsupported_operation", SampleAccess.ReadOnlyStore);
+        await RawErrorAsync("asp_delete", new { requestId = "delete" }, "unsupported_operation");
         var tools = await mcp.ListToolsAsync();
-        Assert.IsFalse(tools.Any(tool => tool.Name == "readonly_write"));
+        Assert.HasCount(5, tools);
+        Assert.IsTrue(tools.All(tool => tool.Name.StartsWith("asp_", StringComparison.Ordinal)));
     }
 
     [TestMethod]
-    public async Task AgentArgumentsCannotOverrideFixedStorePrefixOrPayloadBounds()
+    public async Task GenericArgumentsCannotWidenAuthorizedTargetPolicyOrPayloadBounds()
     {
-        await RawErrorAsync("first_list", new { requestId = "override", prefix = "notes/", limit = 1, storeId = "second" }, "invalid_request");
-        await RawErrorAsync("first_list", new { requestId = "override", prefix = "notes/", limit = 1, maxReadBytes = 99999 }, "invalid_request");
-        await RawErrorAsync("first_list", new Dictionary<string, object> { ["requestId"] = "schema", ["Prefix"] = "notes/", ["limit"] = 1 }, "invalid_request");
-        await RawErrorAsync("first_list", new { requestId = "schema", prefix = "notes/", limit = "1" }, "invalid_request");
-        await RawErrorAsync("first_list", new { requestId = "schema", limit = 1 }, "invalid_request");
-        await RawErrorAsync("first_list", new { requestId = "schema", prefix = (string?)null, limit = 1 }, "invalid_request");
+        await RawErrorAsync("asp_list", new { requestId = "override", prefix = "notes/", limit = 1, storeId = "second" }, "invalid_request");
+        await RawErrorAsync("asp_list", new { requestId = "override", prefix = "notes/", limit = 1, maxReadBytes = 99999 }, "invalid_request");
+        await RawErrorAsync("asp_list", new Dictionary<string, object> { ["requestId"] = "schema", ["Prefix"] = "notes/", ["limit"] = 1 }, "invalid_request");
+        await RawErrorAsync("asp_list", new { requestId = "schema", prefix = "notes/", limit = "1" }, "invalid_request");
+        await RawErrorAsync("asp_list", new { requestId = "schema", limit = 1 }, "invalid_request");
+        await RawErrorAsync("asp_list", new { requestId = "schema", prefix = (string?)null, limit = 1 }, "invalid_request");
         await ErrorAsync("forbidden", () => client.ListAsync(new("wide", "", 1)));
         await ErrorAsync("forbidden", () => client.WriteAsync(Write("outside/a", "a")));
         await ErrorAsync("invalid_request", () => client.WriteAsync(Write("notes/../escape", "a")));
@@ -143,7 +145,7 @@ public sealed class AspConformanceTests
         var written = await client.WriteAsync(Write("notes/a", "a"));
         await ErrorAsync("limit_exceeded", () => client.ReadAsync(new("read-limit", written.Item.Reference, 0, 4097)));
         await ErrorAsync("invalid_request", () => client.ReadAsync(new("offset", written.Item.Reference, 100, 1)));
-        await RawErrorAsync("first_write", Write("notes/a", "a") with { ContentBase64 = "?" }, "invalid_request");
+        await RawErrorAsync("asp_write", Write("notes/a", "a") with { ContentBase64 = "?" }, "invalid_request");
     }
 
     [TestMethod]
@@ -196,13 +198,48 @@ public sealed class AspConformanceTests
     public async Task MissingMappingAndProviderPinsFailExplicitly()
     {
         await ErrorAsync("unsupported_operation", () => AspClient.ConnectAsync(mcp, "missing", SampleAccess.FirstStore));
-        await ErrorAsync("incompatible_provider", () => AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore, expectedProviderId: "different"));
-        await ErrorAsync("incompatible_provider", () => AspClient.ConnectAsync(mcp, "first", SampleAccess.FirstStore, expectedProviderVersion: "2.0.0"));
+        await ErrorAsync("incompatible_provider", () => AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore, expectedProviderId: "different"));
+        await ErrorAsync("incompatible_provider", () => AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore, expectedProviderVersion: "2.0.0"));
     }
 
-    private async Task RawErrorAsync(string tool, object args, string code)
+    [TestMethod]
+    public async Task NativeGenericToolSelectsTargetsAndReauthorizesEveryCall()
     {
-        var values = JsonSerializer.SerializeToElement(args, AspProtocol.JsonOptions).EnumerateObject()
+        var tools = await mcp.ListToolsAsync();
+        CollectionAssert.AreEquivalent(new[] { "asp_describe", "asp_list", "asp_stat", "asp_read", "asp_write" }, tools.Select(tool => tool.Name).ToArray());
+        var listSchema = tools.Single(tool => tool.Name == "asp_list").ProtocolTool.InputSchema;
+        Assert.IsTrue(listSchema.GetProperty("properties").TryGetProperty("store", out _));
+        var request = new AspInvocation<AspWriteRequest>(SampleAccess.SecondStore, Write("notes/direct", "direct-agent-call"));
+        var wire = JsonSerializer.SerializeToElement(request, AspProtocol.JsonOptions);
+        var response = await mcp.CallToolAsync("asp_write", wire.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value.Clone(), StringComparer.Ordinal));
+        Assert.IsFalse(response.IsError == true);
+        Assert.AreEqual("notes/direct", response.StructuredContent!.Value.GetProperty("data").GetProperty("item").GetProperty("key").GetString());
+        Assert.IsEmpty((await client.ListAsync(new("first-empty", "notes/", 10))).Objects);
+        var second = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.SecondStore);
+        Assert.HasCount(1, (await second.ListAsync(new("second-visible", "notes/", 10))).Objects);
+
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", access.OtherToken);
+        await ErrorAsync("forbidden", () => second.ListAsync(new("cached-client-denied", "notes/", 10)));
+        await RawErrorAsync("asp_list", new AspListRequest("direct-denied", "notes/", 1), "forbidden", SampleAccess.SecondStore);
+        Assert.IsEmpty((await client.ListAsync(new("first-authorized", "notes/", 1))).Objects);
+        await ErrorAsync("forbidden", () => AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore with { StoreId = "unregistered" }));
+    }
+
+    [TestMethod]
+    public async Task GenericEnvelopeRejectsPhysicalLocationsAndForgedBindingIdentities()
+    {
+        var valid = JsonSerializer.SerializeToElement(new AspInvocation<AspListRequest>(SampleAccess.FirstStore, new("invalid-envelope", "notes/", 1)), AspProtocol.JsonOptions);
+        var arguments = valid.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value.Clone(), StringComparer.Ordinal);
+        arguments["configuration"] = new { path = "/arbitrary/backend" };
+        var response = await mcp.CallToolAsync("asp_list", arguments);
+        Assert.IsTrue(response.IsError);
+        Assert.AreEqual("invalid_request", response.StructuredContent!.Value.GetProperty("error").GetProperty("code").GetString());
+        await RawErrorAsync("asp_list", new AspListRequest("wrong-binding", "notes/", 1), "forbidden", SampleAccess.FirstStore with { BindingId = "other-physical-binding" });
+    }
+
+    private async Task RawErrorAsync(string tool, object args, string code, AspStoreRef? store = null)
+    {
+        var values = JsonSerializer.SerializeToElement(new AspInvocation<object>(store ?? SampleAccess.FirstStore, args), AspProtocol.JsonOptions).EnumerateObject()
             .ToDictionary(value => value.Name, value => (object?)value.Value.Clone(), StringComparer.Ordinal);
         var response = await mcp.CallToolAsync(tool, values);
         Assert.IsTrue(response.IsError);

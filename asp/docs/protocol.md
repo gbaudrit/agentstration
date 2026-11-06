@@ -25,43 +25,106 @@ binding; revision pins that binding's configuration. It contains no physical pat
 backend URI or credential. Changing placement/configuration requires a new revision;
 a historical reference must never resolve through a newer binding implicitly.
 
-A host constructs each `AspToolBinding` with its exact StoreRef, maximum policy and
-provider instance. Its authorization callback derives the authenticated subject,
-current permission revision and current grant from trusted transport/product state
-on **every** invocation. No callback means no binding. There is no anonymous default.
-The SDK requires the returned store to match the fixed store and intersects the
-current grant with the fixed policy. The provider receives this resulting context
-on every call and must enforce it independently. Sharing an extension, provider
+The extension configures `AspStoreBinding` entries mapping exact logical targets
+to provider instances and maximum access policies. One generic MCP Tool group serves
+all these targets. Every invocation carries `{ store, arguments }`; `store` is the
+caller-selected `AspStoreRef`, while `arguments` carries the operation inputs below.
+A target selection is **not authority**. The extension resolves only configured
+identities and its authorization callback derives the authenticated subject,
+current permission revision and permitted grant on **every** invocation. Unknown
+identities/revisions and unauthorized targets fail. No callback means no binding.
+
+The SDK requires the authorized grant to match the selected target and intersects
+it with that target's configured maximum policy. The provider receives this trusted
+resulting context and enforces it independently. Sharing an extension, provider
 instance, filesystem directory or database table never grants cross-store access.
+An authorized caller, including an Agent granted direct access, may select any
+target it is permitted to use through these same generic Tools.
 
-Policies fix allowed list/stat/read/write operations, an ordinal logical prefix,
-optional inclusive `keyFrom` / exclusive `keyBefore` bounds, per-call page/read/write
-limits. The narrower compatible prefix, intersected key interval, boolean AND and
-minimum payload limits apply. Disjoint scopes reveal no objects. Unsupported policy
-fields are rejected, not silently ignored. No partition/query/field restrictions
-are claimed in this profile. A future query profile must apply the same authority
-before evaluating expressions and fail if a fixed restriction cannot be enforced.
+Policies constrain list/stat/read/write operations, an ordinal logical prefix,
+optional inclusive `keyFrom` / exclusive `keyBefore` bounds, and per-call page/read/
+write limits. Compatible prefixes are narrowed, key intervals intersected, booleans
+ANDed and payload limits minimized. Unsupported restriction fields fail rather
+than being ignored. MCP annotations and caller-supplied identifiers confer no rights.
 
-Tools expose only business arguments below: no store, backend, subject, policy,
-credentials, physical configuration or constraint override. Unknown JSON properties,
-missing required properties, null required values and wrong types fail. MCP Tool
-annotations are not authority or atomicity guarantees.
+## Extensible logical-to-physical resolution
+
+StoreId, BindingId and Revision are opaque bounded identifiers, with no backend
+syntax or closed list of storage types. The extension owns their resolution to
+physical placement. Different targets may use the same physical provider or
+separate provider instances/backends without changing the ASP Tool schemas.
+
+Physical configuration is provider-specific opaque JSON governed by the provider's
+JSON Schema and versioning. For example, an S3 provider could define bucket/prefix;
+an Azure provider account/container/prefix; a file provider an authorized root;
+a SQL provider a connection reference/schema/table. These are examples of possible
+provider configuration, not fields or backend implementations built into ASP.
+Keys/values and secret-access references must retain their provider-defined meaning.
+The exact binding revision pins the configuration; remapping an existing identity
+to another physical destination without changing revision violates the contract.
+
+AEP configuration discovery/versioned option sets and the extension's provisioning
+path own creation and configuration of these mappings; #1040 integrates that product
+lifecycle. ASP `describe` returns the selected target's provider configuration schema
+and effective capabilities. Content calls select an existing target and do not
+create or reconfigure physical destinations. This SDK ships no backend enum,
+provider configuration-value transport, target-provisioning API or connection secret
+management. Its sample accepts the empty provider configuration object only.
+
+## Agentstration parameter relays are a product capability
+
+Agentstration may expose a Tool that relays an existing Tool call while fixing
+parameters such as `store`. The Agent sees only the remaining permitted parameters;
+the product must inject fixed values, reject overrides and enforce its authorization
+and constraints before calling the original generic Tool. This mechanism applies
+to arbitrary Tools, including ASP Tools. It is owned by Agentstration, **not** the
+ASP protocol or SDK. #1040 owns this product capability and its Storage use.
+Direct use of an authorized generic ASP Tool remains valid.
+
+Authorization is mandatory on both direct and relayed ASP calls. The SDK invokes
+the extension's authorization callback before provider execution; the callback owns
+the permission source and must verify the authenticated caller's target/operation
+rights. With a relay, the extension normally authenticates the Agentstration service
+identity, while Agentstration authorizes the originating caller locally. Enforcing
+end-user permissions at the extension also requires verifiable delegation through
+the authentication layer; a `userId` business argument is never trusted authority.
+This SDK does not introduce an end-user delegation protocol or permission database.
+
+The SDK contains no relay component, preconfigured Agent Tool publisher or product
+Tool configuration model. Its typed client keeps a selected target for consumer
+convenience and includes that target explicitly in each generic wire invocation;
+this is not an MCP Tool relay. Future query profiles must preserve the same target
+and authorization boundaries and require actual provider/consumer support.
 
 ## MCP operation mappings and JSON Schemas
 
-Each configured Tool prefix `P` maps to these exact known operation suffixes. For
-example, the sample has `first_list`, `second_list` and `readonly_list`, all generated
-by the same SDK. Only operations supported by both the binding and provider appear.
-`describe` is always present, but still requires authorization. Tool discovery may
-show technical mapping names without granting invocation rights.
+A configured service Tool prefix `P` maps to these known operation suffixes. The
+sample exposes `asp_describe`, `asp_list`, `asp_stat`, `asp_read` and `asp_write`
+once for all targets, with no per-target Tool names or schemas. A generic operation
+is published when at least one configured target supports it. The selected target's
+`describe` result determines its capabilities: `asp_write` can exist on the service
+while a read-only target explicitly rejects writes. Every call is reauthorized.
 
-| Operation | Input | Structured success data |
+All Tool inputs have this envelope:
+
+```json
+{
+  "store": { "storeId": "documents", "bindingId": "binding-42", "revision": "7" },
+  "arguments": { "requestId": "list-1", "prefix": "notes/", "limit": 10 }
+}
+```
+
+| Operation | `arguments` | Structured success data |
 | --- | --- | --- |
 | `P_describe` | `{ requestId }` | ASP/profile/provider versions, effective StoreRef, effective policy, capabilities, provider configuration schema |
 | `P_list` | `{ requestId, prefix, limit, cursor? }` | `{ objects: AspObject[], cursor? }` |
 | `P_stat` | `{ requestId, reference }` | `AspObject` |
 | `P_read` | `{ requestId, reference, offset, maxBytes }` | `{ item: AspObject, offset, contentBase64, endOfObject }` |
 | `P_write` | `{ requestId, notAfter, key, contentBase64, expectedVersion? }` | `{ item: AspObject }` |
+
+Store and argument objects are closed: unknown fields, physical locations,
+permission overrides, missing required properties, null required values and wrong
+types fail. Store/binding/revision identifiers are bounded to 128 characters.
 
 The canonical input/output JSON Schemas are in [schemas/](schemas/), generated from
 `AspSchemas.Input/Output` and published as MCP `inputSchema` / `outputSchema`.
@@ -141,7 +204,7 @@ No generic SDK retry loop can manufacture this guarantee for a non-atomic backen
 
 Profile ceilings: 100 objects/page, 65,536 decoded bytes/read or write, 100,000
 characters/call arguments, 200,000 characters/structured result, 4,096
-characters/reference, JSON depth 32, at most 32 configured bindings. Policies may
+characters/reference, JSON depth 32, at most 32 configured target mappings. Policies may
 reduce these limits. The sample uses 10/page and 4,096 bytes per call and limits
 HTTP request bodies to 100,000 bytes. Hosts must bound transport bodies before MCP
 JSON parsing; SDK argument checks occur after transport deserialization. Providers
@@ -160,7 +223,7 @@ A provider failure never creates a success receipt in the SDK.
 | Code | Meaning |
 | --- | --- |
 | `invalid_request` | Wrong schema, key, base64 or input range |
-| `forbidden` | Missing/revoked authorization, mismatched store, widened scope |
+| `forbidden` | Missing/revoked authorization, unauthorized/unknown target, widened scope |
 | `invalid_reference` | Forged, expired, wrong-context/versioned binding or wrong-kind token |
 | `unsupported_operation` | Missing/unknown mapping or unsupported reader/writer operation |
 | `incompatible_version` / `incompatible_schema` / `incompatible_provider` | Consumer compatibility check failed |
@@ -187,6 +250,6 @@ is not a conservation guarantee.
 A future implemented profile can specify retention horizons, preparation/sealing,
 cleanup, exact version conservation and matching provider interfaces. A future
 query profile needs versioned schemas, both client/provider implementations and the
-same immutable fixed restrictions. No OData/GraphQL interface, query placeholder,
+same immutable configured restrictions. No OData/GraphQL interface, query placeholder,
 OpenDAL dependency, product resource redesign or automatic Agent publication is
 part of this delivery.

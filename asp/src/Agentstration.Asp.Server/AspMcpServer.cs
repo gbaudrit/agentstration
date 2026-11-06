@@ -8,19 +8,21 @@ namespace Agentstration.Asp.Server;
 
 public sealed class AspMcpServer
 {
-    private readonly Dictionary<string, AspToolBinding> bindings;
+    private readonly Dictionary<AspStoreRef, AspStoreBinding> bindings;
+    private readonly string toolPrefix;
     private readonly TimeProvider clock;
     private readonly AspReferences references;
 
-    public AspMcpServer(IEnumerable<AspToolBinding> bindings, TimeProvider? clock = null)
+    public AspMcpServer(IEnumerable<AspStoreBinding> bindings, TimeProvider? clock = null, string toolPrefix = "asp")
     {
         ArgumentNullException.ThrowIfNull(bindings);
-        this.bindings = bindings.ToDictionary(value => value.Name, StringComparer.Ordinal);
-        AspValidation.Require(this.bindings.Count is > 0 and <= 32, "invalid_policy", "One to 32 fixed bindings are required.");
+        this.bindings = bindings.ToDictionary(value => value.Store);
+        AspValidation.Require(toolPrefix.Length is > 0 and <= 64 && toolPrefix.All(c => char.IsAsciiLetterOrDigit(c) || c == '_'),
+            "invalid_policy", "Invalid Tool prefix.");
+        this.toolPrefix = toolPrefix;
+        AspValidation.Require(this.bindings.Count is > 0 and <= 32, "invalid_policy", "One to 32 configured logical targets are required.");
         foreach (var binding in this.bindings.Values)
         {
-            AspValidation.Require(binding.Name.Length is > 0 and <= 64 && binding.Name.All(c => char.IsAsciiLetterOrDigit(c) || c == '_'),
-                "invalid_policy", "Invalid binding Tool prefix.");
             AspValidation.Context(new(binding.Store, "validation", "validation", binding.Policy));
             ArgumentNullException.ThrowIfNull(binding.Provider);
             ArgumentNullException.ThrowIfNull(binding.Authorize);
@@ -34,13 +36,13 @@ public sealed class AspMcpServer
         cancellationToken.ThrowIfCancellationRequested();
         return ValueTask.FromResult(new ListToolsResult
         {
-            Tools = bindings.Values.SelectMany(binding => Operations(binding).Select(operation => new Tool
+            Tools = Operations().Select(operation => new Tool
             {
-                Name = $"{binding.Name}_{operation}",
-                Description = $"ASP {AspProtocol.Profile} {operation}; fixed authorized logical store.",
+                Name = $"{toolPrefix}_{operation}",
+                Description = $"ASP {AspProtocol.Profile} {operation}; select an authorized logical storage target.",
                 InputSchema = AspSchemas.Input(operation),
                 OutputSchema = AspSchemas.Output(operation)
-            })).ToList()
+            }).ToList()
         });
     }
 
@@ -50,19 +52,23 @@ public sealed class AspMcpServer
         try
         {
             var parameters = request.Params ?? throw new AspException("invalid_request", "Missing Tool parameters.");
-            var args = JsonSerializer.SerializeToElement(parameters.Arguments ?? new Dictionary<string, JsonElement>());
-            AspValidation.Require(args.GetRawText().Length <= 100_000, "limit_exceeded", "Request exceeds the wire limit.");
+            var wire = JsonSerializer.SerializeToElement(parameters.Arguments ?? new Dictionary<string, JsonElement>());
+            AspValidation.Require(wire.GetRawText().Length <= 100_000, "limit_exceeded", "Request exceeds the wire limit.");
+            var invocation = AspValidation.Parse<AspInvocation<JsonElement>>(wire);
+            var args = invocation.Arguments;
+            AspValidation.Require(args.ValueKind == JsonValueKind.Object, "invalid_request", "Operation arguments must be an object.");
             if (args.TryGetProperty("requestId", out var id) && id.ValueKind == JsonValueKind.String)
                 requestId = id.GetString()!;
             AspValidation.RequestId(requestId);
-            var split = parameters.Name.LastIndexOf('_');
-            AspValidation.Require(split > 0 && bindings.ContainsKey(parameters.Name[..split]), "unsupported_operation", "Unknown ASP mapping.");
-            var binding = bindings[parameters.Name[..split]];
-            var operation = parameters.Name[(split + 1)..];
-            AspValidation.Require(Operations(binding).Contains(operation, StringComparer.Ordinal), "unsupported_operation", "Operation is not supported.");
+            AspValidation.Require(parameters.Name.StartsWith(toolPrefix + "_", StringComparison.Ordinal), "unsupported_operation", "Unknown ASP mapping.");
+            var operation = parameters.Name[(toolPrefix.Length + 1)..];
+            AspValidation.Require(Operations().Contains(operation, StringComparer.Ordinal), "unsupported_operation", "Operation is not supported.");
+            AspValidation.Store(invocation.Store);
+            AspValidation.Require(bindings.TryGetValue(invocation.Store, out var binding), "forbidden", "The selected storage target is not configured or accessible.");
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(30));
             var context = Effective(binding, await binding.Authorize(request, timeout.Token));
+            AspValidation.Require(Operations(binding).Contains(operation, StringComparer.Ordinal), "unsupported_operation", "The selected target does not support this operation.");
             var data = await ExecuteAsync(binding, context, operation, args, timeout.Token);
             return Reply(new AspReply<object>(AspProtocol.Version, requestId, data, null), false);
         }
@@ -72,7 +78,7 @@ public sealed class AspMcpServer
         { return Reply(new AspReply<object>(AspProtocol.Version, requestId, null, new("cancelled", "Outcome may be unknown; retry writes with the exact original request.")), true); }
     }
 
-    private async ValueTask<object> ExecuteAsync(AspToolBinding binding, AspAccessContext context, string operation, JsonElement args, CancellationToken ct)
+    private async ValueTask<object> ExecuteAsync(AspStoreBinding binding, AspAccessContext context, string operation, JsonElement args, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var provider = binding.Provider;
@@ -146,7 +152,7 @@ public sealed class AspMcpServer
         }
     }
 
-    private static AspAccessContext Effective(AspToolBinding binding, AspAccessContext grant)
+    private static AspAccessContext Effective(AspStoreBinding binding, AspAccessContext grant)
     {
         AspValidation.Context(grant);
         AspValidation.Require(grant.Store == binding.Store, "forbidden", "Authorized binding identity does not match.");
@@ -165,7 +171,8 @@ public sealed class AspMcpServer
 
     private static string? MaxKey(string? left, string? right) => left is null ? right : right is null ? left : string.CompareOrdinal(left, right) >= 0 ? left : right;
     private static string? MinKey(string? left, string? right) => left is null ? right : right is null ? left : string.CompareOrdinal(left, right) <= 0 ? left : right;
-    private static IEnumerable<string> Operations(AspToolBinding binding)
+    private IEnumerable<string> Operations() => bindings.Values.SelectMany(Operations).Distinct(StringComparer.Ordinal);
+    private static IEnumerable<string> Operations(AspStoreBinding binding)
     {
         yield return "describe";
         if (binding.Policy.CanList) yield return "list";

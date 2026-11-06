@@ -17,25 +17,37 @@ dotnet pack src/Agentstration.Asp.Client -c Release -o artifacts
 
 The demo starts a loopback-only MCP server, creates an ephemeral Bearer credential,
 uses the real HTTP MCP client, writes JSON bytes, lists/stats/reads them, checks a
-read-only binding, and shuts down. It needs no network service, model, file store
+read-only target, and shuts down. It needs no network service, model, file store
 or product host. Sample credentials are never printed. Running without `--demo`
 serves an ephemeral in-process endpoint for the conformance host; the generated
 credential is available only inside that process.
 
 Implement `IAspObjectReader` and optionally `IAspObjectWriter`. Supply one or more
-`AspToolBinding` instances to `AspMcpServer`; register with
-`services.AddMcpServer().WithHttpTransport().WithAsp(server)` or use the explicit
-handlers shown by the sample. The SDK publishes the standard schemas and maps
-calls to provider methods. The host must authenticate MCP traffic and supply an
-`AspAuthorize` callback that checks current product permissions on **every** call.
-The callback returns trusted logical context, never context parsed from Tool
-arguments. Set request-body limits in the transport host as shown by the sample.
+`AspStoreBinding` entries mapping logical targets to configured physical provider
+instances and access policies. Register `AspMcpServer` using
+`services.AddMcpServer().WithHttpTransport().WithAsp(server)` or the explicit handlers
+shown by the sample. The SDK publishes one generic group of Tools, by default
+`asp_describe/list/stat/read/write`, across all configured targets.
+
+Every call carries `{ store: { storeId, bindingId, revision }, arguments: {...} }`.
+An authenticated caller, including an authorized Agent, selects a target. The host
+must check current permissions on **every** call; a selected ID is never authority.
+The extension resolves the exact logical identity to its physical backend and
+applies the target policy and current grant. Use transport request-body limits.
+Physical configuration is opaque provider-defined JSON with the provider's own
+schema/version; ASP does not impose a bucket/path/table model or configure backends
+through content-call arguments. AEP/product integration owns that separate lifecycle.
 
 A consumer supplies an already-authenticated `McpClient` to
-`AspClient.ConnectAsync(mcp, toolPrefix, exactStoreRef)`. The client checks ASP
-version/profile, schemas, fixed store, capabilities and optional exact provider
-identity/version pins. It does not own the connection or automatically retry a
-mutation. Keep the complete original write request for an exact bounded retry.
+`AspClient.ConnectAsync(mcp, "asp", selectedStoreRef)`. The typed client validates
+ASP version/profile, schemas, target capabilities and optional exact provider pins,
+then includes the selected target in every generic operation. It owns no transport
+and does not retry mutations automatically. Keep original writes for bounded retries.
+
+Exposing an Agentstration Tool that relays another Tool with fixed parameters is a
+**general product capability**, outside this SDK. Such a relay can fix the ASP
+`store` parameter while exposing operation arguments. The ASP SDK contains no
+relay helper or Agent Tool publisher. Direct authorized generic calls remain valid.
 
 `MemoryObjectProvider` and its read-only adapter are executable provider examples,
 not persistent storage. Their bounded process-local state never qualifies as
