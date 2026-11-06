@@ -1,0 +1,18 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <label>@T("LeftValue")<input disabled="@ReadOnly" value="@Step.Left" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Left = Text(e) })" /></label>
+    <label>@T("Operator")<input disabled="@ReadOnly" value="@Step.Operator" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Operator = Text(e) })" /></label>
+    <label>@T("RightValue")<input disabled="@ReadOnly" value="@Step.Right" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Right = Text(e) })" /></label>
+}
+
+@code {
+    [Parameter, EditorRequired] public ConditionFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback<FlowStepDefinition> UpdateSelectedAsync { get; set; }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}

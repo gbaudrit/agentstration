@@ -1,0 +1,55 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <section class="router-editor">
+        <div class="router-group-picker">
+            <button class="button-secondary" @onclick="LoadAgentsAsync">@T("LoadAgents")</button>
+            <button class="button-secondary" disabled="@(ReadOnly || LoadingAgents)" @onclick="AddAllRouterAgentsAsync">@T("AddAll")</button>
+        </div>
+        <p class="muted">@T(RouterAgents.Count == 1 ? "AvailableAgents.One" : "AvailableAgents.Many", RouterAgents.Count)</p>
+        <div class="route-cards">
+            @for (var index = 0; index < Step.Candidates.Count; index++)
+            {
+                var routeIndex = index;
+                var candidate = Step.Candidates[index];
+                <article class="route-card">
+                    <header><span class="route-key-badge">@candidate.Route</span><button disabled="@ReadOnly" @onclick="() => RemoveRouterCandidateAsync.InvokeAsync(routeIndex)">×</button></header>
+                    <label>@T("RouteKey")<input disabled="@ReadOnly" value="@candidate.Route" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Route = Text(e) })" /></label>
+                    <label>@T("Agent")<select disabled="@ReadOnly" value="@AgentSelectionValue(candidate.Agent)" @onchange="e => UpdateRouterCandidateAgentAsync(routeIndex, e)">
+                            @if (ResolveAgent(candidate.Agent) is null)
+                            {
+                                <option value="@AgentSelectionValue(candidate.Agent)">@(candidate.Agent.ResourceId == "unconfigured"
+                                    ? T("AgentNotSelected")
+                                    : T("UnavailableReference", ResourceIdentity(candidate.Agent.ScopeRef, candidate.Agent.Namespace ?? Namespace, candidate.Agent.ResourceId)))</option>
+                            }
+                            @foreach (var item in RouterAgents) { <option value="@ResourceKey(item.ScopeRef, item.Namespace, item.Name)">@ResourceOptionLabel(Localizer, item.DisplayName, item.Namespace, item.ScopeRef)</option> }
+                    </select></label>
+                    <label>@T("Description")<input disabled="@ReadOnly" value="@candidate.Description" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Description = EmptyToNull(Text(e)) })" /></label>
+                    <label>@T("Examples")<input disabled="@ReadOnly" value="@string.Join(", ", candidate.Examples ?? [])" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Examples = Text(e).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) })" /></label>
+                </article>
+            }
+        </div>
+        <button class="button-secondary" disabled="@ReadOnly" @onclick="AddRouterCandidateAsync">＋ @T("AddRoute")</button>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public RouterFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public IReadOnlyList<FlowDesignerAgent> RouterAgents { get; set; } = [];
+    [Parameter] public bool LoadingAgents { get; set; }
+    [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
+    [Parameter, EditorRequired] public Func<FlowResourceReference, string> AgentSelectionValue { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<FlowResourceReference, FlowDesignerAgent?> ResolveAgent { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<int, Func<FlowRouterCandidate, FlowRouterCandidate>, Task> UpdateRouterCandidateAsync { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<int, ChangeEventArgs, Task> UpdateRouterCandidateAgentAsync { get; set; } = default!;
+    [Parameter] public EventCallback LoadAgentsAsync { get; set; }
+    [Parameter] public EventCallback AddAllRouterAgentsAsync { get; set; }
+    [Parameter] public EventCallback AddRouterCandidateAsync { get; set; }
+    [Parameter] public EventCallback<int> RemoveRouterCandidateAsync { get; set; }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}
