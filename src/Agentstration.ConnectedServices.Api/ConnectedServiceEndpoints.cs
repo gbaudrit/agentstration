@@ -72,6 +72,14 @@ internal static class ConnectedServiceEndpoints
                 response.Headers.ETag = stored.ETag;
                 return Results.Ok(stored.Value);
             })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        services.MapGet("/{name}/usages", async (string name, string scopeRef,
+            ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () =>
+            {
+                var usages = (await service.GetUsagesAsync(ResourceScopeRef.Parse(scopeRef), name, token))
+                    .Select(value => new ConnectedServiceUsageResponse(
+                        value.Kind, value.Name, value.DisplayName, value.Url)).ToArray();
+                return Results.Ok(new ConnectedServiceUsagesResponse(usages, usages.Length));
+            })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         services.MapPost("/", async (CreateConnectedServiceRequest body, HttpResponse response,
             ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () => Resource(
                 await service.CreateAsync(new ConnectedServiceResource

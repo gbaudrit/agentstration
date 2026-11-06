@@ -8,6 +8,7 @@ public sealed class ConsoleResourceSearchProvider(
     IModelProfilesClient modelProfiles,
     IModelProvidersClient modelProviders,
     ISourceProvidersClient sourceProviders,
+    IConnectedServicesClient connectedServices,
     IParametersClient parameters,
     ISecretsClient secrets,
     IRuntimeProfilesClient runtimeProfiles,
@@ -50,6 +51,7 @@ public sealed class ConsoleResourceSearchProvider(
             var profilesTask = SafeLoadAsync("model profiles", token => modelProfiles.GetModelProfilesAsync(null, null, null, token), cancellationToken);
             var providersTask = SafeLoadAsync("model providers", token => modelProviders.GetModelProvidersAsync(token), cancellationToken);
             var sourceProvidersTask = SafeLoadAsync("source providers", token => sourceProviders.GetSourceProvidersAsync(token), cancellationToken);
+            var connectedServicesTask = SafeLoadAsync("connected services", token => connectedServices.GetConnectedServicesAsync(token), cancellationToken);
             var runtimeProfilesTask = SafeLoadAsync("runtime profiles", token => runtimeProfiles.GetRuntimeProfilesAsync(token), cancellationToken);
             var parametersTask = SafeLoadAsync("parameters", token => parameters.GetParametersAsync(token), cancellationToken);
             var secretsTask = SafeLoadAsync("secrets", token => secrets.GetSecretsAsync(token), cancellationToken);
@@ -59,7 +61,7 @@ public sealed class ConsoleResourceSearchProvider(
             var executionsTask = SafeLoadAsync("executions", token => runtime.GetExecutionsAsync(token), cancellationToken);
             var workTask = SafeLoadAsync("work items", token => work.GetWorkItemsAsync(token), cancellationToken);
 
-            await Task.WhenAll(agentsTask, profilesTask, providersTask, sourceProvidersTask, runtimeProfilesTask, parametersTask, secretsTask, vaultsTask, flowsTask, instancesTask, executionsTask, workTask);
+            await Task.WhenAll(agentsTask, profilesTask, providersTask, sourceProvidersTask, connectedServicesTask, runtimeProfilesTask, parametersTask, secretsTask, vaultsTask, flowsTask, instancesTask, executionsTask, workTask);
 
             cache =
             [
@@ -67,6 +69,7 @@ public sealed class ConsoleResourceSearchProvider(
                 .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, ResourceUrl("modelprofiles", item.Namespace, item.Name), item.Properties.Status, "adjustments", $"{item.Namespace} {item.Name} {item.Properties.Model.Name}")),
                 .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, ResourceUrl("modelproviders", item.Namespace, item.Name), item.Properties.Status, "cpu", $"{item.Namespace} {item.Name} {item.Properties.ContributionId}")),
                 .. sourceProvidersTask.Result.Select(item => new ResourceSearchResult(item.DisplayName, "Source provider", item.Id, ResourceUrl("sourceproviders", item.Namespace, item.Name), item.Status, "plug-connected", $"{item.Namespace} {item.Name} {item.ContributionId} {item.ExtensionName}")),
+                .. connectedServicesTask.Result.Select(item => new ResourceSearchResult(item.Definition.DisplayName, "Connected Service", item.Address.ToString(), $"/connected-services/{Escape(item.Name)}?scopeRef={Escape(item.ScopeRef!.Value.Value)}", item.ObservedState?.Availability.ToString() ?? "Not observed", "plug-connected", $"{item.Namespace.Value} {item.Name} {item.Definition.Type.Type.Namespace?.Value} {item.Definition.Type.Type.Name}")),
                 .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, ResourceUrl("runtimeprofiles", item.Namespace, item.Name), "Configured", "cube", $"{item.Namespace} {item.Name} {item.Properties.RuntimeType}")),
                 .. parametersTask.Result.Select(item => new ResourceSearchResult(item.Definition.DisplayName, "Parameter", item.Address.ToString(), $"/parameters/{Escape(item.Name)}?scopeRef={Escape(item.ScopeRef!.Value.Value)}", "Configured", "braces", $"{item.Namespace.Value} {item.Name} {item.Definition.ValueType}")),
                 .. secretsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Secret", item.Resource.Address.ToString(), $"/secrets/{Escape(item.Resource.Name)}", item.ValueStatus, "key", $"{item.Resource.Name} {item.Resource.Definition.Vault.Name}")),

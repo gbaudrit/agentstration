@@ -22,6 +22,8 @@
   <data name="Nav.DataSourceProfiles" xml:space="preserve"><value>Profils de source de données</value></data>
   <data name="Nav.Schemas" xml:space="preserve"><value>Schémas</value></data>
   <data name="Command.CreateSchema" xml:space="preserve"><value>Créer un schéma</value></data>
+  <data name="Nav.ConnectedServices" xml:space="preserve"><value>Services connectés</value></data>
+  <data name="Command.CreateConnectedService" xml:space="preserve"><value>Créer un service connecté</value></data>
   <data name="CurrentContext" xml:space="preserve"><value>Contexte Console actuel</value></data>
   <data name="ChangeContext" xml:space="preserve"><value>Changer de contexte Console</value></data>
   <data name="ChooseContext" xml:space="preserve"><value>Choisir un contexte</value></data>

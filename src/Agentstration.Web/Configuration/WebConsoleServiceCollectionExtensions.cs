@@ -90,6 +90,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<ToolDefinitionsApiClient, IToolDefinitionsClient>(services, configured.ManagementApi);
         AddSensitiveClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi);
         AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi);
+        AddClient<ConnectedServicesApiClient, IConnectedServicesClient>(services, configured.ManagementApi);
         AddClient<SchemasApiClient, ISchemasClient>(services, configured.ManagementApi);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ResourceAccessPolicyApiClient, IResourceAccessPolicyClient>(services, configured.ManagementApi);
