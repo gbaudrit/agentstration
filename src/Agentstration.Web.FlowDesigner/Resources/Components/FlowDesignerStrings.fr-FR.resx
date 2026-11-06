@@ -151,4 +151,7 @@
   <data name="NoOutputContractHelp"><value>Cette étape n’expose actuellement aucun contrat de sortie configurable.</value></data>
   <data name="SelectFlowVersionForContract"><value>Sélectionnez une version de Flow disponible pour consulter son contrat.</value></data>
   <data name="SelectToolForContract"><value>Sélectionnez un Tool disponible pour consulter son contrat.</value></data>
+  <data name="DraftChangedDuringSave" xml:space="preserve">
+    <value>Le brouillon a changé pendant la sauvegarde. Vos modifications locales sont conservées. Rechargez le Flow avant de réessayer.</value>
+  </data>
 </root>
