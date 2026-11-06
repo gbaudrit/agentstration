@@ -127,6 +127,7 @@ public sealed partial class FlowDesignerReadOnlyTests
             this.readOnly = readOnly;
             draft = CreateDraft(definition);
         }
+        public string? FailingLoadTarget { get; set; }
         public Func<Task>? BeforeSave { get; set; }
         public Func<Task>? BeforeReplace { get; set; }
         public Func<FlowDesignerTarget, Task<FlowSourceResponse>>? ReadSource { get; set; }
@@ -143,6 +144,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         public Task<FlowDesignerLoadResult> LoadAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
         {
             LoadedTarget = target;
+            if (target.ResourceId == FailingLoadTarget) throw new InvalidOperationException("Flow load unavailable");
             var value = draft.Value;
             return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition) { ScopeRef = value.ScopeRef }, source, ETag: readOnly ? null : draft.ETag, PublishedVersion: readOnly ? "2.1.0" : null));
         }

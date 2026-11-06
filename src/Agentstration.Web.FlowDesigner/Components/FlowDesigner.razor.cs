@@ -153,6 +153,7 @@ public partial class FlowDesigner
         targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = targetCancellation.Token;
         var target = Target;
+        var targetLoaded = false;
         loadingTarget = true;
         saving = publishing = runningDraft = false;
         publication = null;
@@ -162,6 +163,7 @@ public partial class FlowDesigner
             var loaded = await Backend.LoadAsync(target, token);
             token.ThrowIfCancellationRequested();
             Editor.Load(loaded, target);
+            targetLoaded = true;
             var owner = OwnerScope;
             var loadedAgents = await Resources.GetAgentsAsync(owner, token);
             var loadedFlows = await Resources.GetFlowsAsync(owner, token);
@@ -188,7 +190,7 @@ public partial class FlowDesigner
         }
         finally
         {
-            if (!token.IsCancellationRequested) loadingTarget = false;
+            if (!token.IsCancellationRequested) loadingTarget = !targetLoaded;
         }
     }
 

@@ -232,6 +232,27 @@ public sealed partial class FlowDesignerReadOnlyTests
         StringAssert.Contains(rendered.Markup, "Invalid old YAML");
     }
 
+    [TestMethod]
+    public async Task FailedTargetLoadCannotSavePreviousFlowsDirtyDraft()
+    {
+        using var context = CreateContext();
+        var backend = new BackendStub(false) { FailingLoadTarget = "unavailable" };
+        ConfigureSavingContext(context, backend);
+        var rendered = context.Render<FlowDesignerComponent>(p => p.Add(c => c.ResourceId, "sample"));
+        var store = context.Services.GetRequiredService<FlowEditorStore>();
+        await rendered.InvokeAsync(() => store.DispatchAsync(new MoveStepCommand("input", new(10, 20))));
+        rendered.Render(p => p.Add(c => c.ResourceId, "unavailable"));
+        await rendered.InvokeAsync(() => InvokeDesignerAsync(rendered.Instance, "SaveAsync"));
+        await rendered.InvokeAsync(() => InvokeDesignerAsync(rendered.Instance, "ValidateAsync"));
+        await rendered.InvokeAsync(() => InvokeDesignerAsync(rendered.Instance, "PublishAsync"));
+        Assert.AreEqual(0, backend.SaveCount);
+        Assert.AreEqual(0, backend.ValidationCount);
+        Assert.IsNull(backend.LastPublishVersion);
+        Assert.IsTrue(store.State.IsDirty);
+        Assert.AreEqual(new FlowNodePosition(10, 20), store.State.Resource!.Definition.Designer.NodePositions["input"]);
+        StringAssert.Contains(rendered.Markup, "Flow load unavailable");
+    }
+
     private static Task InvokeDesignerAsync(FlowDesignerComponent component, string method) =>
         (Task)typeof(FlowDesignerComponent).GetMethod(method, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(component, null)!;
 
