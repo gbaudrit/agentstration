@@ -156,4 +156,7 @@
   <data name="NoOutputContractHelp"><value>This step does not currently expose a configurable output contract.</value></data>
   <data name="SelectFlowVersionForContract"><value>Select an available Flow version to inspect its contract.</value></data>
   <data name="SelectToolForContract"><value>Select an available Tool to inspect its contract.</value></data>
+  <data name="DraftChangedDuringSave" xml:space="preserve">
+    <value>The draft changed while saving. Your local changes are preserved. Reload the Flow before retrying.</value>
+  </data>
 </root>

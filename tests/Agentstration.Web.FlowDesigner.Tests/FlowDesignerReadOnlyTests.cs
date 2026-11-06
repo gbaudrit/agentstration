@@ -127,6 +127,10 @@ public sealed partial class FlowDesignerReadOnlyTests
             this.readOnly = readOnly;
             draft = CreateDraft(definition);
         }
+        public Func<Task>? BeforeSave { get; set; }
+        public Func<Task>? BeforeReplace { get; set; }
+        public Func<FlowDesignerTarget, Task<FlowSourceResponse>>? ReadSource { get; set; }
+        public List<string> SavedETags { get; } = [];
         public int SaveCount { get; private set; }
         public int ValidationCount { get; private set; }
         public FlowGraphDefinition? LastSavedDefinition { get; private set; }
@@ -143,21 +147,25 @@ public sealed partial class FlowDesignerReadOnlyTests
             return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition) { ScopeRef = value.ScopeRef }, source, ETag: readOnly ? null : draft.ETag, PublishedVersion: readOnly ? "2.1.0" : null));
         }
         public Task<FlowSourceResponse> GetSourceAsync(FlowDesignerTarget target, CancellationToken cancellationToken) =>
-            Task.FromResult(new FlowSourceResponse(source, "yaml", draft.Value.Revision));
-        public Task<FlowDraftResponse> SaveDraftAsync(FlowDesignerTarget target, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken)
+            ReadSource?.Invoke(target) ?? Task.FromResult(new FlowSourceResponse(source, "yaml", draft.Value.Revision));
+        public async Task<FlowDraftResponse> SaveDraftAsync(FlowDesignerTarget target, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken)
         {
             SaveCount++;
+            SavedETags.Add(etag);
+            if (BeforeSave is not null) await BeforeSave();
             LastSavedDefinition = request.Definition;
             draft = new(draft.Value with { Definition = request.Definition, Revision = draft.Value.Revision + 1 }, $"\"etag-{draft.Value.Revision + 1}\"");
-            return Task.FromResult(draft);
+            return draft;
         }
-        public Task<FlowDraftResponse> ReplaceSourceAsync(FlowDesignerTarget target, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken)
+        public async Task<FlowDraftResponse> ReplaceSourceAsync(FlowDesignerTarget target, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken)
         {
+            SavedETags.Add(etag);
             LastReplacementSource = request.Source;
+            if (BeforeReplace is not null) await BeforeReplace();
             if (ReplacementError is not null) throw new InvalidOperationException(ReplacementError);
             source = request.Source;
             draft = new(draft.Value with { Definition = ReplacementDefinition ?? draft.Value.Definition, Revision = draft.Value.Revision + 1 }, "\"next-etag\"");
-            return Task.FromResult(draft);
+            return draft;
         }
         public Task<FlowValidationResponse> ValidateAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
         {
