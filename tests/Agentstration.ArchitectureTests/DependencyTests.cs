@@ -6,6 +6,8 @@ using Agentstration.Agents;
 using Agentstration.Agents.Contracts;
 using Agentstration.Application.Work;
 using Agentstration.Awp.Abstractions;
+using Agentstration.ConnectedServices;
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
@@ -381,7 +383,7 @@ public sealed class DependencyTests
         var repositoryRoot = FindRepositoryRoot();
         var apiRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Api");
         var hostRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Web");
-        var modules = new[] { "Agents", "Bootstrap", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
+        var modules = new[] { "Agents", "Bootstrap", "ConnectedServices", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
 
         foreach (var family in modules)
         {
@@ -420,7 +422,7 @@ public sealed class DependencyTests
         var aggregator = Path.Combine(root, "src", "Agentstration.Api");
         var routeComposition = File.ReadAllText(Path.Combine(aggregator, "ApiTransportEndpointRouteBuilderExtensions.cs"));
         var serviceComposition = File.ReadAllText(Path.Combine(aggregator, "Configuration", "ApiTransportServiceCollectionExtensions.cs"));
-        var families = new[] { "Agents", "Bootstrap", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
+        var families = new[] { "Agents", "Bootstrap", "ConnectedServices", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
         foreach (var family in families)
         {
             Assert.AreEqual(1, CountOccurrences(routeComposition, $"Map{family}Api("), family);
@@ -862,7 +864,8 @@ public sealed class DependencyTests
             typeof(FlowDefinition).Assembly,
             typeof(ModelProfileResource).Assembly,
             typeof(ToolResource).Assembly,
-            typeof(SecretResource).Assembly
+            typeof(SecretResource).Assembly,
+            typeof(ConnectedServiceManagementService).Assembly
         };
 
         Assert.IsFalse(assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Any(reference =>
@@ -1030,13 +1033,13 @@ public sealed class DependencyTests
     {
         var expected = new[]
         {
-            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "KnowledgeSourceToolExposure", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter",
+            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "KnowledgeSourceToolExposure", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter", "ConnectedService",
             "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "ToolSet", "ToolSetVersion", "Trigger", "Source", "SourceVersion", "SourceProvider"
         };
         var actual = new[]
         {
             AgentResourceKinds.Agent, AgentResourceKinds.AgentRevision, AgentResourceKinds.AgentDeployment, FlowResourceKinds.Flow,
-            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, KnowledgeResourceKinds.KnowledgeSourceToolExposure, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter,
+            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, KnowledgeResourceKinds.KnowledgeSourceToolExposure, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter, ConnectedServiceResourceKinds.ConnectedService,
             SecretResourceKinds.Secret, SecretResourceKinds.Vault, ToolResourceKinds.Tool, ToolResourceKinds.ToolDefinition,
             ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, ToolResourceKinds.ToolSet, ToolResourceKinds.ToolSetVersion, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
             SourceResourceKinds.SourceVersion, SourceResourceKinds.SourceProvider
@@ -1058,6 +1061,7 @@ public sealed class DependencyTests
             typeof(KnowledgeSourceResource).Assembly,
             typeof(Agentstration.Models.Contracts.ModelProviderResponse).Assembly,
             typeof(Agentstration.Parameters.Contracts.CreateParameterRequest).Assembly,
+            typeof(CreateConnectedServiceRequest).Assembly,
             typeof(Agentstration.ResourceManagement.Contracts.ResourceDeclaration<>).Assembly,
             typeof(Agentstration.Runtime.Contracts.RuntimeProfileSummaryResponse).Assembly,
             typeof(Agentstration.Secrets.Contracts.SecretResponse).Assembly,

@@ -1,3 +1,4 @@
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
@@ -215,7 +216,22 @@ public sealed class ExtensionRegistrationManagementService(
                 value.Value.Kind,
                 value.Value.Name,
                 value.Value.Definition.DisplayName,
-                value.Value.Definition.ContributionId))
+                value.Value.Definition.ContributionId)),
+            .. (await store.ListAllAsync<ConnectedServiceResource>(
+                ConnectedServiceResourceKinds.ConnectedService, cancellationToken))
+            .Where(value =>
+            {
+                var reference = value.Value.Definition.Type.Extension;
+                var address = reference.Resolve(value.Value.Namespace, ExtensionKinds.ExtensionRegistration);
+                return address.Namespace == @namespace
+                    && string.Equals(address.Name, name, StringComparison.Ordinal)
+                    && reference.ScopeRef == scopeRef;
+            })
+            .Select(value => new ExtensionRegistrationUsage(
+                value.Value.Kind,
+                value.Value.Name,
+                value.Value.Definition.DisplayName,
+                value.Value.Definition.Type.TypeId))
         ];
 
     private async Task<ExtensionRegistrationProperties> ValidateDefinitionAsync(

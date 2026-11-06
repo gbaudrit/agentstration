@@ -41,6 +41,7 @@ public sealed class AepExtensionOptions
     public IList<AepToolContribution> Tools { get; } = [];
     public IList<AepDataSourceProfileBundleContribution> DataSourceProfileBundles { get; } = [];
     public IList<AepSchemaFormatContribution> SchemaFormats { get; } = [];
+    public IList<AepConnectedServiceTypeContribution> ConnectedServiceTypes { get; } = [];
     public IList<AepOptionSetDescriptor> OptionSets { get; } = [];
     public IList<AepValueRequirement> ValueRequirements { get; } = [];
     public AepSourceMaterializationLimits SourceMaterializationLimits { get; set; } = new(
@@ -201,6 +202,8 @@ public static class AepServerExtensions
         if (sources.Length > 0) capabilities[AepCapabilityNames.SourceProvider] = new("1.0", AepProtocol.SourceProvidersPath);
         if (options.Tools.Count > 0) capabilities[AepCapabilityNames.Tools] = new("1.0");
         if (options.SchemaFormats.Count > 0) capabilities[AepCapabilityNames.SchemaFormats] = new("1.0");
+        if (options.ConnectedServiceTypes.Count > 0)
+            capabilities[AepCapabilityNames.ConnectedServiceTypes] = new(AepProtocol.ConnectedServiceTypesCapabilityVersion);
         if (options.OptionSets.Count > 0) capabilities[AepCapabilityNames.Configuration] = new("1.0", AepProtocol.ConfigurationPath);
         if (options.ValueRequirements.Count > 0)
         {
@@ -212,7 +215,8 @@ public static class AepServerExtensions
             options.Extension,
             capabilities,
             new AepContributions(modelProviders, options.Tools.ToArray(), sources,
-                options.DataSourceProfileBundles.ToArray(), options.SchemaFormats.ToArray()),
+                options.DataSourceProfileBundles.ToArray(), options.SchemaFormats.ToArray(),
+                options.ConnectedServiceTypes.ToArray()),
             options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()),
             options.ValueRequirements.Count == 0 ? null : options.ValueRequirements.ToArray());
         var errors = AepDescriptorValidator.Validate(descriptor);
