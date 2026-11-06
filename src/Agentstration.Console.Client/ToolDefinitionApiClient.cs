@@ -12,6 +12,9 @@ public interface IToolDefinitionsClient
     Task<IReadOnlyList<ToolDefinitionResource>> GetAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolDefinitionResource>> GetAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolDefinitionResource>> CreateAsync(CreateToolDefinitionRequest request, CancellationToken cancellationToken);
+    Task<ToolDefinitionResource> CreateFromAcquisitionAsync(ResourceNamespace acquisitionNamespace, string acquisitionId,
+        CreateToolDefinitionFromAcquisitionRequest request, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not create Tools from acquisitions.");
     Task<ResourceSnapshot<ToolDefinitionResource>> UpdateAsync(string name, ResourceNamespace @namespace, PutToolDefinitionRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolDefinitionResource>> SetEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string etag, CancellationToken cancellationToken);
     Task DeleteAsync(string name, ResourceNamespace @namespace, string etag, CancellationToken cancellationToken);
@@ -32,6 +35,16 @@ public sealed class ToolDefinitionsApiClient(HttpClient httpClient) : IToolDefin
     {
         using var response = await httpClient.PostAsJsonAsync("api/tooldefinitions", request, cancellationToken);
         return await ReadAsync(response, cancellationToken);
+    }
+
+    public async Task<ToolDefinitionResource> CreateFromAcquisitionAsync(ResourceNamespace acquisitionNamespace, string acquisitionId,
+        CreateToolDefinitionFromAcquisitionRequest request, CancellationToken cancellationToken)
+    {
+        var path = $"api/tooldefinitions/from-acquisition/{Uri.EscapeDataString(acquisitionId)}?namespace={Uri.EscapeDataString(acquisitionNamespace.Value)}";
+        using var response = await httpClient.PostAsJsonAsync(path, request, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ToolDefinitionResource>(cancellationToken)
+            ?? throw new InvalidOperationException("ToolDefinition API returned an empty response.");
     }
 
     public async Task<ResourceSnapshot<ToolDefinitionResource>> UpdateAsync(string name, ResourceNamespace @namespace, PutToolDefinitionRequest request, string etag, CancellationToken cancellationToken) =>

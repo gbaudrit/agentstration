@@ -20,7 +20,7 @@ dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Rele
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
 
-API integration tests run in four independent test assemblies: `Agentstration.Api.Flows.Tests` (74 cases), `Agentstration.Api.Execution.Tests` (58), `Agentstration.Api.Resources.Tests` (80), and `Agentstration.Api.Tests` (23). These preserve the former consolidated module's 235 cases and test names. Each assembly owns its fixtures and runs its cases sequentially. The diagnostic job runs these assemblies one after another in separate processes so process memory is released between groups. The Integration lane and coverage shard B include all four projects.
+API integration tests run in four independent test assemblies: `Agentstration.Api.Flows.Tests`, `Agentstration.Api.Execution.Tests`, `Agentstration.Api.Resources.Tests`, and `Agentstration.Api.Tests`. These preserve the former consolidated module's cases and test names. The Resources module also owns the 38 Data Source and Artifact API cases moved from Management API after the combined 142-case module exceeded its retained memory budget (2725.1 MiB on Ubuntu CI). Each assembly owns its fixtures and runs its cases sequentially. Memory budgets remain unchanged; diagnostic minimum counts are 118 for Resources and 104 for Management API. The diagnostic job runs these assemblies one after another in separate processes so process memory is released between groups. The Integration lane and coverage shard B include all four projects.
 
 ### SQLite connection pooling regression
 

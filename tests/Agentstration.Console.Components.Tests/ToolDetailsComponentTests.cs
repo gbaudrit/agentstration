@@ -4,6 +4,7 @@ using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -84,6 +85,31 @@ public sealed class ToolDetailsComponentTests
         StringAssert.Contains(rendered.Find(".tool-field").TextContent, "Obligatoire");
         StringAssert.Contains(rendered.Find(".tool-field").TextContent, "Provider-authored English description.");
         StringAssert.Contains(rendered.Find(".tool-capability").TextContent, "Create one durable notification.");
+    }
+
+    [TestMethod]
+    public void AcquisitionToolOpensInExecutionAndLinksTheReturnedArtifactInContext()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = CreateContext(new ToolSchema { Input = ToolDefinitionAcquisitionTarget.InputSchema });
+        context.Services.AddSingleton<IConsoleNavigationContext>(new InstanceNavigationContext());
+        var client = context.Services.GetRequiredService<ToolClient>();
+        client.ExecutionOutput = JsonSerializer.Deserialize<JsonElement>("""
+            {"acquisitionId":"acquisition-2","artifact":{"artifactId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","kind":"durable"}}
+            """);
+        var workspace = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo($"/tools/acquisition-tool?scopeRef={Uri.EscapeDataString(workspace.Value)}&context=%2Finstance&view=execution");
+        var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "acquisition-tool"));
+
+        rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("#tool-execution-tab").GetAttribute("aria-selected")));
+        rendered.Find("[data-testid='tool-run-submit']").Click();
+
+        var artifact = rendered.WaitForElement("[data-testid='tool-run-open-artifact']");
+        Assert.AreEqual("Ouvrir l’artefact", artifact.TextContent);
+        Assert.AreEqual("/artifacts/durable/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?context=%2Finstance", artifact.GetAttribute("href"));
+        Assert.AreEqual(workspace, client.ExecutionScope);
+        Assert.AreEqual(ToolRunMode.Execute, client.RunRequests.Single().Mode);
     }
 
     [TestMethod]
@@ -193,6 +219,8 @@ public sealed class ToolDetailsComponentTests
     private sealed class ToolClient(ToolResource tool) : IToolsClient
     {
         public List<RunToolRequest> RunRequests { get; } = [];
+        public ResourceScopeRef? ExecutionScope { get; private set; }
+        public JsonElement? ExecutionOutput { get; set; }
 
         public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceSnapshot<ToolResource>(tool, "\"etag\""));
@@ -208,6 +236,12 @@ public sealed class ToolDetailsComponentTests
         public Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
 
+        public Task<RunToolResponse> RunToolAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken)
+        {
+            ExecutionScope = scopeRef;
+            return RunToolAsync(@namespace, name, request, cancellationToken);
+        }
+
         public Task<RunToolResponse> RunToolAsync(ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken)
         {
             RunRequests.Add(request);
@@ -221,9 +255,15 @@ public sealed class ToolDetailsComponentTests
                 false,
                 [new ToolRunCheck(request.Mode == ToolRunMode.Simulate ? "dry_run" : "execution", "passed", "Completed.")],
                 request.Mode == ToolRunMode.Execute
-                    ? JsonSerializer.SerializeToElement(new { status = "created" })
+                    ? ExecutionOutput ?? JsonSerializer.SerializeToElement(new { status = "created" })
                     : JsonSerializer.SerializeToElement(new { dryRun = true })));
         }
+    }
+
+    private sealed class InstanceNavigationContext : IConsoleNavigationContext
+    {
+        public string ScopeRef => "/instance";
+        public string AddToUri(string uri) => $"{uri}?context=%2Finstance";
     }
 
     private sealed class CultureScope : IDisposable

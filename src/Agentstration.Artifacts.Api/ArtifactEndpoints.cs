@@ -14,6 +14,7 @@ internal static class ArtifactEndpoints
     public static void Map(RouteGroupBuilder artifacts)
     {
         artifacts.RequireAuthorization(AgentstrationPolicies.Authenticated);
+        artifacts.AddEndpointFilter<ArtifactExecutionScopeFilter>();
         artifacts.MapGet("/staging-bindings", ListBindingsAsync).WithSummary("List Artifact staging bindings").Produces<IEnumerable<ArtifactStagingBindingResource>>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapGet("/staging-bindings/{name}", GetBindingAsync).WithSummary("Get an Artifact staging binding").Produces<ArtifactStagingBindingResource>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/staging-bindings", CreateBindingAsync).WithSummary("Create an Artifact staging binding").Produces<ArtifactStagingBindingResource>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);

@@ -3,6 +3,7 @@ using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
@@ -15,6 +16,8 @@ public sealed class KnowledgeProjectionInputResolver(
     DataSourceManagementService dataSources,
     DataSourceAcquisitionService acquisitions,
     DataSourceAcquisitionTargetService targets,
+    ICurrentRequestContext current,
+    IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider) : IKnowledgeProjectionInputResolver
 {
     public async Task<ResolvedKnowledgeDataSourceBinding> ResolveDependencyAsync(
@@ -24,6 +27,11 @@ public sealed class KnowledgeProjectionInputResolver(
         CancellationToken cancellationToken)
     {
         var ns = binding.DataSource.Namespace ?? ownerNamespace;
+        // ResolveForUseAsync still checks the tenant consumer's grant on the exact ancestor.
+        using var inheritedScope = current.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            && binding.DataSource.ScopeRef == ResourceScopeRef.Instance
+            && ownerScope == ResourceScopeRef.Tenant(current.Current.TenantId)
+            ? requestScopes.PushInstance(current.Current) : null;
         var source = await dataSources.ResolveForUseAsync(ns, binding.DataSource.Name,
             binding.DataSource.ScopeRef, ownerScope, cancellationToken);
         var sourceScope = source.Value.ScopeRef

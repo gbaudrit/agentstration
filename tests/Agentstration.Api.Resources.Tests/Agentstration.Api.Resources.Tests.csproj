@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />
     <ProjectReference Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Agents/Agentstration.Agents.csproj" />
     <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />

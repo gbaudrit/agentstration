@@ -3,16 +3,30 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Artifacts;
 
-public abstract class ArtifactBrokerInternalTool(ArtifactManagementService artifacts) : IInternalMcpToolHandler
+public abstract class ArtifactBrokerInternalTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : IInternalMcpToolHandler
 {
     protected ArtifactManagementService Artifacts { get; } = artifacts;
     public abstract InternalMcpToolDefinition Definition { get; }
-    public abstract Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken);
+    public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    {
+        if (current.AccessMode is not (ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration))
+            throw Error("artifact_execution_scope_required", "Artifact operations require a trusted Tenant, Workspace, and Principal scope.");
+        var context = current.Current;
+        if (context.PrincipalId == Guid.Empty || context.TenantId == Guid.Empty || context.WorkspaceId == Guid.Empty
+            || context.PrincipalId != invocation.PrincipalId || context.TenantId != invocation.TenantId
+            || context.WorkspaceId != invocation.WorkspaceId.Value)
+            throw Error("artifact_execution_scope_required", "Artifact operations require matching trusted execution coordinates.");
+        using var scope = scopes.Push(context);
+        return await ExecuteCoreAsync(invocation, cancellationToken);
+    }
+
+    protected abstract Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken);
 
     protected static InitialToolCategory Category { get; } = new(
         "staged-artifacts", "Staged artifacts", "Governed temporary Artifact operations brokered by Agentstration.");
@@ -36,13 +50,13 @@ public abstract class ArtifactBrokerInternalTool(ArtifactManagementService artif
     }
 }
 
-public sealed class StagedArtifactCreateMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactCreateMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.create", "Create staged artifact",
         "Creates a governed temporary Artifact. The physical backend reference is never returned.",
         Schema(new { type = "object", properties = new { fileName = new { type = "string" }, mediaType = new { type = "string" }, binding = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "fileName", "mediaType" }, additionalProperties = false }), InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var binding = OptionalString(invocation.Arguments, "binding");
         var producer = new ArtifactProducer
@@ -65,13 +79,13 @@ public sealed class StagedArtifactCreateMcpTool(ArtifactManagementService artifa
     }
 }
 
-public sealed class StagedArtifactWriteMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactWriteMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.write", "Write staged artifact",
         "Writes one bounded base64 content chunk through the governed staging binding.",
         Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, offset = new { type = "integer" }, contentBase64 = new { type = "string" } }, required = new[] { "artifactId", "offset", "contentBase64" }, additionalProperties = false }), InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var bytes = Convert.FromBase64String(RequiredString(invocation.Arguments, "contentBase64"));
         var stored = await Artifacts.WriteAsync(StagedArtifactId.Parse(RequiredString(invocation.Arguments, "artifactId")),
@@ -80,23 +94,23 @@ public sealed class StagedArtifactWriteMcpTool(ArtifactManagementService artifac
     }
 }
 
-public sealed class StagedArtifactSealMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactSealMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.seal", "Seal staged artifact",
         "Seals staged content after verifying its length and digest.",
         Schema(new { type = "object", properties = new { artifactId = new { type = "string" } }, required = new[] { "artifactId" }, additionalProperties = false }), InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>
         View((await Artifacts.SealAsync(StagedArtifactId.Parse(RequiredString(invocation.Arguments, "artifactId")), cancellationToken)).Value);
 }
 
-public sealed class StagedArtifactInspectMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactInspectMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.inspect", "Inspect staged artifact",
         "Returns metadata and provenance for an explicitly delegated staged Artifact.",
         Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, leaseId = new { type = "string" } }, required = new[] { "artifactId", "leaseId" }, additionalProperties = false }), InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var stored = await Artifacts.GetStagedAsync(
             StagedArtifactId.Parse(RequiredString(invocation.Arguments, "artifactId")),
@@ -107,14 +121,14 @@ public sealed class StagedArtifactInspectMcpTool(ArtifactManagementService artif
     }
 }
 
-public sealed class StagedArtifactReadContentMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactReadContentMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     private const int MaximumTextBytes = 64 * 1024;
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.read-content", "Read staged artifact content",
         "Reads delegated content as bounded UTF-8 text or a bounded base64 binary chunk.",
         Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, leaseId = new { type = "string" }, offset = new { type = "integer" }, length = new { type = "integer", maximum = ArtifactManagementService.MaximumChunkBytes }, disclosure = new { type = "string", @enum = new[] { "bounded-text", "binary" } } }, required = new[] { "artifactId", "leaseId", "disclosure" }, additionalProperties = false }), InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var disclosure = RequiredString(invocation.Arguments, "disclosure");
         var maximum = disclosure == "bounded-text" ? MaximumTextBytes : ArtifactManagementService.MaximumChunkBytes;
@@ -133,24 +147,24 @@ public sealed class StagedArtifactReadContentMcpTool(ArtifactManagementService a
     }
 }
 
-public sealed class StagedArtifactManageRetentionMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactManageRetentionMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.manage-retention", "Manage staged artifact retention",
         "Extends retention within the selected binding policy.",
         Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "artifactId", "expiresAt" }, additionalProperties = false }), RequiresApproval: true, InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>
         View((await Artifacts.ExtendRetentionAsync(StagedArtifactId.Parse(RequiredString(invocation.Arguments, "artifactId")),
             OptionalTimestamp(invocation.Arguments, "expiresAt") ?? throw Error("staged_artifact_expiration_required", "Expiration is required."), cancellationToken)).Value);
 }
 
-public sealed class StagedArtifactPurgeMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactPurgeMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.purge", "Purge staged artifact",
         "Purges temporary content after lifecycle and active-lease checks.",
         Schema(new { type = "object", properties = new { artifactId = new { type = "string" } }, required = new[] { "artifactId" }, additionalProperties = false }), RequiresApproval: true, InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var id = StagedArtifactId.Parse(RequiredString(invocation.Arguments, "artifactId"));
         await Artifacts.PurgeAsync(id, cancellationToken);
@@ -158,13 +172,13 @@ public sealed class StagedArtifactPurgeMcpTool(ArtifactManagementService artifac
     }
 }
 
-public sealed class StagedArtifactCreateLeaseMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactCreateLeaseMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.create-lease", "Delegate staged artifact",
         "Creates a bounded delegation for an explicit consumer and Artifact.",
         Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, consumerKind = new { type = "string" }, consumerId = new { type = "string" }, operations = new { type = "array", items = new { type = "string" } }, expiresAt = new { type = "string" } }, required = new[] { "artifactId", "consumerKind", "consumerId", "operations", "expiresAt" }, additionalProperties = false }), InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         if (!invocation.Arguments.TryGetProperty("operations", out var operations) || operations.ValueKind != JsonValueKind.Array)
             throw Error("artifact_lease_operations_required", "Lease operations are required.");
@@ -176,13 +190,13 @@ public sealed class StagedArtifactCreateLeaseMcpTool(ArtifactManagementService a
     }
 }
 
-public sealed class StagedArtifactHandoffMcpTool(ArtifactManagementService artifacts) : ArtifactBrokerInternalTool(artifacts)
+public sealed class StagedArtifactHandoffMcpTool(ArtifactManagementService artifacts, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.handoff", "Handoff staged artifact",
         "Delegates, copies, or moves a sealed Artifact to an explicit consumer and governed staging binding.",
         Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, operationId = new { type = "string" }, mode = new { type = "string", @enum = new[] { "reuse", "copy", "move", "reuseOrCopy" } }, consumerKind = new { type = "string" }, consumerId = new { type = "string" }, operations = new { type = "array", items = new { type = "string" } }, leaseExpiresAt = new { type = "string" }, targetBinding = new { type = "string" } }, required = new[] { "artifactId", "operationId", "mode", "consumerKind", "consumerId", "operations", "leaseExpiresAt" }, additionalProperties = false }), InitialCategory: Category);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         if (!invocation.Arguments.TryGetProperty("operations", out var operations) || operations.ValueKind != JsonValueKind.Array)
             throw Error("artifact_lease_operations_required", "Handoff lease operations are required.");

@@ -37,6 +37,8 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<IFlowToolSetResolver, ManagementFlowToolSetResolver>();
         services.AddSingleton<IToolSetDeletionGuard, ToolSetDeletionGuard>();
         services.AddSingleton<IToolDefinitionExecutor, ToolDefinitionExecutor>();
+        services.AddSingleton<IToolDefinitionAcquisitionFactory, ToolDefinitionAcquisitionFactory>();
+        services.AddSingleton<ToolDefinitionAcquisitionExecutor>();
         services.AddSingleton(provider => new Lazy<IToolDefinitionExecutor>(provider.GetRequiredService<IToolDefinitionExecutor>));
         return services;
     }

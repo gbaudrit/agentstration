@@ -288,6 +288,7 @@ public sealed record DataSourceDiscoveryResource : Resource
     public required Guid CreatedBy { get; init; }
     public required Guid TenantId { get; init; }
     public required Guid WorkspaceId { get; init; }
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public DataSourceDiscoveryManifest? Manifest { get; init; }
@@ -370,6 +371,7 @@ public sealed record DataSourceAcquisitionResource : Resource
     public required Guid CreatedBy { get; init; }
     public required Guid TenantId { get; init; }
     public required Guid WorkspaceId { get; init; }
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public int Attempt { get; init; } = 1;

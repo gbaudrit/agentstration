@@ -53,4 +53,33 @@
   <data name="DiscoveryToolBindings" xml:space="preserve"><value>Discovery Tool bindings (JSON)</value></data>
   <data name="Access"><value>Access</value></data>
   <data name="ManagedReadOnly"><value>Managed · read-only</value></data><data name="Editable"><value>Editable</value></data><data name="ManagedProfileHelp"><value>This profile and its published revisions are controlled by the extension installation and cannot be changed directly.</value></data><data name="ManagingExtension"><value>Managing extension</value></data>
+  <data name="OperationalLoadFailed" xml:space="preserve"><value>The Data Source definition is loaded, but its operational status or history could not be loaded. Reload the page to retry.</value></data>
+  <data name="DiscoveryFlowTitle" xml:space="preserve"><value>Discovery Flow</value></data>
+  <data name="DiscoveryHistory" xml:space="preserve"><value>Discovery history</value></data>
+  <data name="DiscoveryLiveUpdates" xml:space="preserve"><value>Execution status and discovered choices update automatically while a run is active.</value></data>
+  <data name="OperationalRefreshFailed" xml:space="preserve"><value>Unable to refresh execution status. Displayed results have been retained. Use Refresh to retry.</value></data>
+  <data name="DiscoveryResultsTab" xml:space="preserve"><value>Results</value></data>
+  <data name="DiscoveryHistoryTab" xml:space="preserve"><value>History</value></data>
+  <data name="ReconcileTarget" xml:space="preserve"><value>Reconcile</value></data>
+  <data name="ReconcileHelp" xml:space="preserve"><value>After rediscovery, reconcile an existing target to explicitly adopt the new choice while preserving its identity and acquisition history.</value></data>
+  <data name="ReconcileUnavailable" xml:space="preserve"><value>Run a new successful discovery containing this eligible choice, then refresh the results.</value></data>
+  <data name="TargetNameInUse" xml:space="preserve"><value>This target name already exists. Reconcile the existing target below, or choose another name for a new target.</value></data>
+  <data name="TargetConcurrencyConflict" xml:space="preserve"><value>The target changed since it was loaded. Refresh the results, review the target, and retry.</value></data>
+  <data name="TargetPromoted" xml:space="preserve"><value>Already promoted</value></data>
+  <data name="TargetNameUsed" xml:space="preserve"><value>Name in use</value></data>
+  <data name="AcquiredArtifacts" xml:space="preserve"><value>Acquired artifacts</value></data>
+  <data name="ViewAcquiredArtifacts" xml:space="preserve"><value>View artifacts</value></data>
+  <data name="HideAcquiredArtifacts" xml:space="preserve"><value>Hide artifacts</value></data>
+  <data name="AcquiredArtifactUnavailable" xml:space="preserve"><value>This artifact is unavailable.</value></data>
+  <data name="CreateAcquisitionTool"><value>Create a Tool</value></data>
+  <data name="CreateAcquisitionToolHelp"><value>Each call runs a new acquisition with the target and parameters shown below, then returns an artifact reference.</value></data>
+  <data name="AcquisitionToolSource"><value>Data Source</value></data>
+  <data name="AcquisitionToolSuggestedName"><value>{0} · {1}</value></data>
+  <data name="AcquisitionToolWorkspace"><value>Create in</value></data>
+  <data name="AcquisitionToolParameters"><value>Fixed parameters</value></data>
+  <data name="AcquisitionToolOutput"><value>Artifact output</value></data>
+  <data name="AcquisitionToolConflict"><value>A Tool with this name already exists. Choose a different technical name.</value></data>
+  <data name="AcquisitionToolForbidden"><value>You do not have permission to create a Tool from this acquisition.</value></data>
+  <data name="AcquisitionToolCreateFailed"><value>The Tool could not be created from this acquisition.</value></data>
+  <data name="Cancel"><value>Cancel</value></data>
 </root>

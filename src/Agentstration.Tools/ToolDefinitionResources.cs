@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Schemas.Contracts;
 
@@ -19,6 +21,50 @@ public sealed record ToolDefinitionFlowTarget
     public bool UseActiveVersion { get; init; } = true;
 }
 
+public sealed record ToolDefinitionAcquisitionTarget(
+    string TemplateId,
+    ResourceNamespace TemplateNamespace,
+    string? ArtifactName,
+    string ArtifactKind)
+{
+    public static JsonElement InputSchema { get; } = JsonSerializer.Deserialize<JsonElement>(
+        """{"type":"object","properties":{},"additionalProperties":false}""");
+
+    public static JsonElement OutputSchema { get; } = JsonSerializer.Deserialize<JsonElement>(
+        """
+        {
+          "type": "object",
+          "properties": {
+            "artifact": {
+              "type": "object",
+              "properties": {
+                "artifactId": { "type": "string" },
+                "kind": { "type": "string", "enum": ["staged", "durable"] },
+                "name": { "type": "string" },
+                "mediaType": { "type": "string" }
+              },
+              "required": ["artifactId", "kind"],
+              "additionalProperties": false
+            },
+            "acquisitionId": { "type": "string" }
+          },
+          "required": ["artifact", "acquisitionId"],
+          "additionalProperties": false
+        }
+        """);
+}
+
+public interface IToolDefinitionAcquisitionFactory
+{
+    Task<StoredResource<ToolDefinitionResource>> CreateAsync(
+        ResourceNamespace templateNamespace,
+        string templateId,
+        string name,
+        string displayName,
+        string artifactId,
+        CancellationToken cancellationToken);
+}
+
 public sealed record ToolDefinitionProperties
 {
     public required string DisplayName { get; init; }
@@ -31,6 +77,8 @@ public sealed record ToolDefinitionProperties
     public JsonElement? OutputSchema { get; init; }
     public SchemaBinding? OutputSchemaBinding { get; init; }
     public required ToolDefinitionFlowTarget Flow { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ToolDefinitionAcquisitionTarget? Acquisition { get; init; }
     public int InvocationTimeoutSeconds { get; init; } = 90;
 }
 
@@ -92,7 +140,7 @@ public sealed record ToolDefinitionKnowledgeReceipt(
     IReadOnlyList<string> ArtifactIds);
 
 public sealed record ToolDefinitionOperationReceipt(
-    string WorkItemId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? WorkItemId,
     string FlowRunId,
     string FlowName,
     ResourceNamespace FlowNamespace,

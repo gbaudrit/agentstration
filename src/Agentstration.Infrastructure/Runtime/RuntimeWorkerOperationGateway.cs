@@ -11,6 +11,7 @@ using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Infrastructure.Runtime;
 
@@ -25,7 +26,8 @@ public sealed class RuntimeWorkerOperationGateway(
     IFlowStepArtifactCapture flowArtifactCapture,
     FlowRunService flowRuns,
     TimeProvider timeProvider,
-    IRequestContextScopeFactory requestScopes) : IRuntimeWorkerOperationGateway
+    IRequestContextScopeFactory requestScopes,
+    ILogger<RuntimeWorkerOperationGateway> logger) : IRuntimeWorkerOperationGateway
 {
     private const string ArtifactRuntimeType = "awp-artifact-v1";
 
@@ -79,36 +81,50 @@ public sealed class RuntimeWorkerOperationGateway(
 
     public async Task<JsonElement?> InvokeToolAsync(RuntimeGovernedToolRequest request, CancellationToken cancellationToken)
     {
-        using var requestScope = EnterScope(request.ExecutionScopeRef, request.TenantId, request.PrincipalId);
-        return await toolExecution.ExecuteAsync(new ToolExecutionContext
+        using var requestScope = request.ExecutionScopeRef.Kind == ResourceScopeKind.Workspace
+            && request.ExecutionScopeRef.TargetId == request.WorkspaceId.Value
+            ? EnterScope(new FlowRunScope(request.TenantId, request.WorkspaceId, request.PrincipalId)
+            { LogicalScopeRef = request.LogicalScopeRef })
+            : EnterScope(request.ExecutionScopeRef, request.TenantId, request.PrincipalId);
+        try
         {
-            OwnerKind = request.StepExecutionId is null ? ToolExecutionOwnerKind.RuntimeRun : ToolExecutionOwnerKind.FlowRun,
-            ToolCallId = request.ToolCallId.ToString("D"),
-            InvocationId = $"awp:{request.TurnAttemptId:D}:{request.ToolCallId:D}",
-            ToolId = request.Tool.Id,
-            ToolNamespace = request.Tool.Namespace,
-            ToolName = request.Tool.Name,
-            ToolProviderId = request.Tool.ProviderId,
-            ToolProviderNamespace = request.Tool.ProviderNamespace,
-            ExternalToolId = request.Tool.ExternalId,
-            ToolScopeRef = request.Tool.ScopeRef,
-            ToolUid = request.Tool.Uid,
-            ToolGeneration = request.Tool.Generation,
-            ToolProviderScopeRef = request.Tool.ProviderScopeRef,
-            ToolProviderUid = request.Tool.ProviderUid,
-            ToolProviderGeneration = request.Tool.ProviderGeneration,
-            TenantId = request.TenantId,
-            WorkspaceId = request.WorkspaceId,
-            PrincipalId = request.PrincipalId,
-            RunId = request.RunId,
-            FlowStepId = request.StepExecutionId?.ToString("D"),
-            AgentId = request.Agent.AgentId.ToString("D"),
-            AgentVersion = request.Agent.Generation,
-            AgentGeneration = request.Agent.Generation,
-            AgentRevisionId = request.Agent.RevisionId,
-            PersistArguments = request.PersistArguments,
-            Arguments = request.Arguments?.Clone()
-        }, cancellationToken);
+            return await toolExecution.ExecuteAsync(new ToolExecutionContext
+            {
+                OwnerKind = request.StepExecutionId is null ? ToolExecutionOwnerKind.RuntimeRun : ToolExecutionOwnerKind.FlowRun,
+                ToolCallId = request.ToolCallId.ToString("D"),
+                InvocationId = $"awp:{request.TurnAttemptId:D}:{request.ToolCallId:D}",
+                ToolId = request.Tool.Id,
+                ToolNamespace = request.Tool.Namespace,
+                ToolName = request.Tool.Name,
+                ToolProviderId = request.Tool.ProviderId,
+                ToolProviderNamespace = request.Tool.ProviderNamespace,
+                ExternalToolId = request.Tool.ExternalId,
+                ToolScopeRef = request.Tool.ScopeRef,
+                ToolUid = request.Tool.Uid,
+                ToolGeneration = request.Tool.Generation,
+                ToolProviderScopeRef = request.Tool.ProviderScopeRef,
+                ToolProviderUid = request.Tool.ProviderUid,
+                ToolProviderGeneration = request.Tool.ProviderGeneration,
+                TenantId = request.TenantId,
+                WorkspaceId = request.WorkspaceId,
+                PrincipalId = request.PrincipalId,
+                RunId = request.RunId,
+                FlowStepId = request.StepExecutionId?.ToString("D"),
+                AgentId = request.Agent.AgentId.ToString("D"),
+                AgentVersion = request.Agent.Generation,
+                AgentGeneration = request.Agent.Generation,
+                AgentRevisionId = request.Agent.RevisionId,
+                PersistArguments = request.PersistArguments,
+                Arguments = request.Arguments?.Clone()
+            }, cancellationToken);
+        }
+        catch (ToolDefinitionInvocationException exception)
+        {
+            logger.LogWarning("Governed Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, Run {RunId}, Agent {AgentId}, Tool {ToolId}, ToolCall {ToolCallId}, TurnAttempt {TurnAttemptId}",
+                exception.Code, exception.Message, request.ExecutionScopeRef.Value, request.LogicalScopeRef?.Value,
+                request.RunId, request.Agent.AgentId, request.Tool.Id, request.ToolCallId, request.TurnAttemptId);
+            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
+        }
     }
 
     public async Task<RuntimeGovernedArtifact> StoreArtifactAsync(
@@ -185,6 +201,9 @@ public sealed class RuntimeWorkerOperationGateway(
         }
         catch (ToolDefinitionInvocationException exception)
         {
+            logger.LogWarning("Governed Flow Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, FlowRun {FlowRunId}, Step {StepDefinitionId}, Attempt {StepAttempt}",
+                exception.Code, exception.Message, run.ExecutionScopeRef.Value, run.Scope.LogicalScopeRef?.Value,
+                run.Id, stepDefinitionId, attempt);
             throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
         }
         return new(
@@ -376,8 +395,19 @@ public sealed class RuntimeWorkerOperationGateway(
             _ => throw new RuntimeExecutionMaterialException("execution_scope_invalid", "The execution scope is invalid.")
         };
 
-    private IDisposable EnterScope(FlowRunScope scope) =>
-        EnterScope(scope.AccessScopeRef, scope.TenantId, scope.PrincipalId);
+    private IDisposable EnterScope(FlowRunScope scope)
+    {
+        var operational = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
+        return scope.AccessScopeRef.Kind switch
+        {
+            ResourceScopeKind.Instance => requestScopes.PushInstance(operational),
+            ResourceScopeKind.Tenant when scope.AccessScopeRef.TargetId == scope.TenantId =>
+                requestScopes.PushTenantAdministration(operational),
+            ResourceScopeKind.Workspace when scope.AccessScopeRef.TargetId == scope.WorkspaceId.Value =>
+                requestScopes.Push(operational),
+            _ => throw new RuntimeExecutionMaterialException("execution_scope_invalid", "The execution scope is invalid.")
+        };
+    }
 
     private sealed record ArtifactState(Guid ArtifactId, string Name, ArtifactReference Reference);
 }

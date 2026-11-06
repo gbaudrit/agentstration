@@ -258,18 +258,18 @@ public sealed class ArtifactAdministrationComponentTests
         Assert.IsFalse(rendered.Markup.Contains("opaque-reference", StringComparison.Ordinal));
     }
 
-    private sealed class ArtifactClient : IArtifactsClient
+    internal sealed class ArtifactClient : IArtifactsClient
     {
         private readonly byte[] content;
         private readonly int maximumBackendChunk;
 
-        public ArtifactClient(string content, int maximumBackendChunk = int.MaxValue, long? declaredLength = null)
+        public ArtifactClient(string content, int maximumBackendChunk = int.MaxValue, long? declaredLength = null, string mediaType = "text/plain")
         {
             this.content = Encoding.UTF8.GetBytes(content);
             this.maximumBackendChunk = maximumBackendChunk;
             var now = DateTimeOffset.UtcNow;
             Artifact = new StagedArtifactView(
-                StagedArtifactId.New(), null, "index.html", "text/plain", declaredLength ?? this.content.Length, "sha256",
+                StagedArtifactId.New(), null, "index.html", mediaType, declaredLength ?? this.content.Length, "sha256",
                 StagedArtifactStatus.Sealed,
                 new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "flow-run-1", FlowRunId = "flow-run-1" },
                 "default", ResourceNamespace.Default, "filesystem", ResourceNamespace.Default, "1.0.0",
@@ -301,15 +301,17 @@ public sealed class ArtifactAdministrationComponentTests
         public StagedArtifactView Artifact { get; }
         public FlowRunArtifactResource Durable { get; }
         public int ContentReadCount { get; private set; }
+        public bool HasLocalCopy { get; set; } = true;
 
         public Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<StagedArtifactView>>([Artifact]);
 
         public Task<StagedArtifactView?> GetStagedAsync(StagedArtifactId id, CancellationToken cancellationToken = default) =>
-            Task.FromResult<StagedArtifactView?>(Artifact);
+            Task.FromResult<StagedArtifactView?>(id == Artifact.ArtifactId ? Artifact : null);
 
         public Task<ArtifactContentChunk> ReadContentAsync(StagedArtifactId id, long offset, int length, CancellationToken cancellationToken = default)
         {
+            Assert.AreEqual(Artifact.ArtifactId, id);
             ContentReadCount++;
             var available = Math.Max(0, content.Length - checked((int)offset));
             var count = Math.Min(Math.Min(length, maximumBackendChunk), available);
@@ -335,15 +337,19 @@ public sealed class ArtifactAdministrationComponentTests
             Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);
 
         public Task<FlowRunArtifactMaterialization> StartMaterializationAsync(FlowRunArtifactId id,
-            CancellationToken cancellationToken = default) => Task.FromResult(new FlowRunArtifactMaterialization(
+            CancellationToken cancellationToken = default)
+        {
+            HasLocalCopy = true;
+            return Task.FromResult(new FlowRunArtifactMaterialization(
                 "flowrun-materialize-1", "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
                 StagedArtifactExpiresAt: Artifact.ExpiresAt));
+        }
 
         public Task<IReadOnlyList<FlowRunArtifactMaterialization>> GetMaterializationsAsync(FlowRunArtifactId id,
-            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FlowRunArtifactMaterialization>>([
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FlowRunArtifactMaterialization>>(HasLocalCopy ? [
                 new("flowrun-materialize-1", "Succeeded", Artifact.ArtifactId, StagedArtifactAvailable: true,
                     StagedArtifactExpiresAt: Artifact.ExpiresAt)
-            ]);
+            ] : []);
 
         public Task<FlowRunArtifactMaterialization?> GetMaterializationAsync(FlowRunArtifactId id, string flowRunId,
             CancellationToken cancellationToken = default) => Task.FromResult<FlowRunArtifactMaterialization?>(new(

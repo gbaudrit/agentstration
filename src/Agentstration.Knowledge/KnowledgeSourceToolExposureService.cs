@@ -16,20 +16,26 @@ public sealed class KnowledgeSourceToolExposureService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     ISecurityAuditWriter audit)
 {
     private const string KnowledgeSourceUidAnnotation = "agentstration.io/knowledge-source-uid";
     private static readonly KnowledgeSourceOperation[] Operations =
         [KnowledgeSourceOperation.Search, KnowledgeSourceOperation.Query, KnowledgeSourceOperation.Read];
 
-    public Task<StoredResource<KnowledgeSourceToolExposureResource>?> GetAsync(
+    public async Task<StoredResource<KnowledgeSourceToolExposureResource>?> GetAsync(
         KnowledgeSourceId id,
         CancellationToken cancellationToken)
     {
-        var scopeRef = CurrentWorkspaceScope();
-        return store.GetExactAsync<KnowledgeSourceToolExposureResource>(
+        var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
+        var source = administrative is null ? null
+            : await sources.ResolveForUseAsync(id, KnowledgeOperationalRead.AdministrativeScope(requestContext)!.Value, cancellationToken);
+        var scopeRef = administrative is null ? CurrentWorkspaceScope() : ResourceScopeRef.Workspace(administrative.WorkspaceId);
+        using var operational = administrative is null ? null : requestScopes.Push(administrative);
+        var exposure = await store.GetExactAsync<KnowledgeSourceToolExposureResource>(
             ScopedResourceAddress.Create(scopeRef, id.Namespace,
                 KnowledgeResourceKinds.KnowledgeSourceToolExposure, id.Value), cancellationToken);
+        return source is null || exposure?.Value.KnowledgeSourceUid == source.Value.Uid ? exposure : null;
     }
 
     public async Task<StoredResource<KnowledgeSourceToolExposureResource>> PublishAsync(

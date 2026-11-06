@@ -62,8 +62,8 @@ public static class ResourceScopePolicy
             or "SourceChannelSnapshot" or "SourceChannelObservedState" or "SourceChannelRefreshRecord" => InstanceTenantWorkspace,
         "Vault" or "Secret" or "Parameter" or "Schema" or "SchemaVersion" or "DataSource"
             or "DataSourceProfile" or "DataSourceProfileRevision" or "KnowledgeSource" => InstanceTenantWorkspace,
-        "ToolProvider" or "Tool" or "ToolSet" or "ToolSetVersion" => InstanceTenantWorkspace,
-        "ToolCategory" or "ToolDefinition" or "ToolExecutionHook" or "DataSourceAcquisition"
+        "ToolProvider" or "Tool" or "ToolSet" or "ToolSetVersion" or "ToolDefinition" => InstanceTenantWorkspace,
+        "ToolCategory" or "ToolExecutionHook" or "DataSourceAcquisition"
             or "DataSourceDiscovery" or "DataSourceAcquisitionTarget" => WorkspaceOnly,
         "Flow" or "FlowVersion" or "Agent" or "AgentRevision" => InstanceTenantWorkspace,
         "AgentDeployment" or "Trigger" => WorkspaceOnly,

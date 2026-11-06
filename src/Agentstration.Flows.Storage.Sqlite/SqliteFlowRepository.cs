@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Flows;
@@ -183,13 +184,18 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     public async Task<StoredFlowRun> CreateRunAsync(FlowRun run, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var key = RunKey(run.Scope.ScopeRef, run.Id);
+        if (await context.Documents.AnyAsync(value => value.Key == key, cancellationToken))
+            throw new FlowConcurrencyException("A Flow Run with this identity already exists.");
         var now = timeProvider.GetUtcNow();
-        var document = Document(run.Scope.ScopeRef, RunKey(run.Scope.ScopeRef, run.Id), RunKind, run.FlowId, run.FlowVersion, run, now);
+        var document = Document(run.Scope.ScopeRef, key, RunKind, run.FlowId, run.FlowVersion, run, now);
         document.TenantId = run.Scope.TenantId;
         document.PrincipalId = run.Scope.PrincipalId;
         document.Status = run.Status;
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return new StoredFlowRun(run, document.ETag, now);
     }
 
@@ -333,10 +339,13 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     public async Task<FlowRunEvent> AppendRunEventAsync(FlowRunEvent runEvent, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        // SQLite takes the write lock before reading the sequence, including across host processes.
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var existing = await context.Documents.AsNoTracking().Where(value => value.ScopeRef == runEvent.ScopeRef.Value && value.Kind == RunEventKind && value.FlowId == runEvent.RunId).CountAsync(cancellationToken);
         var sequenced = runEvent with { Sequence = existing + 1 };
         context.Documents.Add(Document(runEvent.ScopeRef, RunEventKey(runEvent.ScopeRef, runEvent.RunId, sequenced.Sequence), RunEventKind, new FlowId(runEvent.RunId), sequenced.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture), sequenced, runEvent.Timestamp));
         await SaveCreateAsync(context, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return sequenced;
     }
 

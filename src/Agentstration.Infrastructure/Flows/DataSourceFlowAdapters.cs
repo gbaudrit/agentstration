@@ -300,7 +300,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
                 null,
                 null,
                 null,
-                Scope(request.WorkspaceId, request.TenantId, request.PrincipalId))
+                Scope(request.WorkspaceId, request.TenantId, request.PrincipalId) with { LogicalScopeRef = request.LogicalScopeRef })
             {
                 DefinitionScopeRef = request.Flow.ScopeRef
             }, cancellationToken);

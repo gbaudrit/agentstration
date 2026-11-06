@@ -83,32 +83,7 @@ else if (artifact is not null)
         }
         else if (activeTab == DetailsTab.Content)
         {
-            <section class="panel form-section artifact-content-panel" data-testid="staged-artifact-content-panel">
-                <div class="panel-header">
-                    <div><p class="eyebrow">@T("ProtectedContent")</p><h2>@T("ArtifactContent")</h2><p>@T("ContentHelp", MaximumDisplayBytes)</p></div>
-                </div>
-
-                <div class="artifact-content-actions">
-                    <button class="button-secondary" type="button" disabled="@busy" data-testid="staged-artifact-read-preview" @onclick="() => ReadContentAsync(false)">@T("ReadPreview")</button>
-                    <button class="button-primary" type="button" disabled="@(busy || !CanReadFullContent)" data-testid="staged-artifact-read-full" @onclick="() => ReadContentAsync(true)">@T("ReadFullContent")</button>
-                    <a class="button-secondary" href="@Client.GetDownloadUrl(ArtifactId)" download data-enhance-nav="false" data-testid="staged-artifact-download">@T("Download")</a>
-                </div>
-
-                @if (!CanReadFullContent)
-                {
-                    <p class="inline-warning" data-testid="staged-artifact-full-content-limit">@T("FullContentTooLarge", artifact.Length, MaximumDisplayBytes)</p>
-                }
-
-                @if (content is not null)
-                {
-                    <p class="artifact-content-status" data-testid="staged-artifact-content-status">
-                        @T(contentComplete ? "CompleteContentLoaded" : "PreviewContentLoaded", contentBytes, artifact.Length)
-                    </p>
-                    <div class="artifact-content-scroll" data-testid="staged-artifact-content-scroll">
-                        <pre class="artifact-content-view" data-testid="staged-artifact-content">@content</pre>
-                    </div>
-                }
-            </section>
+            <StagedArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" Metadata="artifact" />
         }
         else
         {
@@ -140,20 +115,14 @@ else if (artifact is not null)
 }
 
 @code {
-    private const int PreviewBytes = 8 * 1024;
-    private const int ReadChunkBytes = 256 * 1024;
-    private const int MaximumDisplayBytes = 4 * 1024 * 1024;
-
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private StagedArtifactView? artifact;
     private DetailsTab activeTab;
-    private bool loading = true, busy, failed, confirmPurge, contentComplete;
-    private int contentBytes;
+    private bool loading = true, busy, failed, confirmPurge;
     private string expiration = string.Empty;
-    private string? error, message, content;
+    private string? error, message;
     private StagedArtifactId ArtifactId => StagedArtifactId.Parse(Id);
-    private bool CanReadFullContent => artifact is not null && artifact.Length is >= 0 and <= MaximumDisplayBytes;
     private bool CanExtendRetention => artifact is not null && TryGetExpiration(out var value) && value > artifact.ExpiresAt;
     private bool PurgeEligible => artifact is not null
         && artifact.Status is not (StagedArtifactStatus.Open or StagedArtifactStatus.Persisting or StagedArtifactStatus.Purging or StagedArtifactStatus.Purged)
@@ -186,9 +155,6 @@ else if (artifact is not null)
     {
         loading = true;
         error = null;
-        content = null;
-        contentBytes = 0;
-        contentComplete = false;
         try
         {
             artifact = await Client.GetStagedAsync(ArtifactId, cancellation.Token);
@@ -230,46 +196,6 @@ else if (artifact is not null)
         finally { busy = false; }
     }
 
-    private async Task ReadContentAsync(bool full)
-    {
-        if (busy || artifact is null || (full && !CanReadFullContent)) return;
-        busy = true;
-        failed = false;
-        message = null;
-        try
-        {
-            var maximum = full ? checked((int)artifact.Length) : checked((int)Math.Min(PreviewBytes, artifact.Length));
-            using var output = new MemoryStream(maximum);
-            long offset = 0;
-            var endOfContent = artifact.Length == 0;
-            while (output.Length < maximum && !endOfContent)
-            {
-                var requested = Math.Min(ReadChunkBytes, maximum - checked((int)output.Length));
-                var chunk = await Client.ReadContentAsync(ArtifactId, offset, requested, cancellation.Token);
-                if (chunk.Offset != offset) throw new InvalidOperationException(T("ContentReadOffsetMismatch", offset, chunk.Offset));
-                var bytes = Convert.FromBase64String(chunk.ContentBase64);
-                if (bytes.Length == 0 && !chunk.EndOfContent) throw new InvalidOperationException(T("ContentReadNoProgress"));
-                if (bytes.Length > requested) throw new InvalidOperationException(T("ContentReadTooLarge", requested));
-                await output.WriteAsync(bytes, cancellation.Token);
-                offset += bytes.Length;
-                endOfContent = chunk.EndOfContent;
-            }
-
-            if ((endOfContent && output.Length != artifact.Length)
-                || (full && !endOfContent))
-                throw new InvalidOperationException(T("ContentLengthMismatch", artifact.Length, output.Length));
-
-            var value = output.ToArray();
-            contentBytes = value.Length;
-            contentComplete = endOfContent && output.Length == artifact.Length;
-            content = IsTextMediaType(artifact.MediaType)
-                ? System.Text.Encoding.UTF8.GetString(value)
-                : $"{T("BinaryContent", value.Length)}\n{Convert.ToBase64String(value)}";
-        }
-        catch (Exception exception) { failed = true; message = exception.Message; }
-        finally { busy = false; }
-    }
-
     private async Task PurgeAsync()
     {
         if (busy) return;
@@ -284,11 +210,6 @@ else if (artifact is not null)
         catch (Exception exception) { failed = true; message = exception.Message; busy = false; }
     }
 
-    private static bool IsTextMediaType(string mediaType) => mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
-        || mediaType.Contains("json", StringComparison.OrdinalIgnoreCase)
-        || mediaType.Contains("xml", StringComparison.OrdinalIgnoreCase)
-        || mediaType.Contains("yaml", StringComparison.OrdinalIgnoreCase)
-        || mediaType.Contains("javascript", StringComparison.OrdinalIgnoreCase);
     private static string TabId(DetailsTab tab) => $"staged-artifact-{tab.ToString().ToLowerInvariant()}-tab";
     private enum DetailsTab { Overview, Content, Retention }
 
