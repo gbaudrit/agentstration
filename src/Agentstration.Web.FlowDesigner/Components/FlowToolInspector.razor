@@ -1,0 +1,105 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <div class="inspector-details-group inspector-resource-details">
+        <h3>@T("CalledResource")</h3>
+        <div class="inspector-resource-field">
+            <div class="inspector-resource-heading"><span>@T("CalledTool")</span></div>
+            @if (ReadOnly)
+            {
+                <div class="tool-picker-trigger is-readonly"><UiIcon Name="wrench" /><span>@(SelectedTool?.DisplayName ?? T("CurrentToolUnavailable"))</span></div>
+            }
+            else
+            {
+                <details class="tool-picker" @key="ToolPickerRevision" @onkeydown="HandleToolPickerKeyDown">
+                    <summary class="tool-picker-trigger"><UiIcon Name="wrench" /><span>@(SelectedTool?.DisplayName ?? T("CurrentToolUnavailable"))</span><UiIcon Name="chevron-down" /></summary>
+                    <div class="tool-picker-menu">
+                        <div class="tool-picker-search"><UiIcon Name="search" /><input aria-label="@T("SearchTools")" placeholder="@T("SearchTools")" value="@ToolSearch" @oninput="e => ToolSearchChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" /></div>
+                        <div class="tool-picker-options">
+                            @foreach (var item in VisibleTools)
+                            {
+                                <button type="button" class="tool-picker-option" aria-pressed="@(ResourceKey(item.ScopeRef, item.Namespace, item.Name) == SelectionValue ? "true" : "false")" @onclick="() => SelectToolAsync.InvokeAsync(item)">
+                                    <span class="tool-picker-option-icon"><UiIcon Name="wrench" /></span>
+                                    <span class="tool-picker-option-copy"><strong>@item.DisplayName</strong><small>@T("ResourceOptionDetails", item.Namespace.Value, item.Name, ScopeLabel(Localizer, item.ScopeRef))</small></span>
+                                    @if (ResourceKey(item.ScopeRef, item.Namespace, item.Name) == SelectionValue) { <UiIcon Name="check" /> }
+                                </button>
+                            }
+                            @if (!VisibleTools.Any()) { <p class="tool-picker-empty">@T("NoMatchingTools")</p> }
+                        </div>
+                    </div>
+                </details>
+            }
+        </div>
+        <p class="inspector-resource-id">@T("ToolId") <code>@Step.Tool.ResourceId</code></p>
+    </div>
+    @if (SelectedTool is { } selectedTool)
+    {
+        @if (!selectedTool.Enabled || !selectedTool.Available || selectedTool.RequiresApproval)
+        {
+            <p class="muted">@ToolState(Localizer, selectedTool)</p>
+        }
+    }
+}
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Input" Source="@T("ContractSource.CalledTool")" />
+        @if (SelectedTool is { } selectedTool)
+        {
+            <fieldset class="flow-mapping-editor"><legend>@T("ArgumentsMapping")</legend>
+                <label class="flow-checkbox-field"><input data-testid="tool-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(Step.ArgumentsMapping)" @onchange="UpdateToolTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
+                <small>@T("PassIncomingTransitionOutputHelp")</small>
+                @if (!PassesIncomingTransitionOutput(Step.ArgumentsMapping)
+                && selectedTool.InputSchema.ValueKind == JsonValueKind.Object
+                && selectedTool.InputSchema.TryGetProperty("properties", out var toolProperties)
+                && toolProperties.ValueKind == JsonValueKind.Object)
+                {
+                    @foreach (var property in toolProperties.EnumerateObject())
+                    {
+                        var propertyName = property.Name;
+                        <label>@propertyName<input disabled="@ReadOnly" value="@MappingValue(Step.ArgumentsMapping, propertyName)" @onchange="e => UpdateToolMappingAsync(propertyName, e)" /></label>
+                    }
+                }
+            </fieldset>
+            <SchemaDocumentEditor Value="selectedTool.InputSchema" ReadOnly="true" />
+        }
+        else
+        {
+            <p class="step-contract-empty muted">@T("SelectToolForContract")</p>
+        }
+    </section>
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Output" Source="@T("ContractSource.CalledTool")" />
+        @if (SelectedTool?.OutputSchema is { } toolOutputSchema)
+        {
+            <SchemaDocumentEditor Value="toolOutputSchema" ReadOnly="true" />
+        }
+        else
+        {
+            <p class="step-contract-empty muted">@T("NoOutputContract")</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public ToolFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public FlowDesignerTool? SelectedTool { get; set; }
+    [Parameter] public IEnumerable<FlowDesignerTool> VisibleTools { get; set; } = [];
+    [Parameter] public string SelectionValue { get; set; } = string.Empty;
+    [Parameter] public string ToolSearch { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ToolSearchChanged { get; set; }
+    [Parameter] public int ToolPickerRevision { get; set; }
+    [Parameter] public EventCallback<KeyboardEventArgs> HandleToolPickerKeyDown { get; set; }
+    [Parameter] public EventCallback<FlowDesignerTool> SelectToolAsync { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> UpdateToolTransitionPassthroughAsync { get; set; }
+    [Parameter, EditorRequired] public Func<string, ChangeEventArgs, Task> UpdateToolMappingAsync { get; set; } = default!;
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}

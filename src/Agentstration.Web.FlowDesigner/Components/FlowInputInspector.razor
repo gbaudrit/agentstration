@@ -1,0 +1,42 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Input" />
+        <SchemaBindingEditor Title="@T("InputSchema")" TestId="flow-input-schema"
+            Binding="@(Step.SchemaBinding ?? RootBinding)" LegacySchema="@(Step.Schema ?? RootSchema)"
+            SchemaVersions="SchemaVersions" ValueChanged="UpdateInputSchemaAsync" ReadOnly="ReadOnly"
+            DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync" />
+    </section>
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <section class="step-contract-section" data-testid="input-output-contract">
+        <ContractHeading Direction="Output" Source="@T("ContractSource.SameAsInput")" />
+        @if (EffectiveInputSchema is { } inputOutputSchema)
+        {
+            <SchemaDocumentEditor Value="inputOutputSchema" ReadOnly="true" />
+        }
+        else
+        {
+            <p class="step-contract-empty muted">@T("NoInputContract")</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public InputFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public SchemaBinding? RootBinding { get; set; }
+    [Parameter] public JsonElement? RootSchema { get; set; }
+    [Parameter] public JsonElement? EffectiveInputSchema { get; set; }
+    [Parameter] public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; set; } = [];
+    [Parameter] public EventCallback<SchemaBindingEditorValue> UpdateInputSchemaAsync { get; set; }
+    [Parameter] public Func<ValidateSchemaDefinitionRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaDefinitionAsync { get; set; }
+    [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaInstanceAsync { get; set; }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}

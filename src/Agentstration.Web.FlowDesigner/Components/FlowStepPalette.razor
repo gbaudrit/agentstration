@@ -1,0 +1,33 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+<aside class="step-palette">
+    <header class="designer-drawer-header"><strong>@T("StepPalette")</strong><button type="button" aria-label="@T("CloseStepPalette")" @onclick="ClosePaletteDrawer"><UiIcon Name="x" /></button></header>
+    <section class="step-palette-group" aria-labelledby="palette-steps-heading">
+        <h2 id="palette-steps-heading">@T("Steps")</h2>
+        @foreach (var entry in Palette)
+        {
+            <button data-testid="@($"flow-palette-{entry}")" disabled="@ReadOnly" @onclick="() => AddStepAsync.InvokeAsync(entry)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(entry)" /></span><span>@T($"Step.{entry}")</span></button>
+        }
+    </section>
+    <section class="step-palette-group palette-view" aria-labelledby="palette-view-heading">
+        <h2 id="palette-view-heading">@T("ViewControls")</h2>
+        <button disabled="@ReadOnly" @onclick="() => LayoutAsync.InvokeAsync(false)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="layout-distribute-horizontal" /></span><span>@T("HorizontalLayout")</span></button>
+        <button disabled="@ReadOnly" @onclick="() => LayoutAsync.InvokeAsync(true)"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="layout-distribute-vertical" /></span><span>@T("VerticalLayout")</span></button>
+        <button @onclick="Center"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="focus-centered" /></span><span>@T("Center")</span></button>
+        <button aria-pressed="@ShowAllErrorTransitions" @onclick="ToggleErrorTransitions"><span class="step-palette-icon" aria-hidden="true"><UiIcon Name="alert-triangle" /></span><span>@T(ShowAllErrorTransitions ? "HideErrorTransitions" : "ShowErrorTransitions")</span></button>
+    </section>
+</aside>
+
+@code {
+    private static readonly string[] Palette = ["input", "agent", "flow", "tool", "router", "condition", "transform", "output"];
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ShowAllErrorTransitions { get; set; }
+    [Parameter] public EventCallback ClosePaletteDrawer { get; set; }
+    [Parameter] public EventCallback<string> AddStepAsync { get; set; }
+    [Parameter] public EventCallback<bool> LayoutAsync { get; set; }
+    [Parameter] public EventCallback Center { get; set; }
+    [Parameter] public EventCallback ToggleErrorTransitions { get; set; }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}
