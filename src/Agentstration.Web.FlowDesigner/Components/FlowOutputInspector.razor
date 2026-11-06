@@ -1,0 +1,63 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Input" Source="@T("ContractSource.IncomingTransition")" />
+        @if (EffectiveIncomingSchema is { } incomingSchema)
+        {
+            <SchemaDocumentEditor Value="incomingSchema" ReadOnly="true" />
+        }
+        else
+        {
+            <p class="step-contract-empty muted">@IncomingContractUnavailableText</p>
+        }
+    </section>
+}
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <label>@T("OutputOutcome")<select data-testid="output-outcome" disabled="@ReadOnly" value="@(Step.Outcome ?? FlowOutputOutcome.Success)" @onchange="UpdateOutputOutcomeAsync"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></select></label>
+    @if ((Step.Outcome ?? FlowOutputOutcome.Success) == FlowOutputOutcome.Error)
+    {
+        <label>@T("ErrorCode")<input data-testid="output-error-code" disabled="@ReadOnly" value="@Step.Code" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Code = EmptyToNull(Text(e)) })" /></label>
+        <label>@T("Message")<textarea data-testid="output-error-message" disabled="@ReadOnly" value="@Step.Message" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Message = EmptyToNull(Text(e)) })"></textarea></label>
+        <label>@T("ErrorDetailsExpression")<input data-testid="output-error-details" disabled="@ReadOnly" value="@Step.DetailsExpression" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { DetailsExpression = EmptyToNull(Text(e)) })" /></label>
+    }
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <section class="step-contract-section" data-testid="terminal-output-contract">
+        <ContractHeading Direction="Output" Source="@(EffectiveIncomingSchema is null && LegacyOutputSchema is not null ? T("ContractSource.LegacyOutput") : T("ContractSource.SameAsInput"))" />
+        <div class="output-passthrough" data-testid="output-mapping">
+            <span class="output-passthrough-icon" aria-hidden="true"><UiIcon Name="arrow-right" /></span>
+            <span class="output-passthrough-copy"><strong>@T("IncomingTransitionOutput")</strong><small>@T("OutputMappingHelp")</small></span>
+            <details class="output-passthrough-technical"><summary>@T("TechnicalDetail")</summary><code>@OutputMappingExpression(Step)</code></details>
+        </div>
+        @if (EffectiveIncomingSchema is { } incomingSchema)
+        {
+            <SchemaDocumentEditor Value="incomingSchema" ReadOnly="true" />
+        }
+        else if (LegacyOutputSchema is { } legacyOutputSchema)
+        {
+            <SchemaDocumentEditor Value="legacyOutputSchema" ReadOnly="true" />
+        }
+        else
+        {
+            <p class="step-contract-empty muted">@IncomingContractUnavailableText</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public OutputFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public JsonElement? EffectiveIncomingSchema { get; set; }
+    [Parameter] public JsonElement? LegacyOutputSchema { get; set; }
+    [Parameter] public string IncomingContractUnavailableText { get; set; } = string.Empty;
+    [Parameter] public EventCallback<ChangeEventArgs> UpdateOutputOutcomeAsync { get; set; }
+    [Parameter] public EventCallback<FlowStepDefinition> UpdateSelectedAsync { get; set; }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}

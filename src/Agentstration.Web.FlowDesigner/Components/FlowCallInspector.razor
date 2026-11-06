@@ -1,0 +1,172 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <div class="inspector-details-group inspector-resource-details">
+        <h3>@T("CalledResource")</h3>
+        <div class="inspector-resource-field">
+            <div class="inspector-resource-heading">
+                <label for="flow-call-reference">@T("CalledFlow")</label>
+                @if (SelectedFlow is { } selectedFlow)
+                {
+                    <a class="inspector-resource-link" href="@FlowUrl(selectedFlow)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenFlowInNewTab")"><UiIcon Name="external-link" />@T("OpenFlow")</a>
+                }
+            </div>
+            <input id="flow-call-reference" data-testid="flow-call-reference" disabled="@ReadOnly" list="flow-targets" value="@SelectionValue" @onchange="UpdateFlowTargetAsync" />
+            <datalist id="flow-targets">
+                @if (SelectedFlow is null)
+                {
+                    <option value="@SelectionValue">@T("UnavailableReference", ResourceIdentity(Step.Flow.ScopeRef, Step.Flow.Namespace ?? Namespace, Step.Flow.ResourceId))</option>
+                }
+                @foreach (var item in Flows)
+                {
+                    <option value="@ResourceKey(item.ScopeRef, item.Namespace, item.Name)">@ResourceOptionLabel(Localizer, item.DisplayName, item.Namespace, item.ScopeRef)</option>
+                }
+            </datalist>
+        </div>
+        @if (SelectedFlow is { } referencedFlow)
+        {
+            <p class="inspector-resource-id">@T("FlowId") <code>@referencedFlow.Name</code></p>
+        }
+    </div>
+    <label>@T("VersionStrategy")<select data-testid="flow-call-version-strategy" disabled="@ReadOnly" value="@Step.Flow.VersionStrategy" @onchange="UpdateFlowVersionStrategyAsync">
+            <option value="@FlowCallVersionStrategy.Active">@T("VersionStrategy.Active")</option>
+            <option value="@FlowCallVersionStrategy.Exact">@T("VersionStrategy.Exact")</option>
+    </select></label>
+    @if (Step.Flow.VersionStrategy == FlowCallVersionStrategy.Exact)
+    {
+        <label>@T("ExactVersion")<select data-testid="flow-call-exact-version" disabled="@ReadOnly" value="@Step.Flow.Version" @onchange="UpdateFlowExactVersionAsync">
+                @foreach (var version in FlowVersions) { <option value="@version.Version">@version.Version</option> }
+        </select></label>
+    }
+}
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Input" />
+        @if (SelectedFlowVersion is not null)
+        {
+            @if (ReceivesParentInput && SelectedFlowVersion.InputSchemaReference is { } sharedInputReference)
+            {
+                <aside class="shared-contract-reuse" data-testid="flow-call-shared-input-contract">
+                    <div>
+                        <strong>@T("CalledFlowSharedInputTitle")</strong>
+                        <p>@T("CalledFlowSharedInputHelp")</p>
+                        <code>@SchemaReferenceLabel(sharedInputReference)</code>
+                    </div>
+                    @if (ParentInputHasExplicitContract)
+                    {
+                        <span class="inspector-step-type">@T("ParentInputContractAlreadyDefined")</span>
+                    }
+                    else if (!ReadOnly)
+                    {
+                        <button type="button" class="button-secondary" data-testid="use-called-flow-shared-input" @onclick="UseCalledFlowSharedInputAsync">@T("UseCalledFlowSharedInput")</button>
+                    }
+                </aside>
+            }
+            else if (ReceivesParentInput
+            && SelectedFlowVersion.InputSchema is not null
+            && SelectedFlowVersion.InputSchemaReference is null)
+            {
+                <aside class="shared-contract-reuse" data-testid="flow-call-inline-input-contract">
+                    <div>
+                        <strong>@T("CalledFlowInlineInputTitle")</strong>
+                        <p>@T("CalledFlowInlineInputHelp")</p>
+                    </div>
+                    @if (ParentInputHasExplicitContract)
+                    {
+                        <span class="inspector-step-type">@T("ParentInputContractAlreadyDefined")</span>
+                    }
+                    else if (!ReadOnly)
+                    {
+                        <button type="button" class="button-secondary" data-testid="copy-called-flow-inline-input" @onclick="CopyCalledFlowInlineInputAsync">@T("CopyCalledFlowInlineInput")</button>
+                    }
+                </aside>
+            }
+            <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
+                <label class="flow-checkbox-field"><input data-testid="flow-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(Step.InputMapping)" @onchange="UpdateFlowTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
+                <small>@T("PassIncomingTransitionOutputHelp")</small>
+                @if (!PassesIncomingTransitionOutput(Step.InputMapping)
+                && SelectedFlowVersion.InputSchema is { ValueKind: JsonValueKind.Object } inputSchema
+                && inputSchema.TryGetProperty("properties", out var inputProperties)
+                && inputProperties.ValueKind == JsonValueKind.Object)
+                {
+                    @foreach (var property in inputProperties.EnumerateObject())
+                    {
+                        var propertyName = property.Name;
+                        <label>@propertyName<input disabled="@ReadOnly" value="@MappingValue(Step.InputMapping, propertyName)" @onchange="e => UpdateFlowMappingAsync(propertyName, e)" /></label>
+                    }
+                }
+            </fieldset>
+            @if (SelectedFlowVersion.InputSchema is { } calledFlowInputSchema)
+            {
+                <SchemaDocumentEditor Value="calledFlowInputSchema" ReadOnly="true" />
+            }
+            else
+            {
+                <p class="step-contract-empty muted">@T("NoInputContract")</p>
+            }
+        }
+        else
+        {
+            <p class="step-contract-empty muted">@T("SelectFlowVersionForContract")</p>
+        }
+    </section>
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Output" Source="@T("ContractSource.CalledFlow")" />
+        @if (SelectedFlowVersion is { NamedOutputs.Count: > 0 } calledFlowVersion)
+        {
+            <div class="called-flow-outputs">
+                @foreach (var namedOutput in calledFlowVersion.NamedOutputs)
+                {
+                    <article class="called-flow-output" data-testid="called-flow-output-contract">
+                        <header><strong>@(namedOutput.DisplayName ?? namedOutput.Name)</strong><code>@namedOutput.Name</code><span class="inspector-step-type">@T($"OutputOutcome.{namedOutput.Outcome}")</span></header>
+                        @if (namedOutput.Schema is { } namedOutputSchema)
+                        {
+                            <SchemaDocumentEditor Value="namedOutputSchema" ReadOnly="true" />
+                        }
+                        else
+                        {
+                            <p class="step-contract-empty muted">@T("NamedOutputContractUnavailable", namedOutput.Name)</p>
+                        }
+                    </article>
+                }
+            </div>
+        }
+        else if (SelectedFlowVersion?.OutputSchema is { } calledFlowOutputSchema)
+        {
+            <SchemaDocumentEditor Value="calledFlowOutputSchema" ReadOnly="true" />
+        }
+        else
+        {
+            <p class="step-contract-empty muted">@T("NoOutputContract")</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public FlowCallStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public FlowDesignerFlow? SelectedFlow { get; set; }
+    [Parameter] public FlowDesignerFlowVersion? SelectedFlowVersion { get; set; }
+    [Parameter] public IEnumerable<FlowDesignerFlow> Flows { get; set; } = [];
+    [Parameter] public IReadOnlyList<FlowDesignerFlowVersion> FlowVersions { get; set; } = [];
+    [Parameter] public string SelectionValue { get; set; } = string.Empty;
+    [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
+    [Parameter] public bool ReceivesParentInput { get; set; }
+    [Parameter] public bool ParentInputHasExplicitContract { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> UpdateFlowTargetAsync { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> UpdateFlowVersionStrategyAsync { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> UpdateFlowExactVersionAsync { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> UpdateFlowTransitionPassthroughAsync { get; set; }
+    [Parameter] public EventCallback UseCalledFlowSharedInputAsync { get; set; }
+    [Parameter] public EventCallback CopyCalledFlowInlineInputAsync { get; set; }
+    [Parameter, EditorRequired] public Func<string, ChangeEventArgs, Task> UpdateFlowMappingAsync { get; set; } = default!;
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}
