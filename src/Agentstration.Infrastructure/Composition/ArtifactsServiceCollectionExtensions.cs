@@ -19,6 +19,7 @@ internal static class ArtifactsServiceCollectionExtensions
         services.AddSingleton<IArtifactStagingToolExecutor, ToolSetArtifactStagingExecutor>();
         services.AddSingleton<ArtifactManagementService>();
         services.AddSingleton<IArtifactContentMaterializationGateway, ArtifactContentMaterializationGateway>();
+        services.AddSingleton<DurableArtifactContentReader>();
         services.AddSingleton<ArtifactPlatformResourceProvisioner>();
         services.AddSingleton<KnowledgePlatformResourceProvisioner>();
         services.AddSingleton(new StagedArtifactCleanupOptions());

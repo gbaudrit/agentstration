@@ -122,8 +122,8 @@ public sealed class StandaloneRegistrationContractTests
             [typeof(IPackResourceHandler)] = 11,
             [typeof(IAepEnrollmentResourceProvisioner)] = 2,
             [typeof(IToolExecutionEventSink)] = 2,
-            [typeof(IInternalMcpToolDefinitionProvider)] = 33,
-            [typeof(IInternalMcpToolHandler)] = 33,
+            [typeof(IInternalMcpToolDefinitionProvider)] = 34,
+            [typeof(IInternalMcpToolHandler)] = 34,
             [typeof(IFlowVersionActivationGuard)] = 4,
             [typeof(IFlowDeletionGuard)] = 3,
             [typeof(IWorkExecutionScopeAccessor)] = 2

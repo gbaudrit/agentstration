@@ -60,6 +60,7 @@ public sealed class ToolDefinitionFlowActivationGuard(
         var matchingDefinitions = definitions.Where(value =>
                      value.Value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
                      && targetId == workspaceId.Value
+                     && value.Value.Definition.Acquisition is null
                      && value.Value.Definition.Enabled
                      && value.Value.Definition.Flow.UseActiveVersion
                      && string.Equals(value.Value.Definition.Flow.Name, version.FlowId.Value, StringComparison.Ordinal)
@@ -97,6 +98,7 @@ public sealed class ToolDefinitionFlowDeletionGuard(
         var usage = definitions.Select(value => value.Value).FirstOrDefault(value =>
             value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
             && targetId == workspaceId.Value
+            && value.Definition.Acquisition is null
             && string.Equals(value.Definition.Flow.Name, flowId.Value, StringComparison.Ordinal)
             && (value.Definition.Flow.Namespace ?? value.Namespace) == flowId.Namespace);
         if (usage is not null)
@@ -109,7 +111,8 @@ public sealed class ToolDefinitionExecutor(
     IToolDefinitionFlowResolver flowResolver,
     RootFlowSubmissionService submissions,
     FlowRunService runs,
-    KnowledgeRetrievalService? knowledgeRetrieval = null) : IToolDefinitionExecutor
+    KnowledgeRetrievalService? knowledgeRetrieval = null,
+    ToolDefinitionAcquisitionExecutor? acquisitions = null) : IToolDefinitionExecutor
 {
     private static readonly JsonSerializerOptions WebJsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -127,6 +130,14 @@ public sealed class ToolDefinitionExecutor(
     public async Task<ToolDefinitionInvocationResult> ExecuteAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
         var stored = await ValidateAsync(invocation, cancellationToken);
+
+        if (stored.Value.Definition.Acquisition is { } acquisition)
+        {
+            if (acquisitions is null)
+                throw new ToolDefinitionInvocationException("tool_definition_acquisition_unavailable",
+                    "Acquisition Tools are unavailable.");
+            return await acquisitions.ExecuteAsync(stored.Value, acquisition, invocation, cancellationToken);
+        }
 
         if (knowledgeRetrieval is not null
             && stored.Value.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source", out var sourceName)
@@ -329,14 +340,25 @@ public sealed class ToolDefinitionExecutor(
     private async Task<StoredResource<ToolDefinitionResource>> ValidateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
         var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
+            ?? (acquisitions is null ? null
+                : await acquisitions.FindInOperationalWorkspaceAsync(definitions, invocation, cancellationToken))
             ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", $"ToolDefinition '{invocation.Namespace}/{invocation.ToolName}' was not found.");
         if (!stored.Value.Definition.Enabled)
             throw new ToolDefinitionInvocationException("tool_definition_disabled", $"ToolDefinition '{stored.Value.Address}' is disabled.");
-        if (stored.Value.ScopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } ownerWorkspace }
-            || ownerWorkspace != invocation.WorkspaceId.Value)
+        if (stored.Value.ScopeRef != ResourceScopeRef.Workspace(invocation.WorkspaceId.Value)
+            && acquisitions?.OwnsAdministrativeInvocation(stored.Value, invocation) != true)
             throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is not owned by the invocation Workspace.");
         if (invocation.Arguments.GetRawText().Length > 65_536)
             throw new ToolDefinitionInvocationException("tool_definition_input_too_large", "ToolDefinition input cannot exceed 65536 JSON characters.");
+        if (stored.Value.Definition.Acquisition is not null)
+        {
+            try { ToolInputSchemaValidator.Validate(stored.Value.Definition.InputSchema, invocation.Arguments); }
+            catch (ToolInputValidationException exception)
+            {
+                throw new ToolDefinitionInvocationException("tool_definition_input_invalid", exception.Message, exception);
+            }
+            return stored;
+        }
         if (stored.Value.Definition.FixedArguments is { ValueKind: JsonValueKind.Object } fixedArguments)
             foreach (var property in fixedArguments.EnumerateObject())
                 if (invocation.Arguments.TryGetProperty(property.Name, out _))

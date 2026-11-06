@@ -291,6 +291,7 @@ export class OrganizationWorkspacesPage {
     ]);
     await expect(shell).toHaveAttribute('data-context-kind', 'Workspace');
     await expect(shell).toHaveAttribute('data-context-scope', scopeRef);
+    await expect(shell).toHaveAttribute('data-workspace-id', workspaceId);
   }
 
   public async selectByName(name: string): Promise<string> {

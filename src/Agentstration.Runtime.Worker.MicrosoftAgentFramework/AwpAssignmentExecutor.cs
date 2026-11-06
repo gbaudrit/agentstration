@@ -70,6 +70,7 @@ internal sealed class AwpAssignmentExecutor(
                 AgentGeneration = material.Agent.Generation,
                 PersistArguments = material.Execution.PersistToolArguments
             }), cancellationToken);
+        WarnIfEmptyResponse(material.RunId, material.Agent.ParticipantId, result, chatClient);
         if (!string.IsNullOrEmpty(result.Output))
             await session.AppendEventAsync(AwpExecutionEventKind.ResponseDelta, location,
                 JsonSerializer.SerializeToElement(new { content = result.Output }), null, cancellationToken);
@@ -80,8 +81,12 @@ internal sealed class AwpAssignmentExecutor(
                 model = result.ModelName,
                 inputTokens = result.Usage?.InputTokens,
                 outputTokens = result.Usage?.OutputTokens,
+                finishReason = chatClient.LastFinishReason,
+                responseContentCount = chatClient.LastResponseContentCount,
+                responseTextLength = chatClient.LastResponseTextLength,
                 totalTokens = result.Usage?.TotalTokens
             }), null, cancellationToken);
+        EnsureFinalResponse(result, chatClient);
         return JsonSerializer.SerializeToElement(result.Output);
     }
 
@@ -650,6 +655,7 @@ internal sealed class AwpAssignmentExecutor(
                 FlowStepId = step.StepExecutionId.Value.ToString("D"),
                 AgentGeneration = agent.Generation
             }), cancellationToken);
+        WarnIfEmptyResponse(material.RunId, agent.ParticipantId, result, chatClient);
         if (!string.IsNullOrEmpty(result.Output))
             await session.AppendEventAsync(AwpExecutionEventKind.ResponseDelta, location,
                 JsonSerializer.SerializeToElement(new { content = result.Output }), null, cancellationToken);
@@ -667,9 +673,31 @@ internal sealed class AwpAssignmentExecutor(
                 provider = effective.ProviderType,
                 inputTokens = effective.Usage?.InputTokens,
                 outputTokens = effective.Usage?.OutputTokens,
+                finishReason = chatClient.LastFinishReason,
+                responseContentCount = chatClient.LastResponseContentCount,
+                responseTextLength = chatClient.LastResponseTextLength,
                 totalTokens = effective.Usage?.TotalTokens
             }), null, cancellationToken);
+        EnsureFinalResponse(result, chatClient);
         return effective;
+    }
+
+    private void WarnIfEmptyResponse(string runId, string participantId, AgentExecutionResult result, AwpModelChatClient chatClient)
+    {
+        if (string.IsNullOrWhiteSpace(result.Output))
+            logger.LogWarning("Agent produced no final text. Run {RunId}, Participant {ParticipantId}, Model {ModelId}, FinishReason {FinishReason}, ResponseContentCount {ResponseContentCount}, ResponseTextLength {ResponseTextLength}, OutputTokens {OutputTokens}",
+                runId, participantId, chatClient.LastModelId, chatClient.LastFinishReason,
+                chatClient.LastResponseContentCount, chatClient.LastResponseTextLength, result.Usage?.OutputTokens);
+    }
+
+    private static void EnsureFinalResponse(AgentExecutionResult result, AwpModelChatClient chatClient)
+    {
+        if (!string.IsNullOrWhiteSpace(result.Output)) return;
+        var tokenLimit = string.Equals(chatClient.LastFinishReason, "length", StringComparison.OrdinalIgnoreCase);
+        throw new AwpExecutionNotSupportedException(tokenLimit ? "model_output_token_limit" : "model_empty_response",
+            tokenLimit
+                ? "The model reached its generation token limit without producing a final answer. Increase the output token budget or review the reasoning settings."
+                : "The model completed without producing a final answer. Review the model response and generation settings.");
     }
 
     private async Task<AwpFlowStepLocation> OpenStepAsync(AwpAssignmentSession session,

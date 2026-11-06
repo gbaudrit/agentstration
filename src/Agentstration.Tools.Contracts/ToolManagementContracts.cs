@@ -17,6 +17,7 @@ public sealed record ResolveToolSetRouteRequest(string Version, string Capabilit
 public sealed record ToolDiscoveryDiffResponse(int New, int Changed, int Unchanged, int Unavailable, int Total);
 public sealed record ToolConnectionTestResponse(string Status, int ToolCount, IReadOnlyDictionary<string, bool> Capabilities, IReadOnlyDictionary<string, string> ServerMetadata);
 public sealed record CreateToolDefinitionRequest(string Name, ToolDefinitionProperties Properties, string? Namespace = null);
+public sealed record CreateToolDefinitionFromAcquisitionRequest(string Name, string DisplayName, string ArtifactId);
 public sealed record PutToolDefinitionRequest(ToolDefinitionProperties Properties);
 public sealed record SetToolDefinitionEnabledRequest(bool Enabled);
 public sealed record CreateToolExecutionHookRequest(string Name, ToolExecutionHookProperties Properties, string? Namespace = null);

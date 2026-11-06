@@ -40,6 +40,7 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<StagedArtifactSealMcpTool>(services);
         AddInternalTool<StagedArtifactInspectMcpTool>(services);
         AddInternalTool<StagedArtifactReadContentMcpTool>(services);
+        AddInternalTool<DurableArtifactReadContentMcpTool>(services);
         AddInternalTool<StagedArtifactCreateLeaseMcpTool>(services);
         AddInternalTool<StagedArtifactHandoffMcpTool>(services);
         AddInternalTool<StagedArtifactManageRetentionMcpTool>(services);

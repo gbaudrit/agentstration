@@ -331,6 +331,9 @@ else
     {
         if (hub is not null) await hub.DisposeAsync();
         var endpoint = Navigation.ToAbsoluteUri("/hubs/flow-runs");
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
+        if (query.TryGetValue("context", out var context))
+            endpoint = new Uri(Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(endpoint.AbsoluteUri, "context", context.ToString()));
         hub = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
             .WithUrl(endpoint, options => RealtimeSession.Configure(endpoint, options))
             .WithAutomaticReconnect()
@@ -583,8 +586,13 @@ else
     }
 
     private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
-    private string RunErrorMessage(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
-        ? T("Error.AgentModelProfileUnavailable") : error.Message;
+    private string RunErrorMessage(FlowRunError error) => error.Code switch
+    {
+        "agent_model_profile_unavailable" => T("Error.AgentModelProfileUnavailable"),
+        "model_output_token_limit" => T("Error.ModelOutputTokenLimit"),
+        "model_empty_response" => T("Error.ModelEmptyResponse"),
+        _ => error.Message
+    };
     private static string? RunErrorDetail(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
         ? error.Message : error.Details;
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });

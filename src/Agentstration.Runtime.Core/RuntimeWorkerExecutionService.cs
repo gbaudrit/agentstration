@@ -189,7 +189,8 @@ public sealed class RuntimeWorkerExecutionService(
             material.TenantId, material.WorkspaceId, material.PrincipalId, material.RunId,
             arguments, material is RuntimeDirectAgentExecutionMaterial direct ? direct.Execution.PersistToolArguments : null)
         {
-            ExecutionScopeRef = material.ScopeRef
+            ExecutionScopeRef = material.ScopeRef,
+            LogicalScopeRef = material.LogicalScopeRef
         }, lease.Token);
     }
 

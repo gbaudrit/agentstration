@@ -206,8 +206,12 @@ export class ExecutionScopesPage {
         `${consoleUrl}/flows/${encodeURIComponent(fixture.flowName)}?scopeRef=${encodeURIComponent(fixture.scopes.instance)}`,
         TestIds.flowObservability.flowDetails,
       );
-      await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
-      await this.page.getByTestId(TestIds.flowObservability.flowRunOpen).dispatchEvent('click');
+      const openRun = this.page.getByTestId(TestIds.flowObservability.flowRunOpen);
+      await expect(async () => {
+        await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
+        await expect(openRun).toBeVisible({ timeout: 2_000 });
+      }).toPass({ timeout: 20_000 });
+      await openRun.click();
       await this.page.getByTestId(TestIds.flowObservability.flowRunDialog).waitFor({ state: 'visible' });
       const flowInput = this.page.getByRole('textbox', { name: 'JSON input' });
       await flowInput.fill('{}');
@@ -650,6 +654,9 @@ export class ExecutionScopesPage {
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Execution-scope route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
+    if (marker === TestIds.flowObservability.agentRunner) {
+      await expect(this.page.getByTestId(marker)).toHaveAttribute('data-interactive', 'true');
+    }
   }
 }
 

@@ -78,9 +78,12 @@ internal static class KnowledgeSourceEndpoints
         KnowledgeSourceManagementService service,
         ICurrentRequestContext context,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
-            Results.Ok(await service.GetReadinessForUseAsync(
-                new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)),
-                ResourceScopeRef.Workspace(context.Current.WorkspaceId), cancellationToken)));
+        {
+            var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef));
+            return Results.Ok(context.AccessMode is ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration
+                ? await service.GetReadinessAsync(id, cancellationToken)
+                : await service.GetReadinessForUseAsync(id, ResourceScopeRef.Workspace(context.Current.WorkspaceId), cancellationToken));
+        });
 
     private static Task<IResult> GetToolExposureAsync(
         string name,

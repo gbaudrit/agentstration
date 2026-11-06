@@ -53,4 +53,33 @@
   <data name="DiscoveryToolBindings" xml:space="preserve"><value>Associations d’outils de découverte (JSON)</value></data>
   <data name="Access"><value>Accès</value></data>
   <data name="ManagedReadOnly"><value>Géré · lecture seule</value></data><data name="Editable"><value>Modifiable</value></data><data name="ManagedProfileHelp"><value>Ce profil et ses révisions publiées sont contrôlés par l’installation de l’extension et ne peuvent pas être modifiés directement.</value></data><data name="ManagingExtension"><value>Extension gestionnaire</value></data>
+  <data name="OperationalLoadFailed" xml:space="preserve"><value>La définition de la source de données est chargée, mais son état opérationnel ou son historique n’a pas pu être chargé. Rechargez la page pour réessayer.</value></data>
+  <data name="DiscoveryFlowTitle" xml:space="preserve"><value>Flow de découverte</value></data>
+  <data name="DiscoveryHistory" xml:space="preserve"><value>Historique des découvertes</value></data>
+  <data name="DiscoveryLiveUpdates" xml:space="preserve"><value>L’état des exécutions et les choix découverts sont actualisés automatiquement pendant une exécution active.</value></data>
+  <data name="OperationalRefreshFailed" xml:space="preserve"><value>Impossible d’actualiser l’état des exécutions. Les résultats affichés ont été conservés. Utilisez Actualiser pour réessayer.</value></data>
+  <data name="DiscoveryResultsTab" xml:space="preserve"><value>Résultats</value></data>
+  <data name="DiscoveryHistoryTab" xml:space="preserve"><value>Historique</value></data>
+  <data name="ReconcileTarget" xml:space="preserve"><value>Réconcilier</value></data>
+  <data name="ReconcileHelp" xml:space="preserve"><value>Après une redécouverte, réconciliez une cible existante pour adopter explicitement le nouveau choix tout en conservant son identité et son historique d’acquisition.</value></data>
+  <data name="ReconcileUnavailable" xml:space="preserve"><value>Lancez une nouvelle découverte réussie contenant ce choix éligible, puis actualisez les résultats.</value></data>
+  <data name="TargetNameInUse" xml:space="preserve"><value>Ce nom de cible existe déjà. Réconciliez la cible existante ci-dessous, ou choisissez un autre nom pour une nouvelle cible.</value></data>
+  <data name="TargetConcurrencyConflict" xml:space="preserve"><value>La cible a été modifiée depuis son chargement. Actualisez les résultats, vérifiez la cible, puis réessayez.</value></data>
+  <data name="TargetPromoted" xml:space="preserve"><value>Déjà promu</value></data>
+  <data name="TargetNameUsed" xml:space="preserve"><value>Nom déjà utilisé</value></data>
+  <data name="AcquiredArtifacts" xml:space="preserve"><value>Artefacts acquis</value></data>
+  <data name="ViewAcquiredArtifacts" xml:space="preserve"><value>Voir les artefacts</value></data>
+  <data name="HideAcquiredArtifacts" xml:space="preserve"><value>Masquer les artefacts</value></data>
+  <data name="AcquiredArtifactUnavailable" xml:space="preserve"><value>Cet artefact est indisponible.</value></data>
+  <data name="CreateAcquisitionTool"><value>Créer un Tool</value></data>
+  <data name="CreateAcquisitionToolHelp"><value>Chaque appel relance une acquisition avec la cible et les paramètres ci-dessous, puis renvoie une référence d’artefact.</value></data>
+  <data name="AcquisitionToolSource"><value>Source de données</value></data>
+  <data name="AcquisitionToolSuggestedName"><value>{0} · {1}</value></data>
+  <data name="AcquisitionToolWorkspace"><value>Créer dans</value></data>
+  <data name="AcquisitionToolParameters"><value>Paramètres fixes</value></data>
+  <data name="AcquisitionToolOutput"><value>Artefact de sortie</value></data>
+  <data name="AcquisitionToolConflict"><value>Un Tool porte déjà ce nom. Choisissez un autre nom technique.</value></data>
+  <data name="AcquisitionToolForbidden"><value>Vous n’avez pas l’autorisation de créer un Tool à partir de cette acquisition.</value></data>
+  <data name="AcquisitionToolCreateFailed"><value>Le Tool n’a pas pu être créé à partir de cette acquisition.</value></data>
+  <data name="Cancel"><value>Annuler</value></data>
 </root>

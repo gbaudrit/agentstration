@@ -14,6 +14,10 @@ provider enabled
 
 MCP remains authoritative for protocol negotiation, `tools/list`, schemas, invocation and results. AEP contributes only extension identity, display metadata and mappings to MCP. Agent definitions never contain a command, endpoint or raw MCP declaration.
 
+At invocation, Tool input validation accepts `type` as one supported JSON Schema type name or a non-empty array of distinct supported names. A value must match at least one declared type, and the corresponding constraints remain enforced. For example, `["object", "null"]` accepts either an object or `null`; `"object"` alone rejects `null`. Making a property optional permits omission, not an otherwise invalid null value. Object inference from `properties` applies only when `type` is absent.
+
+A malformed `type` declaration at a validated schema node raises `tool_input_schema_invalid`, including unknown names, empty arrays, duplicate names, and non-string array entries. Validation does not rewrite the provider schema or coerce argument values. Required properties, unknown-property restrictions, enums, bounds, array constraints, and the existing nesting and payload limits still apply.
+
 Tool resolution and Tool execution are separate runtime responsibilities. The catalog returns provider-neutral descriptors (identity, schema, availability and approval metadata); it does not return an invocable MCP object. Microsoft Agent Framework receives an Agentstration-owned function adapter, and every effective invocation crosses `IToolExecutionPipeline` before the provider-specific `IToolInvoker` issues MCP `tools/call`. Direct MCP and AEP-to-MCP providers share this boundary:
 
 ```text

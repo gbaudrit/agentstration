@@ -215,3 +215,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 187. [ADR-0187 - Console navigation context is URL-authoritative](0187-console-navigation-context-is-url-authoritative.md)
 188. [ADR-0188 — Agentstration resources and AEP use agentstration.io/v1](0188-canonical-agentstration-api-version.md)
 189. [ADR-0189 — Service registration has explicit module ownership](0189-service-registration-has-explicit-module-ownership.md)
+190. [ADR-0190 — ToolDefinitions replay governed Data Source acquisitions](0190-tool-definitions-replay-governed-data-source-acquisitions.md)
+191. [ADR-0191 — OpenAPI discovery and invocation remain an AEP extension](0191-openapi-discovery-and-invocation-remain-an-aep-extension.md)

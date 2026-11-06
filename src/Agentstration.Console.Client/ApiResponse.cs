@@ -42,10 +42,11 @@ internal static class ApiResponse
         catch (HttpRequestException) { }
         catch (System.Text.Json.JsonException) { }
         var message = problem?.Detail ?? problem?.Title ?? $"Agentstration API returned {(int)response.StatusCode} ({response.ReasonPhrase}).";
-        throw new AgentstrationApiException(message, correlationId ?? Guid.NewGuid().ToString("N"), response.StatusCode, problem?.Title);
+        throw new AgentstrationApiException(message, correlationId ?? Guid.NewGuid().ToString("N"), response.StatusCode, problem?.Title)
+        { ProblemType = problem?.Type };
     }
 
-    private sealed record ApiProblemDetails(string? Title, string? Detail, int? Status);
+    private sealed record ApiProblemDetails(string? Title, string? Detail, int? Status, string? Type);
 }
 
 public sealed class AgentstrationApiException(string message, string errorId, HttpStatusCode? statusCode = null, string? problemTitle = null) : Exception(message)
@@ -53,6 +54,7 @@ public sealed class AgentstrationApiException(string message, string errorId, Ht
     public string ErrorId { get; } = errorId;
     public HttpStatusCode? StatusCode { get; } = statusCode;
     public string? ProblemTitle { get; } = problemTitle;
+    public string? ProblemType { get; init; }
     public bool IsConcurrencyConflict => StatusCode == HttpStatusCode.PreconditionFailed
         || StatusCode == HttpStatusCode.Conflict && string.Equals(ProblemTitle, "Resource version conflict", StringComparison.OrdinalIgnoreCase);
 }

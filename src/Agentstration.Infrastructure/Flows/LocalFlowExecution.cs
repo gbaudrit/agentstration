@@ -56,11 +56,12 @@ public sealed class WorkspaceFlowRunExecutionScope(
     {
         var previous = current.Value;
         current.Value = scope;
+        var operational = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
         var requestScope = scope.AccessScopeRef.Kind switch
         {
-            ResourceScopeKind.Instance => scopeFactory.PushSystem(),
-            ResourceScopeKind.Tenant => scopeFactory.PushTenant(scope.PrincipalId, scope.TenantId),
-            ResourceScopeKind.Workspace => scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value)),
+            ResourceScopeKind.Instance => scopeFactory.PushInstance(operational),
+            ResourceScopeKind.Tenant => scopeFactory.PushTenantAdministration(operational),
+            ResourceScopeKind.Workspace => scopeFactory.Push(operational),
             _ => throw Denied()
         };
         return new ExecutionScopeLease(requestScope, () => current.Value = previous);

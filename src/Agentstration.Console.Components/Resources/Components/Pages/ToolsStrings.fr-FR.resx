@@ -60,4 +60,8 @@
   <data name="Edit"><value>Modifier →</value></data>
   <data name="Categories" xml:space="preserve"><value>Catégories</value></data>
   <data name="ToolSets" xml:space="preserve"><value>ToolSets</value></data>
+  <data name="AcquisitionImplementation"><value>Acquisition</value></data>
+  <data name="AcquisitionImplementationHelp"><value>Ce Tool reprend la cible et les paramètres de l’acquisition de référence.</value></data>
+  <data name="AcquisitionTemplate"><value>Acquisition de référence</value></data>
+  <data name="AcquisitionOutput"><value>Artefact de sortie</value></data>
 </root>

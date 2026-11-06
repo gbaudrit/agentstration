@@ -28,6 +28,9 @@ internal sealed class AwpModelChatClient(
     private string? responseProviderType;
     public string? LastModelId => responseModelId;
     public string? LastProviderType => responseProviderType;
+    public string? LastFinishReason { get; private set; }
+    public int LastResponseContentCount { get; private set; }
+    public int LastResponseTextLength { get; private set; }
 
     public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -38,10 +41,14 @@ internal sealed class AwpModelChatClient(
         var response = await session.Client.InvokeModelAsync(request, cancellationToken);
         responseModelId = response.ModelId;
         responseProviderType = response.ProviderType;
+        LastFinishReason = response.FinishReason;
+        LastResponseContentCount = response.Contents.Count;
+        LastResponseTextLength = response.Contents.OfType<AwpModelTextContent>().Sum(value => value.Text.Length);
         var contents = response.Contents.Select(ToContent).ToList();
         return new ChatResponse(new ChatMessage(ChatRole.Assistant, contents))
         {
             ModelId = response.ModelId,
+            FinishReason = response.FinishReason is null ? null : new ChatFinishReason(response.FinishReason),
             Usage = response.InputTokens is null && response.OutputTokens is null && response.TotalTokens is null ? null : new UsageDetails
             {
                 InputTokenCount = response.InputTokens,

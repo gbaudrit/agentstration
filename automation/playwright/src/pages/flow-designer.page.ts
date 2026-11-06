@@ -497,15 +497,17 @@ export class FlowDesignerPage {
     const controls = focusMode
       ? this.page.locator('.designer-focus-toolbar')
       : this.page.locator('.designer-view-controls');
-    await expect(controls).toBeVisible();
-    const bounds = await controls.boundingBox();
-    const viewport = this.page.viewportSize();
-    expect(bounds).not.toBeNull();
-    expect(viewport).not.toBeNull();
-    expect(bounds!.x).toBeGreaterThanOrEqual(0);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport!.width + 1);
-    expect(bounds!.y).toBeGreaterThanOrEqual(0);
-    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport!.height + 1);
+    await expect(async () => {
+      await expect(controls).toBeVisible();
+      const bounds = await controls.boundingBox();
+      const viewport = this.page.viewportSize();
+      expect(bounds).not.toBeNull();
+      expect(viewport).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport!.width + 1);
+      expect(bounds!.y).toBeGreaterThanOrEqual(0);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport!.height + 1);
+    }).toPass({ timeout: 15_000 });
   }
 
   public async runCollapsedVerificationExpecting(issueCount: number): Promise<void> {

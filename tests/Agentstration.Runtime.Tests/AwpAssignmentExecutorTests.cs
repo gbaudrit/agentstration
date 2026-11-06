@@ -1219,6 +1219,7 @@ public sealed class AwpAssignmentExecutorTests
         string? parentRunId = null,
         string? correlationId = null,
         AwpExecutionAgentMaterial? agentMaterial = null,
+        bool directAgent = false,
         CancellationToken cancellationToken = default)
     {
         using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
@@ -1227,7 +1228,8 @@ public sealed class AwpAssignmentExecutorTests
         using var client = new AwpClient(new Uri("https://authority.test"), credential,
             new(Guid.NewGuid()), TimeProvider.System, 0, handler);
         var assignment = new AwpRunAssignment(new(Guid.NewGuid()), new(Guid.NewGuid()),
-            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), new AwpRootFlowRunTarget(rootRunId ?? runId),
+            new(Guid.NewGuid(), Guid.NewGuid().ToString("D")), directAgent
+                ? new AwpDirectAgentRunTarget(runId) : new AwpRootFlowRunTarget(rootRunId ?? runId),
             new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", "1.0"),
             new("material-1", "1.0", "sha256:material"),
             new("ownership", 1, DateTimeOffset.UtcNow.AddMinutes(5), 15));
@@ -1236,11 +1238,15 @@ public sealed class AwpAssignmentExecutorTests
         var executor = new AwpAssignmentExecutor(NullLoggerFactory.Instance,
             NullLogger<AwpAssignmentExecutor>.Instance);
         var definition = Version("root", graph, TestNow);
-        var material = new AwpRootFlowExecutionMaterial("material-1", "1.0", "sha256:material",
+        AwpExecutionMaterial material = new AwpRootFlowExecutionMaterial("material-1", "1.0", "sha256:material",
             runId, "root", "default", "1.0", "sha256:root", input,
             JsonSerializer.SerializeToElement(definition, JsonOptions), [agentMaterial ?? AgentMaterial()], Guid.NewGuid(),
             RootFlowRunId: rootRunId ?? runId, ParentFlowRunId: parentRunId,
             CorrelationId: correlationId);
+        if (directAgent)
+            material = new AwpDirectAgentExecutionMaterial("material-1", "1.0", "sha256:material", runId,
+                [new("user", "Answer the request.")], null, new(90, "disabled", null, new Dictionary<string, JsonElement>()),
+                agentMaterial ?? AgentMaterial());
 
         return (await executor.ExecuteAsync(session, material, cancellationToken), handler);
     }
@@ -1276,6 +1282,88 @@ public sealed class AwpAssignmentExecutorTests
         "agent-material", "agent", Guid.NewGuid(), "echo-agent", 1, "revision", "sha256:agent",
         "prompt-agent", "Echo agent", "Echo agent", "Return an answer.", "default-reasoning", "default", []);
 
+    [TestMethod]
+    public async Task AgentReceivesAcquisitionAndReaderResultsBeforePublishingFinalText()
+    {
+        var calls = 0;
+        var handler = new GraphHandler(TestNow)
+        {
+            ModelResponseFactory = request =>
+            {
+                calls++;
+                if (calls == 1)
+                    return [new AwpModelToolCallContent("acquire-call", "acquire", JsonSerializer.SerializeToElement(new { }))];
+                var toolResult = request.Messages.SelectMany(message => message.Contents).OfType<AwpModelToolResultContent>().Last();
+                if (calls == 2)
+                {
+                    Assert.AreEqual("artifact-1", toolResult.Result.GetProperty("artifact").GetProperty("artifactId").GetString());
+                    return [new AwpModelToolCallContent("read-call", "read", JsonSerializer.SerializeToElement(new { artifactId = "artifact-1" }))];
+                }
+                Assert.AreEqual("fixture alerts", toolResult.Result.GetProperty("text").GetString());
+                return [new AwpModelTextContent("Here are the fixture alerts.")];
+            },
+            AgentToolResultFactory = request => request.ToolId == "tool-acquire"
+                ? JsonSerializer.SerializeToElement(new { artifact = new { artifactId = "artifact-1", kind = "durable" } })
+                : JsonSerializer.SerializeToElement(new { text = "fixture alerts", endOfContent = true })
+        };
+        var graph = AgentAnswerGraph();
+        var agent = AgentMaterial() with { AgentName = "assistant", Tools = [ToolMaterial("acquire"), ToolMaterial("read")] };
+
+        var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }),
+            handler, agentMaterial: agent);
+
+        Assert.AreEqual(3, calls);
+        Assert.AreEqual("Here are the fixture alerts.", result.Output?.GetString());
+        Assert.IsTrue(handler.Events.Any(value => value.Kind == AwpExecutionEventKind.ResponseDelta
+            && value.Payload?.GetProperty("content").GetString() == "Here are the fixture alerts."));
+    }
+
+    [TestMethod]
+    [DataRow("length", "model_output_token_limit", false)]
+    [DataRow("stop", "model_empty_response", false)]
+    [DataRow("length", "model_output_token_limit", true)]
+    [DataRow("stop", "model_empty_response", true)]
+    public async Task EmptyAgentResponseFailsWithExplicitCodeAndRetainsSafeDiagnostic(string finishReason, string expectedCode, bool directAgent)
+    {
+        var handler = new GraphHandler(TestNow) { ModelOutput = "", ModelFinishReason = finishReason };
+        var error = await Assert.ThrowsExactlyAsync<AwpExecutionNotSupportedException>(() =>
+            ExecuteGraphAsync(AgentAnswerGraph(), JsonSerializer.SerializeToElement(new { }),
+                handler, agentMaterial: AgentMaterial() with { AgentName = "assistant" }, directAgent: directAgent));
+        Assert.AreEqual(expectedCode, error.Code);
+        if (!directAgent)
+        {
+            var failedStep = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.StepCompleted
+                && value.Location.FlowStep?.StepDefinitionId == "answer").Payload!.Value;
+            Assert.AreEqual("failed", failedStep.GetProperty("status").GetString());
+            Assert.AreEqual(expectedCode, failedStep.GetProperty("errorCode").GetString());
+        }
+        var diagnostic = handler.Events.Single(value => value.Kind == AwpExecutionEventKind.Diagnostic).Payload!.Value;
+        Assert.AreEqual(finishReason, diagnostic.GetProperty("finishReason").GetString());
+        Assert.AreEqual(0, diagnostic.GetProperty("responseTextLength").GetInt32());
+        Assert.AreEqual(1, diagnostic.GetProperty("responseContentCount").GetInt32());
+        Assert.IsFalse(diagnostic.TryGetProperty("text", out _));
+    }
+
+    [TestMethod]
+    public async Task TokenLimitWithNonemptyTextPreservesTheProducedOutput()
+    {
+        var handler = new GraphHandler(TestNow) { ModelOutput = "Partial answer", ModelFinishReason = "length" };
+        var (result, _) = await ExecuteGraphAsync(AgentAnswerGraph(), JsonSerializer.SerializeToElement(new { }),
+            handler, agentMaterial: AgentMaterial() with { AgentName = "assistant" });
+        Assert.AreEqual("Partial answer", result.Output?.GetString());
+    }
+
+    private static FlowGraphDefinition AgentAnswerGraph() => new()
+    {
+        EntryStep = "answer",
+        Steps =
+        [
+            new AgentFlowStepDefinition { Name = "answer", Agent = new("assistant") },
+            new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.answer.output}") }
+        ],
+        Transitions = [new("answer-output", "answer", "success", "output")]
+    };
+
     private static AwpExecutionToolMaterial ToolMaterial(string name) => new(
         $"tool-{name}", "default", name, $"Invoke {name}.",
         JsonSerializer.SerializeToElement(new { type = "object" }), null, false);
@@ -1286,6 +1374,9 @@ public sealed class AwpAssignmentExecutorTests
         public List<AwpCreateChildFlowRequest> ChildRequests { get; } = [];
         public List<AwpCleanupFlowArtifactRequest> CleanupRequests { get; } = [];
         public List<AwpInvokeModelRequest> ModelRequests { get; } = [];
+        public Func<AwpInvokeModelRequest, IReadOnlyList<AwpModelContent>>? ModelResponseFactory { get; init; }
+        public Func<AwpInvokeToolRequest, JsonElement>? AgentToolResultFactory { get; init; }
+        public string ModelFinishReason { get; init; } = "stop";
         public List<AwpInvokeFlowToolRequest> FlowToolRequests { get; } = [];
         public List<AwpStoreCheckpointRequest> CheckpointRequests { get; } = [];
         public List<AwpOpenStepExecutionRequest> StepRequests { get; } = [];
@@ -1336,6 +1427,8 @@ public sealed class AwpAssignmentExecutorTests
                 AwpProtocol.AppendEventsPath => AppendEvents(bytes),
                 AwpProtocol.StoreCheckpointPath => StoreCheckpoint(bytes),
                 AwpProtocol.InvokeModelPath => InvokeModel(bytes),
+                AwpProtocol.InvokeToolPath => new AwpInvokeToolResponse(now,
+                    AgentToolResultFactory!(Payload<AwpInvokeToolRequest>(bytes))),
                 AwpProtocol.InvokeFlowToolPath => InvokeFlowTool(bytes),
                 AwpProtocol.CaptureFlowArtifactPath => Capture(bytes),
                 AwpProtocol.CleanupFlowArtifactPath => Cleanup(bytes),
@@ -1392,7 +1485,8 @@ public sealed class AwpAssignmentExecutorTests
             if (ModelFailureMessage is not null) throw new InvalidOperationException(ModelFailureMessage);
             var request = Payload<AwpInvokeModelRequest>(bytes);
             ModelRequests.Add(request);
-            return new(now, [new AwpModelTextContent(ModelOutput)], "deterministic", "stop", 12, 4,
+            var contents = ModelResponseFactory?.Invoke(request) ?? [new AwpModelTextContent(ModelOutput)];
+            return new(now, contents, "deterministic", contents.OfType<AwpModelToolCallContent>().Any() ? "tool_calls" : ModelFinishReason, 12, 4,
                 "Deterministic", 16);
         }
 

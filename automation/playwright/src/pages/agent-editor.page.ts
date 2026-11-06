@@ -32,6 +32,7 @@ export class AgentEditorPage {
     );
     if (!response?.ok()) throw new Error(`Agent page returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.form.waitFor({ state: 'visible' });
+    await expect(this.form).toHaveAttribute('data-interactive', 'true');
   }
 
   public async saveDraft(): Promise<void> {
@@ -39,6 +40,7 @@ export class AgentEditorPage {
   }
 
   public async openTools(): Promise<void> {
+    await expect(this.form).toHaveAttribute('data-interactive', 'true');
     await this.page.getByTestId(TestIds.agentEditor.toolsTab).click();
     await this.page.getByTestId(TestIds.agentEditor.toolSetConfiguration).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.agentEditor.toolConfiguration).waitFor({ state: 'visible' });
