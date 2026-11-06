@@ -382,8 +382,8 @@ export class SourceLifecyclePage {
       return result !== undefined && result.state >= 4;
     }, { timeout: 90_000 }).toBe(true);
     expect(result.state, result.errorMessage ?? undefined).toBe(4);
-    await this.openSource(consoleUrl, name, 'acquisitions');
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitionRow).filter({ hasText: result.flowRunId })).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitionRow).filter({ hasText: result.flowRunId }))
+      .toHaveAttribute('data-state', 'Succeeded', { timeout: 15_000 });
     return result;
   }
 

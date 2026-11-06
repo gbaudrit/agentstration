@@ -1,7 +1,7 @@
 import { test as base } from '@playwright/test';
 import { resolveExternalProductAddresses } from './external-product.js';
 import { startProductHosts, type ProductHosts } from './product-hosts.js';
-import { isActionableConsoleError, isActionableFirstPartyFailure } from '../health/page-health.js';
+import { isActionableAssetResponse, isActionableConsoleError, isActionableFirstPartyFailure } from '../health/page-health.js';
 
 interface AgentstrationWorkerFixtures {
   product: ProductHosts;
@@ -49,6 +49,12 @@ export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFi
       const reason = request.failure()?.errorText ?? 'unknown failure';
       if (!isActionableFirstPartyFailure(request.url(), firstPartyOrigins, reason)) return;
       failures.push(`First-party request failed: ${request.method()} ${request.url()} (${reason})`);
+    });
+    page.on('response', response => {
+      const resourceType = response.request().resourceType();
+      if (isActionableAssetResponse(response.url(), firstPartyOrigins, resourceType, response.status())) {
+        failures.push(`First-party ${resourceType} failed: HTTP ${response.status()} ${response.url()}`);
+      }
     });
     await use();
     if (!page.isClosed()) {

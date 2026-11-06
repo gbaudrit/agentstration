@@ -123,6 +123,10 @@ else
                             @if (runResult.Output is { } output)
                             {
                                 <pre>@JsonSerializer.Serialize(output, IndentedJson)</pre>
+                                @if (ReturnedArtifactUrl(output) is { } artifactUrl)
+                                {
+                                    <a class="button-secondary" href="@artifactUrl" data-testid="tool-run-open-artifact">@T("OpenReturnedArtifact")</a>
+                                }
                             }
                             else
                             {
@@ -157,6 +161,7 @@ else
     [Parameter] public string Name { get; set; } = "";
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
     private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
     private static readonly IReadOnlyDictionary<string, JsonElement> DryRunEnabled = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
     {
@@ -225,7 +230,7 @@ else
                     && (extensionReference.ScopeRef is null || candidate.RegistrationScopeRef == extensionReference.ScopeRef));
             }
         }
-        activeTab = ToolDetailTab.Overview;
+        activeTab = string.Equals(View, "execution", StringComparison.OrdinalIgnoreCase) ? ToolDetailTab.Execution : ToolDetailTab.Overview;
         runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
         runInput = CanSimulate
             ? ToolDryRunContract.Enable(JsonSerializer.SerializeToElement(new { }))
@@ -274,17 +279,35 @@ else
         {
             submitting = true;
             runError = null;
-            runResult = await Client.RunToolAsync(ToolNamespace, Name, new RunToolRequest(runInput.Clone(), runMode), default);
+            var request = new RunToolRequest(runInput.Clone(), runMode);
+            runResult = ScopeRefValue is { Length: > 0 } requestedScope
+                ? await Client.RunToolAsync(ResourceScopeRef.Parse(requestedScope), ToolNamespace, Name, request, default)
+                : await Client.RunToolAsync(ToolNamespace, Name, request, default);
         }
         catch (Exception exception)
         {
             runResult = null;
-            runError = exception.Message;
+            runError = exception is AgentstrationApiException { ProblemType: "https://agentstration.dev/problems/data_source_acquisition_target_stale" }
+                ? T("AcquisitionTargetStale") : exception.Message;
         }
         finally
         {
             submitting = false;
         }
+    }
+
+    private string? ReturnedArtifactUrl(JsonElement output)
+    {
+        if (output.ValueKind != JsonValueKind.Object
+            || !output.TryGetProperty("artifact", out var artifact) || artifact.ValueKind != JsonValueKind.Object
+            || !artifact.TryGetProperty("artifactId", out var id) || id.ValueKind != JsonValueKind.String
+            || !Guid.TryParse(id.GetString(), out var artifactId)
+            || !artifact.TryGetProperty("kind", out var kind) || kind.ValueKind != JsonValueKind.String
+            || kind.GetString() is not ("staged" or "durable"))
+            return null;
+
+        var url = $"/artifacts/{kind.GetString()}/{artifactId:N}";
+        return (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(url) ?? url;
     }
 
     private RenderFragment SchemaSummary(JsonElement? schema) => builder =>

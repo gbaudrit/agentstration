@@ -234,6 +234,12 @@ public sealed class DataSourceProfileService(
         Guid? expectedProfileUid,
         CancellationToken cancellationToken)
     {
+        // Tenant administration lists its exact catalogue, but dependency resolution
+        // must still inspect authorized ancestors before evaluating their use grant.
+        using var hierarchy = requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration
+            ? requestScopes.PushTenant(requestContext.Current.PrincipalId, requestContext.Current.TenantId,
+                requestContext.Current.Restriction)
+            : null;
         var profile = await references.ResolveAsync<DataSourceProfileResource>(reference, ownerNamespace,
             DataSourceResourceKinds.DataSourceProfile, consumerScope, cancellationToken)
             ?? throw Error("data_source_profile_not_found", $"Data Source Profile '{reference.Name}' was not found.");

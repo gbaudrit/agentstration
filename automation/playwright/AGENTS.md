@@ -19,5 +19,6 @@ These instructions apply to `automation/playwright`.
 
 ## Validation
 
+- Complete .NET builds before starting browser hosts and keep product and referenced Razor build outputs unchanged until the campaign ends. Rebuilding a component test project can invalidate the hosts' fingerprinted CSS manifests; rebuild the hosts together before restarting browser validation.
 - Add or update a Playwright test with every journey behavior change.
 - Run `npm exec tsc -- --noEmit` and the affected Playwright test. Run `npm run test:smoke` before handoff when product hosts or shared page objects change.

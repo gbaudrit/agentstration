@@ -131,11 +131,18 @@ export class ArtifactAdministrationPage {
     const protectedContent = await this.page.getByTestId(TestIds.artifacts.stagedContent).innerText();
     await this.assertMetadataOnlyTokenIsDenied(consoleUrl, stagedId, protectedContent);
     await this.page.getByTestId(TestIds.governedKnowledge.stagedRetentionTab).click();
-    const expiration = new Date(new Date(original.expiresAt).getTime() + 60 * 60_000).toISOString().slice(0, 16);
-    await this.page.getByLabel(text.newExpiration, { exact: true }).fill(expiration);
-    await this.page.getByLabel(text.newExpiration, { exact: true }).blur();
+    const expirationInput = this.page.getByLabel(text.newExpiration, { exact: true });
+    // Add a calendar day to the server-rendered local value; this field has no UTC offset.
+    const requestedDate = new Date(`${await expirationInput.inputValue()}:00Z`);
+    requestedDate.setUTCDate(requestedDate.getUTCDate() + 1);
+    const expiration = requestedDate.toISOString().slice(0, 16);
+    await expirationInput.fill(expiration);
+    await expirationInput.blur();
     await this.page.getByRole('button', { name: text.extendRetention, exact: true }).click();
-    await expect.poll(async () => new Date((await read()).expiresAt).getTime()).toBe(Date.parse(`${expiration}:00Z`));
+    await expect.poll(async () => Date.parse((await read()).expiresAt)).toBeGreaterThan(Date.parse(original.expiresAt));
+    await this.page.reload();
+    await this.page.getByTestId(TestIds.governedKnowledge.stagedRetentionTab).click();
+    await expect(expirationInput).toHaveValue(expiration);
     const leaseResponse = await this.page.request.post(`${api}/leases`, {
       data: { consumerKind: 'flow', consumerId: 'knowledge-browser-consumer', operations: [0, 1], expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() },
     });

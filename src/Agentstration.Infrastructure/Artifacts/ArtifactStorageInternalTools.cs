@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
 
@@ -10,7 +11,9 @@ namespace Agentstration.Infrastructure.Artifacts;
 
 public sealed class ArtifactStorageWriteMcpTool(
     ArtifactManagementService artifacts,
-    IArtifactDurableStore durable) : ArtifactBrokerInternalTool(artifacts)
+    IArtifactDurableStore durable,
+    ICurrentRequestContext current,
+    IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public const string Name = "artifact.storage.local.write";
 
@@ -18,7 +21,7 @@ public sealed class ArtifactStorageWriteMcpTool(
         "Deterministically copies sealed staged content to the built-in durable filesystem store and returns a normalized receipt.",
         Schema(new { type = "object", properties = new { stagedArtifactId = new { type = "string" }, producerFlowRunId = new { type = "string" }, producerFlowStepId = new { type = "string" }, storageFlowRunId = new { type = "string" } }, required = new[] { "stagedArtifactId", "producerFlowRunId", "producerFlowStepId" }, additionalProperties = false }), InitialCategory: new("artifact-storage", "Artifact storage", "Storage Flow implementation Tools."), ExposeThroughMcp: false);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var sourceId = StagedArtifactId.Parse(RequiredString(invocation.Arguments, "stagedArtifactId"));
         var source = await Artifacts.GetStagedAsync(sourceId, null, ArtifactLeaseOperation.Inspect, cancellationToken)
@@ -67,7 +70,9 @@ public sealed class ArtifactStorageWriteMcpTool(
 
 public sealed class ArtifactStorageReadMcpTool(
     ArtifactManagementService artifacts,
-    IArtifactDurableStore durable) : ArtifactBrokerInternalTool(artifacts)
+    IArtifactDurableStore durable,
+    ICurrentRequestContext current,
+    IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public const string Name = "artifact.storage.local.read";
 
@@ -75,7 +80,7 @@ public sealed class ArtifactStorageReadMcpTool(
         "Materializes durable content into a new governed staged Artifact without exposing the durable backend reference.",
         Schema(new { type = "object", properties = new { flowRunArtifactId = new { type = "string" }, binding = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "flowRunArtifactId" }, additionalProperties = false }), InitialCategory: new("artifact-storage", "Artifact storage", "Storage Flow implementation Tools."), ExposeThroughMcp: false);
 
-    public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
+    protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var durableArtifact = await Artifacts.GetFlowRunArtifactAsync(
             FlowRunArtifactId.Parse(RequiredString(invocation.Arguments, "flowRunArtifactId")), cancellationToken)

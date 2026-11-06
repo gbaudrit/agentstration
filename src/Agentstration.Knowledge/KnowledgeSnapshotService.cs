@@ -37,6 +37,7 @@ public sealed class KnowledgeSnapshotService(
     IResourceStore store,
     KnowledgeSourceManagementService sources,
     ICurrentRequestContext requestContext,
+    IRequestContextScopeFactory requestScopes,
     IAuthorizationService authorization,
     IKnowledgeSnapshotArtifactResolver artifacts,
     ISecurityAuditWriter audit,
@@ -48,8 +49,10 @@ public sealed class KnowledgeSnapshotService(
         KnowledgeSnapshotId id,
         CancellationToken cancellationToken)
     {
-        var context = RequireContext();
+        var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
+        var context = administrative ?? RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
+        using var operational = administrative is null ? null : requestScopes.Push(context);
         var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
         var snapshot = await RequireSnapshotAsync(scopeRef, id.Value, id.Namespace, cancellationToken);
         return await ViewAsync(snapshot.Value, scopeRef, cancellationToken);
@@ -59,10 +62,12 @@ public sealed class KnowledgeSnapshotService(
         KnowledgeSourceId sourceId,
         CancellationToken cancellationToken)
     {
-        var context = RequireContext();
+        var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
+        var context = administrative ?? RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
         var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var source = await RequireSourceAsync(scopeRef, sourceId, cancellationToken);
+        var source = await RequireSourceAsync(KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef, sourceId, cancellationToken);
+        using var operational = administrative is null ? null : requestScopes.Push(context);
         var values = await store.ListExactAsync<KnowledgeSnapshotResource>(scopeRef,
             KnowledgeResourceKinds.KnowledgeSnapshot, 0, 1000, cancellationToken);
         var result = new List<KnowledgeSnapshotView>();
@@ -76,10 +81,12 @@ public sealed class KnowledgeSnapshotService(
         KnowledgeSourceId sourceId,
         CancellationToken cancellationToken)
     {
-        var context = RequireContext();
+        var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
+        var context = administrative ?? RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsRead, cancellationToken);
         var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var source = await RequireSourceAsync(scopeRef, sourceId, cancellationToken);
+        var source = await RequireSourceAsync(KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef, sourceId, cancellationToken);
+        using var operational = administrative is null ? null : requestScopes.Push(context);
         var observed = await LoadObservedAsync(scopeRef, source.Value, cancellationToken);
         if (observed?.Value.ActiveSnapshotName is null) return null;
         var snapshot = await store.GetExactAsync<KnowledgeSnapshotResource>(Scoped(scopeRef, sourceId.Namespace,

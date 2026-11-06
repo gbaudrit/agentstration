@@ -1,9 +1,14 @@
+using System.Net;
+using System.Net.Http.Json;
 using Agentstration.Api.Contracts;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
@@ -126,6 +131,77 @@ public sealed class ExtensionManagedResourcePresentationTests
         });
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Access")]
+    [DataRow("fr-FR", "Accès")]
+    public void ManagedProfileKeepsAccessAdministrationAvailable(string cultureName, string accessLabel)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfilesClientStub());
+        context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
+        using var http = new HttpClient(new EmptyFlowsHandler()) { BaseAddress = new Uri("http://localhost") };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowApiClient(http));
+        var policies = new ProfilePolicies();
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new ProfileScopes(tenant));
+        context.Services.AddSingleton<IConsoleNavigationContext>(new ProfileNavigationContext(Scope.Value));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/data-source-profiles/crawl4ai-web?scopeRef=%2Finstance&context=%2Finstance");
+        var rendered = context.Render<DataSourceProfileEditor>(parameters => parameters.Add(component => component.Name, "crawl4ai-web"));
+        rendered.WaitForAssertion(() => Assert.IsEmpty(rendered.FindAll(".page-header button.button-danger")));
+        rendered.FindAll("[role=tab]").Single(value => value.TextContent == accessLabel).Click();
+        rendered.WaitForElement("[data-testid=resource-access-target]").Change(tenant.Value);
+        rendered.Find("[data-testid=resource-access-add]").Click();
+        rendered.Find("[data-testid=resource-access-save]").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(policies.Saved);
+            Assert.AreEqual(ToolSetUid, policies.Saved.Resource.Uid);
+            Assert.IsNull(policies.Saved.Resource.Version);
+            Assert.AreEqual(tenant, policies.Saved.Grants.Single().TargetScopeRef);
+        });
+        rendered.FindAll("[role=tab]").Single(value => value.TextContent == (cultureName == "fr-FR" ? "Définition" : "Definition")).Click();
+        Assert.IsTrue(rendered.Find("fieldset").HasAttribute("disabled"));
+        Assert.IsEmpty(rendered.FindAll("button[type=submit]"));
+    }
+
+    private sealed class ProfileNavigationContext(string scopeRef) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scopeRef;
+        public string AddToUri(string uri) => uri;
+    }
+
+    private sealed class EmptyFlowsHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { value = Array.Empty<object>() }) });
+    }
+
+    private sealed class ProfilePolicies : IResourceAccessPolicyClient
+    {
+        public ResourceAccessPolicy? Saved { get; private set; }
+        public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) => Task.FromResult<ResourceAccessPolicySnapshot?>(null);
+        public Task<ResourceAccessPolicySnapshot> PutAsync(ResourceAccessPolicy policy, string? etag, CancellationToken cancellationToken)
+        {
+            Saved = policy;
+            return Task.FromResult(new ResourceAccessPolicySnapshot(policy, "policy"));
+        }
+    }
+
+    private sealed class ProfileScopes(ResourceScopeRef tenant) : IResourceScopeInventoryClient
+    {
+        public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) => Task.FromResult(
+            new ResourceScopeInventoryResponse([
+                new(Scope, ResourceScopeKind.Instance, "Instance", null, false,
+                    [new(ToolSetUid, Namespace, DataSourceResourceKinds.DataSourceProfile, "crawl4ai-web", DateTimeOffset.UnixEpoch)]),
+                new(tenant, ResourceScopeKind.Tenant, "Tenant", Scope, true, [])
+            ]));
+        public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string kind, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(Scope, ResourceScopeKind.Instance, "Instance", true)]);
+    }
+
     private static DataSourceProfileResource Profile() => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
@@ -145,8 +221,8 @@ public sealed class ExtensionManagedResourcePresentationTests
     private sealed class ProfilesClientStub : IDataSourceProfilesClient
     {
         public Task<IReadOnlyList<DataSourceProfileResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileResource>>([Profile()]);
-        public Task<ResourceSnapshot<DataSourceProfileResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<IReadOnlyList<DataSourceProfileRevisionResource>> GetRevisionsAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<DataSourceProfileResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new ResourceSnapshot<DataSourceProfileResource>(Profile(), "profile-etag"));
+        public Task<IReadOnlyList<DataSourceProfileRevisionResource>> GetRevisionsAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileRevisionResource>>([]);
         public Task<ResourceSnapshot<DataSourceProfileResource>> CreateAsync(CreateDataSourceProfileRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceProfileResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceProfileRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ResourceSnapshot<DataSourceProfileRevisionResource>> PublishAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PublishDataSourceProfileRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();

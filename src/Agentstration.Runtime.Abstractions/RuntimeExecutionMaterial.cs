@@ -65,6 +65,7 @@ public abstract record RuntimeExecutionMaterial(
     public ResourceScopeRef ScopeRef { get; init; } = WorkspaceId.Value == Guid.Empty
         ? ResourceScopeRef.Instance
         : ResourceScopeRef.Workspace(WorkspaceId.Value);
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
 }
 
 public sealed record RuntimeDirectAgentExecutionMaterial(

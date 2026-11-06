@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Text.Json;
 using Agentstration.Flows;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -9,6 +10,51 @@ namespace Agentstration.Application.Tests;
 
 public sealed partial class FlowTests
 {
+    [TestMethod]
+    public async Task SqliteConcurrentFlowRunCreationDoesNotSubmitDuplicateInserts()
+    {
+        var commands = new FlowCommandInterceptor();
+        await using var fixture = await FlowFixture.CreateAsync(commands);
+        var run = CreateStoredRun($"flowrun-root-{Guid.NewGuid():N}", new FlowId("catalog"), FlowRunStatus.Pending);
+        commands.Reset();
+
+        var outcomes = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(async () =>
+        {
+            try
+            {
+                await fixture.Repository.CreateRunAsync(run, default);
+                return true;
+            }
+            catch (FlowConcurrencyException)
+            {
+                return false;
+            }
+        })));
+
+        Assert.AreEqual(1, outcomes.Count(created => created));
+        Assert.AreEqual(1, commands.CommandTexts.Count(sql => sql.StartsWith("INSERT INTO \"FlowResources\"", StringComparison.Ordinal)));
+        Assert.IsNotNull(await fixture.Repository.GetRunExactAsync(run.Scope.ScopeRef, run.Id, default));
+    }
+
+    [TestMethod]
+    public async Task SqliteFlowRunEventsHaveUniqueSequencesDuringConcurrentAppends()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        const string runId = "concurrent-events";
+        const int count = 24;
+        var scope = TestScope.ScopeRef;
+        var writes = Enumerable.Range(0, count).Select(index => Task.Run(() =>
+            fixture.Repository.AppendRunEventAsync(new FlowRunEvent(scope, runId, 0, FlowRunEventType.FlowRunCreated,
+                null, JsonSerializer.SerializeToElement(index), Now), default))).ToArray();
+
+        await Task.WhenAll(writes);
+        var stored = await fixture.Repository.ListRunEventsExactAsync(scope, runId, 0, default);
+        CollectionAssert.AreEqual(Enumerable.Range(1, count).Select(value => (long)value).ToArray(),
+            stored.Select(value => value.Sequence).ToArray());
+        CollectionAssert.AreEquivalent(Enumerable.Range(0, count).ToArray(),
+            stored.Select(value => value.Payload!.Value.GetInt32()).ToArray());
+    }
+
     [TestMethod]
     public async Task SqliteRecoveryPagesFilterInSqlAndKeepTheirCursorAfterUpdatesAndDeletion()
     {
