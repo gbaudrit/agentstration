@@ -33,6 +33,7 @@ internal static class SecurityServiceCollectionExtensions
         services.AddSingleton<ParameterManagementService>();
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<ConnectedServiceManagementService>();
+        services.AddSingleton<ConnectedServiceTypeManagementService>();
         services.AddSingleton<IConnectedServiceResolver>(provider => provider.GetRequiredService<ConnectedServiceManagementService>());
         services.AddSingleton<IParameterUsageProvider, ConnectedServiceParameterUsageProvider>();
         services.AddSingleton<SecretManagementService>();

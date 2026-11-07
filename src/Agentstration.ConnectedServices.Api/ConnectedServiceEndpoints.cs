@@ -10,10 +10,52 @@ internal static class ConnectedServiceEndpoints
 {
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/connected-service-types", async (
-            ConnectedServiceManagementService service,
-            CancellationToken token) => Results.Ok(await service.ListTypesAsync(token)))
+        var types = endpoints.MapGroup("/api/connected-service-types");
+        types.MapGet("/", async (ConnectedServiceTypeManagementService service, CancellationToken token) =>
+            Results.Ok((await service.ListAsync(token)).Select(value => value.Value)))
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        types.MapGet("/{name}", async (string name, string scopeRef, string? @namespace,
+            HttpResponse response, ConnectedServiceTypeManagementService service, CancellationToken token) =>
+            await Execute(async () =>
+            {
+                var stored = await service.GetExactAsync(ResourceScopeRef.Parse(scopeRef),
+                    ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, token)
+                    ?? throw new ConnectedServiceTypeNotFoundException(
+                        ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name);
+                response.Headers.ETag = stored.ETag;
+                return Results.Ok(stored.Value);
+            })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        types.MapPost("/", async (CreateConnectedServiceTypeRequest body, HttpResponse response,
+            ConnectedServiceTypeManagementService service, CancellationToken token) => await Execute(async () => Resource(
+                await service.CreateAsync(new ConnectedServiceTypeResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ConnectedServiceResourceKinds.ConnectedServiceType,
+                    Metadata = new()
+                    {
+                        Name = body.Name,
+                        Namespace = body.Namespace ?? ResourceNamespace.Default
+                    },
+                    ScopeRef = body.ScopeRef,
+                    Definition = body.Properties
+                }, token), response, StatusCodes.Status201Created)))
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        types.MapPut("/{name}", async (string name, string scopeRef, string? @namespace,
+            PutConnectedServiceTypeRequest body, HttpRequest request, HttpResponse response,
+            ConnectedServiceTypeManagementService service, CancellationToken token) => await Execute(async () => Resource(
+                await service.PutExactAsync(ResourceScopeRef.Parse(scopeRef),
+                    ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, body.Properties,
+                    request.Headers.IfMatch.FirstOrDefault(), token), response, StatusCodes.Status200OK)))
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        types.MapDelete("/{name}", async (string name, string scopeRef, string? @namespace,
+            HttpRequest request, ConnectedServiceTypeManagementService service, CancellationToken token) =>
+            await Execute(async () =>
+            {
+                await service.DeleteExactAsync(ResourceScopeRef.Parse(scopeRef),
+                    ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name,
+                    request.Headers.IfMatch.FirstOrDefault(), token);
+                return Results.NoContent();
+            })).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
 
         var services = endpoints.MapGroup("/api/connected-services");
         services.MapGet("/", async (ConnectedServiceManagementService service, CancellationToken token) =>
@@ -87,6 +129,10 @@ internal static class ConnectedServiceEndpoints
         { return Results.Problem(statusCode: 403, title: "Connected Service access denied", detail: exception.Message); }
         catch (ConnectedServiceUnavailableException exception)
         { return Results.Problem(statusCode: 409, title: "Connected Service unavailable", detail: exception.Message); }
+        catch (ConnectedServiceTypeNotFoundException exception)
+        { return Results.Problem(statusCode: 404, title: "Connected Service type not found", detail: exception.Message); }
+        catch (ConnectedServiceTypeInUseException exception)
+        { return Results.Problem(statusCode: 409, title: "Connected Service type in use", detail: exception.Message); }
         catch (ResourceConcurrencyException exception)
         { return Results.Problem(statusCode: 409, title: "Resource version conflict", detail: exception.Message); }
         catch (ResourceScopeAccessDeniedException exception)
@@ -96,6 +142,7 @@ internal static class ConnectedServiceEndpoints
         catch (InvalidDescendantUseGrantException exception)
         { return Results.Problem(statusCode: 422, title: "Invalid use grant", detail: exception.Message); }
         catch (Exception exception) when (exception is ConnectedServiceValidationException
+            or ConnectedServiceTypeValidationException
             or ArgumentException or InvalidOperationException or FormatException)
         { return Results.Problem(statusCode: 422, title: "Invalid Connected Service operation", detail: exception.Message); }
     }

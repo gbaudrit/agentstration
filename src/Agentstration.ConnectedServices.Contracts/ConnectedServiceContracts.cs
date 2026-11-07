@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agentstration.Extensions.Contracts;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -10,6 +9,7 @@ namespace Agentstration.ConnectedServices.Contracts;
 
 public static class ConnectedServiceResourceKinds
 {
+    public const string ConnectedServiceType = "ConnectedServiceType";
     public const string ConnectedService = "ConnectedService";
 }
 
@@ -42,7 +42,8 @@ public sealed record ConnectedServiceExportDescriptor(
     ConnectedServiceValueType Type,
     ConnectedServiceValueProtection Protection,
     string? Format = null,
-    string? Description = null);
+    string? Description = null,
+    string? SourceInputId = null);
 
 public sealed record ConnectedServiceTypeVersionDescriptor(
     string Version,
@@ -52,34 +53,25 @@ public sealed record ConnectedServiceTypeVersionDescriptor(
     IReadOnlyList<ConnectedServiceExportDescriptor> Exports,
     bool Deprecated = false);
 
-public sealed record ConnectedServiceTypeDescriptor(
-    string Id,
-    string DisplayName,
-    string PreferredVersion,
-    IReadOnlyList<ConnectedServiceTypeVersionDescriptor> Versions,
-    string? Description = null);
-
-public sealed record ConnectedServiceExtensionIdentity(string Id, string Name, string Version);
-
-public sealed record ConnectedServiceTypeCatalogInspection(
-    string Status,
-    ConnectedServiceExtensionIdentity? Extension,
-    IReadOnlyList<ConnectedServiceTypeDescriptor> Types,
-    string? Details = null);
-
-public interface IConnectedServiceTypeProvider
+public sealed record ConnectedServiceTypeProperties
 {
-    bool CanInspect(Uri endpoint);
-    ValueTask<ConnectedServiceTypeCatalogInspection> InspectAsync(
-        ExtensionRegistrationResource registration,
-        CancellationToken cancellationToken = default);
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public bool Enabled { get; init; } = true;
+    public required string PreferredVersion { get; init; }
+    public IReadOnlyList<ConnectedServiceTypeVersionDescriptor> Versions { get; init; } = [];
+    public DescendantUsePolicy UsePolicy { get; init; } = new();
+}
+
+public sealed record ConnectedServiceTypeResource : Resource
+{
+    public ConnectedServiceTypeProperties Definition { get; init; } = null!;
 }
 
 public sealed record ConnectedServiceTypeReference
 {
-    public required ResourceReference Extension { get; init; }
-    public required string ExtensionId { get; init; }
-    public required string TypeId { get; init; }
+    public required ResourceReference Type { get; init; }
+    public required Guid TypeUid { get; init; }
     public required string Version { get; init; }
     public required string SchemaDigest { get; init; }
 }
@@ -168,15 +160,15 @@ public interface IConnectedServiceResolver
         CancellationToken cancellationToken = default);
 }
 
-public sealed record ConnectedServiceTypeCatalogEntry(
-    ResourceReference Extension,
-    ResourceScopeRef ExtensionScopeRef,
-    ConnectedServiceExtensionIdentity ExtensionIdentity,
-    ConnectedServiceTypeDescriptor Type);
-
 public sealed record CreateConnectedServiceRequest(
     string Name,
     ConnectedServiceProperties Properties,
     ResourceScopeRef? ScopeRef = null);
 
 public sealed record PutConnectedServiceRequest(ConnectedServiceProperties Properties);
+public sealed record CreateConnectedServiceTypeRequest(
+    string Name,
+    ConnectedServiceTypeProperties Properties,
+    ResourceScopeRef? ScopeRef = null,
+    ResourceNamespace? Namespace = null);
+public sealed record PutConnectedServiceTypeRequest(ConnectedServiceTypeProperties Properties);

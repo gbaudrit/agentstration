@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Agentstration.ConnectedServices.Contracts;
-using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
@@ -14,7 +13,6 @@ public sealed class ConnectedServiceManagementService(
     IResourceStore store,
     IResourceScopeOperations scopeOperations,
     DescendantResourceUseAuthorizer useAuthorizer,
-    IEnumerable<IConnectedServiceTypeProvider> typeProviders,
     IParameterResolver parameters,
     ISecretResolver secrets,
     TimeProvider timeProvider) : IConnectedServiceResolver
@@ -34,29 +32,6 @@ public sealed class ConnectedServiceManagementService(
         string name,
         CancellationToken cancellationToken) =>
         store.GetExactAsync<ConnectedServiceResource>(Scoped(scopeRef, name), cancellationToken);
-
-    public async Task<IReadOnlyList<ConnectedServiceTypeCatalogEntry>> ListTypesAsync(CancellationToken cancellationToken)
-    {
-        var entries = new List<ConnectedServiceTypeCatalogEntry>();
-        foreach (var stored in await store.ListAllAsync<ExtensionRegistrationResource>(
-            ExtensionKinds.ExtensionRegistration, cancellationToken))
-        {
-            var registration = stored.Value;
-            if (!registration.Definition.Enabled || registration.ScopeRef is not { } scopeRef) continue;
-            var inspection = await InspectAsync(registration, cancellationToken);
-            if (!string.Equals(inspection.Status, "available", StringComparison.Ordinal)
-                || inspection.Extension is null) continue;
-            entries.AddRange(inspection.Types.Select(type => new ConnectedServiceTypeCatalogEntry(
-                new ResourceReference(registration.Name, scopeRef, registration.Namespace),
-                scopeRef,
-                inspection.Extension,
-                type)));
-        }
-        return entries
-            .OrderBy(value => value.Type.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(value => value.Type.Id, StringComparer.Ordinal)
-            .ToArray();
-    }
 
     public async Task<StoredResource<ConnectedServiceResource>> CreateAsync(
         ConnectedServiceResource resource,
@@ -234,14 +209,13 @@ public sealed class ConnectedServiceManagementService(
             throw new ConnectedServiceValidationException(
                 $"Connected Service descriptions cannot exceed {MaximumDescriptionLength} characters.");
         if (resource.Definition.Type is null
-            || resource.Definition.Type.Extension is null
-            || string.IsNullOrWhiteSpace(resource.Definition.Type.Extension.Name)
-            || string.IsNullOrWhiteSpace(resource.Definition.Type.ExtensionId)
-            || string.IsNullOrWhiteSpace(resource.Definition.Type.TypeId)
+            || resource.Definition.Type.Type is null
+            || string.IsNullOrWhiteSpace(resource.Definition.Type.Type.Name)
+            || resource.Definition.Type.TypeUid == Guid.Empty
             || string.IsNullOrWhiteSpace(resource.Definition.Type.Version)
             || string.IsNullOrWhiteSpace(resource.Definition.Type.SchemaDigest))
             throw new ConnectedServiceValidationException(
-                "Connected Service type references require an Extension, extensionId, typeId, version and schemaDigest.");
+                "Connected Service type references require an exact type, typeUid, version and schemaDigest.");
         if (resource.Definition.Bindings is null)
             throw new ConnectedServiceValidationException("Connected Service bindings cannot be null.");
         if (resource.Definition.Options.ValueKind != JsonValueKind.Object)
@@ -281,37 +255,34 @@ public sealed class ConnectedServiceManagementService(
         }
     }
 
-    private async Task<(ExtensionRegistrationResource Registration, ConnectedServiceTypeVersionDescriptor Version)>
+    private async Task<(ConnectedServiceTypeResource Type, ConnectedServiceTypeVersionDescriptor Version)>
         ResolveTypeAsync(ConnectedServiceResource resource, CancellationToken cancellationToken)
     {
         var scopeRef = RequireScope(resource);
-        var reference = resource.Definition.Type.Extension;
-        var extensionScope = reference.ScopeRef
-            ?? throw new ConnectedServiceValidationException("The Extension Registration reference must include an exact scopeRef.");
-        if (!await useAuthorizer.IsSameOrDescendantAsync(extensionScope, scopeRef, cancellationToken))
-            throw new ConnectedServiceValidationException("The Extension Registration must belong to the same scope or an ancestor scope.");
-        var address = reference.Resolve(resource.Namespace, ExtensionKinds.ExtensionRegistration);
-        var stored = await store.GetExactAsync<ExtensionRegistrationResource>(new ScopedResourceAddress(
-            extensionScope, address.Namespace, address.Kind, address.Name), cancellationToken)
-            ?? throw new ConnectedServiceValidationException($"Extension Registration '{address}' was not found.");
-        if (!stored.Value.Definition.Enabled)
-            throw new ConnectedServiceValidationException($"Extension Registration '{address}' is disabled.");
-        var inspection = await InspectAsync(stored.Value, cancellationToken);
-        if (!string.Equals(inspection.Status, "available", StringComparison.Ordinal) || inspection.Extension is null)
+        var reference = resource.Definition.Type.Type;
+        var typeScope = reference.ScopeRef
+            ?? throw new ConnectedServiceValidationException("The Connected Service type reference must include an exact scopeRef.");
+        if (!await useAuthorizer.IsSameOrDescendantAsync(typeScope, scopeRef, cancellationToken))
             throw new ConnectedServiceValidationException(
-                inspection.Details ?? $"Extension Registration '{address}' is unavailable.");
-        if (!string.Equals(inspection.Extension.Id, resource.Definition.Type.ExtensionId, StringComparison.Ordinal))
-            throw new ConnectedServiceTypeRevisionException("The pinned extension identity no longer matches the registered endpoint.");
-        var type = inspection.Types.SingleOrDefault(value =>
-            string.Equals(value.Id, resource.Definition.Type.TypeId, StringComparison.Ordinal));
-        if (type is null)
+                "The Connected Service type must belong to the same scope or an ancestor scope.");
+        var address = reference.Resolve(resource.Namespace, ConnectedServiceResourceKinds.ConnectedServiceType);
+        var stored = await store.GetExactAsync<ConnectedServiceTypeResource>(new ScopedResourceAddress(
+            typeScope, address.Namespace, address.Kind, address.Name), cancellationToken)
+            ?? throw new ConnectedServiceValidationException($"Connected Service type '{address}' was not found.");
+        if (stored.Value.Uid != resource.Definition.Type.TypeUid)
             throw new ConnectedServiceTypeRevisionException(
-                $"Connected Service type '{resource.Definition.Type.TypeId}' is no longer contributed by the extension.");
-        var version = type.Versions.SingleOrDefault(value =>
+                "The pinned Connected Service type UID no longer matches the stored resource.");
+        if (!stored.Value.Definition.Enabled)
+            throw new ConnectedServiceValidationException($"Connected Service type '{address}' is disabled.");
+        if (!await useAuthorizer.CanUseAsync(typeScope, scopeRef,
+                stored.Value.Definition.UsePolicy, cancellationToken))
+            throw new ConnectedServiceValidationException(
+                $"Connected Service type '{address}' cannot be used from this scope.");
+        var version = stored.Value.Definition.Versions.SingleOrDefault(value =>
             string.Equals(value.Version, resource.Definition.Type.Version, StringComparison.Ordinal));
         if (version is null)
             throw new ConnectedServiceTypeRevisionException(
-                $"Connected Service type version '{resource.Definition.Type.Version}' is no longer contributed by the extension.");
+                $"Connected Service type version '{resource.Definition.Type.Version}' is not available.");
         if (!string.Equals(version.SchemaDigest, resource.Definition.Type.SchemaDigest, StringComparison.Ordinal))
             throw new ConnectedServiceTypeRevisionException(
                 "The Connected Service type schema digest no longer matches the pinned revision.");
@@ -400,16 +371,6 @@ public sealed class ConnectedServiceManagementService(
                 stored.Value.Definition.UsePolicy, cancellationToken))
             throw new ConnectedServiceValidationException(
                 $"Secret bound to input '{binding.InputId}' cannot be used by this Connected Service.");
-    }
-
-    private async ValueTask<ConnectedServiceTypeCatalogInspection> InspectAsync(
-        ExtensionRegistrationResource registration,
-        CancellationToken cancellationToken)
-    {
-        var provider = typeProviders.SingleOrDefault(value => value.CanInspect(registration.Definition.Endpoint));
-        return provider is null
-            ? new("unavailable", null, [], "No Connected Service type provider can inspect this endpoint.")
-            : await provider.InspectAsync(registration, cancellationToken);
     }
 
     private static void ValidateBindingShape(

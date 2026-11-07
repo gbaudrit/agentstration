@@ -8,7 +8,6 @@
     <PackageReference Include="Agentstration.Aep.MicrosoftExtensionsAI" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Models/Agentstration.Models.csproj" />
     <ProjectReference Include="../Agentstration.Parameters/Agentstration.Parameters.csproj" />
