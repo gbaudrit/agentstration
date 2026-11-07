@@ -1,3 +1,4 @@
+using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -7,7 +8,9 @@ namespace Agentstration.Infrastructure.Runtime;
 
 public sealed class ManagementToolExecutionHookResolver(
     IResourceStore store,
-    IResourceScopeResolver scopeResolver) : IToolExecutionHookResolver
+    IResourceScopeResolver scopeResolver,
+    ICurrentRequestContext? requestContext = null,
+    IRequestContextScopeFactory? requestScopes = null) : IToolExecutionHookResolver
 {
     public async ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveAsync(
         ToolExecutionContext context,
@@ -24,6 +27,7 @@ public sealed class ManagementToolExecutionHookResolver(
             && workspaceScope.Ancestors.All(value => value.Ref != ResourceScopeRef.Tenant(tenantId)))
             return [];
 
+        using var workspace = EnterOperationalWorkspace(context, workspaceId);
         var resources = await store.ListAllAsync<ToolExecutionHookResource>(ToolResourceKinds.ToolExecutionHook, cancellationToken);
         var hooks = new List<IToolExecutionHook>();
         foreach (var stored in resources)
@@ -40,6 +44,17 @@ public sealed class ManagementToolExecutionHookResolver(
             hooks.Add(Create(resource));
         }
         return hooks;
+    }
+
+    private IDisposable? EnterOperationalWorkspace(ToolExecutionContext execution, WorkspaceId workspaceId)
+    {
+        if (requestContext is not { AccessMode: ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration })
+            return null;
+        var current = requestContext.Current;
+        return current.WorkspaceId == workspaceId.Value && current.TenantId == execution.TenantId
+            && current.PrincipalId == execution.PrincipalId
+            ? requestScopes?.Push(current)
+            : null;
     }
 
     private static bool Matches(IReadOnlyList<string> selector, string? value) =>

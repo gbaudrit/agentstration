@@ -171,4 +171,52 @@ public sealed partial class FlowDesignerReadOnlyTests
         Assert.IsNotNull(input.SchemaBinding?.Inline);
         Assert.AreEqual("object", input.SchemaBinding.Inline.Content.GetProperty("type").GetString());
     }
+
+    [TestMethod]
+    public async Task ConditionEditsFollowTheSelectedStepAcrossSettingsReopens()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "first",
+            Steps =
+            [
+                new ConditionFlowStepDefinition { Name = "first", Left = "first-left", Operator = "equals", Right = "first-right" },
+                new ConditionFlowStepDefinition { Name = "second", Left = "second-left", Operator = "equals", Right = "second-right" }
+            ]
+        };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false, definition));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+        var store = context.Services.GetRequiredService<FlowEditorStore>();
+
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("first"));
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
+        rendered.FindAll(".step-settings-form input")[0].Change("updated-left");
+        rendered.FindAll(".step-settings-form input")[1].Change("contains");
+        rendered.FindAll(".step-settings-form input")[2].Change("updated-right");
+
+        var first = store.State.Resource!.Definition.Steps.OfType<ConditionFlowStepDefinition>().Single(step => step.Name == "first");
+        Assert.AreEqual("updated-left", first.Left);
+        Assert.AreEqual("contains", first.Operator);
+        Assert.AreEqual("updated-right", first.Right);
+
+        rendered.Find(".step-settings-close").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("second"));
+        rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
+        Assert.AreEqual("second-left", rendered.FindAll(".step-settings-form input")[0].GetAttribute("value"));
+        rendered.FindAll(".step-settings-form input")[2].Change("second-updated");
+
+        var conditions = store.State.Resource!.Definition.Steps.OfType<ConditionFlowStepDefinition>().ToArray();
+        Assert.AreEqual(first, conditions.Single(step => step.Name == "first"));
+        Assert.AreEqual("second-updated", conditions.Single(step => step.Name == "second").Right);
+        rendered.Render(parameters => parameters.Add(component => component.IsReadOnly, true));
+        Assert.IsTrue(rendered.FindAll(".step-settings-form input").All(input => input.HasAttribute("disabled")));
+    }
 }

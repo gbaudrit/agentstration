@@ -1,0 +1,44 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+<div class="dialog-backdrop connection-contract-backdrop" role="presentation" @onclick="DismissConnectionContractPrompt">
+    <section class="dialog connection-contract-dialog" role="dialog" aria-modal="true" aria-labelledby="connection-contract-title" data-testid="connection-contract-dialog" @onclick:stopPropagation="true">
+        <span class="eyebrow">@T("InputContract")</span>
+        <h2 id="connection-contract-title">@T($"ConnectionContractTitle.{Source}")</h2>
+        <p>@T($"ConnectionContractHelp.{Source}", ResourceDisplayName)</p>
+        @if (ReplacesExistingContract)
+        {
+            <p class="connection-contract-warning" role="alert">@T("ConnectionContractOverwriteWarning")</p>
+        }
+        @if (Reference is { } promptReference)
+        {
+            <article class="connection-contract-choice">
+                <strong>@T("CalledFlowSharedInputTitle")</strong>
+                <p>@T($"ConnectionContractSharedHelp.{Source}")</p>
+                <code>@SchemaReferenceLabel(promptReference)</code>
+            </article>
+        }
+        else
+        {
+            <article class="connection-contract-choice">
+                <strong>@T("CalledFlowInlineInputTitle")</strong>
+                <p>@T($"ConnectionContractInlineHelp.{Source}")</p>
+            </article>
+        }
+        <div class="dialog-actions">
+            <button type="button" class="button-secondary" data-testid="connection-contract-later" @onclick="DismissConnectionContractPrompt">@T("ConfigureContractLater")</button>
+            <button type="button" class="button-primary" data-testid="connection-contract-apply" @onclick="ApplyConnectionContractAsync">@T(Reference is not null ? $"ConnectionContractApplyShared.{Source}" : $"ConnectionContractApplyInline.{Source}")</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter] public FlowConnectionContractSource Source { get; set; }
+    [Parameter] public string ResourceDisplayName { get; set; } = string.Empty;
+    [Parameter] public bool ReplacesExistingContract { get; set; }
+    [Parameter] public SchemaVersionReference? Reference { get; set; }
+    [Parameter] public EventCallback DismissConnectionContractPrompt { get; set; }
+    [Parameter] public EventCallback ApplyConnectionContractAsync { get; set; }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+}

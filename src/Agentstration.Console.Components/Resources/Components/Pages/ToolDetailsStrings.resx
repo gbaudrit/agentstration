@@ -84,4 +84,6 @@
   <data name="RunCheck.no_execution"><value>The provider was not invoked and no execution resource was created.</value></data>
   <data name="RunCheck.execution"><value>The tool execution completed.</value></data>
   <data name="ManagingExtension"><value>Managing extension</value></data><data name="TechnicalProvider"><value>Technical provider</value></data>
+  <data name="OpenReturnedArtifact"><value>Open artifact</value></data>
+  <data name="AcquisitionTargetStale" xml:space="preserve"><value>A newer discovery is available. Open the source, reconcile the target in Discovery, then run this Tool again. If the selected operation changed, run a new acquisition and create a Tool from it.</value></data>
 </root>

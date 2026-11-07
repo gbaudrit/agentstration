@@ -34,6 +34,9 @@ public interface IDataSourcesClient
     Task<ResourceSnapshot<DataSourceAcquisitionTargetResource>> PromoteTargetAsync(ResourceNamespace ns,
         string discoveryId, PromoteDataSourceAcquisitionTargetRequest request,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<ResourceSnapshot<DataSourceAcquisitionTargetResource>> ReconcileTargetAsync(ResourceNamespace ns,
+        string name, ReconcileDataSourceAcquisitionTargetRequest request, string etag,
+        CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 public interface IDataSourceProfilesClient
@@ -104,6 +107,12 @@ public sealed class DataSourcesApiClient(HttpClient httpClient) : IDataSourcesCl
         CancellationToken cancellationToken = default) => SendAsync<DataSourceAcquisitionTargetResource>(HttpMethod.Post,
             $"api/datasourcediscoveries/{Uri.EscapeDataString(discoveryId)}/targets?namespace={Uri.EscapeDataString(ns.Value)}",
             request, null, cancellationToken);
+
+    public Task<ResourceSnapshot<DataSourceAcquisitionTargetResource>> ReconcileTargetAsync(ResourceNamespace ns,
+        string name, ReconcileDataSourceAcquisitionTargetRequest request, string etag,
+        CancellationToken cancellationToken = default) => SendAsync<DataSourceAcquisitionTargetResource>(HttpMethod.Post,
+            $"api/datasourceacquisitiontargets/{Uri.EscapeDataString(name)}/reconcile?namespace={Uri.EscapeDataString(ns.Value)}",
+            request, etag, cancellationToken);
 
     private async Task<ResourceSnapshot<T>> GetResourceAsync<T>(string path, CancellationToken cancellationToken)
     {

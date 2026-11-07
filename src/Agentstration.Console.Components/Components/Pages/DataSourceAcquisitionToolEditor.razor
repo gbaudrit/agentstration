@@ -1,0 +1,122 @@
+@implements IDisposable
+@inject IToolDefinitionsClient Client
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+<div class="dialog-backdrop" role="presentation">
+    <section class="dialog acquisition-tool-dialog" role="dialog" aria-modal="true" aria-labelledby="acquisition-tool-title" data-testid="acquisition-tool-editor">
+        <h2 id="acquisition-tool-title">@Localizer["CreateAcquisitionTool"]</h2>
+        <p>@Localizer["CreateAcquisitionToolHelp"]</p>
+        @if (error is not null)
+        {
+            <div class="form-alert form-alert-danger" role="alert">@error</div>
+        }
+        <form @onsubmit="CreateAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <div class="form-grid">
+                    <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="true"
+                        DisplayNameTestId="acquisition-tool-display-name" TechnicalNameTestId="acquisition-tool-name" />
+                </div>
+                <dl class="resource-details acquisition-tool-recipe">
+                    <dt>@Localizer["AcquisitionToolSource"]</dt><dd>@SourceDisplayName <ResourceScopeBadge ScopeRef="Acquisition.DataSourceScopeRef" Compact /></dd>
+                    <dt>@Localizer["AcquisitionTarget"]</dt><dd>@(Acquisition.Target?.DisplayName ?? Localizer["None"].Value)</dd>
+                    <dt>@Localizer["AcquisitionToolWorkspace"]</dt><dd>@(ContextScope.Kind == ResourceScopeKind.Workspace ? WorkspaceDisplayName : null) <ResourceScopeBadge ScopeRef="ContextScope" Compact /></dd>
+                    <dt>@Localizer["AcquisitionToolParameters"]</dt><dd><pre data-testid="acquisition-tool-parameters">@FixedParameters</pre></dd>
+                    <dt>@Localizer["AcquisitionToolOutput"] <code>artifact</code></dt>
+                    <dd>
+                        @if (publishableArtifacts.Count > 1)
+                        {
+                            <select aria-label="@Localizer["AcquisitionToolOutput"]" @bind="artifactId" required data-testid="acquisition-tool-artifact">
+                                <option value="">@Localizer["Select"]</option>
+                                @foreach (var artifact in publishableArtifacts)
+                                {
+                                    <option value="@artifact.ArtifactId">@ArtifactLabel(artifact)</option>
+                                }
+                            </select>
+                        }
+                        else if (publishableArtifacts.Count == 1)
+                        {
+                            @ArtifactLabel(publishableArtifacts[0])
+                        }
+                    </dd>
+                </dl>
+            </fieldset>
+            <div class="dialog-actions">
+                <button class="button-secondary" type="button" disabled="@busy" @onclick="OnCancel">@Localizer["Cancel"]</button>
+                <button class="button-primary" type="submit" disabled="@(busy || !CanCreate)" data-testid="acquisition-tool-create">
+                    @Localizer[busy ? "Saving" : "CreateAcquisitionTool"]
+                </button>
+            </div>
+        </form>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DataSourceAcquisitionResource Acquisition { get; set; } = null!;
+    [Parameter, EditorRequired] public string SourceDisplayName { get; set; } = string.Empty;
+    [Parameter] public string? WorkspaceDisplayName { get; set; }
+    [Parameter, EditorRequired] public ResourceScopeRef ContextScope { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<DataSourceAcquisitionArtifact> publishableArtifacts = [];
+    private string displayName = string.Empty, name = string.Empty, artifactId = string.Empty;
+    private string? error;
+    private bool busy;
+
+    private bool CanCreate => !string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(name)
+        && publishableArtifacts.Any(artifact => artifact.ArtifactId == artifactId);
+    private string FixedParameters => Acquisition.Parameters.ValueKind == JsonValueKind.Object
+        ? JsonSerializer.Serialize(Acquisition.Parameters, IndentedJson)
+        : "{}";
+
+    protected override void OnInitialized()
+    {
+        displayName = Acquisition.Target is { } target
+            ? Localizer["AcquisitionToolSuggestedName", target.DisplayName, SourceDisplayName]
+            : SourceDisplayName;
+        publishableArtifacts = Acquisition.Manifest?.Artifacts
+            .Where(artifact => artifact.Disposition == DataSourceArtifactDisposition.Publishable).ToArray() ?? [];
+        if (publishableArtifacts.Count == 1) artifactId = publishableArtifacts[0].ArtifactId;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (busy || !CanCreate) return;
+        busy = true;
+        error = null;
+        try
+        {
+            var created = await Client.CreateFromAcquisitionAsync(Acquisition.Namespace, Acquisition.Name,
+                new(name.Trim(), displayName.Trim(), artifactId), cancellation.Token);
+            var scope = Uri.EscapeDataString((created.ScopeRef ?? ContextScope).Value);
+            var context = Uri.EscapeDataString(ContextScope.Value);
+            var toolName = Uri.EscapeDataString(AgentstrationToolProvider.ToolResourceName(created.Name));
+            Navigation.NavigateTo($"/tools/{toolName}?namespace={Uri.EscapeDataString(created.Namespace.Value)}&scopeRef={scope}&context={context}&view=execution");
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            error = Localizer["AcquisitionToolConflict"];
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized)
+        {
+            error = Localizer["AcquisitionToolForbidden"];
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or JsonException or InvalidOperationException)
+        {
+            error = Localizer["AcquisitionToolCreateFailed"];
+        }
+        finally { busy = false; }
+    }
+
+    private static string ArtifactLabel(DataSourceAcquisitionArtifact artifact) =>
+        string.IsNullOrWhiteSpace(artifact.Name) ? artifact.ArtifactId : artifact.Name;
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

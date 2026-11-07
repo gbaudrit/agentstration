@@ -24,8 +24,155 @@ using ModelContextProtocol.Client;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class ArtifactApiTests : ModelManagementApiTestBase
+public sealed class ArtifactApiTests : ResourceManagementApiTestBase
 {
+    [TestMethod]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    public async Task ArtifactConsoleApiUsesItsOperationalWorkspaceIncludingStreamedContent(ResourceScopeKind kind)
+    {
+        await using var factory = Factory();
+        var bootstrap = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var workspace = kind == ResourceScopeKind.Instance
+            ? await topology.GetInstanceOperationsWorkspaceAsync(default)
+            : await topology.GetTenantOperationsWorkspaceAsync(bootstrap.TenantId, default);
+        var context = new RequestContext(bootstrap.PrincipalId, workspace.TenantId, workspace.Id);
+        var service = factory.Services.GetRequiredService<ArtifactManagementService>();
+        var bytes = Encoding.UTF8.GetBytes("portal artifact");
+        StagedArtifactId operationalId;
+        FlowRunArtifactId durableId;
+        using (scopes.Push(context))
+        {
+            var staged = await service.CreateStagedAsync(new("portal.txt", "text/plain",
+                new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "portal", FlowRunId = "portal-flow" }), default);
+            operationalId = staged.Value.ArtifactId;
+            _ = await service.WriteAsync(operationalId, 0, bytes, default);
+            var sealedArtifact = await service.SealAsync(operationalId, default);
+            var durable = await service.CompleteFlowRunArtifactAsync(operationalId, new("portal-flow", "portal-step", new()
+            {
+                StorageFlowRunId = "portal-storage",
+                OpaqueReference = "portal-reference",
+                MediaType = sealedArtifact.Value.MediaType,
+                Length = sealedArtifact.Value.Length,
+                Sha256 = sealedArtifact.Value.Sha256!
+            }), default);
+            durableId = durable.Value.ArtifactId;
+        }
+        StagedArtifactId businessId;
+        using (scopes.Push(bootstrap))
+        {
+            businessId = (await service.CreateStagedAsync(new("business.txt", "text/plain",
+                new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "business" }), default)).Value.ArtifactId;
+        }
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, kind == ResourceScopeKind.Instance ? ResourceScopeRef.Instance : ResourceScopeRef.Tenant(bootstrap.TenantId));
+        using var stagedResponse = await client.GetAsync("/api/artifacts/staged");
+        Assert.AreEqual(HttpStatusCode.OK, stagedResponse.StatusCode, await stagedResponse.Content.ReadAsStringAsync());
+        var stagedViews = await stagedResponse.Content.ReadFromJsonAsync<StagedArtifactView[]>();
+        Assert.IsNotNull(stagedViews);
+        Assert.IsTrue(stagedViews.Any(value => value.ArtifactId == operationalId));
+        Assert.IsFalse(stagedViews.Any(value => value.ArtifactId == businessId));
+        var durableViews = await client.GetFromJsonAsync<FlowRunArtifactResource[]>("/api/artifacts/flow-run-artifacts");
+        Assert.IsTrue(durableViews!.Any(value => value.ArtifactId == durableId));
+        using var download = await client.GetAsync($"/api/artifacts/staged/{operationalId}/download");
+        Assert.AreEqual(HttpStatusCode.OK, download.StatusCode);
+        CollectionAssert.AreEqual(bytes, await download.Content.ReadAsByteArrayAsync());
+        using var createdResponse = await client.PostAsJsonAsync("/api/artifacts/staged", new CreateStagedArtifactRequest(
+            "from-api.txt", "text/plain", new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "api" }));
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode, await createdResponse.Content.ReadAsStringAsync());
+        SelectConsoleContext(client, ResourceScopeRef.Workspace(bootstrap.WorkspaceId));
+        var businessViews = await client.GetFromJsonAsync<StagedArtifactView[]>("/api/artifacts/staged");
+        Assert.IsNotNull(businessViews);
+        Assert.IsTrue(businessViews.Any(value => value.ArtifactId == businessId));
+        Assert.IsFalse(businessViews.Any(value => value.ArtifactId == operationalId));
+        using var hidden = await client.GetAsync($"/api/artifacts/staged/{operationalId}");
+        Assert.AreEqual(HttpStatusCode.NotFound, hidden.StatusCode);
+    }
+
+    [TestMethod]
+    [DataRow(ResourceScopeKind.Workspace)]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    public async Task ArtifactBrokerUsesTrustedOperationalWorkspaceWithoutDroppingScopeGuards(ResourceScopeKind kind)
+    {
+        await using var factory = Factory();
+        var bootstrap = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var workspace = kind switch
+        {
+            ResourceScopeKind.Instance => await topology.GetInstanceOperationsWorkspaceAsync(default),
+            ResourceScopeKind.Tenant => await topology.GetTenantOperationsWorkspaceAsync(bootstrap.TenantId, default),
+            _ => null
+        };
+        var context = workspace is null ? bootstrap : new RequestContext(bootstrap.PrincipalId, workspace.TenantId, workspace.Id);
+        IDisposable Enter(RequestContext value) => kind switch
+        {
+            ResourceScopeKind.Instance => scopes.PushInstance(value),
+            ResourceScopeKind.Tenant => scopes.PushTenantAdministration(value),
+            _ => scopes.Push(value)
+        };
+        var service = factory.Services.GetRequiredService<ArtifactManagementService>();
+        var handlers = factory.Services.GetServices<IInternalMcpToolHandler>().ToDictionary(handler => handler.Definition.Name);
+        var invocation = new InternalMcpToolInvocation(context.TenantId, new WorkspaceId(context.WorkspaceId), context.PrincipalId,
+            "scope-call", "scope-correlation", JsonSerializer.SerializeToElement(new { fileName = "scope.txt", mediaType = "text/plain" }),
+            ToolDefinitionCallerKind.Flow, "flow:scope-flow", "scope-flow", "scope-step");
+        var broker = handlers["staged-artifact.create"];
+        StagedArtifactId artifactId;
+        using (Enter(context))
+        {
+            var mode = factory.Services.GetRequiredService<ICurrentRequestContext>().AccessMode;
+            var mismatch = await Assert.ThrowsAsync<ArtifactValidationException>(() =>
+                broker.ExecuteAsync(invocation with { WorkspaceId = new WorkspaceId(Guid.NewGuid()) }, default));
+            Assert.AreEqual("artifact_execution_scope_required", mismatch.Code);
+            var output = await broker.ExecuteAsync(invocation, default);
+            artifactId = StagedArtifactId.Parse(output!.Value.GetProperty("artifactReference").GetString()!);
+            var content = Encoding.UTF8.GetBytes("scoped artifact");
+            _ = await handlers["staged-artifact.write"].ExecuteAsync(invocation with
+            {
+                Arguments = JsonSerializer.SerializeToElement(new { artifactId = artifactId.ToString(), offset = 0, contentBase64 = Convert.ToBase64String(content) })
+            }, default);
+            _ = await handlers["staged-artifact.seal"].ExecuteAsync(invocation with
+            {
+                Arguments = JsonSerializer.SerializeToElement(new { artifactId = artifactId.ToString() })
+            }, default);
+            Assert.AreEqual(mode, factory.Services.GetRequiredService<ICurrentRequestContext>().AccessMode);
+            using (scopes.Push(context))
+            {
+                var created = await service.GetStagedAsync(artifactId, null, ArtifactLeaseOperation.Read, default);
+                Assert.IsNotNull(created);
+                Assert.AreEqual(context.TenantId, created.Value.TenantId);
+                Assert.AreEqual(context.WorkspaceId, created.Value.WorkspaceId.Value);
+                Assert.AreEqual(ResourceScopeRef.Workspace(context.WorkspaceId), created.Value.ScopeRef);
+                Assert.AreEqual(StagedArtifactStatus.Sealed, created.Value.ArtifactStatus);
+                var read = await service.ReadAsync(artifactId, 0, content.Length, null, default);
+                CollectionAssert.AreEqual(content, Convert.FromBase64String(read.ContentBase64));
+            }
+            using (Enter(context with { Restriction = new AuthorizationRestriction(Guid.NewGuid(), context.WorkspaceId, new HashSet<string>(StringComparer.Ordinal)) }))
+            {
+                _ = await Assert.ThrowsAsync<AuthorizationDeniedException>(() => broker.ExecuteAsync(invocation, default));
+            }
+            Assert.AreEqual(mode, factory.Services.GetRequiredService<ICurrentRequestContext>().AccessMode);
+        }
+        if (kind != ResourceScopeKind.Workspace)
+        {
+            using var business = scopes.Push(bootstrap);
+            Assert.IsNull(await service.GetStagedAsync(artifactId, null, ArtifactLeaseOperation.Read, default));
+        }
+        using (scopes.PushSystem())
+        {
+            var denied = await Assert.ThrowsAsync<ArtifactValidationException>(() => broker.ExecuteAsync(invocation, default));
+            Assert.AreEqual("artifact_execution_scope_required", denied.Code);
+        }
+        using (scopes.PushTenant(bootstrap.PrincipalId, bootstrap.TenantId))
+        {
+            var denied = await Assert.ThrowsAsync<ArtifactValidationException>(() => broker.ExecuteAsync(invocation, default));
+            Assert.AreEqual("artifact_execution_scope_required", denied.Code);
+        }
+    }
+
     [TestMethod]
     public async Task FlowStepCaptureCreatesASealedArtifactAndReusesItOnRetry()
     {
@@ -190,7 +337,8 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
         var source = await service.CreateStagedAsync(new("report.txt", "text/plain",
             new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "producer", FlowRunId = "producer-run", FlowStepId = "render" }), default);
-        var bytes = Encoding.UTF8.GetBytes("durable data");
+        const string durableText = "abcé😀{\"records\":[1,2]}";
+        var bytes = Encoding.UTF8.GetBytes(durableText);
         _ = await service.WriteAsync(source.Value.ArtifactId, 0, bytes, default);
         _ = await service.SealAsync(source.Value.ArtifactId, default);
 
@@ -265,6 +413,61 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
         Assert.AreEqual(completed.StagedArtifactId, history[0].StagedArtifactId);
         Assert.IsTrue(history[0].StagedArtifactAvailable);
 
+        var publicReader = factory.Services.GetRequiredService<DurableArtifactReadContentMcpTool>();
+        Assert.IsTrue(publicReader.Definition.ExposeThroughMcp);
+        var firstRead = await publicReader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
+        {
+            artifactId = durableId.ToString(),
+            length = 4
+        }), "public-read"), default);
+        Assert.IsNotNull(firstRead);
+        Assert.AreEqual("abc", firstRead.Value.GetProperty("text").GetString());
+        Assert.AreEqual(3L, firstRead.Value.GetProperty("nextOffset").GetInt64());
+        Assert.IsFalse(firstRead.Value.GetProperty("endOfContent").GetBoolean());
+        var readRun = firstRead.Value.GetProperty("materializationRunId").GetString();
+        Assert.IsFalse(firstRead.Value.GetRawText().Contains("opaqueReference", StringComparison.OrdinalIgnoreCase));
+        foreach (var mode in new[] { ControlPlaneAccessMode.Workspace, ControlPlaneAccessMode.Instance, ControlPlaneAccessMode.TenantAdministration })
+        {
+            var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+            using var readScope = mode switch
+            {
+                ControlPlaneAccessMode.Instance => scopes.PushInstance(context),
+                ControlPlaneAccessMode.TenantAdministration => scopes.PushTenantAdministration(context),
+                _ => scopes.Push(context)
+            };
+            var rest = await publicReader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
+            {
+                artifactId = durableId.ToString(),
+                materializationRunId = readRun,
+                offset = 3,
+                length = 64
+            }), "public-read-next"), default);
+            Assert.IsNotNull(rest);
+            Assert.AreEqual(durableText, "abc" + rest.Value.GetProperty("text").GetString());
+            Assert.IsTrue(rest.Value.GetProperty("endOfContent").GetBoolean());
+        }
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(restricted))
+            _ = await Assert.ThrowsAsync<AuthorizationDeniedException>(() => publicReader.ExecuteAsync(
+                Invocation(restricted, JsonSerializer.SerializeToElement(new { artifactId = durableId.ToString(), materializationRunId = readRun }), "denied-read"), default));
+        var otherWorkspace = await factory.Services.GetRequiredService<IOperationalTopologyProvisioner>()
+            .GetInstanceOperationsWorkspaceAsync(default);
+        var foreign = context with { TenantId = otherWorkspace.TenantId, WorkspaceId = otherWorkspace.Id };
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(foreign))
+        {
+            var missing = await Assert.ThrowsAsync<ArtifactValidationException>(() => publicReader.ExecuteAsync(
+                Invocation(foreign, JsonSerializer.SerializeToElement(new { artifactId = durableId.ToString(), materializationRunId = readRun }), "foreign-read"), default));
+            Assert.AreEqual("flow_run_artifact_not_found", missing.Code);
+        }
+        foreach (var length in new[] { 0, 65537 })
+        {
+            var invalidRange = await Assert.ThrowsAsync<ArtifactValidationException>(() => publicReader.ExecuteAsync(
+                Invocation(context, JsonSerializer.SerializeToElement(new { artifactId = durableId.ToString(), length }), "invalid-read"), default));
+            Assert.AreEqual("durable_artifact_read_range_invalid", invalidRange.Code);
+        }
+        var wrongRun = await Assert.ThrowsAsync<ArtifactValidationException>(() => publicReader.ExecuteAsync(
+            Invocation(context, JsonSerializer.SerializeToElement(new { artifactId = durableId.ToString(), materializationRunId = "nonexistent-run" }), "wrong-read"), default));
+        Assert.AreEqual("artifact_materialization_not_found", wrongRun.Code);
+
         var flows = factory.Services.GetRequiredService<FlowService>();
         var writeFlow = await flows.GetExactAsync(ResourceScopeRef.Instance,
             new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default);
@@ -332,7 +535,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ProvisioningDemotesLegacyBuiltInDefaultBindingWithoutBreakingCompatibility()
     {
-        await using var factory = await ManagementServiceFixture.CreateAsync();
+        await using var factory = await ResourceServiceFixture.CreateAsync();
         var context = factory.Context;
         using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var store = factory.Services.GetRequiredService<IResourceStore>();
@@ -375,7 +578,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task HandoffCopiesAcrossBindingsAndRecoversByOperationId()
     {
-        await using var factory = await ManagementServiceFixture.CreateAsync();
+        await using var factory = await ResourceServiceFixture.CreateAsync();
         var context = factory.Context;
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
@@ -418,7 +621,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task StagedArtifactsAreWorkspaceIsolatedBoundedAndProtectedByActiveLeases()
     {
-        await using var factory = await ManagementServiceFixture.CreateAsync();
+        await using var factory = await ResourceServiceFixture.CreateAsync();
         var context = factory.Context;
         var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
@@ -491,7 +694,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     public async Task ExpiredLeasesStaleBindingsAndIntegrityMismatchesAreRejected()
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero));
-        await using var factory = await ManagementServiceFixture.CreateAsync(clock);
+        await using var factory = await ResourceServiceFixture.CreateAsync(clock);
         var context = factory.Context;
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
@@ -556,7 +759,7 @@ public sealed class ArtifactApiTests : ModelManagementApiTestBase
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero));
         var backend = new FaultingArtifactStagingExecutor();
-        await using var factory = await ManagementServiceFixture.CreateAsync(clock, services =>
+        await using var factory = await ResourceServiceFixture.CreateAsync(clock, services =>
         {
             services.RemoveAll<IArtifactStagingToolExecutor>();
             services.AddSingleton<IArtifactStagingToolExecutor>(backend);

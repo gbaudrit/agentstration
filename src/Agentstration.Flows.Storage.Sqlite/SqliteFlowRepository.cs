@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Flows;
@@ -183,13 +184,18 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     public async Task<StoredFlowRun> CreateRunAsync(FlowRun run, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var key = RunKey(run.Scope.ScopeRef, run.Id);
+        if (await context.Documents.AnyAsync(value => value.Key == key, cancellationToken))
+            throw new FlowConcurrencyException("A Flow Run with this identity already exists.");
         var now = timeProvider.GetUtcNow();
-        var document = Document(run.Scope.ScopeRef, RunKey(run.Scope.ScopeRef, run.Id), RunKind, run.FlowId, run.FlowVersion, run, now);
+        var document = Document(run.Scope.ScopeRef, key, RunKind, run.FlowId, run.FlowVersion, run, now);
         document.TenantId = run.Scope.TenantId;
         document.PrincipalId = run.Scope.PrincipalId;
         document.Status = run.Status;
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return new StoredFlowRun(run, document.ETag, now);
     }
 
@@ -233,15 +239,23 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         return new FlowRunPage(documents.Take(take).Select(ToRun).ToArray(), documents.Length > take);
     }
 
-    public async Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(FlowRunKey? after, int take, CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var documents = await context.Documents.AsNoTracking().Where(value => value.Kind == RunKind)
-            .OrderBy(value => value.UpdatedAt).Skip(skip).Take(Math.Min(take, 1000)).ToArrayAsync(cancellationToken);
-        return documents.Select(ToRun).Where(value => value.Value.Status is FlowRunStatus.Pending or FlowRunStatus.Running or FlowRunStatus.WaitingForInput or FlowRunStatus.WaitingForChild)
-            .Select(value => new FlowRunKey(value.Value.Scope.ScopeRef, value.Value.Id)).ToArray();
+        var documentsQuery = after is { } cursor
+            ? context.Documents.FromSqlInterpolated($"""SELECT * FROM "FlowResources" WHERE "Key" > {RunKey(cursor.ScopeRef, cursor.RunId)}""")
+            : context.Documents;
+        var query = documentsQuery.AsNoTracking().Where(value => value.Kind == RunKind
+            && (value.Status == FlowRunStatus.Pending || value.Status == FlowRunStatus.Running
+                || value.Status == FlowRunStatus.WaitingForInput || value.Status == FlowRunStatus.WaitingForChild));
+        var documents = await query.OrderBy(value => value.Key).Take(Math.Min(take, 1000))
+            .Select(value => new { value.ScopeRef, value.Key }).ToArrayAsync(cancellationToken);
+        return documents.Select(value =>
+        {
+            var scopeRef = ResourceScopeRef.Parse(value.ScopeRef);
+            return new FlowRunKey(scopeRef, value.Key[RunKey(scopeRef, string.Empty).Length..]);
+        }).ToArray();
     }
 
     public async Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken)
@@ -325,10 +339,13 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     public async Task<FlowRunEvent> AppendRunEventAsync(FlowRunEvent runEvent, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        // SQLite takes the write lock before reading the sequence, including across host processes.
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var existing = await context.Documents.AsNoTracking().Where(value => value.ScopeRef == runEvent.ScopeRef.Value && value.Kind == RunEventKind && value.FlowId == runEvent.RunId).CountAsync(cancellationToken);
         var sequenced = runEvent with { Sequence = existing + 1 };
         context.Documents.Add(Document(runEvent.ScopeRef, RunEventKey(runEvent.ScopeRef, runEvent.RunId, sequenced.Sequence), RunEventKind, new FlowId(runEvent.RunId), sequenced.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture), sequenced, runEvent.Timestamp));
         await SaveCreateAsync(context, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return sequenced;
     }
 

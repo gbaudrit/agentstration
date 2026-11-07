@@ -30,6 +30,8 @@ public interface IToolsClient
         @namespace.IsDefault ? SetEnabledAsync(name, enabled, etag, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Tools.");
     Task<RunToolResponse> RunToolAsync(ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Tool execution.");
+    Task<RunToolResponse> RunToolAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken) =>
+        RunToolAsync(@namespace, name, request, cancellationToken);
 }
 
 public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
@@ -97,9 +99,16 @@ public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
         return await ReadToolAsync(response, cancellationToken);
     }
 
-    public async Task<RunToolResponse> RunToolAsync(ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken)
+    public Task<RunToolResponse> RunToolAsync(ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken) =>
+        RunToolCoreAsync(@namespace, name, request, null, cancellationToken);
+
+    public Task<RunToolResponse> RunToolAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, RunToolRequest request, CancellationToken cancellationToken) =>
+        RunToolCoreAsync(@namespace, name, request, scopeRef, cancellationToken);
+
+    private async Task<RunToolResponse> RunToolCoreAsync(ResourceNamespace @namespace, string name, RunToolRequest request,
+        ResourceScopeRef? scopeRef, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsJsonAsync(ToolPath(@namespace, name, child: "run"), request, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync(ToolPath(@namespace, name, scopeRef, "run"), request, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<RunToolResponse>(cancellationToken))!;
     }

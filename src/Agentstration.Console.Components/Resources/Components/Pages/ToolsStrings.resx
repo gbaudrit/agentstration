@@ -60,4 +60,8 @@
   <data name="Edit"><value>Edit →</value></data>
   <data name="Categories" xml:space="preserve"><value>Categories</value></data>
   <data name="ToolSets" xml:space="preserve"><value>ToolSets</value></data>
+  <data name="AcquisitionImplementation"><value>Acquisition</value></data>
+  <data name="AcquisitionImplementationHelp"><value>This Tool reuses the target and parameters from its acquisition template.</value></data>
+  <data name="AcquisitionTemplate"><value>Acquisition template</value></data>
+  <data name="AcquisitionOutput"><value>Output artifact</value></data>
 </root>

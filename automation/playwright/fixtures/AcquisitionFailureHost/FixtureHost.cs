@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Playwright.AcquisitionFailure;
 
@@ -33,6 +34,7 @@ internal sealed class AcquisitionFailureFactory : WebApplicationFactory<Program>
         builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddCommandLine(Environment.GetCommandLineArgs().Skip(1).ToArray()));
         builder.UseEnvironment("Development");
+        builder.ConfigureLogging(logging => logging.AddConsole());
         builder.ConfigureServices(services => services.AddSingleton<IHttpMessageHandlerBuilderFilter, FixtureTransportFilter>());
     }
 }

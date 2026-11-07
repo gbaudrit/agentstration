@@ -14,6 +14,7 @@ using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
 using Agentstration.Extensions.Ollama;
+using Agentstration.Extensions.OpenApi;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
@@ -58,6 +59,49 @@ namespace Agentstration.ArchitectureTests;
 [TestClass]
 public sealed class DependencyTests
 {
+    [TestMethod]
+    public void OpenApiDependenciesStayInsideTheAutonomousExtension()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var extensionProject = Path.Combine(sourceRoot, "Agentstration.Extensions.OpenApi", "Agentstration.Extensions.OpenApi.csproj");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
+        Assert.IsTrue(File.Exists(extensionProject));
+        var project = File.ReadAllText(extensionProject);
+        Assert.Contains("<PackageReference Include=\"Microsoft.OpenApi\"", project);
+        Assert.Contains("<PackageReference Include=\"YamlDotNet\"", project);
+        Assert.Contains("../Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj", File.ReadAllText(appHostProject));
+        CollectionAssert.DoesNotContain(typeof(OpenApiContractParser).Assembly.GetReferencedAssemblies()
+            .Select(value => value.Name).ToArray(), "Agentstration.DataSources.Contracts");
+        CollectionAssert.DoesNotContain(typeof(OpenApiContractParser).Assembly.GetReferencedAssemblies()
+            .Select(value => value.Name).ToArray(), "Agentstration.Knowledge.Contracts");
+
+        var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(path, extensionProject, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(path, appHostProject, StringComparison.OrdinalIgnoreCase))
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.OpenApi", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(sourceRoot, path))
+            .ToArray();
+        Assert.IsEmpty(violations, $"OpenAPI extension must not enter product modules: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void AspireOpenApiRegistrationIsOptInAndForwardsOnlyBoundedProviderPolicy()
+    {
+        var root = FindRepositoryRoot();
+        var appHost = File.ReadAllText(Path.Combine(root, "src", "Agentstration.AppHost", "Program.cs"));
+        var settings = File.ReadAllText(Path.Combine(root, "src", "Agentstration.AppHost", "appsettings.json"));
+
+        Assert.Contains("OpenApi:Enabled", appHost, StringComparison.Ordinal);
+        Assert.Contains("if (openApiEnabled)", appHost, StringComparison.Ordinal);
+        Assert.Contains("AddProject<Projects.Agentstration_Extensions_OpenApi>(\"openapi-extension\")", appHost, StringComparison.Ordinal);
+        Assert.Contains("OpenApi:AllowedDomains must contain at least one domain", appHost, StringComparison.Ordinal);
+        Assert.Contains("OpenApi__AllowedDomains__{index}", appHost, StringComparison.Ordinal);
+        Assert.Contains("Agentstration.Extensions.OpenApi\", \"openapi-extension", appHost, StringComparison.Ordinal);
+        Assert.Contains("\"OpenApi\"", settings, StringComparison.Ordinal);
+        Assert.Contains("\"Enabled\": false", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenApi__Credentials", appHost, StringComparison.Ordinal);
+    }
+
     [TestMethod]
     public void Crawl4AiDependenciesStayInsideTheAutonomousExtension()
     {
@@ -408,6 +452,12 @@ public sealed class DependencyTests
         var srcRoot = Path.Combine(repositoryRoot, "src");
         var program = File.ReadAllText(Path.Combine(hostRoot, "Program.cs"));
         var composition = File.ReadAllText(Path.Combine(hostRoot, "Hosting", "StandaloneHostComposition.cs"));
+        var serviceRegistration = File.ReadAllText(Path.Combine(hostRoot, "Hosting", "StandaloneHostServiceCollectionExtensions.cs"));
+        var hostSources = string.Join(Environment.NewLine, Directory
+            .EnumerateFiles(hostRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Select(File.ReadAllText));
         var apiTransport = string.Join(Environment.NewLine, Directory
             .EnumerateDirectories(srcRoot, "Agentstration.*.Api")
             .Append(Path.Combine(srcRoot, "Agentstration.Api"))
@@ -424,25 +474,43 @@ public sealed class DependencyTests
         Assert.DoesNotContain("MapAgentstrationApi", program, StringComparison.Ordinal);
         Assert.DoesNotContain("InitializeAsync", program, StringComparison.Ordinal);
 
-        Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationApi("));
+        Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationServerPresentation("));
+        Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationBackgroundWorkers("));
+        Assert.DoesNotContain("AddAgentstrationApi(", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService<", composition, StringComparison.Ordinal);
+        Assert.AreEqual(1, CountOccurrences(RegistrationMethod("AddAgentstrationServerPresentation"), "AddAgentstrationApi("));
+        Assert.AreEqual(1, CountOccurrences(hostSources, "AddAgentstrationApi("));
         Assert.AreEqual(1, CountOccurrences(composition, "AddAgentstrationWebConsole("));
+        Assert.AreEqual(1, CountOccurrences(hostSources, ".AddAgentstrationWebConsole("));
         Assert.AreEqual(1, CountOccurrences(composition, "MapAgentstrationApi("));
+        Assert.AreEqual(1, CountOccurrences(hostSources, "MapAgentstrationApi("));
         foreach (var worker in new[]
                  {
                      "LocalWorkExecutionWorker",
+                     "RuntimeAssignmentLeaseReaper",
                      "FlowRunRecoveryWorker",
                      "SourceRefreshWorker"
                  })
         {
-            Assert.AreEqual(1, CountOccurrences(composition, $"AddHostedService<{worker}>"), worker);
+            Assert.AreEqual(1, CountOccurrences(RegistrationMethod("AddAgentstrationBackgroundWorkers"), $"AddHostedService<{worker}>"), worker);
+            Assert.AreEqual(1, CountOccurrences(hostSources, $"AddHostedService<{worker}>"), worker);
         }
-        Assert.DoesNotContain("AddHostedService<RuntimeRunExecutionWorker>", composition, StringComparison.Ordinal);
-        Assert.DoesNotContain("AddHostedService<FlowRunExecutionWorker>", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService<RuntimeRunExecutionWorker>", hostSources, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHostedService<FlowRunExecutionWorker>", hostSources, StringComparison.Ordinal);
 
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddSignalR("));
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddMcpServer("));
         Assert.AreEqual(2, CountOccurrences(apiTransport, "MapHub<"));
         Assert.AreEqual(1, CountOccurrences(apiTransport, "MapMcp("));
+
+        string RegistrationMethod(string method)
+        {
+            var start = serviceRegistration.IndexOf($"IServiceCollection {method}(", StringComparison.Ordinal);
+            Assert.IsGreaterThanOrEqualTo(0, start, method);
+            var end = serviceRegistration.IndexOf("\n    }", start, StringComparison.Ordinal);
+            Assert.IsGreaterThan(start, end, method);
+            return serviceRegistration[start..end];
+        }
     }
 
     [TestMethod]

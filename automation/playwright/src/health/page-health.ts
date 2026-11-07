@@ -21,3 +21,17 @@ export function isActionableFirstPartyFailure(
 
   return firstPartyOrigins.has(origin) && !failureReason.includes('ERR_ABORTED');
 }
+
+export function isActionableAssetResponse(
+  requestUrl: string,
+  firstPartyOrigins: ReadonlySet<string>,
+  resourceType: string,
+  status: number,
+): boolean {
+  if (status < 400 || (resourceType !== 'stylesheet' && resourceType !== 'script')) return false;
+  try {
+    return firstPartyOrigins.has(new URL(requestUrl).origin);
+  } catch {
+    return false;
+  }
+}

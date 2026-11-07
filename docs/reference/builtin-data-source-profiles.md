@@ -22,6 +22,10 @@ The Web and REST implementations accept a response of at most 1 MiB, follow at m
 
 Data Sources and Data Source Profiles may be owned at instance, tenant, or Workspace scope. A Data Source may reference only a profile visible through the ancestor-only scope rules and an explicit descendant-use grant. The three core built-ins, their acquisition Flows, Tools, Tool Providers, ToolSets, and staging composition are instance-owned; their tenant grants propagate discovery and use to descendant Workspaces. Acquisition records, Flow Runs, staged content, and durable Artifacts remain isolated in the consuming Workspace.
 
+When the Console context is Instance or Tenant, acquisition and discovery use the governed Instance operations or Tenant operations Workspace. The selected administrative scope remains the logical consumer for authorization; the operational Workspace is only the storage and execution destination. Acquisitions and discoveries retain that logical scope alongside the exact source and profile evidence, including when pending work is recovered. Their history and promoted targets are not shared with business Workspaces.
+
+At the resource owner context, the **Access** tab administers descendant discovery and use grants independently of definition protection. This remains available for extension-managed profiles: changing a local access policy does not edit the contributed definition, revision, hash, or provenance. Profile policies identify the mutable profile by UID and generation; a published revision version is not a version of that resource identity.
+
 The `-builtin` identities are owned by Agentstration and cannot be edited, republished, reactivated, deleted, or replaced through YAML. Their metadata includes:
 
 ```yaml
@@ -42,4 +46,6 @@ The optional Crawl4AI extension contributes `crawl4ai-web`. Successful enrollmen
 The inventory records both the extension version and the independent bundle version, exact resource identities, published versions, definition evidence, and resolved Tool bindings. It remains readable when the extension is unavailable or unenrolled. The Console shows this ownership on Data Source Profile lists and details and links back to the exact managing registration.
 
 An interrupted installation retains its partial inventory and can complete missing publications on retry. An already installed bundle is a no-op only when its recorded identities, generations, versions, owners, and definition evidence still match the stored resources. A mismatch marks the installation degraded and returns a stable conflict instead of adopting, overwriting, or silently repairing the changed resource. Ordinary administration cannot mutate the managed resources or their published versions, including after unenrollment.
+
+The optional OpenAPI extension contributes `openapi-governed`. Its discovery Flow returns bounded hierarchical operation choices, and its acquisition Flow requires an explicitly promoted current target before invoking and persisting a response. See [Governed OpenAPI extension](openapi-extension.md).
 

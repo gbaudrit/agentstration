@@ -25,6 +25,10 @@ internal static class ToolDefinitionEndpoints
             .Produces<ToolDefinitionResource>(StatusCodes.Status201Created)
             .WithSummary("Create a ToolDefinition")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        definitions.MapPost("/from-acquisition/{id}", CreateFromAcquisitionAsync)
+            .Produces<ToolDefinitionResource>(StatusCodes.Status201Created)
+            .WithSummary("Create a ToolDefinition from a successful Data Source acquisition")
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources, AgentstrationPolicies.CanReadRuns);
         definitions.MapPut("/{name}", PutAsync)
             .Produces<ToolDefinitionResource>()
             .WithSummary("Update a ToolDefinition")
@@ -39,10 +43,12 @@ internal static class ToolDefinitionEndpoints
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
 
-    private static Task<IResult> ListAsync(string? @namespace, ToolDefinitionService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListAsync(string? @namespace, ToolDefinitionService service, ICurrentRequestContext current,
+        IRequestContextScopeFactory scopes, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
-            var values = (await service.ListAsync(cancellationToken)).Select(value => value.Value);
+            var values = (await service.ListAsync(cancellationToken)).Select(value => value.Value)
+                .Concat(await ToolsApiHttp.ListOperationalAcquisitionToolsAsync(service, current, scopes, cancellationToken));
             if (!string.IsNullOrWhiteSpace(@namespace))
             {
                 var parsed = ResourceNamespace.Parse(@namespace);
@@ -51,11 +57,15 @@ internal static class ToolDefinitionEndpoints
             return Results.Ok(new ValueResponse<ToolDefinitionResource>(values.ToArray()));
         });
 
-    private static Task<IResult> GetAsync(string name, string? @namespace, HttpResponse response, ToolDefinitionService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetAsync(string name, string? @namespace, string? scopeRef, HttpResponse response,
+        ToolDefinitionService service, ICurrentRequestContext current, IRequestContextScopeFactory scopes, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var ns = ResourceNamespace.Parse(@namespace);
-            var stored = await service.GetAsync(name, ns, cancellationToken)
+            var target = string.IsNullOrWhiteSpace(scopeRef) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(scopeRef);
+            using var operationalScope = ToolsApiHttp.EnterOperationalWorkspace(target, current, scopes);
+            var stored = await (target is { } exact ? service.GetExactAsync(name, ns, exact, cancellationToken)
+                : service.GetAsync(name, ns, cancellationToken))
                 ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, ns));
             return ToolsApiHttp.ResourceResult(stored, response, 200);
         });
@@ -87,9 +97,30 @@ internal static class ToolDefinitionEndpoints
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var ns = ResourceNamespace.Parse(@namespace);
-            var resource = Resource(name, ns, body.Properties, ResourceScopeRef.Workspace(context.Current.WorkspaceId));
+            var owner = body.Properties.Acquisition is null ? null : context.AccessMode switch
+            {
+                ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+                ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(context.Current.TenantId),
+                _ => (ResourceScopeRef?)null
+            };
+            var resource = Resource(name, ns, body.Properties, owner ?? ResourceScopeRef.Workspace(context.Current.WorkspaceId));
             return ToolsApiHttp.ResourceResult(
                 await service.PutAsync(resource, ToolsApiHttp.IfMatch(request), false, cancellationToken), response, 200);
+        });
+
+    private static Task<IResult> CreateFromAcquisitionAsync(
+        string id,
+        string? @namespace,
+        CreateToolDefinitionFromAcquisitionRequest body,
+        HttpResponse response,
+        IToolDefinitionAcquisitionFactory factory,
+        CancellationToken cancellationToken) =>
+        ToolsApiHttp.ExecuteAsync(async () =>
+        {
+            var stored = await factory.CreateAsync(ResourceNamespace.Parse(@namespace), id, body.Name,
+                body.DisplayName, body.ArtifactId, cancellationToken);
+            response.Headers.Location = $"/api/tooldefinitions/{Uri.EscapeDataString(stored.Value.Name)}?namespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}&scopeRef={Uri.EscapeDataString(stored.Value.ScopeRef!.Value.Value)}";
+            return ToolsApiHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
         });
 
     private static Task<IResult> SetEnabledAsync(

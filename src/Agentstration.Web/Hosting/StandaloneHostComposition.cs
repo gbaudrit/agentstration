@@ -1,35 +1,23 @@
-using Agentstration.Aep.Abstractions;
 using Agentstration.Agents;
 using Agentstration.Application.Work;
-using Agentstration.Extensions;
-using Agentstration.Extensions.Aep;
 using Agentstration.Flows.Application;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
-using Agentstration.Infrastructure.Flows;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
-using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourcePlanning;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
-using Agentstration.Runtime.MicrosoftAgentFramework;
-using Agentstration.Runtime.Profiles;
 using Agentstration.Security.AspNetCoreIdentity;
-using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Sources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Security;
 using Agentstration.Work;
-using OpenTelemetry.Logs;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 
 namespace Agentstration.Web.Hosting;
 
@@ -53,12 +41,10 @@ internal static class StandaloneHostCompositionExtensions
             bootstrapOptions.GrantPlatformAdministrator = configuredAuthentication.DevelopmentGrantPlatformAdministrator;
         }
 
-        builder.Services.AddSingleton(bootstrapOptions);
         var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
         genAiObservability.Validate(builder.Environment.IsDevelopment());
         var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolExecution").Get<ToolExecutionCaptureOptions>() ?? new();
         toolExecutionCapture.Validate();
-        builder.Services.AddSingleton(toolExecutionCapture);
 
         var isTesting = builder.Environment.IsEnvironment("Testing");
         var apiOnlyTesting = isTesting
@@ -133,90 +119,42 @@ internal static class StandaloneHostCompositionExtensions
             .Get<RuntimeWorkerDispatchOptions>() ?? new();
         runtimeWorkerDispatchOptions.Validate();
 
-        builder.Services.AddAgentstration(
-            dataDirectory,
-            aiOptions,
-            controlPlaneConnectionString,
-            workPlaneConnectionString,
-            flowConnectionString,
-            runtimeConnectionString,
-            storageOptions,
-            enableHostedServices: hostedServicesEnabled,
-            sourceVerificationIndexOptions: sourceVerificationIndexOptions,
-            sourceRegistryTransportOptions: sourceRegistryTransportOptions,
-            runtimeWorkerLeaseOptions: runtimeWorkerLeaseOptions,
-            runtimeWorkerDispatchOptions: runtimeWorkerDispatchOptions);
+        builder.Services.AddAgentstrationBootstrapHosting(bootstrapOptions, toolExecutionCapture);
+        builder.Services.AddAgentstration(new AgentstrationCompositionOptions
+        {
+            DataDirectory = dataDirectory,
+            Ai = aiOptions,
+            Storage = storageOptions,
+            ControlPlaneConnectionString = controlPlaneConnectionString,
+            WorkPlaneConnectionString = workPlaneConnectionString,
+            FlowConnectionString = flowConnectionString,
+            RuntimeConnectionString = runtimeConnectionString,
+            EnableHostedServices = hostedServicesEnabled,
+            SourceVerificationIndex = sourceVerificationIndexOptions,
+            SourceRegistryTransport = sourceRegistryTransportOptions,
+            RuntimeWorkerLease = runtimeWorkerLeaseOptions,
+            RuntimeWorkerDispatch = runtimeWorkerDispatchOptions
+        });
         builder.Services.AddAgentstrationModelProviders(builder.Configuration, useManagedProfileResolver);
-        builder.Services.AddSingleton<ModelProviderManagementService>();
-        builder.Services.AddSingleton<ModelDiscoveryService>();
-        builder.Services.AddSingleton<IParameterUsageProvider, ModelProviderParameterUsageProvider>();
-        builder.Services.AddSingleton<SourceProviderManagementService>();
-        builder.Services.AddSingleton<IModelProviderConfigurationStore>(provider => provider.GetRequiredService<ModelProviderManagementService>());
-        builder.Services.AddSingleton<ModelProfileManagementService>();
-        builder.Services.AddSingleton<ModelProfileOptionMigrationService>();
-        builder.Services.AddSingleton<IModelProfileStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
-        builder.Services.AddSingleton<IModelDeploymentStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
-        builder.Services.AddSingleton<IModelProfileReferenceValidator>(provider => provider.GetRequiredService<ModelProfileManagementService>());
-        builder.Services.AddSingleton<ExtensionRegistrationManagementService>();
-        builder.Services.AddSingleton<AepEnrollmentSettingsService>();
-        builder.Services.AddSingleton<AepEnrollmentService>();
-        builder.Services.AddSingleton<AwpWorkerIdentityService>();
-        builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
-        builder.Services.AddSingleton<ResourceScopeInventoryService>();
-        builder.Services.AddSingleton<ExtensionManagementService>();
-        builder.Services.AddSingleton<ExtensionInventoryService>();
-        builder.Services.AddSingleton(builder.Configuration
-            .GetSection(AepEnrollmentPolicyOptions.SectionName)
-            .Get<AepEnrollmentPolicyOptions>() ?? new());
-        builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
-        builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
-        builder.Services.AddAgentstrationApi(builder.Configuration, builder.Environment);
-        if (!apiOnlyTesting)
-        {
-            builder.Services.AddRazorPages();
-            builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-        }
-        builder.Services.AddAgentstrationLocalization(builder.Configuration);
-        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
-            builder.Services.AddAgentstrationPostgreSqlIdentity(
-                identityConnectionString,
-                dataProtectionKeysPath,
-                useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
-        else
-            builder.Services.AddAgentstrationLocalIdentity(
-                identityConnectionString,
-                dataProtectionKeysPath,
-                useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
-        builder.Services.AddScoped<DeclarativeBootstrapService>();
+        builder.Services.AddAgentstrationModelManagement();
+        builder.Services.AddAgentstrationExtensionHosting(builder.Configuration);
+        builder.Services.AddAgentstrationServerPresentation(builder.Configuration, builder.Environment, apiOnlyTesting);
+        builder.Services.AddAgentstrationHostIdentity(
+            storageProvider, identityConnectionString, dataProtectionKeysPath, builder.Environment.IsDevelopment());
         builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
-
-        if (hostedServicesEnabled)
-        {
-            builder.Services.AddHostedService<LocalWorkExecutionWorker>();
-            builder.Services.AddHostedService<RuntimeAssignmentLeaseReaper>();
-            builder.Services.AddHostedService<FlowRunRecoveryWorker>();
-            builder.Services.AddHostedService<SourceRefreshWorker>();
-        }
-
-        if (testingStorageDirectory is not null)
-        {
-            var sqliteConnectionStrings = storageProvider == AgentstrationStorageProvider.Sqlite
-                ? new[]
-                {
-                    identityConnectionString,
-                    controlPlaneConnectionString!,
-                    workPlaneConnectionString!,
-                    flowConnectionString!,
-                    runtimeConnectionString!
-                }
-                : [];
-            builder.Services.AddSingleton(provider => new TestingDataDirectoryCleanup(
-                testingStorageDirectory,
-                sqliteConnectionStrings,
-                provider.GetRequiredService<ILogger<TestingDataDirectoryCleanup>>()));
-        }
-
-        if (openTelemetryEnabled) AddOpenTelemetry(builder);
+        builder.Services.AddAgentstrationBackgroundWorkers(hostedServicesEnabled);
+        var sqliteConnectionStrings = storageProvider == AgentstrationStorageProvider.Sqlite
+            ? new[]
+            {
+                identityConnectionString,
+                controlPlaneConnectionString!,
+                workPlaneConnectionString!,
+                flowConnectionString!,
+                runtimeConnectionString!
+            }
+            : [];
+        builder.Services.AddAgentstrationTestingCleanup(testingStorageDirectory, sqliteConnectionStrings);
+        builder.Services.AddAgentstrationHostObservability(builder.Logging, builder.Configuration, openTelemetryEnabled);
 
         return new(configuredAuthentication, genAiObservability, testingStorageDirectory, apiOnlyTesting);
     }
@@ -307,46 +245,5 @@ internal static class StandaloneHostCompositionExtensions
             testingDataDirectoryCleanup?.Dispose();
             throw;
         }
-    }
-
-    private static void AddOpenTelemetry(WebApplicationBuilder builder)
-    {
-        var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-        builder.Logging.AddOpenTelemetry(logging =>
-        {
-            logging.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("Agentstration.Web"));
-            logging.IncludeScopes = true;
-            logging.IncludeFormattedMessage = true;
-            if (otlpEnabled) logging.AddOtlpExporter();
-        });
-        builder.Services.AddOpenTelemetry()
-            .ConfigureResource(resource => resource.AddService("Agentstration.Web"))
-            .WithTracing(tracing =>
-            {
-                tracing
-                    .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddSource(
-                        WorkItemService.ActivitySource.Name,
-                        RuntimeRunService.ActivitySource.Name,
-                        FlowRunService.ActivitySource.Name,
-                        AgentFrameworkRuntimeFactory.TelemetrySourceName,
-                        GenAiObservabilityOptions.ChatClientSourceName,
-                        GenAiHttpPayloadCaptureHandler.TelemetrySourceName);
-                if (otlpEnabled) tracing.AddOtlpExporter();
-            })
-            .WithMetrics(metrics =>
-            {
-                metrics
-                    .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddMeter(
-                        WorkItemService.Meter.Name,
-                        FlowRunService.Meter.Name,
-                        SourceRegistryManagementService.Meter.Name,
-                        AgentFrameworkRuntimeFactory.TelemetrySourceName,
-                        GenAiObservabilityOptions.ChatClientSourceName);
-                if (otlpEnabled) metrics.AddOtlpExporter();
-            });
     }
 }

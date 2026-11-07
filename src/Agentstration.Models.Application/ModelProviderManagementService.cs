@@ -402,7 +402,11 @@ public sealed class ModelProviderManagementService(
         var inlineValues = new List<AepBoundValue>();
         foreach (var binding in definition.ValueBindings)
         {
-            if (binding.Kind == ModelProviderValueBindingKind.Parameter)
+            if (binding.Kind == ModelProviderValueBindingKind.Literal)
+            {
+                inlineValues.Add(AepBoundValue.Inline(binding.RequirementId, binding.Literal!.Value));
+            }
+            else if (binding.Kind == ModelProviderValueBindingKind.Parameter)
             {
                 try
                 {

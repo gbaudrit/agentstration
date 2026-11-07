@@ -45,11 +45,23 @@ concurrency:
 
 jobs:
   browser-ux-tests:
-    name: browser-ux (${{ matrix.project }})
+    name: browser-ux (${{ matrix.project }}, ${{ matrix.shard }}/${{ matrix.shards }})
     strategy:
       fail-fast: false
       matrix:
-        project: [desktop-chromium, mobile-chromium, locale-contracts]
+        include:
+          - project: desktop-chromium
+            shard: 1
+            shards: 2
+          - project: desktop-chromium
+            shard: 2
+            shards: 2
+          - project: mobile-chromium
+            shard: 1
+            shards: 1
+          - project: locale-contracts
+            shard: 1
+            shards: 1
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -59,6 +71,13 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -102,7 +121,7 @@ jobs:
         working-directory: automation/playwright
         env:
           AGENTSTRATION_PLAYWRIGHT_NO_BUILD: true
-        run: npm run test:smoke -- --project=${{ matrix.project }}
+        run: npm run test:smoke -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
       - name: Write application coverage report
         if: always()
         working-directory: automation/playwright
@@ -111,21 +130,22 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: browser-ux-evidence-${{ matrix.project }}-${{ github.run_attempt }}
+          name: browser-ux-evidence-${{ matrix.project }}-${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
             automation/playwright/test-results
             automation/playwright/playwright-report
             automation/playwright/.work/*/*.log
           if-no-files-found: ignore
+          include-hidden-files: true
 
-  # Preserve the single required check while each project has isolated hosts/data.
+  # Preserve the single required check while each shard has isolated hosts/data.
   browser-ux:
     name: browser-ux
     if: always()
     needs: browser-ux-tests
     runs-on: ubuntu-latest
     steps:
-      - name: Require every browser project to pass
+      - name: Require every browser shard to pass
         env:
           BROWSER_PROJECTS_RESULT: ${{ needs.browser-ux-tests.result }}
         run: test "$BROWSER_PROJECTS_RESULT" = success

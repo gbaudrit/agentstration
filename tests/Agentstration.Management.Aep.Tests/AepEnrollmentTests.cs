@@ -1,4 +1,5 @@
 extern alias crawl4ai;
+extern alias openapi;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -1050,6 +1051,18 @@ public sealed class AepEnrollmentTests
                 new Dictionary<string, string>()));
     }
 
+    private sealed class OpenApiToolDiscovery : IToolProviderDiscovery
+    {
+        public bool Supports(ToolProviderType providerType) => providerType == ToolProviderType.Aep;
+
+        public Task<ToolProviderDiscoveryResult> DiscoverAsync(ToolProviderResource provider, CancellationToken cancellationToken) =>
+            Task.FromResult(new ToolProviderDiscoveryResult(
+                new[] { "openapi.contract.discover", "openapi.operation.invoke" }.Select(id =>
+                    new DiscoveredToolDescriptor(id, id, id, JsonSerializer.SerializeToElement(new { type = "object" }),
+                        null, new Dictionary<string, JsonElement>())).ToArray(),
+                new Dictionary<string, bool> { ["tools"] = true }, new Dictionary<string, string>()));
+    }
+
     private sealed class BundleApplyConflict
     {
         public bool Pending { get; set; }
@@ -1092,10 +1105,85 @@ public sealed class AepEnrollmentTests
         }
     }
 
+    [TestMethod]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    [DataRow(ResourceScopeKind.Workspace)]
+    public async Task PairingInstallsOpenApiBundleAtExactScopeAndProtectsPublishedResources(ResourceScopeKind scopeKind)
+    {
+        var bundle = openapi::Agentstration.Extensions.OpenApi.OpenApiDataSourceProfileBundle.Create();
+        var handler = new EnrollmentLifecycleHandler("Agentstration.Extensions.OpenApi", bundleOverride: bundle);
+        await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IHttpMessageHandlerFactory>();
+            services.AddSingleton<IHttpMessageHandlerFactory>(new EnrollmentHttpClientFactory(handler));
+            services.RemoveAll<IToolProviderDiscovery>();
+            services.AddSingleton<IToolProviderDiscovery, OpenApiToolDiscovery>();
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var enrollment = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var target = scopeKind switch
+        {
+            ResourceScopeKind.Instance => ResourceScopeRef.Instance,
+            ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(context.TenantId),
+            _ => ResourceScopeRef.Workspace(context.WorkspaceId)
+        };
+        var instanceId = Guid.NewGuid();
+        _ = await enrollment.AnnounceAsync(new(instanceId, handler.Manifest().Extension,
+            new Uri("https://openapi.example/"), new Uri("https://openapi.example/aep/enrollment/pair")), default);
+        using var ownerScope = PushOwnerScope(factory, context, target);
+        await enrollment.AssignAsync(context, instanceId, target, default);
+        var code = await enrollment.RotateAsync(context, instanceId, default);
+        var credential = await enrollment.ClaimAsync(new(instanceId, instanceId, code.Code), default);
+        try
+        {
+            _ = await enrollment.ReadyAsync(new(instanceId, instanceId, credential.CompletionToken), default);
+        }
+        catch (AepEnrollmentException exception)
+        {
+            using var systemScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            var failed = await factory.Services.GetRequiredService<IResourceStore>()
+                .ListExactAsync<ExtensionBundleInstallationResource>(target, ExtensionKinds.ExtensionBundleInstallation, 0, 10, default);
+            Assert.Fail(failed.SingleOrDefault()?.Value.Definition.Diagnostic ?? exception.ToString());
+        }
+        using var readScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var installed = (await store.ListExactAsync<ExtensionBundleInstallationResource>(target,
+            ExtensionKinds.ExtensionBundleInstallation, 0, 10, default)).Single();
+        Assert.AreEqual(ExtensionBundleInstallationState.Installed, installed.Value.Definition.State);
+        Assert.AreEqual(bundle.Id, installed.Value.Definition.BundleId);
+        Assert.HasCount(2, installed.Value.Definition.ToolBindings);
+        Assert.HasCount(8, installed.Value.Definition.ManagedResources);
+        Assert.IsTrue(installed.Value.Definition.ManagedResources.All(value => value.ScopeRef == target));
+        var tools = (await store.ListExactAsync<ToolResource>(target, ToolResourceKinds.Tool, 0, int.MaxValue, default))
+            .Where(value => value.Value.Definition.Provider?.Name == $"paired-{instanceId:N}").ToArray();
+        Assert.HasCount(2, tools);
+        Assert.IsTrue(tools.All(value => value.Value.Definition.Enabled));
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        foreach (var name in new[] { "openapi-discovery", "openapi-acquisition" })
+        {
+            var flow = await flows.GetExactAsync(target, new(name), default);
+            Assert.IsNotNull(flow);
+            var failure = await Assert.ThrowsExactlyAsync<ResourceGovernanceViolationException>(() =>
+                flows.PublishVersionExactAsync(target, new(name), flow.Value.Version, true, default));
+            Assert.AreEqual("resource_managed", failure.Code);
+        }
+        var registration = (await store.GetExactAsync<ExtensionRegistrationResource>(ScopedResourceAddress.Create(
+            target, ResourceNamespace.Default, ExtensionKinds.ExtensionRegistration, $"paired-{instanceId:N}"), default))!;
+        await factory.Services.GetServices<IAepEnrollmentResourceProvisioner>().OfType<AepEnrollmentBundleProvisioner>()
+            .Single().ProvisionAsync(registration.Value, handler.Manifest(), default);
+        var repeated = (await store.ListExactAsync<ExtensionBundleInstallationResource>(target,
+            ExtensionKinds.ExtensionBundleInstallation, 0, 10, default)).Single();
+        Assert.AreEqual(installed.ETag, repeated.ETag);
+    }
+
     private sealed class EnrollmentLifecycleHandler(
         string extensionId,
         bool advertiseTool = false,
-        bool advertiseBundle = false) : HttpMessageHandler
+        bool advertiseBundle = false,
+        AepDataSourceProfileBundleContribution? bundleOverride = null) : HttpMessageHandler
     {
         public AepCredentialRotation? Rotation { get; private set; }
         public int PreviousRevocationCount { get; private set; }
@@ -1118,7 +1206,9 @@ public sealed class AepEnrollmentTests
 
         public AepManifest Manifest()
         {
-            var tools = advertiseBundle
+            var tools = bundleOverride is not null
+                ? bundleOverride.RequiredTools!.Select(id => new AepToolContribution(id, id, new AepMcpToolMapping("main", id))).ToArray()
+                : advertiseBundle
                 ? new[]
                 {
                     new AepToolContribution("crawl4ai.web.fetch", "Fetch", new AepMcpToolMapping("main", "web_fetch")),
@@ -1134,8 +1224,8 @@ public sealed class AepEnrollmentTests
                 AepProtocol.Version,
                 new(extensionId, "Pairing test", "1.0.0"),
                 new Dictionary<string, AepCapabilityDescriptor>(),
-                new AepContributions([], tools, DataSourceProfileBundles: advertiseBundle ? [Crawl4AiDataSourceProfileBundle.Create()] : []),
-                advertiseTool || advertiseBundle ? new AepMcpDescriptor([new AepMcpServerDescriptor("main", "/mcp")]) : null);
+                new AepContributions([], tools, DataSourceProfileBundles: bundleOverride is not null ? [bundleOverride] : advertiseBundle ? [Crawl4AiDataSourceProfileBundle.Create()] : []),
+                advertiseTool || advertiseBundle || bundleOverride is not null ? new AepMcpDescriptor([new AepMcpServerDescriptor("main", "/mcp")]) : null);
         }
     }
 }

@@ -173,7 +173,7 @@ jobs:
             minimum-tests: 777
             parallel-modules: 4
           - lane: Integration
-            minimum-tests: 947
+            minimum-tests: 954
             parallel-modules: 2
     steps:
       - name: Check out repository
@@ -264,10 +264,10 @@ jobs:
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
             @{ Name = 'Agentstration.Api.Tests'; Tests = 23; Warning = 2048; Failure = 2432 },
-            @{ Name = 'Agentstration.Api.Flows.Tests'; Tests = 74; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.Flows.Tests'; Tests = 80; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Execution.Tests'; Tests = 58; Warning = 2048; Failure = 2432 },
-            @{ Name = 'Agentstration.Api.Resources.Tests'; Tests = 80; Warning = 2048; Failure = 2432 },
-            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 127; Warning = 1920; Failure = 2560 },
+            @{ Name = 'Agentstration.Api.Resources.Tests'; Tests = 118; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 104; Warning = 1920; Failure = 2560 },
             @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 31; Warning = 500; Failure = 700 },
             @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 64; Warning = 1280; Failure = 1664 },
             @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 29; Warning = 832; Failure = 1024 }
@@ -390,8 +390,8 @@ jobs:
         uses: ./.github/actions/restore-linux-build
         with:
           sdk-version: ${{ needs.build.outputs.sdk-version }}
-      - name: Run PostgreSQL migration and restart test
-        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart" --minimum-expected-tests 1 --progress off
+      - name: Run PostgreSQL migration, restart and Flow recovery tests
+        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart|Name=FlowRecoveryRepairsLegacyStatusesAndDrainsChangingPages" --minimum-expected-tests 2 --progress off
       - name: Run PostgreSQL storage concurrency benchmark
         env:
           AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER: PostgreSql
