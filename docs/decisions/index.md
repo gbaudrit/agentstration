@@ -222,3 +222,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 194. [ADR-0194 — Model Provider bindings support typed literals](0194-typed-literal-model-provider-bindings.md)
 195. [ADR-0195 — Connected Services are product resources over extension-defined types](0195-connected-services-are-product-resources-over-extension-defined-types.md)
 196. [ADR-0196 — Connected Service types are governed resources](0196-connected-service-types-are-governed-resources.md)
+197. [ADR-0197 — Connected Service bindings support typed literals](0197-connected-service-bindings-support-typed-literals.md)

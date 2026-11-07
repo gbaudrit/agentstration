@@ -42,6 +42,16 @@ public sealed class LiteralValueBindingTests
     }
 
     [TestMethod]
+    [DataRow("{}")]
+    [DataRow("[]")]
+    [DataRow("null")]
+    public void ScalarModelProviderContractsRejectStructuredAndNullLiterals(string json)
+    {
+        var requirement = new AepValueRequirement(AepContributionKinds.ModelProvider, "test", "setting", true, AepValueType.Text);
+        AssertInvalid(ModelProviderValueBinding.FromLiteral("setting", JsonSerializer.Deserialize<JsonElement>(json)), requirement, "bound_value_type_invalid");
+    }
+
+    [TestMethod]
     public void BindingVariantsRejectMixedLiteralAndResourcePayloads()
     {
         var requirement = new AepValueRequirement(AepContributionKinds.ModelProvider, "test", "setting", true, AepValueType.Text);

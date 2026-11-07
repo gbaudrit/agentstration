@@ -80,7 +80,8 @@ public sealed record ConnectedServiceTypeReference
 public enum ConnectedServiceBindingKind
 {
     [JsonStringEnumMemberName("parameter")] Parameter,
-    [JsonStringEnumMemberName("secret")] Secret
+    [JsonStringEnumMemberName("secret")] Secret,
+    [JsonStringEnumMemberName("literal")] Literal
 }
 
 public sealed record ConnectedServiceValueBinding
@@ -89,6 +90,7 @@ public sealed record ConnectedServiceValueBinding
     public required ConnectedServiceBindingKind Kind { get; init; }
     public ParameterReference? Parameter { get; init; }
     public SecretReference? Secret { get; init; }
+    public JsonElement? Literal { get; init; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<ConnectedServiceAvailability>))]
@@ -127,6 +129,15 @@ public sealed record ConnectedServiceResource : Resource
 
 public sealed record ConnectedServiceReference(ResourceAddress Address, ResourceScopeRef ScopeRef);
 public sealed record ConnectedServiceResolutionContext(ResourceScopeRef ConsumerScopeRef, ResourceAddress Consumer);
+
+public sealed record ConnectedServiceUsage(string Kind, string Name, string DisplayName, string Url);
+
+public interface IConnectedServiceUsageProvider
+{
+    Task<IReadOnlyList<ConnectedServiceUsage>> GetUsagesAsync(
+        ScopedResourceAddress connectedService,
+        CancellationToken cancellationToken = default);
+}
 
 public sealed class ResolvedConnectedServiceInput : IDisposable
 {
@@ -172,3 +183,5 @@ public sealed record CreateConnectedServiceTypeRequest(
     ResourceScopeRef? ScopeRef = null,
     ResourceNamespace? Namespace = null);
 public sealed record PutConnectedServiceTypeRequest(ConnectedServiceTypeProperties Properties);
+public sealed record ConnectedServiceUsageResponse(string ResourceType, string Name, string DisplayName, string Url);
+public sealed record ConnectedServiceUsagesResponse(IReadOnlyList<ConnectedServiceUsageResponse> Value, int Count);

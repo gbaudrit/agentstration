@@ -15,7 +15,7 @@ They may be:
   Extension Registration.
 
 The builtin `http-endpoint` type is Instance-scoped and Core-owned. Its required
-`baseUrl` Parameter input is also exposed as a standard `baseUrl` export.
+standard `baseUrl` input is also exposed as a standard `baseUrl` export.
 
 Every type publishes a preferred version and an additive set of immutable versions.
 A version contains a JSON configuration schema and digest, typed `standard` or
@@ -48,6 +48,7 @@ The following authorized endpoints manage configured external systems:
 |---|---|---|
 | `GET` | `/api/connected-services` | List visible resources |
 | `GET` | `/api/connected-services/{name}?scopeRef=...` | Read one exact resource |
+| `GET` | `/api/connected-services/{name}/usages?scopeRef=...` | List dependent resources reported by consumer verticals |
 | `POST` | `/api/connected-services` | Create and validate a resource |
 | `PUT` | `/api/connected-services/{name}?scopeRef=...` | Replace desired configuration with `If-Match` |
 | `POST` | `/api/connected-services/{name}/reconcile?scopeRef=...` | Refresh observed compatibility |
@@ -58,18 +59,33 @@ A resource pins an exact type `ResourceReference`, `typeUid`, `version` and
 `schemaDigest`. It contains no Extension Registration reference: the type resource
 records its own origin and management authority. The type must belong to the same
 scope or an ancestor allowed by its use policy. Parameter and Secret bindings are
-also exact scoped references. Required inputs, protection, scalar types and JSON
-options are checked against the pinned version.
+exact scoped references; literals are typed JSON scalars stored directly in the
+resource. Required inputs, protection, scalar types and JSON options are checked
+against the pinned version. Secured inputs accept only Secret references.
 
 Observed availability is `ready`, `stale`, `unavailable` or `disabled`. A replaced
 type identity, missing version or changed digest becomes `stale`; a missing or
 disabled type is `unavailable`. Reconciliation never rewrites the desired revision.
 
-Only references are serialized. Parameter and Secret values are resolved at the
-internal `IConnectedServiceResolver` boundary for an authorized consumer, and
-Secret buffers are disposable. Resolved values are never available from the HTTP
-API.
+References and literal configuration are serialized. Literals are limited to 64
+KiB and visible through authorized resource administration. Parameter and Secret
+values are resolved at the internal `IConnectedServiceResolver` boundary for an
+authorized consumer, and Secret buffers are disposable. Resolved Parameter and
+Secret values are never available from the HTTP API.
 
 Storage adapters bind their requirement ids to selected Connected Service export
 ids explicitly. No automatic matching and no direct OpenDAL-to-provider-extension
 link is part of this API.
+
+## Console
+
+The administration Console exposes the same family-owned API through these routes:
+
+- `/connected-services` lists the permission-aware scoped catalog and filters by type or observed availability;
+- `/connected-services/new` selects an exact `ConnectedServiceType` resource revision, renders its JSON schema and binds every declared input manually to a typed literal, exact Parameter or Secret as allowed by the input contract;
+- `/connected-services/{name}?scopeRef=...` provides Overview, Definition, Access and YAML tabs. Definition updates options and bindings with the resource ETag; YAML exposes the read-only resource manifest.
+
+Reconciliation and deactivation always require explicit confirmation. Reconciliation
+refreshes compatibility evidence but never silently changes the pinned type UID,
+version or schema digest. The Console never displays Secret values and does not
+perform provider-specific Storage configuration.

@@ -34,4 +34,5 @@
   <data name="Binding.True"><value>True</value></data>
   <data name="Binding.False"><value>False</value></data>
   <data name="Binding.LiteralInvalid"><value>Enter a valid value of the expected type from the allowed values, when specified.</value></data>
+  <data name="Binding.ClearLiteral"><value>Clear literal</value></data>
 </root>
