@@ -21,6 +21,7 @@ public sealed class ConnectedServiceManagementService(
     public const int MaximumDisplayNameLength = 200;
     public const int MaximumDescriptionLength = 2_000;
     public const int MaximumOptionsBytes = 256 * 1024;
+    public const int MaximumLiteralBytes = 64 * 1024;
 
     public Task<IReadOnlyList<StoredResource<ConnectedServiceResource>>> ListAsync(CancellationToken cancellationToken) =>
         store.ListAllAsync<ConnectedServiceResource>(ConnectedServiceResourceKinds.ConnectedService, cancellationToken);
@@ -323,9 +324,14 @@ public sealed class ConnectedServiceManagementService(
                 if (resolved.Value is { } value && !Matches(value, input.Type))
                     throw new ConnectedServiceValidationException($"Parameter bound to input '{binding.InputId}' does not match type '{input.Type}'.");
             }
-            else
+            else if (binding.Kind == ConnectedServiceBindingKind.Secret)
             {
                 await ValidateSecretReferenceAsync(binding, resource, cancellationToken);
+            }
+            else if (JsonSerializer.SerializeToUtf8Bytes(binding.Literal!.Value).Length > MaximumLiteralBytes)
+            {
+                throw new ConnectedServiceValidationException(
+                    $"Literal bound to input '{binding.InputId}' cannot exceed {MaximumLiteralBytes} bytes.");
             }
         }
         var supplied = resource.Definition.Bindings.Select(value => value.InputId).ToHashSet(StringComparer.Ordinal);
@@ -341,6 +347,16 @@ public sealed class ConnectedServiceManagementService(
     {
         var scopeRef = RequireScope(service);
         var consumer = service.Address;
+        if (binding.Kind == ConnectedServiceBindingKind.Literal)
+        {
+            var literal = binding.Literal!.Value;
+            return new ResolvedConnectedServiceInput
+            {
+                Id = binding.InputId,
+                Type = TypeOf(literal),
+                Value = literal.Clone()
+            };
+        }
         if (binding.Kind == ConnectedServiceBindingKind.Parameter)
         {
             var resolved = await parameters.ResolveAsync(binding.Parameter!, new(scopeRef, consumer), cancellationToken)
@@ -393,9 +409,14 @@ public sealed class ConnectedServiceManagementService(
         var valid = binding.Kind switch
         {
             ConnectedServiceBindingKind.Parameter => binding.Parameter is not null && binding.Secret is null
-                && input.Protection == ConnectedServiceValueProtection.Standard,
+                && binding.Literal is null && input.Protection == ConnectedServiceValueProtection.Standard,
             ConnectedServiceBindingKind.Secret => binding.Parameter is null && binding.Secret is { ScopeRef: not null }
+                && binding.Literal is null
                 && input.Type == ConnectedServiceValueType.Text,
+            ConnectedServiceBindingKind.Literal => binding.Parameter is null && binding.Secret is null
+                && binding.Literal is { ValueKind: not JsonValueKind.Undefined } literal
+                && input.Protection == ConnectedServiceValueProtection.Standard
+                && Matches(literal, input.Type),
             _ => false
         };
         if (!valid)

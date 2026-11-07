@@ -30,6 +30,11 @@
   <data name="Availability.Unavailable"><value>Indisponible</value></data>
   <data name="Availability.Disabled"><value>Désactivé</value></data>
   <data name="Details.Description"><value>Inspectez la ressource de type épinglée, la configuration sûre, les exports et les diagnostics.</value></data>
+  <data name="DetailsSections"><value>Sections du service connecté</value></data>
+  <data name="Tab.Overview"><value>Vue d’ensemble</value></data>
+  <data name="Tab.Definition"><value>Définition</value></data>
+  <data name="Tab.Access"><value>Accès</value></data>
+  <data name="Tab.YAML"><value>YAML</value></data>
   <data name="Reconcile"><value>Réconcilier</value></data>
   <data name="Edit"><value>Modifier</value></data>
   <data name="Deactivate"><value>Désactiver</value></data>
@@ -51,12 +56,14 @@
   <data name="SchemaDigest"><value>Empreinte du schéma</value></data>
   <data name="Options"><value>Options non sensibles</value></data>
   <data name="Bindings"><value>Liaisons de valeurs</value></data>
-  <data name="NoBindings"><value>Aucune liaison de paramètre ou de secret n’est configurée.</value></data>
+  <data name="NoBindings"><value>Aucune liaison littérale, de paramètre ou de secret n’est configurée.</value></data>
   <data name="Input"><value>Entrée</value></data>
   <data name="SourceKind"><value>Type de source</value></data>
   <data name="ExactResource"><value>Ressource délimitée exacte</value></data>
+  <data name="ValueOrResource"><value>Valeur ou ressource exacte</value></data>
   <data name="BindingKind.Parameter"><value>Paramètre</value></data>
   <data name="BindingKind.Secret"><value>Secret</value></data>
+  <data name="BindingKind.Literal"><value>Valeur littérale</value></data>
   <data name="Exports"><value>Exports et capacités</value></data>
   <data name="ContributionUnavailable"><value>La révision du type épinglé n’est plus disponible. Les preuves enregistrées restent visibles ; réconciliez uniquement après examen du contrat modifié.</value></data>
   <data name="NoExports"><value>Cette révision de type ne déclare aucun export.</value></data>
@@ -86,7 +93,7 @@
   <data name="Editor.Description"><value>Configurez une ressource de type précise et liez explicitement ses entrées.</value></data>
   <data name="Cancel"><value>Annuler</value></data>
   <data name="ManualBinding"><value>Liaison manuelle</value></data>
-  <data name="ManualBindingExplanation"><value>Sélectionnez explicitement chaque paramètre ou secret. Aucune correspondance entre extensions n’est déduite.</value></data>
+  <data name="ManualBindingExplanation"><value>Saisissez une valeur littérale ou sélectionnez explicitement chaque paramètre ou secret. Aucune correspondance entre extensions n’est déduite.</value></data>
   <data name="ConnectedServiceResource"><value>Ressource de service connecté</value></data>
   <data name="Description"><value>Description</value></data>
   <data name="Contribution"><value>Contrat de type</value></data>
@@ -94,7 +101,7 @@
   <data name="NoTypes"><value>Aucune ressource de type de service connecté activée n’est actuellement disponible.</value></data>
   <data name="TypePinnedHelp"><value>L’UID de la ressource de type, sa version et l’empreinte du schéma sont épinglés à la création.</value></data>
   <data name="NoTypeDescription"><value>Aucune description n’a été fournie pour ce type.</value></data>
-  <data name="Bindings.Description"><value>Les entrées sont résolues par des références exactes à des paramètres ou secrets délimités. Les valeurs des secrets ne sont jamais affichées.</value></data>
+  <data name="Bindings.Description"><value>Les entrées standard acceptent des valeurs littérales typées ou des paramètres délimités exacts. Les chaînes peuvent utiliser des secrets, dont les valeurs ne sont jamais affichées.</value></data>
   <data name="NoInputs"><value>Cette révision de type ne déclare aucune entrée externe.</value></data>
   <data name="Required"><value>Obligatoire</value></data>
   <data name="Optional"><value>Facultatif</value></data>
@@ -105,4 +112,9 @@
   <data name="Saving"><value>Enregistrement…</value></data>
   <data name="Save"><value>Enregistrer le service connecté</value></data>
   <data name="NoDependents"><value>Aucune ressource dépendante ne signale actuellement ce service connecté.</value></data>
+  <data name="RawDefinition"><value>Définition brute</value></data>
+  <data name="YAML"><value>YAML du service connecté</value></data>
+  <data name="YamlReadOnlyHelp"><value>Ce manifeste reflète la définition enregistrée. Modifiez-la depuis l’onglet Définition.</value></data>
+  <data name="ReadOnly"><value>Lecture seule</value></data>
+  <data name="YamlDefinition"><value>Définition YAML du service connecté</value></data>
 </root>

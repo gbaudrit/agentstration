@@ -80,7 +80,8 @@ public sealed record ConnectedServiceTypeReference
 public enum ConnectedServiceBindingKind
 {
     [JsonStringEnumMemberName("parameter")] Parameter,
-    [JsonStringEnumMemberName("secret")] Secret
+    [JsonStringEnumMemberName("secret")] Secret,
+    [JsonStringEnumMemberName("literal")] Literal
 }
 
 public sealed record ConnectedServiceValueBinding
@@ -89,6 +90,7 @@ public sealed record ConnectedServiceValueBinding
     public required ConnectedServiceBindingKind Kind { get; init; }
     public ParameterReference? Parameter { get; init; }
     public SecretReference? Secret { get; init; }
+    public JsonElement? Literal { get; init; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<ConnectedServiceAvailability>))]

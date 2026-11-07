@@ -31,7 +31,8 @@ public sealed class ConnectedServiceEditorModelTests
             DisplayName = "Redis",
             Bindings =
             [
-                new() { InputId = "endpoint", Kind = ConnectedServiceBindingKind.Parameter, Reference = $"{parameterScope.Value}|shared|endpoint" }
+                new() { InputId = "endpoint", Kind = ConnectedServiceBindingKind.Parameter, Reference = $"{parameterScope.Value}|shared|endpoint" },
+                new() { InputId = "retries", Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement(3) }
             ],
             UseGrants = [new DescendantUseGrant(owner)]
         };
@@ -42,9 +43,15 @@ public sealed class ConnectedServiceEditorModelTests
         Assert.AreEqual("redis", properties.Type.Type.Name);
         Assert.AreEqual(new ResourceNamespace("azure.extension"), properties.Type.Type.Namespace);
         Assert.AreEqual("sha256:contract", properties.Type.SchemaDigest);
-        Assert.AreEqual(parameterScope, properties.Bindings.Single().Parameter!.ScopeRef);
-        Assert.AreEqual(new ResourceNamespace("shared"), properties.Bindings.Single().Parameter!.Address.Namespace);
-        Assert.IsNull(properties.Bindings.Single().Secret);
+        var parameter = properties.Bindings.Single(value => value.InputId == "endpoint");
+        Assert.AreEqual(parameterScope, parameter.Parameter!.ScopeRef);
+        Assert.AreEqual(new ResourceNamespace("shared"), parameter.Parameter.Address.Namespace);
+        Assert.IsNull(parameter.Secret);
+        var literal = properties.Bindings.Single(value => value.InputId == "retries");
+        Assert.AreEqual(ConnectedServiceBindingKind.Literal, literal.Kind);
+        Assert.AreEqual(3, literal.Literal?.GetInt32());
+        Assert.IsNull(literal.Parameter);
+        Assert.IsNull(literal.Secret);
         Assert.AreEqual(owner, properties.UsePolicy.Grants.Single().ScopeRef);
     }
 }

@@ -10,11 +10,13 @@ using Agentstration.Secrets.Contracts;
 using Agentstration.Web.Console;
 using Agentstration.Web.Components.Values;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
 
 using ConnectedServicesPage = Agentstration.Web.Components.Pages.ConnectedServices;
+using ConnectedServiceDetailsPage = Agentstration.Web.Components.Pages.ConnectedServiceDetails;
 using ConnectedServiceEditorPage = Agentstration.Web.Components.Pages.ConnectedServiceEditor;
 
 [TestClass]
@@ -73,14 +75,15 @@ public sealed class ConnectedServiceComponentTests
 
             var endpoint = editors.Single(value => value.Instance.Requirement.Id == "endpoint").Instance;
             CollectionAssert.AreEqual(
-                new[] { ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret },
+                new[] { ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret },
                 endpoint.AllowedSources.ToArray());
+            Assert.AreEqual(ValueBindingSourceKind.Literal, endpoint.Selection.Kind);
             CollectionAssert.AreEquivalent(
                 new[] { "workspace-endpoint", "granted-endpoint", "configured-secret", "granted-secret" },
                 endpoint.Options.Select(value => value.Address.Name).ToArray());
 
             var retries = editors.Single(value => value.Instance.Requirement.Id == "retries").Instance;
-            CollectionAssert.AreEqual(new[] { ValueBindingSourceKind.Parameter }, retries.AllowedSources.ToArray());
+            CollectionAssert.AreEqual(new[] { ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter }, retries.AllowedSources.ToArray());
             CollectionAssert.AreEqual(new[] { "workspace-retries" }, retries.Options.Select(value => value.Address.Name).ToArray());
 
             var credential = editors.Single(value => value.Instance.Requirement.Id == "credential").Instance;
@@ -89,6 +92,43 @@ public sealed class ConnectedServiceComponentTests
             Assert.IsNotNull(credential.CreationContext);
             Assert.AreEqual(workspace, credential.CreationContext.ScopeRef);
         });
+    }
+
+    [TestMethod]
+    public void DetailsUseResourceTabsEmbedDefinitionAndDoNotExposeAnEditAction()
+    {
+        using var context = new BunitContext();
+        var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var type = TypeCatalog();
+        var resource = Resource(workspace, type);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConnectedServicesClient>(new DetailsClient(resource, type, workspace));
+        context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
+        context.Services.AddSingleton<ISecretsClient>(new SecretsClientStub([]));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            $"/connected-services/{resource.Name}?scopeRef={Uri.EscapeDataString(workspace.Value)}");
+
+        var rendered = context.Render<ConnectedServiceDetailsPage>(parameters => parameters
+            .Add(component => component.Name, resource.Name));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(4, rendered.FindAll(".resource-tabs button"));
+            Assert.IsEmpty(rendered.FindAll("a[href*='/edit']"));
+        });
+
+        rendered.Find("[data-testid='connected-service-definition-tab']").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(1, rendered.FindAll("[data-testid='connected-service-form']"));
+            Assert.IsEmpty(rendered.FindAll(".form-alert-danger"));
+            Assert.HasCount(3, rendered.FindComponents<ValueBindingRequirementEditor>());
+        });
+
+        rendered.Find("[data-testid='connected-service-yaml-tab']").Click();
+        rendered.WaitForAssertion(() => StringAssert.Contains(
+            rendered.Find("[data-testid='connected-service-yaml-viewer'] textarea").TextContent,
+            "apiVersion"));
     }
 
     private static ConnectedServiceTypeResource TypeCatalog() => new()
@@ -151,7 +191,8 @@ public sealed class ConnectedServiceComponentTests
             }
         }, configured ? "Configured" : "Missing", configured);
 
-    private static ConnectedServiceResource Resource(ResourceScopeRef scope) => new()
+    private static ConnectedServiceResource Resource(ResourceScopeRef scope,
+        ConnectedServiceTypeResource? type = null) => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
         Kind = ConnectedServiceResourceKinds.ConnectedService,
@@ -160,7 +201,9 @@ public sealed class ConnectedServiceComponentTests
         Definition = new()
         {
             DisplayName = "Redis",
-            Type = new() { Type = new ResourceReference("redis", ResourceScopeRef.Instance, new("azure")), TypeUid = Guid.NewGuid(), Version = "1.0.0", SchemaDigest = "sha256:contract" },
+            Type = type is null
+                ? new() { Type = new ResourceReference("redis", ResourceScopeRef.Instance, new("azure")), TypeUid = Guid.NewGuid(), Version = "1.0.0", SchemaDigest = "sha256:contract" }
+                : new() { Type = new ResourceReference(type.Name, type.ScopeRef, type.Namespace), TypeUid = type.Uid, Version = "1.0.0", SchemaDigest = "sha256:http" },
             Options = JsonSerializer.SerializeToElement(new { })
         },
         ObservedState = new() { Availability = ConnectedServiceAvailability.Ready, ObservedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) }
@@ -186,6 +229,20 @@ public sealed class ConnectedServiceComponentTests
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(workspace, workspace.Kind, "Workspace", true)]);
         public Task<ResourceSnapshot<ConnectedServiceResource>> GetConnectedServiceAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ConnectedServiceUsagesResponse> GetUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ConnectedServiceResource>> CreateConnectedServiceAsync(CreateConnectedServiceRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ConnectedServiceResource>> UpdateConnectedServiceAsync(string name, ResourceScopeRef scopeRef, PutConnectedServiceRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ConnectedServiceResource>> ReconcileAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ConnectedServiceResource>> DeactivateAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class DetailsClient(ConnectedServiceResource resource, ConnectedServiceTypeResource type,
+        ResourceScopeRef workspace) : IConnectedServicesClient
+    {
+        public Task<IReadOnlyList<ConnectedServiceTypeResource>> GetTypesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConnectedServiceTypeResource>>([type]);
+        public Task<IReadOnlyList<ConnectedServiceResource>> GetConnectedServicesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(workspace, workspace.Kind, "Workspace", true)]);
+        public Task<ResourceSnapshot<ConnectedServiceResource>> GetConnectedServiceAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => Task.FromResult(new ResourceSnapshot<ConnectedServiceResource>(resource, "\"etag\""));
+        public Task<ConnectedServiceUsagesResponse> GetUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => Task.FromResult(new ConnectedServiceUsagesResponse([], 0));
         public Task<ResourceSnapshot<ConnectedServiceResource>> CreateConnectedServiceAsync(CreateConnectedServiceRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ConnectedServiceResource>> UpdateConnectedServiceAsync(string name, ResourceScopeRef scopeRef, PutConnectedServiceRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ConnectedServiceResource>> ReconcileAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();

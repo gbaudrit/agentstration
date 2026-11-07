@@ -169,6 +169,102 @@ public sealed class ConnectedServiceApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
+    public async Task LiteralBindingsPersistResolveAndRemainUnavailableForSecuredInputs()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var tenant = await TenantScopeAsync(client);
+        SelectConsoleContext(client, tenant);
+
+        using var typeResponse = await client.PostAsJsonAsync("/api/connected-service-types",
+            new CreateConnectedServiceTypeRequest("literal-storage", TypeProperties(), tenant));
+        Assert.AreEqual(HttpStatusCode.Created, typeResponse.StatusCode);
+        var type = (await typeResponse.Content.ReadFromJsonAsync<ConnectedServiceTypeResource>())!;
+        var version = type.Definition.Versions.Single();
+        var properties = new ConnectedServiceProperties
+        {
+            DisplayName = "Literal storage",
+            Type = new ConnectedServiceTypeReference
+            {
+                Type = new ResourceReference(type.Name, tenant, type.Namespace),
+                TypeUid = type.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest
+            },
+            Options = JsonSerializer.SerializeToElement(new { region = "eu-west-1" }),
+            Bindings =
+            [
+                new ConnectedServiceValueBinding
+                {
+                    InputId = "endpoint",
+                    Kind = ConnectedServiceBindingKind.Literal,
+                    Literal = JsonSerializer.SerializeToElement("https://literal.example.test")
+                }
+            ]
+        };
+
+        using var createdResponse = await client.PostAsJsonAsync("/api/connected-services",
+            new CreateConnectedServiceRequest("literal-storage", properties, tenant));
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        var created = (await createdResponse.Content.ReadFromJsonAsync<ConnectedServiceResource>())!;
+        Assert.AreEqual("https://literal.example.test",
+            created.Definition.Bindings.Single().Literal?.GetString());
+
+        var resolver = factory.Services.GetRequiredService<IConnectedServiceResolver>();
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        using (var resolved = await resolver.ResolveAsync(
+            new ConnectedServiceReference(created.Address, tenant),
+            new ConnectedServiceResolutionContext(tenant,
+                ResourceAddress.Create(ResourceNamespace.Default, "Storage", "consumer"))))
+        {
+            Assert.IsNotNull(resolved);
+            Assert.AreEqual("https://literal.example.test", resolved.Inputs.Single().Value?.GetString());
+            Assert.IsNull(resolved.Inputs.Single().Secret);
+        }
+
+        using var wrongType = await client.PostAsJsonAsync("/api/connected-services",
+            new CreateConnectedServiceRequest("wrong-literal", properties with
+            {
+                DisplayName = "Wrong literal",
+                Bindings =
+                [
+                    new ConnectedServiceValueBinding
+                    {
+                        InputId = "endpoint",
+                        Kind = ConnectedServiceBindingKind.Literal,
+                        Literal = JsonSerializer.SerializeToElement(42)
+                    }
+                ]
+            }, tenant));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, wrongType.StatusCode);
+
+        var securedProperties = TypeProperties();
+        var securedVersion = securedProperties.Versions.Single() with
+        {
+            Inputs = [new("endpoint", true, ConnectedServiceValueType.Text,
+                ConnectedServiceValueProtection.Secured, "uri")]
+        };
+        using var securedTypeResponse = await client.PostAsJsonAsync("/api/connected-service-types",
+            new CreateConnectedServiceTypeRequest("secured-storage",
+                securedProperties with { Versions = [securedVersion] }, tenant));
+        Assert.AreEqual(HttpStatusCode.Created, securedTypeResponse.StatusCode);
+        var securedType = (await securedTypeResponse.Content.ReadFromJsonAsync<ConnectedServiceTypeResource>())!;
+        using var securedLiteral = await client.PostAsJsonAsync("/api/connected-services",
+            new CreateConnectedServiceRequest("secured-literal", properties with
+            {
+                DisplayName = "Secured literal",
+                Type = new ConnectedServiceTypeReference
+                {
+                    Type = new ResourceReference(securedType.Name, tenant, securedType.Namespace),
+                    TypeUid = securedType.Uid,
+                    Version = securedVersion.Version,
+                    SchemaDigest = securedVersion.SchemaDigest
+                }
+            }, tenant));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, securedLiteral.StatusCode);
+    }
+
+    [TestMethod]
     public async Task TypeVersionsAreImmutableAndServiceCreationRejectsWrongDigest()
     {
         await using var factory = Factory();

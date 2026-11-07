@@ -36,7 +36,7 @@ public sealed class ConnectedServiceEditorModel
             SchemaDigest = version.SchemaDigest
         },
         Options = Options.Clone(),
-        Bindings = Bindings.Where(value => value.Reference is not null).Select(value => value.ToBinding()).ToArray(),
+        Bindings = Bindings.Where(value => value.IsConfigured).Select(value => value.ToBinding()).ToArray(),
         UsePolicy = new() { Grants = UseGrants.ToArray() }
     };
 
@@ -57,9 +57,16 @@ public sealed class ConnectedServiceBindingEditorModel
     public required string InputId { get; init; }
     public required ConnectedServiceBindingKind Kind { get; set; }
     public string? Reference { get; set; }
+    public JsonElement? Literal { get; set; }
+
+    public bool IsConfigured => Kind == ConnectedServiceBindingKind.Literal
+        ? Literal is { ValueKind: not JsonValueKind.Undefined }
+        : !string.IsNullOrWhiteSpace(Reference);
 
     public ConnectedServiceValueBinding ToBinding()
     {
+        if (Kind == ConnectedServiceBindingKind.Literal)
+            return new() { InputId = InputId, Kind = Kind, Literal = Literal?.Clone() };
         var parts = (Reference ?? throw new InvalidOperationException("A binding reference is required.")).Split('|', 3);
         if (parts.Length != 3) throw new InvalidOperationException("The binding reference is invalid.");
         var scope = ResourceScopeRef.Parse(parts[0]);
@@ -73,6 +80,13 @@ public sealed class ConnectedServiceBindingEditorModel
 
     public static ConnectedServiceBindingEditorModel From(ConnectedServiceValueBinding binding)
     {
+        if (binding.Kind == ConnectedServiceBindingKind.Literal)
+            return new()
+            {
+                InputId = binding.InputId,
+                Kind = binding.Kind,
+                Literal = binding.Literal?.Clone()
+            };
         var address = binding.Parameter?.Address ?? binding.Secret?.Address
             ?? throw new InvalidOperationException("The Connected Service binding has no resource reference.");
         var scope = binding.Parameter?.ScopeRef ?? binding.Secret?.ScopeRef

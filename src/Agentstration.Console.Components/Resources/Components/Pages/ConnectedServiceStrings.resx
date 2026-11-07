@@ -30,6 +30,11 @@
   <data name="Availability.Unavailable"><value>Unavailable</value></data>
   <data name="Availability.Disabled"><value>Disabled</value></data>
   <data name="Details.Description"><value>Inspect the pinned type resource, safe configuration, exports and diagnostics.</value></data>
+  <data name="DetailsSections"><value>Connected Service sections</value></data>
+  <data name="Tab.Overview"><value>Overview</value></data>
+  <data name="Tab.Definition"><value>Definition</value></data>
+  <data name="Tab.Access"><value>Access</value></data>
+  <data name="Tab.YAML"><value>YAML</value></data>
   <data name="Reconcile"><value>Reconcile</value></data>
   <data name="Edit"><value>Edit</value></data>
   <data name="Deactivate"><value>Deactivate</value></data>
@@ -51,12 +56,14 @@
   <data name="SchemaDigest"><value>Schema digest</value></data>
   <data name="Options"><value>Non-sensitive options</value></data>
   <data name="Bindings"><value>Value bindings</value></data>
-  <data name="NoBindings"><value>No Parameter or Secret bindings are configured.</value></data>
+  <data name="NoBindings"><value>No Literal, Parameter or Secret bindings are configured.</value></data>
   <data name="Input"><value>Input</value></data>
   <data name="SourceKind"><value>Source kind</value></data>
   <data name="ExactResource"><value>Exact scoped resource</value></data>
+  <data name="ValueOrResource"><value>Value or exact resource</value></data>
   <data name="BindingKind.Parameter"><value>Parameter</value></data>
   <data name="BindingKind.Secret"><value>Secret</value></data>
+  <data name="BindingKind.Literal"><value>Literal</value></data>
   <data name="Exports"><value>Exports and capabilities</value></data>
   <data name="ContributionUnavailable"><value>The pinned type revision is no longer available. Saved evidence remains visible; reconcile only after reviewing the changed contract.</value></data>
   <data name="NoExports"><value>This type revision declares no exports.</value></data>
@@ -86,7 +93,7 @@
   <data name="Editor.Description"><value>Configure one exact service type resource and bind its inputs explicitly.</value></data>
   <data name="Cancel"><value>Cancel</value></data>
   <data name="ManualBinding"><value>Manual binding</value></data>
-  <data name="ManualBindingExplanation"><value>Select each Parameter or Secret explicitly. No extension-to-extension mapping is inferred.</value></data>
+  <data name="ManualBindingExplanation"><value>Enter a literal or select each Parameter or Secret explicitly. No extension-to-extension mapping is inferred.</value></data>
   <data name="ConnectedServiceResource"><value>Connected Service resource</value></data>
   <data name="Description"><value>Description</value></data>
   <data name="Contribution"><value>Type contract</value></data>
@@ -94,7 +101,7 @@
   <data name="NoTypes"><value>No enabled Connected Service type resource is currently available.</value></data>
   <data name="TypePinnedHelp"><value>The type resource UID, version and schema digest are pinned when the resource is created.</value></data>
   <data name="NoTypeDescription"><value>No description was supplied for this type.</value></data>
-  <data name="Bindings.Description"><value>Inputs resolve through exact scoped Parameter or Secret references. Secret values are never displayed.</value></data>
+  <data name="Bindings.Description"><value>Standard inputs accept typed literals or exact scoped Parameters. String inputs may use Secrets, whose values are never displayed.</value></data>
   <data name="NoInputs"><value>This type revision declares no external inputs.</value></data>
   <data name="Required"><value>Required</value></data>
   <data name="Optional"><value>Optional</value></data>
@@ -105,4 +112,9 @@
   <data name="Saving"><value>Saving…</value></data>
   <data name="Save"><value>Save Connected Service</value></data>
   <data name="NoDependents"><value>No dependent resource currently reports this Connected Service.</value></data>
+  <data name="RawDefinition"><value>Raw definition</value></data>
+  <data name="YAML"><value>Connected Service YAML</value></data>
+  <data name="YamlReadOnlyHelp"><value>This manifest reflects the saved resource definition. Edit it through the Definition tab.</value></data>
+  <data name="ReadOnly"><value>Read-only</value></data>
+  <data name="YamlDefinition"><value>Connected Service YAML definition</value></data>
 </root>
