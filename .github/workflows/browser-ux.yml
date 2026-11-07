@@ -136,6 +136,7 @@ jobs:
             automation/playwright/playwright-report
             automation/playwright/.work/*/*.log
           if-no-files-found: ignore
+          include-hidden-files: true
 
   # Preserve the single required check while each shard has isolated hosts/data.
   browser-ux:

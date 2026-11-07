@@ -46,16 +46,29 @@ public static class ModelProviderValueBindingValidator
             switch (binding.Kind)
             {
                 case ModelProviderValueBindingKind.Parameter:
-                    if (!ValidParameter(binding.Parameter) || binding.Secret is not null)
+                    if (!ValidParameter(binding.Parameter) || binding.Secret is not null || binding.Literal is not null)
                         issues.Add(new("value_binding_reference_invalid", $"Value requirement '{binding.RequirementId}' needs one exact scoped Parameter reference.", binding.RequirementId));
                     else if (requirement.Protection == AepValueProtection.Secured)
                         issues.Add(new("value_binding_protection_invalid", $"Secured Value requirement '{binding.RequirementId}' must bind a Secret.", binding.RequirementId));
                     break;
                 case ModelProviderValueBindingKind.Secret:
-                    if (!ValidSecret(binding.Secret) || binding.Parameter is not null)
+                    if (!ValidSecret(binding.Secret) || binding.Parameter is not null || binding.Literal is not null)
                         issues.Add(new("value_binding_reference_invalid", $"Value requirement '{binding.RequirementId}' needs one exact scoped Secret reference.", binding.RequirementId));
                     else if (requirement.AllowedValues is not null)
-                        issues.Add(new("value_binding_allowed_values_require_parameter", $"Value requirement '{binding.RequirementId}' declares allowed values and must bind a Parameter.", binding.RequirementId));
+                        issues.Add(new("value_binding_allowed_values_require_parameter", $"Value requirement '{binding.RequirementId}' declares allowed values and must bind a Parameter or a literal value.", binding.RequirementId));
+                    break;
+                case ModelProviderValueBindingKind.Literal:
+                    if (binding.Literal is not { ValueKind: not System.Text.Json.JsonValueKind.Undefined } literal
+                        || binding.Parameter is not null || binding.Secret is not null)
+                    {
+                        issues.Add(new("value_binding_literal_invalid", $"Value requirement '{binding.RequirementId}' needs one literal value.", binding.RequirementId));
+                        break;
+                    }
+                    var valueIssues = AepBoundValueValidator.Validate(
+                        [AepBoundValue.Inline(binding.RequirementId, literal)], [requirement],
+                        AepContributionKinds.ModelProvider, contributionId, requireAll: false);
+                    foreach (var issue in valueIssues)
+                        issues.Add(new(issue.Code, $"Value requirement '{binding.RequirementId}' failed validation ({issue.Code}).", binding.RequirementId));
                     break;
                 default:
                     issues.Add(new("value_binding_kind_invalid", $"Value requirement '{binding.RequirementId}' has an unsupported binding kind.", binding.RequirementId));

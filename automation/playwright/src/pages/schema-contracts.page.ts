@@ -316,6 +316,7 @@ export class SchemaContractsPage {
       await this.page.mouse.down();
       await this.page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height / 2, { steps: 10 });
       await this.page.mouse.up();
+      await expect(this.page.getByTestId(TestIds.schemaContracts.connectionDialog)).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
   }
 

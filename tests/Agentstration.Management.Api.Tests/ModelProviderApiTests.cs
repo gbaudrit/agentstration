@@ -466,8 +466,19 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         Assert.AreEqual(reference, saved?.Definition.ValueBindings.Single().Parameter);
         Assert.AreEqual("endpoint=Parameter:[REDACTED]", saved?.Definition.ValueBindings.Single().ToString());
 
+        using var literalCreated = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
+            "literal-provider", Properties("Literal provider", [ModelProviderValueBinding.FromLiteral("endpoint", JsonSerializer.SerializeToElement("https://backup.test"))]), ScopeRef: instance));
+        Assert.AreEqual(HttpStatusCode.Created, literalCreated.StatusCode);
+        using var literalRead = await client.GetAsync("/api/modelproviders/literal-provider");
+        Assert.AreEqual(HttpStatusCode.OK, literalRead.StatusCode);
+        var literalSaved = await literalRead.Content.ReadFromJsonAsync<ModelProviderResource>();
+        Assert.AreEqual("https://backup.test", literalSaved?.Definition.ValueBindings.Single().Literal?.GetString());
+
         var invalidCases = new[]
         {
+            Properties("Literal protection", [ModelProviderValueBinding.FromLiteral("endpoint", JsonSerializer.SerializeToElement("https://provider.test")), ModelProviderValueBinding.FromLiteral("credential", JsonSerializer.SerializeToElement("must-not-leak"))]),
+            Properties("Literal type", [ModelProviderValueBinding.FromLiteral("endpoint", JsonSerializer.SerializeToElement(7))]),
+            Properties("Literal value", [ModelProviderValueBinding.FromLiteral("endpoint", JsonSerializer.SerializeToElement("https://other.test"))]),
             Properties("Unknown", [ModelProviderValueBinding.FromParameter("unknown", reference)]),
             Properties("Duplicate", [
                 ModelProviderValueBinding.FromParameter("endpoint", reference),
@@ -488,6 +499,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                 $"invalid-binding-{index}", invalidCases[index], ScopeRef: instance));
             Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
             Assert.IsFalse((await invalid.Content.ReadAsStringAsync()).Contains("https://other.test", StringComparison.Ordinal));
+            Assert.IsFalse((await invalid.Content.ReadAsStringAsync()).Contains("must-not-leak", StringComparison.Ordinal));
         }
 
         using var delete = new HttpRequestMessage(HttpMethod.Delete,
