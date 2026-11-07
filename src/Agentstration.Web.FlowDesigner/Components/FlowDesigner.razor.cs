@@ -30,6 +30,7 @@ public partial class FlowDesigner
     private IReadOnlyList<FlowDesignerFlow> flows = [];
     private IReadOnlyList<FlowDesignerFlowVersion> flowVersions = [];
     private IReadOnlyList<FlowDesignerTool> tools = [];
+    private bool loadingResources = true;
     private IReadOnlyList<FlowDesignerSchemaVersion> schemaVersions = [];
     private string? loadedResource;
     private string sourceText = string.Empty;
@@ -146,6 +147,7 @@ public partial class FlowDesigner
         var targetKey = $"{ScopeRef?.Value}/{Namespace.Value}/{ResourceId}";
         if (loadedResource == targetKey) return;
         loadedResource = targetKey;
+        loadingResources = true;
         Editor.StateChanged += EditorChanged;
         try
         {
@@ -166,6 +168,10 @@ public partial class FlowDesigner
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             error = exception.Message;
+        }
+        finally
+        {
+            loadingResources = false;
         }
     }
 

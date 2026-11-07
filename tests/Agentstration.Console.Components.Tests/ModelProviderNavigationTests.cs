@@ -307,23 +307,34 @@ public sealed partial class ModelProviderNavigationTests
             Extension: new ExtensionIdentityResponse("typed.extension", "Typed extension", "1.0.0", null),
             Contributions: [new ExtensionContributionResponse("model-provider", "typed")],
             OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual",
-            ValueRequirements: [new("model-provider", "typed", "projectEndpoint", true, "string", "standard", "Project endpoint", "uri")]);
+            ValueRequirements: [new("model-provider", "typed", "projectEndpoint", true, "string", "standard", "Project endpoint", "uri"),
+                new("model-provider", "typed", "inferenceEndpoint", true, "string", "standard", "Inference endpoint", "uri")]);
         using var context = CreateContext(out _, [extension]);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(
             "/modelproviders/new?extension=typed-extension&extensionNamespace=default&contributionId=typed");
         var rendered = context.Render<ModelProviderDetails>();
         rendered.WaitForElement("[data-testid='model-provider-name']").Change("foundry");
-        rendered.WaitForElement("[data-testid='model-provider-binding-create']:not([disabled])").Click();
+        rendered.WaitForElement("[data-requirement-id='projectEndpoint'] [data-testid='model-provider-binding-create']:not([disabled])").Click();
         rendered.WaitForElement("[data-testid='contextual-parameter-value']").Change("https://example.test/projects/demo");
         rendered.Find("[data-testid='contextual-parameter-create']").Click();
 
         rendered.WaitForAssertion(() =>
         {
-            var target = rendered.Find("[data-testid='model-provider-binding-target']");
+            var target = rendered.Find("[data-requirement-id='projectEndpoint'] [data-testid='model-provider-binding-target']");
             Assert.AreEqual($"{WorkspaceScope.Value}|default|mp-foundry-projectendpoint", ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
             Assert.AreEqual($"{WorkspaceScope.Value}|default|mp-foundry-projectendpoint", target.QuerySelector("option[selected]")?.GetAttribute("value"));
             StringAssert.Contains(target.TextContent, "projectEndpoint");
             Assert.IsFalse(rendered.Markup.Contains("contextual-parameter-creator", StringComparison.Ordinal));
+        });
+
+        rendered.Find("[data-requirement-id='inferenceEndpoint'] [data-testid='model-provider-binding-create']").Click();
+        rendered.WaitForElement("[data-testid='contextual-parameter-value']").Change("https://example.test/openai/v1");
+        rendered.Find("[data-testid='contextual-parameter-create']").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            var target = rendered.Find("[data-requirement-id='inferenceEndpoint'] [data-testid='model-provider-binding-target']");
+            Assert.AreEqual($"{WorkspaceScope.Value}|default|mp-foundry-inferenceendpoint", ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
+            Assert.HasCount(0, rendered.FindAll("[data-testid='contextual-parameter-creator']"));
         });
     }
 
@@ -694,8 +705,9 @@ public sealed partial class ModelProviderNavigationTests
         public Task<IReadOnlyList<ParameterResource>> GetParametersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ParameterResource>>(resources.ToArray());
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ParameterResource>> GetParameterAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ParameterResource>> CreateParameterAsync(CreateParameterRequest request, CancellationToken cancellationToken)
+        public async Task<ResourceSnapshot<ParameterResource>> CreateParameterAsync(CreateParameterRequest request, CancellationToken cancellationToken)
         {
+            await Task.Yield();
             var resource = new ParameterResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -705,7 +717,7 @@ public sealed partial class ModelProviderNavigationTests
                 Definition = request.Properties
             };
             resources.Add(resource);
-            return Task.FromResult(new ResourceSnapshot<ParameterResource>(resource, "\"parameter-etag\""));
+            return new ResourceSnapshot<ParameterResource>(resource, "\"parameter-etag\"");
         }
         public Task<ResourceSnapshot<ParameterResource>> UpdateParameterAsync(string name, ResourceScopeRef scopeRef, PutParameterRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteParameterAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
