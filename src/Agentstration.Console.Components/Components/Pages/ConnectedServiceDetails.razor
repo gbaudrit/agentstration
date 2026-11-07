@@ -13,7 +13,6 @@ else if (error is not null) { <ErrorState Message="@error.Message"><button class
 else if (resource is not null)
 {
     <InheritedResourceNotice OwnerScopeRef="@(resource.ScopeRef ?? ResourceScopeRef.Instance)" />
-    <div class="form-alert form-alert-info"><strong>@T("SavedConfiguration")</strong><span>@T("AvailabilityExplanation")</span></div>
     <ResourceTabs Label="@T("DetailsSections")">
         @foreach (var tab in AvailableTabs)
         {

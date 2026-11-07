@@ -37,7 +37,10 @@ public sealed class ConnectedServiceComponentTests
             var row = rendered.Find("[data-testid='connected-service-row']");
             StringAssert.Contains(row.TextContent, "Redis");
             StringAssert.Contains(row.TextContent, "Ready");
-            StringAssert.Contains(row.InnerHtml, $"scopeRef={Uri.EscapeDataString(scope.Value)}");
+            var nameLink = rendered.Find("[data-testid='connected-service-name-link']");
+            Assert.AreEqual("resource-name-link", nameLink.ClassName);
+            StringAssert.Contains(nameLink.GetAttribute("href")!, $"scopeRef={Uri.EscapeDataString(scope.Value)}");
+            Assert.DoesNotContain("Inspect", row.TextContent, StringComparison.OrdinalIgnoreCase);
         });
     }
 
@@ -115,6 +118,8 @@ public sealed class ConnectedServiceComponentTests
         {
             Assert.HasCount(4, rendered.FindAll(".resource-tabs button"));
             Assert.IsEmpty(rendered.FindAll("a[href*='/edit']"));
+            Assert.DoesNotContain("Saved configuration and observed availability", rendered.Markup,
+                StringComparison.Ordinal);
         });
 
         rendered.Find("[data-testid='connected-service-definition-tab']").Click();

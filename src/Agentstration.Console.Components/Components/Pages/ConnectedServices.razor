@@ -19,8 +19,8 @@ else if (Filtered.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("Emp
 else
 {
     <DataGrid TItem="ConnectedServiceResource" Items="Filtered">
-        <Header><tr><th>@T("Name")</th><th>@T("Type")</th><th>@T("Status")</th><th>@T("Scope")</th><th></th></tr></Header>
-        <Row Context="item"><tr data-testid="connected-service-row"><td><strong>@item.Definition.DisplayName</strong><br /><code>@item.Name</code></td><td><strong>@item.Definition.Type.Type.Name</strong><br /><small>@item.Definition.Type.Version</small></td><td><StatusBadge Text="@StatusLabel(Availability(item))" Status="@StatusColor(Availability(item))" /></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /></td><td><a class="text-button" href="@DetailsUrl(item)">@T("InspectArrow")</a></td></tr></Row>
+        <Header><tr><th>@T("Name")</th><th>@T("Type")</th><th>@T("Status")</th><th>@T("Scope")</th></tr></Header>
+        <Row Context="item"><tr data-testid="connected-service-row"><td><strong><a class="resource-name-link" href="@DetailsUrl(item)" data-testid="connected-service-name-link">@item.Definition.DisplayName</a></strong><br /><code>@item.Name</code></td><td><strong>@item.Definition.Type.Type.Name</strong><br /><small>@item.Definition.Type.Version</small></td><td><StatusBadge Text="@StatusLabel(Availability(item))" Status="@StatusColor(Availability(item))" /></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /></td></tr></Row>
     </DataGrid>
 }
 

@@ -24,7 +24,6 @@
   <data name="Type"><value>Type</value></data>
   <data name="Status"><value>État</value></data>
   <data name="Scope"><value>Portée</value></data>
-  <data name="InspectArrow"><value>Inspecter →</value></data>
   <data name="Availability.Ready"><value>Prêt</value></data>
   <data name="Availability.Stale"><value>Obsolète</value></data>
   <data name="Availability.Unavailable"><value>Indisponible</value></data>
@@ -39,8 +38,6 @@
   <data name="Edit"><value>Modifier</value></data>
   <data name="Deactivate"><value>Désactiver</value></data>
   <data name="Back"><value>Retour</value></data>
-  <data name="SavedConfiguration"><value>Configuration enregistrée et disponibilité observée</value></data>
-  <data name="AvailabilityExplanation"><value>Prêt signifie que la ressource de type épinglée peut actuellement être résolue. Cela ne prouve pas la connectivité du service distant.</value></data>
   <data name="Availability"><value>Disponibilité</value></data>
   <data name="Enabled"><value>Activé</value></data>
   <data name="Yes"><value>Oui</value></data>

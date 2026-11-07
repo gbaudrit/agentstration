@@ -24,7 +24,6 @@
   <data name="Type"><value>Type</value></data>
   <data name="Status"><value>Status</value></data>
   <data name="Scope"><value>Scope</value></data>
-  <data name="InspectArrow"><value>Inspect →</value></data>
   <data name="Availability.Ready"><value>Ready</value></data>
   <data name="Availability.Stale"><value>Stale</value></data>
   <data name="Availability.Unavailable"><value>Unavailable</value></data>
@@ -39,8 +38,6 @@
   <data name="Edit"><value>Edit</value></data>
   <data name="Deactivate"><value>Deactivate</value></data>
   <data name="Back"><value>Back</value></data>
-  <data name="SavedConfiguration"><value>Saved configuration and observed availability</value></data>
-  <data name="AvailabilityExplanation"><value>Ready means the pinned type resource can currently be resolved. It does not prove remote service connectivity.</value></data>
   <data name="Availability"><value>Availability</value></data>
   <data name="Enabled"><value>Enabled</value></data>
   <data name="Yes"><value>Yes</value></data>
