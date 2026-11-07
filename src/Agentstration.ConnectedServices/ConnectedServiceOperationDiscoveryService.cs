@@ -59,6 +59,36 @@ public sealed class ConnectedServiceOperationDiscoveryService(
     public const int MaximumIdempotencyKeyLength = 200;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    public async Task<(ConnectedServiceOperationDiscoveryResource Discovery, ConnectedServiceResource Service,
+        ConnectedServiceTypeResource Type, ConnectedServiceTypeVersionDescriptor Version)> GetExecutionAsync(
+        ResourceNamespace @namespace, string id, string runId, CancellationToken cancellationToken)
+    {
+        var context = RequireContext();
+        var stored = await store.GetExactAsync<ConnectedServiceOperationDiscoveryResource>(new(
+            ResourceScopeRef.Workspace(context.WorkspaceId), @namespace,
+            ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, id), cancellationToken)
+            ?? throw Error("connected_service_discovery_not_found", "The discovery was not found.");
+        var discovery = stored.Value;
+        if (discovery.FlowRunId != runId || discovery.CreatedBy != context.PrincipalId
+            || discovery.TenantId != context.TenantId || IsTerminal(discovery.State))
+            throw Error("connected_service_discovery_execution_denied", "The discovery execution context does not match.");
+        var reference = discovery.Service;
+        var service = await services.GetExactAsync(reference.Service.ScopeRef, reference.Service.Address.Namespace,
+            reference.Service.Address.Name, cancellationToken)
+            ?? throw Error("connected_service_unavailable", "The Connected Service is unavailable.");
+        if (service.Value.Uid != reference.ServiceUid || service.Value.Generation != reference.Generation
+            || service.Value.Namespace != reference.Service.Address.Namespace)
+            throw Error("connected_service_revision_changed", "The Connected Service revision changed.");
+        EnsureDiscoverable(service.Value);
+        var (type, version) = await ResolveServiceTypeAsync(service.Value, cancellationToken);
+        if (service.Value.Definition.Type != discovery.ServiceType
+            || version.OperationDiscovery?.Flow != discovery.Flow)
+            throw Error("connected_service_discovery_revision_changed", "The discovery dependencies changed.");
+        await ValidateDependenciesAsync(version.OperationDiscovery, service.Value.Namespace,
+            reference.Service.ScopeRef, cancellationToken);
+        return (discovery, service.Value, type, version);
+    }
+
     public async Task<StoredResource<ConnectedServiceOperationDiscoveryResource>> StartAsync(
         ResourceScopeRef serviceScope,
         string serviceName,

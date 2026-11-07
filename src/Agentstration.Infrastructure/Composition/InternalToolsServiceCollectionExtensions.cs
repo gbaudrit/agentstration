@@ -1,4 +1,5 @@
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
@@ -23,6 +24,8 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<AssistantDocumentationMcpTool>(services);
         AddInternalTool<AssistantDiagnosticsMcpTool>(services);
         AddInternalTool<DateTimeMcpTool>(services);
+        AddInternalTool<ConnectedServiceDiscoveryMcpTool>(services);
+        services.AddSingleton<ConnectedServiceDiscoveryExecutor>();
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);

@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" Aliases="openapi" />
     <ProjectReference Include="../../src/Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
     <ProjectReference Include="../../src/Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />
     <Compile Include="../TestHostMetrics.cs" Link="TestHostMetrics.cs" />

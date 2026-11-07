@@ -42,6 +42,11 @@ profiles. The profile target supplies the scope when the document omits one.
 
 ## Operation types and discovery
 
+The optional [OpenAPI extension](openapi-extension.md#connected-service-operation-discovery)
+provides an executable provider of this lifecycle, with its own independent types
+and a reference-only discovery Flow. ADR-0199 documents its protected AEP
+connection execution and the explicit transition from legacy Data Source discovery.
+
 `ConnectedServiceOperationType` is a governed resource with immutable additive
 versions. A version defines the JSON schema of one protocol-specific operation,
 its interaction shape and an invocation contract. This keeps an OpenAPI operation,
