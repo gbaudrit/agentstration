@@ -21,12 +21,21 @@
         </label>
         @if (selection.Kind == ValueBindingSourceKind.Literal && Sources.Contains(selection.Kind))
         {
+            @if (Requirement.LiteralSchema is { } schema)
+            {
+                <div data-testid="@(TestIdPrefix + "-binding-literal")">
+                    <JsonSchemaInputEditor Schema="schema" Value="@(selection.Literal ?? default)" AllowAnyRoot="true" Required="Requirement.Required"
+                        ValueChanged="SchemaLiteralChangedAsync" ValidationChanged="SchemaValidationChanged" Disabled="Disabled" />
+                </div>
+            }
+            else
+            {
             <label><span>@T("Binding.LiteralValue")</span>
                 @if (Requirement.AllowedValues is { Count: > 0 } allowedValues)
                 {
-                    <select value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")">
-                        <option value="">@T("Binding.SelectValue")</option>
-                        @foreach (var value in allowedValues) { <option value="@DisplayValue(value)">@DisplayValue(value)</option> }
+                    <select @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")">
+                        <option value="" selected="@(selection.Literal is null)" disabled>@T("Binding.SelectValue")</option>
+                        @foreach (var value in allowedValues) { <option value="@DisplayValue(value)" selected="@(selection.Literal is { } current && JsonElement.DeepEquals(current, value))">@(value.ValueKind == JsonValueKind.String && value.GetString() == string.Empty ? value.GetRawText() : DisplayValue(value))</option> }
                     </select>
                 }
                 else if (Requirement.ValueType == "boolean")
@@ -40,6 +49,8 @@
                     <input value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" />
                 }
             </label>
+            <button type="button" class="button-secondary" disabled="@(Disabled || selection.Literal is null && !invalidLiteral)" @onclick="ClearLiteralAsync" data-testid="@(TestIdPrefix + "-binding-literal-clear")">@T("Binding.ClearLiteral")</button>
+            }
         }
         else if (selection.Kind is ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)
         {
@@ -124,7 +135,7 @@ else
             invalidLiteral = false;
             CloseCreator();
         }
-        if (selection.Kind == ValueBindingSourceKind.Literal && selection.Literal is { } literal)
+        if (selection.Kind == ValueBindingSourceKind.Literal && selection.Literal is { ValueKind: not JsonValueKind.Undefined } literal && Requirement.LiteralSchema is null)
             invalidLiteral = !MatchesType(literal)
                 || Requirement.AllowedValues is { } allowed && !allowed.Any(candidate => JsonElement.DeepEquals(candidate, literal));
         if (attachedContext != EditContext)
@@ -159,7 +170,8 @@ else
         literalText = args.Value?.ToString() ?? string.Empty;
         JsonElement? value = null;
         invalidLiteral = false;
-        if (literalText.Length > 0)
+        if (literalText.Length > 0 || Requirement.ValueType == "string" &&
+            (Requirement.AllowedValues is null || Requirement.AllowedValues.Any(value => value.ValueKind == JsonValueKind.String && value.GetString() == string.Empty)))
         {
             try
             {
@@ -169,6 +181,28 @@ else
             catch (JsonException) { invalidLiteral = true; }
         }
         await SelectAsync(new(ValueBindingSourceKind.Literal, Literal: invalidLiteral ? null : value));
+    }
+
+    private async Task ClearLiteralAsync()
+    {
+        if (Disabled || selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind)) return;
+        literalText = string.Empty; invalidLiteral = false;
+        await SelectAsync(new(ValueBindingSourceKind.Literal));
+    }
+
+    private Task SchemaLiteralChangedAsync(JsonElement value)
+    {
+        if (Disabled || selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind) || Requirement.LiteralSchema is null)
+            return Task.CompletedTask;
+        return SelectAsync(new(ValueBindingSourceKind.Literal, Literal: value.ValueKind == JsonValueKind.Undefined ? null : value.Clone()));
+    }
+
+    private void SchemaValidationChanged(JsonSchemaInputValidationState state)
+    {
+        if (selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind) || Requirement.LiteralSchema is null) return;
+        invalidLiteral = !state.IsValid && (selection.IsConfigured || state.Issues.Any(issue => issue.Code == "InvalidJson"))
+            || selection.IsConfigured && selection.Literal is { } value && Requirement.AllowedValues is { } allowed && !allowed.Any(candidate => JsonElement.DeepEquals(candidate, value));
+        UpdateValidation();
     }
 
     private bool MatchesType(JsonElement value) => Requirement.ValueType switch
@@ -214,7 +248,7 @@ else
 
     private void CloseCreator() { creating = false; creatorContext = null; }
     private static string TargetValue(ScopedResourceAddress? address) => address is { } value ? $"{value.ScopeRef.Value}|{value.Namespace.Value}|{value.Name}" : string.Empty;
-    private static string DisplayValue(JsonElement value) => value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
+    private static string DisplayValue(JsonElement value) => value.ValueKind == JsonValueKind.Undefined ? string.Empty : value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
     private void Validate(object? sender, ValidationRequestedEventArgs args) => UpdateValidation(force: true);
     private void UpdateValidation(bool force = false)
     {
