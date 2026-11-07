@@ -21,7 +21,7 @@ namespace Agentstration.Web.Tests;
 
 [TestClass]
 [DoNotParallelize]
-public sealed class ModelProviderNavigationTests
+public sealed partial class ModelProviderNavigationTests
 {
     private static readonly ResourceNamespace ProviderNamespace = new("shared.models");
     private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Guid.Parse("b07e7249-b525-4c32-a7bb-5e805fc768e7"));
@@ -581,6 +581,7 @@ public sealed class ModelProviderNavigationTests
         public int RefreshCalls { get; private set; }
         public string? RefreshedProvider { get; private set; }
         public bool FailRefresh { get; set; }
+        public CreateModelProviderRequest? CreatedRequest { get; private set; }
         private TaskCompletionSource<ModelProviderUsagesResponse>? usagesCompletion;
 
         public void DelayUsages() =>
@@ -635,8 +636,10 @@ public sealed class ModelProviderNavigationTests
         public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) =>
             Task.FromResult(new ModelProviderStatusResponse(providerName, "available", DateTimeOffset.UnixEpoch, null));
 
-        public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(new ResourceSnapshot<ModelProviderResource>(new ModelProviderResource
+        public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken)
+        {
+            CreatedRequest = request;
+            return Task.FromResult(new ResourceSnapshot<ModelProviderResource>(new ModelProviderResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = ModelResourceKinds.ModelProvider,
@@ -644,6 +647,7 @@ public sealed class ModelProviderNavigationTests
                 ScopeRef = request.ScopeRef,
                 Definition = request.Properties
             }, "\"provider-created\""));
+        }
         public Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken)
         {
             RefreshCalls++;

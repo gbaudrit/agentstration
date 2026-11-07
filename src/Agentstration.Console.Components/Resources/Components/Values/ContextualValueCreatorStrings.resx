@@ -10,4 +10,27 @@
   <data name="NoEligibleVault"><value>No Vault can be used from this scope. Create or grant a Vault first.</value></data><data name="Secret.WriteOnly"><value>The value is sent directly to the Vault and is never read back by the Console.</value></data><data name="Secret.ValueWriteFailed"><value>Secret '{0}' was created, but its value could not be stored. Open the Secret page to complete its configuration.</value></data>
   <data name="Cancel"><value>Cancel</value></data><data name="Creating"><value>Creating…</value></data><data name="CreateAndUse"><value>Create and use</value></data>
   <data name="DefaultNamespaceOnly"><value>Parameters and Secrets currently use the default namespace.</value></data>
+  <data name="Binding.Required"><value>Required</value></data>
+  <data name="Binding.Optional"><value>Optional</value></data>
+  <data name="Binding.Protection.Standard"><value>Standard</value></data>
+  <data name="Binding.Protection.Secured"><value>Secured</value></data>
+  <data name="Binding.ExpectedType"><value>Expected type</value></data>
+  <data name="Binding.ExpectedFormat"><value>Format</value></data>
+  <data name="Binding.ValueSource"><value>Value source</value></data>
+  <data name="Binding.Source.Parameter"><value>Parameter</value></data>
+  <data name="Binding.Source.Secret"><value>Secret</value></data>
+  <data name="Binding.Source.Literal"><value>Literal</value></data>
+  <data name="Binding.ExactResource"><value>Exact scoped resource</value></data>
+  <data name="Binding.SelectResource"><value>Select a resource</value></data>
+  <data name="Binding.CreateParameter"><value>Create a Parameter</value></data>
+  <data name="Binding.CreateSecret"><value>Create a Secret</value></data>
+  <data name="Binding.UnavailableSelection"><value>Unavailable — {0}/{1}/{2}</value></data>
+  <data name="Binding.RequiredMissing"><value>This required value needs a binding before saving.</value></data>
+  <data name="Binding.SecretValueHidden"><value>The Secret value remains write-only and is never loaded into the Console.</value></data>
+  <data name="Binding.SourceUnavailable"><value>This source is not allowed for this requirement.</value></data>
+  <data name="Binding.LiteralValue"><value>Literal value</value></data>
+  <data name="Binding.SelectValue"><value>Select a value</value></data>
+  <data name="Binding.True"><value>True</value></data>
+  <data name="Binding.False"><value>False</value></data>
+  <data name="Binding.LiteralInvalid"><value>Enter a valid value of the expected type from the allowed values, when specified.</value></data>
 </root>

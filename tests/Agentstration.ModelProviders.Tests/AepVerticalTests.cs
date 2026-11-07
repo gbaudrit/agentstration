@@ -474,6 +474,32 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task ProviderLiteralsReachDiscoveryChatAndStreamingWithoutAParameterResolver()
+    {
+        await using var factory = new AepExtensionFactory(requireParameter: true);
+        using var http = factory.CreateClient();
+        var adapter = new AepModelProvider(new FixedHttpClientFactory(http));
+        var first = BoundProvider("first", ResourceScopeRef.Instance, "unused", http.BaseAddress!) with
+        {
+            ValueBindings = [ModelProviderValueBinding.FromLiteral("endpoint", JsonSerializer.SerializeToElement("https://first.test"))]
+        };
+        var second = first with
+        {
+            Name = "second",
+            ScopeRef = ResourceScopeRef.Tenant(Guid.NewGuid()),
+            ValueBindings = [ModelProviderValueBinding.FromLiteral("endpoint", JsonSerializer.SerializeToElement("https://second.test"))]
+        };
+        await Task.WhenAll(adapter.ListModelsAsync(first).AsTask(), adapter.ListModelsAsync(second).AsTask());
+        using var chat = adapter.CreateChatClient(first, Deployment(first));
+        await chat.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")]);
+        await foreach (var _ in chat.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "ping")])) { }
+
+        Assert.AreEqual(3, factory.Provider.ObservedBoundValueSets.Count(values => values.Single() == "https://first.test"));
+        Assert.AreEqual(1, factory.Provider.ObservedBoundValueSets.Count(values => values.Single() == "https://second.test"));
+        Assert.AreEqual(AepBoundValueKind.Inline, factory.Provider.LastBoundValues!.Single().Kind);
+    }
+
+    [TestMethod]
     public async Task ProviderRejectsAParameterChangedToADisallowedValueBeforeInvocation()
     {
         var allowed = JsonSerializer.SerializeToElement("ApiKey");

@@ -49,17 +49,11 @@ else
                     @foreach (var requirement in Requirements)
                     {
                         var binding = Binding(requirement);
-                        var secured = IsSecured(requirement);
-                        <div class="panel binding-requirement" data-testid="model-provider-value-requirement" data-requirement-id="@requirement.Id">
-                            <div class="panel-header"><div><strong>@requirement.Id</strong>@if (!string.IsNullOrWhiteSpace(requirement.Description)) { <p>@requirement.Description</p> }</div><div><StatusBadge Text="@(requirement.Required ? T("Required") : T("Optional"))" Status="@(requirement.Required ? UiStatus.Info : UiStatus.Neutral)" /><StatusBadge Text="@(secured ? T("Protection.Secured") : T("Protection.Standard"))" Status="@(secured ? UiStatus.Warning : UiStatus.Neutral)" /></div></div>
-                            <p><span>@T("ExpectedType"):</span> <code>@requirement.ValueType</code>@if (!string.IsNullOrWhiteSpace(requirement.Format)) { <span> · @T("ExpectedFormat"): <code>@requirement.Format</code></span> }</p>
-                            <div class="form-grid">
-                                <label><span>@T("ValueSource")</span><select value="@binding.Kind" @onchange="args => SourceChanged(binding, args)" data-testid="model-provider-binding-kind"><option value="@ModelProviderValueBindingKind.Parameter" disabled="@secured">@T("Source.Parameter")</option><option value="@ModelProviderValueBindingKind.Secret">@T("Source.Secret")</option></select></label>
-                                <div class="contextual-binding-target"><label><span>@T("ExactResource")</span><select @key="TargetValue(binding)" @onchange="args => TargetChanged(binding, args)" data-testid="model-provider-binding-target"><option value="" selected="@(!binding.IsConfigured)">@T("SelectValueSource")</option>@if (!BindingAvailable(binding) && binding.IsConfigured) { <option value="@TargetValue(binding)" selected disabled>@T("UnavailableSelection", binding.ScopeRef, binding.Namespace, binding.Name)</option> }@if (binding.Kind == ModelProviderValueBindingKind.Parameter) { @foreach (var item in AvailableParameters) { <option value="@TargetValue(item)" selected="@(TargetValue(item) == TargetValue(binding))">@item.Definition.DisplayName — @item.ScopeRef/@item.Namespace/@item.Name</option> } } else { @foreach (var item in AvailableSecrets) { <option value="@TargetValue(item.Resource)" selected="@(TargetValue(item.Resource) == TargetValue(binding))">@item.Resource.Definition.DisplayName — @item.Resource.ScopeRef/@item.Resource.Namespace/@item.Resource.Name</option> } }</select></label><button type="button" class="button-secondary" disabled="@(selectedScope is null)" @onclick="() => OpenValueCreator(requirement, binding)" data-testid="model-provider-binding-create">@(binding.Kind == ModelProviderValueBindingKind.Parameter ? T("CreateParameter") : T("CreateSecret"))</button></div>
-                            </div>
-                            @if (requirement.Required && !binding.IsConfigured) { <p class="inline-warning">@T("RequiredBindingMissing")</p> }
-                            @if (binding.Kind == ModelProviderValueBindingKind.Secret) { <p class="inline-info">@T("SecretValueHidden")</p> }
-                        </div>
+                        <ValueBindingRequirementEditor @key="binding" Requirement="@RequirementModel(requirement)"
+                            AllowedSources="@BindingSources(requirement)" Options="@BindingOptions(requirement)"
+                            Selection="@BindingSelection(binding)" SelectionChanged="value => BindingChanged(binding, value)"
+                            CreationContext="@CreationContext(requirement)" ResourceCreated="ValueCreatedAsync"
+                            Disabled="@(!CanManage)" TestIdPrefix="model-provider" DialogSectionId="@binding" />
                     }
                 </div>
             </section>
@@ -94,8 +88,10 @@ else
 }
 
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-provider-delete-dialog" />
-<ContextualParameterCreator IsOpen="@(creationBinding?.Kind == ModelProviderValueBindingKind.Parameter)" Context="creationContext" OnCreated="ValueCreatedAsync" OnCancel="CloseValueCreator" />
-<ContextualSecretCreator IsOpen="@(creationBinding?.Kind == ModelProviderValueBindingKind.Secret)" Context="creationContext" OnCreated="ValueCreatedAsync" OnCancel="CloseValueCreator" />
+@if (model is not null)
+{
+    @foreach (var binding in model.ValueBindings) { <Microsoft.AspNetCore.Components.Sections.SectionOutlet SectionId="@binding" /> }
+}
 
 @code {
     [Parameter] public string? Name { get; set; }
@@ -112,8 +108,6 @@ else
     private ModelProviderEditorModel? model; private ModelProviderResource? resource; private IReadOnlyList<ModelProviderUsageResponse> usages = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ParameterResource> parameters = []; private IReadOnlyList<SecretResponse> secrets = [];
     private ModelProviderStatusResponse? status; private ModelDiscoveryDiffResponse? discoveryResult; private AgentstrationApiException? error; private string? modelsError; private string? etag; private bool saving; private bool testing; private bool refreshing; private bool confirmDelete;
-    private ModelProviderValueBindingEditorModel? creationBinding;
-    private ContextualValueCreationContext? creationContext;
     private ResourceScopeRef? selectedScope;
     private bool hydrated;
     private bool loading;
@@ -225,10 +219,11 @@ else
         model.ValueBindings = Requirements.Select(requirement =>
         {
             var binding = existing.GetValueOrDefault(requirement.Id) ?? new ModelProviderValueBindingEditorModel { RequirementId = requirement.Id };
-            if (IsSecured(requirement) && binding.Kind == ModelProviderValueBindingKind.Parameter)
+            if (IsSecured(requirement) && binding.Kind != ModelProviderValueBindingKind.Secret)
             {
                 binding.Kind = ModelProviderValueBindingKind.Secret;
                 binding.Name = binding.Namespace = binding.ScopeRef = string.Empty;
+                binding.Literal = null;
             }
             return binding;
         }).ToList();
@@ -237,54 +232,52 @@ else
         model!.ValueBindings.Single(value => value.RequirementId == requirement.Id);
     private static bool IsSecured(ExtensionValueRequirementResponse requirement) =>
         requirement.Protection.Equals("secured", StringComparison.OrdinalIgnoreCase);
-    private void SourceChanged(ModelProviderValueBindingEditorModel binding, ChangeEventArgs args)
+    private static ValueBindingRequirement RequirementModel(ExtensionValueRequirementResponse requirement) =>
+        new(requirement.Id, requirement.Required, requirement.ValueType, IsSecured(requirement), requirement.Description, requirement.Format, requirement.AllowedValues);
+    private static IReadOnlyList<ValueBindingSourceKind> BindingSources(ExtensionValueRequirementResponse requirement) =>
+        IsSecured(requirement) ? [ValueBindingSourceKind.Secret]
+        : requirement.AllowedValues is not null ? [ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Literal]
+        : [ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret, ValueBindingSourceKind.Literal];
+    private IReadOnlyList<ValueBindingOption> BindingOptions(ExtensionValueRequirementResponse requirement) =>
+        AvailableParameters.Where(value => Compatible(value, requirement))
+            .Select(value => new ValueBindingOption(ValueBindingSourceKind.Parameter,
+                ScopedResourceAddress.Create(value.ScopeRef!.Value, value.Namespace, value.Kind, value.Name), value.Definition.DisplayName))
+            .Concat(AvailableSecrets.Select(value => new ValueBindingOption(ValueBindingSourceKind.Secret,
+                ScopedResourceAddress.Create(value.Resource.ScopeRef!.Value, value.Resource.Namespace, value.Resource.Kind, value.Resource.Name), value.Resource.Definition.DisplayName)))
+            .ToArray();
+    private static bool Compatible(ParameterResource parameter, ExtensionValueRequirementResponse requirement) =>
+        !IsSecured(requirement) && ParameterType(requirement.ValueType) == parameter.Definition.ValueType
+        && (requirement.AllowedValues is null || requirement.AllowedValues.Any(value => JsonElement.DeepEquals(value, parameter.Definition.Value)));
+    private static ValueBindingSelection BindingSelection(ModelProviderValueBindingEditorModel binding) => new(
+        binding.Kind switch { ModelProviderValueBindingKind.Parameter => ValueBindingSourceKind.Parameter, ModelProviderValueBindingKind.Secret => ValueBindingSourceKind.Secret, _ => ValueBindingSourceKind.Literal },
+        binding.IsConfigured && binding.Kind != ModelProviderValueBindingKind.Literal
+            ? ScopedResourceAddress.Create(ResourceScopeRef.Parse(binding.ScopeRef), ResourceNamespace.Parse(binding.Namespace),
+                binding.Kind == ModelProviderValueBindingKind.Parameter ? ParameterResourceKinds.Parameter : SecretResourceKinds.Secret, binding.Name)
+            : null,
+        binding.Literal);
+    private static void BindingChanged(ModelProviderValueBindingEditorModel binding, ValueBindingSelection value)
     {
-        if (Enum.TryParse<ModelProviderValueBindingKind>(args.Value?.ToString(), out var kind)) binding.Kind = kind;
-        binding.Name = binding.ScopeRef = string.Empty;
-        binding.Namespace = ResourceNamespace.DefaultValue;
+        binding.Kind = value.Kind switch { ValueBindingSourceKind.Parameter => ModelProviderValueBindingKind.Parameter, ValueBindingSourceKind.Secret => ModelProviderValueBindingKind.Secret, _ => ModelProviderValueBindingKind.Literal };
+        binding.Name = value.Resource?.Name ?? string.Empty;
+        binding.Namespace = value.Resource?.Namespace.Value ?? ResourceNamespace.DefaultValue;
+        binding.ScopeRef = value.Resource?.ScopeRef.Value ?? string.Empty;
+        binding.Literal = value.Literal;
     }
-    private void TargetChanged(ModelProviderValueBindingEditorModel binding, ChangeEventArgs args)
+    private ContextualValueCreationContext? CreationContext(ExtensionValueRequirementResponse requirement)
     {
-        var value = args.Value?.ToString() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(value)) { binding.Name = binding.ScopeRef = string.Empty; return; }
-        Resource? resource = binding.Kind == ModelProviderValueBindingKind.Parameter
-            ? AvailableParameters.FirstOrDefault(candidate => TargetValue(candidate) == value)
-            : AvailableSecrets.Select(candidate => candidate.Resource).FirstOrDefault(candidate => TargetValue(candidate) == value);
-        if (resource?.ScopeRef is not { } scopeRef) return;
-        binding.Name = resource.Name;
-        binding.Namespace = resource.Namespace.Value;
-        binding.ScopeRef = scopeRef.Value;
-    }
-    private void OpenValueCreator(ExtensionValueRequirementResponse requirement, ModelProviderValueBindingEditorModel binding)
-    {
-        if (selectedScope is not { } scopeRef) return;
-        creationBinding = binding;
+        if (selectedScope is not { } scopeRef) return null;
         var consumerName = !string.IsNullOrWhiteSpace(model?.Name) ? model.Name : model?.ContributionId ?? "provider";
         var consumerDisplayName = !string.IsNullOrWhiteSpace(model?.DisplayName) ? model.DisplayName : consumerName;
-        var suggestedName = SecretEditorModel.IdentifierFromDisplayName($"mp-{consumerName}-{requirement.Id}");
-        creationContext = new ContextualValueCreationContext(
-            scopeRef,
-            suggestedName,
-            $"{consumerDisplayName} — {requirement.Id}",
-            requirement.Description,
-            ResourceNamespace.Default,
-            ParameterType(requirement.ValueType),
-            requirement.Format,
-            requirement.AllowedValues);
+        return new(scopeRef, SecretEditorModel.IdentifierFromDisplayName($"mp-{consumerName}-{requirement.Id}"),
+            $"{consumerDisplayName} — {requirement.Id}", Namespace: ResourceNamespace.Default);
     }
     private async Task ValueCreatedAsync(ScopedResourceAddress address)
     {
-        if (creationBinding is null) return;
-        creationBinding.Name = address.Name;
-        creationBinding.Namespace = address.Namespace.Value;
-        creationBinding.ScopeRef = address.ScopeRef.Value;
-        if (creationBinding.Kind == ModelProviderValueBindingKind.Parameter)
+        if (address.Kind == ParameterResourceKinds.Parameter)
             parameters = await ParametersClient.GetParametersAsync(cancellation.Token);
         else
             secrets = await SecretsClient.GetSecretsAsync(address.ScopeRef, cancellation.Token);
-        CloseValueCreator();
     }
-    private void CloseValueCreator() { creationBinding = null; creationContext = null; }
     private static ParameterValueType? ParameterType(string valueType) => valueType.ToLowerInvariant() switch
     {
         "string" => ParameterValueType.Text,
@@ -293,15 +286,6 @@ else
         "boolean" => ParameterValueType.Logical,
         _ => null
     };
-    private bool BindingAvailable(ModelProviderValueBindingEditorModel binding) => binding.Kind == ModelProviderValueBindingKind.Parameter
-        ? AvailableParameters.Any(value => TargetValue(value) == TargetValue(binding))
-        : AvailableSecrets.Any(value => TargetValue(value.Resource) == TargetValue(binding));
-    private static string TargetValue(Resource resource) => resource.ScopeRef is { } scope
-        ? $"{scope.Value}|{resource.Namespace.Value}|{resource.Name}"
-        : string.Empty;
-    private static string TargetValue(ModelProviderValueBindingEditorModel binding) => binding.IsConfigured
-        ? $"{binding.ScopeRef}|{binding.Namespace}|{binding.Name}"
-        : string.Empty;
     private bool CanUse(ParameterResource resource) => resource.ScopeRef is { } owner
         && CanUse(owner, resource.Definition.UsePolicy);
     private bool CanUse(SecretResource resource) => resource.ScopeRef is { } owner

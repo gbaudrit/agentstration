@@ -217,3 +217,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 189. [ADR-0189 — Service registration has explicit module ownership](0189-service-registration-has-explicit-module-ownership.md)
 190. [ADR-0190 — ToolDefinitions replay governed Data Source acquisitions](0190-tool-definitions-replay-governed-data-source-acquisitions.md)
 191. [ADR-0191 — OpenAPI discovery and invocation remain an AEP extension](0191-openapi-discovery-and-invocation-remain-an-aep-extension.md)
+192. [ADR-0192 — Model Provider bindings support typed literals](0192-typed-literal-model-provider-bindings.md)
