@@ -10,7 +10,7 @@
     </div>
     @if (!analysis.CanRender)
     {
-        <p class="inline-warning" role="status">@Localizer[$"Fallback.{analysis.FallbackReason ?? "UnsupportedSchema"}"]</p>
+        <p class="inline-warning" role="status">@Localizer[$"Fallback.{(AllowAnyRoot && analysis.FallbackReason == "MissingSchema" ? "MissingValueSchema" : AllowAnyRoot && analysis.FallbackReason == "FreeFormSchema" ? "FreeFormValueSchema" : analysis.FallbackReason ?? "UnsupportedSchema")}"]</p>
     }
     @if (rawMode || !analysis.CanRender)
     {
@@ -19,7 +19,7 @@
     }
     else if (analysis.Root is not null)
     {
-        <JsonSchemaField Schema="analysis.Root" Value="document" ValueChanged="ChangeDocumentAsync" Disabled="@(Disabled || ReadOnly)" LockedPaths="lockedPaths" Issues="state.Issues" />
+        <JsonSchemaField Schema="@(analysis.Root with { Title = analysis.Root.Title ?? (AllowAnyRoot ? Localizer["JsonValue"].Value : null) })" Value="document" ValueChanged="ChangeDocumentAsync" Disabled="@(Disabled || ReadOnly)" LockedPaths="lockedPaths" Issues="state.Issues" PreservePresence="AllowAnyRoot" IsPresent="valuePresent" ValueRemoved="RemoveDocumentAsync" />
     }
 </section>
 
@@ -31,8 +31,11 @@
     [Parameter] public IReadOnlyDictionary<string, JsonElement>? LockedValues { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool AllowAnyRoot { get; set; }
+    [Parameter] public bool Required { get; set; } = true;
     private JsonSchemaInputAnalysis analysis = new(null, "MissingSchema");
-    private JsonObject document = [];
+    private JsonNode? document = new JsonObject();
+    private bool valuePresent = true;
     private string rawText = "{}", schemaKey = string.Empty, valueKey = string.Empty, lockedValuesKey = string.Empty;
     private IReadOnlySet<string> lockedPaths = new HashSet<string>(StringComparer.Ordinal);
     private bool rawMode;
@@ -42,8 +45,9 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var nextSchemaKey = Schema?.GetRawText() ?? string.Empty;
-        var nextValueKey = Value.ValueKind == JsonValueKind.Undefined ? "{}" : Value.GetRawText();
+        var schemaJson = Schema is { ValueKind: not JsonValueKind.Undefined } schema ? schema.GetRawText() : string.Empty;
+        var nextSchemaKey = $"{AllowAnyRoot}|{Required}|{Schema?.ValueKind}|{schemaJson}";
+        var nextValueKey = Value.ValueKind == JsonValueKind.Undefined ? AllowAnyRoot ? "<absent>" : "{}" : Value.GetRawText();
         var nextLockedValuesKey = LockedValues is null
             ? string.Empty
             : string.Join('|', LockedValues.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => $"{item.Key}:{item.Value.GetRawText()}"));
@@ -53,75 +57,106 @@
         lockedPaths = LockedValues?.Keys.Select(name => $"$.{name}").ToHashSet(StringComparer.Ordinal)
             ?? new HashSet<string>(StringComparer.Ordinal);
         var previousCanRender = analysis.CanRender;
-        analysis = JsonSchemaInputModel.Analyze(Schema);
-        if (!TryObject(nextValueKey, out var nextDocument)) nextDocument = [];
+        analysis = JsonSchemaInputModel.Analyze(Schema, AllowAnyRoot, Required);
+        valuePresent = nextValueKey != "<absent>";
+        if (!TryDocument(nextValueKey, out var nextDocument)) nextDocument = AllowAnyRoot ? null : new JsonObject();
         document = nextDocument;
         var firstParameters = !initialized;
-        var initializeEmpty = firstParameters && document.Count == 0;
-        if (initializeEmpty && analysis.Root is not null) document = JsonSchemaInputModel.ApplyDefaults(document, analysis.Root);
+        var initializeEmpty = !AllowAnyRoot && firstParameters && document is JsonObject { Count: 0 };
+        if (initializeEmpty && analysis.Root is not null) document = JsonSchemaInputModel.ApplyDefaults((JsonObject)document!, analysis.Root);
         ApplyLockedValues(document);
         if (firstParameters) canInitializeRawTemplate = initializeEmpty;
-        rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-        valueKey = document.ToJsonString();
+        rawText = DocumentText(indented: true, editable: true);
+        valueKey = DocumentText();
         if (!analysis.CanRender) rawMode = true;
         else if (!previousCanRender) rawMode = false;
         initialized = true;
         await PublishAsync(initializeEmpty);
     }
 
-    private async Task ChangeDocumentAsync(JsonNode? value) { canInitializeRawTemplate = false; document = value as JsonObject ?? []; ApplyLockedValues(document); rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true }); valueKey = document.ToJsonString(); await PublishAsync(true); }
+    private async Task ChangeDocumentAsync(JsonNode? value)
+    {
+        if (Disabled || ReadOnly) return;
+        canInitializeRawTemplate = false;
+        document = AllowAnyRoot ? value?.DeepClone() : value as JsonObject ?? new JsonObject();
+        valuePresent = true;
+        ApplyLockedValues(document);
+        rawText = DocumentText(indented: true, editable: true);
+        valueKey = DocumentText();
+        await PublishAsync(true);
+    }
+    private async Task RemoveDocumentAsync()
+    {
+        if (!AllowAnyRoot || Disabled || ReadOnly) return;
+        canInitializeRawTemplate = false;
+        document = null; valuePresent = false; rawText = string.Empty; valueKey = "<absent>";
+        await PublishAsync(true);
+    }
     private async Task ChangeRawAsync(ChangeEventArgs args)
     {
+        if (Disabled || ReadOnly) return;
         rawText = args.Value?.ToString() ?? string.Empty;
-        if (TryObject(rawText, out var parsed)) { document = parsed; ApplyLockedValues(document); rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true }); valueKey = document.ToJsonString(); await PublishAsync(true); return; }
+        if (AllowAnyRoot && string.IsNullOrWhiteSpace(rawText)) { await RemoveDocumentAsync(); return; }
+        if (TryDocument(rawText, out var parsed)) { document = parsed; valuePresent = true; ApplyLockedValues(document); rawText = DocumentText(indented: true, editable: true); valueKey = DocumentText(); await PublishAsync(true); return; }
         state = new(false, null, [new("$", "InvalidJson")], !analysis.CanRender, analysis.FallbackReason);
         await ValidationChanged.InvokeAsync(state);
     }
     private async Task ShowRaw()
     {
-        if (canInitializeRawTemplate && analysis.Root is not null)
+        if (Disabled) return;
+        if (!ReadOnly && canInitializeRawTemplate && analysis.Root is not null)
         {
             var template = JsonSchemaInputModel.CreateTemplate(analysis.Root);
-            foreach (var property in document) template[property.Key] = property.Value?.DeepClone();
+            foreach (var property in (JsonObject)document!) template[property.Key] = property.Value?.DeepClone();
             document = template;
             ApplyLockedValues(document);
             canInitializeRawTemplate = false;
-            valueKey = document.ToJsonString();
+            valueKey = DocumentText();
             await PublishAsync(true);
         }
-        rawText = EditableDocument(document).ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        rawText = DocumentText(indented: true, editable: true);
         rawMode = true;
     }
-    private void ShowForm() { if (TryObject(rawText, out _)) rawMode = false; }
+    private void ShowForm() { if (!Disabled && (AllowAnyRoot && !valuePresent || TryDocument(rawText, out _))) rawMode = false; }
     private async Task PublishAsync(bool notifyValue)
     {
-        var value = JsonSerializer.SerializeToElement(document);
-        IReadOnlyList<JsonSchemaInputIssue> issues = analysis.Root is null
-            ? Encoding.UTF8.GetByteCount(value.GetRawText()) > JsonSchemaInputModel.MaximumValueBytes ? [new("$", "ValueTooLarge", JsonSchemaInputModel.MaximumValueBytes.ToString(System.Globalization.CultureInfo.InvariantCulture))] : []
-            : JsonSchemaInputModel.Validate(value, analysis.Root);
+        JsonElement? value = valuePresent ? JsonSerializer.SerializeToElement(document) : null;
+        IReadOnlyList<JsonSchemaInputIssue> issues = value is null ? Required ? [new("$", "Required")] : [] : analysis.Root is null
+            ? Encoding.UTF8.GetByteCount(value.Value.GetRawText()) > JsonSchemaInputModel.MaximumValueBytes ? [new("$", "ValueTooLarge", JsonSchemaInputModel.MaximumValueBytes.ToString(System.Globalization.CultureInfo.InvariantCulture))] : []
+            : JsonSchemaInputModel.Validate(value.Value, analysis.Root);
         state = new(issues.Count == 0, value, issues, !analysis.CanRender, analysis.FallbackReason);
-        if (notifyValue) await ValueChanged.InvokeAsync(value);
+        if (notifyValue) await ValueChanged.InvokeAsync(value ?? default);
         await ValidationChanged.InvokeAsync(state);
     }
     private string IssueText(JsonSchemaInputIssue issue)
     {
         var message = issue is { Code: "MinimumLength", Constraint: "1" }
             ? Localizer["Validation.MinimumLength.One"]
-            : Localizer[$"Validation.{issue.Code}", issue.Constraint ?? string.Empty];
+            : Localizer[$"Validation.{(AllowAnyRoot && issue.Code == "InvalidJson" ? "InvalidJsonValue" : issue.Code)}", issue.Constraint ?? string.Empty];
         return $"{issue.Path}: {message}";
     }
-    private void ApplyLockedValues(JsonObject target)
+    private void ApplyLockedValues(JsonNode? value)
     {
-        if (LockedValues is null) return;
+        if (LockedValues is null || value is not JsonObject target) return;
         foreach (var item in LockedValues)
             target[item.Key] = JsonNode.Parse(item.Value.GetRawText());
     }
-    private JsonObject EditableDocument(JsonObject source)
+    private JsonNode? EditableDocument(JsonNode? source)
     {
-        var editable = (JsonObject)source.DeepClone();
-        if (LockedValues is not null)
-            foreach (var name in LockedValues.Keys) editable.Remove(name);
+        var editable = source?.DeepClone();
+        if (LockedValues is not null && editable is JsonObject map)
+            foreach (var name in LockedValues.Keys) map.Remove(name);
         return editable;
     }
-    private static bool TryObject(string json, out JsonObject value) { try { value = JsonNode.Parse(json) as JsonObject ?? throw new JsonException(); return true; } catch (JsonException) { value = []; return false; } }
+    private string DocumentText(bool indented = false, bool editable = false) => !valuePresent ? indented ? string.Empty : "<absent>"
+        : (editable ? EditableDocument(document) : document)?.ToJsonString(new JsonSerializerOptions { WriteIndented = indented }) ?? "null";
+    private bool TryDocument(string json, out JsonNode? value)
+    {
+        try
+        {
+            value = JsonNode.Parse(json);
+            return AllowAnyRoot || value is JsonObject;
+        }
+        catch (JsonException) { value = null; return false; }
+    }
 }

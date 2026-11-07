@@ -49,4 +49,20 @@
   <data name="Validation.Maximum"><value>Saisissez une valeur inférieure ou égale à {0}.</value></data>
   <data name="Validation.ExclusiveMinimum"><value>Saisissez une valeur supérieure à {0}.</value></data>
   <data name="Validation.ExclusiveMaximum"><value>Saisissez une valeur inférieure à {0}.</value></data>
+  <data name="SetValue"><value>Définir une valeur</value></data>
+  <data name="ClearValue"><value>Effacer la valeur</value></data>
+  <data name="UnionType"><value>Type de valeur</value></data>
+  <data name="Kind.Map"><value>Objet</value></data>
+  <data name="Kind.List"><value>Tableau</value></data>
+  <data name="Kind.Text"><value>Texte</value></data>
+  <data name="Kind.WholeNumber"><value>Nombre entier</value></data>
+  <data name="Kind.DecimalNumber"><value>Nombre</value></data>
+  <data name="Kind.Toggle"><value>Booléen</value></data>
+  <data name="Kind.NullValue"><value>null JSON</value></data>
+  <data name="Kind.Union"><value>Union</value></data>
+  <data name="Fallback.MissingValueSchema"><value>Aucun schéma de valeur n’a été fourni. Saisissez une valeur JSON de taille limitée.</value></data>
+  <data name="Fallback.FreeFormValueSchema"><value>Ce schéma autorise des valeurs JSON libres. Utilisez le JSON brut.</value></data>
+  <data name="Validation.InvalidJsonValue"><value>Saisissez une valeur JSON valide.</value></data>
+  <data name="Validation.Union"><value>Utilisez une valeur correspondant à l’un des types autorisés.</value></data>
+  <data name="Validation.ExclusiveUnion"><value>La valeur doit correspondre à une seule variante du schéma.</value></data>
 </root>

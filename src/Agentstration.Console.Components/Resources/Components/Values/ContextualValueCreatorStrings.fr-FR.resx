@@ -34,4 +34,5 @@
   <data name="Binding.True"><value>Vrai</value></data>
   <data name="Binding.False"><value>Faux</value></data>
   <data name="Binding.LiteralInvalid"><value>Saisissez une valeur valide du type attendu parmi les valeurs autorisées, le cas échéant.</value></data>
+  <data name="Binding.ClearLiteral"><value>Effacer la valeur directe</value></data>
 </root>
