@@ -220,3 +220,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 192. [ADR-0192 — ASP defines a standalone content profile over MCP](0192-asp-defines-a-standalone-content-profile-over-mcp.md)
 193. [ADR-0193 — ASP Tools select logical targets and Agentstration owns parameter relays](0193-asp-tools-select-logical-targets-and-product-owns-relays.md)
 194. [ADR-0194 — Connected Services are product resources over extension-defined types](0194-connected-services-are-product-resources-over-extension-defined-types.md)
+195. [ADR-0195 — Connected Service types are governed resources](0195-connected-service-types-are-governed-resources.md)

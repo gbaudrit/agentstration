@@ -217,21 +217,16 @@ public sealed class ExtensionRegistrationManagementService(
                 value.Value.Name,
                 value.Value.Definition.DisplayName,
                 value.Value.Definition.ContributionId)),
-            .. (await store.ListAllAsync<ConnectedServiceResource>(
-                ConnectedServiceResourceKinds.ConnectedService, cancellationToken))
-            .Where(value =>
-            {
-                var reference = value.Value.Definition.Type.Extension;
-                var address = reference.Resolve(value.Value.Namespace, ExtensionKinds.ExtensionRegistration);
-                return address.Namespace == @namespace
-                    && string.Equals(address.Name, name, StringComparison.Ordinal)
-                    && reference.ScopeRef == scopeRef;
-            })
+            .. (await store.ListAllAsync<ConnectedServiceTypeResource>(
+                ConnectedServiceResourceKinds.ConnectedServiceType, cancellationToken))
+            .Where(value => string.Equals(value.Value.Governance.ManagedBy?.Reference,
+                $"{scopeRef.Value}/{ExtensionKinds.ExtensionRegistration}/{@namespace}/{name}",
+                StringComparison.Ordinal))
             .Select(value => new ExtensionRegistrationUsage(
                 value.Value.Kind,
                 value.Value.Name,
                 value.Value.Definition.DisplayName,
-                value.Value.Definition.Type.TypeId))
+                value.Value.Definition.PreferredVersion))
         ];
 
     private async Task<ExtensionRegistrationProperties> ValidateDefinitionAsync(

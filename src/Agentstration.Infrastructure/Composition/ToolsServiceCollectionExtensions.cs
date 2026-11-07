@@ -2,6 +2,7 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Bootstrap;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Tools;
@@ -21,6 +22,7 @@ internal static class ToolsServiceCollectionExtensions
         services.AddAgentstrationMcpTools();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentToolProvisioner>();
+        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentConnectedServiceTypeProvisioner>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentBundleProvisioner>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();

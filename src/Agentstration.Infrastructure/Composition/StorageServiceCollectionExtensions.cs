@@ -1,6 +1,7 @@
 using Agentstration.Flows.Storage.PostgreSql;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.ResourceManagement.Storage.PostgreSql;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.ResourcePlanning.Storage.PostgreSql;
@@ -23,6 +24,7 @@ internal static class StorageServiceCollectionExtensions
         services.AddSingleton<InstanceInitializationOptions>();
         services.AddSingleton<IInstanceInitializationCoordinator, InstanceInitializationCoordinator>();
         services.AddSingleton<WorkspacePlatformResourceProvisioner>();
+        services.AddSingleton<ConnectedServicePlatformResourceProvisioner>();
         services.AddSingleton<IWorkspacePlatformResourceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
         services.AddSingleton<IWorkspaceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)

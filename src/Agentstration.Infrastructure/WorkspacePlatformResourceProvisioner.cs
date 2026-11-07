@@ -1,5 +1,6 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.ResourceManagement;
@@ -23,11 +24,13 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     IResourceGovernanceContext governance,
     IResourceAccessPolicyService accessPolicies,
     InternalMcpToolProjectionService internalTools,
+    ConnectedServicePlatformResourceProvisioner connectedServiceTypes,
     ArtifactPlatformResourceProvisioner artifacts,
     KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
 {
     public async Task EnsureAllAsync(CancellationToken cancellationToken)
     {
+        using (scopes.PushSystem()) await connectedServiceTypes.EnsureAsync(cancellationToken);
         var tenants = await identities.ListTenantsAsync(cancellationToken);
         foreach (var tenant in tenants.Where(value => value.Status == TenantStatus.Active))
         {
@@ -40,6 +43,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public async Task EnsureAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         using var systemScope = scopes.PushSystem();
+        await connectedServiceTypes.EnsureAsync(cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
         var runtimeProfile = await EnsureStandardRuntimeProfileAsync(cancellationToken);
