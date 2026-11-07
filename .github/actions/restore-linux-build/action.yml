@@ -1,0 +1,44 @@
+name: Restore Linux build
+description: Restore the current run's compiled outputs and resolve dependencies without compiling.
+inputs:
+  sdk-version:
+    description: Exact SDK version used by the build producer.
+    required: true
+  restore-aep:
+    description: Also restore the autonomous AEP solution.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Set up the build SDK
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: ${{ inputs.sdk-version }}
+    - name: Cache NuGet packages
+      uses: actions/cache@v6
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', '.config/dotnet-tools.json', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
+        restore-keys: |
+          nuget-${{ runner.os }}-
+    - name: Download this run's Linux build
+      uses: actions/download-artifact@v8
+      with:
+        name: dotnet-build-linux-${{ github.sha }}
+        path: ${{ runner.temp }}/dotnet-build
+    - name: Verify and extract the Linux build
+      shell: pwsh
+      run: ./scripts/ci/transfer-linux-build.ps1 -Action Import -ArchiveDirectory "$env:RUNNER_TEMP/dotnet-build"
+    - name: Resolve dependencies and audit packages
+      shell: pwsh
+      env:
+        RESTORE_AEP: ${{ inputs.restore-aep }}
+      run: |
+        # A cache hit can be incomplete. Restore still resolves packages and SDKs;
+        # test jobs use --no-build and never fall back to compilation.
+        dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
+        if ($LASTEXITCODE -ne 0) { throw 'Dependency restore failed.' }
+        if ($env:RESTORE_AEP -eq 'true') {
+          dotnet restore aep/Aep.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
+          if ($LASTEXITCODE -ne 0) { throw 'AEP dependency restore failed.' }
+        }
