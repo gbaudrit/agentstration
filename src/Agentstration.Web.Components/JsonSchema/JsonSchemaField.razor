@@ -4,13 +4,34 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<JsonSchemaInputStrings> Localizer
 
 <div class="schema-field schema-field-@Schema.Kind.ToString().ToLowerInvariant() @(IsLocked ? "schema-field-locked" : null)" data-schema-path="@Schema.Path">
-    @if (Schema.Kind == JsonSchemaInputKind.Map)
+    @if (PreservePresence && !IsPresent && Schema.Kind != JsonSchemaInputKind.Union)
+    {
+        <button type="button" class="button-secondary" disabled="@FieldDisabled" aria-label="@Localizer["SetValueFor", Label]" @onclick="InitializeValueAsync">@Localizer["SetValue"]</button>
+        <span>@Localizer["NotSet"]</span>
+    }
+    @if (Schema.Kind == JsonSchemaInputKind.Union)
+    {
+        <label><span>@Label @RequiredMark @Localizer["UnionType"]</span>
+            <select value="@SelectedVariantIndex" disabled="@FieldDisabled" @onchange="ChangeVariantAsync">
+                <option value="-1" disabled="@(PreservePresence && !ValueRemoved.HasDelegate)">@Localizer["NotSet"]</option>
+                @foreach (var variant in Schema.Variants!.Select((value, index) => (value, index)))
+                {
+                    <option value="@variant.index">@(variant.value.Title ?? Localizer[$"Kind.{variant.value.Kind}"])</option>
+                }
+            </select>
+        </label>
+        @if (SelectedVariantIndex is >= 0 and var selected)
+        {
+            <JsonSchemaField Schema="@(Schema.Variants![selected] with { Required = Schema.Required, Title = Schema.Variants[selected].Title ?? Schema.Title })" Value="Value" ValueChanged="ValueChanged" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="@Issues.Where(issue => issue.Path != Schema.Path).ToArray()" PreservePresence="PreservePresence" IsPresent="IsPresent" />
+        }
+    }
+    else if (Schema.Kind == JsonSchemaInputKind.Map)
     {
         @if (Schema.Path != "$") { <h4>@Label</h4>@Help }
         <div class="schema-object-fields">
             @foreach (var property in Schema.Properties)
             {
-                <JsonSchemaField Schema="property" Value="@ObjectValue(property.Name)" ValueChanged="value => ChangePropertyAsync(property, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" />
+                <JsonSchemaField Schema="property" Value="@ObjectValue(property.Name)" ValueChanged="value => ChangePropertyAsync(property, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" PreservePresence="PreservePresence" IsPresent="@(Value is JsonObject current && current.ContainsKey(property.Name))" ValueRemoved="() => RemovePropertyAsync(property.Name)" />
             }
         </div>
     }
@@ -19,7 +40,7 @@
         <fieldset disabled="@FieldDisabled"><legend>@Label @RequiredMark @RulesTooltip</legend>@Help
             @foreach (var item in ArrayItems.Select((value, index) => (value, index)))
             {
-                <div class="schema-array-item"><JsonSchemaField Schema="@(Schema.Items! with { Path = $"{Schema.Path}[{item.index}]", Name = $"{Schema.Name} {item.index + 1}" })" Value="item.value" ValueChanged="value => ChangeArrayItemAsync(item.index, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" /><button type="button" class="button-secondary" disabled="@FieldDisabled" @onclick="() => RemoveArrayItemAsync(item.index)">@Localizer["RemoveItem"]</button></div>
+                <div class="schema-array-item"><JsonSchemaField Schema="@(JsonSchemaInputModel.AtPath(Schema.Items!, $"{Schema.Path}[{item.index}]") with { Name = $"{Schema.Name} {item.index + 1}" })" Value="item.value" ValueChanged="value => ChangeArrayItemAsync(item.index, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" PreservePresence="PreservePresence" /><button type="button" class="button-secondary" disabled="@FieldDisabled" @onclick="() => RemoveArrayItemAsync(item.index)">@Localizer["RemoveItem"]</button></div>
             }
             <button type="button" class="button-secondary" @onclick="AddArrayItemAsync" disabled="@(FieldDisabled || ArrayItems.Count >= EffectiveMaximumItems)">@Localizer["AddItem"]</button>
         </fieldset>
@@ -37,7 +58,7 @@
     }
     else if (Schema.AllowedValues.Count > 0)
     {
-        <label><span>@Label @RequiredMark @RulesTooltip</span><select value="@SerializedValue" disabled="@FieldDisabled" @onchange="ChangeEnumAsync"><option value="">@Localizer["NotSet"]</option>@foreach (var option in Schema.AllowedValues) { <option value="@option.GetRawText()">@Display(option)</option> }</select></label>@Help
+        <label><span>@Label @RequiredMark @RulesTooltip</span><select value="@SerializedValue" disabled="@FieldDisabled" @onchange="ChangeEnumAsync"><option value="" disabled="@(PreservePresence && !ValueRemoved.HasDelegate)">@Localizer["NotSet"]</option>@foreach (var option in Schema.AllowedValues) { <option value="@option.GetRawText()">@Display(option)</option> }</select></label>@Help
     }
     else if (Schema.Kind == JsonSchemaInputKind.Text)
     {
@@ -60,6 +81,10 @@
     {
         <label><span>@Label @RequiredMark</span><input value="null" readonly /></label>@Help
     }
+    @if (PreservePresence && IsPresent && ValueRemoved.HasDelegate)
+    {
+        <button type="button" class="button-secondary" disabled="@FieldDisabled" aria-label="@Localizer["ClearValueFor", Label]" @onclick="RemoveValueAsync">@Localizer["ClearValue"]</button>
+    }
     @foreach (var issue in FieldIssues)
     {
         <span class="field-validation-error" role="alert">@IssueText(issue)</span>
@@ -73,6 +98,31 @@
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public IReadOnlySet<string> LockedPaths { get; set; } = new HashSet<string>(StringComparer.Ordinal);
     [Parameter] public IReadOnlyList<JsonSchemaInputIssue> Issues { get; set; } = [];
+    [Parameter] public bool PreservePresence { get; set; }
+    [Parameter] public bool IsPresent { get; set; } = true;
+    [Parameter] public EventCallback ValueRemoved { get; set; }
+    private int chosenVariant = -1;
+    private IReadOnlyList<JsonSchemaInputNode>? previousVariants;
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(previousVariants, Schema.Variants)) chosenVariant = -1;
+        previousVariants = Schema.Variants;
+    }
+    private int SelectedVariantIndex
+    {
+        get
+        {
+            if (!IsPresent || Schema.Variants is null) return -1;
+            var value = JsonSerializer.SerializeToElement(Value);
+            if (chosenVariant >= 0 && chosenVariant < Schema.Variants.Count && JsonSchemaInputModel.Matches(value, Schema.Variants[chosenVariant]))
+                return chosenVariant;
+            for (var index = 0; index < Schema.Variants.Count; index++)
+                if (JsonSchemaInputModel.Validate(value, Schema.Variants[index]).Count == 0) return index;
+            for (var index = 0; index < Schema.Variants.Count; index++)
+                if (JsonSchemaInputModel.Matches(value, Schema.Variants[index])) return index;
+            return -1;
+        }
+    }
     private string Label => Schema.Title ?? Schema.Name;
     private bool IsLocked => LockedPaths.Contains(Schema.Path);
     private bool FieldDisabled => Disabled || IsLocked;
@@ -81,8 +131,8 @@
     private string NumberValue => Value?.ToJsonString() ?? string.Empty;
     private bool UsesMultilineText => Schema.MaximumLength is >= 1000;
     private bool BooleanValue => Value is JsonValue value && value.TryGetValue<bool>(out var result) && result;
-    private string SerializedValue => Value?.ToJsonString() ?? string.Empty;
-    private IReadOnlyList<JsonNode?> ArrayItems => Value is JsonArray array ? array.ToArray() : [];
+    private string SerializedValue => Value?.ToJsonString() ?? (PreservePresence && IsPresent ? "null" : string.Empty);
+    private IReadOnlyList<JsonNode?> ArrayItems => Value is JsonArray array ? array.Take(JsonSchemaInputModel.MaximumRenderedItems).ToArray() : [];
     private int EffectiveMaximumItems => Math.Min(Schema.MaximumItems ?? JsonSchemaInputModel.MaximumRenderedItems, JsonSchemaInputModel.MaximumRenderedItems);
     private RenderFragment Help => builder => { if (!string.IsNullOrWhiteSpace(Schema.Description)) builder.AddMarkupContent(0, $"<small>{System.Net.WebUtility.HtmlEncode(Schema.Description)}</small>"); else if (Schema.Examples.Count > 0) builder.AddContent(1, Localizer["Example", Display(Schema.Examples[0])]); };
     private RenderFragment RulesTooltip => builder =>
@@ -129,18 +179,29 @@
         ? Localizer["Validation.MinimumLength.One"]
         : Localizer[$"Validation.{issue.Code}", issue.Constraint ?? string.Empty];
     private JsonNode? ObjectValue(string name) => Value is JsonObject value && value.TryGetPropertyValue(name, out var child) ? child : null;
-    private async Task ChangePropertyAsync(JsonSchemaInputNode property, JsonNode? value) { var root = Value is JsonObject current ? (JsonObject)current.DeepClone() : []; if (value is null && !property.Required) root.Remove(property.Name); else root[property.Name] = value?.DeepClone(); await ValueChanged.InvokeAsync(root); }
+    private async Task ChangePropertyAsync(JsonSchemaInputNode property, JsonNode? value) { if (FieldDisabled) return; var root = Value is JsonObject current ? (JsonObject)current.DeepClone() : []; if (value is null && !property.Required && !PreservePresence) root.Remove(property.Name); else root[property.Name] = value?.DeepClone(); await ValueChanged.InvokeAsync(root); }
+    private async Task RemovePropertyAsync(string name) { if (FieldDisabled) return; var root = Value is JsonObject current ? (JsonObject)current.DeepClone() : []; root.Remove(name); await ValueChanged.InvokeAsync(root); }
+    private Task InitializeValueAsync() => FieldDisabled ? Task.CompletedTask : ValueChanged.InvokeAsync(JsonSchemaInputModel.TemplateValue(Schema));
+    private Task RemoveValueAsync() => FieldDisabled ? Task.CompletedTask : ValueRemoved.InvokeAsync();
+    private Task ChangeVariantAsync(ChangeEventArgs args)
+    {
+        if (FieldDisabled || !int.TryParse(args.Value?.ToString(), CultureInfo.InvariantCulture, out var index)) return Task.CompletedTask;
+        if (index < 0) return ValueRemoved.HasDelegate ? ValueRemoved.InvokeAsync() : PreservePresence ? Task.CompletedTask : ValueChanged.InvokeAsync(null);
+        if (Schema.Variants is null || index >= Schema.Variants.Count) return Task.CompletedTask;
+        chosenVariant = index;
+        return ValueChanged.InvokeAsync(JsonSchemaInputModel.TemplateValue(Schema.Variants[index]));
+    }
     private Task ChangeStringAsync(ChangeEventArgs args)
     {
         var text = args.Value?.ToString() ?? string.Empty;
-        return ValueChanged.InvokeAsync(text.Length == 0 && !Schema.Required ? null : JsonValue.Create(text));
+        return FieldDisabled ? Task.CompletedTask : ValueChanged.InvokeAsync(text.Length == 0 && !Schema.Required && !PreservePresence ? null : JsonValue.Create(text));
     }
-    private Task ChangeBooleanAsync(ChangeEventArgs args) => ValueChanged.InvokeAsync(JsonValue.Create(args.Value is bool value && value));
-    private Task ChangeEnumAsync(ChangeEventArgs args) => ValueChanged.InvokeAsync(string.IsNullOrEmpty(args.Value?.ToString()) ? null : JsonNode.Parse(args.Value!.ToString()!));
-    private Task ChangeNumberAsync(ChangeEventArgs args) { var text = args.Value?.ToString(); if (string.IsNullOrWhiteSpace(text)) return ValueChanged.InvokeAsync(null); JsonNode? node = Schema.Kind == JsonSchemaInputKind.WholeNumber && long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer) ? JsonValue.Create(integer) : decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? JsonValue.Create(number) : JsonValue.Create(text); return ValueChanged.InvokeAsync(node); }
-    private async Task ChangeArrayItemAsync(int index, JsonNode? value) { var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array[index] = value?.DeepClone(); await ValueChanged.InvokeAsync(array); }
-    private async Task AddArrayItemAsync() { var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array.Add(NewValue(Schema.Items!)); await ValueChanged.InvokeAsync(array); }
-    private async Task RemoveArrayItemAsync(int index) { var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array.RemoveAt(index); await ValueChanged.InvokeAsync(array); }
+    private Task ChangeBooleanAsync(ChangeEventArgs args) => FieldDisabled ? Task.CompletedTask : ValueChanged.InvokeAsync(JsonValue.Create(args.Value is bool value && value));
+    private Task ChangeEnumAsync(ChangeEventArgs args) => FieldDisabled ? Task.CompletedTask : string.IsNullOrEmpty(args.Value?.ToString()) && PreservePresence ? ValueRemoved.InvokeAsync() : ValueChanged.InvokeAsync(string.IsNullOrEmpty(args.Value?.ToString()) ? null : JsonNode.Parse(args.Value!.ToString()!));
+    private Task ChangeNumberAsync(ChangeEventArgs args) { if (FieldDisabled) return Task.CompletedTask; var text = args.Value?.ToString(); if (string.IsNullOrWhiteSpace(text)) return PreservePresence && ValueRemoved.HasDelegate ? ValueRemoved.InvokeAsync() : ValueChanged.InvokeAsync(null); JsonNode? node = Schema.Kind == JsonSchemaInputKind.WholeNumber && long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer) ? JsonValue.Create(integer) : decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? JsonValue.Create(number) : JsonValue.Create(text); return ValueChanged.InvokeAsync(node); }
+    private async Task ChangeArrayItemAsync(int index, JsonNode? value) { if (FieldDisabled) return; var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array[index] = value?.DeepClone(); await ValueChanged.InvokeAsync(array); }
+    private async Task AddArrayItemAsync() { if (FieldDisabled) return; var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array.Add(PreservePresence ? JsonSchemaInputModel.TemplateValue(Schema.Items!) : NewValue(Schema.Items!)); await ValueChanged.InvokeAsync(array); }
+    private async Task RemoveArrayItemAsync(int index) { if (FieldDisabled) return; var array = Value is JsonArray current ? (JsonArray)current.DeepClone() : []; array.RemoveAt(index); await ValueChanged.InvokeAsync(array); }
     private static JsonNode? NewValue(JsonSchemaInputNode schema) => schema.Default is { } value ? JsonNode.Parse(value.GetRawText()) : schema.Kind switch { JsonSchemaInputKind.Map => new JsonObject(), JsonSchemaInputKind.List => new JsonArray(), JsonSchemaInputKind.Text => JsonValue.Create(string.Empty), JsonSchemaInputKind.WholeNumber => JsonValue.Create(0), JsonSchemaInputKind.DecimalNumber => JsonValue.Create(0m), JsonSchemaInputKind.Toggle => JsonValue.Create(false), _ => null };
-    private static string Display(JsonElement value) => value.ValueKind == JsonValueKind.String ? value.GetString()! : value.GetRawText();
+    private static string Display(JsonElement value) => value.ValueKind == JsonValueKind.String && value.GetString()!.Length > 0 ? value.GetString()! : value.GetRawText();
 }
