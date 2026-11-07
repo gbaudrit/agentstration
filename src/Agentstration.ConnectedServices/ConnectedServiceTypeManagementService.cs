@@ -223,6 +223,38 @@ public sealed class ConnectedServiceTypeManagementService(
                 throw new ConnectedServiceTypeValidationException(
                     $"Export '{export.Id}' must reference an input with the same type and protection.");
         }
+        ValidateOperationDiscovery(version.OperationDiscovery);
+    }
+
+    private static void ValidateOperationDiscovery(ConnectedServiceOperationDiscoveryDescriptor? discovery)
+    {
+        if (discovery is null) return;
+        var flow = discovery.Flow
+            ?? throw new ConnectedServiceTypeValidationException("Operation discovery requires an exact Flow reference.");
+        if (flow.Flow.ScopeRef is null || flow.FlowUid == Guid.Empty
+            || string.IsNullOrWhiteSpace(flow.Version) || string.IsNullOrWhiteSpace(flow.DefinitionHash))
+            throw new ConnectedServiceTypeValidationException(
+                "Operation discovery Flow references require an exact scope, UID, version and definition hash.");
+        if (!string.Equals(flow.Contract, ConnectedServiceOperationDiscoveryContracts.V1, StringComparison.Ordinal))
+            throw new ConnectedServiceTypeValidationException(
+                $"Operation discovery Flows must declare contract '{ConnectedServiceOperationDiscoveryContracts.V1}'.");
+        if (discovery.ProducedTypes is null || discovery.ProducedTypes.Count == 0)
+            throw new ConnectedServiceTypeValidationException(
+                "Operation discovery must declare at least one produced operation type.");
+        if (discovery.ProducedTypes.Any(reference => reference.Type.ScopeRef is null
+                || reference.TypeUid == Guid.Empty || string.IsNullOrWhiteSpace(reference.Version)
+                || string.IsNullOrWhiteSpace(reference.SchemaDigest)))
+            throw new ConnectedServiceTypeValidationException(
+                "Produced operation types require an exact scope, UID, version and schema digest.");
+        if (discovery.ProducedTypes.GroupBy(reference => new
+            {
+                reference.Type.ScopeRef,
+                Namespace = reference.Type.Namespace?.Value,
+                reference.Type.Name,
+                reference.TypeUid,
+                reference.Version
+            }).Any(group => group.Count() > 1))
+            throw new ConnectedServiceTypeValidationException("Produced operation type references must be unique.");
     }
 
     private static ConnectedServiceTypeProperties MergeVersions(

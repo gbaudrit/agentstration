@@ -20,6 +20,7 @@ public static class AepProtocol
     public const string SecretAccessVersion = "1.0";
     public const string ModelProviderCapabilityVersion = "1.0";
     public const string ConnectedServiceTypesCapabilityVersion = "1.0";
+    public const string ConnectedServiceOperationTypesCapabilityVersion = "1.0";
     public const string SecretAccessPath = "/api/aep/secrets/redeem";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
@@ -44,6 +45,7 @@ public static class AepCapabilityNames
     public const string SecretAccess = "aep.secret-access";
     public const string SchemaFormats = "aep.schema-formats";
     public const string ConnectedServiceTypes = "aep.connected-service-types";
+    public const string ConnectedServiceOperationTypes = "aep.connected-service-operation-types";
 }
 
 public sealed record AepExtensionIdentity(string Id, string Name, string Version, string? Description = null);
@@ -61,6 +63,7 @@ public static class AepContributionKinds
     public const string DataSourceProfileBundle = "data-source-profile-bundle";
     public const string SchemaFormat = "schema-format";
     public const string ConnectedServiceType = "connected-service-type";
+    public const string ConnectedServiceOperationType = "connected-service-operation-type";
 }
 
 public static class AepOptionScopes
@@ -411,7 +414,55 @@ public sealed record AepContributions(
     IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null,
     IReadOnlyList<AepDataSourceProfileBundleContribution>? DataSourceProfileBundles = null,
     IReadOnlyList<AepSchemaFormatContribution>? SchemaFormats = null,
-    IReadOnlyList<AepConnectedServiceTypeContribution>? ConnectedServiceTypes = null);
+    IReadOnlyList<AepConnectedServiceTypeContribution>? ConnectedServiceTypes = null,
+    IReadOnlyList<AepConnectedServiceOperationTypeContribution>? ConnectedServiceOperationTypes = null);
+
+[JsonConverter(typeof(JsonStringEnumConverter<AepConnectedServiceOperationInteraction>))]
+public enum AepConnectedServiceOperationInteraction
+{
+    [JsonStringEnumMemberName("request-response")] RequestResponse,
+    [JsonStringEnumMemberName("server-stream")] ServerStream,
+    [JsonStringEnumMemberName("client-stream")] ClientStream,
+    [JsonStringEnumMemberName("duplex-stream")] DuplexStream,
+    [JsonStringEnumMemberName("subscription")] Subscription
+}
+
+public sealed record AepConnectedServiceOperationInvocationDescriptor(
+    string ProviderOperationId,
+    string ContractVersion);
+
+public sealed record AepConnectedServiceOperationTypeVersionDescriptor(
+    string Version,
+    string SchemaDigest,
+    JsonElement DefinitionSchema,
+    AepConnectedServiceOperationInteraction Interaction,
+    AepConnectedServiceOperationInvocationDescriptor Invocation,
+    bool Deprecated = false)
+{
+    public static AepConnectedServiceOperationTypeVersionDescriptor Create(
+        string version,
+        JsonElement definitionSchema,
+        AepConnectedServiceOperationInteraction interaction,
+        AepConnectedServiceOperationInvocationDescriptor invocation,
+        bool deprecated = false) => new(version, AepSchemaDigest.Compute(definitionSchema),
+            definitionSchema.Clone(), interaction, invocation, deprecated);
+}
+
+public sealed record AepConnectedServiceOperationTypeContribution(
+    string Id,
+    string DisplayName,
+    string PreferredVersion,
+    IReadOnlyList<AepConnectedServiceOperationTypeVersionDescriptor> Versions,
+    string? Description = null,
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+
+public sealed record AepConnectedServiceOperationTypeReference(string Id, string Version);
+
+public sealed record AepConnectedServiceOperationDiscoveryDescriptor(
+    string FlowName,
+    string FlowVersion,
+    IReadOnlyList<AepConnectedServiceOperationTypeReference> ProducedTypes,
+    string? FlowNamespace = null);
 
 public sealed record AepConnectedServiceInputDescriptor(
     string Id,
@@ -436,6 +487,8 @@ public sealed record AepConnectedServiceTypeVersionDescriptor(
     IReadOnlyList<AepConnectedServiceExportDescriptor> Exports,
     bool Deprecated = false)
 {
+    public AepConnectedServiceOperationDiscoveryDescriptor? OperationDiscovery { get; init; }
+
     public static AepConnectedServiceTypeVersionDescriptor Create(
         string version,
         JsonElement schema,
@@ -598,6 +651,7 @@ public static class AepDescriptorValidator
             errors.Add($"Schema formats capability version '{schemaCapability.Version}' is not supported.");
         if (hasSchemaCapability && !hasSchemaFormats)
             errors.Add("The aep.schema-formats capability needs at least one Schema format contribution.");
+        ValidateConnectedServiceOperationTypes(descriptor, errors);
         ValidateConnectedServiceTypes(descriptor, errors);
         var sourceProviders = new HashSet<string>(StringComparer.Ordinal);
         foreach (var provider in descriptor.Contributions.SourceProviders ?? [])
@@ -710,7 +764,57 @@ public static class AepDescriptorValidator
         || string.Equals(kind, AepContributionKinds.SchemaFormat, StringComparison.Ordinal)
             && (contributions.SchemaFormats ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
         || string.Equals(kind, AepContributionKinds.ConnectedServiceType, StringComparison.Ordinal)
-            && (contributions.ConnectedServiceTypes ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+            && (contributions.ConnectedServiceTypes ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(kind, AepContributionKinds.ConnectedServiceOperationType, StringComparison.Ordinal)
+            && (contributions.ConnectedServiceOperationTypes ?? []).Any(value => string.Equals(value.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    private static void ValidateConnectedServiceOperationTypes(AepManifest descriptor, List<string> errors)
+    {
+        var types = descriptor.Contributions.ConnectedServiceOperationTypes ?? [];
+        var hasCapability = descriptor.Capabilities.TryGetValue(
+            AepCapabilityNames.ConnectedServiceOperationTypes, out var capability);
+        if (types.Count > 0 && !hasCapability)
+            errors.Add("Connected Service operation type contributions need the aep.connected-service-operation-types capability.");
+        if (hasCapability && !string.Equals(capability!.Version,
+                AepProtocol.ConnectedServiceOperationTypesCapabilityVersion, StringComparison.Ordinal))
+            errors.Add($"Connected Service operation types capability version '{capability.Version}' is not supported.");
+        if (hasCapability && types.Count == 0)
+            errors.Add("The aep.connected-service-operation-types capability needs at least one operation type contribution.");
+        if (types.Count > 128)
+            errors.Add("A manifest may contain at most 128 Connected Service operation type contributions.");
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var type in types)
+        {
+            if (type is null) { errors.Add("A Connected Service operation type contribution cannot be null."); continue; }
+            if (!IsValidValueRequirementId(type.Id))
+                errors.Add($"Connected Service operation type contribution id '{type.Id}' is invalid.");
+            else if (!ids.Add(type.Id))
+                errors.Add($"Connected Service operation type contribution '{type.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(type.DisplayName) || type.DisplayName.Length > 256
+                || type.Description?.Length > 2_000)
+                errors.Add($"Connected Service operation type contribution '{type.Id}' has invalid text fields.");
+            var versions = type.Versions ?? [];
+            if (versions.Count == 0 || versions.Count > 32
+                || !versions.Any(value => value is not null
+                    && string.Equals(value.Version, type.PreferredVersion, StringComparison.Ordinal)))
+                errors.Add($"Connected Service operation type contribution '{type.Id}' must contain its preferred version and at most 32 versions.");
+            if (versions.Where(value => value is not null).Select(value => value!.Version)
+                    .Distinct(StringComparer.Ordinal).Count() != versions.Count)
+                errors.Add($"Connected Service operation type contribution '{type.Id}' contains duplicate versions.");
+            foreach (var version in versions)
+            {
+                if (version is null) { errors.Add($"Connected Service operation type '{type.Id}' contains a null version."); continue; }
+                if (string.IsNullOrWhiteSpace(version.Version)
+                    || version.DefinitionSchema.ValueKind != JsonValueKind.Object
+                    || JsonSerializer.SerializeToUtf8Bytes(version.DefinitionSchema, AepProtocol.JsonOptions).Length > 256 * 1024
+                    || !string.Equals(version.SchemaDigest, AepSchemaDigest.Compute(version.DefinitionSchema), StringComparison.Ordinal))
+                    errors.Add($"Connected Service operation type '{type.Id}' version '{version.Version}' has an invalid schema contract.");
+                if (version.Invocation is null || string.IsNullOrWhiteSpace(version.Invocation.ProviderOperationId)
+                    || string.IsNullOrWhiteSpace(version.Invocation.ContractVersion))
+                    errors.Add($"Connected Service operation type '{type.Id}' version '{version.Version}' requires an invocation contract.");
+            }
+        }
+    }
 
     private static void ValidateConnectedServiceTypes(AepManifest descriptor, List<string> errors)
     {
@@ -772,6 +876,25 @@ public static class AepDescriptorValidator
                     (version.Inputs ?? []).Select(value => value?.Id), errors);
                 ValidateConnectedServiceMembers(type.Id, version.Version, "export",
                     (version.Exports ?? []).Select(value => value?.Id), errors);
+                if (version.OperationDiscovery is { } discovery)
+                {
+                    if (string.IsNullOrWhiteSpace(discovery.FlowName)
+                        || string.IsNullOrWhiteSpace(discovery.FlowVersion))
+                        errors.Add($"Connected Service type '{type.Id}' version '{version.Version}' operation discovery requires a Flow name and version.");
+                    if (discovery.ProducedTypes is null || discovery.ProducedTypes.Count == 0
+                        || discovery.ProducedTypes.Any(reference => reference is null
+                            || string.IsNullOrWhiteSpace(reference.Id) || string.IsNullOrWhiteSpace(reference.Version)))
+                        errors.Add($"Connected Service type '{type.Id}' version '{version.Version}' operation discovery requires produced operation types.");
+                    foreach (var reference in discovery.ProducedTypes ?? [])
+                    {
+                        if (reference is null) continue;
+                        var operationType = (descriptor.Contributions.ConnectedServiceOperationTypes ?? [])
+                            .SingleOrDefault(candidate => string.Equals(candidate.Id, reference.Id, StringComparison.Ordinal));
+                        if (operationType is null || !operationType.Versions.Any(candidate =>
+                                string.Equals(candidate.Version, reference.Version, StringComparison.Ordinal)))
+                            errors.Add($"Connected Service type '{type.Id}' version '{version.Version}' references unknown operation type '{reference.Id}:{reference.Version}'.");
+                    }
+                }
             }
         }
     }

@@ -40,6 +40,7 @@ Initial registered names are:
 - `aep.tools`
 - `aep.schema-formats`
 - `aep.connected-service-types`
+- `aep.connected-service-operation-types`
 - `aep.configuration`
 - `aep.value-requirements`
 - `aep.bound-values`
@@ -64,6 +65,14 @@ instance, product scope, Parameter or Secret resource reference, resolved value 
 consumer binding. A consumer pins the exact contribution version and digest and
 owns instance lifecycle. A changed schema requires a new version; a digest mismatch
 is invalid and must not be interpreted as a compatible update.
+
+An extension advertises `aep.connected-service-operation-types` version `1.0`
+when it contributes protocol-specific operation definitions. Each immutable version
+contains a JSON definition schema and digest, an interaction shape and a provider
+invocation contract. A Connected Service type version may declare a discovery Flow
+name/version and the operation-type id/version pairs it can emit. The product
+resolves these declarations to exact local resource and Flow revisions during
+enrollment; the manifest never carries configured service instances or credentials.
 
 ### Schema formats
 

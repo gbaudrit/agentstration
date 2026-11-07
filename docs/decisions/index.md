@@ -223,3 +223,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 195. [ADR-0195 — Connected Services are product resources over extension-defined types](0195-connected-services-are-product-resources-over-extension-defined-types.md)
 196. [ADR-0196 — Connected Service types are governed resources](0196-connected-service-types-are-governed-resources.md)
 197. [ADR-0197 — Connected Service bindings support typed literals](0197-connected-service-bindings-support-typed-literals.md)
+198. [ADR-0198 — Connected Service operations are typed discovered resources](0198-connected-service-operations-are-typed-discovered-resources.md)
