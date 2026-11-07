@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([string[]] $Paths = @(), [switch] $RunEverything)
 $documentation = '^(docs/|README\.md$|CONTRIBUTING\.md$|CODE_OF_CONDUCT\.md$|SECURITY\.md$|NOTICE$|LICENSE$|\.github/(CODEOWNERS$|ISSUE_TEMPLATE/|pull_request_template\.md$|rulesets/|workflows/(documentation|publish-documentation)\.yml$))'
-$shared = '^(global\.json$|Directory\.(Build|Packages)\.(props|targets)$|\.github/workflows/ci\.yml$|scripts/ci/)'
+$shared = '^(global\.json$|Directory\.(Build|Packages)\.(props|targets)$|\.github/workflows/ci\.yml$|\.github/actions/restore-linux-build/|scripts/ci/)'
 [pscustomobject]@{
     dotnet = $RunEverything.IsPresent -or @($Paths | Where-Object { $_ -notmatch $documentation }).Count -gt 0
     aep = $RunEverything.IsPresent -or @($Paths | Where-Object { $_ -match "^(aep/)|$shared" }).Count -gt 0
