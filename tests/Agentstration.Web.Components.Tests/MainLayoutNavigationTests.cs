@@ -26,7 +26,7 @@ public sealed class MainLayoutNavigationTests
             ("Observe", [("Agent instances", "/agent-instances"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
             ("Workplace", [("Configuration", "/workspaces")]),
             ("Resources", [("Packs", "/packs"), ("Data Sources", "/data-sources"), ("Knowledge Sources", "/knowledge-sources"), ("Artifacts", "/artifacts"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
-            ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
+            ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Connected Services", "/connected-services"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
             ("Configuration", [("Runtime profiles", "/runtimeprofiles"), ("Secrets", "/secrets"), ("Resource scopes", "/settings/resource-scopes")]),
             ("System", [("Workers", "/settings/runtime-workers"), ("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
 
@@ -52,6 +52,7 @@ public sealed class MainLayoutNavigationTests
             groups.Select(GroupLabel).ToArray());
         Assert.AreEqual("Configuration", groups[5].QuerySelector("a")?.TextContent.Trim());
         Assert.AreEqual("MCP & Outils", groups[7].QuerySelector("a")?.TextContent.Trim());
+        Assert.AreEqual("Services connectés", groups[7].QuerySelector("a[href='/connected-services']")?.TextContent.Trim());
         Assert.AreEqual("Profils de source de données", groups[1].QuerySelector("a[href='/data-source-profiles']")?.TextContent.Trim());
         Assert.AreEqual("Sources de données", groups[6].QuerySelector("a[href='/data-sources']")?.TextContent.Trim());
         Assert.AreEqual("Schémas", groups[1].QuerySelector("a[href='/schemas']")?.TextContent.Trim());
@@ -118,6 +119,7 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/data-sources']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/schemas']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/conversations']").Count);
+        Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/connected-services']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/resource-scopes']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/cleanup']").Count);
         Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/agent-instances']").Count);

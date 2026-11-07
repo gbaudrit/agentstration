@@ -13,6 +13,8 @@ internal static class ConnectedServiceEndpoints
         var types = endpoints.MapGroup("/api/connected-service-types");
         types.MapGet("/", async (ConnectedServiceTypeManagementService service, CancellationToken token) =>
             Results.Ok((await service.ListAsync(token)).Select(value => value.Value)))
+            .Produces<IEnumerable<ConnectedServiceTypeResource>>()
+            .WithSummary("List Connected Service types")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         types.MapGet("/{name}", async (string name, string scopeRef, string? @namespace,
             HttpResponse response, ConnectedServiceTypeManagementService service, CancellationToken token) =>
@@ -24,7 +26,9 @@ internal static class ConnectedServiceEndpoints
                         ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name);
                 response.Headers.ETag = stored.ETag;
                 return Results.Ok(stored.Value);
-            })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+            })).Produces<ConnectedServiceTypeResource>()
+            .WithSummary("Get a Connected Service type")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         types.MapPost("/", async (CreateConnectedServiceTypeRequest body, HttpResponse response,
             ConnectedServiceTypeManagementService service, CancellationToken token) => await Execute(async () => Resource(
                 await service.CreateAsync(new ConnectedServiceTypeResource
@@ -39,6 +43,8 @@ internal static class ConnectedServiceEndpoints
                     ScopeRef = body.ScopeRef,
                     Definition = body.Properties
                 }, token), response, StatusCodes.Status201Created)))
+            .Produces<ConnectedServiceTypeResource>(StatusCodes.Status201Created)
+            .WithSummary("Create a Connected Service type")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         types.MapPut("/{name}", async (string name, string scopeRef, string? @namespace,
             PutConnectedServiceTypeRequest body, HttpRequest request, HttpResponse response,
@@ -46,6 +52,8 @@ internal static class ConnectedServiceEndpoints
                 await service.PutExactAsync(ResourceScopeRef.Parse(scopeRef),
                     ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, body.Properties,
                     request.Headers.IfMatch.FirstOrDefault(), token), response, StatusCodes.Status200OK)))
+            .Produces<ConnectedServiceTypeResource>()
+            .WithSummary("Update a Connected Service type")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         types.MapDelete("/{name}", async (string name, string scopeRef, string? @namespace,
             HttpRequest request, ConnectedServiceTypeManagementService service, CancellationToken token) =>
@@ -55,11 +63,15 @@ internal static class ConnectedServiceEndpoints
                     ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name,
                     request.Headers.IfMatch.FirstOrDefault(), token);
                 return Results.NoContent();
-            })).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+            })).Produces(StatusCodes.Status204NoContent)
+            .WithSummary("Delete a Connected Service type")
+            .RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
 
         var services = endpoints.MapGroup("/api/connected-services");
         services.MapGet("/", async (ConnectedServiceManagementService service, CancellationToken token) =>
             Results.Ok((await service.ListAsync(token)).Select(value => value.Value)))
+            .Produces<IEnumerable<ConnectedServiceResource>>()
+            .WithSummary("List Connected Services")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         services.MapGet("/{name}", async (string name, string? scopeRef, HttpResponse response,
             ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () =>
@@ -71,7 +83,9 @@ internal static class ConnectedServiceEndpoints
                 if (stored is null) throw new ConnectedServiceNotFoundException(name);
                 response.Headers.ETag = stored.ETag;
                 return Results.Ok(stored.Value);
-            })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+            })).Produces<ConnectedServiceResource>()
+            .WithSummary("Get a Connected Service")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         services.MapGet("/{name}/usages", async (string name, string scopeRef,
             ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () =>
             {
@@ -79,7 +93,9 @@ internal static class ConnectedServiceEndpoints
                     .Select(value => new ConnectedServiceUsageResponse(
                         value.Kind, value.Name, value.DisplayName, value.Url)).ToArray();
                 return Results.Ok(new ConnectedServiceUsagesResponse(usages, usages.Length));
-            })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+            })).Produces<ConnectedServiceUsagesResponse>()
+            .WithSummary("List Connected Service usages")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         services.MapPost("/", async (CreateConnectedServiceRequest body, HttpResponse response,
             ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () => Resource(
                 await service.CreateAsync(new ConnectedServiceResource
@@ -90,6 +106,8 @@ internal static class ConnectedServiceEndpoints
                     ScopeRef = body.ScopeRef,
                     Definition = body.Properties
                 }, token), response, StatusCodes.Status201Created)))
+            .Produces<ConnectedServiceResource>(StatusCodes.Status201Created)
+            .WithSummary("Create a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         services.MapPut("/{name}", async (string name, string? scopeRef, PutConnectedServiceRequest body,
             HttpRequest request, HttpResponse response, ConnectedServiceManagementService service,
@@ -97,18 +115,24 @@ internal static class ConnectedServiceEndpoints
                 ? await service.PutExactAsync(scope, name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token)
                 : await service.PutAsync(name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token),
                 response, StatusCodes.Status200OK)))
+            .Produces<ConnectedServiceResource>()
+            .WithSummary("Update a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         services.MapPost("/{name}/reconcile", async (string name, string scopeRef, HttpRequest request,
             HttpResponse response, ConnectedServiceManagementService service, CancellationToken token) =>
             await Execute(async () => Resource(await service.ReconcileAsync(
                 ResourceScopeRef.Parse(scopeRef), name, request.Headers.IfMatch.FirstOrDefault(), token),
                 response, StatusCodes.Status200OK)))
+            .Produces<ConnectedServiceResource>()
+            .WithSummary("Reconcile a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         services.MapPost("/{name}/deactivate", async (string name, string scopeRef, HttpRequest request,
             HttpResponse response, ConnectedServiceManagementService service, CancellationToken token) =>
             await Execute(async () => Resource(await service.DeactivateAsync(
                 ResourceScopeRef.Parse(scopeRef), name, request.Headers.IfMatch.FirstOrDefault(), token),
                 response, StatusCodes.Status200OK)))
+            .Produces<ConnectedServiceResource>()
+            .WithSummary("Deactivate a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         services.MapDelete("/{name}", async (string name, string scopeRef, HttpRequest request,
             ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () =>
@@ -116,7 +140,9 @@ internal static class ConnectedServiceEndpoints
                 await service.DeleteAsync(ResourceScopeRef.Parse(scopeRef), name,
                     request.Headers.IfMatch.FirstOrDefault(), token);
                 return Results.NoContent();
-            })).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+            })).Produces(StatusCodes.Status204NoContent)
+            .WithSummary("Delete a Connected Service")
+            .RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     }
 
     private static ResourceScopeRef? Scope(string? value) =>
