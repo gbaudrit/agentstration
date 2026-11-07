@@ -1,0 +1,237 @@
+@namespace Agentstration.Web.Components.Values
+@using Microsoft.AspNetCore.Components.Sections
+@implements IDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ContextualValueCreatorStrings> Localizer
+
+<div class="panel binding-requirement" data-testid="@(TestIdPrefix + "-value-requirement")" data-requirement-id="@Requirement.Id">
+    <div class="panel-header">
+        <div><strong>@Requirement.Id</strong>@if (!string.IsNullOrWhiteSpace(Requirement.Description)) { <p>@Requirement.Description</p> }</div>
+        <div>
+            <StatusBadge Text="@T(Requirement.Required ? "Binding.Required" : "Binding.Optional")" Status="@(Requirement.Required ? UiStatus.Info : UiStatus.Neutral)" />
+            <StatusBadge Text="@T(Requirement.Secured ? "Binding.Protection.Secured" : "Binding.Protection.Standard")" Status="@(Requirement.Secured ? UiStatus.Warning : UiStatus.Neutral)" />
+        </div>
+    </div>
+    <p><span>@T("Binding.ExpectedType"):</span> <code>@Requirement.ValueType</code>@if (!string.IsNullOrWhiteSpace(Requirement.Format)) { <span> · @T("Binding.ExpectedFormat"): <code>@Requirement.Format</code></span> }</p>
+    <div class="form-grid">
+        <label><span>@T("Binding.ValueSource")</span>
+            <select value="@selection.Kind" @onchange="SourceChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-kind")">
+                @if (!Sources.Contains(selection.Kind)) { <option value="@selection.Kind" disabled>@T("Binding.SourceUnavailable")</option> }
+                @foreach (var kind in Sources) { <option value="@kind">@T($"Binding.Source.{kind}")</option> }
+            </select>
+        </label>
+        @if (selection.Kind == ValueBindingSourceKind.Literal && Sources.Contains(selection.Kind))
+        {
+            <label><span>@T("Binding.LiteralValue")</span>
+                @if (Requirement.AllowedValues is { Count: > 0 } allowedValues)
+                {
+                    <select value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")">
+                        <option value="">@T("Binding.SelectValue")</option>
+                        @foreach (var value in allowedValues) { <option value="@DisplayValue(value)">@DisplayValue(value)</option> }
+                    </select>
+                }
+                else if (Requirement.ValueType == "boolean")
+                {
+                    <select value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")">
+                        <option value="">@T("Binding.SelectValue")</option><option value="true">@T("Binding.True")</option><option value="false">@T("Binding.False")</option>
+                    </select>
+                }
+                else
+                {
+                    <input value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" />
+                }
+            </label>
+        }
+        else if (selection.Kind is ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)
+        {
+            <div class="contextual-binding-target">
+                <label><span>@T("Binding.ExactResource")</span>
+                    <select @key="TargetValue(selection.Resource)" @onchange="TargetChangedAsync" disabled="@(Disabled || !Sources.Contains(selection.Kind))" data-testid="@(TestIdPrefix + "-binding-target")">
+                        <option value="" selected="@(!selection.IsConfigured)">@T("Binding.SelectResource")</option>
+                        @if (!Available && selection.Resource is { } missing) { <option value="@TargetValue(missing)" selected disabled>@T("Binding.UnavailableSelection", missing.ScopeRef, missing.Namespace, missing.Name)</option> }
+                        @foreach (var option in CurrentOptions) { <option value="@TargetValue(option.Address)" selected="@(option.Address == selection.Resource)">@option.DisplayName — @option.Address.ScopeRef/@option.Address.Namespace/@option.Address.Name</option> }
+                    </select>
+                </label>
+                <button type="button" class="button-secondary" disabled="@(Disabled || CreationContext is null || !Sources.Contains(selection.Kind))" @onclick="OpenCreator" data-testid="@(TestIdPrefix + "-binding-create")">@T(selection.Kind == ValueBindingSourceKind.Parameter ? "Binding.CreateParameter" : "Binding.CreateSecret")</button>
+            </div>
+        }
+    </div>
+    @if (ValidationError is { } message) { <p class="inline-warning" role="alert">@message</p> }
+    @if (selection.Kind == ValueBindingSourceKind.Secret) { <p class="inline-info">@T("Binding.SecretValueHidden")</p> }
+</div>
+
+@if (DialogSectionId is { } sectionId)
+{
+    <SectionContent SectionId="@sectionId">@CreatorDialogs</SectionContent>
+}
+else
+{
+    @CreatorDialogs
+}
+
+@code {
+    [Parameter, EditorRequired] public ValueBindingRequirement Requirement { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<ValueBindingSourceKind> AllowedSources { get; set; } = [];
+    [Parameter] public IReadOnlyList<ValueBindingOption> Options { get; set; } = [];
+    [Parameter] public ValueBindingSelection Selection { get; set; } = new(ValueBindingSourceKind.Parameter);
+    [Parameter] public EventCallback<ValueBindingSelection> SelectionChanged { get; set; }
+    [Parameter] public ContextualValueCreationContext? CreationContext { get; set; }
+    [Parameter] public EventCallback<ScopedResourceAddress> ResourceCreated { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string TestIdPrefix { get; set; } = "value-binding";
+    [Parameter] public object? DialogSectionId { get; set; }
+    [CascadingParameter] private EditContext? EditContext { get; set; }
+
+    private ValueBindingSelection selection = new(ValueBindingSourceKind.Parameter);
+    private ValueBindingSelection? lastParameter;
+    private ValueBindingOption? createdOption;
+    private ContextualValueCreationContext? creatorContext;
+    private bool creating;
+    private bool invalidLiteral;
+    private string literalText = string.Empty;
+    private EditContext? attachedContext;
+    private ValidationMessageStore? messages;
+    private string? previousError;
+    private RenderFragment CreatorDialogs => @<div>
+        <ContextualParameterCreator IsOpen="@(creating && selection.Kind == ValueBindingSourceKind.Parameter)" Context="creatorContext" OnCreated="ValueCreatedAsync" OnCancel="CloseCreator" />
+        <ContextualSecretCreator IsOpen="@(creating && selection.Kind == ValueBindingSourceKind.Secret)" Context="creatorContext" OnCreated="ValueCreatedAsync" OnCancel="CloseCreator" />
+    </div>;
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private IReadOnlyList<ValueBindingSourceKind> Sources => AllowedSources.Where(kind =>
+        Enum.IsDefined(kind) && (!Requirement.Secured || kind == ValueBindingSourceKind.Secret)).Distinct().ToArray();
+    private IEnumerable<ValueBindingOption> CurrentOptions => Options
+        .Concat(createdOption is null || Options.Any(value => value.Address == createdOption.Address && value.Kind == createdOption.Kind) ? [] : new[] { createdOption })
+        .Where(value => value.Kind == selection.Kind && Sources.Contains(value.Kind));
+    private bool Available => CurrentOptions.Any(value => value.Address == selection.Resource);
+    private string? ValidationError => !Sources.Contains(selection.Kind) ? T("Binding.SourceUnavailable")
+        : invalidLiteral ? T("Binding.LiteralInvalid")
+        : Requirement.Required && !selection.IsConfigured ? T("Binding.RequiredMissing") : null;
+
+    protected override void OnParametersSet()
+    {
+        if (createdOption is not null && Options.Any(value => value.Kind == createdOption.Kind && value.Address == createdOption.Address))
+            createdOption = null;
+        if (creating && (Disabled || !Sources.Contains(selection.Kind)
+            || CreationContext?.ScopeRef != creatorContext?.ScopeRef || CreationContext?.EffectiveNamespace != creatorContext?.EffectiveNamespace))
+        {
+            CloseCreator();
+            createdOption = null;
+        }
+        if (!Equals(lastParameter, Selection))
+        {
+            selection = Selection;
+            lastParameter = Selection;
+            literalText = Selection.Literal is { } value ? DisplayValue(value) : string.Empty;
+            invalidLiteral = false;
+            CloseCreator();
+        }
+        if (selection.Kind == ValueBindingSourceKind.Literal && selection.Literal is { } literal)
+            invalidLiteral = !MatchesType(literal)
+                || Requirement.AllowedValues is { } allowed && !allowed.Any(candidate => JsonElement.DeepEquals(candidate, literal));
+        if (attachedContext != EditContext)
+        {
+            DetachContext();
+            attachedContext = EditContext;
+            messages = EditContext is null ? null : new ValidationMessageStore(EditContext);
+            if (attachedContext is not null) attachedContext.OnValidationRequested += Validate;
+        }
+        UpdateValidation();
+    }
+
+    private async Task SourceChangedAsync(ChangeEventArgs args)
+    {
+        if (Disabled || !Enum.TryParse<ValueBindingSourceKind>(args.Value?.ToString(), out var kind) || !Sources.Contains(kind)) return;
+        CloseCreator(); literalText = string.Empty; invalidLiteral = false;
+        await SelectAsync(new(kind));
+    }
+
+    private async Task TargetChangedAsync(ChangeEventArgs args)
+    {
+        if (Disabled || !Sources.Contains(selection.Kind) || selection.Kind is not (ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)) return;
+        var key = args.Value?.ToString() ?? string.Empty;
+        if (key.Length == 0) { await SelectAsync(new(selection.Kind)); return; }
+        var option = CurrentOptions.FirstOrDefault(value => TargetValue(value.Address) == key);
+        if (option is not null) await SelectAsync(new(selection.Kind, option.Address));
+    }
+
+    private async Task LiteralChangedAsync(ChangeEventArgs args)
+    {
+        if (Disabled || selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind)) return;
+        literalText = args.Value?.ToString() ?? string.Empty;
+        JsonElement? value = null;
+        invalidLiteral = false;
+        if (literalText.Length > 0)
+        {
+            try
+            {
+                value = Requirement.ValueType == "string" ? JsonSerializer.SerializeToElement(literalText) : JsonSerializer.Deserialize<JsonElement>(literalText);
+                invalidLiteral = !MatchesType(value.Value) || Requirement.AllowedValues is { } allowed && !allowed.Any(candidate => JsonElement.DeepEquals(candidate, value.Value));
+            }
+            catch (JsonException) { invalidLiteral = true; }
+        }
+        await SelectAsync(new(ValueBindingSourceKind.Literal, Literal: invalidLiteral ? null : value));
+    }
+
+    private bool MatchesType(JsonElement value) => Requirement.ValueType switch
+    {
+        "string" => value.ValueKind == JsonValueKind.String,
+        "integer" => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
+        "number" => value.ValueKind == JsonValueKind.Number,
+        "boolean" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
+        _ => false
+    };
+
+    private async Task SelectAsync(ValueBindingSelection value)
+    {
+        selection = lastParameter = value;
+        UpdateValidation();
+        await SelectionChanged.InvokeAsync(value);
+    }
+
+    private void OpenCreator()
+    {
+        if (Disabled || CreationContext is null || !Sources.Contains(selection.Kind) || selection.Kind is not (ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)) return;
+        creatorContext = CreationContext with
+        {
+            Description = Requirement.Description,
+            ValueType = Requirement.ValueType switch { "string" => ParameterValueType.Text, "integer" => ParameterValueType.WholeNumber, "number" => ParameterValueType.DecimalNumber, "boolean" => ParameterValueType.Logical, _ => null },
+            Format = Requirement.Format,
+            AllowedValues = Requirement.AllowedValues
+        };
+        creating = true;
+    }
+
+    private async Task ValueCreatedAsync(ScopedResourceAddress address)
+    {
+        if (!creating || creatorContext is null || address.ScopeRef != creatorContext.ScopeRef || address.Namespace != creatorContext.EffectiveNamespace) return;
+        var expectedKind = selection.Kind == ValueBindingSourceKind.Parameter ? ParameterResourceKinds.Parameter : SecretResourceKinds.Secret;
+        if (address.Kind != expectedKind || !Sources.Contains(selection.Kind)) return;
+        createdOption = new(selection.Kind, address, creatorContext.SuggestedDisplayName);
+        CloseCreator();
+        await SelectAsync(new(selection.Kind, address));
+        await ResourceCreated.InvokeAsync(address);
+        if (ResourceCreated.HasDelegate) createdOption = null;
+    }
+
+    private void CloseCreator() { creating = false; creatorContext = null; }
+    private static string TargetValue(ScopedResourceAddress? address) => address is { } value ? $"{value.ScopeRef.Value}|{value.Namespace.Value}|{value.Name}" : string.Empty;
+    private static string DisplayValue(JsonElement value) => value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
+    private void Validate(object? sender, ValidationRequestedEventArgs args) => UpdateValidation(force: true);
+    private void UpdateValidation(bool force = false)
+    {
+        var error = ValidationError;
+        if (messages is null || !force && previousError == error) return;
+        previousError = error;
+        messages.Clear();
+        if (error is not null) messages.Add(new FieldIdentifier(this, nameof(Selection)), error);
+        attachedContext!.NotifyValidationStateChanged();
+    }
+    private void DetachContext()
+    {
+        if (attachedContext is null) return;
+        attachedContext.OnValidationRequested -= Validate;
+        messages?.Clear();
+        attachedContext.NotifyValidationStateChanged();
+        previousError = null;
+    }
+    public void Dispose() => DetachContext();
+}
