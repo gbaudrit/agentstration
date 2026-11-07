@@ -41,6 +41,7 @@ src/
   Agentstration.Packs.Contracts/    Pack installation, authoring and composition contracts
   Agentstration.Packs/            Pack authoring, installation and composition
   Agentstration.Parameters*/      scoped nonsecret Parameter resources, contracts and API
+  Agentstration.ConnectedServices*/ scoped remote-service resources, contracts and API
   Agentstration.Schemas*/         format-neutral Schema drafts, immutable versions, contracts and API
   Agentstration.Sources/          Source and source-registry use cases
   Agentstration.ResourceManagement.Storage.Sqlite/
@@ -144,6 +145,7 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Resource Planning | durable Workspace-scoped Resource Plans, deterministic materialization with explicit per-Agent Model and Runtime Profile bindings, reviewable ChangeSets, validation, governed application through canonical services, planning Tools, specialist Flows, and Console review UX | an official installable Pack |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, durable Worker assignments with renewable leases and fencing, authenticated AWP registration and governed operations, independent MAF Worker processes, bounded pull-based claim/heartbeat transport, governed AWP model streaming over typed SSE events, Aspire/Compose/manual hosting, registry, reconciliation, and provider-neutral AWP v1 wire contracts | additional Runtime implementations, Kubernetes integration, and automatic checkpoint-based recovery after Worker loss |
 | Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions, cached discovery |
+| Connected Services | Governed `ConnectedServiceType` resources (Core-, user- or extension-owned) and Instance-, Tenant- or Workspace-owned remote-service definitions pinned to exact type UID/version/digest, schema-validated non-secret options, typed Literal and late-bound Parameter/Secret inputs, typed exports, scoped CRUD, reconciliation and deactivation | explicit consumer export bindings, including Storage/OpenDAL adapters |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
 | Flows | Instance-, Tenant-, and Workspace-owned typed graph drafts, immutable exact-scope versions, Workspace-owned durable Runs, opaque SQLite/PostgreSQL runtime state, interactive input suspension/recovery, visual editors and SignalR replay | distributed dispatch, arbitrary graph waits, HumanApproval nodes, and provider-level effect idempotency |

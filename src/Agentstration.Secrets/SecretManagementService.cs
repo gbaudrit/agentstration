@@ -1,3 +1,4 @@
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
@@ -323,6 +324,17 @@ public sealed class SecretManagementService(
                     && binding.Secret.Address.Namespace == ResourceNamespace.Default
                     && string.Equals(binding.Secret.Address.Name, name, StringComparison.Ordinal)))
                 usages.Add(new(profile.Value.Kind, profile.Value.Name, profile.Value.Definition.DisplayName));
+        }
+        foreach (var service in await store.ListAllAsync<ConnectedServiceResource>(
+            ConnectedServiceResourceKinds.ConnectedService, cancellationToken))
+        {
+            if (service.Value.Definition.Bindings.Any(binding =>
+                    binding.Kind == ConnectedServiceBindingKind.Secret
+                    && binding.Secret is { } reference
+                    && reference.ScopeRef == scopeRef
+                    && reference.Address.Namespace == ResourceNamespace.Default
+                    && string.Equals(reference.Address.Name, name, StringComparison.Ordinal)))
+                usages.Add(new(service.Value.Kind, service.Value.Name, service.Value.Definition.DisplayName));
         }
         foreach (var registration in await store.ListAllAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, cancellationToken))
         {

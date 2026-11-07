@@ -305,6 +305,8 @@ public sealed class AepModelProvider(
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.DataSourceProfileBundle, value.Id)))
                     .Concat((manifest.Contributions.SchemaFormats ?? [])
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.SchemaFormat, value.Id)))
+                    .Concat((manifest.Contributions.ConnectedServiceTypes ?? [])
+                        .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.ConnectedServiceType, value.Id)))
                     .ToArray(),
                 catalog.OptionSets.Select(Map).ToArray(),
                 ValueRequirements: manifest.ValueRequirements);

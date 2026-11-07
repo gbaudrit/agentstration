@@ -118,9 +118,10 @@ public sealed class StandaloneRegistrationContractTests
         var contributions = new Dictionary<Type, int>
         {
             [typeof(ISecretVaultProvider)] = 2,
-            [typeof(IBootstrapResourceHandler)] = 17,
+            [typeof(IBootstrapResourceHandler)] = 18,
             [typeof(IPackResourceHandler)] = 11,
-            [typeof(IAepEnrollmentResourceProvisioner)] = 2,
+            [typeof(IAepEnrollmentResourceProvisioner)] = 3,
+            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 2,
             [typeof(IToolExecutionEventSink)] = 2,
             [typeof(IInternalMcpToolDefinitionProvider)] = 34,
             [typeof(IInternalMcpToolHandler)] = 34,

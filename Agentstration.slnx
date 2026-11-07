@@ -34,6 +34,11 @@
     <Project Path="src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <Project Path="src/Agentstration.Bootstrap.Api/Agentstration.Bootstrap.Api.csproj" />
   </Folder>
+  <Folder Name="/src/ConnectedServices/">
+    <Project Path="src/Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
+    <Project Path="src/Agentstration.ConnectedServices.Api/Agentstration.ConnectedServices.Api.csproj" />
+    <Project Path="src/Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />
+  </Folder>
   <Folder Name="/src/Composition/">
     <Project Path="src/Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
     <Project Path="src/Agentstration.Api/Agentstration.Api.csproj" />
