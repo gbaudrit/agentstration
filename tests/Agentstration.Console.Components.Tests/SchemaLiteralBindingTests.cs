@@ -161,10 +161,14 @@ public sealed partial class ModelProviderNavigationTests
         var editContext = new EditContext(new object());
         ValueBindingSelection? selected = null;
         var rendered = RenderSchemaLiteral(context, editContext, """{"type":"null"}""", value => selected = value);
-        rendered.FindAll("button").Single(button => button.TextContent == set).Click();
+        var setButton = rendered.FindAll("button").Single(button => button.TextContent == set);
+        StringAssert.Contains(setButton.GetAttribute("aria-label"), set);
+        setButton.Click();
         Assert.AreEqual(JsonValueKind.Null, selected!.Literal!.Value.ValueKind);
         Assert.IsTrue(editContext.Validate());
-        rendered.FindAll("button").Single(button => button.TextContent == clear).Click();
+        var clearButton = rendered.FindAll("button").Single(button => button.TextContent == clear);
+        StringAssert.Contains(clearButton.GetAttribute("aria-label"), clear);
+        clearButton.Click();
         Assert.IsNull(selected.Literal);
         Assert.IsFalse(editContext.Validate());
     }

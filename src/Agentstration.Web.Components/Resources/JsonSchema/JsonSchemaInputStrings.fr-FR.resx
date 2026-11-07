@@ -50,7 +50,9 @@
   <data name="Validation.ExclusiveMinimum"><value>Saisissez une valeur supérieure à {0}.</value></data>
   <data name="Validation.ExclusiveMaximum"><value>Saisissez une valeur inférieure à {0}.</value></data>
   <data name="SetValue"><value>Définir une valeur</value></data>
+  <data name="SetValueFor"><value>Définir une valeur : {0}</value></data>
   <data name="ClearValue"><value>Effacer la valeur</value></data>
+  <data name="ClearValueFor"><value>Effacer la valeur : {0}</value></data>
   <data name="UnionType"><value>Type de valeur</value></data>
   <data name="Kind.Map"><value>Objet</value></data>
   <data name="Kind.List"><value>Tableau</value></data>

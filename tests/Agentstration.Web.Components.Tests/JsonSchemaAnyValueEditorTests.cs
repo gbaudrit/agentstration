@@ -82,6 +82,7 @@ public sealed class JsonSchemaAnyValueEditorTests
         var type = rendered.Find("select");
         type.Change("0");
         Assert.IsFalse(state!.IsValid);
+        StringAssert.Contains(rendered.Find("input[type='number']").ParentElement!.TextContent, "JSON");
         rendered.Find("input[type='number']").Input("2");
         Assert.IsTrue(state.IsValid);
         Assert.AreEqual(2, state.Value!.Value.GetInt32());

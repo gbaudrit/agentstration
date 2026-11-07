@@ -11,7 +11,9 @@
   <data name="AddItem"><value>Add item</value></data>
   <data name="RemoveItem"><value>Remove item</value></data>
   <data name="SetValue"><value>Set value</value></data>
+  <data name="SetValueFor"><value>Set value: {0}</value></data>
   <data name="ClearValue"><value>Clear value</value></data>
+  <data name="ClearValueFor"><value>Clear value: {0}</value></data>
   <data name="UnionType"><value>Value type</value></data>
   <data name="Kind.Map"><value>Object</value></data>
   <data name="Kind.List"><value>Array</value></data>

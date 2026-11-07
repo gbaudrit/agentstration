@@ -6,7 +6,7 @@
 <div class="schema-field schema-field-@Schema.Kind.ToString().ToLowerInvariant() @(IsLocked ? "schema-field-locked" : null)" data-schema-path="@Schema.Path">
     @if (PreservePresence && !IsPresent && Schema.Kind != JsonSchemaInputKind.Union)
     {
-        <button type="button" class="button-secondary" disabled="@FieldDisabled" @onclick="InitializeValueAsync">@Localizer["SetValue"]</button>
+        <button type="button" class="button-secondary" disabled="@FieldDisabled" aria-label="@Localizer["SetValueFor", Label]" @onclick="InitializeValueAsync">@Localizer["SetValue"]</button>
         <span>@Localizer["NotSet"]</span>
     }
     @if (Schema.Kind == JsonSchemaInputKind.Union)
@@ -22,7 +22,7 @@
         </label>
         @if (SelectedVariantIndex is >= 0 and var selected)
         {
-            <JsonSchemaField Schema="@(Schema.Variants![selected] with { Required = Schema.Required })" Value="Value" ValueChanged="ValueChanged" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="@Issues.Where(issue => issue.Path != Schema.Path).ToArray()" PreservePresence="PreservePresence" IsPresent="IsPresent" />
+            <JsonSchemaField Schema="@(Schema.Variants![selected] with { Required = Schema.Required, Title = Schema.Variants[selected].Title ?? Schema.Title })" Value="Value" ValueChanged="ValueChanged" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="@Issues.Where(issue => issue.Path != Schema.Path).ToArray()" PreservePresence="PreservePresence" IsPresent="IsPresent" />
         }
     }
     else if (Schema.Kind == JsonSchemaInputKind.Map)
@@ -83,7 +83,7 @@
     }
     @if (PreservePresence && IsPresent && ValueRemoved.HasDelegate)
     {
-        <button type="button" class="button-secondary" disabled="@FieldDisabled" @onclick="RemoveValueAsync">@Localizer["ClearValue"]</button>
+        <button type="button" class="button-secondary" disabled="@FieldDisabled" aria-label="@Localizer["ClearValueFor", Label]" @onclick="RemoveValueAsync">@Localizer["ClearValue"]</button>
     }
     @foreach (var issue in FieldIssues)
     {
