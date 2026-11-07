@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Models;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
@@ -77,6 +78,19 @@ public sealed class ParameterEditorModelTests
         var properties = ModelProviderEditorModel.FromResource(resource).ToProperties();
 
         Assert.AreEqual(8_192, properties.SpecificationOverrides["exact-model"].Limits.ContextTokens);
+    }
+
+    [TestMethod]
+    public void ModelProviderEditorRoundTripsTypedLiteralsWithoutResourceReferences()
+    {
+        var binding = ModelProviderValueBinding.FromLiteral("retry", JsonSerializer.SerializeToElement(3));
+        var editor = ModelProviderValueBindingEditorModel.From(binding);
+        Assert.IsTrue(editor.IsConfigured);
+        var saved = editor.ToBinding();
+        Assert.AreEqual(3, saved.Literal?.GetInt32());
+        Assert.IsNull(saved.Parameter);
+        Assert.IsNull(saved.Secret);
+        Assert.AreEqual(string.Empty, editor.ScopeRef);
     }
 
     [TestMethod]

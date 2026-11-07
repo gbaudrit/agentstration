@@ -8,7 +8,7 @@ function Must-Fail([scriptblock] $Action, [string] $Message) {
     Require $failed $Message
 }
 Assert-CoverageInventory $root
-foreach ($path in @('src/Agentstration.ResourcePlanning.Storage.PostgreSql/Migrations/Test.cs', 'src/Agentstration.Security.AspNetCoreIdentity.PostgreSql/Test.cs', 'Directory.Packages.props', 'scripts/ci/classify-changes.ps1')) {
+foreach ($path in @('src/Agentstration.ResourcePlanning.Storage.PostgreSql/Migrations/Test.cs', 'src/Agentstration.Security.AspNetCoreIdentity.PostgreSql/Test.cs', 'Directory.Packages.props', 'scripts/ci/classify-changes.ps1', '.github/actions/restore-linux-build/action.yml')) {
     $result = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require ($result.storage -and $result.dotnet) "Missing storage selection: $path"
 }

@@ -10,4 +10,28 @@
   <data name="NoEligibleVault"><value>Aucun coffre n’est utilisable depuis ce périmètre. Créez ou autorisez d’abord un coffre.</value></data><data name="Secret.WriteOnly"><value>La valeur est envoyée directement au coffre et n’est jamais relue par la Console.</value></data><data name="Secret.ValueWriteFailed"><value>Le secret « {0} » a été créé, mais sa valeur n’a pas pu être enregistrée. Ouvrez la page du secret pour terminer sa configuration.</value></data>
   <data name="Cancel"><value>Annuler</value></data><data name="Creating"><value>Création…</value></data><data name="CreateAndUse"><value>Créer et utiliser</value></data>
   <data name="DefaultNamespaceOnly"><value>Les paramètres et secrets utilisent actuellement l’espace de noms par défaut.</value></data>
+  <data name="Binding.Required"><value>Obligatoire</value></data>
+  <data name="Binding.Optional"><value>Facultatif</value></data>
+  <data name="Binding.Protection.Standard"><value>Standard</value></data>
+  <data name="Binding.Protection.Secured"><value>Sécurisée</value></data>
+  <data name="Binding.ExpectedType"><value>Type attendu</value></data>
+  <data name="Binding.ExpectedFormat"><value>Format</value></data>
+  <data name="Binding.ValueSource"><value>Source de valeur</value></data>
+  <data name="Binding.Source.Parameter"><value>Paramètre</value></data>
+  <data name="Binding.Source.Secret"><value>Secret</value></data>
+  <data name="Binding.Source.Literal"><value>Valeur directe</value></data>
+  <data name="Binding.Source.Caller"><value>Fourni par l’appelant</value></data>
+  <data name="Binding.ExactResource"><value>Ressource de portée exacte</value></data>
+  <data name="Binding.SelectResource"><value>Sélectionner une ressource</value></data>
+  <data name="Binding.CreateParameter"><value>Créer un paramètre</value></data>
+  <data name="Binding.CreateSecret"><value>Créer un secret</value></data>
+  <data name="Binding.UnavailableSelection"><value>Indisponible — {0}/{1}/{2}</value></data>
+  <data name="Binding.RequiredMissing"><value>Cette valeur obligatoire doit être liée avant l’enregistrement.</value></data>
+  <data name="Binding.SecretValueHidden"><value>La valeur du secret reste en écriture seule et n’est jamais chargée dans la Console.</value></data>
+  <data name="Binding.SourceUnavailable"><value>Cette source n’est pas autorisée pour cette exigence.</value></data>
+  <data name="Binding.LiteralValue"><value>Valeur directe</value></data>
+  <data name="Binding.SelectValue"><value>Sélectionner une valeur</value></data>
+  <data name="Binding.True"><value>Vrai</value></data>
+  <data name="Binding.False"><value>Faux</value></data>
+  <data name="Binding.LiteralInvalid"><value>Saisissez une valeur valide du type attendu parmi les valeurs autorisées, le cas échéant.</value></data>
 </root>

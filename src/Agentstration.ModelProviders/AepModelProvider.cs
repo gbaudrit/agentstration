@@ -114,6 +114,11 @@ public sealed class AepModelProvider(
         {
             foreach (var binding in bindings)
             {
+                if (binding.Kind == ModelProviderValueBindingKind.Literal)
+                {
+                    values.Add(AepBoundValue.Inline(binding.RequirementId, binding.Literal!.Value));
+                    continue;
+                }
                 if (binding.Kind == ModelProviderValueBindingKind.Parameter)
                 {
                     if (parameters is null)
