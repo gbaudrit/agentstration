@@ -12,7 +12,9 @@ using Agentstration.Parameters;
 using Agentstration.Parameters.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -249,6 +251,158 @@ public sealed class ConnectedServiceApiTests : ModelManagementApiTestBase
             .GetExactAsync(tenant, ResourceNamespace.Default, "bootstrap-service-type", default));
     }
 
+    [TestMethod]
+    public async Task McpShapedDiscoveryMaterializesTypedReadOnlyOperations()
+    {
+        var gateway = new DeterministicConnectedServiceDiscoveryGateway();
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IConnectedServiceOperationDiscoveryFlowGateway>();
+            services.AddSingleton<IConnectedServiceOperationDiscoveryFlowGateway>(gateway);
+        }));
+        using var client = factory.CreateClient();
+        var tenant = await WorkspaceScopeAsync(client);
+        SelectConsoleContext(client, tenant);
+
+        var operationSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            required = new[] { "name", "inputSchema" },
+            properties = new
+            {
+                name = new { type = "string" },
+                inputSchema = new { type = "object" }
+            },
+            additionalProperties = false
+        });
+        var operationTypeProperties = new ConnectedServiceOperationTypeProperties
+        {
+            DisplayName = "MCP tool",
+            PreferredVersion = "1.0.0",
+            Versions =
+            [
+                new("1.0.0", AepSchemaDigest.Compute(operationSchema), operationSchema,
+                    ConnectedServiceOperationInteraction.RequestResponse,
+                    new("mcp.tools/call", "1.0"))
+            ]
+        };
+        using var operationTypeResponse = await client.PostAsJsonAsync(
+            "/api/connected-service-operation-types",
+            new CreateConnectedServiceOperationTypeRequest("mcp-tool", operationTypeProperties, tenant));
+        Assert.AreEqual(HttpStatusCode.Created, operationTypeResponse.StatusCode);
+        var operationType = (await operationTypeResponse.Content
+            .ReadFromJsonAsync<ConnectedServiceOperationTypeResource>())!;
+        var operationTypeReference = new ConnectedServiceOperationTypeReference
+        {
+            Type = new(operationType.Name, tenant, operationType.Namespace),
+            TypeUid = operationType.Uid,
+            Version = "1.0.0",
+            SchemaDigest = operationType.Definition.Versions.Single().SchemaDigest
+        };
+
+        var serviceSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            additionalProperties = false
+        });
+        var serviceVersion = new ConnectedServiceTypeVersionDescriptor(
+            "1.0.0", AepSchemaDigest.Compute(serviceSchema), serviceSchema, [], [])
+        {
+            OperationDiscovery = new()
+            {
+                Flow = new()
+                {
+                    Flow = new("mcp-discovery", tenant),
+                    FlowUid = Guid.NewGuid(),
+                    Version = "1.0.0",
+                    DefinitionHash = "sha256:test-flow",
+                    Contract = ConnectedServiceOperationDiscoveryContracts.V1
+                },
+                ProducedTypes = [operationTypeReference]
+            }
+        };
+        using var serviceTypeResponse = await client.PostAsJsonAsync("/api/connected-service-types",
+            new CreateConnectedServiceTypeRequest("mcp-server", new()
+            {
+                DisplayName = "MCP server",
+                PreferredVersion = "1.0.0",
+                Versions = [serviceVersion]
+            }, tenant));
+        Assert.AreEqual(HttpStatusCode.Created, serviceTypeResponse.StatusCode);
+        var serviceType = (await serviceTypeResponse.Content.ReadFromJsonAsync<ConnectedServiceTypeResource>())!;
+
+        using var serviceResponse = await client.PostAsJsonAsync("/api/connected-services",
+            new CreateConnectedServiceRequest("weather-mcp", new()
+            {
+                DisplayName = "Weather MCP",
+                Type = new()
+                {
+                    Type = new(serviceType.Name, tenant, serviceType.Namespace),
+                    TypeUid = serviceType.Uid,
+                    Version = serviceVersion.Version,
+                    SchemaDigest = serviceVersion.SchemaDigest
+                },
+                Options = JsonSerializer.SerializeToElement(new { })
+            }, tenant));
+        Assert.AreEqual(HttpStatusCode.Created, serviceResponse.StatusCode);
+
+        gateway.Output = JsonSerializer.SerializeToElement(new ConnectedServiceOperationDiscoveryManifest
+        {
+            Operations =
+            [
+                new()
+                {
+                    ExternalId = "tools/weather.current",
+                    DisplayName = "Current weather",
+                    Type = operationTypeReference,
+                    Definition = JsonSerializer.SerializeToElement(new
+                    {
+                        name = "weather.current",
+                        inputSchema = new { type = "object" }
+                    })
+                }
+            ]
+        });
+        using var start = await client.PostAsJsonAsync(
+            $"/api/connected-services/weather-mcp/operation-discoveries?scopeRef={Uri.EscapeDataString(tenant.Value)}",
+            new StartConnectedServiceOperationDiscoveryRequest(IdempotencyKey: "mcp-fixture"));
+        Assert.AreEqual(HttpStatusCode.Accepted, start.StatusCode,
+            await start.Content.ReadAsStringAsync());
+        var discovery = (await start.Content
+            .ReadFromJsonAsync<ConnectedServiceOperationDiscoveryResource>())!;
+        using var synchronized = await client.GetAsync(
+            $"/api/connected-service-operation-discoveries/{discovery.Name}");
+        Assert.AreEqual(HttpStatusCode.OK, synchronized.StatusCode);
+
+        using var operationsResponse = await client.GetAsync(
+            $"/api/connected-services/weather-mcp/operations?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        Assert.AreEqual(HttpStatusCode.OK, operationsResponse.StatusCode);
+        var operations = (await operationsResponse.Content
+            .ReadFromJsonAsync<ConnectedServiceOperationResource[]>())!;
+        Assert.HasCount(1, operations);
+        Assert.AreEqual("tools/weather.current", operations[0].Definition.ExternalId);
+        Assert.AreEqual(ConnectedServiceOperationAvailability.Available,
+            operations[0].ObservedState.Availability);
+        Assert.AreEqual("mcp.tools/call", operationType.Definition.Versions.Single().Invocation.ProviderOperationId);
+
+        gateway.Output = JsonSerializer.SerializeToElement(new ConnectedServiceOperationDiscoveryManifest());
+        using var secondStart = await client.PostAsJsonAsync(
+            $"/api/connected-services/weather-mcp/operation-discoveries?scopeRef={Uri.EscapeDataString(tenant.Value)}",
+            new StartConnectedServiceOperationDiscoveryRequest(IdempotencyKey: "mcp-fixture-empty"));
+        Assert.AreEqual(HttpStatusCode.Accepted, secondStart.StatusCode);
+        var secondDiscovery = (await secondStart.Content
+            .ReadFromJsonAsync<ConnectedServiceOperationDiscoveryResource>())!;
+        using var secondSynchronized = await client.GetAsync(
+            $"/api/connected-service-operation-discoveries/{secondDiscovery.Name}");
+        Assert.AreEqual(HttpStatusCode.OK, secondSynchronized.StatusCode);
+        var rediscovered = (await client.GetFromJsonAsync<ConnectedServiceOperationResource[]>(
+            $"/api/connected-services/weather-mcp/operations?scopeRef={Uri.EscapeDataString(tenant.Value)}"))!;
+        Assert.HasCount(1, rediscovered);
+        Assert.AreEqual(operations[0].Uid, rediscovered[0].Uid);
+        Assert.AreEqual(ConnectedServiceOperationAvailability.Unavailable,
+            rediscovered[0].ObservedState.Availability);
+    }
+
     private static ConnectedServiceTypeProperties TypeProperties() => new()
     {
         DisplayName = "Object storage account",
@@ -270,4 +424,36 @@ public sealed class ConnectedServiceApiTests : ModelManagementApiTestBase
         (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
             $"/api/resource-scopes/targets?kind={ConnectedServiceResourceKinds.ConnectedService}"))!
         .Single(value => value.Kind == ResourceScopeKind.Tenant).ScopeRef;
+
+    private static async Task<ResourceScopeRef> WorkspaceScopeAsync(HttpClient client) =>
+        (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
+            $"/api/resource-scopes/targets?kind={ConnectedServiceResourceKinds.ConnectedService}"))!
+        .Single(value => value.Kind == ResourceScopeKind.Workspace).ScopeRef;
+
+    private sealed class DeterministicConnectedServiceDiscoveryGateway
+        : IConnectedServiceOperationDiscoveryFlowGateway
+    {
+        private ConnectedServiceDiscoveryFlowRunRequest? request;
+        public JsonElement Output { get; set; }
+
+        public Task<ConnectedServiceDiscoveryFlowRunSnapshot> StartAsync(
+            ConnectedServiceDiscoveryFlowRunRequest value, CancellationToken cancellationToken)
+        {
+            request = value;
+            return Task.FromResult(new ConnectedServiceDiscoveryFlowRunSnapshot(value.RunId,
+                ConnectedServiceOperationDiscoveryState.Pending, null, null, null, null));
+        }
+
+        public Task<ConnectedServiceDiscoveryFlowRunSnapshot?> GetAsync(
+            Guid workspaceId, string runId, Guid tenantId, Guid principalId,
+            CancellationToken cancellationToken) => Task.FromResult<ConnectedServiceDiscoveryFlowRunSnapshot?>(
+            request is null ? null : new(runId, ConnectedServiceOperationDiscoveryState.Succeeded,
+                Output.Clone(), null, null, DateTimeOffset.UtcNow));
+
+        public Task<ConnectedServiceDiscoveryFlowRunSnapshot> CancelAsync(
+            Guid workspaceId, string runId, Guid tenantId, Guid principalId,
+            CancellationToken cancellationToken) => Task.FromResult(new ConnectedServiceDiscoveryFlowRunSnapshot(
+                runId, ConnectedServiceOperationDiscoveryState.Cancelled, null, null, null,
+                DateTimeOffset.UtcNow));
+    }
 }

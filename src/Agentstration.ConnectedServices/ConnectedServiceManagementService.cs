@@ -122,6 +122,13 @@ public sealed class ConnectedServiceManagementService(
     {
         var existing = await GetExactAsync(scopeRef, name, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(name);
+        var hasOperations = (await store.ListAllAsync<ConnectedServiceOperationResource>(
+                ConnectedServiceResourceKinds.ConnectedServiceOperation, cancellationToken))
+            .Any(item => item.Value.Definition.Service.ServiceUid == existing.Value.Uid);
+        var hasDiscoveries = (await store.ListAllAsync<ConnectedServiceOperationDiscoveryResource>(
+                ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, cancellationToken))
+            .Any(item => item.Value.Service.ServiceUid == existing.Value.Uid);
+        if (hasOperations || hasDiscoveries) throw new ConnectedServiceInUseException(name);
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
             await store.DeleteExactAsync(Scoped(scopeRef, name), etag, token);
@@ -450,3 +457,5 @@ public sealed class ConnectedServiceAccessDeniedException(ResourceAddress addres
     : Exception($"Connected Service '{address}' is outside the execution context.");
 public sealed class ConnectedServiceUnavailableException(ResourceAddress address)
     : Exception($"Connected Service '{address}' is not ready for use.");
+public sealed class ConnectedServiceInUseException(string name)
+    : Exception($"Connected Service '{name}' has operation discovery history or materialized operations.");

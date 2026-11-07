@@ -81,6 +81,52 @@ public sealed class AepConformanceTests
     }
 
     [TestMethod]
+    public void ConnectedServiceOperationTypesAndDiscoveryRoundTripAsExtensionOwnedContracts()
+    {
+        using var operationSchema = JsonDocument.Parse(
+            """{"type":"object","required":["operationId"],"properties":{"operationId":{"type":"string"}}}""");
+        using var serviceSchema = JsonDocument.Parse("""{"type":"object"}""");
+        var operationType = new AepConnectedServiceOperationTypeContribution(
+            "openapi-operation",
+            "OpenAPI operation",
+            "1.0.0",
+            [AepConnectedServiceOperationTypeVersionDescriptor.Create(
+                "1.0.0",
+                operationSchema.RootElement,
+                AepConnectedServiceOperationInteraction.RequestResponse,
+                new("openapi.invoke", "1.0"))]);
+        var serviceVersion = AepConnectedServiceTypeVersionDescriptor.Create(
+            "1.0.0", serviceSchema.RootElement) with
+        {
+            OperationDiscovery = new(
+                "openapi-discovery",
+                "1.0.0",
+                [new("openapi-operation", "1.0.0")])
+        };
+        var manifest = new AepManifest(
+            AepProtocol.Version,
+            new("openapi", "OpenAPI", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.ConnectedServiceTypes] = new("1.0"),
+                [AepCapabilityNames.ConnectedServiceOperationTypes] = new("1.0")
+            },
+            new AepContributions([], ConnectedServiceTypes:
+                [new("openapi", "OpenAPI service", "1.0.0", [serviceVersion])],
+                ConnectedServiceOperationTypes: [operationType]));
+
+        var json = JsonSerializer.Serialize(manifest, AepProtocol.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<AepManifest>(json, AepProtocol.JsonOptions)!;
+
+        Assert.IsEmpty(AepDescriptorValidator.Validate(roundTripped));
+        var operationVersion = roundTripped.Contributions.ConnectedServiceOperationTypes!
+            .Single().Versions.Single();
+        Assert.AreEqual("openapi.invoke", operationVersion.Invocation.ProviderOperationId);
+        Assert.AreEqual("openapi-discovery", roundTripped.Contributions.ConnectedServiceTypes!
+            .Single().Versions.Single().OperationDiscovery!.FlowName);
+    }
+
+    [TestMethod]
     public void SchemaFormatContributionsRoundTripAlongsideUnrelatedContributions()
     {
         var manifest = new AepManifest(

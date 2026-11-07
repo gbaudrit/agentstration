@@ -40,6 +40,49 @@ validation then use the local resources; they do not call the extension live.
 Types can also be included as `ConnectedServiceType` documents in Bootstrap
 profiles. The profile target supplies the scope when the document omits one.
 
+## Operation types and discovery
+
+`ConnectedServiceOperationType` is a governed resource with immutable additive
+versions. A version defines the JSON schema of one protocol-specific operation,
+its interaction shape and an invocation contract. This keeps an OpenAPI operation,
+an MCP tool and future protocol operations distinct without hard-coding their
+definitions in the product.
+
+An AEP extension contributes operation types with the
+`aep.connected-service-operation-types` capability. A Connected Service type
+version may then declare an exact discovery Flow and the exact operation-type
+revisions that the Flow may emit. Enrollment materializes operation types, Flows
+and service types in dependency order. Bootstrap supports
+`ConnectedServiceOperationType` documents as well.
+
+The operation-type endpoints are:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/connected-service-operation-types` | List operation types |
+| `GET` | `/api/connected-service-operation-types/{name}?scopeRef=...&namespace=...` | Read an exact operation type |
+| `POST` | `/api/connected-service-operation-types` | Create an operation type |
+| `PUT` | `/api/connected-service-operation-types/{name}?scopeRef=...&namespace=...` | Add versions or update mutable properties |
+| `DELETE` | `/api/connected-service-operation-types/{name}?scopeRef=...&namespace=...` | Delete an unused operation type |
+
+Discovery runs as the exact Flow pinned by the service type and uses contract
+`connected-service-operation-discovery/v1`. Its input exposes only exact resource
+identity and caller context, never resolved credential values. The bounded output
+is validated against the declared operation types before materialization.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/connected-services/{name}/operation-discoveries?scopeRef=...` | Start a durable discovery |
+| `GET` | `/api/connected-services/{name}/operation-discoveries?scopeRef=...` | List discoveries for a service |
+| `GET` | `/api/connected-service-operation-discoveries/{id}?namespace=...` | Observe and synchronize a discovery |
+| `POST` | `/api/connected-service-operation-discoveries/{id}/cancel?namespace=...` | Cancel an active discovery |
+| `GET` | `/api/connected-services/{name}/operations?scopeRef=...` | List materialized operations |
+| `GET` | `/api/connected-service-operations/{name}?scopeRef=...&namespace=...` | Read an exact materialized operation |
+
+Materialized operations are read-only. Rediscovery preserves their deterministic
+identity, updates validated definitions and marks operations omitted from the
+latest successful manifest as unavailable instead of deleting them.
+
 ## Connected Services
 
 The following authorized endpoints manage configured external systems:

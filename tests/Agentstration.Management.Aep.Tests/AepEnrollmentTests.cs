@@ -119,7 +119,9 @@ public sealed class AepEnrollmentTests
             new Dictionary<string, AepCapabilityDescriptor>
             {
                 [AepCapabilityNames.ConnectedServiceTypes] = new(
-                    AepProtocol.ConnectedServiceTypesCapabilityVersion)
+                    AepProtocol.ConnectedServiceTypesCapabilityVersion),
+                [AepCapabilityNames.ConnectedServiceOperationTypes] = new(
+                    AepProtocol.ConnectedServiceOperationTypesCapabilityVersion)
             },
             new AepContributions([], ConnectedServiceTypes:
             [
@@ -128,10 +130,23 @@ public sealed class AepEnrollmentTests
                     "S3 account",
                     "1.0.0",
                     [AepConnectedServiceTypeVersionDescriptor.Create("1.0.0", schema)])
+            ], ConnectedServiceOperationTypes:
+            [
+                new AepConnectedServiceOperationTypeContribution(
+                    "s3-operation",
+                    "S3 operation",
+                    "1.0.0",
+                    [AepConnectedServiceOperationTypeVersionDescriptor.Create(
+                        "1.0.0", schema,
+                        AepConnectedServiceOperationInteraction.RequestResponse,
+                        new("s3.invoke", "1.0"))])
             ]),
             null);
 
         using var systemScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var operationTypeProvisioner = factory.Services.GetServices<IAepEnrollmentResourceProvisioner>()
+            .OfType<AepEnrollmentConnectedServiceOperationTypeProvisioner>().Single();
+        await operationTypeProvisioner.ProvisionAsync(registration, manifest, default);
         var provisioner = factory.Services.GetServices<IAepEnrollmentResourceProvisioner>()
             .OfType<AepEnrollmentConnectedServiceTypeProvisioner>().Single();
         await provisioner.ProvisionAsync(registration, manifest, default);
@@ -146,6 +161,14 @@ public sealed class AepEnrollmentTests
             created.Value.Governance.ManagedBy?.Kind);
         Assert.AreEqual($"{target.Value}/{ExtensionKinds.ExtensionRegistration}/default/paired-storage",
             created.Value.Governance.ManagedBy?.Reference);
+        var operationType = await factory.Services
+            .GetRequiredService<ConnectedServiceOperationTypeManagementService>()
+            .GetExactAsync(target, ResourceNamespace.Parse("io.agentstration.test.storage"),
+                "s3-operation", default);
+        Assert.IsNotNull(operationType);
+        Assert.AreEqual(ResourceOriginKind.Extension, operationType.Value.Governance.Origin.Kind);
+        Assert.AreEqual("s3.invoke",
+            operationType.Value.Definition.Versions.Single().Invocation.ProviderOperationId);
 
         await provisioner.ProvisionAsync(registration, manifest, default);
         Assert.AreEqual(created.ETag, (await types.GetExactAsync(target,

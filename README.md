@@ -61,7 +61,7 @@ Packs form a distribution layer above these boundaries. The repository produces 
 
 The Agentstration Extension Protocol SDK, conformance validator, CLI, samples and standalone Inspector are staged autonomously in [`aep/`](aep/README.md). AEP gives extensions versioned discovery, capability and option contracts without leaking provider-specific concerns into portable Agentstration resources.
 
-Connected Services and their types are scoped product resources. A type may be bootstrapped by Core, authored by a user or materialized from an AEP contribution with extension governance; a configured service pins one exact type resource revision while Agentstration owns lifecycle and late-bound credentials. The REST surfaces are documented in [Connected Services API](docs/reference/connected-services.md); consumer bindings such as Storage/OpenDAL remain explicit and do not couple extensions together.
+Connected Services, their service types and their protocol-specific operation types are scoped product resources. A type may be bootstrapped by Core, authored by a user or materialized from an AEP contribution with extension governance; a configured service pins one exact type revision, while durable Flow-backed discovery materializes validated read-only operations. The REST surfaces are documented in [Connected Services API](docs/reference/connected-services.md); consumer bindings such as Storage/OpenDAL remain explicit and do not couple extensions together.
 
 The standalone Agentstration Storage Protocol SDK is staged in [`asp/`](asp/README.md): neutral bounded content contracts, MCP client/server adapters, an offline sample and conformance tests. It does not yet integrate product Storage resources or promise durable Snapshot retention.
 

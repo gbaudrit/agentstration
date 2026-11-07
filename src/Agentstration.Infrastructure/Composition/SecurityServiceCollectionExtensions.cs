@@ -34,6 +34,12 @@ internal static class SecurityServiceCollectionExtensions
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());
         services.AddSingleton<ConnectedServiceManagementService>();
         services.AddSingleton<ConnectedServiceTypeManagementService>();
+        services.AddSingleton<ConnectedServiceOperationTypeManagementService>();
+        services.AddSingleton<ConnectedServiceOperationDiscoveryService>();
+        services.AddSingleton<IConnectedServiceOperationDiscoveryFlowGateway,
+            ConnectedServiceOperationDiscoveryFlowGateway>();
+        if (context.Options.EnableHostedServices)
+            services.AddHostedService<ConnectedServiceOperationDiscoveryRecoveryWorker>();
         services.AddSingleton<IConnectedServiceResolver>(provider => provider.GetRequiredService<ConnectedServiceManagementService>());
         services.AddSingleton<IParameterUsageProvider, ConnectedServiceParameterUsageProvider>();
         services.AddSingleton<SecretManagementService>();
