@@ -128,6 +128,15 @@ public sealed record ConnectedServiceResource : Resource
 public sealed record ConnectedServiceReference(ResourceAddress Address, ResourceScopeRef ScopeRef);
 public sealed record ConnectedServiceResolutionContext(ResourceScopeRef ConsumerScopeRef, ResourceAddress Consumer);
 
+public sealed record ConnectedServiceUsage(string Kind, string Name, string DisplayName, string Url);
+
+public interface IConnectedServiceUsageProvider
+{
+    Task<IReadOnlyList<ConnectedServiceUsage>> GetUsagesAsync(
+        ScopedResourceAddress connectedService,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed class ResolvedConnectedServiceInput : IDisposable
 {
     public required string Id { get; init; }
@@ -172,3 +181,5 @@ public sealed record CreateConnectedServiceTypeRequest(
     ResourceScopeRef? ScopeRef = null,
     ResourceNamespace? Namespace = null);
 public sealed record PutConnectedServiceTypeRequest(ConnectedServiceTypeProperties Properties);
+public sealed record ConnectedServiceUsageResponse(string ResourceType, string Name, string DisplayName, string Url);
+public sealed record ConnectedServiceUsagesResponse(IReadOnlyList<ConnectedServiceUsageResponse> Value, int Count);

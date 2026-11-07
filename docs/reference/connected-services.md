@@ -48,6 +48,7 @@ The following authorized endpoints manage configured external systems:
 |---|---|---|
 | `GET` | `/api/connected-services` | List visible resources |
 | `GET` | `/api/connected-services/{name}?scopeRef=...` | Read one exact resource |
+| `GET` | `/api/connected-services/{name}/usages?scopeRef=...` | List dependent resources reported by consumer verticals |
 | `POST` | `/api/connected-services` | Create and validate a resource |
 | `PUT` | `/api/connected-services/{name}?scopeRef=...` | Replace desired configuration with `If-Match` |
 | `POST` | `/api/connected-services/{name}/reconcile?scopeRef=...` | Refresh observed compatibility |
@@ -73,3 +74,17 @@ API.
 Storage adapters bind their requirement ids to selected Connected Service export
 ids explicitly. No automatic matching and no direct OpenDAL-to-provider-extension
 link is part of this API.
+
+## Console
+
+The administration Console exposes the same family-owned API through these routes:
+
+- `/connected-services` lists the permission-aware scoped catalog and filters by type or observed availability;
+- `/connected-services/new` selects an exact `ConnectedServiceType` resource revision, renders its JSON schema and binds every declared input manually to an exact Parameter or Secret;
+- `/connected-services/{name}?scopeRef=...` displays the pinned type resource and governance evidence, safe options, binding references, exports, diagnostics and reported dependents;
+- `/connected-services/{name}/edit?scopeRef=...` updates options and bindings with the resource ETag.
+
+Reconciliation and deactivation always require explicit confirmation. Reconciliation
+refreshes compatibility evidence but never silently changes the pinned type UID,
+version or schema digest. The Console never displays Secret values and does not
+perform provider-specific Storage configuration.

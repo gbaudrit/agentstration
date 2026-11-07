@@ -91,6 +91,10 @@ public sealed class ConnectedServiceApiTests : ModelManagementApiTestBase
         Assert.AreEqual(ConnectedServiceAvailability.Ready, created.ObservedState?.Availability);
         Assert.IsFalse((await createdResponse.Content.ReadAsStringAsync()).Contains(
             "https://storage.example.test", StringComparison.Ordinal));
+        var usages = await client.GetFromJsonAsync<ConnectedServiceUsagesResponse>(
+            $"/api/connected-services/{created.Name}/usages?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        Assert.IsNotNull(usages);
+        Assert.AreEqual(0, usages.Count);
 
         using var deleteParameter = new HttpRequestMessage(HttpMethod.Delete,
             $"/api/parameters/storage-endpoint?scopeRef={Uri.EscapeDataString(tenant.Value)}");
