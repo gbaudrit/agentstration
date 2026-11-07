@@ -22,8 +22,9 @@ internal static class ToolsServiceCollectionExtensions
         services.AddAgentstrationMcpTools();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentToolProvisioner>();
-        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentConnectedServiceTypeProvisioner>();
+        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentConnectedServiceOperationTypeProvisioner>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentBundleProvisioner>();
+        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentConnectedServiceTypeProvisioner>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ToolDefinitionService>();

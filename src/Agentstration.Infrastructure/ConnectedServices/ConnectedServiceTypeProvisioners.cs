@@ -4,6 +4,8 @@ using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.ConnectedServices;
@@ -62,6 +64,8 @@ public sealed class ConnectedServicePlatformResourceProvisioner(
 
 public sealed class AepEnrollmentConnectedServiceTypeProvisioner(
     ConnectedServiceTypeManagementService types,
+    ConnectedServiceOperationTypeManagementService operationTypes,
+    FlowService flows,
     IResourceGovernanceContext governance) : IAepEnrollmentResourceProvisioner
 {
     public async Task ProvisionAsync(
@@ -93,31 +97,83 @@ public sealed class AepEnrollmentConnectedServiceTypeProvisioner(
                     DisplayName = contribution.DisplayName,
                     Description = contribution.Description,
                     PreferredVersion = contribution.PreferredVersion,
-                    Versions = contribution.Versions.Select(Map).ToArray()
+                    Versions = await Task.WhenAll(contribution.Versions.Select(version =>
+                        MapAsync(version, scopeRef, @namespace, cancellationToken)))
                 }
             }, cancellationToken);
         }
     }
 
-    private static ConnectedServiceTypeVersionDescriptor Map(
-        AepConnectedServiceTypeVersionDescriptor version) => new(
-        version.Version,
-        version.SchemaDigest,
-        version.Schema.Clone(),
-        version.Inputs.Select(input => new ConnectedServiceInputDescriptor(
-            input.Id,
-            input.Required,
-            Map(input.Type),
-            Map(input.Protection),
-            input.Format,
-            input.Description)).ToArray(),
-        version.Exports.Select(export => new ConnectedServiceExportDescriptor(
-            export.Id,
-            Map(export.Type),
-            Map(export.Protection),
-            export.Format,
-            export.Description)).ToArray(),
-        version.Deprecated);
+    private async Task<ConnectedServiceTypeVersionDescriptor> MapAsync(
+        AepConnectedServiceTypeVersionDescriptor version,
+        ResourceScopeRef scopeRef,
+        ResourceNamespace extensionNamespace,
+        CancellationToken cancellationToken)
+    {
+        ConnectedServiceOperationDiscoveryDescriptor? discovery = null;
+        if (version.OperationDiscovery is { } declared)
+        {
+            var flowNamespace = string.IsNullOrWhiteSpace(declared.FlowNamespace)
+                ? extensionNamespace : ResourceNamespace.Parse(declared.FlowNamespace);
+            var flowId = new FlowId(declared.FlowName, flowNamespace);
+            var flow = await flows.GetExactAsync(scopeRef, flowId, cancellationToken)
+                ?? throw new ConnectedServiceTypeValidationException(
+                    $"Discovery Flow '{flowNamespace}/{declared.FlowName}' was not provisioned.");
+            var flowVersion = await flows.GetVersionExactAsync(scopeRef, flowId,
+                    declared.FlowVersion, cancellationToken)
+                ?? throw new ConnectedServiceTypeValidationException(
+                    $"Discovery Flow version '{flowNamespace}/{declared.FlowName}:{declared.FlowVersion}' was not provisioned.");
+            if (!flowVersion.Value.Metadata.TryGetValue(FlowMetadataKeys.Contract, out var contract)
+                || !string.Equals(contract, ConnectedServiceOperationDiscoveryContracts.V1, StringComparison.Ordinal))
+                throw new ConnectedServiceTypeValidationException(
+                    $"Discovery Flow '{flowNamespace}/{declared.FlowName}:{declared.FlowVersion}' must declare contract '{ConnectedServiceOperationDiscoveryContracts.V1}'.");
+            var producedTypes = new List<ConnectedServiceOperationTypeReference>();
+            foreach (var reference in declared.ProducedTypes)
+            {
+                var stored = await operationTypes.GetExactAsync(scopeRef, extensionNamespace,
+                    reference.Id, cancellationToken)
+                    ?? throw new ConnectedServiceOperationTypeNotFoundException(extensionNamespace, reference.Id);
+                var operationVersion = stored.Value.Definition.Versions.SingleOrDefault(candidate =>
+                    string.Equals(candidate.Version, reference.Version, StringComparison.Ordinal))
+                    ?? throw new ConnectedServiceOperationTypeRevisionException(
+                        $"Operation type version '{reference.Id}:{reference.Version}' was not provisioned.");
+                producedTypes.Add(new()
+                {
+                    Type = new(reference.Id, scopeRef, extensionNamespace),
+                    TypeUid = stored.Value.Uid,
+                    Version = operationVersion.Version,
+                    SchemaDigest = operationVersion.SchemaDigest
+                });
+            }
+            discovery = new()
+            {
+                Flow = new()
+                {
+                    Flow = new(declared.FlowName, scopeRef, flowNamespace),
+                    FlowUid = flow.Value.Uid,
+                    Version = flowVersion.Value.Version,
+                    DefinitionHash = flowVersion.Value.DefinitionHash
+                        ?? throw new ConnectedServiceTypeValidationException("The discovery Flow has no definition hash."),
+                    Contract = contract
+                },
+                ProducedTypes = producedTypes
+            };
+        }
+        return new(
+            version.Version,
+            version.SchemaDigest,
+            version.Schema.Clone(),
+            version.Inputs.Select(input => new ConnectedServiceInputDescriptor(
+                input.Id, input.Required, Map(input.Type), Map(input.Protection),
+                input.Format, input.Description)).ToArray(),
+            version.Exports.Select(export => new ConnectedServiceExportDescriptor(
+                export.Id, Map(export.Type), Map(export.Protection),
+                export.Format, export.Description)).ToArray(),
+            version.Deprecated)
+        {
+            OperationDiscovery = discovery
+        };
+    }
 
     private static ConnectedServiceValueType Map(AepValueType type) => type switch
     {
@@ -134,4 +190,60 @@ public sealed class AepEnrollmentConnectedServiceTypeProvisioner(
         AepValueProtection.Secured => ConnectedServiceValueProtection.Secured,
         _ => throw new ArgumentOutOfRangeException(nameof(protection))
     };
+}
+
+public sealed class AepEnrollmentConnectedServiceOperationTypeProvisioner(
+    ConnectedServiceOperationTypeManagementService types,
+    IResourceGovernanceContext governance) : IAepEnrollmentResourceProvisioner
+{
+    public async Task ProvisionAsync(
+        ExtensionRegistrationResource registration,
+        AepManifest? authenticatedManifest,
+        CancellationToken cancellationToken)
+    {
+        if (authenticatedManifest?.Contributions.ConnectedServiceOperationTypes is not { Count: > 0 } contributions)
+            return;
+        var scopeRef = registration.ScopeRef
+            ?? throw new ConnectedServiceOperationTypeValidationException(
+                "The Extension Registration has no ownership scope.");
+        var installationReference = $"{scopeRef.Value}/{registration.Kind}/{registration.Namespace}/{registration.Name}";
+        using var governanceScope = governance.Push(ResourceGovernance.Extension(
+            installationReference, authenticatedManifest.Extension.Id, authenticatedManifest.Extension.Version));
+        var @namespace = ResourceNamespace.Parse(authenticatedManifest.Extension.Id);
+        foreach (var contribution in contributions)
+        {
+            _ = await types.SynchronizeManagedAsync(new ConnectedServiceOperationTypeResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ConnectedServiceResourceKinds.ConnectedServiceOperationType,
+                Metadata = new() { Name = contribution.Id, Namespace = @namespace },
+                ScopeRef = scopeRef,
+                Definition = new()
+                {
+                    DisplayName = contribution.DisplayName,
+                    Description = contribution.Description,
+                    PreferredVersion = contribution.PreferredVersion,
+                    Versions = contribution.Versions.Select(version =>
+                        new ConnectedServiceOperationTypeVersionDescriptor(
+                            version.Version,
+                            version.SchemaDigest,
+                            version.DefinitionSchema.Clone(),
+                            Map(version.Interaction),
+                            new(version.Invocation.ProviderOperationId, version.Invocation.ContractVersion),
+                            version.Deprecated)).ToArray()
+                }
+            }, cancellationToken);
+        }
+    }
+
+    private static ConnectedServiceOperationInteraction Map(AepConnectedServiceOperationInteraction interaction) =>
+        interaction switch
+        {
+            AepConnectedServiceOperationInteraction.RequestResponse => ConnectedServiceOperationInteraction.RequestResponse,
+            AepConnectedServiceOperationInteraction.ServerStream => ConnectedServiceOperationInteraction.ServerStream,
+            AepConnectedServiceOperationInteraction.ClientStream => ConnectedServiceOperationInteraction.ClientStream,
+            AepConnectedServiceOperationInteraction.DuplexStream => ConnectedServiceOperationInteraction.DuplexStream,
+            AepConnectedServiceOperationInteraction.Subscription => ConnectedServiceOperationInteraction.Subscription,
+            _ => throw new ArgumentOutOfRangeException(nameof(interaction))
+        };
 }

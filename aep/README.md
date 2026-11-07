@@ -55,6 +55,8 @@ Extensions may also publish `schema-format` contributions through `aep.schema-fo
 
 Extensions may publish immutable `connected-service-type` contributions through `aep.connected-service-types`. Each type declares a preferred version and exact versions containing a JSON configuration schema and digest, typed/protected inputs and typed/protected exports. AEP describes types only: the consuming product owns configured instances, scope, references, lifecycle and Secret resolution. Register descriptors through `AepExtensionOptions.ConnectedServiceTypes`; changing a schema requires a new version.
 
+Protocol-specific operation contracts are separate `connected-service-operation-type` contributions advertised through `aep.connected-service-operation-types`. Register them through `AepExtensionOptions.ConnectedServiceOperationTypes`. A Connected Service type version may bind an exact contributed discovery Flow and the operation-type ids/versions that its bounded discovery manifest is allowed to produce. This lets an OpenAPI extension own OpenAPI service and operation shapes without inheriting the builtin HTTP type or coupling to another extension.
+
 ## Authenticate AEP traffic
 
 The client accepts a request-scoped credential provider. It applies the Bearer to each request without changing shared `HttpClient.DefaultRequestHeaders`:
