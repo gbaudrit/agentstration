@@ -3,7 +3,7 @@ using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
-public enum ValueBindingSourceKind { Parameter, Secret, Literal }
+public enum ValueBindingSourceKind { Parameter, Secret, Literal, Caller }
 
 public sealed record ValueBindingRequirement(
     string Id,
@@ -24,9 +24,12 @@ public sealed record ValueBindingSelection(
     ScopedResourceAddress? Resource = null,
     JsonElement? Literal = null)
 {
-    public bool IsConfigured => Kind == ValueBindingSourceKind.Literal
-        ? Literal is { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) }
-        : Resource is not null;
+    public bool IsConfigured => Kind switch
+    {
+        ValueBindingSourceKind.Caller => true,
+        ValueBindingSourceKind.Literal => Literal is { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) },
+        _ => Resource is not null
+    };
 
     public override string ToString() => $"{Kind}:[REDACTED]";
 }

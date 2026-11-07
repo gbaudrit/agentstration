@@ -34,21 +34,101 @@ public sealed partial class ModelProviderNavigationTests
     }
 
     [TestMethod]
-    [DataRow("en-US", "Required", "Literal", "Expected type")]
-    [DataRow("fr-FR", "Obligatoire", "Valeur directe", "Type attendu")]
-    public void SharedBindingEditorLocalizesRequirementAndSources(string cultureName, string required, string literal, string type)
+    [DataRow("en-US", "Required", "Literal", "Expected type", "Provided by caller")]
+    [DataRow("fr-FR", "Obligatoire", "Valeur directe", "Type attendu", "Fourni par l’appelant")]
+    public void SharedBindingEditorLocalizesRequirementAndSources(string cultureName, string required, string literal, string type, string caller)
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = CreateContext(out _);
         var rendered = context.Render<ValueBindingRequirementEditor>(parameters => parameters
             .Add(value => value.Requirement, new("retry", true, "integer", Description: "Retry count", Format: "int64"))
-            .Add(value => value.AllowedSources, [ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret, ValueBindingSourceKind.Literal]));
+            .Add(value => value.AllowedSources, [ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret, ValueBindingSourceKind.Literal, ValueBindingSourceKind.Caller]));
 
         StringAssert.Contains(rendered.Markup, required);
         StringAssert.Contains(rendered.Markup, literal);
         StringAssert.Contains(rendered.Markup, type);
         StringAssert.Contains(rendered.Markup, "Retry count");
         StringAssert.Contains(rendered.Markup, "int64");
+        Assert.AreEqual(caller, rendered.Find("option[value='Caller']").TextContent);
+    }
+
+    [TestMethod]
+    [DataRow(ValueBindingSourceKind.Parameter)]
+    [DataRow(ValueBindingSourceKind.Secret)]
+    [DataRow(ValueBindingSourceKind.Literal)]
+    public void SharedCallerSelectionClearsThePreviousPayloadAndNeedsNoValueEditor(ValueBindingSourceKind previousKind)
+    {
+        using var context = CreateContext(out _);
+        ValueBindingSelection? selected = null;
+        var resource = ScopedResourceAddress.Create(WorkspaceScope, ResourceNamespace.Default,
+            previousKind == ValueBindingSourceKind.Secret ? "Secret" : "Parameter", "value");
+        var previous = previousKind == ValueBindingSourceKind.Literal
+            ? new ValueBindingSelection(previousKind, Literal: JsonSerializer.SerializeToElement(7))
+            : new ValueBindingSelection(previousKind, resource);
+        var rendered = context.Render<ValueBindingRequirementEditor>(parameters => parameters
+            .Add(value => value.Requirement, new("input", true, "integer"))
+            .Add(value => value.AllowedSources, Enum.GetValues<ValueBindingSourceKind>())
+            .Add(value => value.Selection, previous)
+            .Add(value => value.CreationContext, new(WorkspaceScope, "input", "Input"))
+            .Add(value => value.SelectionChanged, value => selected = value));
+        if (previousKind != ValueBindingSourceKind.Literal)
+            rendered.Find("[data-testid$='binding-create']").Click();
+
+        rendered.Find("[data-testid$='binding-kind']").Change("Caller");
+
+        Assert.IsNotNull(selected);
+        Assert.AreEqual(ValueBindingSourceKind.Caller, selected.Kind);
+        Assert.IsTrue(selected.IsConfigured);
+        Assert.IsNull(selected.Resource);
+        Assert.IsNull(selected.Literal);
+        Assert.HasCount(0, rendered.FindAll("[data-testid$='binding-target'], [data-testid$='binding-literal'], [data-testid$='binding-create'], [role='dialog'], [role='alert']"));
+    }
+
+    [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(true, true)]
+    public void SharedCallerSelectionRequiresExplicitPermissionAndAnEditableConsumer(bool allowed, bool disabled)
+    {
+        using var context = CreateContext(out _);
+        var changes = 0;
+        var rendered = context.Render<ValueBindingRequirementEditor>(parameters => parameters
+            .Add(value => value.Requirement, new("input", false, "string"))
+            .Add(value => value.AllowedSources, allowed
+                ? [ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Caller]
+                : [ValueBindingSourceKind.Parameter])
+            .Add(value => value.Disabled, disabled)
+            .Add(value => value.SelectionChanged, _ => changes++));
+
+        Assert.HasCount(allowed ? 1 : 0, rendered.FindAll("option[value='Caller']"));
+        var source = rendered.Find("[data-testid$='binding-kind']");
+        Assert.AreEqual(disabled, source.HasAttribute("disabled"));
+        source.Change("Caller");
+        Assert.AreEqual(0, changes);
+    }
+
+    [TestMethod]
+    public void SharedCallerCanBeDisabledAndEnabledWhilePreservingARequiredSelection()
+    {
+        using var context = CreateContext(out _);
+        var editContext = new EditContext(new object());
+        var rendered = context.Render<CascadingValue<EditContext>>(parameters => parameters
+            .Add(value => value.Value, editContext)
+            .AddChildContent<ValueBindingRequirementEditor>(editor => editor
+                .Add(value => value.Requirement, new("input", true, "string"))
+                .Add(value => value.AllowedSources, [ValueBindingSourceKind.Caller])
+                .Add(value => value.Selection, new(ValueBindingSourceKind.Caller))));
+
+        Assert.IsTrue(editContext.Validate());
+        var editor = rendered.FindComponent<ValueBindingRequirementEditor>();
+        editor.Render(parameters => parameters.Add(value => value.AllowedSources, [ValueBindingSourceKind.Parameter]));
+        Assert.IsFalse(editContext.Validate());
+        Assert.AreEqual("Caller", ((IHtmlSelectElement)rendered.Find("[data-testid$='binding-kind']")).Value);
+        Assert.IsTrue(rendered.Find("option[value='Caller']").HasAttribute("disabled"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid$='binding-target'], [data-testid$='binding-literal'], [data-testid$='binding-create']"));
+
+        editor.Render(parameters => parameters.Add(value => value.AllowedSources, [ValueBindingSourceKind.Caller]));
+        Assert.IsTrue(editContext.Validate());
+        Assert.IsFalse(rendered.Find("option[value='Caller']").HasAttribute("disabled"));
     }
 
     [TestMethod]
@@ -100,7 +180,7 @@ public sealed partial class ModelProviderNavigationTests
         var changes = 0;
         var rendered = context.Render<ValueBindingRequirementEditor>(parameters => parameters
             .Add(value => value.Requirement, new("credential", true, "string", Secured: true))
-            .Add(value => value.AllowedSources, [ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Literal, ValueBindingSourceKind.Secret])
+            .Add(value => value.AllowedSources, [ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Literal, ValueBindingSourceKind.Secret, ValueBindingSourceKind.Caller])
             .Add(value => value.Selection, new(ValueBindingSourceKind.Secret))
             .Add(value => value.SelectionChanged, _ => changes++));
 
@@ -108,6 +188,7 @@ public sealed partial class ModelProviderNavigationTests
         CollectionAssert.AreEqual(new[] { "Secret" }, source.QuerySelectorAll("option").Select(value => value.GetAttribute("value")).ToArray());
         source.Change("Literal");
         source.Change("Parameter");
+        source.Change("Caller");
         Assert.AreEqual(0, changes);
         Assert.HasCount(0, rendered.FindAll("[data-testid$='binding-literal']"));
     }
@@ -254,6 +335,7 @@ public sealed partial class ModelProviderNavigationTests
         var rendered = context.Render<Agentstration.Web.Components.Pages.ModelProviderDetails>();
         rendered.WaitForElement("[data-testid='model-provider-name']").Change("literal-provider");
         rendered.Find("[data-testid='model-provider-display-name']").Change("Literal provider");
+        Assert.HasCount(0, rendered.FindAll("option[value='Caller']"));
         rendered.Find("[data-testid='model-provider-binding-kind']").Change("Literal");
         rendered.Find("[data-testid='model-provider-binding-literal']").Change("7");
         rendered.Find("form[data-testid='model-provider-form']").Submit();

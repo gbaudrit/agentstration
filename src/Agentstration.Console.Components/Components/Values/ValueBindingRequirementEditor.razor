@@ -41,7 +41,7 @@
                 }
             </label>
         }
-        else if (selection.Kind != ValueBindingSourceKind.Literal)
+        else if (selection.Kind is ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)
         {
             <div class="contextual-binding-target">
                 <label><span>@T("Binding.ExactResource")</span>
@@ -146,7 +146,7 @@ else
 
     private async Task TargetChangedAsync(ChangeEventArgs args)
     {
-        if (Disabled || !Sources.Contains(selection.Kind)) return;
+        if (Disabled || !Sources.Contains(selection.Kind) || selection.Kind is not (ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)) return;
         var key = args.Value?.ToString() ?? string.Empty;
         if (key.Length == 0) { await SelectAsync(new(selection.Kind)); return; }
         var option = CurrentOptions.FirstOrDefault(value => TargetValue(value.Address) == key);
@@ -189,7 +189,7 @@ else
 
     private void OpenCreator()
     {
-        if (Disabled || CreationContext is null || !Sources.Contains(selection.Kind) || selection.Kind == ValueBindingSourceKind.Literal) return;
+        if (Disabled || CreationContext is null || !Sources.Contains(selection.Kind) || selection.Kind is not (ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)) return;
         creatorContext = CreationContext with
         {
             Description = Requirement.Description,

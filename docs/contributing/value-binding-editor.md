@@ -5,7 +5,7 @@
 Supply:
 
 - A `ValueBindingRequirement` with the invariant identifier and scalar type (`string`, `integer`, `number` or `boolean`), required/protection state, description, optional format and optional allowed JSON values. Format is displayed as requirement metadata; the consumer's normal server validation remains authoritative.
-- Explicit `AllowedSources`: `Parameter`, `Secret` and/or `Literal`. Secured requirements always exclude Parameters and literals, even if the caller includes them. Consumers may impose narrower restrictions; Model Provider requirements with allowed values exclude Secrets, as required by their server contract.
+- Explicit `AllowedSources`: `Parameter`, `Secret`, `Literal` and/or `Caller`. Include `Caller` only when the consumer supports values supplied at invocation time; omit it to disable that choice. Secured requirements always allow only Secrets, even if the consumer includes other sources. Consumers may impose narrower restrictions; Model Providers do not enable `Caller`, and their requirements with allowed values exclude Secrets, as required by their server contract.
 - Compatible `ValueBindingOption` entries containing a source kind, display name and exact `ScopedResourceAddress`. The consumer filters by type, allowed values, scope, authorization and use policy. The component never retrieves resource inventories or resolves Secret values.
 - The current `ValueBindingSelection` and a `SelectionChanged` callback. Resource selections preserve scope, namespace and name; literal selections carry typed JSON with no resource reference. Missing persisted references remain visible as unavailable rather than being replaced. Switching source clears the previous payload. Consumers convert the selection to their own persisted contract.
 - An optional `ContextualValueCreationContext` with the exact consumer scope, namespace and suggested resource identity. The component projects the requirement's type, format and allowed values into the existing Parameter/Secret creator. Omit the context to disable contextual creation. The current creators support the default namespace only.
@@ -25,6 +25,10 @@ When the editor is inside an `EditForm`, supply a unique, stable `DialogSectionI
 ```
 
 Missing required selections, disallowed sources and invalid literal types/allowed values participate in the enclosing `EditContext` validation. Boolean literals use a localized selector, while technical allowed values retain their original representation. Callers must still validate commands on the server; UI filtering is not an authorization boundary. Disable the editor for read-only consumers.
+
+`Caller` displays **Provided by caller** (French: **Fourni par l’appelant**) without a value field, resource selector or creation action. Selecting it emits `new ValueBindingSelection(ValueBindingSourceKind.Caller)` with no resource or literal payload and counts as a configured binding, including for required requirements. The consuming editor owns persistence, invocation-time resolution and validation of the eventual value; the shared component does not implement those behaviors.
+
+The consumer can toggle this choice by adding or removing `ValueBindingSourceKind.Caller` in `AllowedSources`. Removing it while a Caller binding is selected preserves that selection as unavailable and invalidates the enclosing form; it does not silently replace it. `Disabled` independently makes the entire editor read-only.
 
 Component-owned presentation is localized through the existing `ContextualValueCreatorStrings` catalog in English and French. `TestIdPrefix` defaults to `value-binding`; existing consumers may supply a prefix to preserve browser selector contracts.
 

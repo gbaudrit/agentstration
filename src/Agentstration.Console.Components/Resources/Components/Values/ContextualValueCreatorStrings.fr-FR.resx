@@ -20,6 +20,7 @@
   <data name="Binding.Source.Parameter"><value>Paramètre</value></data>
   <data name="Binding.Source.Secret"><value>Secret</value></data>
   <data name="Binding.Source.Literal"><value>Valeur directe</value></data>
+  <data name="Binding.Source.Caller"><value>Fourni par l’appelant</value></data>
   <data name="Binding.ExactResource"><value>Ressource de portée exacte</value></data>
   <data name="Binding.SelectResource"><value>Sélectionner une ressource</value></data>
   <data name="Binding.CreateParameter"><value>Créer un paramètre</value></data>
