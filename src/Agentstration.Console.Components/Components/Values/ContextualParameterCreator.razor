@@ -3,7 +3,7 @@
 @inject IParametersClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ContextualValueCreatorStrings> Localizer
 
-@if (IsOpen && Context is not null)
+@if (IsOpen && Context is { } creationContext)
 {
     <div class="dialog-backdrop" role="presentation" @onclick="CancelAsync">
         <section class="dialog contextual-value-dialog" role="dialog" aria-modal="true" aria-labelledby="contextual-parameter-title" @onclick:stopPropagation data-testid="contextual-parameter-creator">
@@ -15,14 +15,14 @@
                 <div class="form-grid">
                     <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Parameter" IsNew="true" DisplayNameTestId="contextual-parameter-display-name" TechnicalNameTestId="contextual-parameter-name" />
                     <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
-                    <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="Context.ScopeRef" /></label>
-                    <label><span>@T("ValueType")</span><InputSelect @bind-Value="model.ValueType" disabled="@(Context.ValueType is not null)" data-testid="contextual-parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</InputSelect></label>
-                    @if (!string.IsNullOrWhiteSpace(Context.Format)) { <p class="form-span-2 inline-info">@T("ExpectedFormat", Context.Format)</p> }
+                    <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="creationContext.ScopeRef" /></label>
+                    <label><span>@T("ValueType")</span><InputSelect @bind-Value="model.ValueType" disabled="@(creationContext.ValueType is not null)" data-testid="contextual-parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</InputSelect></label>
+                    @if (!string.IsNullOrWhiteSpace(creationContext.Format)) { <p class="form-span-2 inline-info">@T("ExpectedFormat", creationContext.Format)</p> }
                     <label class="form-span-2"><span>@T("Value")</span>
-                        @if (Context.AllowedValues is { Count: > 0 })
+                        @if (creationContext.AllowedValues is { Count: > 0 } allowedValues)
                         {
                             <InputSelect @bind-Value="model.Value" data-testid="contextual-parameter-value">
-                                @foreach (var value in Context.AllowedValues) { <option value="@EditorValue(value)">@EditorValue(value)</option> }
+                                @foreach (var value in allowedValues) { <option value="@EditorValue(value)">@EditorValue(value)</option> }
                             </InputSelect>
                         }
                         else

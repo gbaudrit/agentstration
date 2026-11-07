@@ -15,6 +15,25 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ModelProviderNavigationTests
 {
     [TestMethod]
+    public void ParameterAllowedValuesCanFinishRenderingAfterTheDialogCloses()
+    {
+        using var context = CreateContext(out _);
+        var rendered = context.Render<ContextualParameterCreator>(parameters => parameters
+            .Add(value => value.IsOpen, true)
+            .Add(value => value.Context, new(WorkspaceScope, "authentication", "Authentication",
+                AllowedValues: [JsonSerializer.SerializeToElement("ApiKey"), JsonSerializer.SerializeToElement("ManagedIdentity")])));
+        var options = rendered.FindComponent<InputSelect<string>>().Instance.ChildContent!;
+
+        rendered.Render(parameters => parameters
+            .Add(value => value.IsOpen, false)
+            .Add(value => value.Context, null));
+        var lateRender = context.Render(options);
+
+        StringAssert.Contains(lateRender.Markup, "ApiKey");
+        StringAssert.Contains(lateRender.Markup, "ManagedIdentity");
+    }
+
+    [TestMethod]
     [DataRow("en-US", "Required", "Literal", "Expected type")]
     [DataRow("fr-FR", "Obligatoire", "Valeur directe", "Type attendu")]
     public void SharedBindingEditorLocalizesRequirementAndSources(string cultureName, string required, string literal, string type)
