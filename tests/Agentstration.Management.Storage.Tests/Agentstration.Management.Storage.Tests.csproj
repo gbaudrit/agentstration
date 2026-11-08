@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <Compile Include="../ManagementServiceFixture.cs" Link="ManagementServiceFixture.cs" />
     <ProjectReference Include="../../src/Agentstration.Flows/Agentstration.Flows.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flows.Storage.Abstractions/Agentstration.Flows.Storage.Abstractions.csproj" />

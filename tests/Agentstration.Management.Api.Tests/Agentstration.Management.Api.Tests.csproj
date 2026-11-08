@@ -5,6 +5,7 @@
     <ProjectReference Include="../../src/Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
     <ProjectReference Include="../../src/Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />
     <Compile Include="../TestHostMetrics.cs" Link="TestHostMetrics.cs" />
+    <Compile Include="../ManagementServiceFixture.cs" Link="ManagementServiceFixture.cs" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />

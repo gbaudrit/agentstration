@@ -165,6 +165,12 @@ validation; it does not start or duplicate that reusable integrated journey.
   instead of HTTP hosts, preserving their names and assertions. All five passed
   locally after the adaptation. Subsequent metrics are retained with the
   [candidate CI](https://github.com/gbaudrit/agentstration/actions/runs/42506327201).
+  That candidate still passed all 125 tests but peaked at 2,625.7 MiB. The five
+  service-only scenarios therefore belong to the existing Management Storage
+  Integration module; their names/assertions remain unchanged, and both modules
+  compile the same fixture implementation with independent instances/databases.
+  Management API retains the real HTTP Storage scenarios. The required functional
+  and coverage inventories retain every case; no new project is introduced.
   No shared mutable test fixture, budget increase or forced GC is introduced.
 - TypeScript compilation, all three route-catalog checks, changed C# whitespace,
   ADR validation (198 records), LikeC4 and the complete Docusaurus build passed.
