@@ -14,22 +14,22 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-[DoNotParallelize]
 public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBase
 {
-    private static WebApplicationFactory<Program> factory = null!;
-
-    [ClassInitialize]
-    public static void Initialize(TestContext _) => factory = Factory();
-
-    [ClassCleanup]
-    public static async Task CleanupAsync() => await factory.DisposeAsync();
-
     [TestMethod]
-    public async Task PublicationAndLifecycleUseEtagsAndRetainPinnedStorageVersions()
+    public async Task AdministrationPreservesImmutableVersionsIndependentGrantsAndGovernedDefinitions()
     {
+        await using var factory = Factory();
         using var client = factory.CreateClient();
         var context = await GetBootstrapContextAsync(factory);
+        await PublicationAndLifecycleUseEtagsAndRetainPinnedStorageVersions(client, context);
+        await GenericDiscoverAndUseAreIndependentAndHiddenExactReadsStayHidden(client, context);
+        await BuiltinGrantsRemainIndependentFromProtectedDefinitionAndUsePolicy(factory, client, context);
+        await GenerationPinnedDiscoveryFailsClosedAfterMetadataUpdate(client, context);
+    }
+
+    private static async Task PublicationAndLifecycleUseEtagsAndRetainPinnedStorageVersions(HttpClient client, RequestContext context)
+    {
         var scope = ResourceScopeRef.Tenant(context.TenantId);
         SelectConsoleContext(client, scope);
         using var created = await client.PostAsJsonAsync("/api/storage-types", new CreateStorageTypeRequest("versioned", Definition(), scope));
@@ -82,11 +82,8 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         await Problem(mutation, "storage_type_version_immutable", HttpStatusCode.UnprocessableEntity);
     }
 
-    [TestMethod]
-    public async Task GenericDiscoverAndUseAreIndependentAndHiddenExactReadsStayHidden()
+    private static async Task GenericDiscoverAndUseAreIndependentAndHiddenExactReadsStayHidden(HttpClient client, RequestContext context)
     {
-        using var client = factory.CreateClient();
-        var context = await GetBootstrapContextAsync(factory);
         var owner = ResourceScopeRef.Tenant(context.TenantId);
         var consumer = ResourceScopeRef.Workspace(context.WorkspaceId);
         SelectConsoleContext(client, owner);
@@ -131,11 +128,9 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         }
     }
 
-    [TestMethod]
-    public async Task BuiltinGrantsRemainIndependentFromProtectedDefinitionAndUsePolicy()
+    private static async Task BuiltinGrantsRemainIndependentFromProtectedDefinitionAndUsePolicy(
+        WebApplicationFactory<Program> factory, HttpClient client, RequestContext context)
     {
-        using var client = factory.CreateClient();
-        var context = await GetBootstrapContextAsync(factory);
         var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
         await factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
         SelectConsoleContext(client, ResourceScopeRef.Instance);
@@ -187,11 +182,8 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         Assert.IsFalse((await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types"))!.Value.Any(value => value.Uid == type.Uid));
     }
 
-    [TestMethod]
-    public async Task GenerationPinnedDiscoveryFailsClosedAfterMetadataUpdate()
+    private static async Task GenerationPinnedDiscoveryFailsClosedAfterMetadataUpdate(HttpClient client, RequestContext context)
     {
-        using var client = factory.CreateClient();
-        var context = await GetBootstrapContextAsync(factory);
         var scope = ResourceScopeRef.Tenant(context.TenantId);
         var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
         SelectConsoleContext(client, scope);
