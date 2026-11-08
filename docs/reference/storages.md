@@ -1,0 +1,173 @@
+# Storages API
+
+Storages are governed logical resources. A Storage selects an exact StorageType
+version, its own fixed envelope and, for remote types, an exact Connected Service
+with manually confirmed export mappings. It owns no credentials. Data Source and
+Knowledge rules cannot replace those selections.
+
+## Types and discovery
+
+`StorageType` is an Instance-, Tenant- or Workspace-owned resource with the normal
+UID, namespace, generation, governance and access policy. Core, operators and
+authenticated extension adapters can supply types. An extension may synchronize
+only its own resources, with exact registration UID and contribution evidence.
+There is no link to the extension that supplied a Connected Service type.
+
+Each immutable version declares:
+
+- configuration and envelope JSON schemas and their SHA-256 digests;
+- whether a Connected Service is required, plus typed/protected requirements;
+- implemented list/stat/read/write/delete and optional stable-version/retention
+  capabilities, and bounded page/read/write limits;
+- optional exact extension contribution evidence and deprecation metadata.
+
+The complete version exposes its computed `contractDigest` in the catalog. Consumers pin that
+digest as `contractDigest`, in addition to `typeUid`, `version`, `schemaDigest` and
+the exact type `ResourceReference`. New versions are additive; published versions
+cannot change or disappear. Preferred-version updates never rebind Storages.
+
+The builtin Core-owned `local` version `1.0.0` requires no Connected Service. Its
+configuration and envelope are empty objects. It is an executable management and
+logical-resolution contract; it advertises no content operations. #1040 supplies
+the Artifact adapter and default Storage, and advertises their actual capabilities.
+Existing Artifact Flows, acquisition Tools, durable reads and histories continue
+through their existing implementation.
+
+Catalog results include per-version availability. The default metadata adapter
+checks the exact extension registration UID, generation and enabled state locally. A
+changed provider registration cannot silently remap an immutable type version. #1040 may
+supply provider observations through `IStorageTypeAvailabilityProvider`; catalog
+and management calls never perform a storage operation or fetch credentials.
+
+## HTTP operations
+
+All routes require the normal resource read/write/delete permission. Detail and
+mutation routes select the canonical resource name plus exact `scopeRef` and
+optional `namespace` (default `default`). There is no second Storage identifier.
+
+| Method | Route | Behavior |
+|---|---|---|
+| GET | `/api/storage-types` | Visible type catalog |
+| GET | `/api/storage-types/{name}` | Exact governed type and version availability |
+| POST | `/api/storage-types` | Create a type |
+| PUT | `/api/storage-types/{name}` | Update metadata or append immutable versions |
+| DELETE | `/api/storage-types/{name}` | Delete an unused user-managed type |
+| GET | `/api/storages` | Scoped visible Storage collection |
+| GET | `/api/storages/{name}` | Exact resource, current diagnostics and ETag |
+| POST | `/api/storages` | Create with complete explicit bindings |
+| PUT | `/api/storages/{name}` | Update display metadata, enablement or use policy |
+| GET | `/api/storages/{name}/usages` | Consumer-reported dependencies |
+| POST | `/api/storages/{name}/reconcile` | Observe drift or explicitly accept a complete new definition |
+| POST | `/api/storages/{name}/deactivate` | Disable safely while retaining the resource |
+
+Collection routes accept `scopeRef` (defaults to the authenticated scope), `skip`
+(0–1000000) and `take` (1–100, default 50). They return `{ value, nextLink }`.
+Foreign scopes and undiscoverable resources remain inaccessible. Reads recompute
+availability without mutating saved choices or changing ETags.
+
+Creation uses `{ name, properties, scopeRef, namespace }`. A local definition can
+be constructed from the exact catalog resource:
+
+```csharp
+var version = type.Definition.Versions.Single(v => v.Version == "1.0.0");
+var properties = new StorageProperties
+{
+    DisplayName = "Local content",
+    Type = new()
+    {
+        Type = new(type.Name, type.ScopeRef, type.Namespace),
+        TypeUid = type.Uid,
+        Version = version.Version,
+        SchemaDigest = version.SchemaDigest,
+        ContractDigest = version.ContractDigest
+    },
+    Configuration = JsonSerializer.SerializeToElement(new { }),
+    Envelope = JsonSerializer.SerializeToElement(new { })
+};
+```
+
+Remote definitions additionally save `connectedService` (exact address, scope,
+UID and generation), `connectedServiceType` (exact type reference/UID/version/
+schema digest), and `bindings`. Each binding has a `requirementId` and the complete
+selected export descriptor as `export`. The caller explicitly supplies these
+entries. Matching names, owners, formats or suggestions never generate a binding.
+One service may back multiple independent Storages.
+
+Every mandatory requirement must be bound. Export ids must belong to the selected
+exact service type and still exist with the saved descriptor. Scalar type,
+standard/secured protection and any required format must agree. Disabled,
+recreated, inaccessible or stale services and missing/unbound exports fail.
+Inspection validates binding references without resolving Secret values.
+
+The configuration and envelope retain provider-owned key casing and JSON values.
+Both are schema validated. Administrators authorized to inspect a resource can
+read its saved configuration, but it contains no copied Secret values. Do not put
+credentials in non-sensitive configuration; express them as secured requirements
+bound to Connected Service exports.
+
+## Concurrency, drift and diagnostics
+
+Every update, type deletion, reconciliation and deactivation requires the exact
+`If-Match` ETag. Missing headers return 428; conflicting versions return 409.
+Bindings, type, connection, configuration and envelope changes through PUT return
+`storage_reconciliation_required`. POST reconciliation with `{}` only observes
+drift and retains desired configuration and generation. To accept a new selection,
+send `{ properties: /* complete explicitly confirmed definition */ }` with the
+current ETag. Successful acceptance advances the generation. It never infers an
+export mapping or switches a recreated service to its new UID.
+
+Consumer dependencies block deactivation and binding changes with
+`storage_in_use`. The `IStorageUsageProvider` port allows #1041/#1042 to report
+their live and historical dependencies. A disabled or missing provider leaves the
+Storage, its exact contribution evidence and saved bindings intact. There is no
+Storage DELETE route that could erase those references.
+
+Problem Details contain an invariant `code`, status and bounded diagnostic text.
+Typical codes include `storage_mapping_incomplete`, `storage_export_incompatible`,
+`storage_export_stale`, `storage_service_stale`, `storage_type_stale`,
+`storage_provider_unavailable`, `storage_access_denied` and `storage_in_use`.
+Diagnostics never echo configuration, export values or credentials.
+
+The Schemas family's builtin JSON Schema profile is used: maximum 256 KiB per
+document, depth 16, no external references, bounded regular expressions and no
+silently ignored unsupported keywords. Types contain at most 32 versions and 64
+requirements; a Storage contains at most 64 bindings. Opaque configuration is not
+a universal bucket/path/table contract.
+
+## Consumer and adapter ports
+
+`IStorageResolver.ResolveAsync` consumes a `StorageRevisionReference` containing
+the canonical scoped address, UID, generation and `bindingDigest` from the
+resource's observed state. The consumer context must match the authenticated
+scope. Resolution checks the Storage UsePolicy and resource access policy, and
+revalidates the selected type, schemas, service, mappings and availability. Each
+ancestor dependency separately requires its use and access grants. Old/forged
+revisions and revoked grants fail on each call.
+
+`ProtectedStorageContext` exposes a serializable logical revision and exact type/
+service evidence. Configuration, envelope and bindings remain separate protected
+properties, excluded from JSON and redacted from its string representation. There
+are no secrets in this object. It is a selector/evidence object, not a bearer
+credential; the resolver must be called under current authorization before use.
+
+#1040 consumes these ports, resolves Secret references late through Connected
+Services, and maps the separate authority layers into protected ASP invocation
+contexts. It owns actual caller authorization at the provider, AEP contributions,
+ASP capabilities and Artifact integration. It must revalidate exact revisions at
+invocation, enforce limits and never accept lower-authority configuration overrides.
+#1041/#1042 select Storage revisions and supply dataset/Snapshot rules separately.
+#1046 supplies Console administration; this delivery adds no Storage UX.
+
+## Bootstrap and persistence
+
+Bootstrap handlers accept `StorageType` and `Storage` manifests at all three
+scopes, with create/skip planning and normal governance. A Storage manifest must
+explicitly pin an already materialized type UID/version/digests and, when needed,
+service revision and export descriptors. Provision the type before preparing the
+Storage manifest; bootstrap does not invent mappings or replace type references
+by name.
+
+Both resources use the existing scoped document store, with SQLite by default and
+the same PostgreSQL document-store behavior. No EF migration, legacy Storage
+contract or dual read/write is introduced. Other verticals and their histories
+are preserved. See [ADR-0199](../decisions/0199-storages-own-explicit-service-export-bindings.md).

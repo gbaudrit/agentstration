@@ -116,7 +116,12 @@ values are resolved at the internal `IConnectedServiceResolver` boundary for an
 authorized consumer, and Secret buffers are disposable. Resolved Parameter and
 Secret values are never available from the HTTP API.
 
-Storage adapters bind their requirement ids to selected Connected Service export
+`IConnectedServiceExportInspector` validates exact service revisions and export
+metadata without resolving Secret values. It checks current use grants for the
+service, its type and bound inputs. Storage dependencies are reported through
+`IConnectedServiceUsageProvider` and block service deletion.
+
+The [Storages API](storages.md) binds requirement ids to selected Connected Service export
 ids explicitly. No automatic matching and no direct OpenDAL-to-provider-extension
 link is part of this API.
 

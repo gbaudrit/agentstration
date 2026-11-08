@@ -158,6 +158,11 @@
     <Project Path="src/Agentstration.Sources.Api/Agentstration.Sources.Api.csproj" />
     <Project Path="src/Agentstration.Sources.Contracts/Agentstration.Sources.Contracts.csproj" />
   </Folder>
+  <Folder Name="/src/Storage/">
+    <Project Path="src/Agentstration.Storage.Contracts/Agentstration.Storage.Contracts.csproj" />
+    <Project Path="src/Agentstration.Storage/Agentstration.Storage.csproj" />
+    <Project Path="src/Agentstration.Storage.Api/Agentstration.Storage.Api.csproj" />
+  </Folder>
   <Folder Name="/src/Tools/">
     <Project Path="src/Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <Project Path="src/Agentstration.Tools/Agentstration.Tools.csproj" />
@@ -213,6 +218,7 @@
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Resources/">
+    <Project Path="tests/Agentstration.Storage.Tests/Agentstration.Storage.Tests.csproj" />
     <Project Path="tests/Agentstration.ResourceManagement.Tests/Agentstration.ResourceManagement.Tests.csproj" />
     <Project Path="tests/Agentstration.Schemas.Tests/Agentstration.Schemas.Tests.csproj" />
     <Project Path="tests/Agentstration.Secrets.Tests/Agentstration.Secrets.Tests.csproj" />
