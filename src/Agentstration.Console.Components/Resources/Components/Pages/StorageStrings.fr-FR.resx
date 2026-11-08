@@ -138,4 +138,42 @@
   <data name="ScopeKind.Workspace" xml:space="preserve"><value>Espace de travail</value></data>
   <data name="SelectedType" xml:space="preserve"><value>Référence du type sélectionnée</value></data>
   <data name="SelectedService" xml:space="preserve"><value>Révision du service sélectionnée</value></data>
+  <data name="Type.Manage" xml:space="preserve"><value>Gérer les types de stockage</value></data>
+  <data name="Type.ListHelp" xml:space="preserve"><value>Administrez les contrats d’implémentation, les versions immuables et les autorisations de ressources par périmètre.</value></data>
+  <data name="Type.Create" xml:space="preserve"><value>Créer un type de stockage</value></data>
+  <data name="Type.Edit" xml:space="preserve"><value>Modifier les métadonnées du type</value></data>
+  <data name="Type.Publish" xml:space="preserve"><value>Publier une nouvelle version</value></data>
+  <data name="Type.Delete" xml:space="preserve"><value>Supprimer le type</value></data>
+  <data name="Type.Back" xml:space="preserve"><value>Retour aux types de stockage</value></data>
+  <data name="Type.Loading" xml:space="preserve"><value>Chargement des types de stockage…</value></data>
+  <data name="Type.Search" xml:space="preserve"><value>Rechercher des types de stockage</value></data>
+  <data name="Type.PreferredVersion" xml:space="preserve"><value>Version préférée</value></data>
+  <data name="Type.VersionContract" xml:space="preserve"><value>Contrat de version immuable</value></data>
+  <data name="Type.ImmutableHelp" xml:space="preserve"><value>Les versions publiées ne peuvent être modifiées ni supprimées. Publiez une nouvelle version pour changer les schémas, exigences ou capacités. Les stockages conservent leur version sélectionnée exacte.</value></data>
+  <data name="Type.RequiresService" xml:space="preserve"><value>Nécessite un service connecté</value></data>
+  <data name="Type.ConfigurationSchema" xml:space="preserve"><value>Schéma de configuration (JSON Schema)</value></data>
+  <data name="Type.EnvelopeSchema" xml:space="preserve"><value>Schéma d’enveloppe (JSON Schema)</value></data>
+  <data name="Type.Requirements" xml:space="preserve"><value>Exigences typées (JSON)</value></data>
+  <data name="Type.RequirementsHelp" xml:space="preserve"><value>Saisissez un tableau JSON de descripteurs : id, required, type, protection et format facultatif. Utilisez [] si aucun service connecté n’est requis. Les identifiants restent des références de secrets sur le service connecté.</value></data>
+  <data name="Type.CapabilitiesHelp" xml:space="preserve"><value>Déclarez uniquement les opérations réellement implémentées par cette version. Les capacités décrivent ce qui est pris en charge ; elles n’accordent aucun droit utilisateur ni accès aux ressources.</value></data>
+  <data name="Type.MaximumPageSize" xml:space="preserve"><value>Taille de page maximale</value></data>
+  <data name="Type.MaximumReadBytes" xml:space="preserve"><value>Taille de lecture maximale (octets)</value></data>
+  <data name="Type.MaximumWriteBytes" xml:space="preserve"><value>Taille d’écriture maximale (octets)</value></data>
+  <data name="Type.SetPreferred" xml:space="preserve"><value>Définir cette version comme préférée pour les nouvelles sélections</value></data>
+  <data name="Type.Validation" xml:space="preserve"><value>Saisissez des schémas JSON valides et bornés ainsi qu’un tableau d’exigences. Vérifiez la version, les métadonnées et les limites avant d’enregistrer.</value></data>
+  <data name="Type.ReviewCurrent" xml:space="preserve"><value>Consulter la révision enregistrée sans perdre ma saisie</value></data>
+  <data name="Type.CurrentSaved" xml:space="preserve"><value>Nom d’affichage actuellement enregistré : {0}. Génération : {1}. Votre saisie est conservée ; vérifiez-la avant de réenregistrer.</value></data>
+  <data name="Type.ManagedBy" xml:space="preserve"><value>Géré par</value></data>
+  <data name="Type.ManagedHelp" xml:space="preserve"><value>Core ou l’extension contributrice possède cette définition et son cycle de vie. Les autorisations de ressources permises sont administrées séparément dans Accès.</value></data>
+  <data name="Type.UsagesHelp" xml:space="preserve"><value>Seules les références découvrables dans votre contexte courant sont listées (100 au maximum). D’autres dépendances peuvent néanmoins empêcher la désactivation ou la suppression.</value></data>
+  <data name="Type.AccessHelp" xml:space="preserve"><value>Il s’agit d’autorisations Discover/Use par périmètre de ressource, distinctes des rôles utilisateurs et des capacités d’implémentation. Une autorisation Use enregistrée ne garantit pas à elle seule l’usage fonctionnel : les contrôles UsePolicy existants, l’activation, la disponibilité du fournisseur et les références exactes restent applicables. L’administration de UsePolicy est différée.</value></data>
+  <data name="Type.Yaml" xml:space="preserve"><value>YAML du type de stockage en lecture seule</value></data>
+  <data name="Type.DeleteConfirm" xml:space="preserve"><value>Supprimer ce type de stockage appartenant à un utilisateur ? Vérifiez d’abord les contrats publiés et les références. Toute dépendance de stockage empêchera la suppression.</value></data>
+  <data name="Error.TypeInUse" xml:space="preserve"><value>Un stockage référence ce type. Vérifiez ses dépendances avant de le désactiver ou de le supprimer.</value></data>
+  <data name="Error.TypeImmutable" xml:space="preserve"><value>Cette version est déjà publiée et immuable. Publiez une version différente.</value></data>
+  <data name="Error.TypeManaged" xml:space="preserve"><value>Cette définition est gérée par Core ou une extension. Seules les autorisations de ressources permises peuvent être administrées ici.</value></data>
+  <data name="Type.DisableConfirm" xml:space="preserve"><value>Désactiver ce type pour les nouveaux usages ? Vérifiez d’abord toutes les références de stockage. Les types référencés ne peuvent pas être désactivés.</value></data>
+  <data name="Type.GenericUse" xml:space="preserve"><value>Use générique dans ce contexte</value></data>
+  <data name="Type.UseGranted" xml:space="preserve"><value>Use générique accordé</value></data>
+  <data name="Type.UseNotGranted" xml:space="preserve"><value>Use générique non accordé</value></data>
 </root>

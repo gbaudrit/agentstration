@@ -35,6 +35,7 @@ public sealed class StorageComponentTests
         Metadata = new() { Name = remote ? "remote" : "local" }, ScopeRef = Scope,
         Governance = remote ? ResourceGovernance.Extension("provider", "storage-provider", "1") : ResourceGovernance.Core("storage.local", "1"),
         ObservedVersions = [new("1", StorageAvailability.Ready)],
+        ObservedUse = new(Scope, new(true, ResourceAccessDecisionReasons.SameScope)),
         Definition = new()
         {
             DisplayName = remote ? "Remote fixture" : "Local fixture", PreferredVersion = "1", Versions = [new()
@@ -75,6 +76,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ListShowsExactScopedLinksAndBuiltinAndExtensionEvidence()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new());
         var page = context.Render<Storages>();
         page.WaitForAssertion(() =>
@@ -92,6 +94,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ReadOnlyContextHidesCreationAndLifecycleActions()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new(), canWrite: false);
         var list = context.Render<Storages>();
         list.WaitForElement("[data-testid=storage-row]");
@@ -105,6 +108,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void NoReadPermissionDoesNotFetchStorageResources()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client, canRead: false);
         var page = context.Render<Storages>();
@@ -115,6 +119,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void EditorRequiresExplicitTypeServiceAndEveryMandatoryExport()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new());
         var page = context.Render<StorageEditor>();
         page.WaitForElement("[data-testid=storage-type]");
@@ -138,6 +143,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void NewLocalStorageNeedsNoConnectedServiceAndSavesExactType()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client);
         var page = context.Render<StorageEditor>();
@@ -158,6 +164,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ExistingServiceGenerationIsPreservedUntilExplicitRebindAndConfirmation()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client, serviceGeneration: 2);
         Navigate(context, Resource(), edit: true);
@@ -184,6 +191,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void MetadataUpdateUsesPutAndKeepsSavedMappings()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client);
         Navigate(context, Resource(), edit: true);
@@ -201,6 +209,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ConflictIsLocalizedAndDoesNotShowBackendProblemDetails()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient { Failure = new("PRIVATE BACKEND DETAILS", "correlation", HttpStatusCode.Conflict, "storage_version_conflict") };
         using var context = Setup(client);
         Navigate(context, Resource(), edit: true);
@@ -214,6 +223,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void DetailUsesCanonicalTabsAndYamlContainsReferencesWithoutConnectionValues()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new()); Navigate(context, Resource());
         var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
         page.WaitForElement("[data-testid=storage-mapping]");
@@ -229,6 +239,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void DeactivationRequiresConfirmationAndReportsDependenciesWithoutLosingResource()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient { Failure = new("PRIVATE", "correlation", HttpStatusCode.Conflict, "storage_in_use") };
         using var context = Setup(client); Navigate(context, Resource());
         var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
@@ -243,6 +254,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void DriftObservationSendsNoReplacementAndUsesSavedEtag()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client); Navigate(context, Resource());
         var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
@@ -257,6 +269,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void MissingTypeKeepsExactSavedIdentityVisibleAndMetadataEditable()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new() { TypesMissing = true }); Navigate(context, Resource(), edit: true);
         var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents"));
         page.WaitForAssertion(() => StringAssert.Contains(page.Markup, "saved exact type is unavailable"));
@@ -267,6 +280,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void LocalCreationRemainsAvailableWhenConnectedServiceMetadataFails()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new(), servicesUnavailable: true);
         var page = context.Render<StorageEditor>();
         page.WaitForElement("[data-testid=storage-type]");
@@ -281,6 +295,7 @@ public sealed class StorageComponentTests
     [DataRow("/workspaces/10460000-0000-0000-0000-000000000003")]
     public void ListUsesTheSelectedAdministrativeScope(string selectedScope)
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client, selectedScope: selectedScope);
         var page = context.Render<Storages>();
@@ -291,6 +306,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ConnectedServiceStorageDependencyLinksPreserveQualifiedIdentity()
     {
+        using var culture = new TestCultureScope("en-US");
         var url = StorageLinks.Details(Resource());
         Assert.AreEqual(url, StorageLinks.FromApi("/api" + url));
     }
@@ -298,6 +314,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ClearingTheTypeSelectionClearsConnectionDraftAndDisablesSave()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new());
         var page = context.Render<StorageEditor>();
         page.WaitForElement("[data-testid=storage-type]");
@@ -306,6 +323,21 @@ public sealed class StorageComponentTests
         page.Find("[data-testid=storage-type]").Change(string.Empty);
         Assert.IsTrue(page.Find("[data-testid=storage-save]").HasAttribute("disabled"));
         Assert.IsEmpty(page.FindAll("[data-testid=storage-service], [data-testid=storage-export]"));
+    }
+
+    [TestMethod]
+    public void DiscoverableTypeWithoutGenericUseRemainsVisibleButCannotBeSelected()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = Setup(new() { TypeUseDenied = true });
+        var page = context.Render<StorageEditor>();
+        page.WaitForElement("[data-testid=storage-type]");
+        var choices = page.FindAll("[data-testid=storage-type] option").Where(value => !string.IsNullOrEmpty(value.GetAttribute("value"))).ToArray();
+        Assert.IsTrue(choices.Length > 0);
+        Assert.IsTrue(choices.All(value => value.HasAttribute("disabled")));
+        SelectType(page, "remote");
+        Assert.IsTrue(page.Find("[data-testid=storage-save]").HasAttribute("disabled"));
+        StringAssert.Contains(page.Markup, "Generic Use not granted");
     }
 
     private static BunitContext Setup(StorageClient client, bool canWrite = true, bool canRead = true, long serviceGeneration = 1, bool servicesUnavailable = false, string? selectedScope = null)
@@ -334,6 +366,7 @@ public sealed class StorageComponentTests
     }
     private sealed class StorageClient : IStoragesClient
     {
+        public bool TypeUseDenied { get; init; }
         public bool TypesMissing { get; init; }
         public AgentstrationApiException? Failure { get; init; }
         public ResourceScopeRef? ListScope { get; private set; }
@@ -345,7 +378,7 @@ public sealed class StorageComponentTests
         public ReconcileStorageRequest? Reconciled { get; private set; }
         public string? LastEtag { get; private set; }
         public ScopedResourceAddress? LastAddress { get; private set; }
-        public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) => Task.FromResult<IReadOnlyList<StorageTypeResource>>(TypesMissing ? [] : [Type(), Type(false)]);
+        public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) => Task.FromResult<IReadOnlyList<StorageTypeResource>>(TypesMissing ? [] : new[] { Type(), Type(false) }.Select(type => TypeUseDenied ? type with { ObservedUse = new(scope, new(false, ResourceAccessDecisionReasons.GrantMissing)) } : type).ToArray());
         public Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token) { ListCalls++; ListScope = scope; return Task.FromResult<IReadOnlyList<StorageResource>>([Resource()]); }
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(Scope, ResourceScopeKind.Workspace, "Workspace", true)]);
         public Task<ResourceSnapshot<StorageResource>> GetAsync(ScopedResourceAddress address, CancellationToken token) => Task.FromResult(new ResourceSnapshot<StorageResource>(Resource(), "\"revision-4\""));

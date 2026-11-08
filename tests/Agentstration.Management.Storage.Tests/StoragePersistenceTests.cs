@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
@@ -74,6 +75,87 @@ public sealed class StoragePersistenceTests
                 await Assert.ThrowsAsync<ResourceConcurrencyException>(async () =>
                     await store.PutExactAsync(scope, restored.Value with { Generation = 5 }, restored.ETag, false, default));
                 Assert.AreNotEqual(saved.ETag, updated.ETag);
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task AdministrativeOverlaySurvivesManagedUpdatesRestartAndExplicitRevocation()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "agentstration-storage-policies", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var connection = $"Data Source={Path.Combine(directory, "management.db")}";
+        var target = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var scope = ResourceScopeRef.Instance;
+        var address = new ScopedResourceAddress(scope, ResourceNamespace.Default, StorageResourceKinds.StorageType, "managed");
+        Guid uid;
+        string initialPolicyEtag, revokedPolicyEtag;
+        try
+        {
+            await using (var first = Provider(connection))
+            {
+                var store = first.GetRequiredService<IResourceStore>();
+                await store.InitializeAsync(default);
+                var schema = JsonSerializer.SerializeToElement(new { type = "object" });
+                using var manager = first.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.fixture", "1"));
+                var type = await store.PutExactAsync(scope, new StorageTypeResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
+                    Metadata = new() { Name = address.Name }, ScopeRef = scope, Generation = 1,
+                    Definition = new() { DisplayName = "Managed", PreferredVersion = "1", Versions = [new()
+                    {
+                        Version = "1", ConfigurationSchema = schema, SchemaDigest = StorageDigests.Schema(schema),
+                        EnvelopeSchema = schema, EnvelopeSchemaDigest = StorageDigests.Schema(schema)
+                    }] }
+                }, null, true, default);
+                uid = type.Value.Uid;
+                var policies = first.GetRequiredService<IResourceAccessPolicyStore>();
+                var policy = await policies.PutAsync(new(new(uid, scope, type.Value.Namespace, type.Value.Kind),
+                    [new(target, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+                initialPolicyEtag = policy.ETag;
+                await Assert.ThrowsAsync<ResourceConcurrencyException>(() => policies.PutAsync(policy.Policy with { Grants = [] }, null, default));
+            }
+            await using (var second = Provider(connection))
+            {
+                var store = second.GetRequiredService<IResourceStore>();
+                await store.InitializeAsync(default);
+                var type = (await store.GetExactAsync<StorageTypeResource>(address, default))!;
+                var policies = second.GetRequiredService<IResourceAccessPolicyStore>();
+                var policy = (await policies.GetAsync(uid, scope, default))!;
+                Assert.AreEqual(initialPolicyEtag, policy.ETag);
+                Assert.IsNull(policy.Policy.Resource.Generation);
+                Assert.AreEqual(target, policy.Policy.Grants.Single().TargetScopeRef);
+                using (second.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.fixture", "2")))
+                    await store.PutExactAsync(scope, type.Value with
+                    {
+                        Generation = 2, Definition = type.Value.Definition with { DisplayName = "Updated by manager",
+                            Versions = [.. type.Value.Definition.Versions, type.Value.Definition.Versions.Single() with { Version = "2" }] }
+                    }, type.ETag, false, default);
+                Assert.AreEqual(initialPolicyEtag, (await policies.GetAsync(uid, scope, default))!.ETag);
+                var revoked = await policies.PutAsync(policy.Policy with { Grants = [] }, policy.ETag, default);
+                revokedPolicyEtag = revoked.ETag;
+                await Assert.ThrowsAsync<ResourceConcurrencyException>(() => policies.PutAsync(policy.Policy, initialPolicyEtag, default));
+                await Assert.ThrowsAsync<ResourceConcurrencyException>(() => policies.DeleteAsync(uid, scope, null, default));
+            }
+            await using (var third = Provider(connection))
+            {
+                var store = third.GetRequiredService<IResourceStore>();
+                await store.InitializeAsync(default);
+                var policies = third.GetRequiredService<IResourceAccessPolicyStore>();
+                var policy = (await policies.GetAsync(uid, scope, default))!;
+                Assert.AreEqual(revokedPolicyEtag, policy.ETag);
+                Assert.IsEmpty(policy.Policy.Grants);
+                var type = (await store.GetExactAsync<StorageTypeResource>(address, default))!;
+                using var manager = third.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.fixture", "2"));
+                await store.DeleteExactAsync(address, type.ETag, default);
+                var recreated = await store.PutExactAsync(scope, type.Value, null, true, default);
+                Assert.AreNotEqual(uid, recreated.Value.Uid);
+                Assert.IsNull(await policies.GetAsync(recreated.Value.Uid, scope, default));
             }
         }
         finally

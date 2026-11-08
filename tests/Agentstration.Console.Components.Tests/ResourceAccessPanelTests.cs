@@ -105,14 +105,81 @@ public sealed class ResourceAccessPanelTests
         Assert.AreEqual(0, rendered.FindAll("[data-testid='resource-access-grant']").Count);
     }
 
+    [TestMethod]
+    public void EvaluationUsesSavedGenericDecisionsAndIdentifiesUnsavedGrants()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var uid = Guid.NewGuid();
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeScopes(uid, tenant));
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(new FakePolicies());
+        var page = context.Render<ResourceAccessPanel>(parameters => parameters
+            .Add(value => value.OwnerScopeRef, ResourceScopeRef.Instance).Add(value => value.Namespace, ResourceNamespace.Default)
+            .Add(value => value.Kind, "Agent").Add(value => value.Name, "managed-agent").Add(value => value.EvaluateSavedAccess, true));
+        page.WaitForElement("[data-testid=resource-access-target]").Change(tenant.Value);
+        page.Find("[data-testid=resource-access-add]").Click();
+        page.Find("[data-testid=resource-access-evaluation-target]").Change(tenant.Value);
+        page.Find("[data-testid=resource-access-evaluate]").Click();
+        page.WaitForElement("[data-testid=resource-access-decisions]");
+        StringAssert.Contains(page.Find("[data-testid=resource-access-decisions]").TextContent, "Allowed");
+        StringAssert.Contains(page.Find("[data-testid=resource-access-decisions]").TextContent, "Denied");
+        StringAssert.Contains(page.Markup, "unsaved changes");
+        StringAssert.Contains(page.Markup, "do not evaluate user permissions, UsePolicy");
+    }
+
+    [TestMethod]
+    public void ConflictRetainsIndependentActionsAndReviewDoesNotDiscardDraft()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var uid = Guid.NewGuid();
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var policies = new FakePolicies
+        {
+            Existing = new(new(new(uid, ResourceScopeRef.Instance, ResourceNamespace.Default, "Agent"),
+                [new(tenant, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), "\"policy-1\""),
+            FailWrites = true
+        };
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeScopes(uid, tenant));
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
+        var page = context.Render<ResourceAccessPanel>(parameters => parameters
+            .Add(value => value.OwnerScopeRef, ResourceScopeRef.Instance).Add(value => value.Namespace, ResourceNamespace.Default)
+            .Add(value => value.Kind, "Agent").Add(value => value.Name, "managed-agent"));
+        page.WaitForElement("[data-testid=resource-access-grant]");
+        page.FindAll(".access-actions input")[0].Change(false);
+        page.Find("[data-testid=resource-access-save]").Click();
+        page.WaitForElement("[data-testid=resource-access-review]");
+        Assert.IsFalse(page.FindAll(".access-actions input")[0].HasAttribute("checked"));
+        policies.CurrentEtag = "\"new-baseline\"";
+        page.Find("[data-testid=resource-access-review]").Click();
+        page.WaitForAssertion(() => Assert.IsEmpty(page.FindAll("[data-testid=resource-access-review]")));
+        policies.FailWrites = false;
+        page.Find("[data-testid=resource-access-save]").Click();
+        page.WaitForElement("[data-testid=resource-access-saved]");
+        CollectionAssert.AreEqual(new[] { ResourceAccessAction.Use }, policies.Saved!.Grants.Single().Actions.ToArray());
+        Assert.IsNull(policies.Saved.Resource.Generation);
+        Assert.AreEqual("\"new-baseline\"", policies.LastEtag);
+    }
+
     private sealed class FakePolicies : IResourceAccessPolicyClient
     {
+        public Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessDecision(request.Action == ResourceAccessAction.Discover,
+                request.Action == ResourceAccessAction.Discover ? ResourceAccessDecisionReasons.ExactGrant : ResourceAccessDecisionReasons.GrantMissing));
+        public bool FailWrites { get; set; }
+        public string CurrentEtag { get; set; } = "\"policy-1\"";
+        public string? LastEtag { get; private set; }
         public ResourceAccessPolicySnapshot? Existing { get; init; }
         public ResourceAccessPolicy? Saved { get; private set; }
-        public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) => Task.FromResult(Existing);
+        public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) => Task.FromResult(Existing is null ? null : Existing with { ETag = CurrentEtag });
         public Task<ResourceAccessPolicySnapshot> PutAsync(ResourceAccessPolicy policy, string? etag, CancellationToken cancellationToken)
         {
             Saved = policy;
+            LastEtag = etag;
+            if (FailWrites) throw new AgentstrationApiException("PRIVATE", "id", System.Net.HttpStatusCode.Conflict);
             return Task.FromResult(new ResourceAccessPolicySnapshot(policy, "\"policy-2\""));
         }
     }

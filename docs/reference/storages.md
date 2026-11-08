@@ -51,6 +51,8 @@ optional `namespace` (default `default`). There is no second Storage identifier.
 | GET | `/api/storage-types/{name}` | Exact governed type and version availability |
 | POST | `/api/storage-types` | Create a type |
 | PUT | `/api/storage-types/{name}` | Update metadata or append immutable versions |
+| POST | `/api/storage-types/{name}/versions` | Explicitly append a new immutable version, optionally making it preferred |
+| GET | `/api/storage-types/{name}/usages` | Up to 100 discoverable Storage references, preserving exact scope/namespace |
 | DELETE | `/api/storage-types/{name}` | Delete an unused user-managed type |
 | GET | `/api/storages` | Scoped visible Storage collection |
 | GET | `/api/storages/{name}` | Exact resource, current diagnostics and ETag |
@@ -160,7 +162,51 @@ contexts. It owns actual caller authorization at the provider, AEP contributions
 ASP capabilities and Artifact integration. It must revalidate exact revisions at
 invocation, enforce limits and never accept lower-authority configuration overrides.
 #1041/#1042 select Storage revisions and supply dataset/Snapshot rules separately.
-#1046 supplies Console administration; this delivery adds no Storage UX.
+#1046 supplies Storage Console administration and #1064 adds independent
+StorageType administration plus the existing generic resource-grant journey.
+
+## StorageType administration and resource grants
+
+Publication accepts `{ version: /* complete StorageTypeVersionDescriptor */,
+setPreferred: false }` and requires the current type `If-Match`. Publishing an
+existing version returns `storage_type_version_exists` (409). Existing versions
+remain immutable, and changing the preferred version never rebinds Storages.
+Ordinary metadata edits preserve the existing version collection. Managed Core
+and extension definitions remain protected, including publication and lifecycle.
+A referenced type cannot be disabled or deleted (`storage_type_in_use`, 409).
+The usages endpoint lists only dependencies discoverable by the current caller;
+unlisted dependencies can still block lifecycle, without disclosing their identity.
+
+Generic access overlays use the existing `/api/resource-access-policies` API and
+its `/{resourceUid}/evaluate` operation. They remain independent from type/Storage
+definitions and ETags. Creation without an ETag is allowed only when no overlay
+exists; updating or deleting an existing overlay requires its current `If-Match`.
+Absent/stale update tokens return 409 without overwriting saved grants.
+
+Discover and Use are independent actions targeting exact descendant scopeRefs,
+with explicit permitted propagation. Missing policies/actions deny descendant
+access. Catalogues and exact metadata reads use the shared store's Discover
+filter, including owner/namespace/kind and optional generation/version pins.
+Same-name recreation receives a new UID and inherits no grants. The Console
+creates UID-bound, unpinned Storage overlays so mutable metadata and additional
+immutable versions preserve sharing; explicitly pinned policies fail closed
+after the pinned revision changes. Synchronizers do not write access overlays.
+
+The Access evaluator displays saved **generic** decisions, not unsaved draft
+grants or a promise of functional usability. Existing contextual authorization,
+UsePolicy, enablement, exact dependency contracts, provider availability and
+content capabilities still apply. User-permission expansion is deferred to
+[#1077](https://github.com/gbaudrit/agentstration/issues/1077), and UsePolicy
+administration to [#1078](https://github.com/gbaudrit/agentstration/issues/1078).
+In particular, granting Discover/Use to the single Instance-owned builtin local
+type does not bypass its existing descendant UsePolicy. There is no global
+automatic grant or per-Workspace type copy.
+
+Type reads project `observedUse` with the authenticated consumer scope and the
+shared evaluator's generic Use decision. This projection is recomputed and never
+persisted. The Storage editor retains discoverable types for inspection while
+disabling new selection when that generic grant is absent, independently of
+provider availability. The server repeats its existing resolution checks.
 
 ## Bootstrap and persistence
 

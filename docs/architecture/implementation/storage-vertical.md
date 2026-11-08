@@ -84,3 +84,29 @@ Secret-resolution ports. Architecture checks explicitly permit this family contr
 while continuing to reject Storage services, API modules and concrete persistence
 from Console assemblies. This follows ADR-0199 and the existing Connected Service
 Console architecture; it introduces no new architectural decision or ADR.
+
+## StorageType administration (#1064)
+
+The existing family now exposes explicit immutable-version publication and a
+bounded discoverable-reference projection. Dependency checks cover type deletion
+and disablement even when the consumer cannot be disclosed. Console adds an
+independent catalogue, exact details, metadata editor and version-publication
+form through `IStorageTypesClient`, implemented by the existing HTTP client and
+registered in both Console composition roots. There is no new module or schema.
+
+The shared Access panel reuses the canonical evaluator for saved generic
+Discover/Use decisions. Ordinary Storage overlays bind to exact resource UID,
+scope, namespace and kind rather than automatically pinning mutable generation.
+Explicit revision pins remain supported and fail closed in both store discovery
+and effective evaluation. Existing-overlay writes require the policy's own ETag;
+conflicts retain the Console draft and require explicit review of the current
+revision before retry. SQLite and PostgreSQL implement the same identity and
+concurrency rules. Managed-resource synchronization never writes these overlays.
+
+These changes implement ADR-0172/ADR-0181 and the Storage family contract; no new
+architectural decision is introduced and accepted ADRs are unchanged. Existing
+UsePolicy and caller-authorization checks remain in place. Their expansion is
+separately tracked by #1078 and #1077. #1040 retains actual ASP/AEP/Artifact/local
+execution and provisioning; #1041/#1042 retain consumer rules. #1065 remains
+blocked on explicit implemented-UX approval and implementation merge, independently
+of the required implementation smoke/regression checks.

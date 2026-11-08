@@ -6,6 +6,9 @@ public static class StorageErrorKey
 {
     public static string For(Exception error) => error is AgentstrationApiException api ? api.ProblemTitle switch
     {
+        "storage_type_in_use" => "Error.TypeInUse",
+        "storage_type_version_exists" or "storage_type_version_immutable" => "Error.TypeImmutable",
+        "resource_managed" or "resource_governance_authority_required" => "Error.TypeManaged",
         "storage_version_conflict" or "storage_etag_required" => "Error.Conflict",
         "storage_mapping_incomplete" or "storage_export_incompatible" => "Error.Mapping",
         "storage_export_stale" or "storage_exports_stale" => "Error.Export",

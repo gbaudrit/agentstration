@@ -11,6 +11,10 @@
 .access-add label { flex: 1; display: grid; gap: .35rem; }
 .access-readonly { margin-top: 1rem; color: var(--color-text-muted, #5f6f85); }
 .access-success { color: var(--color-success, #087f5b); }
+.access-evaluation { display: grid; gap: .75rem; min-width: 0; }
+.access-evaluation label { display: grid; gap: .35rem; }
+.access-evaluation select { width: 100%; min-width: 0; }
+.access-evaluation .resource-details dd { overflow-wrap: anywhere; }
 @media (max-width: 760px) {
     .access-identity-grid, .access-governance-grid { grid-template-columns: 1fr; }
     .access-grant { grid-template-columns: 1fr; align-items: stretch; }

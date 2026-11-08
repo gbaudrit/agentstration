@@ -26,7 +26,7 @@ public sealed class MainLayoutNavigationTests
             ("Observe", [("Agent instances", "/agent-instances"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
             ("Workplace", [("Configuration", "/workspaces")]),
             ("Resources", [("Packs", "/packs"), ("Data Sources", "/data-sources"), ("Knowledge Sources", "/knowledge-sources"), ("Artifacts", "/artifacts"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
-            ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Connected Services", "/connected-services"), ("Storages", "/storages"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
+            ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Connected Services", "/connected-services"), ("Storages", "/storages"), ("Storage types", "/storage-types"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
             ("Configuration", [("Runtime profiles", "/runtimeprofiles"), ("Secrets", "/secrets"), ("Resource scopes", "/settings/resource-scopes")]),
             ("System", [("Workers", "/settings/runtime-workers"), ("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
 
@@ -54,6 +54,7 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual("MCP & Outils", groups[7].QuerySelector("a")?.TextContent.Trim());
         Assert.AreEqual("Services connectés", groups[7].QuerySelector("a[href='/connected-services']")?.TextContent.Trim());
         Assert.AreEqual("Stockages", groups[7].QuerySelector("a[href='/storages']")?.TextContent.Trim());
+        Assert.AreEqual("Types de stockage", groups[7].QuerySelector("a[href='/storage-types']")?.TextContent.Trim());
         Assert.AreEqual("Profils de source de données", groups[1].QuerySelector("a[href='/data-source-profiles']")?.TextContent.Trim());
         Assert.AreEqual("Sources de données", groups[6].QuerySelector("a[href='/data-sources']")?.TextContent.Trim());
         Assert.AreEqual("Schémas", groups[1].QuerySelector("a[href='/schemas']")?.TextContent.Trim());

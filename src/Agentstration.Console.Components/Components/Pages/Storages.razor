@@ -26,7 +26,7 @@ else
             </DataGrid>
         }
     </section>
-    <section class="panel form-section"><div class="panel-header"><h2>@T("TypeCatalog")</h2></div><p>@T("TypeCatalog.Help")</p>
+    <section class="panel form-section"><div class="panel-header"><h2>@T("TypeCatalog")</h2><a href="/storage-types" data-testid="storage-types-manage">@T("Type.Manage")</a></div><p>@T("TypeCatalog.Help")</p>
         @if (types.Count == 0) { <p>@T("NoTypes")</p> }
         @foreach (var type in types)
         {

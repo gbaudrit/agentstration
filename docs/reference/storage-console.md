@@ -13,6 +13,44 @@ persistence implementations or ASP/AEP adapters.
 | `/storages/new` | Create in the selected Instance, Tenant or Workspace administrative context |
 | `/storages/{name}?scopeRef=...&namespace=...` | Exact resource: Overview, Definition, Access and YAML |
 | `/storages/{name}/edit?scopeRef=...&namespace=...` | Dedicated entry to the same Definition editor |
+| `/storage-types` | Scoped StorageType catalogue and links to exact definitions |
+| `/storage-types/new` | Create a user-owned type and its initial immutable version |
+| `/storage-types/{name}?scopeRef=...&namespace=...` | Exact type: Overview, Definition, Access and YAML |
+| `/storage-types/{name}/edit?scopeRef=...&namespace=...` | Edit display metadata without rewriting published versions |
+| `/storage-types/{name}/versions/new?scopeRef=...&namespace=...` | Explicitly publish an additional immutable version |
+
+### StorageType interactions (#1064)
+
+The type catalogue is independently accessible from Storage administration. Exact
+links preserve the owner scope and namespace. Overview exposes governance,
+availability, version contracts and discoverable Storage references. Definition
+separates mutable display metadata/enablement/preferred version from publication
+of an additional version. Published schemas, requirements, capabilities, digests
+and contribution evidence are never edited in place. Disabling an in-use type is
+rejected; deletion requires confirmation and an unused user-owned resource.
+Core/extension definitions remain read-only while permitted Access administration
+remains available. No permission to edit access grants permits provider forgery.
+
+Access reuses the shared grant editor and evaluates saved generic Discover/Use
+decisions for one exact scope. Draft grants do not change the saved decision until
+saved. Ordinary Storage grants bind to resource UID, owner, namespace and kind,
+without a generation pin so metadata updates or new versions preserve sharing.
+Explicit revision-pinned policies still fail closed when stale. Policy ETags are
+independent from resource ETags; conflicts retain the draft for review.
+
+New user-permission work is deferred to [#1077](https://github.com/gbaudrit/agentstration/issues/1077)
+and UsePolicy administration to [#1078](https://github.com/gbaudrit/agentstration/issues/1078).
+Current authorization and UsePolicy guards remain enforced. A saved generic Use
+grant does not promise functional usability: enablement, exact references,
+UsePolicy, provider availability and actual capabilities still apply. The single
+Instance-owned metadata-only `local@1.0.0` is not copied or globally shared.
+Its descendant UsePolicy cannot be administered by this increment.
+
+The native focused scenario [#1065](https://github.com/gbaudrit/agentstration/issues/1065)
+remains blocked until explicit implemented-UX approval and implementation merge.
+Implementation behavior tests and real desktop/mobile en-US/fr-FR smoke checks
+remain required. The integrated #1033 journey and #1040 adapters/provisioning are
+separate deliveries.
 
 The scoped resource name is the canonical identity; no `StorageId` is introduced.
 Detail links always preserve namespace and owner scope. `context` continues to

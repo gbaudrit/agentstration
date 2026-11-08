@@ -195,6 +195,31 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         }
         var catalog = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types");
         Assert.AreEqual(ResourceOriginKind.Extension, catalog!.Value.Single(t => t.Uid == type.Uid).Governance.Origin.Kind);
+        var workspace = ResourceScopeRef.Workspace((await GetBootstrapContextAsync(factory)).WorkspaceId);
+        var policyPath = $"/api/resource-access-policies/{type.Uid}";
+        var policy = new ResourceAccessPolicy(new(type.Uid, scope, type.Namespace, type.Kind),
+            [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]);
+        using var grant = await client.PutAsJsonAsync(policyPath, policy);
+        await Status(grant, HttpStatusCode.OK);
+        var policyEtag = grant.Headers.ETag!.ToString();
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            using (factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(type.Governance))
+                type = (await factory.Services.GetRequiredService<StorageTypeManagementService>().SynchronizeManagedAsync(type with
+                { Definition = type.Definition with { DisplayName = "Updated extension metadata" } }, default)).Value;
+            registration = await factory.Services.GetRequiredService<IResourceStore>().PutExactAsync(scope,
+                registration.Value with { Definition = registration.Value.Definition with { Enabled = false } }, registration.ETag, false, default);
+        }
+        var offlineType = await client.GetFromJsonAsync<StorageTypeResource>($"/api/storage-types/{type.Name}?scopeRef={Uri.EscapeDataString(scope.Value)}&namespace={type.Namespace}");
+        Assert.AreEqual(StorageAvailability.Unavailable, offlineType!.ObservedVersions.Single().Availability);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+            registration = await factory.Services.GetRequiredService<IResourceStore>().PutExactAsync(scope,
+                registration.Value with { Definition = registration.Value.Definition with { Enabled = true } }, registration.ETag, false, default);
+        using var retainedPolicy = await client.GetAsync(policyPath);
+        Assert.AreEqual(policyEtag, retainedPolicy.Headers.ETag!.ToString());
+        var returnedType = await client.GetFromJsonAsync<StorageTypeResource>($"/api/storage-types/{type.Name}?scopeRef={Uri.EscapeDataString(scope.Value)}&namespace={type.Namespace}");
+        Assert.AreEqual(StorageAvailability.Ready, returnedType!.ObservedVersions.Single().Availability);
+        Assert.AreEqual(type.Uid, returnedType.Uid);
         using var created = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("extension-store", Properties(type), scope));
         await Status(created, HttpStatusCode.Created);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
@@ -207,6 +232,15 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         Assert.AreEqual(storage.Uid, observed!.Uid);
         Assert.AreEqual(StorageAvailability.Unavailable, observed.ObservedState?.Availability);
         Assert.AreEqual(1, type.Definition.Versions.Single().Contribution?.ProviderGeneration);
+        using var revoke = await Send(client, HttpMethod.Put, policyPath, policy with { Grants = [] }, policyEtag);
+        await Status(revoke, HttpStatusCode.OK);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            using var authority = factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(type.Governance);
+            await factory.Services.GetRequiredService<StorageTypeManagementService>().SynchronizeManagedAsync(type with
+            { Definition = type.Definition with { DisplayName = "Retained after revocation" } }, default);
+        }
+        Assert.IsEmpty((await client.GetFromJsonAsync<ResourceAccessPolicy>(policyPath))!.Grants);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
             await factory.Services.GetRequiredService<IResourceStore>().DeleteExactAsync(new(scope, registration.Value.Namespace,
                 registration.Value.Kind, registration.Value.Name), registration.ETag, default);

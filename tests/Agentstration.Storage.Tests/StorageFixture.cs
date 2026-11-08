@@ -28,7 +28,7 @@ internal sealed class StorageFixture
     {
         var scopes = new Scopes();
         var use = new DescendantResourceUseAuthorizer(scopes);
-        Types = new(Store, scopes, use, Governance, Availability, Context);
+        Types = new(Store, scopes, use, Governance, Availability, Context, Access, Context);
         Storages = new(Store, scopes, use, Access, Inspector, Availability, [Dependencies], Context, new Authorization(), new Authorization(), new FixedTime());
     }
 
@@ -173,11 +173,13 @@ internal sealed class StorageFixture
     }
     public sealed class MemoryStore : IResourceStore
     {
+        public HashSet<ResourceScopeRef> ReadDeniedScopes { get; } = [];
         private readonly Dictionary<ScopedResourceAddress, (Resource Value, string ETag)> resources = [];
         private int revision;
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource =>
-            Task.FromResult(resources.TryGetValue(address, out var stored) ? new StoredResource<T>((T)stored.Value, stored.ETag, default) : null);
+            ReadDeniedScopes.Contains(address.ScopeRef) ? throw new ResourceScopeAccessDeniedException(address.ScopeRef)
+                : Task.FromResult(resources.TryGetValue(address, out var stored) ? new StoredResource<T>((T)stored.Value, stored.ETag, default) : null);
         public Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
         {
             var key = new ScopedResourceAddress(scopeRef, resource.Namespace, resource.Kind, resource.Name);

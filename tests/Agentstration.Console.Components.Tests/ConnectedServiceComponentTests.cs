@@ -25,6 +25,7 @@ public sealed class ConnectedServiceComponentTests
     [TestMethod]
     public void CatalogRendersTypeAvailabilityAndExactScope()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
