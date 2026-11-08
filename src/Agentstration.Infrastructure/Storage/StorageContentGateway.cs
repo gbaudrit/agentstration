@@ -24,6 +24,15 @@ public sealed class StorageContentGateway(
     private readonly IDataProtector protector = protection.CreateProtector("Agentstration.Storage.Content.v1");
     private sealed record Reference(string Kind, string Authority, string Key, string? Version, DateTimeOffset Expires, string? Query);
 
+    public async Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default) =>
+        _ = await ExecuteAsync(target, (_, policy, _, _) =>
+        {
+            AspValidation.Require((!target.Policy.List || policy.Policy.CanList)
+                && (!target.Policy.Stat || policy.Policy.CanStat) && (!target.Policy.Read || policy.Policy.CanRead)
+                && (!target.Policy.Write || policy.Policy.CanWrite), "forbidden", "The dataset rule requests unavailable Storage operations.");
+            return Task.FromResult(true);
+        }, cancellationToken, false);
+
     public async Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit,
         string? cursor = null, CancellationToken cancellationToken = default)
     {
@@ -75,7 +84,8 @@ public sealed class StorageContentGateway(
     }, cancellationToken);
 
     private async Task<T> ExecuteAsync<T>(StorageContentRequest target,
-        Func<ProtectedStorageContext, AspAccessContext, StorageTypeResource, CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+        Func<ProtectedStorageContext, AspAccessContext, StorageTypeResource, CancellationToken, Task<T>> operation, CancellationToken cancellationToken,
+        bool requireExecution = true)
     {
         ArgumentNullException.ThrowIfNull(target);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -83,7 +93,7 @@ public sealed class StorageContentGateway(
         try
         {
             var context = await resolver.ResolveAsync(target.Storage, target.Consumer, deadline.Token);
-            if (current.AccessMode != ControlPlaneAccessMode.System)
+            if (requireExecution && current.AccessMode != ControlPlaneAccessMode.System)
             {
                 RequestContext execution;
                 try { execution = current.Current; }

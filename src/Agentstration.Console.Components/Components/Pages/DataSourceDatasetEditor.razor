@@ -1,0 +1,209 @@
+@implements IDisposable
+@inject IDataSourcesClient Client
+@inject IStoragesClient Storages
+@inject IConnectedServiceOperationsClient Operations
+@inject IConnectedServicesClient ConnectedServices
+@inject NavigationManager Navigation
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+<PageTitle>@(source?.Definition.DisplayName ?? T("CreateSource")) · Agentstration</PageTitle>
+<PageHeader Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@T("DatasetHelp")" TestId="data-source-dataset-editor">
+    <Actions><a class="button-secondary" href="/data-sources">@T("Back")</a></Actions>
+</PageHeader>
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else
+{
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+    @if (source is not null && scope is { } owner) { <InheritedResourceNotice OwnerScopeRef="owner" /> }
+    <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section">
+        <fieldset class="resource-definition-fields" disabled="@(busy || !CanManage || !interactive)" data-testid="dataset-definition-fields" data-interactive="@(interactive ? "true" : "false")">
+            <div class="form-grid">
+                <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="data-source-display-name" TechnicalNameTestId="data-source-name" />
+                <label><span>@T("Namespace")</span><input @bind="resourceNamespace" disabled="@(!IsNew)" /></label>
+                @if (IsNew) { <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSource" Value="scope" ValueChanged="ChangeScopeAsync" /> }
+                else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="scope" /></label> }
+                <label class="form-field-wide"><span>@T("Description")</span><textarea @bind="description" maxlength="2000"></textarea></label>
+                <label><input type="checkbox" @bind="enabled" /> @T("Enabled")</label>
+                <label class="form-field-wide"><span>@T("DatasetStorage")</span><select @bind="storageKey" data-testid="dataset-storage" required>
+                    <option value="">@T("Select")</option>
+                    @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef · @storage.Namespace/@storage.Name · @storage.Generation</option> }
+                    @if (source?.Definition.Dataset is { } saved && storages.All(value => StorageKey(value) != storageKey)) { <option value="@storageKey">@saved.Storage.Storage · @T("DatasetPinnedUnavailable")</option> }
+                </select><small>@T("DatasetStorageHelp")</small></label>
+                <label class="form-field-wide"><span>@T("DatasetPrefix")</span><input @bind="prefix" maxlength="256" data-testid="dataset-prefix" /><small>@T("DatasetPrefixHelp")</small></label>
+                <label class="form-field-wide"><span>@T("DatasetOperation")</span><select value="@operationKey" @onchange="ChangeOperation" data-testid="dataset-operation" required>
+                    <option value="">@T("Select")</option>
+                    @foreach (var operation in operations) { <option value="@OperationKey(operation)">@operation.Definition.DisplayName · @operation.Definition.Service.Service.Address.Name · @operation.ScopeRef · @operation.Generation · @T(operation.Enabled ? "Enabled" : "Disabled")</option> }
+                    @if (source?.Definition.Dataset is { } binding && operations.All(value => OperationKey(value) != operationKey)) { <option value="@operationKey">@binding.Acquisition.Operation.Operation · @T("DatasetPinnedUnavailable")</option> }
+                </select><small>@T("DatasetOperationHelp")</small></label>
+                @if (SelectedOperation is { } selected)
+                {
+                    <div class="form-field-wide"><button class="button-secondary" type="button" disabled="@(!ResourceOwnershipContext.CanManage(selected.ScopeRef, Services))" @onclick="ToggleOperationAsync" data-testid="dataset-operation-enabled">@T(selected.Enabled ? "DatasetDisableOperation" : "DatasetEnableOperation")</button><small>@T("DatasetActivationHelp")</small></div>
+                }
+                <div class="form-field-wide" data-testid="dataset-parameters"><span>@T("Parameters")</span>
+                    @if (NoConfiguration) { <p>@T("DatasetNoConfiguration")</p> }
+                    else { <JsonSchemaInputEditor Schema="InputSchema" Value="parameters" ValueChanged="value => parameters = value" ValidationChanged="state => parametersValid = state.IsValid" Disabled="@(busy || !CanManage)" AllowAnyRoot="true" /> }
+                    <small>@T("DatasetParametersHelp")</small>
+                </div>
+            </div>
+            <div class="form-actions"><button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || enabled && (!parametersValid || string.IsNullOrEmpty(storageKey) || SelectedOperation?.Enabled != true))">@T("Save")</button>
+                <button class="button-secondary" type="button" @onclick="RefreshAsync" disabled="@busy">@T("Refresh")</button>
+                @if (IsNew) { <a class="button-secondary" href="/data-sources/new">@T("DatasetLegacyProfile")</a> }
+            </div>
+        </fieldset>
+    </EditForm>
+    @if (CanManage)
+    {
+        <section class="panel form-section"><h2>@T("DatasetDiscoverOperations")</h2><p>@T("DatasetDiscoverHelp")</p>
+            <label><span>@T("DatasetService")</span><select @bind="serviceKey"><option value="">@T("Select")</option>@foreach (var service in connectedServices) { <option value="@service.Uid.ToString()">@service.Definition.DisplayName · @service.ScopeRef</option> }</select></label>
+            <div class="form-actions"><button class="button-secondary" type="button" disabled="@(busy || string.IsNullOrEmpty(serviceKey))" @onclick="DiscoverAsync">@T("StartDiscovery")</button></div>
+        </section>
+    }
+    @if (source is not null)
+    {
+        <section class="panel form-section" data-testid="dataset-acquisitions"><div class="panel-header"><div><h2>@T("AcquisitionHistory")</h2><p>@T("DatasetFixedCallHelp")</p></div><div class="form-actions">
+            <button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || !interactive || readiness?.CanAcquire != true)" @onclick="StartAsync">@T("StartAcquisition")</button>
+            <button class="button-secondary" type="button" disabled="@busy" @onclick="RefreshAsync">@T("Refresh")</button>
+        </div></div>
+        @if (readiness?.Ready == false) { <p role="status">@T("DatasetNotReady")</p> }
+        @if (readiness is { Ready: true, CanAcquire: false }) { <p role="status">@T("DatasetAcquisitionNotAuthorized")</p> }
+        @if (history.Count == 0) { <p>@T("NoAcquisitions")</p> }
+        else
+        {
+            <DataGrid TItem="DataSourceAcquisitionResource" Items="history"><Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("DatasetContent")</th><th>@T("FlowRun")</th></tr></Header><Row Context="item">
+                <tr data-testid="data-source-acquisition-row" data-state="@item.State"><td>@item.CreatedAt.ToLocalTime().ToString("g")</td><td>@T($"AcquisitionState.{item.State}")</td><td>
+                @if (item.Content is not null) { <button class="button-secondary" type="button" disabled="@busy" data-testid="dataset-read-content" @onclick="() => ReadAsync(item)">@T("DatasetReadContent")</button><small>@item.Content.Length · @item.Content.Sha256</small> }
+                @if (item.ErrorCode is not null) { <span role="status">@T("DatasetExecutionFailed") <code>@item.ErrorCode</code></span> }
+                </td><td><a class="text-button" href="@FlowUrl(item)"><code>@item.FlowRunId</code></a></td></tr>
+            </Row></DataGrid>
+        }
+        @if (preview is not null) { <div data-testid="dataset-content"><h3>@T("DatasetContent")</h3><p>@T("DatasetContentUntrusted")</p><pre class="runner-json">@preview</pre>@if (previewTruncated) { <p>@T("DatasetContentTruncated")</p> }<button class="button-secondary" type="button" @onclick="() => preview = null">@T("DatasetCloseContent")</button></div> }
+        </section>
+        @if (CanManage && scope is { } accessScope) { <section class="panel form-section"><h2>@T("Access")</h2><ResourceAccessPanel OwnerScopeRef="accessScope" Namespace="source.Namespace" Kind="@DataSourceResourceKinds.DataSource" Name="@source.Name" Generation="source.Generation" Governance="source.Governance" /></section> }
+    }
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? Namespace { get; set; }
+    [Parameter] public string? ScopeRef { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private DataSourceResource? source;
+    private DataSourceReadiness? readiness;
+    private ResourceScopeRef? scope;
+    private string technicalName = "", displayName = "", resourceNamespace = "default", description = "", prefix = "", storageKey = "", operationKey = "", serviceKey = "";
+    private string? etag, error, preview;
+    private bool loading = true, busy, enabled = true, parametersValid = true, previewTruncated;
+    private bool interactive;
+    private JsonElement parameters = JsonSerializer.SerializeToElement(new { });
+    private IReadOnlyList<StorageResource> storages = [];
+    private IReadOnlyList<ConnectedServiceOperationResource> operations = [];
+    private IReadOnlyList<ConnectedServiceResource> connectedServices = [];
+    private IReadOnlyList<DataSourceAcquisitionResource> history = [];
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool CanManage => Services.GetService<ConsoleContextState>()?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true
+        && (IsNew || scope is { } owner && ResourceOwnershipContext.CanManage(owner, Services));
+    private ConnectedServiceOperationResource? SelectedOperation => operations.FirstOrDefault(item => OperationKey(item) == operationKey);
+    private JsonElement? InputSchema => SelectedOperation?.Definition.Definition.TryGetProperty("inputSchema", out var schema) == true ? schema : readiness?.Dataset?.InputSchema;
+    private bool NoConfiguration => InputSchema is { } schema && schema.TryGetProperty("additionalProperties", out var additional) && additional.ValueKind == JsonValueKind.False
+        && (!schema.TryGetProperty("properties", out var properties) || properties.EnumerateObject().Any() == false)
+        && (!schema.TryGetProperty("required", out var required) || required.GetArrayLength() == 0);
+    private string T(string key) => Localizer[key];
+    private static string StorageKey(StorageResource item) => $"{item.Uid}:{item.Generation}:{item.ObservedState?.BindingDigest}";
+    private static string OperationKey(ConnectedServiceOperationResource item) => $"{item.Uid}:{item.Generation}:{item.Definition.DefinitionDigest}";
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            scope = string.IsNullOrWhiteSpace(ScopeRef) ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
+            if (!IsNew)
+            {
+                var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, scope!.Value, cancellation.Token);
+                source = snapshot.Value; etag = snapshot.ETag;
+                technicalName = source.Name; displayName = source.Definition.DisplayName; description = source.Definition.Description ?? "";
+                resourceNamespace = source.Namespace.Value; enabled = source.Definition.Enabled;
+                var saved = source.Definition.Dataset!;
+                prefix = saved.Rule.Prefix; parameters = saved.Acquisition.Parameters.Clone();
+                storageKey = $"{saved.Storage.StorageUid}:{saved.Storage.Generation}:{saved.Storage.BindingDigest}";
+                operationKey = $"{saved.Acquisition.Operation.OperationUid}:{saved.Acquisition.Operation.Generation}:{saved.Acquisition.Operation.DefinitionDigest}";
+            }
+            await RefreshCoreAsync();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = T("DatasetLoadFailed"); }
+        finally { loading = false; }
+    }
+
+    private async Task RefreshCoreAsync()
+    {
+        connectedServices = await ConnectedServices.GetConnectedServicesAsync(cancellation.Token);
+        if (connectedServices.FirstOrDefault(item => item.Uid.ToString() == serviceKey) is { } selectedService)
+            await Operations.RefreshDiscoveryAsync(selectedService, cancellation.Token);
+        operations = await Operations.GetAsync(cancellation.Token);
+        if (scope is { } owner) storages = await Storages.GetStoragesAsync(owner, cancellation.Token);
+        if (source is not null)
+        {
+            readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, scope!.Value, cancellation.Token);
+            history = await Client.GetAcquisitionsAsync(source.Namespace, source.Name, scope.Value, cancellation.Token);
+        }
+    }
+    private async Task RefreshAsync() => await RunAsync(RefreshCoreAsync);
+    private async Task ChangeScopeAsync(ResourceScopeRef? value) { scope = value; storageKey = ""; operationKey = ""; await RefreshAsync(); }
+    private void ChangeOperation(ChangeEventArgs value) { operationKey = value.Value?.ToString() ?? ""; parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; }
+    private async Task ToggleOperationAsync() => await RunAsync(async () =>
+    {
+        var selected = SelectedOperation!;
+        var saved = await Operations.SetEnabledAsync(selected, !selected.Enabled, cancellation.Token);
+        operations = operations.Select(item => item.Uid == selected.Uid ? saved.Value : item).ToArray();
+        operationKey = OperationKey(saved.Value);
+    });
+    private async Task DiscoverAsync() => await RunAsync(async () =>
+    {
+        await Operations.DiscoverAsync(connectedServices.Single(item => item.Uid.ToString() == serviceKey), cancellation.Token);
+        error = T("DatasetDiscoveryAccepted");
+    });
+    private async Task SaveAsync() => await RunAsync(async () =>
+    {
+        var storage = storages.SingleOrDefault(item => StorageKey(item) == storageKey);
+        var operation = SelectedOperation;
+        var storageReference = storage is null ? source!.Definition.Dataset!.Storage : new StorageRevisionReference(
+            new(storage.ScopeRef!.Value, storage.Namespace, storage.Kind, storage.Name), storage.Uid, storage.Generation, storage.ObservedState!.BindingDigest!);
+        var operationReference = operation is null ? source!.Definition.Dataset!.Acquisition.Operation : new ConnectedServiceOperationRevisionReference(
+            new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid, operation.Generation, operation.Definition.DefinitionDigest);
+        var rule = (source?.Definition.Dataset?.Rule ?? new StorageContentPolicy(Write: true)) with { Prefix = prefix };
+        var definition = new DataSourceProperties { DisplayName = displayName.Trim(), Description = description, Enabled = enabled,
+            Dataset = new(storageReference, rule, new(operationReference, parameters)) };
+        var saved = IsNew ? await Client.CreateAsync(new(technicalName, definition, resourceNamespace, scope), cancellation.Token)
+            : await Client.UpdateAsync(source!.Namespace, source.Name, scope!.Value, new(definition), etag!, cancellation.Token);
+        source = saved.Value; etag = saved.ETag;
+        Navigation.NavigateTo($"/data-sources/{Uri.EscapeDataString(source.Name)}?scopeRef={Uri.EscapeDataString(source.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(source.Namespace.Value)}&context={Uri.EscapeDataString(ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? source.ScopeRef.Value.Value)}");
+        await RefreshCoreAsync();
+    });
+    private async Task StartAsync() => await RunAsync(async () =>
+    {
+        _ = await Client.StartAcquisitionAsync(source!.Namespace, source.Name, scope!.Value, new(), cancellation.Token);
+        await RefreshCoreAsync();
+    });
+    private async Task ReadAsync(DataSourceAcquisitionResource item) => await RunAsync(async () =>
+    {
+        var content = await Client.ReadContentAsync(item.Namespace, item.Name, cancellation.Token);
+        preview = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64));
+        previewTruncated = !content.EndOfObject;
+    });
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true; error = null;
+        try { await action(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = T("DatasetActionFailed"); }
+        finally { busy = false; }
+    }
+    private static string FlowUrl(DataSourceAcquisitionResource item) => $"/flow-runs/{Uri.EscapeDataString(item.FlowRunId)}?scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(item.LogicalScopeRef?.Value ?? item.ScopeRef.Value.Value)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

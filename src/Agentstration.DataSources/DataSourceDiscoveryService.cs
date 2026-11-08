@@ -54,7 +54,7 @@ public sealed class DataSourceDiscoveryService(
                 ?? throw Error("data_source_profile_pin_missing",
                     $"Data Source '{source.Value.Address}' does not pin an exact Data Source Profile identity.");
             var profile = await profiles.ResolveActiveAsync(ownerScope, source.Value.Namespace,
-                source.Value.Definition.Profile, profileUid, cancellationToken);
+                source.Value.Definition.Profile!, profileUid, cancellationToken);
             if (profile.Definition.DiscoveryFlow is null)
                 throw Error("data_source_discovery_not_supported", $"Profile '{profile.Name}' does not define discovery.");
             var composition = await compositions.ResolveDiscoveryAsync(ownerScope, source.Value.Namespace, profile, cancellationToken);
@@ -413,7 +413,7 @@ public sealed class DataSourceAcquisitionTargetService(
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
         execution.EnsureVisible(source.Value.ScopeRef!.Value);
         var profile = await profiles.ResolveActiveAsync(source.Value.ScopeRef!.Value, source.Value.Namespace,
-            source.Value.Definition.Profile, cancellationToken);
+            source.Value.Definition.Profile!, cancellationToken);
         var discoveries = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceDiscoveryResource>(ResourceScopeRef.Workspace(context.WorkspaceId),
             DataSourceResourceKinds.DataSourceDiscovery, 0, 1_000, cancellationToken));
         var latestDiscovery = discoveries.Where(value => value.Value.DataSourceUid == source.Value.Uid

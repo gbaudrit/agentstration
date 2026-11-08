@@ -225,6 +225,14 @@ public sealed class ConnectedServiceOperationTypeManagementService(
             || string.IsNullOrWhiteSpace(version.Invocation.ContractVersion))
             throw new ConnectedServiceOperationTypeValidationException(
                 $"Operation type version '{version.Version}' requires an interaction and invocation contract.");
+        if (version.Acquisition is { } acquisition
+            && (version.Interaction != ConnectedServiceOperationInteraction.RequestResponse
+                || acquisition.Flow?.Flow.ScopeRef is null || acquisition.Flow.FlowUid == Guid.Empty
+                || string.IsNullOrWhiteSpace(acquisition.Flow.Version) || string.IsNullOrWhiteSpace(acquisition.Flow.DefinitionHash)
+                || acquisition.Flow.Contract != "connected-service-operation-acquisition/v1"
+                || string.IsNullOrWhiteSpace(acquisition.InputSchemaProperty) || string.IsNullOrWhiteSpace(acquisition.OutputSchemaProperty)
+                || string.IsNullOrWhiteSpace(acquisition.ReadOnlyProperty)))
+            throw new ConnectedServiceOperationTypeValidationException("Acquisition adapters require an exact request-response Flow and explicit schema properties.");
     }
 
     public static string SchemaDigest(JsonElement schema) =>

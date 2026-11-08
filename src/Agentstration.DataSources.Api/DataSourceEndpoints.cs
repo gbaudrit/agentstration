@@ -82,6 +82,8 @@ internal static class DataSourceEndpoints
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
         try { return await action(); }
+        catch (Agentstration.Storage.StorageException exception)
+        { return Problem(exception.Code, "Storage unavailable", exception.StatusCode, exception.Message); }
         catch (ResourceNotFoundException exception) { return Problem("data-source-not-found", "Data Source not found", 404, exception.Message); }
         catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (ResourceScopeAccessDeniedException exception) { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }

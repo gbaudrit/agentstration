@@ -35,6 +35,7 @@ public sealed class RegistrationContractTests
         var contributions = new Dictionary<Type, (int Count, ServiceLifetime Lifetime)>
         {
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
+            [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(IBootstrapResourceHandler)] = (20, ServiceLifetime.Scoped),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),
             [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),

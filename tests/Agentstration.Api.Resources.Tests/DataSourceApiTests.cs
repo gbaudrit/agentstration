@@ -447,7 +447,7 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         var profile = await profiles.CreateAsync(ProfileResource("versioned", workspace, Profile()), default);
         _ = await profiles.PublishAsync(ResourceNamespace.Default, "versioned", workspace, new("1.0.0"), default);
         var source = await sources.CreateAsync(SourceResource("source-a", workspace, new("versioned", workspace)), default);
-        var first = await profiles.ResolveActiveAsync(workspace, source.Value.Namespace, source.Value.Definition.Profile, default);
+        var first = await profiles.ResolveActiveAsync(workspace, source.Value.Namespace, source.Value.Definition.Profile!, default);
         Assert.AreEqual("1.0.0", first.Version);
 
         var draft = profile.Value.Definition with { Description = "Second revision", Version = "2.0.0" };
@@ -456,20 +456,20 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         _ = await profiles.PublishAsync(ResourceNamespace.Default, "versioned", workspace,
             new("2.0.0", Activate: false), default);
         var beforeActivation = await profiles.ResolveActiveAsync(workspace, ResourceNamespace.Default,
-            source.Value.Definition.Profile, default);
+            source.Value.Definition.Profile!, default);
         Assert.AreEqual("1.0.0", beforeActivation.Version);
         var profileBeforeActivation = await profiles.GetAsync(ResourceNamespace.Default, "versioned", workspace, default);
         _ = await profiles.ActivateAsync(ResourceNamespace.Default, "versioned", workspace,
             new("2.0.0"), profileBeforeActivation!.ETag, default);
         var afterActivation = await profiles.ResolveActiveAsync(workspace, ResourceNamespace.Default,
-            source.Value.Definition.Profile, default);
+            source.Value.Definition.Profile!, default);
         Assert.AreEqual("2.0.0", afterActivation.Version);
 
         var profileBeforeRollback = await profiles.GetAsync(ResourceNamespace.Default, "versioned", workspace, default);
         _ = await profiles.ActivateAsync(ResourceNamespace.Default, "versioned", workspace,
             new("1.0.0"), profileBeforeRollback!.ETag, default);
         var afterRollback = await profiles.ResolveActiveAsync(workspace, ResourceNamespace.Default,
-            source.Value.Definition.Profile, default);
+            source.Value.Definition.Profile!, default);
         Assert.AreEqual("1.0.0", afterRollback.Version);
 
         var stale = await Assert.ThrowsAsync<DataSourceValidationException>(() => profiles.ActivateAsync(
@@ -585,7 +585,7 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
             ?? throw new AssertFailedException("The acquisition response must contain a resource.");
         Assert.AreEqual(source.Value.Uid, started.DataSourceUid);
         Assert.AreEqual(workspace, started.DataSourceScopeRef);
-        Assert.AreEqual("1.0.0", started.Composition.Profile.Version);
+        Assert.AreEqual("1.0.0", started.Composition!.Profile.Version);
         Assert.AreEqual("1.0.0", started.Composition.Flow.Version);
         Assert.AreEqual(DataSourceFlowContracts.Acquisition, started.Composition.Flow.Contract);
 

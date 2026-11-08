@@ -1,0 +1,10 @@
+.form-section { min-width: 0; width: 100%; box-sizing: border-box; }
+select, input, textarea { max-width: 100%; }
+pre, code, small { overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; max-height: 28rem; overflow: auto; }
+small { display: block; }
+.form-section ::deep .resource-access-panel { grid-template-columns: minmax(0, 1fr); }
+.form-section ::deep .resource-access-panel select { min-width: 0; max-width: 100%; }
+@media (max-width: 620px) {
+    .panel-header { flex-direction: column; align-items: stretch; }
+}

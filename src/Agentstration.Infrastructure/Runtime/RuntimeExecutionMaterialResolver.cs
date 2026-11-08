@@ -17,9 +17,21 @@ public sealed class RuntimeExecutionMaterialResolver(
     IRuntimeAgentResolver agents,
     AgentManagementService agentManagement,
     IToolCatalog tools,
-    IOptions<FlowRunExecutionOptions> flowOptions) : IRuntimeExecutionMaterialResolver
+    IOptions<FlowRunExecutionOptions> flowOptions,
+    Agentstration.DataSources.DataSourceDatasetAcquisitionService? datasetAcquisitions = null) : IRuntimeExecutionMaterialResolver
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private async Task ValidateDatasetAsync(FlowRun run, CancellationToken cancellationToken)
+    {
+        if (run.DefinitionSnapshot.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract)
+            != Agentstration.DataSources.DataSourceDatasetCompositionService.FlowContract) return;
+        if (datasetAcquisitions is null)
+            throw new RuntimeExecutionMaterialException("operation_adapter_unavailable", "Dataset execution is unavailable.");
+        try { await datasetAcquisitions.ValidateInvocationAsync(run.Id, run.Input, cancellationToken); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { throw new RuntimeExecutionMaterialException("operation_acquisition_refused", "The accepted operation acquisition is no longer authorized or available."); }
+    }
 
     public async Task<RuntimeExecutionMaterial> ResolveAsync(
         RuntimeWorkerAssignment assignment,
@@ -47,6 +59,7 @@ public sealed class RuntimeExecutionMaterialResolver(
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this root assignment.");
         await flowScopes.ValidateAsync(run.Scope, cancellationToken);
         using var scope = flowScopes.Enter(run.Scope);
+        await ValidateDatasetAsync(run, cancellationToken);
         if (!string.Equals(run.FlowVersion, flowVersion, StringComparison.Ordinal)
             || !string.Equals(DefinitionHash(run), flowDefinitionHash, StringComparison.Ordinal))
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The step does not reference the pinned Flow version and hash.");
@@ -107,6 +120,7 @@ public sealed class RuntimeExecutionMaterialResolver(
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this root assignment.");
         await flowScopes.ValidateAsync(run.Scope, cancellationToken);
         using var scope = flowScopes.Enter(run.Scope);
+        await ValidateDatasetAsync(run, cancellationToken);
         if (!string.Equals(run.FlowVersion, run.DefinitionSnapshot.Version, StringComparison.Ordinal)
             || run.DefinitionHash is not null
             && !string.Equals(run.DefinitionHash, run.DefinitionSnapshot.DefinitionHash, StringComparison.Ordinal)

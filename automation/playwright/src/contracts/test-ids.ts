@@ -143,6 +143,11 @@ export const TestIds = {
     snapshotDetails: 'knowledge-snapshot-details', retrievalText: 'knowledge-retrieval-text',
     retrievalRun: 'knowledge-retrieval-run', retrievalResult: 'knowledge-retrieval-result',
   },
+  datasetComposition: {
+    editor: 'data-source-dataset-editor', fields: 'dataset-definition-fields', storage: 'dataset-storage', prefix: 'dataset-prefix',
+    operation: 'dataset-operation', activation: 'dataset-operation-enabled', parameters: 'dataset-parameters',
+    acquisitions: 'dataset-acquisitions', readContent: 'dataset-read-content', content: 'dataset-content',
+  },
   schemaDrivenSources: {
     dataSourceEditor: 'data-source-editor',
     dataSourceDisplayName: 'data-source-display-name',
