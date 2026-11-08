@@ -157,8 +157,8 @@ export class GovernedKnowledgePage {
     await this.openToolSet(consoleUrl, evidence.toolSetName, scope);
     const versions = this.page.getByTestId(TestIds.governedKnowledge.toolSetVersion);
     await expect(versions).toHaveCount(2);
-    await expect(versions.filter({ hasText: '2.0.0' })).toContainText(additionalTool);
-    await expect(versions.filter({ hasText: '1.0.0' })).not.toContainText(additionalTool);
+    await expect(versions.filter({ has: this.page.getByRole('heading', { level: 3, name: /\b2\.0\.0$/ }) })).toContainText(additionalTool);
+    await expect(versions.filter({ has: this.page.getByRole('heading', { level: 3, name: /\b1\.0\.0$/ }) })).not.toContainText(additionalTool);
     const beforeDelete = await (await this.get(consoleUrl, path, scope)).json() as unknown;
     await this.publishedTools.getByRole('button', { name: text.deleteToolSet, exact: true }).click();
     await this.page.getByRole('dialog').getByRole('button', { name: text.confirmToolSetDelete, exact: true }).click();
