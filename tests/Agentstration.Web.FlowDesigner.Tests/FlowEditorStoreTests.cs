@@ -308,6 +308,7 @@ public sealed class FlowEditorStoreTests
             new("rejected", "Rejected", FlowOutputOutcome.Error, null)
         ]);
 
+        store.SetSource("entryStep: child # applied YAML");
         store.MarkSaved(response, "entryStep: child", store.CaptureSave());
 
         var node = store.State.Diagram.Nodes.Single(item => item.Name == "child");
@@ -335,6 +336,7 @@ public sealed class FlowEditorStoreTests
         var store = new FlowEditorStore();
         store.Load(response, "entryStep: input");
 
+        store.SetSource("entryStep: input # applied YAML");
         store.MarkSaved(response, "entryStep: input", store.CaptureSave());
 
         Assert.AreEqual(ownerScope, store.State.Resource!.ScopeRef);

@@ -393,16 +393,19 @@ public sealed class FlowEditorStore
         if (!IsCurrent(snapshot)) return false;
         var newerGraph = State.LocalRevision != snapshot.GraphRevision;
         var newerSource = sourceRevision != snapshot.SourceRevision;
+        // A visual save echoes the submitted graph. Keep live canvas models,
+        // including any endpoint being dragged, when acknowledging that write.
+        var applySourceGraph = snapshot.HasSourceChanges && !newerGraph;
         var dirty = editRevision != snapshot.EditRevision;
         State = State with
         {
-            Resource = newerGraph ? State.Resource! with { DraftRevision = response.Value.Revision }
+            Resource = !applySourceGraph ? State.Resource! with { DraftRevision = response.Value.Revision }
                 : new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags,
                     response.Value.Definition, response.Value.Revision)
                 { ScopeRef = response.Value.ScopeRef },
-            Diagram = newerGraph ? State.Diagram : FlowDesignerDocument.From(response.Value.Definition, flowCallOutputs),
+            Diagram = applySourceGraph ? FlowDesignerDocument.From(response.Value.Definition, flowCallOutputs) : State.Diagram,
             ETag = response.ETag,
-            LocalRevision = newerGraph ? State.LocalRevision : State.LocalRevision + 1,
+            LocalRevision = applySourceGraph ? State.LocalRevision + 1 : State.LocalRevision,
             SourceText = newerSource ? State.SourceText : source,
             HasSourceChanges = newerSource && State.HasSourceChanges,
             SourceError = newerSource ? State.SourceError : null,

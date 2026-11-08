@@ -3,7 +3,9 @@ using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.Components;
+using Agentstration.Web.FlowDesigner.Diagramming;
 using Agentstration.Web.FlowDesigner.State;
+using Blazor.Diagrams.Core.Anchors;
 using Blazor.Diagrams.Core.Geometry;
 using Bunit;
 using Microsoft.AspNetCore.Components.Web;
@@ -26,6 +28,40 @@ public sealed partial class FlowDesignerReadOnlyTests
     }
 
     private static TaskCompletionSource<bool> Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    [TestMethod]
+    public async Task AutosaveAcknowledgementPreservesAnEndpointBeingDragged()
+    {
+        using var context = CreateContext();
+        var started = Signal();
+        var release = Signal();
+        var definition = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }, new TransformFlowStepDefinition { Name = "transform" }, new OutputFlowStepDefinition { Name = "output" }],
+            Transitions = [new("route", "input", "completed", "transform")]
+        };
+        var backend = new BackendStub(false, definition) { BeforeSave = async () => { started.TrySetResult(true); await release.Task; } };
+        ConfigureSavingContext(context, backend);
+        var rendered = context.Render<FlowDesignerComponent>(p => p.Add(c => c.ResourceId, "sample"));
+        var store = context.Services.GetRequiredService<FlowEditorStore>();
+        await rendered.InvokeAsync(() => store.DispatchAsync(new MoveStepCommand("input", new(10, 20))));
+        var diagram = GetDiagram(rendered.FindComponent<FlowCanvas>().Instance);
+        var link = diagram.Links.Single();
+        var output = diagram.Nodes.OfType<FlowDiagramNode>().Single(node => node.Source.Name == "output");
+        var save = rendered.InvokeAsync(() => InvokeCoordinatorAsync(rendered.Instance, includeSource: false));
+        await started.Task;
+        var dragging = new PositionAnchor(new Point(500, 500));
+        await rendered.InvokeAsync(() => link.SetTarget(dragging));
+        release.SetResult(true);
+        await save;
+
+        Assert.AreSame(link, diagram.Links.Single());
+        Assert.AreSame(dragging, link.Target);
+        Assert.IsFalse(store.State.IsDirty);
+        await rendered.InvokeAsync(() => link.SetTarget(new SinglePortAnchor(output.Input)));
+        Assert.AreEqual("output", store.State.Resource!.Definition.Transitions.Single().ToStep);
+    }
 
     [TestMethod]
     public async Task SavingFlushesEditsMadeDuringWriteAndSerializesValidation()
