@@ -9,15 +9,21 @@ does not create Connected Services, infer mappings or publish Agent Tools.
 
 | Type | Version | Execution | Connection requirements |
 | --- | --- | --- | --- |
-| opendal.fs | 1.0.0 | describe/list/stat/read/write | None |
-| opendal.s3 | 0.1.0-preview.1 | Descriptor only; every operation unavailable | endpoint, access-key; secured secret-key |
-| opendal.azblob | 0.1.0-preview.1 | Descriptor only; every operation unavailable | endpoint, account; secured account-key |
+| opendal.fs | 1.0.0 | Four text/blob methods, list/stat, session controls | None |
+| opendal.s3 | 1.0.0 | Same generic ASP group through native S3 Operator | endpoint, region, access-key; secured secret-key |
+| opendal.azblob | 1.0.0 | Same generic ASP group through native Azure Blob Operator | endpoint, account; secured account-key |
 
-The remote descriptors advertise no executable capabilities and refuse binding
-configuration before reading Secret values. Their typed contracts document future
-explicit mappings; neither contributes a Connected Service type or instance.
-The AEP bound-value/Secret-access protocol capabilities describe the protected
-requirement format, not operational remote storage support.
+All types handled by this extension are contributed and executable. Other services
+compiled into Apache.OpenDAL are not integrated StorageTypes. Adding one requires
+its typed connection/configuration contract and deterministic adapter validation;
+no new Agent-facing method or physical storage engine is needed.
+
+Remote configuration is `{ "bucket": "...", "root": "optional-prefix/" }` for S3
+or `{ "container": "...", "root": "optional-prefix/" }` for Azure Blob. Connection
+values come only from explicit typed Connected Service exports. Credentials use
+existing AEP one-use Secret grants, with redirects disabled during redemption.
+Endpoints require HTTPS, except loopback HTTP for local deployments/tests. S3
+ambient configuration and instance-metadata credential loading are disabled.
 
 Filesystem configuration is exactly `{}`. The operator supplies the physical
 root through `OpenDal:RootDirectory`, never through Storage configuration or MCP
@@ -94,43 +100,78 @@ deployment/authentication practices.
 5. Provider authentication, allowlist, exact StoreRef, envelope and per-operation
    checks remain mandatory. Disablement, revoked access and stale identities fail.
 
-For a future executable remote backend, an administrator must select a separate
-Connected Service and explicitly map its typed exports to each requirement.
-Connection values, implementation configuration, Storage envelope and dataset
-policy remain separate. The current S3/Azure descriptors cannot execute that path.
+For S3/Azure, select a separate Connected Service and explicitly map its standard
+and secured exports to every requirement shown above. The extension contributes
+no Connected Service type or instance and does not select another extension.
+Connection values, bucket/container configuration, Storage envelope and dataset
+policy remain separate. Agents continue to see generic logical content operations.
 
 ## Storage semantics and limits
 
-Each logical StoreId/BindingId pair receives its own hashed directory beneath the
-operator root. Two Storages share a filesystem service without sharing data or
-reference authority. Logical keys are stored inside the bounded state object and
-are never interpreted as physical paths.
+Each logical StoreId/BindingId pair receives an isolated SHA-256 partition. Filesystem
+placement is `<operator-root>/<partition>/data/<logical-key>`; remote placement adds
+that partition to the configured bucket/container root. These are ordinary native
+objects/keys: a key does not imply a filesystem. There is no `objects.json`, shared
+content serialization, object/version index or persisted protocol receipt ledger.
+Filesystem-specific containment/link checks protect the local mapping; all actual
+content I/O uses the same OpenDAL Operator/Stream methods as remote backends.
 
-All content and receipt state is read/written through OpenDAL. It uses one atomic
-state object and the filesystem backend's same-filesystem atomic write directory;
-an exclusive coordination lock serializes cooperating processes. Native operator
-handles are disposed after each operation. Native errors are redacted into bounded
-ASP errors. No blind retry loop is added.
+ASP.Server supplies [text/blob sessions](https://github.com/gbaudrit/agentstration/blob/integration/fr-1032/asp/docs/protocol.md),
+strict UTF-8, fixed byte ranges, sequencing, replay, expiry and explicit finalization.
+Protected AEP binding leases still last at most 30 seconds. Longer direct SDK
+transfers must renew the protected lease with the same exact target and authority;
+a lease is not extended by an ASP session. The current product content port remains
+bounded to one returned payload.
 
-- Profile ceilings: 100 objects/page, 65,536 bytes/read or write; envelopes can reduce them.
-- Per store: 128 objects, 8 MiB decoded content, 512 live idempotency receipts,
-  16 MiB serialized state. Four native operations may run concurrently per host.
-- Missing expectedVersion means create-only; replacement requires the current version.
-  Exact retries return the original receipt even after replacement or process restart.
-- Original deadlines remain mandatory; expired requests cannot replay. Full
-  original identities, arguments and authorized context must remain unchanged.
-- Cancellation while waiting for coordination stops without writing. Native
-  filesystem commit is synchronous and bounded; cancellation after commit reports
-  uncertainty. It never releases the lock while native work continues.
-- Re-list after restart to reacquire process-bound ASP object references/cursors.
-  Pagination is a live ordinal walk, not an immutable snapshot.
+The extension translates authorized operations and native capabilities. It exposes
+no physical settings in content arguments and adds no blind retry loop.
 
-This state-object layout is intended for bounded local storage, not importing an
-existing arbitrary directory or high-throughput object hosting. Updates rewrite
-the bounded state. No deletion, historical versions, Snapshot retention,
-cross-host distributed coordination or power-loss durability is guaranteed.
-The root must be operator-owned and inaccessible to untrusted filesystem writers;
-symlink checks do not eliminate races caused by a privileged administrator.
+- Profile ceilings: 100 objects/page and 65,536 decoded bytes/chunk, narrowed by
+  effective policy. Objects can span many chunks; no 8 MiB or 128-object store quota.
+- This host allows 32 open SDK sessions and 32 native operation/transfer handles.
+  Default replay limits remain 8,192 entries, 64 MiB decoded read replay budget,
+  30 seconds/chunk, within the original at-most-five-minute session deadline.
+- Effective `describe.transfers` comes from `Operator.Info.Capability`, with SDK
+  options narrowed to what this binding can uphold. Progressive transfer, empty
+  writes, create-only, replacement, ETag conditions and metadata are independent
+  from retention. All three types implement native list/stat/read/write.
+- `mode: create` uses native IfNotExists. `replace` is explicitly unconditional
+  unless a supported native ETag condition is provided. Native version write
+  conditions have no managed 0.3.1 option and are rejected. The SDK's combined
+  ETagConditions flag requires both IfMatch and IfNoneMatch; S3's partial native
+  condition support is conservatively not advertised under that combined flag.
+- Append is declined: the managed Stream completion API returns no Metadata, so
+  an exact resulting object length after append cannot be evidenced. Metadata is
+  accepted only when all declared metadata fields have native support.
+- Only confirmed native completion yields SDK success. Stream receipts preserve
+  known bytes/requested metadata with unavailable version/ETag/provider digest
+  left null; the SDK computes the transferred-byte SHA-256. No later stat pretends
+  to be the original commit. A later list/stat can supply native ETag/version for
+  subsequent protected references, independently of that original receipt.
+- No atomic publication is advertised. For filesystem creates, do not enable
+  atomic_write_dir: the native mode failed concurrent create-only exclusion in
+  our regression test. Direct native create_new/O_EXCL enforces exclusion; an open
+  write may be progressively visible. No custom cross-process CAS lock is added.
+- Abort is cleanup, not rollback. Native Stream disposal may close/publish unfinished
+  work; the extension returns unknown status for such writes. Failed finalization
+  does not invent a receipt. Native handles stay alive until submitted work settles,
+  even when the request is cancelled. Native operation/I/O timeouts are 20/15 seconds.
+- Replay receipts are process-local SDK state. Exact live retries return their
+  original result even after later replacement. Restart preserves physical content,
+  not sessions/receipts; reacquire list/object references after restart. No durable
+  exactly-once promise, historical-version retention or Snapshot retention is made.
+
+The 0.3.1 .NET `List` API materializes native entries. ASP pages are ordinal, filtered
+and bounded, but large namespace listing can use memory proportional to those
+entries; a native iterator binding would be needed for bounded listing memory.
+Pagination is live rather than a snapshot. Blob content transfers themselves use
+bounded buffers without whole-object materialization. No deletion, cross-host
+transaction or power-loss durability guarantee is provided by the extension.
+
+The filesystem root must be private and operator-owned. Reject symbolic, reparse
+and dangling links; checks do not prevent a privileged concurrent filesystem
+replacement. Persist product identities/control-plane data alongside physical
+content to keep exact configured targets resolvable.
 
 ## Native packaging and deployment
 
@@ -156,3 +197,16 @@ See [ADR-0201](../decisions/0201-opendal-runs-in-an-autonomous-asp-extension.md)
 The dedicated OpenDAL CI publishes and smoke-tests native distributions on Linux
 and Windows; the root Integration lane includes the native provider/MCP tests and
 the actual product-to-extension Storage execution regression.
+
+
+## Validation scope
+
+The native extension tests exercise real MCP, filesystem writes/reads, concurrent
+native conditional creation, more than 128 keys, a 9 MiB progressive transfer,
+strict authority, restart and exact replay. S3 and Azure tests execute the actual
+native operators against synthetic loopback HTTP protocol peers, including secured
+AEP credential redemption, progressive writes, ETag-protected ranged reads and
+create conflicts. They are not a full emulator or live cloud certification. The
+Management API regression covers contributed StorageTypes, explicit typed export
+mappings, product content calls, isolation, disablement and revocation. The published
+standalone smoke checks matching native assets/licenses and content after restart.

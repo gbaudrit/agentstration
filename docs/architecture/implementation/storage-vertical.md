@@ -209,37 +209,25 @@ and PR #1079. These checks do not approve the UX or authorize a merge.
 ## OpenDAL extension — FR #1039
 
 The autonomous Agentstration.Extensions.OpenDal host consumes Apache.OpenDAL 0.3.1
-through ASP.Server/ASP.Aep. It contributes executable opendal.fs@1.0.0 and
-non-executable S3/Azure preview descriptors. Product modules retain their existing
-provider-neutral ports and never acquire native dependencies. See
-[the OpenDAL reference](../../reference/opendal-extension.md) and
-[ADR-0201](../../decisions/0201-opendal-runs-in-an-autonomous-asp-extension.md).
+through ASP.Server/ASP.Aep. It contributes executable opendal.fs, opendal.s3 and
+opendal.azblob version 1.0.0. One provider translates ASP operations to the same
+native Operator/Stream methods for every backend. Backend capabilities and typed
+connection requirements stay inside the extension; product modules remain
+provider-neutral. See [the OpenDAL reference](../../reference/opendal-extension.md)
+and [ADR-0201](../../decisions/0201-opendal-runs-in-an-autonomous-asp-extension.md).
 
-The extension's test project belongs to the required Integration lane and coverage
-shard B. Management API tests exercise real product resolution, AEP contributions,
-protected configuration, MCP and native filesystem access, including disablement.
-The standalone sample and distribution runner verify publication and a process
-restart without a running Agentstration product.
+FR #1085 supplies text/blob sessions and bounded replay receipts in the independent
+ASP SDK (ADR-0202). OpenDAL stores each logical key directly: there is no aggregate
+objects.json, custom content engine, persistent protocol receipt ledger, 128-object
+quota or 8 MiB store quota. Optional native conditions/metadata are gated, and native
+stream completion never acquires exact commit metadata by a later stat.
 
-Validation on the OpenDAL implementation at `34c8605`:
-
-- Root restore and Release build passed with zero warnings/errors.
-- Required Fast lane: 999 passed, zero failed/skipped.
-- Required Integration lane: 1,107 discovered, 1,095 passed, zero failed and the
-  existing 12 optional PostgreSQL/live-provider skips. No OpenDAL case was skipped.
-- Published Linux x64 executable passed real MCP write/retry/list/stat/read, then
-  read the same persisted version after process restart. Native files and license
-  notices were checked in the published distribution.
-- Actual Docker remove/recreate passed with a retained content bind mount and
-  networking disabled, using an offline image built from the installed .NET 10.0.8
-  and host glibc libraries. The official runtime image pull was refused locally.
-- Dedicated [native CI](https://github.com/gbaudrit/agentstration/actions/runs/42509181589)
-  passed on Windows x64 and Ubuntu 24.04 x64, including the published-process
-  restart smoke. Its Linux job also built the checked-in Dockerfile successfully.
-- Exact changed-source formatting verification, 199-ADR validation, LikeC4
-  validation/generation and the complete production Docusaurus build passed.
-- The separately dispatched [general CI](https://github.com/gbaudrit/agentstration/actions/runs/42509308400)
-  was still running when this record was written; its success is not implied.
-
-No new Console/Workplace journey was added. #1033/#1065 keep their existing
-ownership and UX validation/merge gates. #1039 remains open for review.
+The required Integration lane and coverage shard B include the native extension
+suite. Offline tests execute real MCP and native filesystem calls, a 9 MiB stream,
+concurrent conditional creates, isolation and restart. S3/Azure tests use real native
+operators against synthetic local HTTP protocol peers and protected Secret grants;
+they do not claim a live cloud/emulator certification. Product integration tests
+exercise contributed types, manual exports, protected configuration, revocation
+and disablement. Native Linux/Windows distribution and restart checks run in the
+dedicated packaging workflow. These backend checks do not approve the deferred
+Console/Workplace UX gates owned by #1033/#1065.

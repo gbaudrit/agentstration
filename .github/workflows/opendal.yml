@@ -35,8 +35,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Verify filesystem MCP and provider contracts
-        run: dotnet test --project tests/Agentstration.Extensions.OpenDal.Tests --configuration Release --minimum-expected-tests 16
+      - name: Verify native backend MCP and provider contracts
+        run: dotnet test --project tests/Agentstration.Extensions.OpenDal.Tests --configuration Release --minimum-expected-tests 17
       - name: Publish the standalone extension
         run: dotnet publish src/Agentstration.Extensions.OpenDal --configuration Release --runtime ${{ matrix.rid }} --self-contained false --output artifacts/opendal/${{ matrix.rid }}
       - name: Build the independent MCP consumer

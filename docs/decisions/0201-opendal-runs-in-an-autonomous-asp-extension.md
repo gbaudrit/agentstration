@@ -6,71 +6,80 @@ Proposed
 
 ## Context
 
-FR #1039, under #1032, needs physical storage through OpenDAL while preserving
-ADR-0193's ASP/MCP contract, AEP discovery and ADR-0200's protected configuration
-exchange. OpenDAL's README still calls the .NET binding unreleased, but NuGet
-publishes the official Apache.OpenDAL 0.3.1 package. Its native library and managed
-wrapper share source commit fce9cdefdea7c8e54dfbaf3c88c3b6d5ec68146e.
-
-ASP writers must commit content and idempotency receipts atomically. Ordinary
-OpenDAL writes do not establish that guarantee for arbitrary backends. The .NET
-binding's task cancellation also does not prove cancellation of native work.
+FR #1039 under #1032 needs OpenDAL physical access behind the ASP/MCP and AEP
+boundaries. The official Apache.OpenDAL 0.3.1 NuGet package is published despite
+its embedded README saying otherwise. Wrapper and native library share commit
+fce9cdefdea7c8e54dfbaf3c88c3b6d5ec68146e. FR #1085 now supplies provider-neutral
+text/blob sessions, progressive streams and bounded replay receipts in the SDK.
 
 ## Decision
 
-Use the exact official Apache.OpenDAL 0.3.1 package inside an autonomous .NET
-extension. Product, Storage, Connected Service and neutral ASP/AEP SDK assemblies
-do not reference OpenDAL. Reuse Asp.Server, Asp.Aep and AEP enrollment authentication.
-No additional wire transport, Python MCP server, permission engine or product
-resource dependency is introduced.
+Consume the pinned official package inside an autonomous .NET extension. Product,
+Storage, Connected Service and neutral ASP/AEP SDK assemblies never reference
+OpenDAL. Reuse ASP.Server, ASP.Aep, AEP.Client and enrollment authentication. No
+new transport, permission engine, Python MCP server or business resource dependency
+is introduced. No fork or Rust compiler is needed for normal builds.
 
-Contribute opendal.fs@1.0.0 as the executable filesystem implementation. Publish
-S3 and Azure Blob preview descriptors with typed standard/secured requirements
-and all executable capabilities false. Their configuration leases are refused
-before credential redemption. They create no Connected Service and cannot infer
-cross-extension mappings.
+Use one ASP-to-Operator adapter for filesystem, S3 and Azure Blob. Contribute all
+three executable StorageTypes at 1.0.0 with typed requirements and schemas; other
+native compiled services are not silently advertised as integrated. The adapter
+stores logical keys directly through OpenDAL. The SDK owns session sequencing,
+text conversion and in-process replay. There is no aggregate content JSON, custom
+object/version index, persistent receipt ledger or extension store-size quota.
 
-Filesystem physical placement uses an operator-owned absolute root and a hash of
-the logical StoreId/BindingId pair. Configuration is empty; callers cannot choose
-roots or raw backend settings. The Storage envelope and dataset policy remain
-separate documents, intersected without widening. Every lease and content call
-checks the authenticated AEP subject against an explicit operator allowlist.
-Monitored disablement or removal of that subject revokes further operations.
+Keep connection bindings, physical configuration, Storage envelope and dataset
+policy separate. Remote Secret values are redeemed through existing AEP grants,
+not supplied as content arguments. Endpoint/identity/region exports are standard
+values; credentials are secured. Never infer cross-extension mappings or create
+a Connected Service. Exact StoreRef and current authenticated allowlist checks
+remain mandatory on every operation; intersect restrictions without widening.
 
-For this bounded backend, persist content, current versions and live receipts as
-one state object through OpenDAL. An exclusive file lock serializes cooperating
-processes, including reads. Configure fs atomic_write_dir on the same filesystem;
-OpenDAL commits the state object by atomic rename. .NET handles directory/link
-checks and coordination only; OpenDAL performs all content/state I/O.
+Partition physical roots by logical StoreId/BindingId. Filesystem roots are absolute
+operator-owned configuration, never caller content parameters. Validate relative
+key containment and reject reparse/dangling/symbolic links. Remote bucket/container
+and optional prefix are protected configuration, with the same partition appended.
+No unconfigured raw native settings or ambient S3 credentials are accepted.
 
-Bound each store to 128 objects, 8 MiB decoded content and 512 live receipts,
-with a 16 MiB serialized state ceiling. Bound the host to four concurrent native
-operations. This deliberately trades throughput for a small executable backend
-whose conditional writes and receipts have one commit boundary.
+Derive effective transfer capabilities from the configured native Operator and
+narrow published operations. Reject unsupported conditions instead of emulating
+CAS with a stat/write pair. In 0.3.1 the managed write options do not expose native
+version conditions, and stream completion returns no Metadata. Therefore decline
+version conditions and append; preserve known transferred length/requested metadata
+with null unavailable version/ETag/digest. The SDK computes transfer integrity.
+Never call stat to manufacture exact original commit evidence.
 
-Use synchronous bounded native filesystem operations inside that boundary.
-Check cancellation before acquiring locks, before commit and after native work.
-Do not release locks or handles while a cancelled asynchronous native write may
-still be running. Cancellation or failure may leave an unknown outcome; exact
-original retries reconcile through persisted receipts within their deadline.
+Do not advertise atomic publication or durable replay. The filesystem native
+atomic_write_dir mode allowed concurrent IfNotExists writers to all succeed in
+our regression test. Use the native direct create_new/O_EXCL path instead; content
+can be progressively visible. This enforces native create exclusion without a
+custom lock/receipt engine. Other condition support remains capability gated.
 
-No deletion, historical-version conservation, durable Snapshot retention,
-power-loss durability or arbitrary-directory interoperability is advertised.
-Reject symbolic/reparse/dangling links. The root must not be writable by an
-untrusted actor: path checks do not defend against a privileged concurrent
-filesystem replacement. Persist the complete root and product identities.
+Keep native resources alive until submitted work settles. The .NET cancellation
+API cancels observation and does not prove native cancellation. Check request
+cancellation before/after native work, use native timeout layers and retain handles
+through completion. Normalize native errors without leaking paths or credentials.
+The native output-stream API has no abort primitive and disposal may close/publish
+unfinished work: surface unknown status rather than claim rollback. SDK replay
+never re-executes an uncertain protocol chunk.
 
 ## Consequences
 
-- No fork or Rust compiler is required for ordinary builds or execution.
-- Publish RID-specific managed/native distributions, upstream notices and license
-  texts. Validate real MCP through the published executable before and after restart.
-- Windows x64 and Linux x64 receive a dedicated CI matrix. Linux uses glibc;
-  Alpine/musl, trimming, single-file publication and Native AOT are unsupported.
-- Updating OpenDAL requires the same native, ASP, isolation and packaging checks.
-  If a blocking defect requires a fork, pin one upstream revision, build wrapper
-  and native library together, publish under a distinct internal package identity
-  and document the correction and criteria for returning upstream.
-- Larger stores and executable cloud backends need their own implemented atomic
-  receipt strategy and new immutable contribution versions. Their descriptors
-  do not promise execution or Snapshot suitability.
+- Large transfers use native streams and bounded ASP chunks. No 128-object or
+  8 MiB aggregate quota remains. Chunk, object, session and replay limits differ.
+- The binding materializes native listings; ASP page results are sorted and bounded,
+  but listing large namespaces can consume memory proportional to native entries.
+  A future native iterator API is required to remove that separate limitation.
+- Content survives provider restart where the physical backend persists it.
+  Sessions, references and replay receipts require reacquisition/reconciliation;
+  no exactly-once restart recovery, historical-version retention, Snapshot retention,
+  power-loss durability or deletion operation is promised.
+- Ship matching managed/native RID outputs plus upstream notices/licenses. Validate
+  real published MCP before/after restart. Dedicated CI targets Windows x64 and
+  Ubuntu 24.04 Linux x64. Other packaged RIDs are not support claims; glibc is required,
+  and musl/Alpine, trimming, single-file and Native AOT remain unsupported.
+- Offline native cloud protocol peers exercise the common adapter without accounts;
+  live cloud behavior, credentials, network and operational limits still need
+  deployment-specific validation. No generic Agent API changes with the backend.
+- If a blocking upstream defect later requires a fork, pin wrapper/native sources
+  together under a distinct internal package identity and document the correction
+  and criteria for returning upstream. Accepted ADRs remain unchanged.

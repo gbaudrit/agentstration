@@ -35,15 +35,14 @@ var client = await AspClient.ConnectAsync(mcp, version.Asp.ToolPrefix, store,
 var existing = (await client.ListAsync(new("before", "demo/", 10))).Objects.SingleOrDefault(o => o.Key == "demo/smoke.txt");
 if (args.Length == 2)
 {
-    var write = new AspWriteRequest(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddMinutes(2), "demo/smoke.txt",
-        Convert.ToBase64String("OpenDAL ASP/MCP offline"u8), existing?.Version);
-    var written = await client.WriteAsync(write);
-    var retry = await client.WriteAsync(write);
-    if (retry.Item.Version != written.Item.Version) throw new InvalidDataException("The write retry changed the committed version.");
+    var write = new AspWriteBlobRequest(Guid.NewGuid().ToString("N"), 0, true, Convert.ToBase64String("OpenDAL ASP/MCP offline"u8),
+        Options: new("demo/smoke.txt", existing is null ? "create" : "replace"), NotAfter: DateTimeOffset.UtcNow.AddMinutes(2));
+    var written = await client.WriteBlobAsync(write); var retry = await client.WriteBlobAsync(write);
+    if (retry != written) throw new InvalidDataException("The write retry changed the original result.");
 }
 var item = (await client.ListAsync(new("after", "demo/", 10))).Objects.Single(o => o.Key == "demo/smoke.txt");
 var metadata = await client.StatAsync(new("stat", item.Reference));
-var content = await client.ReadAsync(new("read", metadata.Reference, 0, 4096));
+var content = await client.ReadBlobAsync(new("read", Selection: new(metadata.Reference), NotAfter: DateTimeOffset.UtcNow.AddMinutes(2)));
 if (Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)) != "OpenDAL ASP/MCP offline")
     throw new InvalidDataException("The filesystem round trip differs.");
 Console.WriteLine($"OpenDAL ASP/MCP smoke passed; bytes={metadata.Length}; version={metadata.Version}");

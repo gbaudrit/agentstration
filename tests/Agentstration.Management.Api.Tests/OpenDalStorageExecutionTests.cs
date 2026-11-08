@@ -127,7 +127,7 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
             var second = await Create("opendal-second");
             Assert.IsNull(first.Definition.ConnectedService);
             Assert.IsEmpty(first.Definition.Bindings);
-            await VerifyExplicitDescriptorMappingsAsync(services, scope);
+            await VerifyExplicitRemoteMappingsAsync(services, scope);
             var gateway = services.GetRequiredService<IStorageContentGateway>();
             var target = Target(first, scope);
             var write = new StorageWrite("product-write", DateTimeOffset.UtcNow.AddMinutes(2), "notes/a",
@@ -149,7 +149,8 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
             _ = await resources.PutExactAsync(scope, registration.Value with
             { Definition = registration.Value.Definition with { Enabled = false } }, registration.ETag, false, default);
             await Assert.ThrowsAsync<StorageException>(() => gateway.ReadAsync(target, written.Reference, 0, 100));
-            Assert.HasCount(1, Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories));
+            Assert.IsEmpty(Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories));
+            Assert.HasCount(1, Directory.GetFiles(root, "a", SearchOption.AllDirectories));
         }
         finally
         {
@@ -162,7 +163,7 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
         new(new(scope, resource.Namespace, resource.Kind, resource.Name), resource.Uid, resource.Generation, StorageDigests.Binding(resource.Definition)),
         new(scope, resource.Address), new(Write: true, Prefix: "notes/"));
 
-    private static async Task VerifyExplicitDescriptorMappingsAsync(IServiceProvider services, ResourceScopeRef scope)
+    private static async Task VerifyExplicitRemoteMappingsAsync(IServiceProvider services, ResourceScopeRef scope)
     {
         var remote = (await services.GetRequiredService<StorageTypeManagementService>().GetExactAsync(scope,
             ResourceNamespace.Parse(OpenDalStorageTypes.ExtensionId), "opendal.s3", default))!.Value;
@@ -208,7 +209,7 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
         }, default)).Value;
         var definition = new StorageProperties
         {
-            DisplayName = "Descriptor mapping fixture",
+            DisplayName = "Remote mapping fixture",
             Type = new()
             {
                 Type = new(remote.Name, scope, remote.Namespace),
@@ -239,8 +240,8 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
         });
         var context = await services.GetRequiredService<IStorageResolver>().ResolveAsync(Target(mapped, scope).Storage,
             new(scope, mapped.Address));
-        Assert.IsFalse(context.Capabilities.List || context.Capabilities.Read || context.Capabilities.Write);
-        Assert.HasCount(3, context.Bindings);
+        Assert.IsTrue(context.Capabilities.List && context.Capabilities.Read && context.Capabilities.Write);
+        Assert.HasCount(4, context.Bindings);
         Assert.AreEqual(definition.Configuration.GetRawText(), context.Configuration.GetRawText());
         Assert.AreEqual(definition.Envelope.GetRawText(), context.Envelope.GetRawText());
         Assert.IsTrue(context.Bindings.All(b => b.RequirementId != b.Export.Id));

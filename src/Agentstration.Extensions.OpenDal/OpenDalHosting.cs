@@ -15,6 +15,8 @@ public static class OpenDalHosting
         services.AddOptions<OpenDalOptions>().BindConfiguration(OpenDalOptions.SectionName).ValidateOnStart();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<OpenDalExecutionGate>();
+        services.AddHttpClient("opendal-secret-access", client => client.Timeout = TimeSpan.FromSeconds(10))
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
         services.AddHttpContextAccessor();
         services.AddSingleton<IAspAepBindingFactory, OpenDalBindingFactory>();
         services.AddAgentstrationAep(options =>
@@ -31,7 +33,7 @@ public static class OpenDalHosting
             caller => services.GetRequiredService<IOptionsMonitor<OpenDalOptions>>().CurrentValue.Authorizes(caller),
             services.GetRequiredService<TimeProvider>()));
         services.AddSingleton(services => new AspMcpServer(services.GetRequiredService<AspAepBindings>().ResolveAsync,
-            services.GetRequiredService<TimeProvider>()));
+            services.GetRequiredService<TimeProvider>(), sessionLimits: new(MaximumSessions: 32)));
         services.AddMcpServer().WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
             .WithListToolsHandler((request, ct) => request.Services!.GetRequiredService<AspMcpServer>().ListToolsAsync(request, ct))
             .WithCallToolHandler((request, ct) => request.Services!.GetRequiredService<AspMcpServer>().CallToolAsync(request, ct));

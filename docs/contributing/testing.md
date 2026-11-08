@@ -109,7 +109,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
 | `Agentstration.Runtime.Tests` | Integration | Runtime business behavior and SQLite reconstruction without the executable host |
 | `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |
-| `Agentstration.Extensions.OpenDal.Tests` | Integration | Official native OpenDAL filesystem, real ASP/MCP, isolation, bounded receipts and restart |
+| `Agentstration.Extensions.OpenDal.Tests` | Integration | Official native OpenDAL filesystem/S3/Azure operators, real ASP/MCP, isolation, progressive transfer and restart |
 | `Agentstration.Web.Tests` | Integration | Combined standalone composition, startup, storage profiles, workers, and lifecycle |
 | `Agentstration.Performance.Tests` | Performance, opt-in | SQLite/PostgreSQL relational storage concurrency workloads and machine-readable reports |
 | `Agentstration.Workplace.Web.Tests` | Integration | Workplace HTTP host |

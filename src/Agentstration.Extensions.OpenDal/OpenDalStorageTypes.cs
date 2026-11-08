@@ -36,35 +36,40 @@ public static class OpenDalStorageTypes
     public static IReadOnlyList<AepStorageTypeContribution> Contributions { get; } =
     [
         new(FileSystemId, "OpenDAL filesystem", Version,
-        [new(Version, AepSchemaDigest.Compute(ConfigurationSchema), ConfigurationSchema,
-            AepSchemaDigest.Compute(EnvelopeSchema), EnvelopeSchema, false, [],
-            new(true, true, true, true), new(100, 65536, 65536),
-            new(AspProtocol.Profile, "content", "asp", FileSystemId, Version))],
-        "Bounded isolated filesystem content through Apache OpenDAL; no historical versions or Snapshot retention."),
-        RemoteDescriptor("opendal.s3", "OpenDAL S3 (descriptor only)", "bucket", "access-key", "secret-key"),
-        RemoteDescriptor("opendal.azblob", "OpenDAL Azure Blob (descriptor only)", "container", "account", "account-key")
+        [Descriptor(FileSystemId, ConfigurationSchema, false, [])],
+        "Native filesystem objects through Apache OpenDAL. No historical versions or Snapshot retention."),
+        new("opendal.s3", "OpenDAL S3", Version,
+        [Descriptor("opendal.s3", RemoteSchema("bucket"), true,
+            [new("endpoint", true, AepValueType.Text, AepValueProtection.Standard),
+             new("region", true, AepValueType.Text, AepValueProtection.Standard),
+             new("access-key", true, AepValueType.Text, AepValueProtection.Standard),
+             new("secret-key", true, AepValueType.Text, AepValueProtection.Secured)])],
+        "S3 objects through the same native OpenDAL adapter; explicit connection bindings are required."),
+        new("opendal.azblob", "OpenDAL Azure Blob", Version,
+        [Descriptor("opendal.azblob", RemoteSchema("container"), true,
+            [new("endpoint", true, AepValueType.Text, AepValueProtection.Standard),
+             new("account", true, AepValueType.Text, AepValueProtection.Standard),
+             new("account-key", true, AepValueType.Text, AepValueProtection.Secured)])],
+        "Azure Blob objects through the same native OpenDAL adapter; explicit connection bindings are required.")
     ];
 
-    private static AepStorageTypeContribution RemoteDescriptor(string id, string displayName, string destination,
-        string identity, string credential)
+    private static AepStorageTypeVersion Descriptor(string id, JsonElement schema, bool remote,
+        IReadOnlyList<AepStorageRequirement> requirements) =>
+        new(Version, AepSchemaDigest.Compute(schema), schema, AepSchemaDigest.Compute(EnvelopeSchema), EnvelopeSchema,
+            remote, requirements, new(true, true, true, true), new(100, 65536, 65536),
+            new(AspProtocol.Profile, "content", "asp", id, Version));
+
+    private static JsonElement RemoteSchema(string destination) => JsonSerializer.SerializeToElement(new
     {
-        var schema = JsonSerializer.SerializeToElement(new
+        type = "object",
+        additionalProperties = false,
+        required = new[] { destination },
+        properties = new Dictionary<string, object>
         {
-            type = "object",
-            additionalProperties = false,
-            required = new[] { destination },
-            properties = new Dictionary<string, object> { [destination] = new { type = "string", minLength = 1, maxLength = 256 } }
-        });
-        const string version = "0.1.0-preview.1";
-        return new(id, displayName, version,
-            [new(version, AepSchemaDigest.Compute(schema), schema, AepSchemaDigest.Compute(EnvelopeSchema), EnvelopeSchema,
-                true, [new("endpoint", true, AepValueType.Text, AepValueProtection.Standard),
-                    new(identity, true, AepValueType.Text, AepValueProtection.Standard),
-                    new(credential, true, AepValueType.Text, AepValueProtection.Secured)],
-                new(false, false, false, false), new(100, 65536, 65536),
-                new(AspProtocol.Profile, "content", "asp", id, version))],
-            "Metadata only: no executable remote backend. Configuration leases and every content operation are refused.");
-    }
+            [destination] = new { type = "string", minLength = 1, maxLength = 256 },
+            ["root"] = new { type = "string", maxLength = 256 }
+        }
+    });
 }
 
 public sealed record OpenDalEnvelope(string Prefix = "", bool List = true, bool Stat = true, bool Read = true,

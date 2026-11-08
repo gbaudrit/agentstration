@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
@@ -23,7 +24,7 @@ public sealed class OpenDalMcpTests
     private const string Credential = "public-disposable-opendal-fixture-token-1039";
     private const string OtherCredential = "public-disposable-opendal-other-token-1039";
     private static readonly AspStoreRef First = new("first", "filesystem", "revision-1");
-    private static readonly AspAccessPolicy Policy = new(true, true, true, true, "notes/", 4096, 4096, 10);
+    private static readonly AspAccessPolicy Policy = new(true, true, true, true, "notes/", 65536, 65536, 10);
     private readonly string root = Path.Combine(Path.GetTempPath(), "opendal-mcp-" + Guid.NewGuid().ToString("N"));
     private Factory factory = null!;
 
@@ -54,46 +55,44 @@ public sealed class OpenDalMcpTests
         Assert.AreEqual(OpenDalStorageTypes.FileSystemId, description.ProviderId);
         Assert.IsTrue(description.Capabilities.Write);
         Assert.IsFalse(description.Capabilities.StableVersions || description.Capabilities.Retention || description.Capabilities.Delete);
-        var written = await lease.Client.WriteAsync(Write("notes/a", "OpenDAL réel"));
-        var item = await lease.Client.StatAsync(new("stat", written.Item.Reference));
-        Assert.AreEqual(written.Item.Version, item.Version);
+        var written = await lease.Client.WriteBlobAsync(Write("notes/a", "OpenDAL réel"));
+        var item = await lease.Client.StatAsync(new("stat", written.Receipt!.Item.Reference));
+        Assert.AreEqual(written.Receipt!.Item.Version, item.Version);
         Assert.AreEqual("notes/a", (await lease.Client.ListAsync(new("list", "notes/", 10))).Objects.Single().Key);
-        var first = await lease.Client.ReadAsync(new("read", item.Reference, 0, 4));
+        var first = await lease.Client.ReadBlobAsync(new("read", Selection: new(item.Reference, new(0, 4)), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1)));
         Assert.AreEqual("Open", Encoding.UTF8.GetString(Convert.FromBase64String(first.ContentBase64)));
-        Assert.IsFalse(first.EndOfObject);
-        var rest = await lease.Client.ReadAsync(new("rest", item.Reference, 4, 100));
+        Assert.IsTrue(first.Final);
+        var rest = await lease.Client.ReadBlobAsync(new("rest", Selection: new(item.Reference, new(4, 100)), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1)));
         Assert.AreEqual("DAL réel", Encoding.UTF8.GetString(Convert.FromBase64String(rest.ContentBase64)));
-        Assert.IsTrue(rest.EndOfObject);
-        var statePath = Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories).Single();
-        using var state = JsonDocument.Parse(await File.ReadAllBytesAsync(statePath));
-        Assert.AreEqual("OpenDAL réel", Encoding.UTF8.GetString(state.RootElement.GetProperty("objects")
-            .GetProperty("notes/a").GetProperty("content").GetBytesFromBase64()));
+        Assert.IsTrue(rest.Final);
+        Assert.IsEmpty(Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories));
+        Assert.AreEqual("OpenDAL réel", await File.ReadAllTextAsync(Directory.GetFiles(root, "a", SearchOption.AllDirectories).Single()));
     }
 
     [TestMethod]
-    public async Task ExactRetriesConcurrencyConditionalWritesAndRestartPreserveOriginalReceipts()
+    public async Task ExactChunkReplaysAndRestartPreserveContentWithoutInventingDurableReceipts()
     {
         var request = Write("notes/retry", "one");
-        string version;
+        string oldReference;
         await using (var lease = await ConnectAsync(First))
         {
-            var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => lease.Client.WriteAsync(request)));
-            Assert.HasCount(1, results.Select(r => r.Item.Version).Distinct().ToArray());
-            version = results[0].Item.Version;
-            await Error("idempotency_conflict", () => lease.Client.WriteAsync(request with { ContentBase64 = "dHdv" }));
-            await Error("conflict", () => lease.Client.WriteAsync(Write("notes/retry", "two")));
-            var updated = await lease.Client.WriteAsync(Write("notes/retry", "two") with { ExpectedVersion = version });
-            await Error("version_unavailable", () => lease.Client.ReadAsync(new("old", results[0].Item.Reference, 0, 10)));
-            Assert.AreEqual(version, (await lease.Client.WriteAsync(request)).Item.Version);
-            Assert.AreNotEqual(version, updated.Item.Version);
+            var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => lease.Client.WriteBlobAsync(request)));
+            Assert.HasCount(1, results.Select(r => r.SessionRef).Distinct().ToArray());
+            Assert.IsNull(results[0].Receipt!.Item.Version); Assert.IsNull(results[0].Receipt!.Item.ETag);
+            oldReference = results[0].Receipt!.Item.Reference;
+            await Error("idempotency_conflict", () => lease.Client.WriteBlobAsync(request with { ContentBase64 = "dHdv" }));
+            await Error("conflict", () => lease.Client.WriteBlobAsync(Write("notes/retry", "two")));
+            await lease.Client.WriteBlobAsync(Write("notes/retry", "two") with { Options = new("notes/retry", "replace") });
+            Assert.AreEqual(results[0], await lease.Client.WriteBlobAsync(request));
         }
-        await factory.DisposeAsync();
-        factory = new(root);
+        await factory.DisposeAsync(); factory = new(root);
         await using var restarted = await ConnectAsync(First);
-        Assert.AreEqual(version, (await restarted.Client.WriteAsync(request)).Item.Version);
+        await Error("invalid_reference", () => restarted.Client.ReadBlobAsync(new("old", Selection: new(oldReference), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1))));
+        // Durable object content survives; in-process sessions/receipts do not.
+        await Error("conflict", () => restarted.Client.WriteBlobAsync(request));
         var current = (await restarted.Client.ListAsync(new("list", "notes/", 10))).Objects.Single();
-        var read = await restarted.Client.ReadAsync(new("read", current.Reference, 0, 100));
-        Assert.AreEqual("two", Encoding.UTF8.GetString(Convert.FromBase64String(read.ContentBase64)));
+        var read = await restarted.Client.ReadTextAsync(new("read", Selection: new(current.Reference), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1)));
+        Assert.AreEqual("two", read.Content);
     }
 
     [TestMethod]
@@ -101,34 +100,36 @@ public sealed class OpenDalMcpTests
     {
         await using var first = await ConnectAsync(First);
         await using var second = await ConnectAsync(First with { StoreId = "second" });
-        foreach (var name in new[] { "c", "a", "b" }) await first.Client.WriteAsync(Write("notes/" + name, name));
+        foreach (var name in new[] { "c", "a", "b" }) await first.Client.WriteBlobAsync(Write("notes/" + name, name));
         var page = await first.Client.ListAsync(new("page-1", "notes/", 1));
         Assert.AreEqual("notes/a", page.Objects.Single().Key);
         Assert.IsNotNull(page.Cursor);
         Assert.AreEqual("notes/b", (await first.Client.ListAsync(new("page-2", "notes/", 1, page.Cursor))).Objects.Single().Key);
         await Error("invalid_reference", () => first.Client.ListAsync(new("changed-page", "notes/", 2, page.Cursor)));
         await Error("invalid_reference", () => second.Client.ListAsync(new("foreign-page", "notes/", 1, page.Cursor)));
-        await Error("invalid_reference", () => second.Client.ReadAsync(new("foreign-object", page.Objects[0].Reference, 0, 10)));
+        await Error("invalid_reference", () => second.Client.ReadBlobAsync(new("foreign-object", Selection: new(page.Objects[0].Reference), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1))));
         Assert.IsEmpty((await second.Client.ListAsync(new("empty", "notes/", 10))).Objects);
-        Assert.HasCount(1, Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories));
+        Assert.IsEmpty(Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories));
     }
 
     [TestMethod]
     public async Task EnvelopeLimitsTraversalOverridesAndReadOnlyTargetsAreEnforced()
     {
         await using var lease = await ConnectAsync(First, new OpenDalEnvelope(Prefix: "notes/", Write: true, MaximumReadBytes: 4));
-        var written = await lease.Client.WriteAsync(Write("notes/a", "content"));
-        await Error("limit_exceeded", () => lease.Client.ReadAsync(new("limit", written.Item.Reference, 0, 5)));
+        var written = await lease.Client.WriteBlobAsync(Write("notes/a", "content"));
+        var bounded = await lease.Client.ReadBlobAsync(new("limit", Selection: new(written.Receipt!.Item.Reference, PreferredChunkSizeBytes: 100), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1)));
+        Assert.AreEqual(4, bounded.ByteLength); Assert.IsFalse(bounded.Final);
+        await lease.Client.CloseReadAsync(new("close", bounded.SessionRef));
         await Error("forbidden", () => lease.Client.ListAsync(new("wide", "", 1)));
-        await Error("invalid_request", () => lease.Client.WriteAsync(Write("notes/../escape", "x")));
-        await Error("forbidden", () => lease.Client.WriteAsync(Write("outside/a", "x")));
-        await Error("limit_exceeded", () => lease.Client.WriteAsync(Write("notes/large", new string('x', 4097))));
+        await Error("invalid_request", () => lease.Client.WriteBlobAsync(Write("notes/../escape", "x")));
+        await Error("forbidden", () => lease.Client.WriteBlobAsync(Write("outside/a", "x")));
+        await Error("limit_exceeded", () => lease.Client.WriteBlobAsync(Write("notes/large", new string('x', 65537))));
         var wire = JsonSerializer.SerializeToElement(new { store = First, arguments = new { requestId = "override", prefix = "notes/", limit = 1, root = "/tmp/escape" } });
         var response = await lease.Mcp.CallToolAsync("asp_list", wire.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value));
         Assert.AreEqual("invalid_request", response.StructuredContent!.Value.GetProperty("error").GetProperty("code").GetString());
         await using var readOnly = await ConnectAsync(First, new { prefix = "notes/", write = false });
         Assert.IsFalse(readOnly.Client.Description.Capabilities.Write);
-        await Error("unsupported_operation", () => readOnly.Client.WriteAsync(Write("notes/b", "x")));
+        await Error("unsupported_operation", () => readOnly.Client.WriteBlobAsync(Write("notes/b", "x")));
     }
 
     [TestMethod]
@@ -168,40 +169,41 @@ public sealed class OpenDalMcpTests
     }
 
     [TestMethod]
-    public async Task RemoteDescriptorsHaveTypedRequirementsAndRefuseExecutionWithoutRedeemingSecrets()
+    public void EverySupportedBackendContributesExecutableTypesWithExplicitTypedRequirements()
     {
+        CollectionAssert.AreEquivalent(new[] { "opendal.fs", "opendal.s3", "opendal.azblob" }, OpenDalStorageTypes.Contributions.Select(c => c.Id).ToArray());
         foreach (var descriptor in OpenDalStorageTypes.Contributions.Where(c => c.Id != OpenDalStorageTypes.FileSystemId))
         {
-            var version = descriptor.Versions.Single();
-            Assert.IsFalse(version.Capabilities.List || version.Capabilities.Stat || version.Capabilities.Read || version.Capabilities.Write);
-            Assert.IsTrue(version.RequiresConnectedService);
-            Assert.HasCount(1, version.Requirements.Where(r => r.Protection == AepValueProtection.Secured).ToArray());
-            var request = Binding(First) with
-            {
-                ContributionId = descriptor.Id,
-                Version = version.Version,
-                Digest = AepStorageProtocol.Digest(version),
-                Connection = version.Requirements.Select(r => r.Protection == AepValueProtection.Standard
-                    ? AepBoundValue.Inline(r.Id, JsonSerializer.SerializeToElement("Opaque_VENDOR_Value"))
-                    : AepBoundValue.Secured(r.Id, new(AepProtocol.SecretAccessVersion,
-                        new Uri("https://never-contact.invalid/secret"), OpenDalStorageTypes.ExtensionId, r.Id,
-                        "fixture-execution", "opaque-fixture-handle"))).ToArray()
-            };
-            using var http = factory.Authenticated();
-            using var response = await http.PostAsJsonAsync(AepStorageProtocol.BindingPath, request, AepProtocol.JsonOptions);
-            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-            Assert.IsFalse(Directory.Exists(root));
+            var version = descriptor.Versions.Single(); Assert.IsTrue(version.Capabilities.List && version.Capabilities.Stat && version.Capabilities.Read && version.Capabilities.Write);
+            Assert.IsTrue(version.RequiresConnectedService); Assert.HasCount(1, version.Requirements.Where(r => r.Protection == AepValueProtection.Secured).ToArray());
         }
+    }
+
+    [TestMethod]
+    public async Task ProgressiveNativeTransferExceedsEightMiBWithBoundedBuffers()
+    {
+        await using var lease = await ConnectAsync(First);
+        var block = new byte[32768]; for (var i = 0; i < block.Length; i++) block[i] = (byte)(i % 251);
+        using var expected = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        await using var output = lease.Client.OpenWriteStream(new("notes/large"), "large-write", DateTimeOffset.UtcNow.AddMinutes(2));
+        for (var i = 0; i < 288; i++) { await output.WriteAsync(block); expected.AppendData(block); }
+        var receipt = await output.CompleteAsync(); var digest = Convert.ToHexStringLower(expected.GetHashAndReset());
+        Assert.AreEqual(9 * 1024 * 1024L, receipt.WrittenBytes); Assert.AreEqual(digest, receipt.Sha256);
+        await using var input = lease.Client.OpenReadStream(new(receipt.Item.Reference, PreferredChunkSizeBytes: 65536), "large-read", DateTimeOffset.UtcNow.AddMinutes(2));
+        using var actual = IncrementalHash.CreateHash(HashAlgorithmName.SHA256); int read; long total = 0;
+        while ((read = await input.ReadAsync(block)) != 0) { total += read; actual.AppendData(block, 0, read); }
+        Assert.AreEqual(receipt.WrittenBytes, total); Assert.AreEqual(digest, Convert.ToHexStringLower(actual.GetHashAndReset()));
+        Assert.AreEqual(receipt.WrittenBytes, new FileInfo(Directory.GetFiles(root, "large", SearchOption.AllDirectories).Single()).Length);
     }
 
     [TestMethod]
     public async Task CancelledAndExpiredWritesLeaveNoAcknowledgedContent()
     {
         await using var lease = await ConnectAsync(First);
-        await Error("request_expired", () => lease.Client.WriteAsync(Write("notes/expired", "x") with { NotAfter = DateTimeOffset.UtcNow.AddMinutes(-1) }));
+        await Error("request_expired", () => lease.Client.WriteBlobAsync(Write("notes/expired", "x") with { NotAfter = DateTimeOffset.UtcNow.AddMinutes(-1) }));
         using var ct = new CancellationTokenSource();
         await ct.CancelAsync();
-        await Assert.ThrowsAsync<OperationCanceledException>(() => lease.Client.WriteAsync(Write("notes/cancelled", "x"), ct.Token));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => lease.Client.WriteBlobAsync(Write("notes/cancelled", "x"), ct.Token));
         Assert.IsEmpty((await lease.Client.ListAsync(new("empty", "notes/", 10))).Objects);
     }
 
@@ -229,8 +231,8 @@ public sealed class OpenDalMcpTests
             JsonSerializer.SerializeToElement(envelope ?? new { prefix = "notes/", write = true }, AspProtocol.JsonOptions),
             JsonSerializer.SerializeToElement(Policy, AspProtocol.JsonOptions), new string('a', 64), DateTimeOffset.UtcNow.AddSeconds(25));
     }
-    private static AspWriteRequest Write(string key, string value) => new(Guid.NewGuid().ToString("N"),
-        DateTimeOffset.UtcNow.AddMinutes(2), key, Convert.ToBase64String(Encoding.UTF8.GetBytes(value)));
+    private static AspWriteBlobRequest Write(string key, string value) => new(Guid.NewGuid().ToString("N"), 0, true,
+        Convert.ToBase64String(Encoding.UTF8.GetBytes(value)), Options: new(key), NotAfter: DateTimeOffset.UtcNow.AddMinutes(2));
     private static async Task Error(string code, Func<Task> action) =>
         Assert.AreEqual(code, (await Assert.ThrowsAsync<AspException>(action)).Code);
 
