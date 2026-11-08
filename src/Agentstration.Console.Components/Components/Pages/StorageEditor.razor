@@ -28,7 +28,7 @@ else
                 <label><span>@T("Enabled")</span><InputCheckbox @bind-Value="model.Enabled" /></label>
             </div><p>@T("Identity.Help")</p></section>
             <section class="panel form-section"><div class="panel-header"><h2>@T("ExactType")</h2></div>
-                @if (model.Type is { } savedType) { <p>@T("SavedType"): <code>@savedType.Type.ScopeRef/@savedType.Type.Namespace/@savedType.Type.Name · @savedType.TypeUid · @savedType.Version · @savedType.SchemaDigest · @savedType.ContractDigest</code></p> }
+                @if (model.Type is { } savedType) { <p>@T("SelectedType"): <code>@savedType.Type.ScopeRef/@savedType.Type.Namespace/@savedType.Type.Name · @savedType.TypeUid · @savedType.Version · @savedType.SchemaDigest · @savedType.ContractDigest</code></p> }
                 <label><span>@T("Type")</span><select value="@TypeKey" @onchange="TypeChanged" data-testid="storage-type">
                     <option value="">@T("SelectType")</option>
                     @if (model.Type is not null && SelectedType is null) { <option value="@TypeKey" disabled>@T("SavedTypeUnavailable")</option> }
@@ -41,7 +41,7 @@ else
                 @if (current.Version.RequiresConnectedService)
                 {
                     <section class="panel form-section"><div class="panel-header"><h2>@T("ConnectedService")</h2></div>
-                        @if (model.ConnectedService is { } savedService) { <p>@T("SavedService"): <code>@savedService.Service.ScopeRef/@savedService.Service.Address · @savedService.ServiceUid · @savedService.Generation</code></p> }
+                        @if (model.ConnectedService is { } savedService) { <p>@T("SelectedService"): <code>@savedService.Service.ScopeRef/@savedService.Service.Address · @savedService.ServiceUid · @savedService.Generation</code></p> }
                         <label><span>@T("ConnectedService")</span><select value="@ServiceKey" @onchange="ServiceChanged" data-testid="storage-service">
                             <option value="">@T("SelectService")</option>
                             @if (model.ConnectedService is not null && SelectedService is null) { <option value="@ServiceKey" disabled>@T("SavedServiceUnavailable")</option> }
@@ -152,7 +152,7 @@ else
     private void TypeChanged(ChangeEventArgs args)
     {
         var choice = variants.FirstOrDefault(value => value.Key == args.Value?.ToString());
-        if (choice is null || !Available(choice)) return;
+        if (choice is not null && !Available(choice) || choice is null && !string.IsNullOrEmpty(args.Value?.ToString())) return;
         model.SelectType(choice); configurationValid = envelopeValid = true;
     }
     private void ServiceChanged(ChangeEventArgs args) => model.SelectService(services.FirstOrDefault(value => Key(value) == args.Value?.ToString() && ServiceAvailable(value)));

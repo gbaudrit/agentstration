@@ -295,6 +295,19 @@ public sealed class StorageComponentTests
         Assert.AreEqual(url, StorageLinks.FromApi("/api" + url));
     }
 
+    [TestMethod]
+    public void ClearingTheTypeSelectionClearsConnectionDraftAndDisablesSave()
+    {
+        using var context = Setup(new());
+        var page = context.Render<StorageEditor>();
+        page.WaitForElement("[data-testid=storage-type]");
+        SelectType(page, "remote");
+        SelectService(page);
+        page.Find("[data-testid=storage-type]").Change(string.Empty);
+        Assert.IsTrue(page.Find("[data-testid=storage-save]").HasAttribute("disabled"));
+        Assert.IsEmpty(page.FindAll("[data-testid=storage-service], [data-testid=storage-export]"));
+    }
+
     private static BunitContext Setup(StorageClient client, bool canWrite = true, bool canRead = true, long serviceGeneration = 1, bool servicesUnavailable = false, string? selectedScope = null)
     {
         var context = new BunitContext();

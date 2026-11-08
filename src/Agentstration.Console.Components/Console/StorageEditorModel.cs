@@ -21,9 +21,9 @@ public sealed class StorageEditorModel
     public JsonElement Envelope { get; set; } = JsonSerializer.SerializeToElement(new { });
     public List<DescendantUseGrant> UseGrants { get; set; } = [];
 
-    public void SelectType(StorageTypeChoice choice)
+    public void SelectType(StorageTypeChoice? choice)
     {
-        Type = choice.Reference;
+        Type = choice?.Reference;
         Configuration = JsonSerializer.SerializeToElement(new { });
         Envelope = JsonSerializer.SerializeToElement(new { });
         SelectService(null);

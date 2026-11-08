@@ -136,4 +136,6 @@
   <data name="ScopeKind.Instance" xml:space="preserve"><value>Instance</value></data>
   <data name="ScopeKind.Tenant" xml:space="preserve"><value>Tenant</value></data>
   <data name="ScopeKind.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="SelectedType" xml:space="preserve"><value>Selected type reference</value></data>
+  <data name="SelectedService" xml:space="preserve"><value>Selected service revision</value></data>
 </root>
