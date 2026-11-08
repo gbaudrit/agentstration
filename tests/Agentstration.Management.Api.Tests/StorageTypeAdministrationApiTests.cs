@@ -74,11 +74,7 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
     }
 
     [TestMethod]
-    [DataRow(true, false)]
-    [DataRow(false, true)]
-    [DataRow(true, true)]
-    [DataRow(false, false)]
-    public async Task GenericDiscoverAndUseAreIndependentAndHiddenExactReadsStayHidden(bool discover, bool use)
+    public async Task GenericDiscoverAndUseAreIndependentAndHiddenExactReadsStayHidden()
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
@@ -87,31 +83,43 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         var consumer = ResourceScopeRef.Workspace(context.WorkspaceId);
         SelectConsoleContext(client, owner);
         using var response = await client.PostAsJsonAsync("/api/storage-types", new CreateStorageTypeRequest("shared", Definition(), owner));
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
         var type = (await response.Content.ReadFromJsonAsync<StorageTypeResource>())!;
-        var actions = new List<ResourceAccessAction>();
-        if (discover) actions.Add(ResourceAccessAction.Discover);
-        if (use) actions.Add(ResourceAccessAction.Use);
         var identity = new ResourceAccessIdentity(type.Uid, owner, type.Namespace, type.Kind);
-        using var policy = await client.PutAsJsonAsync($"/api/resource-access-policies/{type.Uid}",
-            new ResourceAccessPolicy(identity, actions.Count == 0 ? [] : [new(consumer, actions)]));
-        Assert.AreEqual(HttpStatusCode.OK, policy.StatusCode);
-        foreach (var action in Enum.GetValues<ResourceAccessAction>())
+        string? etag = null;
+        // Exercise all four states and revocation in one host instead of bootstrapping a host per grant combination.
+        foreach (var (discover, use) in new[] { (true, false), (false, true), (true, true), (false, false) })
         {
-            using var decisionResponse = await client.PostAsJsonAsync($"/api/resource-access-policies/{type.Uid}/evaluate", new EvaluateResourceAccessRequest(identity, consumer, action));
-            var decision = (await decisionResponse.Content.ReadFromJsonAsync<ResourceAccessDecision>())!;
-            Assert.AreEqual(action == ResourceAccessAction.Discover ? discover : use, decision.Allowed);
+            SelectConsoleContext(client, owner);
+            var actions = new List<ResourceAccessAction>();
+            if (discover) actions.Add(ResourceAccessAction.Discover);
+            if (use) actions.Add(ResourceAccessAction.Use);
+            using var policyRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/resource-access-policies/{type.Uid}")
+            {
+                Content = JsonContent.Create(new ResourceAccessPolicy(identity, actions.Count == 0 ? [] : [new(consumer, actions)]))
+            };
+            if (etag is not null) policyRequest.Headers.IfMatch.ParseAdd(etag);
+            using var policy = await client.SendAsync(policyRequest);
+            Assert.AreEqual(HttpStatusCode.OK, policy.StatusCode);
+            etag = policy.Headers.ETag!.ToString();
+            foreach (var action in Enum.GetValues<ResourceAccessAction>())
+            {
+                using var decisionResponse = await client.PostAsJsonAsync($"/api/resource-access-policies/{type.Uid}/evaluate", new EvaluateResourceAccessRequest(identity, consumer, action));
+                var decision = (await decisionResponse.Content.ReadFromJsonAsync<ResourceAccessDecision>())!;
+                Assert.AreEqual(action == ResourceAccessAction.Discover ? discover : use, decision.Allowed);
+            }
+            SelectConsoleContext(client, consumer);
+            var list = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types?take=1");
+            Assert.AreEqual(discover, list!.Value.Any(value => value.Uid == type.Uid));
+            if (discover)
+            {
+                var observed = list.Value.Single(value => value.Uid == type.Uid).ObservedUse!;
+                Assert.AreEqual(consumer, observed.ConsumerScopeRef);
+                Assert.AreEqual(use, observed.Use.Allowed);
+            }
+            using var exact = await client.GetAsync(TypePath(type));
+            Assert.AreEqual(discover ? HttpStatusCode.OK : HttpStatusCode.NotFound, exact.StatusCode);
         }
-        SelectConsoleContext(client, consumer);
-        var list = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types?take=1");
-        Assert.AreEqual(discover, list!.Value.Any(value => value.Uid == type.Uid));
-        if (discover)
-        {
-            var observed = list.Value.Single(value => value.Uid == type.Uid).ObservedUse!;
-            Assert.AreEqual(consumer, observed.ConsumerScopeRef);
-            Assert.AreEqual(use, observed.Use.Allowed);
-        }
-        using var exact = await client.GetAsync(TypePath(type));
-        Assert.AreEqual(discover ? HttpStatusCode.OK : HttpStatusCode.NotFound, exact.StatusCode);
     }
 
     [TestMethod]
