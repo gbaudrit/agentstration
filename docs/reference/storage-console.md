@@ -155,7 +155,8 @@ validation; it does not start or duplicate that reusable integrated journey.
   maximum 2 parallel modules. Optional skips are PostgreSQL (2), live Foundry (8),
   llama.cpp (1) and LocalAI (1). The local attempt was interrupted for the later
   test-fixture rebuild; the completed result here is the CI result.
-- Targeted checks: 38 Storage application tests, 15 Storage HTTP scenarios,
+- Targeted checks: 38 Storage application tests, 15 targeted Storage cases in
+  the original Management API test module,
   32 Storage Console/localization cases and 3 persistence cases passed. These
   include Tenant propagation, Discover-only and revocation refusal, foreign
   Tenant isolation, managed synchronization and real SQLite restarts.
