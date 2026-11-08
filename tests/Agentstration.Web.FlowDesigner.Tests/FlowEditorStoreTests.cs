@@ -10,6 +10,72 @@ namespace Agentstration.Web.FlowDesigner.Tests;
 public sealed class FlowEditorStoreTests
 {
     [TestMethod]
+    public async Task SaveAcknowledgesOnlyCapturedGraphAndPreservesUndoRedo()
+    {
+        var response = SavingDraft();
+        var store = new FlowEditorStore();
+        store.Load(response, "initial source");
+        await store.DispatchAsync(new MoveStepCommand("input", new(10, 20)));
+        var sent = store.CaptureSave();
+        await store.DispatchAsync(new MoveStepCommand("input", new(30, 40)));
+        var saved = new FlowDraftResponse(response.Value with { Definition = sent.Resource.Definition, Revision = 1 }, "next-etag");
+        store.MarkSaved(saved, "saved source", sent);
+        Assert.IsTrue(store.State.IsDirty);
+        Assert.AreEqual("next-etag", store.State.ETag);
+        Assert.AreEqual(new FlowNodePosition(30, 40), store.State.Resource!.Definition.Designer.NodePositions["input"]);
+        Assert.AreEqual(FlowSaveState.UnsavedChanges, store.State.SaveState);
+        var latest = store.CaptureSave();
+        store.Undo();
+        store.Redo();
+        store.MarkSaved(new(saved.Value with { Definition = latest.Resource.Definition }, "newer-etag"), "latest source", latest);
+        Assert.IsTrue(store.State.IsDirty);
+        Assert.AreEqual(new FlowNodePosition(30, 40), store.State.Resource.Definition.Designer.NodePositions["input"]);
+        Assert.IsTrue(store.CanUndo);
+    }
+
+    [TestMethod]
+    public void LateSaveDoesNotReplaceNewerRawSourceOrClearItsDirtyState()
+    {
+        var response = SavingDraft();
+        var store = new FlowEditorStore();
+        store.Load(response, "initial source");
+        store.SetSource("first YAML", null);
+        var snapshot = store.CaptureSave();
+        store.SetSource("newer YAML", null);
+        store.MarkSaved(new(response.Value with { Revision = 1 }, "new-etag"), "canonical first YAML", snapshot);
+        Assert.AreEqual("newer YAML", store.State.SourceText);
+        Assert.IsTrue(store.State.HasSourceChanges);
+        Assert.IsTrue(store.State.IsDirty);
+    }
+
+    [TestMethod]
+    public void ReloadingSameResourceInvalidatesOldAcknowledgements()
+    {
+        var response = SavingDraft();
+        var store = new FlowEditorStore();
+        store.Load(response, "old session");
+        var snapshot = store.CaptureSave();
+        store.Load(response, "new session");
+        Assert.IsFalse(store.AcknowledgeSave(new(response.Value, "old-etag"), snapshot));
+        Assert.IsFalse(store.MarkSaved(new(response.Value, "old-etag"), "old source", snapshot));
+        Assert.AreEqual("new session", store.State.SourceText);
+        Assert.AreEqual(response.ETag, store.State.ETag);
+        Assert.IsFalse(store.State.IsDirty);
+    }
+
+    private static FlowDraftResponse SavingDraft() => new(new FlowDraft
+    {
+        WorkspaceId = WorkspaceId,
+        ScopeRef = ResourceScopeRef.Workspace(WorkspaceId.Value),
+        Id = "saving-draft",
+        FlowId = new("saving"),
+        DisplayName = "Saving",
+        Definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] },
+        CreatedAt = DateTimeOffset.UnixEpoch,
+        UpdatedAt = DateTimeOffset.UnixEpoch
+    }, "initial-etag");
+
+    [TestMethod]
     public async Task CommandsKeepDiagramAndDefinitionSynchronizedAndSupportUndoRedo()
     {
         var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
@@ -242,7 +308,8 @@ public sealed class FlowEditorStoreTests
             new("rejected", "Rejected", FlowOutputOutcome.Error, null)
         ]);
 
-        store.MarkSaved(response, "entryStep: child");
+        store.SetSource("entryStep: child # applied YAML");
+        store.MarkSaved(response, "entryStep: child", store.CaptureSave());
 
         var node = store.State.Diagram.Nodes.Single(item => item.Name == "child");
         CollectionAssert.AreEqual(new[] { "approved", "rejected" }, node.OutputEvents.ToArray());
@@ -269,7 +336,8 @@ public sealed class FlowEditorStoreTests
         var store = new FlowEditorStore();
         store.Load(response, "entryStep: input");
 
-        store.MarkSaved(response, "entryStep: input");
+        store.SetSource("entryStep: input # applied YAML");
+        store.MarkSaved(response, "entryStep: input", store.CaptureSave());
 
         Assert.AreEqual(ownerScope, store.State.Resource!.ScopeRef);
     }
