@@ -132,7 +132,40 @@ defaults without generic authorization are reported as unavailable; existing Art
 through its independent backend. No permission exception or scope approval is
 pending. #1077/#1078 retain their deferred requirements.
 
-The earlier candidate's validation evidence is superseded for this correction.
-Release/functional/deployment and documentation checks are being rerun before the
-review head is updated. No new complete-lane success is claimed in this interim
-record.
+Validation was completed against application correction `c90f80f`, based on
+`integration/fr-1032` at `a27d3d7`, with .NET SDK 10.0.300. Earlier candidate counts
+are superseded by these results.
+
+| Check | Result |
+|---|---|
+| Root restore and Release build | Passed; 0 warnings, 0 errors; audit/analyzers enabled |
+| Required Fast lane | 999 passed, 0 failed, 0 skipped; minimum 777, maximum 4 parallel modules |
+| Required Integration lane | 1,090 discovered: 1,078 passed, 0 failed, 12 existing optional skips; minimum 954, maximum 2 parallel modules |
+| Focused Storage module | 31 passed |
+| Focused HTTP/provisioning cases | 6 passed |
+| Real SQLite sharing/revocation/restart scenario | Passed; native content and exact identities retained, foreign Tenant refused, synchronization/restarts preserve grants and revocation |
+| ADR/LikeC4/full Docusaurus build | Passed; 198 unique ADRs |
+| Actual standalone executable | Health 200, Development fixture login 204, Storage catalogue/list 200; builtin versions and Instance default verified |
+| Real Docker remove/recreate | Passed; two retained volumes preserve exact Storage/Workspace identities, protected content reference, Artifact receipt and historical content without grant initialization |
+
+No Storage test was skipped. The 12 skips are the existing optional PostgreSQL and
+live-model integrations. An initial lane attempt exposed an existing Git test's
+exact cancellation-type assertion; isolated test correction `4840c11` accepts valid
+derived .NET cancellation exceptions, and the complete required lane was rerun.
+The Git provider implementation is unchanged.
+
+The AEP SDK and ASP/AEP package source are unchanged by the authorization correction;
+independent checks passed earlier (59 AEP tests and package README/license/notices).
+Docker uses the published production-composition probe in a locally assembled
+.NET 10.0.8 runtime image with networking disabled. The official
+`mcr.microsoft.com/dotnet/aspnet:10.0` image pull was refused by the registry in this
+environment; its checked-in Dockerfile remains unverified here.
+
+Cross-branch review of #1079 confirmed that its selector combines generic Use,
+enablement and version availability. Its former builtin test expecting a
+UsePolicy-related 403 must expect successful authorized creation, and must select
+an exact/preferred version rather than assuming the builtin has one version. Its
+Storage-specific help text also needs alignment with the current contract. An
+isolated test patch was prepared for that branch; no Console source was changed
+in #1080. Combined-branch/browser validation is not claimed by these backend checks.
+No new reusable UX scenario was added; #1033/#1065 retain their existing gates.
