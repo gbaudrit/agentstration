@@ -15,6 +15,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: opendal-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   native:
     strategy:

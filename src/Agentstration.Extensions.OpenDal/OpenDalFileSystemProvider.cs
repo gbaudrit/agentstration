@@ -80,7 +80,7 @@ public sealed class OpenDalFileSystemProvider(string root, AspStoreRef store, Ti
             // Recheck the original deadline after waiting for the cross-process commit lock.
             AspValidation.Write(new(request.RequestId, request.NotAfter, request.Key, "", request.ExpectedVersion), context, clock);
             var identity = AspValidation.Digest(JsonSerializer.SerializeToUtf8Bytes(new
-                { context.Store, context.Subject, context.AuthorizationRevision, request.RequestId }, AspProtocol.JsonOptions));
+            { context.Store, context.Subject, context.AuthorizationRevision, request.RequestId }, AspProtocol.JsonOptions));
             var fingerprint = AspValidation.Digest(JsonSerializer.SerializeToUtf8Bytes(new { context, request }, AspProtocol.JsonOptions));
             if (state.Receipts.TryGetValue(identity, out var previous))
             {
@@ -125,7 +125,7 @@ public sealed class OpenDalFileSystemProvider(string root, AspStoreRef store, Ti
             CreatePrivateDirectory(temporary);
             Checked(Path.Combine(directory, StateKey));
             using var op = new Operator("fs", new Dictionary<string, string>
-                { ["root"] = directory, ["atomic_write_dir"] = temporary });
+            { ["root"] = directory, ["atomic_write_dir"] = temporary });
             var state = ReadState(op);
             cancellationToken.ThrowIfCancellationRequested();
             return operation(op, state);

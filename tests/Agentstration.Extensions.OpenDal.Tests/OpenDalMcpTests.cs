@@ -178,7 +178,9 @@ public sealed class OpenDalMcpTests
             Assert.HasCount(1, version.Requirements.Where(r => r.Protection == AepValueProtection.Secured).ToArray());
             var request = Binding(First) with
             {
-                ContributionId = descriptor.Id, Version = version.Version, Digest = AepStorageProtocol.Digest(version),
+                ContributionId = descriptor.Id,
+                Version = version.Version,
+                Digest = AepStorageProtocol.Digest(version),
                 Connection = version.Requirements.Select(r => r.Protection == AepValueProtection.Standard
                     ? AepBoundValue.Inline(r.Id, JsonSerializer.SerializeToElement("Opaque_VENDOR_Value"))
                     : AepBoundValue.Secured(r.Id, new(AepProtocol.SecretAccessVersion,
@@ -250,7 +252,9 @@ public sealed class OpenDalMcpTests
         {
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Aep:EnrollmentMode"] = "Disabled", ["OpenDal:RootDirectory"] = directory, ["OpenDal:AllowedClients:0"] = "product"
+                ["Aep:EnrollmentMode"] = "Disabled",
+                ["OpenDal:RootDirectory"] = directory,
+                ["OpenDal:AllowedClients:0"] = "product"
             }));
             builder.ConfigureServices(services =>
             {

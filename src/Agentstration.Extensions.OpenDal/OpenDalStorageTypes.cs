@@ -11,20 +11,26 @@ public static class OpenDalStorageTypes
     public const string Version = "1.0.0";
     public static JsonElement ConfigurationSchema { get; } = JsonSerializer.SerializeToElement(new
     {
-        type = "object", additionalProperties = false, properties = new { }
+        type = "object",
+        additionalProperties = false,
+        properties = new { }
     });
     public static JsonElement EnvelopeSchema { get; } = JsonSerializer.SerializeToElement(new
     {
-        type = "object", additionalProperties = false,
+        type = "object",
+        additionalProperties = false,
         properties = new
         {
             prefix = new { type = "string", maxLength = 256 },
-            list = new { type = "boolean" }, stat = new { type = "boolean" },
-            read = new { type = "boolean" }, write = new { type = "boolean" },
+            list = new { type = "boolean" },
+            stat = new { type = "boolean" },
+            read = new { type = "boolean" },
+            write = new { type = "boolean" },
             maximumReadBytes = new { type = "integer", minimum = 1, maximum = 65536 },
             maximumWriteBytes = new { type = "integer", minimum = 1, maximum = 65536 },
             maximumPageSize = new { type = "integer", minimum = 1, maximum = 100 },
-            keyFrom = new { type = "string", maxLength = 256 }, keyBefore = new { type = "string", maxLength = 256 }
+            keyFrom = new { type = "string", maxLength = 256 },
+            keyBefore = new { type = "string", maxLength = 256 }
         }
     });
     public static IReadOnlyList<AepStorageTypeContribution> Contributions { get; } =
@@ -44,7 +50,9 @@ public static class OpenDalStorageTypes
     {
         var schema = JsonSerializer.SerializeToElement(new
         {
-            type = "object", additionalProperties = false, required = new[] { destination },
+            type = "object",
+            additionalProperties = false,
+            required = new[] { destination },
             properties = new Dictionary<string, object> { [destination] = new { type = "string", minLength = 1, maxLength = 256 } }
         });
         const string version = "0.1.0-preview.1";
