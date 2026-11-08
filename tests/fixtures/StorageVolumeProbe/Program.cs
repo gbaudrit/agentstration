@@ -44,6 +44,7 @@ using (scopes.PushSystem())
     await services.GetRequiredService<FlowService>().InitializeAsync(default);
     await services.GetRequiredService<FlowRunService>().InitializeAsync(default);
     context = await services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+    await services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(default);
     await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
 }
 using (scopes.PushSystem())

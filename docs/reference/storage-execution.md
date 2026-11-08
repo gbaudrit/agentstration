@@ -43,20 +43,23 @@ Overwritten object versions become unavailable; no stable-version or durable
 Snapshot retention capability is advertised.
 
 Provisioning attempts a `local-default` using the existing Storage service and its
-current authorization/UsePolicy checks. It creates no grants, writes no UsePolicy
+current generic Use authorization and exact resource checks. It creates no grants, writes no UsePolicy
 and changes no access overlay. An existing default retains its UID, enabled state,
 configuration, envelope and policies; a reserved-name/ownership collision fails.
 
-The single Instance-owned type initially grants no descendant use. Consequently,
-ordinary Workspace and Tenant-owned defaults remain unavailable unless their
-existing access configuration already permits creation. The Instance operational
+The single Instance-owned type starts with no automatic descendant sharing.
+Workspace/Tenant defaults remain unavailable until an administrator explicitly
+grants generic Use. A grant to a Tenant with propagation permits its Workspaces;
+Discover alone is insufficient. Empty embedded UsePolicy metadata creates no
+second lock while #1078 is deferred. The Instance operational
 default works in its logical Instance context. No type copies, global exemptions
 or automatic sharing are introduced to make a blocked default usable.
 
 A blocked attempt returns `unavailable` with a bounded diagnostic and writes a
 structured operator warning containing Workspace/scope/code, without failing the
 rest of Workspace initialization. Existing defaults are observed without repair
-or mutation. A generic Use grant alone cannot override UsePolicy. #1064 owns
+or mutation. Generic Use is the current Storage-family authorization contract;
+embedded UsePolicy metadata is not an additional gate. #1064 owns
 existing generic grant administration, #1077 new user-permission work and #1078
 UsePolicy work; this increment implements none of those deferred policy features.
 
@@ -88,9 +91,10 @@ part of ordinary resource/Tool results or diagnostics.
 Persist both metadata and bytes when replacing a container. Losing metadata creates
 different UIDs; retained directories are never automatically adopted by name.
 The independent builtin Artifact backend keeps `/data/durable-artifacts`.
-When no selectable default exists, or a Workspace-scoped Artifact Flow cannot
-select an administrative default owned at Instance/Tenant scope, new builtin
-Artifact writes retain that existing backend. This neither grants Storage access
+When no selectable default exists, new builtin Artifact writes retain that
+existing backend. Workspace-scoped Artifact Flows also retain it in operational
+Workspaces: they do not implicitly select the administrative default owned at
+Instance/Tenant scope. This neither grants Storage access
 nor retargets a selected reference. When an authorized default is selected, new
 receipts pin its exact Storage revision and use its directory; disabled, revoked,
 stale or incompatible selections fail without falling back. Backup/restore must preserve these

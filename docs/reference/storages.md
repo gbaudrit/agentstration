@@ -143,10 +143,15 @@ a universal bucket/path/table contract.
 `IStorageResolver.ResolveAsync` consumes a `StorageRevisionReference` containing
 the canonical scoped address, UID, generation and `bindingDigest` from the
 resource's observed state. The consumer context must match the authenticated
-scope. Resolution checks the Storage UsePolicy and resource access policy, and
-revalidates the selected type, schemas, service, mappings and availability. Each
-ancestor dependency separately requires its use and access grants. Old/forged
-revisions and revoked grants fail on each call.
+scope. Storage and StorageType use is authorized by the existing generic
+`ResourceAccessPolicy.Use` decision, with exact identity and same/descendant scope
+checks. A Tenant grant with propagation authorizes its Workspaces; Discover alone
+does not authorize use. The embedded Storage-family UsePolicy metadata is not an
+additional authorization gate while that vertical is deferred to #1078. No grants
+are generated automatically. Resolution also revalidates type, schemas, service,
+manual mappings and availability. Connected Service inspection keeps the independent
+checks owned by that family. Old/forged revisions and revoked grants fail on each
+call.
 
 `ProtectedStorageContext` exposes a serializable logical revision and exact type/
 service evidence. Configuration, envelope and bindings remain separate protected

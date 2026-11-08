@@ -27,8 +27,11 @@ The three authority layers remain separate:
 3. Data Source/Knowledge own logical dataset or output rules and exact selected
    Storage revisions. They receive no ability to replace connection or envelope.
 
-Resolution repeats current authorization and contract checks. It verifies both
-descendant UsePolicy and the resource access policy for each dependency. Protected
+Resolution repeats current authorization and contract checks. For Storage and
+StorageType resources, the generic Use decision is the current usage authority;
+Tenant propagation, exact identities, revocations and scope boundaries are checked
+on each call. Embedded UsePolicy metadata does not impose a second Storage-family
+lock while #1078 is deferred. Connected Service inspection retains its own checks. Protected
 configuration does not serialize with the logical revision. Sharing physical
 placement or an extension never grants shared logical authority.
 
@@ -104,8 +107,7 @@ content Tool arguments carry only logical target selection and business inputs.
 
 Initialization target 3 reconciles existing Workspaces through the existing fenced
 startup mechanism. Provisioning writes no access grants or UsePolicy and preserves
-configuration, disablement and existing access decisions. Existing restrictive
-checks may block Workspace/Tenant defaults; a bounded result/operator warning
+configuration, disablement and existing access decisions. Absent generic Use grants may block Workspace/Tenant defaults; a bounded result/operator warning
 reports that limitation while other provisioning continues. The Instance default
 is usable in its logical administrative context. #1077/#1078 retain new permission
 and policy work.
@@ -122,8 +124,11 @@ match exact UIDs; another resource at the same name does not inherit them.
 The maintainer confirmed that policy work remains out of #1040. Automatic grant
 initialization was removed, including type UsePolicy mutation, operational Storage
 UsePolicy grants, generic grant initialization and first-grant markers. Existing
-policy evaluation remains unchanged. Workspace/Tenant defaults blocked by those
-checks are reported as unavailable; existing Artifact functionality stays usable
+generic policy evaluation remains the authority. The maintainer then clarified
+that generic Use must authorize the complete Storage-family path, without a second
+unadministrable embedded UsePolicy lock. That extra Storage/StorageType gate was
+removed at the application boundary; no grants are synthesized. Workspace/Tenant
+defaults without generic authorization are reported as unavailable; existing Artifact functionality stays usable
 through its independent backend. No permission exception or scope approval is
 pending. #1077/#1078 retain their deferred requirements.
 

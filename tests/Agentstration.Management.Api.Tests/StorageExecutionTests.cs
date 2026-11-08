@@ -192,14 +192,17 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
         var workspace = new Workspace(Guid.NewGuid(), bootstrap.TenantId, "new-local-workspace", "New local Workspace",
             WorkspaceStatus.Initializing, DateTimeOffset.UtcNow);
         await identities.AddWorkspaceAsync(workspace, default);
-        // An existing generic grant still cannot override the unchanged UsePolicy restriction.
+        var initial = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => provisioner.EnsureAsync(workspace, default)));
+        Assert.IsTrue(initial.All(r => r.Availability == StorageAvailability.Unavailable));
+        // An explicit generic grant makes the default usable without adding embedded grants.
         var existing = await policies.PutAsync(new(new(typeBefore.Value.Uid, ResourceScopeRef.Instance, ResourceNamespace.Default,
             StorageResourceKinds.StorageType), [new(ResourceScopeRef.Workspace(workspace.Id), [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
         var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => provisioner.EnsureAsync(workspace, default)));
-        Assert.IsTrue(results.All(r => r.Availability == StorageAvailability.Unavailable && r.Diagnostic?.Code == "storage_access_denied"));
+        Assert.IsTrue(results.All(r => r.Availability == StorageAvailability.Ready));
         var address = new ScopedResourceAddress(ResourceScopeRef.Workspace(workspace.Id), ResourceNamespace.Default,
             StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName);
-        Assert.IsNull(await resources.GetExactAsync<StorageResource>(address, default));
+        var sharedDefault = (await resources.GetExactAsync<StorageResource>(address, default))!;
+        Assert.IsEmpty(sharedDefault.Value.Definition.UsePolicy.Grants);
         await services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(workspace, default);
         Assert.AreEqual(WorkspaceStatus.Active, (await identities.GetWorkspaceAsync(workspace.TenantId, workspace.Id, default))!.Status);
         Assert.AreEqual(typeBefore.ETag, (await resources.GetExactAsync<StorageTypeResource>(typeAddress, default))!.ETag);

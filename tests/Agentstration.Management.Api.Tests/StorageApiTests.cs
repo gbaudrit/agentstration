@@ -234,6 +234,51 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
+    public async Task BuiltinTenantPropagatedUsePermitsWorkspaceCreationAndRevocationRefusesIt()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var targets = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>("/api/resource-scopes/targets?kind=Storage"))!;
+        var tenant = targets.Single(t => t.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        var workspace = targets.Single(t => t.Kind == ResourceScopeKind.Workspace).ScopeRef;
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+        var type = (await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types"))!.Value.Single(t => t.Name == "local");
+        Assert.IsEmpty(type.Definition.UsePolicy.Grants);
+        var policy = new ResourceAccessPolicy(new(type.Uid, ResourceScopeRef.Instance, type.Namespace, type.Kind),
+            [new(tenant, [ResourceAccessAction.Discover], IncludeDescendants: true)]);
+        var policyPath = $"/api/resource-access-policies/{type.Uid:D}";
+        using var discoverOnly = await client.PutAsJsonAsync(policyPath, policy);
+        await Status(discoverOnly, HttpStatusCode.OK);
+        var policyEtag = discoverOnly.Headers.ETag!.ToString();
+        SelectConsoleContext(client, workspace);
+        var visible = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types");
+        Assert.IsTrue(visible!.Value.Any(t => t.Uid == type.Uid));
+        using var denied = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("discover-only", Properties(type), workspace));
+        await Problem(denied, HttpStatusCode.Forbidden, "storage_access_denied");
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+        var usable = policy with { Grants = [new(tenant, [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)] };
+        using var grant = await Send(client, HttpMethod.Put, policyPath, usable, policyEtag);
+        await Status(grant, HttpStatusCode.OK);
+        policyEtag = grant.Headers.ETag!.ToString();
+        SelectConsoleContext(client, workspace);
+        using var created = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("tenant-shared-local", Properties(type), workspace));
+        await Status(created, HttpStatusCode.Created);
+        var storage = (await created.Content.ReadFromJsonAsync<StorageResource>())!;
+        Assert.AreEqual(workspace, storage.ScopeRef);
+        Assert.AreEqual(type.Uid, storage.Definition.Type.TypeUid);
+        Assert.IsEmpty(storage.Definition.UsePolicy.Grants);
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+        using var revoked = await Send(client, HttpMethod.Put, policyPath, policy, policyEtag);
+        await Status(revoked, HttpStatusCode.OK);
+        SelectConsoleContext(client, workspace);
+        using var refusal = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("revoked-local", Properties(type), workspace));
+        await Problem(refusal, HttpStatusCode.Forbidden, "storage_access_denied");
+        var observed = (await client.GetFromJsonAsync<StorageResource>(Path(storage)))!;
+        Assert.AreEqual(StorageAvailability.Unavailable, observed.ObservedState!.Availability);
+        Assert.IsTrue(observed.ObservedState.Diagnostics.Any(d => d.Code == "storage_access_denied"));
+    }
+
+    [TestMethod]
     public async Task TypeDeletionSeesWorkspaceDependenciesAndRequiresHierarchicalGrants()
     {
         await using var factory = Factory();

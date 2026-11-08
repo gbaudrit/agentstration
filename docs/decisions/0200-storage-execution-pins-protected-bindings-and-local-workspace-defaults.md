@@ -26,7 +26,7 @@ authoring/composition belongs to #1078. Existing restrictive checks remain in fo
 Expose provider-neutral content ports from `Storage.Contracts`. Infrastructure
 adapts these ports to local content and the existing ASP client. Each call resolves
 the exact Storage scope, UID, generation and binding digest again, including type,
-schema, provider, service, exports, access policies and descendant UsePolicy. Actual
+schema, provider, service, exports and generic resource-access decisions. Actual
 content operations also require the existing `runs/execute` contextual permission;
 catalogue/definition inspection does not execute content operations. Administrative
 execution retains its trusted operational Workspace and logical scope.
@@ -79,18 +79,27 @@ owning Storage service without writing UsePolicy or access overlays. Business
 defaults belong to their Workspace; operational defaults belong to their logical
 Instance/Tenant scope. No descendant type copies or automatic grants are created.
 
-With the current restrictive Instance type, ordinary Workspace/Tenant defaults
-remain unavailable unless existing authorization already permits them. This is a
+An explicit generic Use grant is the current Storage-family authority: a Tenant
+grant with propagation permits descendant Workspace creation/resolution. Discover
+alone, revoked grants, stale identities and foreign Tenant targets remain refused.
+Embedded Storage/StorageType UsePolicy metadata is not an additional access gate
+while #1078 is deferred. This maintainer-directed contract supersedes only the
+Storage-family composition clause in accepted ADR-0199; that accepted record is
+left unchanged. Connected Service export inspection retains its own family's
+existing restrictions. No grants, policy editor or second evaluator are added.
+
+Without generic Use, Workspace/Tenant defaults remain unavailable. This is a
 recorded provisioning limitation, not a reason to bypass the guards or expand the
 scope into #1078. A blocked attempt returns a bounded diagnostic and emits a
 structured operator warning while the remaining Workspace provisioning continues.
 Existing defaults retain identity, configuration, disablement and access decisions;
-collisions fail without replacing a resource. A generic Use grant cannot override
-an existing UsePolicy denial. #1077/#1078 own the deferred permission/policy work.
+collisions fail without replacing a resource. Synchronization and restart retain
+generic grants/revocations. #1077/#1078 own the deferred permission/policy work.
 
 The independent builtin Artifact backend and its existing Flows remain available
-when no selectable default exists or their Workspace context cannot select an
-administrative default. No existing receipt is relocated or retargeted. Authorized
+when no selectable default exists. Workspace-scoped builtin Artifact Flows also
+retain that backend in operational Workspaces instead of implicitly selecting an
+administrative default from their Workspace context. No existing receipt is relocated or retargeted. Authorized
 native selection pins the exact default Storage in a new receipt and uses its
 separate directory. Once selected, disabled/revoked/stale/incompatible references
 fail; they never fall back to another backend. Dependency checks retain exact

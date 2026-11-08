@@ -52,11 +52,14 @@ public sealed class StorageManagementTests
         };
         var updated = await f.Types.PutExactAsync(StorageFixture.Tenant, type.Value.Namespace, type.Value.Name,
             type.Value.Definition with { Versions = [version], PreferredVersion = version.Version }, type.ETag, default);
-        var stored = await f.Storages.CreateAsync(remote with { Definition = remote.Definition with
+        var stored = await f.Storages.CreateAsync(remote with
         {
-            Type = StorageFixture.Reference(updated.Value),
-            Bindings = [new("access_key_id", remote.Definition.Bindings.Single().Export)]
-        } }, default);
+            Definition = remote.Definition with
+            {
+                Type = StorageFixture.Reference(updated.Value),
+                Bindings = [new("access_key_id", remote.Definition.Bindings.Single().Export)]
+            }
+        }, default);
         Assert.AreEqual("access_key_id", stored.Value.Definition.Bindings.Single().RequirementId);
         await f.Storages.ResolveAsync(StorageFixture.Revision(stored.Value), new(StorageFixture.Tenant, stored.Value.Address));
     }
@@ -139,8 +142,11 @@ public sealed class StorageManagementTests
         var foreign = await f.Store.PutExactAsync(StorageFixture.Foreign, stored.Value with { ScopeRef = StorageFixture.Foreign }, null, true, default);
         await Failure("storage_access_denied", () => f.Storages.CreateAsync(remote with
         {
-            Definition = remote.Definition with { ConnectedService = remote.Definition.ConnectedService! with
-            { Service = new(foreign.Value.Address, StorageFixture.Foreign), ServiceUid = foreign.Value.Uid } }
+            Definition = remote.Definition with
+            {
+                ConnectedService = remote.Definition.ConnectedService! with
+                { Service = new(foreign.Value.Address, StorageFixture.Foreign), ServiceUid = foreign.Value.Uid }
+            }
         }, default));
     }
 
@@ -161,34 +167,36 @@ public sealed class StorageManagementTests
         var remote = await f.RemoteAsync();
         var saved = await f.Storages.CreateAsync(remote, default);
         var type = (await f.Types.GetExactAsync(StorageFixture.Tenant, ResourceNamespace.Default, "remote", default))!;
-        var changed = type.Value with { Definition = type.Value.Definition with
-        { Versions = [type.Value.Definition.Versions.Single() with { Requirements = [] }] } };
+        var changed = type.Value with
+        {
+            Definition = type.Value.Definition with
+            { Versions = [type.Value.Definition.Versions.Single() with { Requirements = [] }] }
+        };
         await f.Store.PutExactAsync(StorageFixture.Tenant, changed, type.ETag, false, default);
         await Failure("storage_type_stale", () => f.Storages.ResolveAsync(StorageFixture.Revision(saved.Value), new(StorageFixture.Tenant, saved.Value.Address)));
     }
 
     [TestMethod]
-    public async Task DescendantNeedsBothUsePolicyAndCurrentResourceAccessGrant()
+    public async Task DescendantNeedsCurrentGenericUseWithoutASecondEmbeddedPolicyGrant()
     {
         var f = new StorageFixture();
         var type = await f.TypeAsync();
-        await Failure("storage_access_denied", () => f.Storages.CreateAsync(StorageFixture.Storage(type, scope: StorageFixture.Workspace), default));
-        var updated = await f.Types.PutExactAsync(StorageFixture.Tenant, type.Namespace, type.Name,
-            type.Definition with { UsePolicy = new() { Grants = [new(StorageFixture.Workspace)] } }, type.ETag, default);
+        Assert.IsEmpty(type.Definition.UsePolicy.Grants);
         f.Access.Allowed = false;
-        await Failure("storage_access_denied", () => f.Storages.CreateAsync(StorageFixture.Storage(updated.Value, scope: StorageFixture.Workspace), default));
+        await Failure("storage_access_denied", () => f.Storages.CreateAsync(StorageFixture.Storage(type, scope: StorageFixture.Workspace), default));
         f.Access.Allowed = true;
-        var stored = await f.Storages.CreateAsync(StorageFixture.Storage(updated.Value, scope: StorageFixture.Workspace), default);
+        var stored = await f.Storages.CreateAsync(StorageFixture.Storage(type, scope: StorageFixture.Workspace), default);
         Assert.AreEqual(StorageFixture.Workspace, stored.Value.ScopeRef);
+        Assert.IsEmpty(stored.Value.Definition.UsePolicy.Grants);
+        await Failure("storage_access_denied", () => f.Storages.CreateAsync(StorageFixture.Storage(type, scope: StorageFixture.Foreign), default));
     }
 
     [TestMethod]
-    public async Task ResolverRechecksUsePolicyAndRevokedAuthorization()
+    public async Task ResolverRechecksRevokedGenericAuthorization()
     {
         var f = new StorageFixture();
         var resource = StorageFixture.Storage(await f.TypeAsync());
-        var stored = await f.Storages.CreateAsync(resource with
-        { Definition = resource.Definition with { UsePolicy = new() { Grants = [new(StorageFixture.Workspace)] } } }, default);
+        var stored = await f.Storages.CreateAsync(resource, default);
         await f.Storages.ResolveAsync(StorageFixture.Revision(stored.Value), new(StorageFixture.Workspace, stored.Value.Address));
         f.Access.Allowed = false;
         await Failure("storage_access_denied", () => f.Storages.ResolveAsync(StorageFixture.Revision(stored.Value), new(StorageFixture.Workspace, stored.Value.Address)));
@@ -254,7 +262,8 @@ public sealed class StorageManagementTests
         };
         var desired = new StorageTypeResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.StorageType,
             Metadata = new() { Name = "object-storage", Namespace = ResourceNamespace.Parse("extension.storage") },
             ScopeRef = StorageFixture.Tenant,
             Definition = new() { DisplayName = "Extension type", PreferredVersion = version.Version, Versions = [version] }
@@ -330,8 +339,10 @@ public sealed class StorageManagementTests
         var version = StorageFixture.Version() with { ConfigurationSchema = schema, SchemaDigest = StorageDigests.Schema(schema) };
         await Failure("storage_schema_invalid", () => f.Types.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-            Metadata = new() { Name = "invalid" }, ScopeRef = StorageFixture.Tenant,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.StorageType,
+            Metadata = new() { Name = "invalid" },
+            ScopeRef = StorageFixture.Tenant,
             Definition = new() { DisplayName = "Invalid", PreferredVersion = version.Version, Versions = [version] }
         }, default));
     }
@@ -341,8 +352,11 @@ public sealed class StorageManagementTests
     {
         var f = new StorageFixture();
         var resource = StorageFixture.Storage(await f.TypeAsync());
-        var stored = await f.Storages.CreateAsync(resource with { Definition = resource.Definition with
-        { Configuration = JsonSerializer.SerializeToElement(new { prefix = "private" }) } }, default);
+        var stored = await f.Storages.CreateAsync(resource with
+        {
+            Definition = resource.Definition with
+            { Configuration = JsonSerializer.SerializeToElement(new { prefix = "private" }) }
+        }, default);
         var resolved = await f.Storages.ResolveAsync(StorageFixture.Revision(stored.Value), new(StorageFixture.Tenant, stored.Value.Address));
         var json = JsonSerializer.Serialize(resolved);
         Assert.DoesNotContain("private", json, StringComparison.Ordinal);

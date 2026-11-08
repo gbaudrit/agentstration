@@ -80,7 +80,7 @@ public sealed partial class LocalStorageDefaultsProvisioner(IResourceStore resou
                         Envelope = JsonSerializer.SerializeToElement(new StorageContentPolicy(Write: true), Json)
                     }
                 };
-                // Reuse the owning service's current access/UsePolicy validation. Provisioning changes no grants.
+                // Reuse the owning service's current generic Use and resource validation. Provisioning changes no grants.
                 var created = await storages.CreateAsync(desired, cancellationToken);
                 return await ObserveAsync(created.Value, workspace, cancellationToken);
             }
