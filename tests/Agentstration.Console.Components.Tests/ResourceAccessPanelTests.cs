@@ -156,6 +156,10 @@ public sealed class ResourceAccessPanelTests
         policies.CurrentEtag = "\"new-baseline\"";
         page.Find("[data-testid=resource-access-review]").Click();
         page.WaitForAssertion(() => Assert.IsEmpty(page.FindAll("[data-testid=resource-access-review]")));
+        StringAssert.Contains(page.Find(".access-current-policy").TextContent, "Discover, Use");
+        StringAssert.Contains(page.Find(".access-current-policy").TextContent, tenant.Value);
+        StringAssert.Contains(page.Find(".access-current-policy").TextContent, "Exact target only");
+        Assert.IsFalse(page.FindAll(".access-actions input")[0].HasAttribute("checked"));
         policies.FailWrites = false;
         page.Find("[data-testid=resource-access-save]").Click();
         page.WaitForElement("[data-testid=resource-access-saved]");

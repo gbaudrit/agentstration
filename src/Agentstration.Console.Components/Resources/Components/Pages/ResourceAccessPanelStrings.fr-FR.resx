@@ -69,5 +69,7 @@
   <data name="Evaluation.Stale" xml:space="preserve"><value>La révision de ressource ou de politique est obsolète ; vérifiez l’identité exacte.</value></data>
   <data name="Evaluation.Unavailable" xml:space="preserve"><value>La décision demandée n’est pas disponible dans ce contexte.</value></data>
   <data name="ReviewCurrent" xml:space="preserve"><value>Consulter la révision de politique sans perdre mes autorisations</value></data>
-  <data name="ReviewedPolicy" xml:space="preserve"><value>La révision courante de la politique est chargée. Vos autorisations saisies sont conservées ; vérifiez-les avant de réenregistrer.</value></data>
+  <data name="ReviewedPolicy" xml:space="preserve"><value>Comparez ces autorisations enregistrées avec votre saisie conservée. Un nouvel enregistrement remplace les autorisations enregistrées par votre saisie.</value></data>
+  <data name="CurrentPolicy" xml:space="preserve"><value>Autorisations actuellement enregistrées</value></data>
+  <data name="ExactTargetOnly" xml:space="preserve"><value>Cible exacte uniquement</value></data>
 </root>

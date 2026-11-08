@@ -28,6 +28,8 @@
   <data name="Description" xml:space="preserve"><value>Description</value></data>
   <data name="Scope" xml:space="preserve"><value>Portée propriétaire</value></data>
   <data name="Enabled" xml:space="preserve"><value>Activé</value></data>
+  <data name="Value.Yes" xml:space="preserve"><value>Oui</value></data>
+  <data name="Value.No" xml:space="preserve"><value>Non</value></data>
   <data name="Uid" xml:space="preserve"><value>UID de la ressource</value></data>
   <data name="Generation" xml:space="preserve"><value>Génération</value></data>
   <data name="Type" xml:space="preserve"><value>Type de stockage</value></data>

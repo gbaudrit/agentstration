@@ -1,4 +1,5 @@
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 label { display: grid; gap: .5rem; min-width: 0; }
 code, p { overflow-wrap: anywhere; }
+.storage-type-current dd { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 620px) { .form-actions { bottom: 80px; } }

@@ -75,8 +75,14 @@ public sealed class StorageTypeComponentTests
         page.WaitForElement("[data-testid=storage-type-review]");
         Assert.AreEqual("My retained change", page.Find("[data-testid=storage-type-display-name]").GetAttribute("value"));
         client.CurrentEtag = "\"latest\"";
+        client.Resource = client.Resource with
+        {
+            Definition = client.Resource.Definition with { Description = "Another administrator's saved description" }
+        };
         page.Find("[data-testid=storage-type-review]").Click();
         page.WaitForAssertion(() => Assert.IsEmpty(page.FindAll("[data-testid=storage-type-review]")));
+        StringAssert.Contains(page.Find(".storage-type-current").TextContent, "Another administrator's saved description");
+        Assert.AreEqual("My retained change", page.Find("[data-testid=storage-type-display-name]").GetAttribute("value"));
         client.FailWrites = false;
         page.Find("form").Submit();
         page.WaitForAssertion(() => Assert.AreEqual("\"latest\"", client.LastEtag));

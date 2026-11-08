@@ -69,5 +69,7 @@
   <data name="Evaluation.Stale" xml:space="preserve"><value>The resource or policy revision is stale; review the exact identity.</value></data>
   <data name="Evaluation.Unavailable" xml:space="preserve"><value>The requested decision is unavailable in this context.</value></data>
   <data name="ReviewCurrent" xml:space="preserve"><value>Review current policy revision without discarding my grants</value></data>
-  <data name="ReviewedPolicy" xml:space="preserve"><value>The current policy revision is loaded. Your draft grants are retained; review them before saving again.</value></data>
+  <data name="ReviewedPolicy" xml:space="preserve"><value>Compare these saved grants with your retained draft. Saving again replaces the saved grants with your draft.</value></data>
+  <data name="CurrentPolicy" xml:space="preserve"><value>Current saved grants</value></data>
+  <data name="ExactTargetOnly" xml:space="preserve"><value>Exact target only</value></data>
 </root>

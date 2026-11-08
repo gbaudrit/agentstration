@@ -109,7 +109,22 @@
                 <p class="error-panel" role="alert">@T("SaveFailed")</p>
                 <button type="button" class="button-secondary" @onclick="ReviewPolicyAsync" disabled="@saving" data-testid="resource-access-review">@T("ReviewCurrent")</button>
             }
-            @if (reviewedPolicy) { <p role="status">@T("ReviewedPolicy")</p> }
+            @if (reviewedPolicy)
+            {
+                <section class="access-current-policy" aria-label="@T("CurrentPolicy")">
+                    <h3>@T("CurrentPolicy")</h3><p role="status">@T("ReviewedPolicy")</p>
+                    @if (reviewedGrants.Count == 0) { <p>@T("NoGrants")</p> }
+                    else
+                    {
+                        <ul>
+                            @foreach (var grant in reviewedGrants)
+                            {
+                                <li><code>@grant.TargetScopeRef.Value</code> · @string.Join(", ", grant.Actions.Select(action => T(action.ToString()))) · @T(grant.IncludeDescendants ? "IncludeDescendants" : "ExactTargetOnly")</li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
             @if (saved) { <p class="access-success" role="status" data-testid="resource-access-saved">@T("Saved")</p> }
             @if (canManage)
             {
@@ -142,6 +157,7 @@
     private string evaluationTarget = string.Empty;
     private bool evaluating, evaluationError;
     private bool reviewedPolicy;
+    private IReadOnlyList<ResourceAccessGrant> reviewedGrants = [];
     private ResourceAccessDecision? discoverDecision, useDecision;
     private IEnumerable<ResourceScopeTargetResponse> EvaluationTargets => targets.Where(value => value.ScopeRef == OwnerScopeRef || IsDescendant(value.ScopeRef, OwnerScopeRef));
     private IReadOnlyList<ResourceScopeTargetResponse> AvailableTargets => targets
@@ -160,7 +176,7 @@
     private async Task LoadAsync()
     {
         ClearEvaluation();
-        loading = true; loadError = saveError = saved = invalidTarget = false; dirty = false; grants.Clear();
+        loading = true; loadError = saveError = saved = invalidTarget = reviewedPolicy = false; dirty = false; grants.Clear();
         try
         {
             inventory = await Scopes.GetAsync(cancellation.Token);
@@ -214,7 +230,7 @@
         {
             var policy = new ResourceAccessPolicy(identity, grants.Select(value => value.ToGrant()).ToArray());
             var snapshot = await Policies.PutAsync(policy, etag, cancellation.Token);
-            etag = snapshot.ETag; dirty = false; saved = true;
+            etag = snapshot.ETag; dirty = false; saved = true; reviewedPolicy = false;
             ClearEvaluation();
         }
         catch (AgentstrationApiException) { saveError = true; }
@@ -229,6 +245,7 @@
         {
             var current = await Policies.GetAsync(identity.Uid, cancellation.Token);
             etag = current?.ETag;
+            reviewedGrants = current?.Policy.Grants ?? [];
             saveError = false; reviewedPolicy = true;
             ClearEvaluation();
         }

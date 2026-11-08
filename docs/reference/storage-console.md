@@ -36,7 +36,10 @@ decisions for one exact scope. Draft grants do not change the saved decision unt
 saved. Ordinary Storage grants bind to resource UID, owner, namespace and kind,
 without a generation pin so metadata updates or new versions preserve sharing.
 Explicit revision-pinned policies still fail closed when stale. Policy ETags are
-independent from resource ETags; conflicts retain the draft for review.
+independent from resource ETags; conflicts retain the draft for review. Explicit
+review shows the currently saved grants alongside the retained draft before a
+replacement can be retried. Type metadata conflicts similarly show the saved
+display name, generation, description, enablement and preferred version.
 
 New user-permission work is deferred to [#1077](https://github.com/gbaudrit/agentstration/issues/1077)
 and UsePolicy administration to [#1078](https://github.com/gbaudrit/agentstration/issues/1078).

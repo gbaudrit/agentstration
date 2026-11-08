@@ -21,7 +21,17 @@ else
         {
             <button type="button" class="button-secondary" @onclick="ReviewAsync" disabled="@busy" data-testid="storage-type-review">@T("Type.ReviewCurrent")</button>
         }
-        @if (reviewed && original is not null) { <p role="status">@Localizer["Type.CurrentSaved", original.Definition.DisplayName, original.Generation]</p> }
+        @if (reviewed && original is not null)
+        {
+            <section class="panel storage-type-current">
+                <p role="status">@Localizer["Type.CurrentSaved", original.Definition.DisplayName, original.Generation]</p>
+                <dl class="resource-details">
+                    <dt>@T("Description")</dt><dd>@original.Definition.Description</dd>
+                    <dt>@T("Enabled")</dt><dd>@T(original.Definition.Enabled ? "Value.Yes" : "Value.No")</dd>
+                    <dt>@T("Type.PreferredVersion")</dt><dd>@original.Definition.PreferredVersion</dd>
+                </dl>
+            </section>
+        }
         <EditForm Model="draft" OnSubmit="RequestSaveAsync" FormName="storage-type-editor" class="resource-form">
             <fieldset disabled="@busy">
                 @if (!IsPublishing)
