@@ -150,8 +150,11 @@ validation; it does not start or duplicate that reusable integrated journey.
 - `dotnet build Agentstration.slnx --configuration Release --no-restore`: passed, 0 warnings and 0 errors.
 - Required Fast lane, minimum 777 and maximum 4 parallel modules: 1,025 passed,
   0 failed/skipped. Includes architecture and localization checks.
-- Required Integration lane: combined-tree validation is in progress; no result
-  is claimed here until it completes.
+- Required Integration lane on the combined product tree in CI: 1,080 passed,
+  0 failed and 12 optional integrations skipped (1,092 total), minimum 954 and
+  maximum 2 parallel modules. Optional skips are PostgreSQL (2), live Foundry (8),
+  llama.cpp (1) and LocalAI (1). The local attempt was interrupted for the later
+  test-fixture rebuild; the completed result here is the CI result.
 - Targeted checks: 38 Storage application tests, 15 Storage HTTP scenarios,
   32 Storage Console/localization cases and 3 persistence cases passed. These
   include Tenant propagation, Discover-only and revocation refusal, foreign
@@ -160,7 +163,9 @@ validation; it does not start or duplicate that reusable integrated journey.
   unchanged 2,560 MiB diagnostic limit at 2,683.6 MiB. Five service-only Storage
   cases now use the repository's existing isolated ManagementServiceFixture
   instead of HTTP hosts, preserving their names and assertions. All five passed
-  locally after the adaptation; the corrected diagnostic result is pending.
+  locally after the adaptation. Subsequent metrics are retained with the
+  [candidate CI](https://github.com/gbaudrit/agentstration/actions/runs/42506327201).
+  No shared mutable test fixture, budget increase or forced GC is introduced.
 - TypeScript compilation, all three route-catalog checks, changed C# whitespace,
   ADR validation (198 records), LikeC4 and the complete Docusaurus build passed.
 - Real executable smoke passed en-US/fr-FR at 1440×1000 and 390×844. It covered
@@ -171,11 +176,15 @@ validation; it does not start or duplicate that reusable integrated journey.
   selectable; API creation 403), add Use (Workspace Console creation succeeded),
   then revoke Use (selection disabled again and API creation 403). No Console
   authorization override was introduced.
-- Combined implementation tree: `66c5fe5c9708876cbe476cff150fbc3a088f7226`, including
-  merged #1080. Current [.NET CI](https://github.com/gbaudrit/agentstration/actions/runs/42504549843),
+- Combined product tree: `66c5fe5c9708876cbe476cff150fbc3a088f7226`, including
+  merged #1080. The later fixture correction `e44ad295` changes only tests and
+  documentation, preserving the product source. Initial [.NET CI](https://github.com/gbaudrit/agentstration/actions/runs/42504549843),
   [Browser UX](https://github.com/gbaudrit/agentstration/actions/runs/42504555815)
   and [Documentation](https://github.com/gbaudrit/agentstration/actions/runs/42504555813)
-  record remote outcomes. Documentation passed; remaining CI results are pending.
+  record the initial remote outcomes, including the memory failure described
+  above. Final outcomes and exact validated commits are recorded in
+  [PR #1079](https://github.com/gbaudrit/agentstration/pull/1079); earlier evidence
+  does not imply an overall CI pass for a later candidate.
 
 These implementation checks do not constitute maintainer UX approval. The reusable
 integrated scenario #1033 and focused #1065 remain blocked as described above.

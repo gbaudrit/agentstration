@@ -197,3 +197,11 @@ Storage-specific help text also needs alignment with the current contract. An
 isolated test patch was prepared for that branch; no Console source was changed
 in #1080. Combined-branch/browser validation is not claimed by these backend checks.
 No new reusable UX scenario was added; #1033/#1065 retain their existing gates.
+
+The #1064 integration applies those cross-branch adaptations and the subsequent
+maintainer decision to retain one functional pre-release `local@1.0.0`. The
+Storage-specific help, builtin version selection, authorized creation/revocation
+assertions and request-observation/selector regressions now follow ADR-0200.
+Combined validation and the isolated service-fixture correction are recorded in
+[the Console reference](../../reference/storage-console.md#validation-evidence--combined-10641040-2026-11-08)
+and PR #1079. These checks do not approve the UX or authorize a merge.
