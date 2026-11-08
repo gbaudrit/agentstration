@@ -3,8 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Api.Contracts;
 using Agentstration.ConnectedServices.Contracts;
-using Agentstration.Identity.Contracts;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
@@ -37,8 +37,9 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         var type = catalog!.Value.Single(t => t.Name == StoragePlatformResourceProvisioner.LocalTypeName);
         Assert.AreEqual(ResourceOriginKind.BuiltIn, type.Governance.Origin.Kind);
         Assert.AreEqual(ResourceManagementAuthorityKind.Core, type.Governance.ManagedBy?.Kind);
-        Assert.AreEqual(StorageAvailability.Ready, type.ObservedVersions.Single().Availability);
-        Assert.IsFalse(type.Definition.Versions.Single().Capabilities.Write);
+        Assert.IsTrue(type.ObservedVersions.All(v => v.Availability == StorageAvailability.Ready));
+        Assert.IsFalse(type.Definition.Versions.Single(v => v.Version == "1.0.0").Capabilities.Write);
+        Assert.IsTrue(type.Definition.Versions.Single(v => v.Version == "2.0.0").Capabilities.Write);
 
         using var createdResponse = await client.PostAsJsonAsync("/api/storages",
             new CreateStorageRequest("local-test", Properties(type), ResourceScopeRef.Instance));
@@ -52,7 +53,7 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         await Status(detail, HttpStatusCode.OK);
         Assert.AreEqual(createdResponse.Headers.ETag, detail.Headers.ETag);
         var list = await client.GetFromJsonAsync<PagedResponse<StorageResource>>("/api/storages?take=1");
-        Assert.AreEqual(created.Uid, list!.Value.Single().Uid);
+        Assert.HasCount(1, list!.Value);
         using var invalidPage = await client.GetAsync("/api/storages?take=101");
         await Problem(invalidPage, HttpStatusCode.UnprocessableEntity, "storage_page_invalid");
     }
@@ -107,14 +108,23 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
             await factory.Services.GetRequiredService<IResourceStore>().PutExactAsync(scope, new SecretResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret,
-                Metadata = new() { Name = "credential" }, ScopeRef = scope,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Secret,
+                Metadata = new() { Name = "credential" },
+                ScopeRef = scope,
                 Definition = new() { DisplayName = "Credential", Vault = new("vault", scope), Key = "fixture-key" }
             }, null, true, default);
         using var serviceResponse = await client.PostAsJsonAsync("/api/connected-services", new CreateConnectedServiceRequest("account", new()
         {
-            DisplayName = "Account", Type = new() { Type = new(serviceType.Name, scope), TypeUid = serviceType.Uid,
-                Version = "1.0.0", SchemaDigest = serviceVersion.SchemaDigest }, Options = Empty,
+            DisplayName = "Account",
+            Type = new()
+            {
+                Type = new(serviceType.Name, scope),
+                TypeUid = serviceType.Uid,
+                Version = "1.0.0",
+                SchemaDigest = serviceVersion.SchemaDigest
+            },
+            Options = Empty,
             Bindings = [new() { InputId = "credential", Kind = ConnectedServiceBindingKind.Secret,
                 Secret = new SecretReference(new(ResourceNamespace.Default, SecretResourceKinds.Secret, "credential"), scope) }]
         }, scope));
@@ -178,8 +188,11 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         {
             registration = await factory.Services.GetRequiredService<IResourceStore>().PutExactAsync(scope, new ExtensionRegistrationResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration,
-                Metadata = new() { Name = "storage-extension" }, ScopeRef = scope, Generation = 1,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
+                Metadata = new() { Name = "storage-extension" },
+                ScopeRef = scope,
+                Generation = 1,
                 Definition = new() { DisplayName = "Storage extension", Endpoint = new("http://127.0.0.1:1"), ExpectedExtensionId = "extension.storage" }
             }, null, true, default);
             var address = new ScopedResourceAddress(scope, registration.Value.Namespace, registration.Value.Kind, registration.Value.Name);
@@ -187,10 +200,15 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
                 $"{scope.Value}/{address.Kind}/{address.Namespace}/{address.Name}", "extension.storage", "1.0.0"));
             type = (await factory.Services.GetRequiredService<StorageTypeManagementService>().SynchronizeManagedAsync(new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-                Metadata = new() { Name = "object-store", Namespace = ResourceNamespace.Parse("extension.storage") }, ScopeRef = scope,
-                Definition = TypeProperties() with { Versions = [TypeProperties().Versions.Single() with
-                { Contribution = new(address, registration.Value.Uid, registration.Value.Generation, "object-store", "1.0.0", "sha256:fixture") }] }
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = StorageResourceKinds.StorageType,
+                Metadata = new() { Name = "object-store", Namespace = ResourceNamespace.Parse("extension.storage") },
+                ScopeRef = scope,
+                Definition = TypeProperties() with
+                {
+                    Versions = [TypeProperties().Versions.Single() with
+                { Contribution = new(address, registration.Value.Uid, registration.Value.Generation, "object-store", "1.0.0", "sha256:fixture") }]
+                }
             }, default)).Value;
         }
         var catalog = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types");
@@ -213,6 +231,51 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         var missing = await client.GetFromJsonAsync<StorageResource>(Path(storage));
         Assert.AreEqual(storage.Uid, missing!.Uid);
         Assert.AreEqual(StorageAvailability.Unavailable, missing.ObservedState?.Availability);
+    }
+
+    [TestMethod]
+    public async Task BuiltinTenantPropagatedUsePermitsWorkspaceCreationAndRevocationRefusesIt()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var targets = (await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>("/api/resource-scopes/targets?kind=Storage"))!;
+        var tenant = targets.Single(t => t.Kind == ResourceScopeKind.Tenant).ScopeRef;
+        var workspace = targets.Single(t => t.Kind == ResourceScopeKind.Workspace).ScopeRef;
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+        var type = (await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types"))!.Value.Single(t => t.Name == "local");
+        Assert.IsEmpty(type.Definition.UsePolicy.Grants);
+        var policy = new ResourceAccessPolicy(new(type.Uid, ResourceScopeRef.Instance, type.Namespace, type.Kind),
+            [new(tenant, [ResourceAccessAction.Discover], IncludeDescendants: true)]);
+        var policyPath = $"/api/resource-access-policies/{type.Uid:D}";
+        using var discoverOnly = await client.PutAsJsonAsync(policyPath, policy);
+        await Status(discoverOnly, HttpStatusCode.OK);
+        var policyEtag = discoverOnly.Headers.ETag!.ToString();
+        SelectConsoleContext(client, workspace);
+        var visible = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types");
+        Assert.IsTrue(visible!.Value.Any(t => t.Uid == type.Uid));
+        using var denied = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("discover-only", Properties(type), workspace));
+        await Problem(denied, HttpStatusCode.Forbidden, "storage_access_denied");
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+        var usable = policy with { Grants = [new(tenant, [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)] };
+        using var grant = await Send(client, HttpMethod.Put, policyPath, usable, policyEtag);
+        await Status(grant, HttpStatusCode.OK);
+        policyEtag = grant.Headers.ETag!.ToString();
+        SelectConsoleContext(client, workspace);
+        using var created = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("tenant-shared-local", Properties(type), workspace));
+        await Status(created, HttpStatusCode.Created);
+        var storage = (await created.Content.ReadFromJsonAsync<StorageResource>())!;
+        Assert.AreEqual(workspace, storage.ScopeRef);
+        Assert.AreEqual(type.Uid, storage.Definition.Type.TypeUid);
+        Assert.IsEmpty(storage.Definition.UsePolicy.Grants);
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+        using var revoked = await Send(client, HttpMethod.Put, policyPath, policy, policyEtag);
+        await Status(revoked, HttpStatusCode.OK);
+        SelectConsoleContext(client, workspace);
+        using var refusal = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("revoked-local", Properties(type), workspace));
+        await Problem(refusal, HttpStatusCode.Forbidden, "storage_access_denied");
+        var observed = (await client.GetFromJsonAsync<StorageResource>(Path(storage)))!;
+        Assert.AreEqual(StorageAvailability.Unavailable, observed.ObservedState!.Availability);
+        Assert.IsTrue(observed.ObservedState.Diagnostics.Any(d => d.Code == "storage_access_denied"));
     }
 
     [TestMethod]
@@ -253,8 +316,10 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         var typeHandler = handlers.Single(h => h.Kind == StorageResourceKinds.StorageType);
         var typeDocument = new BootstrapResourceDocument
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-            Metadata = new() { Name = "bootstrap-storage-type" }, Definition = JsonSerializer.SerializeToElement(TypeProperties())
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.StorageType,
+            Metadata = new() { Name = "bootstrap-storage-type" },
+            Definition = JsonSerializer.SerializeToElement(TypeProperties())
         };
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await typeHandler.PlanAsync(typeDocument, operation, new(), default)).Disposition);
         Assert.AreEqual(BootstrapResourceApplyResult.Created, await typeHandler.ApplyAsync(typeDocument, operation, default));
@@ -262,8 +327,10 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
             .GetExactAsync(scope, ResourceNamespace.Default, "bootstrap-storage-type", default))!.Value;
         var storageDocument = new BootstrapResourceDocument
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.Storage,
-            Metadata = new() { Name = "bootstrap-storage" }, Definition = JsonSerializer.SerializeToElement(Properties(type))
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.Storage,
+            Metadata = new() { Name = "bootstrap-storage" },
+            Definition = JsonSerializer.SerializeToElement(Properties(type))
         };
         var handler = handlers.Single(h => h.Kind == StorageResourceKinds.Storage);
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await handler.PlanAsync(storageDocument, operation, new(), default)).Disposition);
@@ -276,17 +343,30 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
 
     private static StorageTypeProperties TypeProperties(bool remote = false) => new()
     {
-        DisplayName = "Storage type", PreferredVersion = "1.0.0", Versions =
+        DisplayName = "Storage type",
+        PreferredVersion = "1.0.0",
+        Versions =
         [new() { Version = "1.0.0", ConfigurationSchema = Schema, SchemaDigest = StorageDigests.Schema(Schema),
             EnvelopeSchema = Schema, EnvelopeSchemaDigest = StorageDigests.Schema(Schema), RequiresConnectedService = remote,
             Requirements = remote ? [new("connection", true, ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Secured)] : [] }]
     };
     private static StorageProperties Properties(StorageTypeResource type)
     {
-        var version = type.Definition.Versions.Single();
-        return new() { DisplayName = "Storage", Configuration = Empty, Envelope = Empty, Type = new()
-        { Type = new(type.Name, type.ScopeRef, type.Namespace), TypeUid = type.Uid, Version = version.Version,
-            SchemaDigest = version.SchemaDigest, ContractDigest = StorageDigests.Version(version) } };
+        var version = type.Definition.Versions.Single(v => v.Version == "1.0.0");
+        return new()
+        {
+            DisplayName = "Storage",
+            Configuration = Empty,
+            Envelope = Empty,
+            Type = new()
+            {
+                Type = new(type.Name, type.ScopeRef, type.Namespace),
+                TypeUid = type.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest,
+                ContractDigest = StorageDigests.Version(version)
+            }
+        };
     }
     private static async Task<StorageTypeResource> CreateType(HttpClient client, ResourceScopeRef scope, bool remote = false)
     {

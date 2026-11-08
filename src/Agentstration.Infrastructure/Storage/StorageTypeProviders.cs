@@ -28,34 +28,66 @@ public sealed class StoragePlatformResourceProvisioner(StorageTypeManagementServ
 {
     public const string LocalTypeName = "local";
     public const string LocalTypeVersion = "1.0.0";
+    public const string ContentTypeVersion = "2.0.0";
 
     public async Task EnsureAsync(CancellationToken cancellationToken)
     {
-        using var authority = governance.Push(ResourceGovernance.Core("storage.local", LocalTypeVersion));
+        using var authority = governance.Push(ResourceGovernance.Core("storage.local", ContentTypeVersion));
+        var existing = await types.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, LocalTypeName, cancellationToken);
         var schema = JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = false });
         _ = await types.SynchronizeManagedAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.StorageType,
             Metadata = new()
             {
                 Name = LocalTypeName,
-                Annotations = new Dictionary<string, string> { [ResourceProvenanceAnnotations.BuiltIn] = "true" }
+                Annotations = existing?.Value.Metadata.Annotations
+                    ?? new Dictionary<string, string> { [ResourceProvenanceAnnotations.BuiltIn] = "true" }
             },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new()
             {
                 DisplayName = "Local storage",
-                Description = "A local logical Storage without a remote connection. Content adapters are composed separately.",
-                PreferredVersion = LocalTypeVersion,
+                Description = "A local logical Storage without a remote connection. Version 2 provides bounded filesystem content operations.",
+                Enabled = existing?.Value.Definition.Enabled ?? true,
+                UsePolicy = existing?.Value.Definition.UsePolicy ?? new(),
+                PreferredVersion = ContentTypeVersion,
                 Versions =
                 [
                     new()
                     {
                         Version = LocalTypeVersion, SchemaDigest = StorageDigests.Schema(schema), ConfigurationSchema = schema,
                         EnvelopeSchemaDigest = StorageDigests.Schema(schema), EnvelopeSchema = schema
+                    },
+                    new()
+                    {
+                        Version = ContentTypeVersion, SchemaDigest = StorageDigests.Schema(schema), ConfigurationSchema = schema,
+                        EnvelopeSchemaDigest = StorageDigests.Schema(LocalEnvelopeSchema), EnvelopeSchema = LocalEnvelopeSchema,
+                        Capabilities = new() { List = true, Stat = true, Read = true, Write = true },
+                        Limits = new(100, 65536, 65536)
                     }
                 ]
             }
         }, cancellationToken);
     }
+
+    public static JsonElement LocalEnvelopeSchema { get; } = JsonSerializer.SerializeToElement(new
+    {
+        type = "object",
+        additionalProperties = false,
+        properties = new Dictionary<string, object>
+        {
+            ["list"] = new { type = "boolean" },
+            ["stat"] = new { type = "boolean" },
+            ["read"] = new { type = "boolean" },
+            ["write"] = new { type = "boolean" },
+            ["prefix"] = new { type = "string", maxLength = 256 },
+            ["maximumPageSize"] = new { type = "integer", minimum = 1, maximum = 100 },
+            ["maximumReadBytes"] = new { type = "integer", minimum = 1, maximum = 65536 },
+            ["maximumWriteBytes"] = new { type = "integer", minimum = 1, maximum = 65536 },
+            ["keyFrom"] = new { type = "string", maxLength = 256 },
+            ["keyBefore"] = new { type = "string", maxLength = 256 }
+        }
+    });
 }

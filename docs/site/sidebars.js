@@ -125,6 +125,7 @@ const sidebars = {
         'reference/versioning',
         'reference/api/overview',
         'reference/storages',
+        'reference/storage-execution',
         'reference/resources/overview',
         'reference/packs',
         'reference/source-registries',

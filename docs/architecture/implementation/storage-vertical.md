@@ -27,8 +27,11 @@ The three authority layers remain separate:
 3. Data Source/Knowledge own logical dataset or output rules and exact selected
    Storage revisions. They receive no ability to replace connection or envelope.
 
-Resolution repeats current authorization and contract checks. It verifies both
-descendant UsePolicy and the resource access policy for each dependency. Protected
+Resolution repeats current authorization and contract checks. For Storage and
+StorageType resources, the generic Use decision is the current usage authority;
+Tenant propagation, exact identities, revocations and scope boundaries are checked
+on each call. Embedded UsePolicy metadata does not impose a second Storage-family
+lock while #1078 is deferred. Connected Service inspection retains its own checks. Protected
 configuration does not serialize with the logical revision. Sharing physical
 placement or an extension never grants shared logical authority.
 
@@ -38,9 +41,13 @@ rebinding or deactivation. Missing providers leave stored resources and evidence
 unchanged. Read-time observations do not create writes or change ETags.
 
 The Core `local` type supports management/resolution without a Connected Service.
-It advertises no unimplemented content capabilities. #1040 delivers actual
-ASP/AEP/Artifact adapters; [#1046 supplies the Console](../../reference/storage-console.md), and #1041/#1042 the dataset and
-Snapshot consumers. Existing acquisitions and Artifact histories are untouched.
+Its immutable metadata-only `1.0.0` remains unchanged. #1040 adds functional
+`2.0.0`, guarded default provisioning, separate UID-bound directories and protected
+ASP/AEP/Artifact adapters. [Execution and deployment](../../reference/storage-execution.md)
+and [ADR-0200](../../decisions/0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md)
+describe runtime authority, policy preservation, current capability limits and
+historical Artifact handling. [#1046 supplies the Console](../../reference/storage-console.md);
+#1041/#1042 retain dataset and Snapshot ownership.
 
 Fast tests exercise domain and authority invariants with deterministic ports.
 Integration tests cover real HTTP/Problem Details, Bootstrap, Secret non-resolution,
@@ -84,3 +91,81 @@ Secret-resolution ports. Architecture checks explicitly permit this family contr
 while continuing to reject Storage services, API modules and concrete persistence
 from Console assemblies. This follows ADR-0199 and the existing Connected Service
 Console architecture; it introduces no new architectural decision or ADR.
+
+## Execution boundary
+
+`Storage.Contracts` owns content DTOs, restrictions and `IStorageContentGateway`.
+`Storage` still references no ASP/AEP implementation. Infrastructure composes the
+SDK adapters and the native local backend; the optional independent `Asp.Aep`
+library configures extension bindings without product-resource references.
+
+Every content call reauthorizes exact resource/type/service/export pins plus the
+current execution permission. Pure local envelope validation participates in
+management through a narrow port, without Secret resolution or physical I/O.
+Remote configuration layers travel through authenticated bounded AEP exchange;
+content Tool arguments carry only logical target selection and business inputs.
+
+Initialization target 3 reconciles existing Workspaces through the existing fenced
+startup mechanism. Provisioning writes no access grants or UsePolicy and preserves
+configuration, disablement and existing access decisions. Absent generic Use grants may block Workspace/Tenant defaults; a bounded result/operator warning
+reports that limitation while other provisioning continues. The Instance default
+is usable in its logical administrative context. #1077/#1078 retain new permission
+and policy work.
+
+Authorized selected-Storage Artifact receipts pin their Storage UID/revision.
+The independent Artifact backend remains the builtin choice when no default can
+be selected in the Flow's Workspace context. A selected reference never falls back
+after disablement or revocation. Existing locations, receipts, leases and histories
+retain their original adapter. Receipt dependencies
+match exact UIDs; another resource at the same name does not inherit them.
+
+## FR #1040 scope correction and validation — 2026-11-08
+
+The maintainer confirmed that policy work remains out of #1040. Automatic grant
+initialization was removed, including type UsePolicy mutation, operational Storage
+UsePolicy grants, generic grant initialization and first-grant markers. Existing
+generic policy evaluation remains the authority. The maintainer then clarified
+that generic Use must authorize the complete Storage-family path, without a second
+unadministrable embedded UsePolicy lock. That extra Storage/StorageType gate was
+removed at the application boundary; no grants are synthesized. Workspace/Tenant
+defaults without generic authorization are reported as unavailable; existing Artifact functionality stays usable
+through its independent backend. No permission exception or scope approval is
+pending. #1077/#1078 retain their deferred requirements.
+
+Validation was completed against application correction `c90f80f`, based on
+`integration/fr-1032` at `a27d3d7`, with .NET SDK 10.0.300. Earlier candidate counts
+are superseded by these results.
+
+| Check | Result |
+|---|---|
+| Root restore and Release build | Passed; 0 warnings, 0 errors; audit/analyzers enabled |
+| Required Fast lane | 999 passed, 0 failed, 0 skipped; minimum 777, maximum 4 parallel modules |
+| Required Integration lane | 1,090 discovered: 1,078 passed, 0 failed, 12 existing optional skips; minimum 954, maximum 2 parallel modules |
+| Focused Storage module | 31 passed |
+| Focused HTTP/provisioning cases | 6 passed |
+| Real SQLite sharing/revocation/restart scenario | Passed; native content and exact identities retained, foreign Tenant refused, synchronization/restarts preserve grants and revocation |
+| ADR/LikeC4/full Docusaurus build | Passed; 198 unique ADRs |
+| Actual standalone executable | Health 200, Development fixture login 204, Storage catalogue/list 200; builtin versions and Instance default verified |
+| Real Docker remove/recreate | Passed; two retained volumes preserve exact Storage/Workspace identities, protected content reference, Artifact receipt and historical content without grant initialization |
+
+No Storage test was skipped. The 12 skips are the existing optional PostgreSQL and
+live-model integrations. An initial lane attempt exposed an existing Git test's
+exact cancellation-type assertion; isolated test correction `4840c11` accepts valid
+derived .NET cancellation exceptions, and the complete required lane was rerun.
+The Git provider implementation is unchanged.
+
+The AEP SDK and ASP/AEP package source are unchanged by the authorization correction;
+independent checks passed earlier (59 AEP tests and package README/license/notices).
+Docker uses the published production-composition probe in a locally assembled
+.NET 10.0.8 runtime image with networking disabled. The official
+`mcr.microsoft.com/dotnet/aspnet:10.0` image pull was refused by the registry in this
+environment; its checked-in Dockerfile remains unverified here.
+
+Cross-branch review of #1079 confirmed that its selector combines generic Use,
+enablement and version availability. Its former builtin test expecting a
+UsePolicy-related 403 must expect successful authorized creation, and must select
+an exact/preferred version rather than assuming the builtin has one version. Its
+Storage-specific help text also needs alignment with the current contract. An
+isolated test patch was prepared for that branch; no Console source was changed
+in #1080. Combined-branch/browser validation is not claimed by these backend checks.
+No new reusable UX scenario was added; #1033/#1065 retain their existing gates.
