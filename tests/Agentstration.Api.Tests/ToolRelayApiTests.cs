@@ -1,16 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Notifications;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Agentstration.Parameters;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Tools;
@@ -49,15 +49,23 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         {
             await store.PutExactAsync(owner, new ToolProviderResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider, Metadata = new() { Name = AgentstrationToolProvider.Name }, ScopeRef = owner,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolProvider,
+                Metadata = new() { Name = AgentstrationToolProvider.Name },
+                ScopeRef = owner,
                 Definition = new() { DisplayName = "Test internal provider", ProviderType = ToolProviderType.Mcp, Mcp = new() { Internal = true } }
             }, null, true, default);
             await store.PutExactAsync(owner, new ToolResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.Tool, Metadata = new() { Name = "agentstration.relay-test.source" }, ScopeRef = owner,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.Tool,
+                Metadata = new() { Name = "agentstration.relay-test.source" },
+                ScopeRef = owner,
                 Definition = new()
                 {
-                    DisplayName = "Test source", ExternalId = handler.Definition.Name, Provider = new(AgentstrationToolProvider.Name, owner),
+                    DisplayName = "Test source",
+                    ExternalId = handler.Definition.Name,
+                    Provider = new(AgentstrationToolProvider.Name, owner),
                     Schema = new() { Input = handler.Definition.InputSchema },
                     Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch }
                 }
@@ -111,22 +119,28 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         var source = (await store.GetExactAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, "agentstration.relay-test.source").AtScope(scope), default))!.Value;
         var parameter = await factory.Services.GetRequiredService<ParameterManagementService>().CreateAsync(new ParameterResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ParameterResourceKinds.Parameter,
-            Metadata = new() { Name = "relay-store" }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ParameterResourceKinds.Parameter,
+            Metadata = new() { Name = "relay-store" },
+            ScopeRef = scope,
             Definition = new() { DisplayName = "Relay store", ValueType = ParameterValueType.Text, Value = Json("\"hr\"") }
         }, default);
         var secrets = factory.Services.GetRequiredService<SecretManagementService>();
         await secrets.CreateVaultAsync(new VaultResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Vault,
-            Metadata = new() { Name = "relay-vault" }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Vault,
+            Metadata = new() { Name = "relay-vault" },
+            ScopeRef = scope,
             Definition = new() { DisplayName = "Relay vault", ProviderType = "local" }
         }, default);
         await secrets.InitializeVaultExactAsync(scope, "relay-vault", default);
         var secret = await secrets.CreateSecretAsync(new SecretResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret,
-            Metadata = new() { Name = "relay-secret" }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Secret,
+            Metadata = new() { Name = "relay-secret" },
+            ScopeRef = scope,
             Definition = new() { DisplayName = "Relay secret", Vault = new("relay-vault", scope), Key = "fixture" }
         }, default);
         using (var value = new SecretValue(Encoding.UTF8.GetBytes("synthetic-first")))
@@ -143,8 +157,11 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         };
         await definitions.PutAsync(new ToolDefinitionResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition,
-            Metadata = new() { Name = "live-relay" }, ScopeRef = scope, Definition = properties
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolDefinition,
+            Metadata = new() { Name = "live-relay" },
+            ScopeRef = scope,
+            Definition = properties
         }, null, true, default);
         var executor = factory.Services.GetRequiredService<IToolDefinitionExecutor>();
         var invocation = new ToolDefinitionInvocation(context.TenantId, new(context.WorkspaceId), context.PrincipalId,
@@ -152,8 +169,11 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         var first = await executor.ExecuteAsync(invocation, default);
         Assert.AreEqual("hr", first.Output?.GetProperty("store").GetProperty("id").GetString());
         Assert.AreEqual("synthetic-first", handler.LastSecret);
-        await store.PutAsync(parameter.Value with { Generation = parameter.Value.Generation + 1,
-            Definition = parameter.Value.Definition with { Value = Json("\"legal\"") } }, parameter.ETag, false, default);
+        await store.PutAsync(parameter.Value with
+        {
+            Generation = parameter.Value.Generation + 1,
+            Definition = parameter.Value.Definition with { Value = Json("\"legal\"") }
+        }, parameter.ETag, false, default);
         using (var value = new SecretValue(Encoding.UTF8.GetBytes("synthetic-second")))
             await secrets.SetValueExactAsync(scope, secret.Value.Name, value, default);
         var second = await executor.ExecuteAsync(invocation with { CallId = "rotated" }, default);
@@ -200,10 +220,17 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var agent = await agents.PutAgentAsync(new AgentResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = AgentResourceKinds.Agent,
-            Metadata = new() { Name = "direct-relay-consumer" }, ScopeRef = scope,
-            Definition = new() { DisplayName = "Direct relay consumer", Instructions = "Use the assigned Tool.",
-                ModelProfile = new("reasoning-default"), Tools = [new(firstTool.Name, scope)] }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            Metadata = new() { Name = "direct-relay-consumer" },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = "Direct relay consumer",
+                Instructions = "Use the assigned Tool.",
+                ModelProfile = new("reasoning-default"),
+                Tools = [new(firstTool.Name, scope)]
+            }
         }, null, true, default);
         var deployment = new AgentDeploymentSpec
         { Environment = "local", RuntimeProfileName = "maf-builtin", HostingMode = AgentHostingMode.InProcess };
@@ -217,10 +244,17 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         var toolSets = factory.Services.GetRequiredService<ToolSetService>();
         await toolSets.CreateAsync(new ToolSetResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolSet,
-            Metadata = new() { Name = "relay-consumer" }, ScopeRef = scope,
-            Definition = new() { DisplayName = "Relay consumer", Version = "4.0.0", Publish = true,
-                Members = [new() { Tool = new(firstTool.Name, scope), Capability = "read", Route = "default" }] }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolSet,
+            Metadata = new() { Name = "relay-consumer" },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = "Relay consumer",
+                Version = "4.0.0",
+                Publish = true,
+                Members = [new() { Tool = new(firstTool.Name, scope), Capability = "read", Route = "default" }]
+            }
         }, default);
         var definitionService = factory.Services.GetRequiredService<ToolDefinitionService>();
         var draft = (await definitionService.GetAsync("relay-test", default, default))!;
@@ -322,17 +356,25 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         var definitions = factory.Services.GetRequiredService<ToolDefinitionService>();
         await definitions.PutAsync(new ToolDefinitionResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition,
-            Metadata = new() { Name = "guarded-relay" }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolDefinition,
+            Metadata = new() { Name = "guarded-relay" },
+            ScopeRef = scope,
             Definition = Relay(source.Value, "1.0.0", "hr") with { Publish = true }
         }, null, true, default);
         await store.PutAsync(new ToolExecutionHookResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolExecutionHook,
-            Metadata = new() { Name = "deny-source" }, ScopeRef = scope,
-            Definition = new() { DisplayName = "Deny source", Handler = ToolExecutionHookHandlers.Deny,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolExecutionHook,
+            Metadata = new() { Name = "deny-source" },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = "Deny source",
+                Handler = ToolExecutionHookHandlers.Deny,
                 Selector = new() { Tools = [source.Value.Name] },
-                Configuration = new Dictionary<string, JsonElement> { ["code"] = Json("\"blocked_source\""), ["message"] = Json("\"Source denied\"") } }
+                Configuration = new Dictionary<string, JsonElement> { ["code"] = Json("\"blocked_source\""), ["message"] = Json("\"Source denied\"") }
+            }
         }, null, true, default);
         var executor = factory.Services.GetRequiredService<IToolDefinitionExecutor>();
         var invocation = new ToolDefinitionInvocation(context.TenantId, new(context.WorkspaceId), context.PrincipalId,
@@ -352,7 +394,8 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
 
     private static RelayToolDefinitionProperties Relay(ToolResource source, string version, string store) => new()
     {
-        DisplayName = "Test relay", Version = version,
+        DisplayName = "Test relay",
+        Version = version,
         Target = new() { Name = source.Name, Namespace = source.Namespace, ScopeRef = source.ScopeRef!.Value, Uid = source.Uid, Generation = source.Generation },
         Bindings = [new LiteralToolArgumentBinding { Path = "/store", Value = JsonSerializer.SerializeToElement(new { id = store }) }]
     };

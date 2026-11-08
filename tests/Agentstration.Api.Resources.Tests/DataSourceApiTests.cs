@@ -224,9 +224,17 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         using var relayCreated = await client.PostAsJsonAsync("/api/tooldefinitions", new CreateToolDefinitionRequest(
             "catalog-relay", new RelayToolDefinitionProperties
             {
-                DisplayName = "Catalog relay", Version = "5.2.0", Publish = true,
-                Target = new() { Name = acquisitionTool.Name, Namespace = acquisitionTool.Namespace,
-                    ScopeRef = acquisitionTool.ScopeRef!.Value, Uid = acquisitionTool.Uid, Generation = acquisitionTool.Generation }
+                DisplayName = "Catalog relay",
+                Version = "5.2.0",
+                Publish = true,
+                Target = new()
+                {
+                    Name = acquisitionTool.Name,
+                    Namespace = acquisitionTool.Namespace,
+                    ScopeRef = acquisitionTool.ScopeRef!.Value,
+                    Uid = acquisitionTool.Uid,
+                    Generation = acquisitionTool.Generation
+                }
             }, ScopeRef: owner));
         Assert.AreEqual(HttpStatusCode.Created, relayCreated.StatusCode, await relayCreated.Content.ReadAsStringAsync());
         var acquisitionsBeforeRelay = gateway.AcquisitionInputs.Count;

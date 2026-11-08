@@ -139,12 +139,24 @@ internal static class AgentstrationMcpHandlers
                 ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", "The published Tool projection is unavailable.");
             var result = await services.GetRequiredService<IToolExecutionPipeline>().ExecuteDetailedAsync(new ToolExecutionContext
             {
-                OwnerKind = ToolExecutionOwnerKind.Mcp, ToolCallId = invocation.CallId, InvocationId = $"{invocation.CallId}:attempt:1",
-                ToolId = tool.Name, ToolName = definition.Name, ExternalToolId = definition.Name,
-                ToolNamespace = tool.Namespace, ToolScopeRef = workspaceScope, ToolUid = tool.Uid, ToolGeneration = tool.Generation,
-                ToolProviderId = AgentstrationToolProvider.Name, ToolProviderNamespace = tool.Namespace, ToolProviderScopeRef = workspaceScope,
-                TenantId = current.TenantId, WorkspaceId = new(current.WorkspaceId), PrincipalId = current.PrincipalId,
-                CorrelationId = invocation.CorrelationId, Arguments = invocation.Arguments
+                OwnerKind = ToolExecutionOwnerKind.Mcp,
+                ToolCallId = invocation.CallId,
+                InvocationId = $"{invocation.CallId}:attempt:1",
+                ToolId = tool.Name,
+                ToolName = definition.Name,
+                ExternalToolId = definition.Name,
+                ToolNamespace = tool.Namespace,
+                ToolScopeRef = workspaceScope,
+                ToolUid = tool.Uid,
+                ToolGeneration = tool.Generation,
+                ToolProviderId = AgentstrationToolProvider.Name,
+                ToolProviderNamespace = tool.Namespace,
+                ToolProviderScopeRef = workspaceScope,
+                TenantId = current.TenantId,
+                WorkspaceId = new(current.WorkspaceId),
+                PrincipalId = current.PrincipalId,
+                CorrelationId = invocation.CorrelationId,
+                Arguments = invocation.Arguments
             }, cancellationToken);
             var output = result.Output?.Clone();
             return new CallToolResult

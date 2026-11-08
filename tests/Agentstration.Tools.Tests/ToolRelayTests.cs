@@ -105,11 +105,14 @@ public sealed class ToolRelayTests
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var resource = new ToolDefinitionResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition,
-            Metadata = new() { Name = "relay" }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolDefinition,
+            Metadata = new() { Name = "relay" },
+            ScopeRef = scope,
             Definition = new RelayToolDefinitionProperties
             {
-                DisplayName = "Relay", Target = new() { Name = "source", ScopeRef = scope, Uid = Guid.NewGuid(), Generation = 7 },
+                DisplayName = "Relay",
+                Target = new() { Name = "source", ScopeRef = scope, Uid = Guid.NewGuid(), Generation = 7 },
                 Bindings = [Literal("/store/id", "\"hr\"")]
             }
         };

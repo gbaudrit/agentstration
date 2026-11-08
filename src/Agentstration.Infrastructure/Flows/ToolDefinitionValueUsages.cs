@@ -32,8 +32,11 @@ public sealed class ToolDefinitionValueUsages(IResourceStore store, IRequestCont
         var versions = (await store.ListAllAsync<ToolDefinitionVersionResource>(ToolResourceKinds.ToolDefinitionVersion, cancellationToken))
             .Select(value => (new ToolDefinitionResource
             {
-                ApiVersion = value.Value.ApiVersion, Kind = ToolResourceKinds.ToolDefinitionVersion, Metadata = value.Value.Metadata,
-                ScopeRef = value.Value.ScopeRef, Definition = value.Value.Definition
+                ApiVersion = value.Value.ApiVersion,
+                Kind = ToolResourceKinds.ToolDefinitionVersion,
+                Metadata = value.Value.Metadata,
+                ScopeRef = value.Value.ScopeRef,
+                Definition = value.Value.Definition
             }, value.Value.DefinitionName));
         return drafts.Concat(versions).ToArray();
     }

@@ -1,11 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Agentstration.Identity.Contracts;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Schemas.Contracts;
-using Agentstration.Parameters;
 using Agentstration.Secrets.Abstractions;
-using Agentstration.Identity.Contracts;
 
 namespace Agentstration.Tools;
 
@@ -75,12 +75,15 @@ public sealed partial class ToolDefinitionService(
         if (resource.Definition is RelayToolDefinitionProperties relay)
         {
             var source = await ResolveRelaySourceAsync(relay.Target, scopeRef, cancellationToken);
-            resource = resource with { Definition = relay with
+            resource = resource with
             {
-                InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings),
-                OutputSchema = source.Tool.Definition.Schema.Output?.Clone(),
-                RequiresApproval = relay.RequiresApproval || source.Tool.Definition.RequiresApproval
-            } };
+                Definition = relay with
+                {
+                    InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings),
+                    OutputSchema = source.Tool.Definition.Schema.Output?.Clone(),
+                    RequiresApproval = relay.RequiresApproval || source.Tool.Definition.RequiresApproval
+                }
+            };
         }
         var contracts = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
         var existing = await GetExactAsync(resource.Name, resource.Namespace, scopeRef, cancellationToken);
@@ -125,8 +128,11 @@ public sealed partial class ToolDefinitionService(
         var current = await GetAsync(name, @namespace, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
         return await store.PutAsync(
-            current.Value with { Generation = checked(current.Value.Generation + 1),
-                Definition = current.Value.Definition with { Enabled = enabled, Publish = false } },
+            current.Value with
+            {
+                Generation = checked(current.Value.Generation + 1),
+                Definition = current.Value.Definition with { Enabled = enabled, Publish = false }
+            },
             ifMatch ?? current.ETag,
             false,
             cancellationToken);

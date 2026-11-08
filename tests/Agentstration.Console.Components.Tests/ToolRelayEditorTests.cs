@@ -353,14 +353,18 @@ public sealed class ToolRelayEditorTests
         public IReadOnlyList<ToolArgumentBinding> InitialBindings { get; init; } = [new LiteralToolArgumentBinding { Path = "/store", Value = JsonSerializer.SerializeToElement(new { id = "hr" }) }];
         public ParameterResource Parameter { get; } = new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ParameterResourceKinds.Parameter,
-            Metadata = new() { Name = "query", Namespace = ResourceNamespace.Parse("shared") }, ScopeRef = ResourceScopeRef.Instance,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ParameterResourceKinds.Parameter,
+            Metadata = new() { Name = "query", Namespace = ResourceNamespace.Parse("shared") },
+            ScopeRef = ResourceScopeRef.Instance,
             Definition = new() { DisplayName = "Query", ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement("hr") }
         };
         public SecretResponse Secret { get; } = new(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret,
-            Metadata = new() { Name = "query", Namespace = ResourceNamespace.Parse("protected") }, ScopeRef = ResourceScopeRef.Instance,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Secret,
+            Metadata = new() { Name = "query", Namespace = ResourceNamespace.Parse("protected") },
+            ScopeRef = ResourceScopeRef.Instance,
             Definition = new() { DisplayName = "Query", Vault = new("local", ResourceScopeRef.Instance), Key = "query" }
         }, "configured", true);
         public ParameterResource? CreatedParameter { get; private set; }
@@ -375,8 +379,14 @@ public sealed class ToolRelayEditorTests
                 if (request.Method == HttpMethod.Post)
                 {
                     var create = await request.Content!.ReadFromJsonAsync<CreateParameterRequest>(cancellationToken);
-                    CreatedParameter = new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = ParameterResourceKinds.Parameter,
-                        Metadata = new() { Name = create!.Name }, ScopeRef = create.ScopeRef, Definition = create.Properties };
+                    CreatedParameter = new()
+                    {
+                        ApiVersion = ResourceApiVersions.CoreV1,
+                        Kind = ParameterResourceKinds.Parameter,
+                        Metadata = new() { Name = create!.Name },
+                        ScopeRef = create.ScopeRef,
+                        Definition = create.Properties
+                    };
                     return Ok(CreatedParameter);
                 }
                 ParameterReads++;
@@ -385,7 +395,8 @@ public sealed class ToolRelayEditorTests
             if (path == "/api/secrets") return Ok(new[] { Secret });
             var properties = Saved?.Properties ?? new RelayToolDefinitionProperties
             {
-                DisplayName = "HR relay", Version = "1.2.0",
+                DisplayName = "HR relay",
+                Version = "1.2.0",
                 Target = new() { Name = Source.Name, ScopeRef = Scope, Uid = Source.Uid, Generation = Source.Generation },
                 Bindings = InitialBindings
             };
@@ -393,10 +404,15 @@ public sealed class ToolRelayEditorTests
             {
                 var version = new ToolDefinitionVersionResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinitionVersion,
-                    Metadata = new() { Name = "relay.v1.2.0" }, ScopeRef = Scope,
-                    DefinitionName = "relay", DefinitionUid = Guid.NewGuid(), Definition = properties,
-                    PublishedAt = DateTimeOffset.UnixEpoch, Source = new(Source, Provider())
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ToolResourceKinds.ToolDefinitionVersion,
+                    Metadata = new() { Name = "relay.v1.2.0" },
+                    ScopeRef = Scope,
+                    DefinitionName = "relay",
+                    DefinitionUid = Guid.NewGuid(),
+                    Definition = properties,
+                    PublishedAt = DateTimeOffset.UnixEpoch,
+                    Source = new(Source, Provider())
                 };
                 if (request.Method == HttpMethod.Post) { Publications++; return Ok(version); }
                 return Ok(new { value = new[] { version } });
@@ -405,8 +421,10 @@ public sealed class ToolRelayEditorTests
             if (request.Method == HttpMethod.Put) Saved = await request.Content!.ReadFromJsonAsync<PutToolDefinitionRequest>(cancellationToken);
             return Ok(new ToolDefinitionResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition,
-                Metadata = new() { Name = "relay" }, ScopeRef = Scope,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolDefinition,
+                Metadata = new() { Name = "relay" },
+                ScopeRef = Scope,
                 Definition = Saved?.Properties ?? properties
             });
         }
@@ -418,15 +436,26 @@ public sealed class ToolRelayEditorTests
         }
         private static ToolResource Tool(string name, string version, string schema) => new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.Tool, Metadata = new() { Name = name },
-            ScopeRef = Scope, Uid = Guid.NewGuid(), Generation = 1,
-            Definition = new() { DisplayName = name, Version = version, Schema = new() { Input = JsonSerializer.Deserialize<JsonElement>(schema) },
-                Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch } }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Metadata = new() { Name = name },
+            ScopeRef = Scope,
+            Uid = Guid.NewGuid(),
+            Generation = 1,
+            Definition = new()
+            {
+                DisplayName = name,
+                Version = version,
+                Schema = new() { Input = JsonSerializer.Deserialize<JsonElement>(schema) },
+                Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch }
+            }
         };
         private static ToolProviderResource Provider() => new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider,
-            Metadata = new() { Name = "provider" }, ScopeRef = Scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new() { Name = "provider" },
+            ScopeRef = Scope,
             Definition = new() { DisplayName = "Provider", ProviderType = ToolProviderType.Mcp }
         };
     }

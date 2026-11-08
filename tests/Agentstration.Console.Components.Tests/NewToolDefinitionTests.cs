@@ -3,13 +3,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.Resources;
 using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Resources;
 using Agentstration.Schemas;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
-using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
@@ -368,8 +368,13 @@ public sealed class NewToolDefinitionTests
             new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input", Schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { query = new { type = "string" } } }) }, new OutputFlowStepDefinition { Name = "done", Outcome = FlowOutputOutcome.Success }] });
         private static ToolResource Tool(string version) => new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.Tool, Metadata = new() { Name = $"source.v{version}" }, ScopeRef = Scope,
-            Uid = Guid.NewGuid(), Generation = 1, Definition = new() { DisplayName = "Source Tool", Version = version, Enabled = true, Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch }, Schema = new() { Input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { collection = new { type = "string" } } }) }, Metadata = new Dictionary<string, JsonElement> { ["agentstration.toolDefinitionUid"] = JsonSerializer.SerializeToElement(DefinitionUid) } }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Metadata = new() { Name = $"source.v{version}" },
+            ScopeRef = Scope,
+            Uid = Guid.NewGuid(),
+            Generation = 1,
+            Definition = new() { DisplayName = "Source Tool", Version = version, Enabled = true, Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch }, Schema = new() { Input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { collection = new { type = "string" } } }) }, Metadata = new Dictionary<string, JsonElement> { ["agentstration.toolDefinitionUid"] = JsonSerializer.SerializeToElement(DefinitionUid) } }
         };
         private static HttpResponseMessage Ok<T>(T value)
         {

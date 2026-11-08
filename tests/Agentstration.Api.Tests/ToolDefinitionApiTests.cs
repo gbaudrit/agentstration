@@ -90,8 +90,11 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             FixedArguments = JsonSerializer.SerializeToElement(new { message = "first" })
         };
         var draft = await definitions.PutAsync(Resource("versioned", ResourceScopeRef.Workspace(context.WorkspaceId), properties), null, true, default);
-        await definitions.PutAsync(draft.Value with { Definition = properties with
-        { Version = "1.1.0", FixedArguments = JsonSerializer.SerializeToElement(new { message = "second" }) } }, draft.ETag, false, default);
+        await definitions.PutAsync(draft.Value with
+        {
+            Definition = properties with
+            { Version = "1.1.0", FixedArguments = JsonSerializer.SerializeToElement(new { message = "second" }) }
+        }, draft.ETag, false, default);
         var executor = factory.Services.GetRequiredService<IToolDefinitionExecutor>();
         var invocation = new ToolDefinitionInvocation(context.TenantId, new(context.WorkspaceId), context.PrincipalId,
             default, "versioned.v1.0.0", "same-call", null, JsonSerializer.SerializeToElement(new { }), ToolDefinitionCallerKind.Mcp);

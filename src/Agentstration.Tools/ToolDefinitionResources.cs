@@ -1,9 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Schemas.Contracts;
-using Agentstration.Parameters;
 using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Tools;
@@ -167,9 +167,13 @@ public sealed record ToolDefinitionVersionResource : Resource, IImmutableResourc
 
     public ToolDefinitionResource ToDefinition() => new()
     {
-        ApiVersion = ApiVersion, Kind = ToolResourceKinds.ToolDefinition,
-        Metadata = Metadata, ScopeRef = ScopeRef, Uid = DefinitionUid,
-        Generation = Generation, Definition = Definition
+        ApiVersion = ApiVersion,
+        Kind = ToolResourceKinds.ToolDefinition,
+        Metadata = Metadata,
+        ScopeRef = ScopeRef,
+        Uid = DefinitionUid,
+        Generation = Generation,
+        Definition = Definition
     };
 }
 

@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
-using Agentstration.Parameters;
 using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Tools;
@@ -29,9 +29,13 @@ public sealed partial class ToolDefinitionService
             if (owner is null || owner.Value.Uid != version.Value.DefinitionUid || !owner.Value.Definition.Enabled) continue;
             result.Add(new(new ToolDefinitionResource
             {
-                ApiVersion = version.Value.ApiVersion, Kind = ToolResourceKinds.ToolDefinition,
-                Metadata = version.Value.Metadata, ScopeRef = version.Value.ScopeRef, Uid = version.Value.DefinitionUid,
-                Generation = version.Value.Generation, Definition = version.Value.Definition
+                ApiVersion = version.Value.ApiVersion,
+                Kind = ToolResourceKinds.ToolDefinition,
+                Metadata = version.Value.Metadata,
+                ScopeRef = version.Value.ScopeRef,
+                Uid = version.Value.DefinitionUid,
+                Generation = version.Value.Generation,
+                Definition = version.Value.Definition
             }, version.ETag, version.UpdatedAt));
         }
         return result;
@@ -61,9 +65,12 @@ public sealed partial class ToolDefinitionService
             throw new ToolDefinitionInvocationException("tool_definition_disabled", "The owning ToolDefinition is disabled, removed or replaced.");
         return new(new ToolDefinitionResource
         {
-            ApiVersion = version.ApiVersion, Kind = ToolResourceKinds.ToolDefinition,
-            Metadata = version.Metadata, ScopeRef = version.ScopeRef,
-            Uid = version.DefinitionUid, Generation = version.Generation,
+            ApiVersion = version.ApiVersion,
+            Kind = ToolResourceKinds.ToolDefinition,
+            Metadata = version.Metadata,
+            ScopeRef = version.ScopeRef,
+            Uid = version.DefinitionUid,
+            Generation = version.Generation,
             Definition = version.Definition
         }, publication.ETag, publication.UpdatedAt);
     }
@@ -154,11 +161,19 @@ public sealed partial class ToolDefinitionService
         {
             publication = (await store.CreateImmutableAsync(new ToolDefinitionVersionResource
             {
-                ApiVersion = draft.Value.ApiVersion, Kind = ToolResourceKinds.ToolDefinitionVersion,
-                Metadata = draft.Value.Metadata with { Name = VersionName(name, version) }, ScopeRef = scope,
-                DefinitionName = name, DefinitionUid = draft.Value.Uid, Definition = properties,
-                Source = source, BindingIdentities = identities, RelayDepth = relayDepth, PublishedAt = timeProvider.GetUtcNow(),
-                Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
+                ApiVersion = draft.Value.ApiVersion,
+                Kind = ToolResourceKinds.ToolDefinitionVersion,
+                Metadata = draft.Value.Metadata with { Name = VersionName(name, version) },
+                ScopeRef = scope,
+                DefinitionName = name,
+                DefinitionUid = draft.Value.Uid,
+                Definition = properties,
+                Source = source,
+                BindingIdentities = identities,
+                RelayDepth = relayDepth,
+                PublishedAt = timeProvider.GetUtcNow(),
+                Generation = 1,
+                Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
             }, cancellationToken)).Value;
         }
         var key = ScopedResourceAddress.Create(scope, @namespace, ToolResourceKinds.Tool,
@@ -166,9 +181,13 @@ public sealed partial class ToolDefinitionService
         if (await store.GetExactAsync<ToolResource>(key, cancellationToken) is null)
             await MaterializeAsync(new ToolDefinitionResource
             {
-                ApiVersion = publication.ApiVersion, Kind = ToolResourceKinds.ToolDefinition,
-                Metadata = publication.Metadata, ScopeRef = scope, Uid = publication.Uid,
-                Generation = 1, Definition = publication.Definition
+                ApiVersion = publication.ApiVersion,
+                Kind = ToolResourceKinds.ToolDefinition,
+                Metadata = publication.Metadata,
+                ScopeRef = scope,
+                Uid = publication.Uid,
+                Generation = 1,
+                Definition = publication.Definition
             }, cancellationToken, publication.DefinitionUid, publication.RelayDepth);
         return publication;
     }

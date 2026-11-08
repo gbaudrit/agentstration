@@ -435,7 +435,8 @@ public sealed class McpToolInvoker(
                 context.Arguments ?? JsonSerializer.SerializeToElement(new { }),
                 callerKind,
                 callerId,
-                InvocationContext(context)) { DefinitionScopeRef = tool.ScopeRef }, cancellationToken);
+                InvocationContext(context))
+            { DefinitionScopeRef = tool.ScopeRef }, cancellationToken);
             var receipt = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["correlationId"] = result.Receipt.CorrelationId
@@ -480,7 +481,8 @@ public sealed class McpToolInvoker(
             throw new ToolResolutionException("internal_tool_executor_unavailable", "The Agentstration ToolDefinition executor is unavailable.");
         return new ToolInvocationResult(await internalTools.Value.SimulateAsync(new ToolDefinitionInvocation(
             tenantId, workspaceId, principalId, tool.Namespace, externalId, context.ToolCallId, context.CorrelationId,
-            arguments, callerKind, callerId, InvocationContext(context)) { DefinitionScopeRef = tool.ScopeRef }, cancellationToken), null);
+            arguments, callerKind, callerId, InvocationContext(context))
+        { DefinitionScopeRef = tool.ScopeRef }, cancellationToken), null);
     }
 
     private async ValueTask<(ToolResource Tool, ToolProviderResource Provider)> ResolveAsync(
