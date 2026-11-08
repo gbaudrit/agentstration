@@ -48,6 +48,9 @@ public sealed class StorageAspRemoteAdapter(IResourceStore resources, IStorageRe
         StorageTypeResource type, AspAccessContext policy, string reference, long offset, int maximumBytes, CancellationToken cancellationToken)
     {
         await using var lease = await ConnectAsync(context, target, type, policy, cancellationToken);
+        // This product port returns one bounded payload even though ASP can transfer larger selections.
+        AspValidation.Require(maximumBytes > 0 && maximumBytes <= lease.Client.Description.Policy.MaxReadBytes,
+            "limit_exceeded", "The requested product payload exceeds the provider's effective bound.");
         var request = new AspReadBlobRequest(Guid.NewGuid().ToString("N"), Selection: new(reference, new(offset, maximumBytes), maximumBytes),
             NotAfter: clock.GetUtcNow().AddSeconds(25));
         using var output = new MemoryStream();
