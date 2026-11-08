@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Parameters;
@@ -60,10 +61,15 @@ public sealed class ModelProviderValueBindingEditorModel
     public string Name { get; set; } = string.Empty;
     public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     public string ScopeRef { get; set; } = string.Empty;
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(ScopeRef);
+    public JsonElement? Literal { get; set; }
+    public bool IsConfigured => Kind == ModelProviderValueBindingKind.Literal
+        ? Literal is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) }
+        : !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(ScopeRef);
 
     public ModelProviderValueBinding ToBinding()
     {
+        if (Kind == ModelProviderValueBindingKind.Literal)
+            return ModelProviderValueBinding.FromLiteral(RequirementId, Literal!.Value);
         var scope = ResourceScopeRef.Parse(ScopeRef);
         var @namespace = ResourceNamespace.Parse(Namespace);
         return Kind == ModelProviderValueBindingKind.Parameter
@@ -75,6 +81,8 @@ public sealed class ModelProviderValueBindingEditorModel
 
     public static ModelProviderValueBindingEditorModel From(ModelProviderValueBinding value)
     {
+        if (value.Kind == ModelProviderValueBindingKind.Literal)
+            return new() { RequirementId = value.RequirementId, Kind = value.Kind, Literal = value.Literal };
         var address = value.Kind == ModelProviderValueBindingKind.Parameter
             ? value.Parameter!.Address
             : value.Secret!.Address;

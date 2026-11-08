@@ -30,6 +30,7 @@ public partial class FlowDesigner
     private IReadOnlyList<FlowDesignerFlow> flows = [];
     private IReadOnlyList<FlowDesignerFlowVersion> flowVersions = [];
     private IReadOnlyList<FlowDesignerTool> tools = [];
+    private bool loadingResources = true;
     private IReadOnlyList<FlowDesignerSchemaVersion> schemaVersions = [];
     private string? loadedResource;
     private string transitionFrom = string.Empty;
@@ -147,6 +148,7 @@ public partial class FlowDesigner
         var targetKey = $"{ScopeRef?.Value}/{Namespace.Value}/{ResourceId}";
         if (loadedResource == targetKey) return;
         loadedResource = targetKey;
+        loadingResources = true;
         targetCancellation?.Cancel();
         targetCancellation?.Dispose();
         autosave?.Cancel();
@@ -190,7 +192,11 @@ public partial class FlowDesigner
         }
         finally
         {
-            if (!token.IsCancellationRequested) loadingTarget = !targetLoaded;
+            if (!token.IsCancellationRequested)
+            {
+                loadingTarget = !targetLoaded;
+                loadingResources = false;
+            }
         }
     }
 

@@ -30,6 +30,36 @@ namespace Agentstration.Web.FlowDesigner.Tests;
 public sealed partial class FlowDesignerReadOnlyTests
 {
     [TestMethod]
+    public void DesignerWaitsForToolContractsBeforeShowingTheCanvas()
+    {
+        using var context = CreateContext();
+        var pending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resources = new ResourceProviderStub { PendingTools = pending.Task };
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(resources);
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new Rectangle(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(component => component.ResourceId, "parent"));
+
+        try
+        {
+            rendered.WaitForAssertion(() => Assert.AreEqual(TestScope, resources.ToolContextScope));
+            Assert.HasCount(0, rendered.FindComponents<FlowCanvas>());
+        }
+        finally
+        {
+            pending.SetResult();
+        }
+
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindComponents<FlowCanvas>()));
+        var canvas = rendered.FindComponent<FlowCanvas>();
+        Assert.IsFalse(canvas.Instance.IsReadOnly);
+        Assert.IsTrue(GetDiagram(canvas.Instance).Nodes.All(node => !node.Locked));
+    }
+
+    [TestMethod]
     public async Task FlowCallCanReplaceAnExistingParentInputContractWithItsSharedContract()
     {
         using var culture = new CultureScope("en-US");

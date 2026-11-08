@@ -62,6 +62,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         public ResourceScopeRef? AgentContextScope { get; private set; }
         public ResourceScopeRef? FlowContextScope { get; private set; }
         public ResourceScopeRef? ToolContextScope { get; private set; }
+        public Task? PendingTools { get; init; }
         public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; init; } = [];
         public IReadOnlyList<FlowDesignerTool> Tools { get; init; } =
         [
@@ -108,10 +109,11 @@ public sealed partial class FlowDesignerReadOnlyTests
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { article = new { type = "string" } } }),
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { summary = new { type = "string" } } }),
                 [new("approved", "Approved", FlowOutputOutcome.Success, null), new("rejected", "Rejected", FlowOutputOutcome.Error, null)])]);
-        public Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
+        public async Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
         {
             ToolContextScope = contextScope;
-            return Task.FromResult<IReadOnlyList<FlowDesignerTool>>(Tools.Select(tool => tool with { ScopeRef = contextScope }).ToArray());
+            if (PendingTools is { } pending) await pending.WaitAsync(cancellationToken);
+            return Tools.Select(tool => tool with { ScopeRef = contextScope }).ToArray();
         }
         public Task<IReadOnlyList<FlowDesignerSchemaVersion>> GetSchemaVersionsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(SchemaVersions);

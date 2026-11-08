@@ -38,10 +38,10 @@ The main verified settings are:
 | `Agentstration:RuntimeWorker:LeaseSafetyMarginSeconds` | `8` | Worker-only margin before lease expiry inside which no new mutation or governed side effect begins. |
 | `Agentstration:InstanceId` | persisted `.agentstration/instance-id` value | Optional explicit AppHost worktree identity used to isolate PostgreSQL volumes and persisted passwords. |
 | `ConnectionStrings:Agentstration` | unset | Required main PostgreSQL connection when the storage provider is `PostgreSql`. |
-| `Data:ControlPlanePath` | `.agentstration/control-plane.db` | Management Plane SQLite database. |
-| `Data:WorkPlanePath` | `.agentstration/work-plane.db` | Work Plane SQLite database. |
-| `Data:FlowPath` | `.agentstration/flow-plane.db` | Flow SQLite database. |
-| `Data:RuntimePath` | `.agentstration/runtime-plane.db` | Runtime SQLite database. |
+| `Data:ControlPlanePath` | `<Data:Directory>/control-plane.db` | Optional explicit Management Plane SQLite database path. |
+| `Data:WorkPlanePath` | `<Data:Directory>/work-plane.db` | Optional explicit Work Plane SQLite database path. |
+| `Data:FlowPath` | `<Data:Directory>/flow-plane.db` | Optional explicit Flow SQLite database path. |
+| `Data:RuntimePath` | `<Data:Directory>/runtime-plane.db` | Optional explicit Runtime SQLite database path. |
 | `ConnectionStrings:Identity` | `.agentstration/identity.db` | ASP.NET Core Identity account database, managed through EF Core migrations. |
 | `Agentstration:Authentication:DataProtectionKeysPath` | `.agentstration/data-protection-keys` | Persistent ASP.NET Core Data Protection key ring for cookies and Identity tokens. |
 | `Agentstration:WorkApi:BaseAddress` | `http://localhost:5100/` | Console-to-Work-API connection on the authoritative server. |
@@ -52,6 +52,12 @@ The main verified settings are:
 | `Agentstration:Aep:Transport:BlockPrivateNetworks` | `true` | Blocks private DNS/IP targets unless their host is explicitly allowed. |
 
 Provider-specific options and persisted model resources are described in [Model providers](../concepts/model-providers.md) and [Model profiles](../concepts/model-profiles.md). Do not store secrets in committed settings files.
+
+## SQLite data directory
+
+When an individual database path is omitted, it is derived from `Data:Directory`. The container image sets `Data__Directory=/data`, so the Management, Work, Flow and Runtime databases use the persistent `/data` volume. Explicit `Data:*Path` settings still take precedence; relative overrides remain relative to the process working directory.
+
+Before upgrading an existing container that stored `control-plane.db`, `work-plane.db` or `flow-plane.db` under `/app/.agentstration`, stop the application and back up those databases before replacing the container. Restore consistent SQLite backups into `/data`, or keep explicit paths pointing at another persistent mount. Preserve any SQLite WAL sidecars when copying stopped databases. Changing the directory does not migrate existing files or recover a discarded container layer. The ordinary local default remains `.agentstration`.
 
 ## External Runtime Worker
 

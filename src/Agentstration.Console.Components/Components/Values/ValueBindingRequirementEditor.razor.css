@@ -1,0 +1,3 @@
+.contextual-binding-target { display: grid; gap: 8px; }
+.contextual-binding-target > label { display: grid; gap: 6px; }
+.contextual-binding-target > button { justify-self: start; }

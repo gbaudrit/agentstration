@@ -67,7 +67,8 @@ public sealed record ModelProviderProperties
 public enum ModelProviderValueBindingKind
 {
     [JsonStringEnumMemberName("parameter")] Parameter,
-    [JsonStringEnumMemberName("secret")] Secret
+    [JsonStringEnumMemberName("secret")] Secret,
+    [JsonStringEnumMemberName("literal")] Literal
 }
 
 public sealed record ModelProviderValueBinding
@@ -76,6 +77,10 @@ public sealed record ModelProviderValueBinding
     public required ModelProviderValueBindingKind Kind { get; init; }
     public ParameterReference? Parameter { get; init; }
     public SecretReference? Secret { get; init; }
+    public JsonElement? Literal { get; init; }
+
+    public static ModelProviderValueBinding FromLiteral(string requirementId, JsonElement value) =>
+        new() { RequirementId = requirementId, Kind = ModelProviderValueBindingKind.Literal, Literal = value.Clone() };
 
     public static ModelProviderValueBinding FromParameter(string requirementId, ParameterReference parameter) =>
         new() { RequirementId = requirementId, Kind = ModelProviderValueBindingKind.Parameter, Parameter = parameter };
