@@ -29,9 +29,17 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         var version = type.Definition.Versions.Single();
         using var storageResponse = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("consumer", new()
         {
-            DisplayName = "Consumer", Type = new() { Type = new(type.Name, scope), TypeUid = type.Uid,
-                Version = version.Version, SchemaDigest = version.SchemaDigest, ContractDigest = version.ContractDigest },
-            Configuration = JsonSerializer.SerializeToElement(new { }), Envelope = JsonSerializer.SerializeToElement(new { })
+            DisplayName = "Consumer",
+            Type = new()
+            {
+                Type = new(type.Name, scope),
+                TypeUid = type.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest,
+                ContractDigest = version.ContractDigest
+            },
+            Configuration = JsonSerializer.SerializeToElement(new { }),
+            Envelope = JsonSerializer.SerializeToElement(new { })
         }, scope));
         Assert.AreEqual(HttpStatusCode.Created, storageResponse.StatusCode);
         var path = TypePath(type);
@@ -142,9 +150,17 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         var version = type.Definition.Versions.Single();
         using var cannotBypass = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("cannot-bypass", new()
         {
-            DisplayName = "Cannot bypass", Type = new() { Type = new(type.Name, type.ScopeRef), TypeUid = type.Uid,
-                Version = version.Version, SchemaDigest = version.SchemaDigest, ContractDigest = version.ContractDigest },
-            Configuration = JsonSerializer.SerializeToElement(new { }), Envelope = JsonSerializer.SerializeToElement(new { })
+            DisplayName = "Cannot bypass",
+            Type = new()
+            {
+                Type = new(type.Name, type.ScopeRef),
+                TypeUid = type.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest,
+                ContractDigest = version.ContractDigest
+            },
+            Configuration = JsonSerializer.SerializeToElement(new { }),
+            Envelope = JsonSerializer.SerializeToElement(new { })
         }, workspace));
         Assert.AreEqual(HttpStatusCode.Forbidden, cannotBypass.StatusCode);
         SelectConsoleContext(client, ResourceScopeRef.Instance);
@@ -182,11 +198,16 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
     private static StorageTypeProperties Definition()
     {
         var schema = JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = false });
-        return new() { DisplayName = "Type", PreferredVersion = "1.0.0", Versions = [new()
+        return new()
+        {
+            DisplayName = "Type",
+            PreferredVersion = "1.0.0",
+            Versions = [new()
         {
             Version = "1.0.0", ConfigurationSchema = schema, SchemaDigest = StorageDigests.Schema(schema),
             EnvelopeSchema = schema, EnvelopeSchemaDigest = StorageDigests.Schema(schema)
-        }] };
+        }]
+        };
     }
     private static string TypePath(StorageTypeResource type) => $"/api/storage-types/{type.Name}?scopeRef={Uri.EscapeDataString(type.ScopeRef!.Value.Value)}&namespace={type.Namespace}";
     private static async Task<HttpResponseMessage> Send(HttpClient client, HttpMethod method, string path, object? body, string etag)

@@ -3,8 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Api.Contracts;
 using Agentstration.ConnectedServices.Contracts;
-using Agentstration.Identity.Contracts;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
@@ -107,14 +107,23 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
             await factory.Services.GetRequiredService<IResourceStore>().PutExactAsync(scope, new SecretResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret,
-                Metadata = new() { Name = "credential" }, ScopeRef = scope,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Secret,
+                Metadata = new() { Name = "credential" },
+                ScopeRef = scope,
                 Definition = new() { DisplayName = "Credential", Vault = new("vault", scope), Key = "fixture-key" }
             }, null, true, default);
         using var serviceResponse = await client.PostAsJsonAsync("/api/connected-services", new CreateConnectedServiceRequest("account", new()
         {
-            DisplayName = "Account", Type = new() { Type = new(serviceType.Name, scope), TypeUid = serviceType.Uid,
-                Version = "1.0.0", SchemaDigest = serviceVersion.SchemaDigest }, Options = Empty,
+            DisplayName = "Account",
+            Type = new()
+            {
+                Type = new(serviceType.Name, scope),
+                TypeUid = serviceType.Uid,
+                Version = "1.0.0",
+                SchemaDigest = serviceVersion.SchemaDigest
+            },
+            Options = Empty,
             Bindings = [new() { InputId = "credential", Kind = ConnectedServiceBindingKind.Secret,
                 Secret = new SecretReference(new(ResourceNamespace.Default, SecretResourceKinds.Secret, "credential"), scope) }]
         }, scope));
@@ -178,8 +187,11 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         {
             registration = await factory.Services.GetRequiredService<IResourceStore>().PutExactAsync(scope, new ExtensionRegistrationResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration,
-                Metadata = new() { Name = "storage-extension" }, ScopeRef = scope, Generation = 1,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
+                Metadata = new() { Name = "storage-extension" },
+                ScopeRef = scope,
+                Generation = 1,
                 Definition = new() { DisplayName = "Storage extension", Endpoint = new("http://127.0.0.1:1"), ExpectedExtensionId = "extension.storage" }
             }, null, true, default);
             var address = new ScopedResourceAddress(scope, registration.Value.Namespace, registration.Value.Kind, registration.Value.Name);
@@ -187,10 +199,15 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
                 $"{scope.Value}/{address.Kind}/{address.Namespace}/{address.Name}", "extension.storage", "1.0.0"));
             type = (await factory.Services.GetRequiredService<StorageTypeManagementService>().SynchronizeManagedAsync(new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-                Metadata = new() { Name = "object-store", Namespace = ResourceNamespace.Parse("extension.storage") }, ScopeRef = scope,
-                Definition = TypeProperties() with { Versions = [TypeProperties().Versions.Single() with
-                { Contribution = new(address, registration.Value.Uid, registration.Value.Generation, "object-store", "1.0.0", "sha256:fixture") }] }
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = StorageResourceKinds.StorageType,
+                Metadata = new() { Name = "object-store", Namespace = ResourceNamespace.Parse("extension.storage") },
+                ScopeRef = scope,
+                Definition = TypeProperties() with
+                {
+                    Versions = [TypeProperties().Versions.Single() with
+                { Contribution = new(address, registration.Value.Uid, registration.Value.Generation, "object-store", "1.0.0", "sha256:fixture") }]
+                }
             }, default)).Value;
         }
         var catalog = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types");
@@ -287,8 +304,10 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
         var typeHandler = handlers.Single(h => h.Kind == StorageResourceKinds.StorageType);
         var typeDocument = new BootstrapResourceDocument
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-            Metadata = new() { Name = "bootstrap-storage-type" }, Definition = JsonSerializer.SerializeToElement(TypeProperties())
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.StorageType,
+            Metadata = new() { Name = "bootstrap-storage-type" },
+            Definition = JsonSerializer.SerializeToElement(TypeProperties())
         };
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await typeHandler.PlanAsync(typeDocument, operation, new(), default)).Disposition);
         Assert.AreEqual(BootstrapResourceApplyResult.Created, await typeHandler.ApplyAsync(typeDocument, operation, default));
@@ -296,8 +315,10 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
             .GetExactAsync(scope, ResourceNamespace.Default, "bootstrap-storage-type", default))!.Value;
         var storageDocument = new BootstrapResourceDocument
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.Storage,
-            Metadata = new() { Name = "bootstrap-storage" }, Definition = JsonSerializer.SerializeToElement(Properties(type))
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.Storage,
+            Metadata = new() { Name = "bootstrap-storage" },
+            Definition = JsonSerializer.SerializeToElement(Properties(type))
         };
         var handler = handlers.Single(h => h.Kind == StorageResourceKinds.Storage);
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await handler.PlanAsync(storageDocument, operation, new(), default)).Disposition);
@@ -310,7 +331,9 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
 
     private static StorageTypeProperties TypeProperties(bool remote = false) => new()
     {
-        DisplayName = "Storage type", PreferredVersion = "1.0.0", Versions =
+        DisplayName = "Storage type",
+        PreferredVersion = "1.0.0",
+        Versions =
         [new() { Version = "1.0.0", ConfigurationSchema = Schema, SchemaDigest = StorageDigests.Schema(Schema),
             EnvelopeSchema = Schema, EnvelopeSchemaDigest = StorageDigests.Schema(Schema), RequiresConnectedService = remote,
             Requirements = remote ? [new("connection", true, ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Secured)] : [] }]
@@ -318,9 +341,20 @@ public sealed class StorageApiTests : ModelManagementApiTestBase
     private static StorageProperties Properties(StorageTypeResource type)
     {
         var version = type.Definition.Versions.Single();
-        return new() { DisplayName = "Storage", Configuration = Empty, Envelope = Empty, Type = new()
-        { Type = new(type.Name, type.ScopeRef, type.Namespace), TypeUid = type.Uid, Version = version.Version,
-            SchemaDigest = version.SchemaDigest, ContractDigest = StorageDigests.Version(version) } };
+        return new()
+        {
+            DisplayName = "Storage",
+            Configuration = Empty,
+            Envelope = Empty,
+            Type = new()
+            {
+                Type = new(type.Name, type.ScopeRef, type.Namespace),
+                TypeUid = type.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest,
+                ContractDigest = StorageDigests.Version(version)
+            }
+        };
     }
     private static async Task<StorageTypeResource> CreateType(HttpClient client, ResourceScopeRef scope, bool remote = false)
     {

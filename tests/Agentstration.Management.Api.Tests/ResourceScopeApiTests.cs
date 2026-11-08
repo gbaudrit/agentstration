@@ -267,10 +267,12 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.AreEqual(workspace, savedSecret.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
-            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+            var accessPolicies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+            _ = await accessPolicies.PutAsync(
                 new(new(savedSecret.Resource.Uid, tenant, savedSecret.Resource.Namespace,
                         savedSecret.Resource.Kind, savedSecret.Resource.Generation),
-                    [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+                    [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+                (await accessPolicies.GetAsync(savedSecret.Resource.Uid, default))?.ETag, default);
         }
         SelectConsoleContext(client, workspace);
         var visibleAfterGrant = await client.GetFromJsonAsync<SecretResponse[]>("/api/secrets");
@@ -571,7 +573,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
             _ = await policies.PutAsync(new ResourceAccessPolicy(
                 new(profile.Value.Uid, tenantScope, profile.Value.Namespace, profile.Value.Kind,
-                    profile.Value.Generation),
+                    Generation: null),
                 [new(workspaceScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
         var runtime = await factory.Services.GetRequiredService<IResourceStore>()
             .GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(ResourceScopeRef.Instance,

@@ -31,24 +31,41 @@ public sealed class StoragePersistenceTests
                 var schema = JsonSerializer.SerializeToElement(new { type = "object" });
                 var version = new StorageTypeVersionDescriptor
                 {
-                    Version = "1.0.0", ConfigurationSchema = schema, SchemaDigest = StorageDigests.Schema(schema),
-                    EnvelopeSchema = schema, EnvelopeSchemaDigest = StorageDigests.Schema(schema), RequiresConnectedService = true,
+                    Version = "1.0.0",
+                    ConfigurationSchema = schema,
+                    SchemaDigest = StorageDigests.Schema(schema),
+                    EnvelopeSchema = schema,
+                    EnvelopeSchemaDigest = StorageDigests.Schema(schema),
+                    RequiresConnectedService = true,
                     Requirements = [new("auth", true, ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Secured)]
                 };
                 var type = await store.PutExactAsync(scope, new StorageTypeResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-                    Metadata = new() { Name = "persistent" }, ScopeRef = scope, Generation = 1,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = StorageResourceKinds.StorageType,
+                    Metadata = new() { Name = "persistent" },
+                    ScopeRef = scope,
+                    Generation = 1,
                     Definition = new() { DisplayName = "Persistent", PreferredVersion = version.Version, Versions = [version] }
                 }, null, true, default);
                 saved = await store.PutExactAsync(scope, new StorageResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.Storage,
-                    Metadata = new() { Name = "store" }, ScopeRef = scope, Generation = 3,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = StorageResourceKinds.Storage,
+                    Metadata = new() { Name = "store" },
+                    ScopeRef = scope,
+                    Generation = 3,
                     Definition = new()
                     {
-                        DisplayName = "Store", Type = new() { Type = new(type.Value.Name, scope), TypeUid = type.Value.Uid,
-                            Version = version.Version, SchemaDigest = version.SchemaDigest, ContractDigest = StorageDigests.Version(version) },
+                        DisplayName = "Store",
+                        Type = new()
+                        {
+                            Type = new(type.Value.Name, scope),
+                            TypeUid = type.Value.Uid,
+                            Version = version.Version,
+                            SchemaDigest = version.SchemaDigest,
+                            ContractDigest = StorageDigests.Version(version)
+                        },
                         ConnectedService = new() { Service = new(new(ResourceNamespace.Default, "ConnectedService", "account"), scope), ServiceUid = Guid.NewGuid(), Generation = 7 },
                         ConnectedServiceType = new() { Type = new("account-type", scope), TypeUid = Guid.NewGuid(), Version = "2.0.0", SchemaDigest = "sha256:account" },
                         Bindings = [new("auth", new("credential", ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Secured))],
@@ -105,13 +122,21 @@ public sealed class StoragePersistenceTests
                 using var manager = first.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.fixture", "1"));
                 var type = await store.PutExactAsync(scope, new StorageTypeResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-                    Metadata = new() { Name = address.Name }, ScopeRef = scope, Generation = 1,
-                    Definition = new() { DisplayName = "Managed", PreferredVersion = "1", Versions = [new()
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = StorageResourceKinds.StorageType,
+                    Metadata = new() { Name = address.Name },
+                    ScopeRef = scope,
+                    Generation = 1,
+                    Definition = new()
+                    {
+                        DisplayName = "Managed",
+                        PreferredVersion = "1",
+                        Versions = [new()
                     {
                         Version = "1", ConfigurationSchema = schema, SchemaDigest = StorageDigests.Schema(schema),
                         EnvelopeSchema = schema, EnvelopeSchemaDigest = StorageDigests.Schema(schema)
-                    }] }
+                    }]
+                    }
                 }, null, true, default);
                 uid = type.Value.Uid;
                 var policies = first.GetRequiredService<IResourceAccessPolicyStore>();
@@ -133,8 +158,12 @@ public sealed class StoragePersistenceTests
                 using (second.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.fixture", "2")))
                     await store.PutExactAsync(scope, type.Value with
                     {
-                        Generation = 2, Definition = type.Value.Definition with { DisplayName = "Updated by manager",
-                            Versions = [.. type.Value.Definition.Versions, type.Value.Definition.Versions.Single() with { Version = "2" }] }
+                        Generation = 2,
+                        Definition = type.Value.Definition with
+                        {
+                            DisplayName = "Updated by manager",
+                            Versions = [.. type.Value.Definition.Versions, type.Value.Definition.Versions.Single() with { Version = "2" }]
+                        }
                     }, type.ETag, false, default);
                 Assert.AreEqual(initialPolicyEtag, (await policies.GetAsync(uid, scope, default))!.ETag);
                 var revoked = await policies.PutAsync(policy.Policy with { Grants = [] }, policy.ETag, default);

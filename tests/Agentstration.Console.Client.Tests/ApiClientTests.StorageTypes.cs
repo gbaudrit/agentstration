@@ -21,13 +21,20 @@ public sealed partial class ApiClientTests
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });
         var type = new StorageTypeResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-            Metadata = new() { Name = "custom", Namespace = ResourceNamespace.Parse("publisher") }, ScopeRef = StorageScope,
-            Definition = new() { DisplayName = "Type", PreferredVersion = "1", Versions = [new()
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.StorageType,
+            Metadata = new() { Name = "custom", Namespace = ResourceNamespace.Parse("publisher") },
+            ScopeRef = StorageScope,
+            Definition = new()
+            {
+                DisplayName = "Type",
+                PreferredVersion = "1",
+                Versions = [new()
             {
                 Version = "1", ConfigurationSchema = schema, SchemaDigest = StorageDigests.Schema(schema),
                 EnvelopeSchema = schema, EnvelopeSchemaDigest = StorageDigests.Schema(schema)
-            }] }
+            }]
+            }
         };
         using var handler = new StubHandler(request =>
         {
@@ -38,7 +45,8 @@ public sealed partial class ApiClientTests
             if (operation != "get") Assert.AreEqual("\"previous\"", request.Headers.IfMatch.Single().ToString());
             return operation == "delete" ? new(HttpStatusCode.NoContent) : new(HttpStatusCode.OK)
             {
-                Content = JsonContent.Create(type), Headers = { ETag = new EntityTagHeaderValue("\"current\"") }
+                Content = JsonContent.Create(type),
+                Headers = { ETag = new EntityTagHeaderValue("\"current\"") }
             };
         });
         using var http = new HttpClient(handler) { BaseAddress = new("https://console.test/") };

@@ -25,20 +25,28 @@ public sealed class StorageComponentTests
     private static readonly ConnectedServiceExportDescriptor Token = new("token", ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Secured);
     private static readonly ConnectedServiceTypeResource ServiceType = new()
     {
-        Uid = Guid.Parse("10460000-0000-0000-0000-000000000004"), ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = ConnectedServiceResourceKinds.ConnectedServiceType, Metadata = new() { Name = "http" }, ScopeRef = Scope,
+        Uid = Guid.Parse("10460000-0000-0000-0000-000000000004"),
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ConnectedServiceResourceKinds.ConnectedServiceType,
+        Metadata = new() { Name = "http" },
+        ScopeRef = Scope,
         Definition = new() { DisplayName = "HTTP", PreferredVersion = "1", Versions = [new("1", "schema", Empty, [], [Endpoint, Token, new("wrong", ConnectedServiceValueType.Logical, ConnectedServiceValueProtection.Standard)])] }
     };
     private static StorageTypeResource Type(bool remote = true) => new()
     {
-        Uid = TypeUid, ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-        Metadata = new() { Name = remote ? "remote" : "local" }, ScopeRef = Scope,
+        Uid = TypeUid,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = StorageResourceKinds.StorageType,
+        Metadata = new() { Name = remote ? "remote" : "local" },
+        ScopeRef = Scope,
         Governance = remote ? ResourceGovernance.Extension("provider", "storage-provider", "1") : ResourceGovernance.Core("storage.local", "1"),
         ObservedVersions = [new("1", StorageAvailability.Ready)],
         ObservedUse = new(Scope, new(true, ResourceAccessDecisionReasons.SameScope)),
         Definition = new()
         {
-            DisplayName = remote ? "Remote fixture" : "Local fixture", PreferredVersion = "1", Versions = [new()
+            DisplayName = remote ? "Remote fixture" : "Local fixture",
+            PreferredVersion = "1",
+            Versions = [new()
             {
                 Version = "1", ConfigurationSchema = EmptySchema, SchemaDigest = StorageDigests.Schema(EmptySchema),
                 EnvelopeSchema = EmptySchema, EnvelopeSchemaDigest = StorageDigests.Schema(EmptySchema),
@@ -51,11 +59,16 @@ public sealed class StorageComponentTests
     private static JsonElement EmptySchema => JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = false });
     private static ConnectedServiceResource Service(long generation = 1) => new()
     {
-        Uid = ServiceUid, ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedService,
-        Metadata = new() { Name = "remote-service" }, ScopeRef = Scope, Generation = generation,
+        Uid = ServiceUid,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ConnectedServiceResourceKinds.ConnectedService,
+        Metadata = new() { Name = "remote-service" },
+        ScopeRef = Scope,
+        Generation = generation,
         Definition = new()
         {
-            DisplayName = "Remote service", Type = new() { Type = new(ServiceType.Name, Scope, ServiceType.Namespace), TypeUid = ServiceType.Uid, Version = "1", SchemaDigest = "schema" },
+            DisplayName = "Remote service",
+            Type = new() { Type = new(ServiceType.Name, Scope, ServiceType.Namespace), TypeUid = ServiceType.Uid, Version = "1", SchemaDigest = "schema" },
             Options = JsonSerializer.SerializeToElement(new { credentialTrap = "DO-NOT-DISPLAY-CONNECTION-OPTIONS" })
         },
         ObservedState = new() { Availability = ConnectedServiceAvailability.Ready, ObservedAt = DateTimeOffset.UnixEpoch }
@@ -67,9 +80,14 @@ public sealed class StorageComponentTests
         if (remote) { draft.SelectService(Service()); draft.Bind("endpoint", Endpoint); draft.Bind("credential", Token); }
         return new()
         {
-            Uid = Guid.Parse("10460000-0000-0000-0000-000000000005"), ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.Storage,
-            Metadata = new() { Name = draft.Name, Namespace = ResourceNamespace.Parse("evidence") }, ScopeRef = Scope, Generation = 4,
-            Definition = draft.Properties(), ObservedState = new(StorageAvailability.Ready, DateTimeOffset.UnixEpoch, null, [])
+            Uid = Guid.Parse("10460000-0000-0000-0000-000000000005"),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.Storage,
+            Metadata = new() { Name = draft.Name, Namespace = ResourceNamespace.Parse("evidence") },
+            ScopeRef = Scope,
+            Generation = 4,
+            Definition = draft.Properties(),
+            ObservedState = new(StorageAvailability.Ready, DateTimeOffset.UnixEpoch, null, [])
         };
     }
 

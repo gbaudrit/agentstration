@@ -34,13 +34,25 @@ public sealed class StorageTypeVersionDraft
             throw new JsonException();
         return new()
         {
-            Version = Version.Trim(), ConfigurationSchema = configuration, SchemaDigest = StorageDigests.Schema(configuration),
-            EnvelopeSchema = envelope, EnvelopeSchemaDigest = StorageDigests.Schema(envelope),
+            Version = Version.Trim(),
+            ConfigurationSchema = configuration,
+            SchemaDigest = StorageDigests.Schema(configuration),
+            EnvelopeSchema = envelope,
+            EnvelopeSchemaDigest = StorageDigests.Schema(envelope),
             RequiresConnectedService = RequiresConnectedService,
             Requirements = JsonSerializer.Deserialize<StorageRequirementDescriptor[]>(Requirements, JsonOptions) ?? throw new JsonException(),
-            Capabilities = new() { List = List, Stat = Stat, Read = Read, Write = Write, Delete = Delete,
-                StableVersions = StableVersions, DurableRetention = DurableRetention },
-            Limits = new(MaximumPageSize, MaximumReadBytes, MaximumWriteBytes), Deprecated = Deprecated
+            Capabilities = new()
+            {
+                List = List,
+                Stat = Stat,
+                Read = Read,
+                Write = Write,
+                Delete = Delete,
+                StableVersions = StableVersions,
+                DurableRetention = DurableRetention
+            },
+            Limits = new(MaximumPageSize, MaximumReadBytes, MaximumWriteBytes),
+            Deprecated = Deprecated
         };
     }
 }

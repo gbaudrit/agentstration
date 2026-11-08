@@ -170,9 +170,16 @@ public sealed class StorageTypeComponentTests
     private static StorageTypeResource Type()
     {
         var version = new StorageTypeVersionDraft().Build();
-        return new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType, Uid = Guid.NewGuid(), ScopeRef = Scope,
-            Metadata = new() { Name = "custom", Namespace = ResourceNamespace.Parse("catalog") }, Generation = 1,
+        return new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.StorageType,
+            Uid = Guid.NewGuid(),
+            ScopeRef = Scope,
+            Metadata = new() { Name = "custom", Namespace = ResourceNamespace.Parse("catalog") },
+            Generation = 1,
             Definition = new() { DisplayName = "Custom type", PreferredVersion = version.Version, Versions = [version] },
-            ObservedVersions = [new(version.Version, StorageAvailability.Ready)] };
+            ObservedVersions = [new(version.Version, StorageAvailability.Ready)]
+        };
     }
 }

@@ -1,8 +1,8 @@
 using Agentstration.Api.Contracts;
-using Agentstration.Web.Security;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Storage.Api;
 
@@ -34,9 +34,11 @@ internal static class StorageEndpoints
             StorageTypeManagementService service, CancellationToken token) => await Execute(async () =>
                 Resource(await service.CreateAsync(new()
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = StorageResourceKinds.StorageType,
                     Metadata = new() { Name = body.Name, Namespace = body.Namespace ?? ResourceNamespace.Default },
-                    ScopeRef = body.ScopeRef, Definition = body.Properties
+                    ScopeRef = body.ScopeRef,
+                    Definition = body.Properties
                 }, token), response, 201)))
             .Produces<StorageTypeResource>(201).WithSummary("Create a governed Storage type")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
@@ -98,9 +100,11 @@ internal static class StorageEndpoints
             StorageManagementService service, CancellationToken token) => await Execute(async () =>
                 Resource(await service.CreateAsync(new()
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.Storage,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = StorageResourceKinds.Storage,
                     Metadata = new() { Name = body.Name, Namespace = body.Namespace ?? ResourceNamespace.Default },
-                    ScopeRef = body.ScopeRef, Definition = body.Properties
+                    ScopeRef = body.ScopeRef,
+                    Definition = body.Properties
                 }, token), response, 201)))
             .Produces<StorageResource>(201).WithSummary("Create a Storage with explicit export mappings")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);

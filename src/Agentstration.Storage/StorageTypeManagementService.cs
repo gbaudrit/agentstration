@@ -53,8 +53,11 @@ public sealed class StorageTypeManagementService(
     }
 
     public Task ValidateForCreateAsync(StorageTypeResource resource, CancellationToken token) =>
-        ValidateAsync(resource with { ScopeRef = resource.ScopeRef
-            ?? scopeOperations.DefaultScopeRef(StorageResourceKinds.StorageType) }, token);
+        ValidateAsync(resource with
+        {
+            ScopeRef = resource.ScopeRef
+            ?? scopeOperations.DefaultScopeRef(StorageResourceKinds.StorageType)
+        }, token);
 
     public async Task<StoredResource<StorageTypeResource>> CreateAsync(StorageTypeResource resource, CancellationToken token)
     {
@@ -65,8 +68,10 @@ public sealed class StorageTypeManagementService(
             await ValidateAsync(scoped, ct);
             return await store.PutExactAsync(scope, scoped with
             {
-                Generation = 1, Status = new() { ProvisioningState = ProvisioningState.Succeeded },
-                ObservedVersions = [], ObservedUse = null
+                Generation = 1,
+                Status = new() { ProvisioningState = ProvisioningState.Succeeded },
+                ObservedVersions = [],
+                ObservedUse = null
             }, null, true, ct);
         }, token);
     }
