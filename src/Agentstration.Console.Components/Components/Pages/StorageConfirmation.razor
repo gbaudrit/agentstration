@@ -5,7 +5,7 @@
 {
     <dialog class="dialog" aria-labelledby="storage-confirmation-title" data-testid="@TestId" @ref="dialog">
         <h2 id="storage-confirmation-title">@Title</h2><p>@Message</p>
-        <div class="dialog-actions"><button type="button" class="button-secondary" data-cancel @onclick="() => OnCancel.InvokeAsync()">@Localizer["Cancel"]</button><button type="button" class="button-danger" @onclick="() => OnConfirm.InvokeAsync()" data-testid="@($"{TestId}-confirm")">@ConfirmLabel</button></div>
+        <form method="dialog"><div class="dialog-actions"><button type="submit" class="button-secondary" data-cancel @onclick="() => OnCancel.InvokeAsync()">@Localizer["Cancel"]</button><button type="submit" class="button-danger" @onclick="() => OnConfirm.InvokeAsync()" data-testid="@($"{TestId}-confirm")">@ConfirmLabel</button></div></form>
     </dialog>
 }
 @code {
