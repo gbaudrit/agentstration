@@ -43,6 +43,10 @@ model {
             description 'Data Source profiles, origins, governed acquisitions, and exact provenance transport'
           }
 
+          storageApi = component 'Storage.Api' {
+            description 'Governed Storage types, scoped logical resources, explicit service export mappings, reconciliation and protected resolution'
+          }
+
           knowledgeApi = component 'Knowledge.Api' {
             description 'Knowledge Source projections, immutable Snapshots, retrieval, and source-specific Tool exposure transport'
           }
@@ -126,7 +130,7 @@ model {
       }
 
       resources = component 'Resource-family services' {
-        description 'Family-owned exact-scope lifecycle and descendant-access services for Agents, Models, Entries, Triggers, Extensions, Sources, Data Sources, Artifacts, Knowledge, Secrets, and related resources'
+        description 'Family-owned exact-scope lifecycle and descendant-access services for Agents, Models, Entries, Triggers, Extensions, Sources, Storages, Data Sources, Artifacts, Knowledge, Secrets, and related resources'
       }
 
       distribution = component 'Distribution and bootstrap' {
@@ -230,6 +234,7 @@ model {
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.agentsApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.artifactsApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.dataSourcesApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.storageApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.knowledgeApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.bootstrapApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.extensionsApi 'Composes'

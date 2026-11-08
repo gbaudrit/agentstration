@@ -3,6 +3,7 @@ using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
@@ -16,7 +17,8 @@ public sealed class ConnectedServiceManagementService(
     IEnumerable<IConnectedServiceUsageProvider> usageProviders,
     IParameterResolver parameters,
     ISecretResolver secrets,
-    TimeProvider timeProvider) : IConnectedServiceResolver
+    IResourceAccessPolicyService accessPolicies,
+    TimeProvider timeProvider) : IConnectedServiceResolver, IConnectedServiceExportInspector
 {
     public const int MaximumDisplayNameLength = 200;
     public const int MaximumDescriptionLength = 2_000;
@@ -142,7 +144,8 @@ public sealed class ConnectedServiceManagementService(
         var hasDiscoveries = (await store.ListAllAsync<ConnectedServiceOperationDiscoveryResource>(
                 ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, cancellationToken))
             .Any(item => item.Value.Service.ServiceUid == existing.Value.Uid);
-        if (hasOperations || hasDiscoveries) throw new ConnectedServiceInUseException(name);
+        if (hasOperations || hasDiscoveries || (await GetUsagesAsync(scopeRef, name, cancellationToken)).Count != 0)
+            throw new ConnectedServiceInUseException(name);
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
             await store.DeleteExactAsync(Scoped(scopeRef, name), etag, token);
@@ -192,6 +195,77 @@ public sealed class ConnectedServiceManagementService(
             foreach (var input in inputs) input.Dispose();
             throw;
         }
+    }
+
+    public async Task<ConnectedServiceExportMetadata> InspectAsync(
+        ConnectedServiceRevisionReference service,
+        ConnectedServiceResolutionContext context,
+        CancellationToken cancellationToken)
+    {
+        try { return await InspectCoreAsync(service, context, cancellationToken); }
+        catch (ConnectedServiceTypeRevisionException)
+        { throw new ConnectedServiceExportInspectionException("storage_service_stale"); }
+        catch (ConnectedServiceAccessDeniedException)
+        { throw new ConnectedServiceExportInspectionException("storage_service_access_denied"); }
+        catch (Exception exception) when (exception is ConnectedServiceUnavailableException
+            or ConnectedServiceValidationException or ParameterAccessDeniedException
+            or ParameterManagementException or InvalidOperationException)
+        { throw new ConnectedServiceExportInspectionException("storage_service_unavailable"); }
+    }
+
+    private async Task<ConnectedServiceExportMetadata> InspectCoreAsync(
+        ConnectedServiceRevisionReference service,
+        ConnectedServiceResolutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var reference = service.Service;
+        if (reference.Address.Kind != ConnectedServiceResourceKinds.ConnectedService
+            || !await useAuthorizer.IsSameOrDescendantAsync(reference.ScopeRef,
+                context.ConsumerScopeRef, cancellationToken))
+            throw new ConnectedServiceAccessDeniedException(reference.Address);
+        var stored = await store.GetExactAsync<ConnectedServiceResource>(new(reference.ScopeRef,
+            reference.Address.Namespace, reference.Address.Kind, reference.Address.Name), cancellationToken)
+            ?? throw new ConnectedServiceUnavailableException(reference.Address);
+        if (stored.Value.Uid != service.ServiceUid || stored.Value.Generation != service.Generation)
+            throw new ConnectedServiceTypeRevisionException("The pinned Connected Service revision is stale.");
+        if (!stored.Value.Definition.Enabled
+            || stored.Value.ObservedState?.Availability != ConnectedServiceAvailability.Ready)
+            throw new ConnectedServiceUnavailableException(reference.Address);
+        if (!await useAuthorizer.CanUseAsync(reference.ScopeRef, context.ConsumerScopeRef,
+            stored.Value.Definition.UsePolicy, cancellationToken))
+            throw new ConnectedServiceAccessDeniedException(reference.Address);
+        var (type, version) = await ResolveTypeAsync(stored.Value, cancellationToken);
+        await EnsureMetadataUseAsync(stored.Value, context.ConsumerScopeRef, cancellationToken);
+        await EnsureMetadataUseAsync(type, reference.ScopeRef, cancellationToken);
+        foreach (var binding in stored.Value.Definition.Bindings)
+        {
+            Resource? input = binding.Kind switch
+            {
+                ConnectedServiceBindingKind.Secret when binding.Secret is { ScopeRef: { } secretScope } secret =>
+                    (await store.GetExactAsync<SecretResource>(new(secretScope, secret.Address.Namespace,
+                        secret.Address.Kind, secret.Address.Name), cancellationToken))?.Value,
+                ConnectedServiceBindingKind.Parameter when binding.Parameter is { } parameter =>
+                    (await store.GetExactAsync<ParameterResource>(new(parameter.ScopeRef, parameter.Address.Namespace,
+                        parameter.Address.Kind, parameter.Address.Name), cancellationToken))?.Value,
+                _ => null
+            };
+            if (binding.Kind != ConnectedServiceBindingKind.Literal)
+            {
+                if (input is null) throw new ConnectedServiceUnavailableException(reference.Address);
+                await EnsureMetadataUseAsync(input, reference.ScopeRef, cancellationToken);
+            }
+        }
+        await ValidateBindingsAsync(stored.Value, version, cancellationToken);
+        var bound = stored.Value.Definition.Bindings.Select(binding => binding.InputId).ToHashSet(StringComparer.Ordinal);
+        return new(stored.Value.Definition.Type, version.Exports.Where(export =>
+            export.SourceInputId is null || bound.Contains(export.SourceInputId)).ToArray());
+    }
+
+    private async Task EnsureMetadataUseAsync(Resource resource, ResourceScopeRef consumerScope, CancellationToken token)
+    {
+        if (!(await accessPolicies.EvaluateAsync(new(resource.Uid, resource.ScopeRef!.Value, resource.Namespace,
+            resource.Kind, resource.Generation), consumerScope, ResourceAccessAction.Use, token)).Allowed)
+            throw new ConnectedServiceAccessDeniedException(resource.Address);
     }
 
     private async Task<StoredResource<ConnectedServiceResource>> PutAsync(

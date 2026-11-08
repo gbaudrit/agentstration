@@ -25,6 +25,7 @@ internal static class StorageServiceCollectionExtensions
         services.AddSingleton<IInstanceInitializationCoordinator, InstanceInitializationCoordinator>();
         services.AddSingleton<WorkspacePlatformResourceProvisioner>();
         services.AddSingleton<ConnectedServicePlatformResourceProvisioner>();
+        services.AddStorageResources();
         services.AddSingleton<IWorkspacePlatformResourceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
         services.AddSingleton<IWorkspaceProvisioner>(provider => provider.GetRequiredService<WorkspacePlatformResourceProvisioner>());
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)

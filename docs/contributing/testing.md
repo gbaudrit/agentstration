@@ -86,6 +86,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Console.Client.Tests` | Fast | HTTP and SignalR mappings, pagination, errors, retries, and credential forwarding without an authoritative server |
 | `Agentstration.Console.Components.Tests` | Fast | Console Razor behavior, presentation state, permissions, localization, and static assets with mocked clients |
 | `Agentstration.ResourceManagement.Tests` | Fast | Resource access policies and descendant-use rules with in-memory ports |
+| `Agentstration.Storage.Tests` | Fast | Storage type/version, explicit export mappings, protected resolution, drift, authorization and concurrency with deterministic in-memory ports |
 | `Agentstration.Schemas.Tests` | Fast | Schema format selection and capability validation |
 | `Agentstration.Secrets.Tests` | Fast | Secret capability authorization, expiry and single-use redemption with fakes |
 | `Agentstration.Infrastructure.Tests` | Fast | Internal date/time tools and HTTP fetch validation with a fake handler |
