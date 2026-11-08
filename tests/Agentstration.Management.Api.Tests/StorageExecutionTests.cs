@@ -15,14 +15,15 @@ namespace Agentstration.Management.Tests;
 public sealed class StorageExecutionTests : ModelManagementApiTestBase
 {
     [TestMethod]
-    public async Task WorkspaceDefaultsAreFunctionalAndDifferentStoragesNeverShareContentAuthority()
+    public async Task InstanceDefaultIsFunctionalAndDifferentStoragesNeverShareContentAuthority()
     {
         await using var factory = Factory();
         var bootstrap = await GetBootstrapContextAsync(factory);
         var services = factory.Services;
         await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
-        using var caller = services.GetRequiredService<IRequestContextScopeFactory>().Push(bootstrap);
-        var scope = ResourceScopeRef.Workspace(bootstrap.WorkspaceId);
+        bootstrap = await InstanceContextAsync(services, bootstrap);
+        using var caller = services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(bootstrap);
+        var scope = ResourceScopeRef.Instance;
         var store = services.GetRequiredService<IResourceStore>();
         var resource = (await store.GetExactAsync<StorageResource>(new(scope, ResourceNamespace.Default,
             StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName), default))!;
@@ -56,35 +57,29 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
-    public async Task ProvisioningPreservesDefaultIdentityDisablementAndIntentionalTypeRevocation()
+    public async Task ProvisioningPreservesDefaultIdentityDisablementAndExistingAccessDecisions()
     {
         await using var factory = Factory();
         var bootstrap = await GetBootstrapContextAsync(factory);
         var services = factory.Services;
         var provisioning = services.GetRequiredService<IWorkspacePlatformResourceProvisioner>();
-        await provisioning.EnsureAllAsync(default);
         using var system = services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
-        var scope = ResourceScopeRef.Workspace(bootstrap.WorkspaceId);
+        var scope = ResourceScopeRef.Instance;
         var resources = services.GetRequiredService<IResourceStore>();
         var address = new ScopedResourceAddress(scope, ResourceNamespace.Default, StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName);
         var before = (await resources.GetExactAsync<StorageResource>(address, default))!;
-        await provisioning.EnsureAllAsync(default);
-        var repeated = (await resources.GetExactAsync<StorageResource>(address, default))!;
-        Assert.AreEqual(before.Value.Uid, repeated.Value.Uid);
-        Assert.AreEqual(before.ETag, repeated.ETag);
-        var type = (await services.GetRequiredService<StorageTypeManagementService>().GetExactAsync(ResourceScopeRef.Instance,
+        var type = (await services.GetRequiredService<StorageTypeManagementService>().GetExactAsync(scope,
             ResourceNamespace.Default, "local", default))!;
         var policies = services.GetRequiredService<IResourceAccessPolicyService>();
-        var policy = (await policies.GetAsync(type.Value.Uid, default))!;
-        _ = await policies.PutAsync(policy.Policy with { Grants = policy.Policy.Grants.Where(g => g.TargetScopeRef != scope).ToArray() }, policy.ETag, default);
+        var consumer = ResourceScopeRef.Workspace(bootstrap.WorkspaceId);
+        var target = new ResourceAccessIdentity(type.Value.Uid, scope, type.Value.Namespace, type.Value.Kind);
+        var allowed = await policies.PutAsync(new(target, [new(consumer, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+        var revoked = await policies.PutAsync(allowed.Policy with { Grants = [] }, allowed.ETag, default);
         await provisioning.EnsureAllAsync(default);
-        Assert.IsFalse((await policies.EvaluateAsync(new(type.Value.Uid, ResourceScopeRef.Instance, type.Value.Namespace, type.Value.Kind),
-            scope, ResourceAccessAction.Use, default)).Allowed);
-        var denied = await Assert.ThrowsAsync<StorageException>(() => services.GetRequiredService<IStorageContentGateway>()
-            .ListAsync(Target(before.Value, scope), "notes/", 10));
-        Assert.AreEqual("storage_access_denied", denied.Code);
-        var revokedPolicy = (await policies.GetAsync(type.Value.Uid, default))!;
-        _ = await policies.PutAsync(policy.Policy, revokedPolicy.ETag, default);
+        Assert.AreEqual(before.ETag, (await resources.GetExactAsync<StorageResource>(address, default))!.ETag);
+        Assert.AreEqual(type.ETag, (await resources.GetExactAsync<StorageTypeResource>(new(scope, type.Value.Namespace, type.Value.Kind, type.Value.Name), default))!.ETag);
+        Assert.AreEqual(revoked.ETag, (await policies.GetAsync(type.Value.Uid, default))!.ETag);
+        Assert.IsFalse((await policies.EvaluateAsync(target, consumer, ResourceAccessAction.Use, default)).Allowed);
         using (services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.local-default", "1.0.0")))
             _ = await services.GetRequiredService<StorageManagementService>().PutExactAsync(scope, ResourceNamespace.Default,
                 before.Value.Name, before.Value.Definition with { Enabled = false }, before.ETag, default);
@@ -147,8 +142,9 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
         var bootstrap = await GetBootstrapContextAsync(factory);
         var services = factory.Services;
         var scopes = services.GetRequiredService<IRequestContextScopeFactory>();
-        using var caller = scopes.Push(bootstrap);
-        var scope = ResourceScopeRef.Workspace(bootstrap.WorkspaceId);
+        bootstrap = await InstanceContextAsync(services, bootstrap);
+        using var caller = scopes.PushInstance(bootstrap);
+        var scope = ResourceScopeRef.Instance;
         var resource = (await services.GetRequiredService<IResourceStore>().GetExactAsync<StorageResource>(
             new(scope, ResourceNamespace.Default, StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName), default))!.Value;
         var target = Target(resource, scope);
@@ -156,7 +152,7 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
         var foreign = await Assert.ThrowsAsync<StorageException>(() => gateway.ListAsync(target with
         { Consumer = target.Consumer with { ConsumerScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()) } }, "notes/", 10));
         Assert.AreEqual("storage_access_denied", foreign.Code);
-        using (scopes.Push(bootstrap with
+        using (scopes.PushInstance(bootstrap with
         {
             Restriction = new(Guid.NewGuid(), bootstrap.WorkspaceId,
             new HashSet<string>(StringComparer.Ordinal) { AuthorizationPermissions.ResourcesRead })
@@ -178,7 +174,7 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
-    public async Task DefaultProvisioningHandlesNewOperationalAndCollidingWorkspacesExplicitly()
+    public async Task RestrictedWorkspaceDefaultsRemainUnavailableWithoutChangingPoliciesOrBlockingOtherProvisioning()
     {
         await using var factory = Factory();
         var bootstrap = await GetBootstrapContextAsync(factory);
@@ -188,44 +184,75 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
         var identities = services.GetRequiredService<IIdentityStore>();
         var resources = services.GetRequiredService<IResourceStore>();
         var provisioner = services.GetRequiredService<LocalStorageDefaultsProvisioner>();
+        var typeAddress = new ScopedResourceAddress(ResourceScopeRef.Instance, ResourceNamespace.Default, StorageResourceKinds.StorageType, "local");
+        var typeBefore = (await resources.GetExactAsync<StorageTypeResource>(typeAddress, default))!;
+        Assert.IsEmpty(typeBefore.Value.Definition.UsePolicy.Grants);
+        var policies = services.GetRequiredService<IResourceAccessPolicyService>();
+        Assert.IsNull(await policies.GetAsync(typeBefore.Value.Uid, default));
         var workspace = new Workspace(Guid.NewGuid(), bootstrap.TenantId, "new-local-workspace", "New local Workspace",
             WorkspaceStatus.Initializing, DateTimeOffset.UtcNow);
         await identities.AddWorkspaceAsync(workspace, default);
-        await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => provisioner.EnsureAsync(workspace, default)));
+        // An existing generic grant still cannot override the unchanged UsePolicy restriction.
+        var existing = await policies.PutAsync(new(new(typeBefore.Value.Uid, ResourceScopeRef.Instance, ResourceNamespace.Default,
+            StorageResourceKinds.StorageType), [new(ResourceScopeRef.Workspace(workspace.Id), [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+        var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => provisioner.EnsureAsync(workspace, default)));
+        Assert.IsTrue(results.All(r => r.Availability == StorageAvailability.Unavailable && r.Diagnostic?.Code == "storage_access_denied"));
         var address = new ScopedResourceAddress(ResourceScopeRef.Workspace(workspace.Id), ResourceNamespace.Default,
             StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName);
-        var original = (await resources.GetExactAsync<StorageResource>(address, default))!;
-        await provisioner.EnsureAsync(workspace, default);
-        Assert.AreEqual(original.ETag, (await resources.GetExactAsync<StorageResource>(address, default))!.ETag);
+        Assert.IsNull(await resources.GetExactAsync<StorageResource>(address, default));
+        await services.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(workspace, default);
+        Assert.AreEqual(WorkspaceStatus.Active, (await identities.GetWorkspaceAsync(workspace.TenantId, workspace.Id, default))!.Status);
+        Assert.AreEqual(typeBefore.ETag, (await resources.GetExactAsync<StorageTypeResource>(typeAddress, default))!.ETag);
+        Assert.AreEqual(existing.ETag, (await policies.GetAsync(typeBefore.Value.Uid, default))!.ETag);
 
         var operational = (await identities.ListWorkspacesAsync(default)).Where(w => w.Kind != WorkspaceKind.Business).ToArray();
         Assert.IsTrue(operational.Any(w => w.Kind == WorkspaceKind.InstanceOperations));
         Assert.IsTrue(operational.Any(w => w.Kind == WorkspaceKind.TenantOperations));
-        foreach (var target in operational)
+        StorageResource? prototype = null;
+        foreach (var targetWorkspace in operational)
         {
-            var owner = target.Kind == WorkspaceKind.InstanceOperations ? ResourceScopeRef.Instance : ResourceScopeRef.Tenant(target.TenantId);
+            var status = await provisioner.EnsureAsync(targetWorkspace, default);
+            var owner = LocalStorageDefaultsProvisioner.OwnerScope(targetWorkspace);
             var storage = (await resources.GetExactAsync<StorageResource>(new(owner, ResourceNamespace.Default,
-                StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName), default))!.Value;
-            Assert.AreEqual(target.Id.ToString("N"), storage.Metadata.Annotations[LocalStorageDefaultsProvisioner.WorkspaceAnnotation]);
-            Assert.AreEqual(ResourceScopeRef.Workspace(target.Id), storage.Definition.UsePolicy.Grants.Single().ScopeRef);
-            using var businessCaller = scopes.Push(bootstrap);
-            var denied = await Assert.ThrowsAsync<StorageException>(() => services.GetRequiredService<IStorageResolver>()
-                .ResolveAsync(Revision(storage), new(ResourceScopeRef.Workspace(bootstrap.WorkspaceId), storage.Address)));
-            Assert.AreEqual("storage_not_found", denied.Code);
+                StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName), default))?.Value;
+            if (targetWorkspace.Kind == WorkspaceKind.TenantOperations)
+            {
+                Assert.AreEqual(StorageAvailability.Unavailable, status.Availability);
+                Assert.IsNull(storage);
+            }
+            else
+            {
+                Assert.AreEqual(StorageAvailability.Ready, status.Availability);
+                Assert.IsNotNull(storage);
+                Assert.AreEqual(targetWorkspace.Id.ToString("N"), storage.Metadata.Annotations[LocalStorageDefaultsProvisioner.WorkspaceAnnotation]);
+                Assert.IsEmpty(storage.Definition.UsePolicy.Grants);
+                prototype = storage;
+                using var businessCaller = scopes.Push(bootstrap);
+                var denied = await Assert.ThrowsAsync<StorageException>(() => services.GetRequiredService<IStorageResolver>()
+                    .ResolveAsync(Revision(storage), new(ResourceScopeRef.Workspace(bootstrap.WorkspaceId), storage.Address)));
+                Assert.AreEqual("storage_not_found", denied.Code);
+            }
         }
-
+        Assert.IsNotNull(prototype);
         var colliding = workspace with { Id = Guid.NewGuid(), Name = "colliding-local-workspace" };
         await identities.AddWorkspaceAsync(colliding, default);
-        var foreign = await resources.PutExactAsync(ResourceScopeRef.Workspace(colliding.Id), original.Value with
+        var foreign = await resources.PutExactAsync(ResourceScopeRef.Workspace(colliding.Id), prototype with
         {
             Uid = Guid.NewGuid(),
             ScopeRef = ResourceScopeRef.Workspace(colliding.Id),
             Governance = ResourceGovernance.User,
-            Metadata = original.Value.Metadata with { Annotations = new Dictionary<string, string>() }
+            Metadata = prototype.Metadata with { Annotations = new Dictionary<string, string>() }
         }, null, true, default);
         var collision = await Assert.ThrowsAsync<StorageException>(() => provisioner.EnsureAsync(colliding, default));
         Assert.AreEqual("storage_default_collision", collision.Code);
         Assert.AreEqual(foreign.ETag, (await resources.GetExactAsync<StorageResource>(address with { ScopeRef = ResourceScopeRef.Workspace(colliding.Id) }, default))!.ETag);
+    }
+
+    private static async Task<RequestContext> InstanceContextAsync(IServiceProvider services, RequestContext bootstrap)
+    {
+        using var system = services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var workspace = await services.GetRequiredService<IOperationalTopologyProvisioner>().GetInstanceOperationsWorkspaceAsync(default);
+        return bootstrap with { TenantId = workspace.TenantId, WorkspaceId = workspace.Id };
     }
 
     private static StorageContentRequest Target(StorageResource resource, ResourceScopeRef scope) => new(

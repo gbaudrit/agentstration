@@ -46,8 +46,17 @@ using (scopes.PushSystem())
     context = await services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
     await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
 }
-using var caller = scopes.Push(context);
-var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+using (scopes.PushSystem())
+{
+    var originalWorkspace = (await services.GetRequiredService<IIdentityStore>().GetWorkspaceAsync(context.TenantId, context.WorkspaceId, default))!;
+    var blocked = await services.GetRequiredService<LocalStorageDefaultsProvisioner>().EnsureAsync(originalWorkspace, default);
+    if (blocked.Availability != StorageAvailability.Unavailable)
+        throw new InvalidOperationException("The restricted business default unexpectedly became usable.");
+    var operational = await services.GetRequiredService<IOperationalTopologyProvisioner>().GetInstanceOperationsWorkspaceAsync(default);
+    context = context with { TenantId = operational.TenantId, WorkspaceId = operational.Id };
+}
+using var caller = scopes.PushInstance(context);
+var scope = ResourceScopeRef.Instance;
 var resource = (await services.GetRequiredService<IResourceStore>().GetExactAsync<StorageResource>(
     new(scope, ResourceNamespace.Default, StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName), default))!.Value;
 var target = new StorageContentRequest(new(new(scope, resource.Namespace, resource.Kind, resource.Name), resource.Uid,
@@ -63,10 +72,10 @@ if (args[0] == "write")
 {
     var written = await gateway.WriteAsync(target, new("docker-volume-create", DateTimeOffset.UtcNow.AddMinutes(4),
         "probe/content", Convert.ToBase64String(bytes)));
-    var source = await artifacts.CreateStagedAsync(new("proof.txt", "text/plain",
-        new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "probe-producer", FlowRunId = "probe-producer", FlowStepId = "produce" }), default);
-    _ = await artifacts.WriteAsync(source.Value.ArtifactId, 0, bytes, default);
-    _ = await artifacts.SealAsync(source.Value.ArtifactId, default);
+    var source = await InWorkspaceAsync(() => artifacts.CreateStagedAsync(new("proof.txt", "text/plain",
+        new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "probe-producer", FlowRunId = "probe-producer", FlowStepId = "produce" }), default));
+    _ = await InWorkspaceAsync(() => artifacts.WriteAsync(source.Value.ArtifactId, 0, bytes, default));
+    _ = await InWorkspaceAsync(() => artifacts.SealAsync(source.Value.ArtifactId, default));
     var opaque = await services.GetRequiredService<WorkspaceArtifactStorage>().CreateReferenceAsync(workspace,
         new string('a', 64), bytes.Length, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes)), default);
     await durable.ResetAsync(workspace, opaque, default);
@@ -81,7 +90,7 @@ if (args[0] == "write")
         Sha256 = stat.Sha256,
         Provenance = new Dictionary<string, string> { ["provider"] = "filesystem", ["probe"] = "volume" }
     };
-    var completed = await artifacts.CompleteFlowRunArtifactAsync(source.Value.ArtifactId, new("probe-producer", "produce", receipt), default);
+    var completed = await InWorkspaceAsync(() => artifacts.CompleteFlowRunArtifactAsync(source.Value.ArtifactId, new("probe-producer", "produce", receipt), default));
     var historical = services.GetRequiredService<FileSystemDurableArtifactStore>();
     await historical.ResetAsync(workspace, "historical-proof", default);
     _ = await historical.WriteAsync(workspace, "historical-proof", 0, bytes, default);
@@ -97,13 +106,19 @@ else
     var read = await gateway.ReadAsync(target, saved.ContentReference, 0, 65536);
     if (!Convert.FromBase64String(read.ContentBase64).SequenceEqual(bytes) || read.Item.Sha256 != saved.Digest)
         throw new InvalidOperationException("Content did not survive container replacement.");
-    var artifact = (await artifacts.GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(saved.ArtifactId), default))!;
+    var artifact = (await InWorkspaceAsync(() => artifacts.GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(saved.ArtifactId), default)))!;
     if (artifact.Value.Receipt.OpaqueReference != saved.ArtifactReference)
         throw new InvalidOperationException("The historical Artifact receipt was rewritten.");
     if (!(await durable.ReadAsync(workspace, saved.ArtifactReference, 0, bytes.Length, default)).Span.SequenceEqual(bytes)
         || !(await durable.ReadAsync(workspace, "historical-proof", 0, bytes.Length, default)).Span.SequenceEqual(bytes))
         throw new InvalidOperationException("Selectable or historical Artifact content did not survive container replacement.");
     Console.WriteLine($"read: Storage={resource.Uid:N}; identity, content, exact Artifact receipt and historical content preserved");
+}
+
+async Task<T> InWorkspaceAsync<T>(Func<Task<T>> action)
+{
+    using var workspaceScope = scopes.Push(context);
+    return await action();
 }
 
 internal sealed record Proof(Guid StorageUid, Guid WorkspaceId, string ContentReference, string Digest, string ArtifactId, string ArtifactReference);

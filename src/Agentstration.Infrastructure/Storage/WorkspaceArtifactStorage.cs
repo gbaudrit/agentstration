@@ -10,7 +10,7 @@ using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Infrastructure.Storage;
 
-/// <summary>New Artifact receipts pin a Storage; existing receipts keep their original filesystem adapter.</summary>
+/// <summary>Authorized selectable defaults pin new receipts; the independent Artifact backend remains available.</summary>
 public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourceStore resources,
     IStorageResolver storages, LocalStoragePaths paths, FileSystemDurableArtifactStore historical,
     ICurrentRequestContext current, IRequestContextScopeFactory scopes) : IArtifactDurableStore
@@ -28,13 +28,28 @@ public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourc
         if (objectId is not { Length: 64 } || !objectId.All(char.IsAsciiHexDigit)
             || length < 0 || sha256 is not { Length: 64 } || !sha256.All(char.IsAsciiHexDigit))
             throw new StorageException("storage_artifact_reference_invalid", "Exact Artifact identity and integrity metadata are required.");
+        if (current.Current.WorkspaceId != workspaceId.Value)
+            throw new StorageException("storage_access_denied", "The Artifact execution Workspace differs from the caller.", 403);
         var workspace = await identities.GetWorkspaceAsync(current.Current.TenantId, workspaceId.Value, cancellationToken)
             ?? throw new StorageException("storage_default_unavailable", "The execution Workspace is unavailable.", 409);
-        StorageResource resource;
+        var consumer = current.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(current.Current.TenantId),
+            _ => ResourceScopeRef.Workspace(workspaceId.Value)
+        };
+        // Builtin Artifact Flows run in a Workspace context. They retain their independent backend
+        // when that context cannot select the administrative default. This grants no Storage access.
+        if (consumer != LocalStorageDefaultsProvisioner.OwnerScope(workspace)) return objectId;
+        StorageResource? resource;
         using (scopes.PushSystem())
             resource = (await resources.GetExactAsync<StorageResource>(new(LocalStorageDefaultsProvisioner.OwnerScope(workspace),
-                ResourceNamespace.Default, StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName), cancellationToken))?.Value
-                ?? throw new StorageException("storage_default_unavailable", "The Workspace default Storage is unavailable.", 409);
+                ResourceNamespace.Default, StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName), cancellationToken))?.Value;
+        // An absent selectable default does not remove the existing independent Artifact backend.
+        // Never fall back after a selected resource is disabled, revoked, stale or incompatible.
+        if (resource is null) return objectId;
+        if (!LocalStorageDefaultsProvisioner.IsOwnedDefault(resource, workspace))
+            throw new StorageException("storage_default_collision", "The reserved default Storage belongs to another owner.", 409);
         var reference = new StorageRevisionReference(new(resource.ScopeRef!.Value, resource.Namespace, resource.Kind, resource.Name),
             resource.Uid, resource.Generation, StorageDigests.Binding(resource.Definition));
         _ = await AuthorizeAsync(reference, workspaceId, Operation.Write, cancellationToken);

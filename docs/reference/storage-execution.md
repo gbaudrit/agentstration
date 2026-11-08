@@ -42,18 +42,23 @@ Expired receipts are pruned at a subsequent write. Capacity refusal is explicit.
 Overwritten object versions become unavailable; no stable-version or durable
 Snapshot retention capability is advertised.
 
-New and existing supported Workspaces receive a `local-default`. Existing defaults
-retain UID, enabled state, configuration, envelope and policies. A reserved-name or
-ownership collision fails. Operational Workspace defaults belong to the associated
-Instance/Tenant logical scope and are shared only with that operational Workspace.
-They are not business Workspace choices.
+Provisioning attempts a `local-default` using the existing Storage service and its
+current authorization/UsePolicy checks. It creates no grants, writes no UsePolicy
+and changes no access overlay. An existing default retains its UID, enabled state,
+configuration, envelope and policies; a reserved-name/ownership collision fails.
 
-Initial exact Discover/Use and descendant UsePolicy decisions are recorded once.
-An intentional revocation survives restart and synchronization. Interrupted initial
-grant setup does not silently restore rights. Existing UsePolicy checks remain
-independent of generic resource grants: a generic Use grant alone does not override
-a UsePolicy denial. #1064 administers existing generic grants; new user-permission
-work belongs to #1077 and UsePolicy authoring/composition to #1078.
+The single Instance-owned type initially grants no descendant use. Consequently,
+ordinary Workspace and Tenant-owned defaults remain unavailable unless their
+existing access configuration already permits creation. The Instance operational
+default works in its logical Instance context. No type copies, global exemptions
+or automatic sharing are introduced to make a blocked default usable.
+
+A blocked attempt returns `unavailable` with a bounded diagnostic and writes a
+structured operator warning containing Workspace/scope/code, without failing the
+rest of Workspace initialization. Existing defaults are observed without repair
+or mutation. A generic Use grant alone cannot override UsePolicy. #1064 owns
+existing generic grant administration, #1077 new user-permission work and #1078
+UsePolicy work; this increment implements none of those deferred policy features.
 
 ## Operator configuration and Docker
 
@@ -82,8 +87,13 @@ part of ordinary resource/Tool results or diagnostics.
 
 Persist both metadata and bytes when replacing a container. Losing metadata creates
 different UIDs; retained directories are never automatically adopted by name.
-Historical Artifacts keep `/data/durable-artifacts`; new selected-Storage Artifact
-content uses the pinned Storage directory. Backup/restore must preserve these
+The independent builtin Artifact backend keeps `/data/durable-artifacts`.
+When no selectable default exists, or a Workspace-scoped Artifact Flow cannot
+select an administrative default owned at Instance/Tenant scope, new builtin
+Artifact writes retain that existing backend. This neither grants Storage access
+nor retargets a selected reference. When an authorized default is selected, new
+receipts pin its exact Storage revision and use its directory; disabled, revoked,
+stale or incompatible selections fail without falling back. Backup/restore must preserve these
 locations and resource/receipt identities together.
 
 The native Artifact adapter uses the logical key `artifacts/<object-id>` and
@@ -97,9 +107,11 @@ copy. Pending files are not deleted automatically. Operators must preserve activ
 copy state and retained content during recovery.
 
 The explicit deployment probe under `tests/fixtures/StorageVolumeProbe` runs the
-production module composition without a model, provider account or UI. Its write
-and read phases verify exact default UID, content reference, Artifact receipt and
-historical Artifact content across separate processes/containers. It is not a
+production module composition without a model, provider account or UI. It verifies
+that the business default stays blocked under existing restrictions, then uses
+the authorized Instance default in its operational context. Its write/read phases
+verify exact default UID, content reference, Artifact receipt and historical
+Artifact content across separate processes/containers, without creating grants. It is not a
 product endpoint or a silently skipped functional test.
 
 Build and run the deployment check from the repository root:

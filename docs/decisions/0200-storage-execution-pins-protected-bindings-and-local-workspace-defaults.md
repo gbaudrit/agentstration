@@ -73,24 +73,29 @@ file under an exclusive per-Storage file lock. This is a content backend, not a
 new control-plane persistence framework. Reads verify stored content integrity.
 Opaque references/cursors bind exact authority, restrictions, query and lifetime.
 
-Initialization version 3 reconciles existing Workspaces; new Workspaces use the
-same provisioner. Business defaults are Workspace-owned. Each Instance/Tenant
-operational Workspace has a separate default owned by its logical administrative
-scope, with explicit access from that operational Workspace only. One Instance
-type is shared through recorded, exact grants; no descendant type copies exist.
+Initialization version 3 attempts defaults for existing Workspaces; new
+Workspaces use the same provisioner. It delegates creation/resolution to the
+owning Storage service without writing UsePolicy or access overlays. Business
+defaults belong to their Workspace; operational defaults belong to their logical
+Instance/Tenant scope. No descendant type copies or automatic grants are created.
 
-Grant initialization is recorded once. Subsequent synchronization/provisioning
-does not restore missing rights, reset disablement or overwrite an existing
-default. Interrupted access initialization fails closed and requires explicit
-administrative repair; a name/ownership collision fails rather than replacing a
-user resource. #1064 administers generic grants and must retain these decisions
-and markers; a generic Use grant never overrides an existing UsePolicy denial.
+With the current restrictive Instance type, ordinary Workspace/Tenant defaults
+remain unavailable unless existing authorization already permits them. This is a
+recorded provisioning limitation, not a reason to bypass the guards or expand the
+scope into #1078. A blocked attempt returns a bounded diagnostic and emits a
+structured operator warning while the remaining Workspace provisioning continues.
+Existing defaults retain identity, configuration, disablement and access decisions;
+collisions fail without replacing a resource. A generic Use grant cannot override
+an existing UsePolicy denial. #1077/#1078 own the deferred permission/policy work.
 
-New builtin Artifact writes pin the selected default Storage in their receipt and
-use its separate directory. Existing unprefixed Artifact receipts retain the
-original durable adapter and location. Do not copy, relocate or retarget existing
-content. Dependency checks include exact Storage UIDs retained by Artifact receipts.
-The existing staging, lease, provenance and read/write Flow contracts remain intact.
+The independent builtin Artifact backend and its existing Flows remain available
+when no selectable default exists or their Workspace context cannot select an
+administrative default. No existing receipt is relocated or retargeted. Authorized
+native selection pins the exact default Storage in a new receipt and uses its
+separate directory. Once selected, disabled/revoked/stale/incompatible references
+fail; they never fall back to another backend. Dependency checks retain exact
+Storage UIDs. Existing staging, lease, provenance and read/write Flow contracts
+remain intact.
 
 ## Consequences
 

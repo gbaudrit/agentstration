@@ -54,7 +54,7 @@ public sealed class ResourceAccessPolicyApiTests : ModelManagementApiTestBase
 
         var listed = await client.GetFromJsonAsync<ValueResponse<ResourceAccessPolicyResponse>>(
             $"/api/resource-access-policies?ownerScopeRef={Uri.EscapeDataString(tenant.Value)}");
-        Assert.AreEqual(resource.Uid, listed!.Value.Single(value => value.Policy.Resource.Uid == resource.Uid).Policy.Resource.Uid);
+        Assert.AreEqual(resource.Uid, listed!.Value.Single().Policy.Resource.Uid);
 
         using var allowed = await client.PostAsJsonAsync(
             $"/api/resource-access-policies/{resource.Uid:D}/evaluate",
