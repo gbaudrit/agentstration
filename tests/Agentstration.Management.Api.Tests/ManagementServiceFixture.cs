@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
-// Shared fixture implementation, with a new provider and private SQLite stores per test; no HTTP host or workers.
+// Real application composition and private SQLite stores; no HTTP host or workers.
 internal sealed class ManagementServiceFixture : IAsyncDisposable
 {
     private readonly string directory;

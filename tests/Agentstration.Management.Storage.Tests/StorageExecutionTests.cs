@@ -1,4 +1,7 @@
 using System.Text;
+using Agentstration.Agents;
+using Agentstration.Flows.Application;
+using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Storage;
@@ -7,6 +10,7 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -256,20 +260,51 @@ public sealed class StorageExecutionTests
         Assert.AreEqual(foreign.ETag, (await resources.GetExactAsync<StorageResource>(address with { ScopeRef = ResourceScopeRef.Workspace(colliding.Id) }, default))!.ETag);
     }
 
-    private static async Task<ManagementServiceFixture> FixtureAsync()
+    private static async Task<StorageFixture> FixtureAsync()
     {
-        var fixture = await ManagementServiceFixture.CreateAsync();
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-storage-execution-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        string Connection(string name) => $"Data Source={Path.Combine(directory, name + ".db")};Pooling=False";
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(new LocalBootstrapOptions { GrantPlatformAdministrator = true });
+        services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(directory, "keys")));
+        services.AddAgentstration(directory,
+            controlPlaneConnectionString: Connection("management"),
+            workPlaneConnectionString: Connection("work"),
+            flowConnectionString: Connection("flow"),
+            runtimeConnectionString: Connection("runtime"),
+            enableHostedServices: false);
+        var provider = services.BuildServiceProvider();
         try
         {
-            using var system = fixture.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
-            await fixture.Services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(default);
-            await fixture.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
-            return fixture;
+            using var system = provider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            await provider.GetRequiredService<IAgentstrationStorageInitializer>().InitializeAsync(default);
+            await provider.GetRequiredService<AgentManagementService>().InitializeAsync(default);
+            await provider.GetRequiredService<FlowService>().InitializeAsync(default);
+            await provider.GetRequiredService<FlowRunService>().InitializeAsync(default);
+            var context = await provider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+            await provider.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(default);
+            await provider.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
+            return new(directory, provider, context);
         }
         catch
         {
-            await fixture.DisposeAsync();
+            await provider.DisposeAsync();
+            Directory.Delete(directory, recursive: true);
             throw;
+        }
+    }
+
+    private sealed class StorageFixture(string directory, ServiceProvider services, RequestContext context) : IAsyncDisposable
+    {
+        public ServiceProvider Services { get; } = services;
+        public RequestContext Context { get; } = context;
+
+        public async ValueTask DisposeAsync()
+        {
+            await Services.DisposeAsync();
+            Directory.Delete(directory, recursive: true);
         }
     }
 
