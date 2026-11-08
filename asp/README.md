@@ -17,7 +17,7 @@ dotnet pack src/Agentstration.Asp.Client -c Release -o artifacts
 ```
 
 The demo starts a loopback-only MCP server, creates an ephemeral Bearer credential,
-uses the real HTTP MCP client, writes JSON bytes, lists/stats/reads them, checks a
+uses the real HTTP MCP client, demonstrates complete and progressive text/binary transfers, a byte range, lists/stats, checks a
 read-only target, and shuts down. It needs no network service, model, file store
 or product host. Sample credentials are never printed. Running without `--demo`
 serves an ephemeral in-process endpoint for the conformance host; the generated
@@ -28,7 +28,8 @@ Implement `IAspObjectReader` and optionally `IAspObjectWriter`. Supply one or mo
 instances and access policies. Register `AspMcpServer` using
 `services.AddMcpServer().WithHttpTransport().WithAsp(server)` or the explicit handlers
 shown by the sample. The SDK publishes one generic group of Tools, by default
-`asp_describe/list/stat/read/write`, across all configured targets.
+`asp_describe/list/stat`, `asp_read_text/blob`, `asp_write_text/blob`,
+and session close/abort/status operations, across all configured targets.
 
 Every call carries `{ store: { storeId, bindingId, revision }, arguments: {...} }`.
 An authenticated caller, including an authorized Agent, selects a target. The host
@@ -73,3 +74,12 @@ runner uses the sample project as its working directory):
 ```sh
 dotnet run --project samples/LocalStorage -- --schemas /absolute/path/to/asp/docs/schemas
 ```
+
+
+Providers expose streams through `OpenReadAsync` and `OpenWriteAsync`; the SDK
+owns bounded protocol sessions and replay receipts. Small transfers complete in
+one call. Larger transfers continue through the same text or binary method with
+`sessionRef` and the next sequence. `AspStreams.OpenReadStream/OpenWriteStream`
+provide async Stream adapters; writes require explicit `CompleteAsync`.
+Capabilities, conditional writes, optional metadata, chunk/range semantics and
+uncertain outcomes are specified in [the protocol](docs/protocol.md).

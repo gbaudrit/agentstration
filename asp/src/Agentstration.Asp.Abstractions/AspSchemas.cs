@@ -12,8 +12,11 @@ public static class AspSchemas
         "describe" => For<AspInvocation<AspDescribeRequest>>(),
         "list" => For<AspInvocation<AspListRequest>>(),
         "stat" => For<AspInvocation<AspReferenceRequest>>(),
-        "read" => For<AspInvocation<AspReadRequest>>(),
-        "write" => For<AspInvocation<AspWriteRequest>>(),
+        "read_blob" => Transfer<AspReadBlobRequest>(false),
+        "read_text" => Transfer<AspReadTextRequest>(false),
+        "write_blob" => Transfer<AspWriteBlobRequest>(true),
+        "write_text" => Transfer<AspWriteTextRequest>(true),
+        "close_read" or "abort_write" or "write_status" => For<AspInvocation<AspSessionRequest>>(),
         _ => throw new AspException("unsupported_operation", "Unknown ASP operation mapping.")
     };
 
@@ -22,10 +25,44 @@ public static class AspSchemas
         "describe" => ForReply<AspDescription>(),
         "list" => ForReply<AspListResult>(),
         "stat" => ForReply<AspObject>(),
-        "read" => ForReply<AspReadResult>(),
-        "write" => ForReply<AspWriteResult>(),
+        "read_blob" => ForReply<AspReadBlobResult>(),
+        "read_text" => ForReply<AspReadTextResult>(),
+        "write_blob" or "write_text" => ForReply<AspWriteResult>(),
+        "close_read" or "abort_write" or "write_status" => ForReply<AspSessionResult>(),
         _ => throw new AspException("unsupported_operation", "Unknown ASP operation mapping.")
     };
+
+    private static JsonElement Transfer<T>(bool writing)
+    {
+        var schema = JsonNode.Parse(For<AspInvocation<T>>().GetRawText())!.AsObject();
+        var arguments = schema["properties"]!["arguments"]!.AsObject();
+        var fixedField = writing ? "options" : "selection";
+        arguments["oneOf"] = new JsonArray(
+            new JsonObject
+            {
+                ["required"] = new JsonArray(fixedField, "notAfter"),
+                ["not"] = new JsonObject { ["required"] = new JsonArray("sessionRef") },
+                ["properties"] = new JsonObject
+                {
+                    ["sequence"] = new JsonObject { ["const"] = 0 },
+                    [fixedField] = new JsonObject { ["not"] = new JsonObject { ["type"] = "null" } },
+                    ["notAfter"] = new JsonObject { ["not"] = new JsonObject { ["type"] = "null" } }
+                }
+            },
+            new JsonObject
+            {
+                ["required"] = new JsonArray("sessionRef", "sequence"),
+                ["not"] = new JsonObject
+                {
+                    ["anyOf"] = new JsonArray(
+                    new JsonObject { ["required"] = new JsonArray(fixedField) },
+                    new JsonObject { ["required"] = new JsonArray("notAfter") },
+                    new JsonObject { ["required"] = new JsonArray("encoding") })
+                },
+                ["properties"] = new JsonObject { ["sessionRef"] = new JsonObject { ["type"] = "string" } }
+            });
+        return JsonSerializer.SerializeToElement(schema);
+    }
 
     private static JsonElement ForReply<T>()
     {
@@ -58,12 +95,17 @@ public static class AspSchemas
                     if (obj.ContainsKey("properties")) obj["additionalProperties"] = false;
                     switch (context.PropertyInfo?.Name)
                     {
-                        case "requestId": case "version": case "providerId": case "providerVersion":
-                        case "storeId": case "bindingId": case "revision":
+                        case "requestId":
+                        case "version":
+                        case "providerId":
+                        case "providerVersion":
+                        case "storeId":
+                        case "bindingId":
+                        case "revision":
                             obj["minLength"] = 1; obj["maxLength"] = 128; break;
                         case "key": obj["minLength"] = 1; obj["maxLength"] = 256; break;
                         case "prefix": obj["maxLength"] = 256; break;
-                        case "reference": case "cursor": obj["minLength"] = 1; obj["maxLength"] = 4096; break;
+                        case "reference": case "cursor": case "sessionRef": obj["minLength"] = 1; obj["maxLength"] = 4096; break;
                         case "limit": obj["minimum"] = 1; obj["maximum"] = AspProtocol.MaxPageSize; break;
                         case "maxBytes": obj["minimum"] = 1; obj["maximum"] = AspProtocol.MaxContentBytes; break;
                         case "offset": case "length": obj["minimum"] = 0; break;

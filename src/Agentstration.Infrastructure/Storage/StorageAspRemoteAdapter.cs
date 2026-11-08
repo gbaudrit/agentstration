@@ -48,15 +48,30 @@ public sealed class StorageAspRemoteAdapter(IResourceStore resources, IStorageRe
         StorageTypeResource type, AspAccessContext policy, string reference, long offset, int maximumBytes, CancellationToken cancellationToken)
     {
         await using var lease = await ConnectAsync(context, target, type, policy, cancellationToken);
-        var result = await lease.Client.ReadAsync(new(Guid.NewGuid().ToString("N"), reference, offset, maximumBytes), cancellationToken);
-        return new(Map(result.Item), result.Offset, result.ContentBase64, result.EndOfObject);
+        var request = new AspReadBlobRequest(Guid.NewGuid().ToString("N"), Selection: new(reference, new(offset, maximumBytes), maximumBytes),
+            NotAfter: clock.GetUtcNow().AddSeconds(25));
+        using var output = new MemoryStream();
+        AspObject? item = null;
+        while (true)
+        {
+            var chunk = await lease.Client.ReadBlobAsync(request, cancellationToken);
+            item ??= chunk.Item;
+            AspValidation.Require(chunk.Item == item && output.Length + chunk.ByteLength <= maximumBytes,
+                "invalid_result", "The provider changed the selected object or exceeded its range.");
+            await output.WriteAsync(Convert.FromBase64String(chunk.ContentBase64), cancellationToken);
+            if (chunk.Final) break;
+            request = new(Guid.NewGuid().ToString("N"), chunk.Sequence + 1, chunk.SessionRef);
+        }
+        return new(Map(item), offset, Convert.ToBase64String(output.ToArray()), offset + output.Length == item.Length);
     }
     public async Task<StorageObject> WriteAsync(ProtectedStorageContext context, StorageContentRequest target,
         StorageTypeResource type, AspAccessContext policy, StorageWrite request, CancellationToken cancellationToken)
     {
         await using var lease = await ConnectAsync(context, target, type, policy, cancellationToken);
-        return Map((await lease.Client.WriteAsync(new(request.RequestId, request.NotAfter, request.Key,
-            request.ContentBase64, request.ExpectedVersion), cancellationToken)).Item);
+        var written = await lease.Client.WriteBlobAsync(new(request.RequestId, 0, true, request.ContentBase64,
+            Options: new(request.Key, request.ExpectedVersion is null ? "create" : "replace", request.ExpectedVersion),
+            NotAfter: request.NotAfter), cancellationToken);
+        return Map(written.Receipt!.Item with { Sha256 = written.Receipt.Sha256 });
     }
 
     private async Task<Lease> ConnectAsync(ProtectedStorageContext context, StorageContentRequest target,

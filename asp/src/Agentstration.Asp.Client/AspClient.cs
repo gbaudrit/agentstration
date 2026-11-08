@@ -34,9 +34,9 @@ public sealed class AspClient
         AspValidation.Require((expectedProviderId is null || description.ProviderId == expectedProviderId)
             && (expectedProviderVersion is null || description.ProviderVersion == expectedProviderVersion), "incompatible_provider", "Provider identity or version differs from the pinned provider.");
         var capabilities = description.Capabilities;
-        foreach (var operation in new[] { "list", "stat", "read", "write" })
+        foreach (var operation in new[] { "list", "stat", "read_blob", "read_text", "close_read", "write_blob", "write_text", "abort_write", "write_status" })
         {
-            var supported = operation switch { "list" => capabilities.List, "stat" => capabilities.Stat, "read" => capabilities.Read, _ => capabilities.Write };
+            var supported = operation switch { "list" => capabilities.List, "stat" => capabilities.Stat, "read_blob" or "read_text" or "close_read" => capabilities.Read, _ => capabilities.Write };
             if (!supported) continue;
             var tool = tools.SingleOrDefault(value => value.Name == $"{toolPrefix}_{operation}")
                 ?? throw new AspException("unsupported_operation", "An advertised ASP mapping is missing.");
@@ -71,28 +71,96 @@ public sealed class AspClient
         return result;
     }
 
-    public async Task<AspReadResult> ReadAsync(AspReadRequest request, CancellationToken cancellationToken = default)
+    public Task<AspReadBlobResult> ReadBlobAsync(AspReadBlobRequest request, CancellationToken cancellationToken = default) =>
+        ReadTransferAsync<AspReadBlobResult>("read_blob", request, cancellationToken);
+    public Task<AspReadTextResult> ReadTextAsync(AspReadTextRequest request, CancellationToken cancellationToken = default) =>
+        ReadTransferAsync<AspReadTextResult>("read_text", request, cancellationToken);
+    public Task<AspWriteResult> WriteBlobAsync(AspWriteBlobRequest request, CancellationToken cancellationToken = default) =>
+        WriteTransferAsync("write_blob", request, request.Sequence, request.Final, AspValidation.Content(request.ContentBase64, Description.Policy.MaxWriteBytes), cancellationToken);
+    public Task<AspWriteResult> WriteTextAsync(AspWriteTextRequest request, CancellationToken cancellationToken = default) =>
+        WriteTransferAsync("write_text", request, request.Sequence, request.Final, AspValidation.Text(request.Content, Description.Policy.MaxWriteBytes), cancellationToken);
+    public Task<AspSessionResult> CloseReadAsync(AspSessionRequest request, CancellationToken cancellationToken = default) => ControlAsync("close_read", request, cancellationToken);
+    public Task<AspSessionResult> AbortWriteAsync(AspSessionRequest request, CancellationToken cancellationToken = default) => ControlAsync("abort_write", request, cancellationToken);
+    public Task<AspSessionResult> WriteStatusAsync(AspSessionRequest request, CancellationToken cancellationToken = default) => ControlAsync("write_status", request, cancellationToken);
+
+    private async Task<AspSessionResult> ControlAsync(string operation, AspSessionRequest request, CancellationToken ct)
     {
-        AspValidation.Require(Description.Capabilities.Read, "unsupported_operation", "Read is unsupported.");
-        var result = await CallAsync<AspReadResult>("read", request, cancellationToken);
-        ValidateObject(result.Item);
-        var bytes = AspValidation.Content(result.ContentBase64, Description.Policy.MaxReadBytes);
-        AspValidation.Require(result.Offset == request.Offset && bytes.Length <= request.MaxBytes && result.Offset >= 0
-            && result.Offset <= result.Item.Length && bytes.Length == Math.Min(request.MaxBytes, result.Item.Length - result.Offset)
-            && result.EndOfObject == (result.Offset + bytes.Length == result.Item.Length), "invalid_result", "Invalid content range.");
-        if (result.Offset == 0 && result.EndOfObject)
-            AspValidation.Require(AspValidation.Digest(bytes) == result.Item.Sha256, "invalid_result", "Content digest mismatch.");
+        var result = await CallAsync<AspSessionResult>(operation, request, ct);
+        AspValidation.Require(result.SessionRef == request.SessionRef && result.State is "open" or "finalized" or "closed" or "aborted" or "unknown"
+            && (result.Receipt is not null) == (result.State == "finalized"), "invalid_result", "Invalid session status.");
+        if (result.Receipt is { } receipt)
+        {
+            ValidateObject(receipt.Item);
+            AspValidation.Require(receipt.WrittenBytes >= 0 && receipt.Sha256 is { Length: 64 }
+                && receipt.Sha256.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'), "invalid_result", "Invalid retained write receipt.");
+        }
         return result;
     }
 
-    public async Task<AspWriteResult> WriteAsync(AspWriteRequest request, CancellationToken cancellationToken = default)
+    private async Task<T> ReadTransferAsync<T>(string operation, object request, CancellationToken ct)
+    {
+        AspValidation.Require(Description.Capabilities.Read, "unsupported_operation", "Read is unsupported.");
+        var result = await CallAsync<T>(operation, request, ct);
+        AspObject item; long sequence; string token; long offset; long selectedOffset; int count; long length; bool final; byte[] bytes;
+        if (result is AspReadBlobResult blob)
+        {
+            (item, sequence, token, offset, selectedOffset, count, length, final) = (blob.Item, blob.Sequence, blob.SessionRef, blob.Offset, blob.SelectedOffset, blob.ByteLength, blob.SelectedLength, blob.Final);
+            bytes = AspValidation.Content(blob.ContentBase64, Description.Policy.MaxReadBytes);
+        }
+        else if (result is AspReadTextResult text)
+        {
+            (item, sequence, token, offset, selectedOffset, count, length, final) = (text.Item, text.Sequence, text.SessionRef, text.Offset, text.SelectedOffset, text.ByteLength, text.SelectedLength, text.Final);
+            try { bytes = new System.Text.UTF8Encoding(false, true).GetBytes(text.Content); }
+            catch (System.Text.EncoderFallbackException) { throw new AspException("invalid_result", "Malformed text response."); }
+        }
+        else throw new AspException("invalid_result", "Missing transfer response.");
+        ValidateObject(item);
+        var wire = JsonSerializer.SerializeToElement(request, AspProtocol.JsonOptions);
+        var requestedSequence = wire.TryGetProperty("sequence", out var seq) ? seq.GetInt64() : 0;
+        AspValidation.Require(sequence == requestedSequence && token is { Length: > 0 and <= 4096 }
+            && offset >= 0 && offset <= item.Length && count == bytes.Length && count <= Description.Policy.MaxReadBytes
+            && count <= item.Length - offset && length >= count && selectedOffset >= 0 && selectedOffset <= offset
+            && length <= item.Length - selectedOffset && offset - selectedOffset <= length - count
+            && (count > 0 || final) && final == (offset - selectedOffset + count == length),
+            "invalid_result", "Invalid transfer byte positions or content.");
+        if (wire.TryGetProperty("sessionRef", out var selected)) AspValidation.Require(token == selected.GetString(), "invalid_result", "The response changed session identity.");
+        if (wire.TryGetProperty("selection", out var fixedSelection))
+        {
+            var selection = AspValidation.Parse<AspReadSelection>(fixedSelection);
+            var start = selection.Range?.Offset ?? 0;
+            AspValidation.Require(selectedOffset == start && offset == start
+                && length == Math.Min(selection.Range?.Length ?? long.MaxValue, item.Length - start),
+                "invalid_result", "The response changed the initial selected byte range.");
+        }
+        if (final && selectedOffset == 0 && offset == 0 && count == item.Length && item.Sha256 is not null)
+            AspValidation.Require(AspValidation.Digest(bytes) == item.Sha256, "invalid_result", "The complete response failed integrity validation.");
+        return result;
+    }
+    private async Task<AspWriteResult> WriteTransferAsync(string operation, object request, long sequence, bool final, byte[] bytes, CancellationToken ct)
     {
         AspValidation.Require(Description.Capabilities.Write, "unsupported_operation", "Write is unsupported.");
-        var bytes = AspValidation.Content(request.ContentBase64, Description.Policy.MaxWriteBytes);
-        var result = await CallAsync<AspWriteResult>("write", request, cancellationToken);
-        ValidateObject(result.Item);
-        AspValidation.Require(result.Item.Key == request.Key && result.Item.Length == bytes.Length
-            && result.Item.Sha256 == AspValidation.Digest(bytes), "invalid_result", "Invalid write receipt.");
+        AspValidation.Require(bytes.Length <= Description.Policy.MaxWriteBytes, "limit_exceeded", "Chunk exceeds its hard bound.");
+        var result = await CallAsync<AspWriteResult>(operation, request, ct);
+        AspValidation.Require(result.Sequence == sequence && result.Final == final && result.WrittenBytes >= bytes.Length
+            && result.SessionRef is { Length: > 0 and <= 4096 } && (result.Receipt is not null) == final,
+            "invalid_result", "Invalid write finalization receipt.");
+        var requestWire = JsonSerializer.SerializeToElement(request, AspProtocol.JsonOptions);
+        if (requestWire.TryGetProperty("sessionRef", out var selected))
+            AspValidation.Require(result.SessionRef == selected.GetString(), "invalid_result", "The response changed session identity.");
+        if (result.Receipt is { } receipt)
+        {
+            ValidateObject(receipt.Item);
+            var wire = JsonSerializer.SerializeToElement(request, AspProtocol.JsonOptions);
+            if (wire.TryGetProperty("options", out var first))
+            {
+                var options = AspValidation.Parse<AspWriteOptions>(first);
+                AspValidation.Require(receipt.Item.Key == options.Key && (options.Mode == "append" || receipt.Item.Length == bytes.Length)
+                    && (options.Mode == "append" || receipt.Item.Sha256 is null || receipt.Item.Sha256 == AspValidation.Digest(bytes)),
+                    "invalid_result", "The receipt differs from the selected target or content.");
+            }
+            AspValidation.Require(receipt.WrittenBytes == result.WrittenBytes && receipt.Sha256 is { Length: 64 }
+                && (sequence != 0 || receipt.Sha256 == AspValidation.Digest(bytes)), "invalid_result", "Invalid write integrity evidence.");
+        }
         return result;
     }
 
@@ -122,8 +190,8 @@ public sealed class AspClient
         if (reply.Error is { } error)
         {
             AspValidation.Require(!string.IsNullOrWhiteSpace(error.Code) && error.Code.Length <= 128
-                && error.Message is { Length: > 0 and <= 1024 }, "invalid_result", "Invalid error envelope.");
-            throw new AspException(error.Code, error.Message);
+                && error.Message is { Length: > 0 and <= 1024 } && (error.SessionRef is null || error.SessionRef.Length <= 4096), "invalid_result", "Invalid error envelope.");
+            throw new AspException(error.Code, error.Message, error.SessionRef);
         }
         return reply.Data!;
     }
@@ -143,7 +211,8 @@ public sealed class AspClient
         AspValidation.Require(!string.IsNullOrWhiteSpace(value.ProviderId) && value.ProviderId.Length <= 128
             && !string.IsNullOrWhiteSpace(value.ProviderVersion) && value.ProviderVersion.Length <= 128
             && value.ConfigurationSchema.ValueKind == JsonValueKind.Object && value.Capabilities is not null
-            && value.Policy is not null, "invalid_result", "Invalid provider description.");
+            && value.Limits is { MaximumSessions: > 0, MaximumReceipts: > 0, MaximumReplayBytes: > 0, ReceiptWindowSeconds: > 0 }
+            && value.Policy is not null && value.Transfers is { MaximumObjectBytes: > 0, DefaultChunkSizeBytes: > 0 }, "invalid_result", "Invalid provider description.");
         AspValidation.Policy(value.Policy);
         var c = value.Capabilities;
         AspValidation.Require(!c.Delete && !c.StableVersions && !c.Retention, "unsupported_capability", "This profile implementation offers no delete, stable-version or retention operation.");

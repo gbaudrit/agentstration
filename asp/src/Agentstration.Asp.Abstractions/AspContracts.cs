@@ -39,44 +39,90 @@ public sealed record AspAccessContext(AspStoreRef Store, string Subject, string 
 public sealed record AspCapabilities(bool List, bool Stat, bool Read, bool Write, bool Delete, bool StableVersions, bool Retention);
 public sealed record AspDescription(
     string AspVersion, string Profile, string ProviderId, string ProviderVersion,
-    AspStoreRef Store, AspCapabilities Capabilities, AspAccessPolicy Policy, JsonElement ConfigurationSchema);
-public sealed record AspObject(string Key, string Version, long Length, string Sha256, string Reference);
+    AspStoreRef Store, AspCapabilities Capabilities, AspAccessPolicy Policy, JsonElement ConfigurationSchema, AspTransferCapabilities Transfers, AspSessionLimits Limits);
+public sealed record AspObject(string Key, [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Version, long Length, [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Sha256, string Reference, string? ETag = null, AspContentMetadata? Metadata = null);
 public sealed record AspListRequest(string RequestId, string Prefix, int Limit, string? Cursor = null);
 public sealed record AspReferenceRequest(string RequestId, string Reference);
-public sealed record AspReadRequest(string RequestId, string Reference, long Offset, int MaxBytes);
-public sealed record AspWriteRequest(string RequestId, DateTimeOffset NotAfter, string Key, string ContentBase64, string? ExpectedVersion = null);
 public sealed record AspDescribeRequest(string RequestId);
 public sealed record AspListResult(IReadOnlyList<AspObject> Objects, string? Cursor = null);
-public sealed record AspReadResult(AspObject Item, long Offset, string ContentBase64, bool EndOfObject);
-public sealed record AspWriteResult(AspObject Item);
-public sealed record AspError(string Code, string Message);
+public sealed record AspError(string Code, string Message, string? SessionRef = null);
 public sealed record AspReply<T>(string AspVersion, string RequestId, T? Data = default, AspError? Error = null);
 
-public sealed class AspException(string code, string message) : Exception(message)
+public sealed class AspException(string code, string message, string? sessionRef = null) : Exception(message)
 {
     public string Code { get; } = code;
+    public string? SessionRef { get; } = sessionRef;
 }
 
 // Provider contracts carry logical identity and effective restrictions on every call.
 // Implementations MUST enforce this context even when several stores share physical placement.
-public sealed record AspProviderObject(string Key, string Version, long Length, string Sha256);
+public sealed record AspProviderObject(string Key, [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Version, long Length, [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Sha256, string? ETag = null, AspContentMetadata? Metadata = null);
 public sealed record AspProviderPage(IReadOnlyList<AspProviderObject> Objects, string? NextKey);
-public sealed record AspProviderRead(AspProviderObject Item, byte[] Content, bool EndOfObject);
-public sealed record AspProviderWrite(string RequestId, DateTimeOffset NotAfter, string Key, byte[] Content, string? ExpectedVersion);
+public sealed record AspSessionLimits(int MaximumSessions = 64, int MaximumReceipts = 8192,
+    long MaximumReplayBytes = 64 * 1024 * 1024, int ReceiptWindowSeconds = 30)
+{
+    public int MaximumSessionSeconds => 300;
+    public int MaximumMetadataBytes => 8192;
+    public int MaximumArgumentCharacters => 100_000;
+    public int MaximumResultCharacters => 200_000;
+}
 
+public sealed record AspTransferCapabilities(
+    bool ProgressiveRead = true, bool ProgressiveWrite = true, bool Replace = false, bool Append = false,
+    bool VersionCondition = false, bool ETagConditions = false, bool Metadata = false,
+    bool AtomicPublication = false, long MaximumObjectBytes = 1_073_741_824, int DefaultChunkSizeBytes = 16_384, bool CreateOnly = true, bool EmptyWrite = true);
+public sealed record AspByteRange(long Offset, long? Length = null);
+public sealed record AspReadSelection(string Reference, AspByteRange? Range = null, int? PreferredChunkSizeBytes = null,
+    string? Encoding = null);
+public sealed record AspContentMetadata(string? ContentType = null, string? ContentEncoding = null,
+    string? ContentDisposition = null, string? CacheControl = null, IReadOnlyDictionary<string, string>? UserMetadata = null);
+public sealed record AspWriteOptions(string Key, string Mode = "create", string? ExpectedVersion = null,
+    string? IfMatch = null, string? IfNoneMatch = null, AspContentMetadata? Metadata = null,
+    long? ExpectedLength = null, string? ExpectedSha256 = null);
+public sealed record AspReadBlobRequest(string RequestId, long Sequence = 0, string? SessionRef = null,
+    AspReadSelection? Selection = null, DateTimeOffset? NotAfter = null);
+public sealed record AspReadTextRequest(string RequestId, long Sequence = 0, string? SessionRef = null,
+    AspReadSelection? Selection = null, DateTimeOffset? NotAfter = null);
+public sealed record AspWriteBlobRequest(string RequestId, long Sequence, bool Final, string ContentBase64,
+    string? SessionRef = null, AspWriteOptions? Options = null, DateTimeOffset? NotAfter = null);
+public sealed record AspWriteTextRequest(string RequestId, long Sequence, bool Final, string Content,
+    string? SessionRef = null, AspWriteOptions? Options = null, DateTimeOffset? NotAfter = null, string? Encoding = null);
+public sealed record AspReadBlobResult(string SessionRef, long Sequence, bool Final, AspObject Item, long Offset,
+    int ByteLength, long SelectedOffset, long SelectedLength, string ContentBase64);
+public sealed record AspReadTextResult(string SessionRef, long Sequence, bool Final, AspObject Item, long Offset,
+    int ByteLength, long SelectedOffset, long SelectedLength, string Content);
+public sealed record AspWriteReceipt(AspObject Item, long WrittenBytes, string Sha256);
+public sealed record AspWriteResult(string SessionRef, long Sequence, bool Final, long WrittenBytes, AspWriteReceipt? Receipt = null);
+public sealed record AspSessionRequest(string RequestId, string SessionRef);
+public sealed record AspSessionResult(string SessionRef, string State, AspWriteReceipt? Receipt = null);
+
+/// <summary>The selection has already been authorized; provider must independently enforce context and identity.</summary>
+public sealed class AspReadHandle(AspProviderObject item, Stream content, long offset, long length) : IAsyncDisposable
+{
+    public AspProviderObject Item { get; } = item;
+    public Stream Content { get; } = content;
+    public long Offset { get; } = offset;
+    public long Length { get; } = length;
+    public ValueTask DisposeAsync() => Content.DisposeAsync();
+}
+public interface IAspWriteHandle : IAsyncDisposable
+{
+    Stream Content { get; }
+    ValueTask<AspProviderObject> CompleteAsync(CancellationToken cancellationToken);
+    /// <summary>Releases work without promising rollback or absence of publication.</summary>
+    ValueTask AbortAsync(CancellationToken cancellationToken);
+}
 public interface IAspObjectReader
 {
     string ProviderId { get; }
     string ProviderVersion { get; }
     JsonElement ConfigurationSchema { get; }
+    AspTransferCapabilities Transfers { get; }
     ValueTask<AspProviderPage> ListAsync(AspAccessContext context, string prefix, string? afterKey, int limit, CancellationToken cancellationToken);
-    ValueTask<AspProviderObject> StatAsync(AspAccessContext context, string key, string version, CancellationToken cancellationToken);
-    ValueTask<AspProviderRead> ReadAsync(AspAccessContext context, string key, string version, long offset, int maxBytes, CancellationToken cancellationToken);
+    ValueTask<AspProviderObject> StatAsync(AspAccessContext context, string key, string? version, string? etag, CancellationToken cancellationToken);
+    ValueTask<AspReadHandle> OpenReadAsync(AspAccessContext context, string key, string? version, string? etag, AspByteRange? range, CancellationToken cancellationToken);
 }
-
-// Atomic conditional writes and a bounded idempotency ledger are provider responsibilities.
-// Implement this interface only when the guarantee can be upheld by the backend.
 public interface IAspObjectWriter
 {
-    ValueTask<AspProviderObject> WriteAsync(AspAccessContext context, AspProviderWrite request, CancellationToken cancellationToken);
+    ValueTask<IAspWriteHandle> OpenWriteAsync(AspAccessContext context, AspWriteOptions options, CancellationToken cancellationToken);
 }

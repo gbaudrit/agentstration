@@ -180,3 +180,15 @@ Agent Tool; optional fixed-target exposure belongs to #1044.
 - #1039: OpenDAL and provider packaging. It consumes this contract without a direct
   Connected Service-extension dependency.
 - #1033: integrated UX scenario, after its existing implemented-UX approval/merge gate.
+
+
+### ASP progressive content contract
+
+FR #1085 directly replaces the unreleased `asp_read`/`asp_write` wire methods with
+`asp_read_text`, `asp_read_blob`, `asp_write_text` and `asp_write_blob`. Providers
+supply byte-oriented streams; the independent SDK manages scoped implicit sessions,
+sequencing, bounded replay receipts and explicit finalization. The product's bounded
+content port delegates to these methods without exposing a backend to the Agent.
+Every continuation and status/cleanup call rechecks the current binding and grant.
+See the [ASP protocol](https://github.com/gbaudrit/agentstration/blob/integration/fr-1032/asp/docs/protocol.md) and
+[ADR-0202](../decisions/0202-asp-uses-scoped-progressive-content-sessions.md).
