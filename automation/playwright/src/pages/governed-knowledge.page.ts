@@ -139,9 +139,9 @@ export class GovernedKnowledgePage {
     const definition = await (await this.get(consoleUrl, `/api/tooldefinitions/${knowledge}.search`, scope)).json() as { definition: Record<string, unknown> };
     const additionalName = `${knowledge}.additional-search`;
     await this.post(consoleUrl, '/api/tooldefinitions', scope, {
-      name: additionalName, namespace: 'default', properties: { ...definition.definition, displayName: additionalName },
+      name: additionalName, namespace: 'default', properties: { ...definition.definition, displayName: additionalName, publish: true },
     }, 201);
-    const additionalTool = `agentstration.${additionalName}`;
+    const additionalTool = `agentstration.${additionalName}.v${String(definition.definition.version)}`;
     const updated = await this.page.request.put(this.url(consoleUrl, path, scope), {
       headers: { 'X-Agentstration-Context': scope, 'If-Match': current.headers()['etag']! },
       data: { properties: { ...toolSet.definition, version: '2.0.0', publish: true,

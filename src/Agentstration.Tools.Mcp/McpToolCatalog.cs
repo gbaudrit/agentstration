@@ -435,14 +435,24 @@ public sealed class McpToolInvoker(
                 context.Arguments ?? JsonSerializer.SerializeToElement(new { }),
                 callerKind,
                 callerId,
-                InvocationContext(context)), cancellationToken);
+                InvocationContext(context)) { DefinitionScopeRef = tool.ScopeRef }, cancellationToken);
             var receipt = new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["flowRunId"] = result.Receipt.FlowRunId,
                 ["correlationId"] = result.Receipt.CorrelationId
             };
+            if (result.Receipt.FlowRunId is { } flowRunId) receipt["flowRunId"] = flowRunId;
             if (result.Receipt.WorkItemId is { } workItemId)
                 receipt["workItemId"] = workItemId;
+            if (result.Receipt.Relay is { } relay)
+            {
+                receipt["relay.publicationUid"] = relay.PublicationUid.ToString("D");
+                receipt["relay.version"] = relay.RelayVersion;
+                receipt["relay.sourceTool"] = relay.SourceToolName;
+                receipt["relay.sourceScope"] = relay.SourceScopeRef.Value;
+                receipt["relay.sourceUid"] = relay.SourceToolUid.ToString("D");
+                receipt["relay.sourceGeneration"] = relay.SourceGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (relay.SourceVersion is { } sourceVersion) receipt["relay.sourceVersion"] = sourceVersion;
+            }
             return new ToolInvocationResult(result.Output?.Clone(), receipt);
         }
         return new ToolInvocationResult(await providers.InvokeAsync(provider, tool, context.Arguments, cancellationToken), null);
@@ -470,7 +480,7 @@ public sealed class McpToolInvoker(
             throw new ToolResolutionException("internal_tool_executor_unavailable", "The Agentstration ToolDefinition executor is unavailable.");
         return new ToolInvocationResult(await internalTools.Value.SimulateAsync(new ToolDefinitionInvocation(
             tenantId, workspaceId, principalId, tool.Namespace, externalId, context.ToolCallId, context.CorrelationId,
-            arguments, callerKind, callerId, InvocationContext(context)), cancellationToken), null);
+            arguments, callerKind, callerId, InvocationContext(context)) { DefinitionScopeRef = tool.ScopeRef }, cancellationToken), null);
     }
 
     private async ValueTask<(ToolResource Tool, ToolProviderResource Provider)> ResolveAsync(
@@ -543,11 +553,12 @@ public sealed class McpToolInvoker(
         context.OwnerKind == ToolExecutionOwnerKind.RuntimeRun ? context.RunId : null,
         context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? context.RunId : null,
         context.FlowStepId,
-        context.InvocationId);
+        context.InvocationId, context.AgentVersion, context.AgentGeneration, context.HasSensitiveArguments);
 
     private static ToolDefinitionCallerKind CallerKind(ToolExecutionContext context) => context.OwnerKind switch
     {
         ToolExecutionOwnerKind.Console => ToolDefinitionCallerKind.Console,
+        ToolExecutionOwnerKind.Mcp => ToolDefinitionCallerKind.Mcp,
         ToolExecutionOwnerKind.FlowRun => ToolDefinitionCallerKind.Flow,
         _ when context.AgentId is not null => ToolDefinitionCallerKind.Agent,
         _ => ToolDefinitionCallerKind.Agent

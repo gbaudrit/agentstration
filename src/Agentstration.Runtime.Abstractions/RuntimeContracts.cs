@@ -307,7 +307,7 @@ public interface IToolCatalog
         CancellationToken cancellationToken = default) => ResolveAsync(tools.Select(value => value.Id), cancellationToken);
 }
 
-public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console }
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console, Mcp }
 
 public sealed record ToolExecutionScope
 {
@@ -325,6 +325,7 @@ public sealed record ToolExecutionScope
 
 public sealed record ToolExecutionContext
 {
+    public bool HasSensitiveArguments { get; init; }
     public ToolExecutionOwnerKind OwnerKind { get; init; }
     public required string ToolCallId { get; init; }
     public required string InvocationId { get; init; }

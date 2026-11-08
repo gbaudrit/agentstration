@@ -145,6 +145,7 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
         catch (Exception exception)
         {
             var failedAt = timeProvider.GetUtcNow();
+            var failureMessage = context.HasSensitiveArguments ? "Sensitive Tool execution failed." : exception.Message;
             var failure = Failure(exception);
             if (!terminalHooksInvoked)
             {
@@ -159,7 +160,7 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
                             failedAt - startedAt,
                             exception.GetType().FullName ?? exception.GetType().Name,
                             failure.Code,
-                            exception.Message),
+                            failureMessage),
                         CancellationToken.None);
                 }
                 catch (Exception hookException)
@@ -174,7 +175,7 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
                     failedAt,
                     failedAt - startedAt,
                     exception.GetType().FullName ?? exception.GetType().Name,
-                    exception.Message,
+                    failureMessage,
                     failure.Kind == ToolExecutionFailureKind.Cancelled)
                 {
                     FailureKind = failure.Kind,

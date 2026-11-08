@@ -75,6 +75,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ListShowsExactScopedLinksAndBuiltinAndExtensionEvidence()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new());
         var page = context.Render<Storages>();
         page.WaitForAssertion(() =>
@@ -105,6 +106,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void NoReadPermissionDoesNotFetchStorageResources()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client, canRead: false);
         var page = context.Render<Storages>();
@@ -158,6 +160,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ExistingServiceGenerationIsPreservedUntilExplicitRebindAndConfirmation()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client, serviceGeneration: 2);
         Navigate(context, Resource(), edit: true);
@@ -201,6 +204,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void ConflictIsLocalizedAndDoesNotShowBackendProblemDetails()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient { Failure = new("PRIVATE BACKEND DETAILS", "correlation", HttpStatusCode.Conflict, "storage_version_conflict") };
         using var context = Setup(client);
         Navigate(context, Resource(), edit: true);
@@ -229,6 +233,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void DeactivationRequiresConfirmationAndReportsDependenciesWithoutLosingResource()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new StorageClient { Failure = new("PRIVATE", "correlation", HttpStatusCode.Conflict, "storage_in_use") };
         using var context = Setup(client); Navigate(context, Resource());
         var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
@@ -257,6 +262,7 @@ public sealed class StorageComponentTests
     [TestMethod]
     public void MissingTypeKeepsExactSavedIdentityVisibleAndMetadataEditable()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Setup(new() { TypesMissing = true }); Navigate(context, Resource(), edit: true);
         var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents"));
         page.WaitForAssertion(() => StringAssert.Contains(page.Markup, "saved exact type is unavailable"));

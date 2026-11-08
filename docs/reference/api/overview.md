@@ -31,3 +31,7 @@ Individual cleanup operations are exposed through `DELETE /api/flowRuns/{runId}`
 The [Storages API](../storages.md) owns `/api/storage-types` and `/api/storages`,
 including scoped lifecycle, immutable type versions, explicit manual export
 mappings, ETags, bounded validation and protected consumer resolution.
+
+## ToolDefinitions
+
+The [ToolDefinition and relay API](../tool-relays.md) owns `/api/tooldefinitions`, its `/{name}/versions` publication/listing routes and `/{name}/usages`. Draft writes use the existing ETag and exact scope/namespace conventions. `toolKind` selects Flow, relay or acquisition behavior. Publication creates an independently versioned ordinary Tool; consumers adopt it explicitly through their existing revision/version mechanisms. Execution remains under the governed `/api/tools/{name}/run` and MCP paths.

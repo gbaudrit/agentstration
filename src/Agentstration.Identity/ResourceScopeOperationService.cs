@@ -138,6 +138,8 @@ public sealed class ResourceScopeOperationService(
             && scopeRef == ResourceScopeRef.Tenant(requestContext.Current.TenantId))
             return await operation(cancellationToken);
 
+        if (requestContext.AccessMode != ControlPlaneAccessMode.Workspace)
+            throw new ResourceScopeAccessDeniedException(scopeRef);
         var current = RequireInteractiveContext();
         if (current.Restriction is not null) throw new ResourceScopeAccessDeniedException(scopeRef);
         if (scopeRef == ResourceScopeRef.Workspace(current.WorkspaceId))

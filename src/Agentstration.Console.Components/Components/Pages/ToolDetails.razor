@@ -14,7 +14,7 @@ else
                     StatusText="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)"
                     Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)"
                     TestId="resource-tool-details">
-        <Actions>@if (CanManage) { <button class="button-primary" data-testid="tool-enabled-toggle" disabled="@tool.Governance.IsManaged" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button> }</Actions>
+        <Actions>@if (CanManage) { <a class="button-secondary" href="@NewDefinitionUrl">@T("NewDefinition")</a> <button class="button-primary" data-testid="tool-enabled-toggle" disabled="@tool.Governance.IsManaged" @onclick="ToggleAsync">@T(tool.Definition.Enabled ? "Disable" : "Enable")</button> }</Actions>
     </ResourceHeader>
 
     <InheritedResourceNotice OwnerScopeRef="@(tool.ScopeRef ?? ResourceScopeRef.Instance)" />
@@ -183,6 +183,14 @@ else
     private ResourceNamespace ToolNamespace => ResourceNamespace.Parse(NamespaceValue);
     private bool CanSimulate => ToolDryRunContract.IsSupported(tool?.Definition.Schema?.Input);
     private bool CanManage => tool is not null && ResourceOwnershipContext.CanManage(tool.ScopeRef ?? ResourceScopeRef.Instance, Services);
+    private string NewDefinitionUrl
+    {
+        get
+        {
+            var url = $"/tools/definitions/new?toolKind=relay&source={Uri.EscapeDataString(ToolResourceIdentity.CatalogId(tool!.Namespace, tool.Name))}";
+            return (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(url) ?? url;
+        }
+    }
     private IReadOnlyDictionary<string, JsonElement>? ManagedRunValues => runMode == ToolRunMode.Simulate ? DryRunEnabled : null;
     private bool CanSubmit => tool is { Definition.Enabled: true }
         && tool.Definition.Discovery?.Available == true

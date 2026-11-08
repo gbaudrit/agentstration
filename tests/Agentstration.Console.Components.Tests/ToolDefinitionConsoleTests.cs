@@ -8,6 +8,8 @@ using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
 using Agentstration.Tools;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -25,6 +27,8 @@ public sealed class ToolDefinitionConsoleTests
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolDefinitionsClient>(new DefinitionClient());
+        context.Services.AddAgentstrationWebComponents();
+        context.Services.GetRequiredService<IConsoleNavigationContext>().SetSelectedScopeRef("/workspaces/11111111-1111-1111-1111-111111111111");
 
         var rendered = context.Render<ToolDefinitions>();
 
@@ -33,6 +37,8 @@ public sealed class ToolDefinitionConsoleTests
             StringAssert.Contains(rendered.Markup, "Send notification");
             StringAssert.Contains(rendered.Markup, "notification-flow");
             StringAssert.Contains(rendered.Markup, "/tools/definitions/notification.send?namespace=default");
+            Assert.AreEqual("/tools/definitions/new?context=%2Fworkspaces%2F11111111-1111-1111-1111-111111111111",
+                rendered.Find("a.button-primary").GetAttribute("href"));
         });
     }
 
@@ -47,8 +53,13 @@ public sealed class ToolDefinitionConsoleTests
         context.Services.AddSingleton<IFlowApiClient>(flows);
         context.Services.AddSingleton<ISchemasClient>(new SchemasClient());
 
-        var rendered = context.Render<ToolDefinitionEditor>();
-        rendered.WaitForElement("select").Change("/workspaces/11111111-1111-1111-1111-111111111111|default|contract-flow");
+        var creationContext = new CreationContext();
+        context.Services.AddSingleton<IConsoleNavigationContext>(creationContext);
+        context.Services.AddSingleton(new ConsoleContextState(creationContext));
+        var rendered = context.Render<NewToolDefinition>();
+        rendered.Find("[data-testid='tool-definition-display-name']").Change("Contract Tool");
+        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        rendered.WaitForElement("[data-testid='tool-definition-flow']").Change("/workspaces/11111111-1111-1111-1111-111111111111|default|contract-flow");
 
         rendered.WaitForAssertion(() =>
         {
@@ -63,6 +74,13 @@ public sealed class ToolDefinitionConsoleTests
             Assert.IsTrue(rendered.Find("[data-testid='tool-definition-output-schema']") is not null));
     }
 
+    private sealed class CreationContext : IConsoleNavigationContext, IConsoleContextProvider
+    {
+        public string ScopeRef => "/workspaces/11111111-1111-1111-1111-111111111111";
+        public string AddToUri(string uri) => uri;
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(NewToolDefinitionTests.SnapshotFor(ResourceScopeRef.Parse(ScopeRef)));
+    }
+
     private sealed class DefinitionClient : IToolDefinitionsClient
     {
         public Task<IReadOnlyList<ToolDefinitionResource>> GetAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ToolDefinitionResource>>([
@@ -72,7 +90,7 @@ public sealed class ToolDefinitionConsoleTests
                 Kind = ToolResourceKinds.ToolDefinition,
                 Metadata = new ResourceMetadata { Name = "notification.send" },
                 ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
-                Definition = new ToolDefinitionProperties
+                Definition = new FlowToolDefinitionProperties
                 {
                     DisplayName = "Send notification",
                     InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),

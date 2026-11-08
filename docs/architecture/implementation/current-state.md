@@ -156,12 +156,12 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | Workspace-owned Trigger resources, including placement in governed Instance/Tenant operational Workspaces, durable occurrences, exact Workspace-keyed Quartz.NET projection in the selected SQLite or PostgreSQL store, startup reconciliation, explicit misfire/concurrency policy, pinned Flow identity and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
-| Tools | hierarchical ToolProvider, Tool, ToolSet, and immutable ToolSet-version resources with exact Extension-registration scope; AEP contribution resolution, MCP schema catalog, governed execution, Workspace ToolDefinitions that publish bounded Flow-backed Tools, and deterministic routing and pinned Agent assignment | richer permissions, credentials, connection policies, and additional built-in hook handlers |
+| Tools | hierarchical ToolProvider, Tool, ToolSet, and immutable ToolSet-version resources with exact Extension-registration scope; AEP contribution resolution, MCP schema catalog, governed execution, Instance/Tenant/Workspace ToolDefinitions with independently versioned Flow, relay and acquisition publications, typed literal/Parameter/Secret bindings, explicit consumer adoption, deterministic routing and pinned Agent assignment | richer permissions, credentials, connection policies, and additional built-in hook handlers |
 | Artifacts | Workspace-scoped staged content, provenance, bounded leases and retention, ToolSet-backed temporary storage, brokered MCP access, immutable Flow Run artifacts, and composable Storage Flows with a local filesystem default | additional provider-supplied staging ToolSets and packaged storage recipes |
 | Data Sources | Instance-, tenant-, and Workspace-scoped origins, reusable versioned acquisition profiles, schema-validated configuration, Workspace execution through `datasource.acquisition/v1`, and exact Flow, Tool, provider and policy provenance | source-usage policy and additional provider compositions |
 | Knowledge | Instance-, Tenant-, and Workspace-owned reusable Knowledge Source definitions over exact Data Source and Flow pins; Workspace-isolated projection, acquisition, Artifact, Snapshot, retrieval, index, and session state; optional `artifact.transform/v1` bindings and governed internal MCP exposure | specialized projection and retrieval catalogs |
 | Notifications | Work and Workplace notification records, the server-keyed `work.notification.create` internal MCP Tool, and reusable delivery Flows | packaged external-provider delivery recipes |
-| MCP | generic governed provider/client infrastructure, bounded internal Tools, and dynamic `tools/list`/`tools/call` publication of enabled ToolDefinitions; no generic Flow launcher or legacy platform tools | resources, prompts, and richer task progress |
+| MCP | generic governed provider/client infrastructure, bounded internal Tools, and dynamic `tools/list`/`tools/call` exposure of enabled immutable ToolDefinition publications through the ordinary governed pipeline; no generic Flow launcher or legacy platform tools | resources, prompts, and richer task progress |
 | Observability | OTel traces/metrics/log correlation tags | dashboards and SLOs |
 
 ## Principal contracts
@@ -578,6 +578,7 @@ SQLite schema evolution remains reset-only before the first release: existing ge
 - ADR-0102: Source Providers follow hierarchical resource visibility
 - ADR-0105: Flows compose reusable Flows and governed Tools
 - ADR-0106: ToolDefinitions publish Flow-backed MCP Tools
+- [ADR-0201 — independent governed ToolDefinition relay versions](../../decisions/0201-tool-definitions-publish-independent-governed-relay-versions.md), extending ADR-0106 with typed variants, immutable publications and explicit adoption; see the [relay contract and acquisition boundary](../../reference/tool-relays.md)
 - ADR-0107: notification channels are delivery Flows
 - ADR-0108: Flow Run causality is a bounded read model
 - [ADR-0117 — product-owned reusable browser journeys](../../decisions/0117-product-owned-browser-journeys.md)

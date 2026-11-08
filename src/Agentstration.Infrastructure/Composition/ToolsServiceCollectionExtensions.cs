@@ -28,6 +28,10 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ToolDefinitionService>();
+        services.AddSingleton<ToolRelayExecutor>();
+        services.AddSingleton<IToolDefinitionUsageReader, ToolDefinitionUsageReader>();
+        services.AddSingleton<Agentstration.Parameters.IParameterUsageProvider, ToolDefinitionValueUsages>();
+        services.AddSingleton<Agentstration.Secrets.ISecretUsageProvider, ToolDefinitionValueUsages>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());

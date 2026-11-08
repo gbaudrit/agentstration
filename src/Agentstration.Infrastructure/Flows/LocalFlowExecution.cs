@@ -101,6 +101,14 @@ public sealed class CurrentWorkExecutionScopeAccessor(ICurrentRequestContext req
         or ControlPlaneAccessMode.Instance
         or ControlPlaneAccessMode.TenantAdministration
         ? new FlowRunScope(requestContext.Current.TenantId, new WorkspaceId(requestContext.Current.WorkspaceId), requestContext.Current.PrincipalId)
+        {
+            LogicalScopeRef = requestContext.AccessMode switch
+            {
+                ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+                ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(requestContext.Current.TenantId),
+                _ => null
+            }
+        }
         : null;
 }
 

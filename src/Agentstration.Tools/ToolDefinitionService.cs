@@ -3,6 +3,9 @@ using System.Text.Json.Nodes;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Parameters;
+using Agentstration.Secrets.Abstractions;
+using Agentstration.Identity.Contracts;
 
 namespace Agentstration.Tools;
 
@@ -11,12 +14,17 @@ public sealed class ToolDefinitionValidationException(string code, string messag
     public string Code { get; } = code;
 }
 
-public sealed class ToolDefinitionService(
+public sealed partial class ToolDefinitionService(
     IResourceStore store,
     IToolDefinitionFlowResolver flows,
     TimeProvider timeProvider,
     IEnumerable<IInternalMcpToolDefinitionProvider>? internalTools = null,
-    ISchemaBindingResolver? schemaBindingResolver = null)
+    ISchemaBindingResolver? schemaBindingResolver = null,
+    IResourceReferenceResolver? references = null,
+    IToolDefinitionUsageReader? usages = null,
+    IParameterResolver? parameters = null,
+    ISecretAccessAuthorizer? secretAccess = null,
+    IResourceScopeOperations? scopeOperations = null)
 {
     private const string JsonSchemaFormat = "json-schema";
 
@@ -39,12 +47,19 @@ public sealed class ToolDefinitionService(
         string? ifMatch,
         bool ifNoneMatch,
         CancellationToken cancellationToken) =>
-        PutCoreAsync(resource, ifMatch, ifNoneMatch, fromAcquisition: false, cancellationToken);
+        WriteAsync(resource, ifMatch, ifNoneMatch, fromAcquisition: false, cancellationToken);
 
     public Task<StoredResource<ToolDefinitionResource>> CreateFromAcquisitionAsync(
         ToolDefinitionResource resource,
         CancellationToken cancellationToken) =>
-        PutCoreAsync(resource, null, true, fromAcquisition: true, cancellationToken);
+        WriteAsync(resource, null, true, fromAcquisition: true, cancellationToken);
+
+    private Task<StoredResource<ToolDefinitionResource>> WriteAsync(ToolDefinitionResource resource,
+        string? ifMatch, bool ifNoneMatch, bool fromAcquisition, CancellationToken cancellationToken) =>
+        scopeOperations is null || resource.ScopeRef is not { } scope
+            ? PutCoreAsync(resource, ifMatch, ifNoneMatch, fromAcquisition, cancellationToken)
+            : scopeOperations.WriteAsync(resource, scope, AuthorizationPermissions.ResourcesWrite,
+                token => PutCoreAsync(resource, ifMatch, ifNoneMatch, fromAcquisition, token), cancellationToken);
 
     private async Task<StoredResource<ToolDefinitionResource>> PutCoreAsync(
         ToolDefinitionResource resource,
@@ -57,18 +72,31 @@ public sealed class ToolDefinitionService(
         if ((internalTools ?? []).Any(value => string.Equals(value.Definition.Name, resource.Name, StringComparison.Ordinal)))
             throw new ToolDefinitionValidationException("tool_definition_name_reserved", $"ToolDefinition name '{resource.Name}' is reserved by an internal Agentstration MCP Tool.");
         var scopeRef = resource.ScopeRef!.Value;
+        if (resource.Definition is RelayToolDefinitionProperties relay)
+        {
+            var source = await ResolveRelaySourceAsync(relay.Target, scopeRef, cancellationToken);
+            resource = resource with { Definition = relay with
+            {
+                InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings),
+                OutputSchema = source.Tool.Definition.Schema.Output?.Clone(),
+                RequiresApproval = relay.RequiresApproval || source.Tool.Definition.RequiresApproval
+            } };
+        }
         var contracts = await ResolveContractsAsync(resource.Definition, scopeRef, resource.Namespace, cancellationToken);
         var existing = await GetExactAsync(resource.Name, resource.Namespace, scopeRef, cancellationToken);
         if (fromAcquisition && existing is not null)
             throw new ResourceConcurrencyException("If-None-Match prevented replacement of an existing resource.");
-        if (!fromAcquisition && (resource.Definition.Acquisition != existing?.Value.Definition.Acquisition
-            || (resource.Definition.Acquisition is not null && resource.Definition.Flow != existing?.Value.Definition.Flow)))
+        if (!fromAcquisition && resource.Definition is AcquisitionToolDefinitionProperties acquisition
+            && (existing?.Value.Definition is not AcquisitionToolDefinitionProperties previousAcquisition
+                || acquisition.Acquisition != previousAcquisition.Acquisition))
             throw new ToolDefinitionValidationException("tool_definition_acquisition_binding_fixed",
                 "The acquisition binding of a ToolDefinition can only be set during creation from an acquisition.");
-        if (resource.Definition.Acquisition is null)
+        if (resource.Definition is FlowToolDefinitionProperties flowDefinition)
         {
-            var resolved = await flows.ResolveAsync(scopeRef, resource.Namespace, resource.Definition.Flow, cancellationToken);
+            var resolved = await flows.ResolveAsync(scopeRef, resource.Namespace, flowDefinition.Flow, cancellationToken);
             ValidateContract(contracts.Definition, resolved);
+            var normalized = (FlowToolDefinitionProperties)contracts.Definition;
+            contracts = (normalized with { Flow = normalized.Flow with { ScopeRef = resolved.ScopeRef ?? normalized.Flow.ScopeRef ?? scopeRef } }, contracts.Snapshots);
         }
         var value = resource with
         {
@@ -82,7 +110,8 @@ public sealed class ToolDefinitionService(
         await EnsureProviderAsync(scopeRef, resource.Namespace, cancellationToken);
         var stored = await store.PutAsync(value, ifMatch ?? existing?.ETag,
             ifNoneMatch || (existing is null && ifMatch is null), cancellationToken);
-        await MaterializeAsync(stored.Value, cancellationToken);
+        if (stored.Value.Definition.Publish)
+            _ = await PublishAsync(stored.Value.Name, stored.Value.Namespace, stored.Value.Definition.Version, cancellationToken, stored.ETag);
         return stored;
     }
 
@@ -95,8 +124,9 @@ public sealed class ToolDefinitionService(
     {
         var current = await GetAsync(name, @namespace, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
-        return await PutAsync(
-            current.Value with { Definition = current.Value.Definition with { Enabled = enabled } },
+        return await store.PutAsync(
+            current.Value with { Generation = checked(current.Value.Generation + 1),
+                Definition = current.Value.Definition with { Enabled = enabled, Publish = false } },
             ifMatch ?? current.ETag,
             false,
             cancellationToken);
@@ -106,14 +136,13 @@ public sealed class ToolDefinitionService(
     {
         var current = await GetAsync(name, @namespace, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
-        var tool = new ResourceKey(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(name), @namespace);
-        if (await store.GetAsync<ToolResource>(tool, cancellationToken) is { } materialized)
-            await store.DeleteAsync(tool, materialized.ETag, cancellationToken);
         await store.DeleteAsync(new ResourceKey(ToolResourceKinds.ToolDefinition, name, @namespace), ifMatch ?? current.ETag, cancellationToken);
     }
 
     public static void ValidateContract(ToolDefinitionProperties definition, ResolvedToolDefinitionFlowContract flow)
     {
+        if (definition.Bindings.Count > 0)
+            throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "Typed argument bindings apply to relay definitions. Flow definitions use their explicit fixed arguments.");
         if (definition.FixedArguments is null && !SameSchema(definition.InputSchema, flow.InputSchema))
             throw new ToolDefinitionValidationException("tool_definition_input_schema_incompatible", "The Tool input schema must match the published Flow input schema.");
         if (definition.FixedArguments is not null && !CompatibleWithFixedArguments(definition, flow.InputSchema))
@@ -187,21 +216,28 @@ public sealed class ToolDefinitionService(
 
     private static void Validate(ToolDefinitionResource resource)
     {
+        if (resource.Definition is null)
+            throw new ToolDefinitionValidationException("tool_definition_invalid", "A ToolDefinition requires a typed definition.");
+        if (resource.Definition.Bindings is null || resource.Definition is RelayToolDefinitionProperties { Target: null })
+            throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "A relay requires its target and binding collection.");
         if (resource.Kind != ToolResourceKinds.ToolDefinition || resource.ApiVersion != ResourceApiVersions.CoreV1)
             throw new ToolDefinitionValidationException("tool_definition_identity_invalid", "ToolDefinition kind and apiVersion are required.");
-        if (resource.ScopeRef is null || resource.Definition.Acquisition is null && resource.ScopeRef.Value.Kind != ResourceScopeKind.Workspace)
-            throw new ToolDefinitionValidationException("tool_definition_scope_invalid", "A ToolDefinition without an acquisition binding must belong to a Workspace.");
+        if (resource.ScopeRef is null)
+            throw new ToolDefinitionValidationException("tool_definition_scope_invalid", "A ToolDefinition requires an exact owner scope.");
+        ResourceScopePolicy.EnsureAllowed(resource, resource.ScopeRef.Value);
         if (string.IsNullOrWhiteSpace(resource.Name) || resource.Name.Length > 128
             || resource.Name.Any(character => !char.IsLetterOrDigit(character) && character is not '.' and not '-' and not '_'))
             throw new ToolDefinitionValidationException("tool_definition_name_invalid", "ToolDefinition names must contain only letters, digits, '.', '-' or '_'.");
         if (string.IsNullOrWhiteSpace(resource.Definition.DisplayName))
             throw new ToolDefinitionValidationException("tool_definition_display_name_required", "ToolDefinition displayName is required.");
-        if (string.IsNullOrWhiteSpace(resource.Definition.Flow.Name))
+        if (resource.Definition is FlowToolDefinitionProperties flow && string.IsNullOrWhiteSpace(flow.Flow.Name))
             throw new ToolDefinitionValidationException("tool_definition_flow_required", "A ToolDefinition requires a Flow implementation.");
-        if ((resource.Definition.Flow.UseActiveVersion && !string.IsNullOrWhiteSpace(resource.Definition.Flow.Version))
-            || (!resource.Definition.Flow.UseActiveVersion && string.IsNullOrWhiteSpace(resource.Definition.Flow.Version)))
+        if (resource.Definition is FlowToolDefinitionProperties flowReference
+            && ((flowReference.Flow.UseActiveVersion && !string.IsNullOrWhiteSpace(flowReference.Flow.Version))
+            || (!flowReference.Flow.UseActiveVersion && string.IsNullOrWhiteSpace(flowReference.Flow.Version))))
             throw new ToolDefinitionValidationException("tool_definition_flow_reference_invalid", "Select either the active Flow version or one exact version.");
         if (resource.Definition.InputSchemaBinding is null
+            && resource.Definition is not RelayToolDefinitionProperties
             && resource.Definition.InputSchema.ValueKind != JsonValueKind.Object)
             throw new ToolDefinitionValidationException("tool_definition_input_schema_invalid", "The Tool input schema must be a JSON object.");
         ValidateBinding(resource.Definition.InputSchemaBinding, "input");
@@ -212,10 +248,14 @@ public sealed class ToolDefinitionService(
             throw new ToolDefinitionValidationException("tool_definition_fixed_arguments_invalid", "ToolDefinition fixed arguments must be a JSON object.");
         if (resource.Definition.InvocationTimeoutSeconds is < 1 or > 900)
             throw new ToolDefinitionValidationException("tool_definition_timeout_invalid", "Tool invocation timeout must be between 1 and 900 seconds.");
-        if (resource.Definition.Acquisition is { } acquisition
+        ValidateVersion(resource.Definition.Version);
+        if (resource.Definition is RelayToolDefinitionProperties && (resource.Definition.FixedArguments is not null
+            || resource.Definition.InputSchemaBinding is not null || resource.Definition.OutputSchemaBinding is not null))
+            throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "Relay inputs use typed bindings and contracts derived from the pinned source.");
+        if (resource.Definition is AcquisitionToolDefinitionProperties { Acquisition: var acquisition }
             && (string.IsNullOrWhiteSpace(acquisition.TemplateId)
                 || acquisition.ArtifactKind is not ("staged" or "durable")
-                || resource.Definition.Flow.UseActiveVersion
+                || resource.Definition.Bindings.Count != 0
                 || resource.Definition.FixedArguments is not null
                 || resource.Definition.InputSchemaBinding is not null
                 || resource.Definition.OutputSchemaBinding is not null
@@ -302,7 +342,7 @@ public sealed class ToolDefinitionService(
         }, null, true, cancellationToken);
     }
 
-    private async Task MaterializeAsync(ToolDefinitionResource definition, CancellationToken cancellationToken)
+    private async Task MaterializeAsync(ToolDefinitionResource definition, CancellationToken cancellationToken, Guid? definitionUid = null, int relayDepth = 0)
     {
         var now = timeProvider.GetUtcNow();
         var name = AgentstrationToolProvider.ToolResourceName(definition.Name);
@@ -321,6 +361,7 @@ public sealed class ToolDefinitionService(
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
             Definition = new ToolResourceProperties
             {
+                Version = definition.Definition.Version,
                 DisplayName = definition.Definition.DisplayName,
                 Description = definition.Definition.Description,
                 Enabled = definition.Definition.Enabled,
@@ -331,7 +372,9 @@ public sealed class ToolDefinitionService(
                 Schema = new ToolSchema { Input = definition.Definition.InputSchema.Clone(), Output = definition.Definition.OutputSchema?.Clone() },
                 Metadata = new Dictionary<string, JsonElement>
                 {
-                    ["agentstration.toolDefinitionUid"] = JsonSerializer.SerializeToElement(definition.Uid),
+                    ["agentstration.toolDefinitionUid"] = JsonSerializer.SerializeToElement(definitionUid ?? definition.Uid),
+                    ["agentstration.toolPublicationUid"] = JsonSerializer.SerializeToElement(definition.Uid),
+                    ["agentstration.relayDepth"] = JsonSerializer.SerializeToElement(relayDepth),
                     ["agentstration.toolDefinitionGeneration"] = JsonSerializer.SerializeToElement(definition.Generation)
                 }
             }
