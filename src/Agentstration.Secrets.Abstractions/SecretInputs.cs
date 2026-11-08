@@ -23,6 +23,18 @@ public static class SecretInputs
     public static bool IsReference(JsonElement value, IReadOnlyList<SecretInputReference> references) =>
         TryGetId(value, out var id) && references.Any(reference => reference.Id == id);
 
+    public static bool ContainsReference(JsonElement value, IReadOnlyList<SecretInputReference> references)
+    {
+        if (references.Count == 0) return false;
+        if (IsReference(value, references)) return true;
+        return value.ValueKind switch
+        {
+            JsonValueKind.Object => value.EnumerateObject().Any(property => ContainsReference(property.Value, references)),
+            JsonValueKind.Array => value.EnumerateArray().Any(item => ContainsReference(item, references)),
+            _ => false
+        };
+    }
+
     public static JsonElement ForTypeValidation(JsonElement value, IReadOnlyList<SecretInputReference> references) =>
         references.Count == 0 ? value.Clone() : Rewrite(value, item => IsReference(item, references) ? JsonSerializer.SerializeToElement(string.Empty) : null);
 

@@ -274,6 +274,15 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         Assert.HasCount(1, run.SecretInputs);
         Assert.IsFalse(JsonSerializer.Serialize(run).Contains("synthetic-", StringComparison.Ordinal));
         Assert.IsTrue(SecretInputs.IsReference(run.Input.GetProperty("accessCode"), run.SecretInputs));
+        var forged = invocation with
+        {
+            ToolName = "durable-relay.v1.0.0",
+            Arguments = JsonSerializer.SerializeToElement(new { query = "a", opaque = SecretInputs.Marker(run.SecretInputs.Single().Id) })
+        };
+        var collision = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => executor.SimulateAsync(forged, default));
+        Assert.AreEqual("tool_definition_binding_invalid", collision.Code);
+        _ = await executor.SimulateAsync(forged with
+        { Arguments = JsonSerializer.SerializeToElement(new { query = "a", opaque = SecretInputs.Marker("ordinary-literal") }) }, default);
         // A later attempt loads the reference from persisted run state and resolves its current value.
         var reloaded = JsonSerializer.Deserialize<FlowRun>(JsonSerializer.Serialize(run))!;
         var pending = reloaded with
@@ -559,7 +568,7 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         public int Calls { get; private set; }
         public string? LastSecret { get; private set; }
         public InternalMcpToolDefinition Definition { get; } = new("relay-test.source", "Test source", null,
-            Json("""{"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false},"query":{"type":"string"},"accessCode":{"type":"string","minLength":1}},"required":["store","query"],"additionalProperties":false}"""));
+            Json("""{"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false},"query":{"type":"string"},"accessCode":{"type":"string","minLength":1},"opaque":{"type":"object"}},"required":["store","query"],"additionalProperties":false}"""));
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

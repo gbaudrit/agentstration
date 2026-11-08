@@ -50,7 +50,8 @@ public sealed class ToolRelayExecutor(
                 || source.Tool.Definition.ExternalId != pinned.Tool.Definition.ExternalId)
                 throw Error("tool_definition_target_stale", "The source provider no longer matches its published revision.");
             var values = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-            var references = (invocation.ExecutionContext?.SecretInputs ?? []).ToList();
+            var inherited = invocation.ExecutionContext?.SecretInputs ?? [];
+            var references = inherited.ToList();
             foreach (var binding in relay.Bindings)
             {
                 switch (binding)
@@ -79,6 +80,11 @@ public sealed class ToolRelayExecutor(
                         break;
                 }
             }
+            // Public JSON cannot acquire authority merely by matching a newly created binding identifier.
+            var introduced = references.Where(reference => !inherited.Any(value => value.Id == reference.Id)).ToArray();
+            if (SecretInputs.ContainsReference(invocation.Arguments, introduced)
+                || relay.Bindings.OfType<LiteralToolArgumentBinding>().Any(binding => SecretInputs.ContainsReference(binding.Value, references)))
+                throw Error("tool_definition_binding_invalid", "An untrusted value collides with a protected input reference.");
             var arguments = ToolRelayArguments.Reconstruct(invocation.Arguments, relay.Bindings, values, pinned.Tool.Definition.Schema!.Input, references);
             using var resolvedInputs = await secretInputs.ResolveAsync(arguments, references, token);
             ToolInputSchemaValidator.Validate(pinned.Tool.Definition.Schema.Input, resolvedInputs.Value);
