@@ -1,0 +1,9 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+@if (Error is not null)
+{
+    <div class="form-alert form-alert-danger" role="alert" data-testid="storage-error">
+        <strong>@Localizer[StorageErrorKey.For(Error)]</strong>
+        <span>@Localizer["Error.RefreshHelp"]</span>
+    </div>
+}
+@code { [Parameter] public Exception? Error { get; set; } }

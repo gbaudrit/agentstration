@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Storages" xml:space="preserve"><value>Storages</value></data>
+  <data name="Storage" xml:space="preserve"><value>Storage</value></data>
+  <data name="List.Description" xml:space="preserve"><value>Administer logical storage resources, their exact types and explicit connections.</value></data>
+  <data name="Editor.Description" xml:space="preserve"><value>Select a versioned implementation and configure its governed logical envelope.</value></data>
+  <data name="Details.Description" xml:space="preserve"><value>Inspect the saved identity, mappings, availability and dependent resources.</value></data>
+  <data name="Create" xml:space="preserve"><value>Create Storage</value></data>
+  <data name="Edit" xml:space="preserve"><value>Edit Storage</value></data>
+  <data name="Save" xml:space="preserve"><value>Save</value></data>
+  <data name="Saving" xml:space="preserve"><value>Saving…</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Back" xml:space="preserve"><value>Back to Storages</value></data>
+  <data name="Loading" xml:space="preserve"><value>Loading Storages…</value></data>
+  <data name="Search" xml:space="preserve"><value>Search Storages</value></data>
+  <data name="AllStatuses" xml:space="preserve"><value>All statuses</value></data>
+  <data name="Empty.Title" xml:space="preserve"><value>No matching Storages</value></data>
+  <data name="Empty.Description" xml:space="preserve"><value>Create a Storage in this context or adjust the filters.</value></data>
+  <data name="TypeCatalog" xml:space="preserve"><value>Visible Storage types</value></data>
+  <data name="TypeCatalog.Help" xml:space="preserve"><value>Capabilities describe the exact implementation version. A type does not create a connection or grant access.</value></data>
+  <data name="NoTypes" xml:space="preserve"><value>No visible Storage type is available in this context.</value></data>
+  <data name="Identity" xml:space="preserve"><value>Resource identity</value></data>
+  <data name="Identity.Help" xml:space="preserve"><value>The selected administrative context owns this resource. Its scoped name and namespace remain fixed after creation.</value></data>
+  <data name="TechnicalName" xml:space="preserve"><value>Scoped name</value></data>
+  <data name="Description" xml:space="preserve"><value>Description</value></data>
+  <data name="Scope" xml:space="preserve"><value>Owner scope</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="Uid" xml:space="preserve"><value>Resource UID</value></data>
+  <data name="Generation" xml:space="preserve"><value>Generation</value></data>
+  <data name="Type" xml:space="preserve"><value>Storage type</value></data>
+  <data name="TypeUid" xml:space="preserve"><value>Type UID</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Origin" xml:space="preserve"><value>Origin</value></data>
+  <data name="ExactType" xml:space="preserve"><value>Exact implementation version</value></data>
+  <data name="SavedType" xml:space="preserve"><value>Saved type reference</value></data>
+  <data name="SavedTypeUnavailable" xml:space="preserve"><value>The saved exact type is unavailable. Its reference is preserved. Explicitly select an available version to reconcile.</value></data>
+  <data name="SelectType" xml:space="preserve"><value>Select an exact type version…</value></data>
+  <data name="SchemaDigest" xml:space="preserve"><value>Configuration schema digest</value></data>
+  <data name="EnvelopeDigest" xml:space="preserve"><value>Envelope schema digest</value></data>
+  <data name="ContractDigest" xml:space="preserve"><value>Version contract digest</value></data>
+  <data name="Contribution" xml:space="preserve"><value>Contribution evidence</value></data>
+  <data name="Capabilities" xml:space="preserve"><value>Supported capabilities</value></data>
+  <data name="NoCapabilities" xml:space="preserve"><value>No content operations advertised</value></data>
+  <data name="Limits" xml:space="preserve"><value>Implementation limits</value></data>
+  <data name="LimitsValue" xml:space="preserve"><value>Page: {0} items · Read: {1} bytes · Write: {2} bytes</value></data>
+  <data name="Deprecated" xml:space="preserve"><value>Deprecated version</value></data>
+  <data name="Yes" xml:space="preserve"><value>Yes</value></data>
+  <data name="No" xml:space="preserve"><value>No</value></data>
+  <data name="ManualMapping" xml:space="preserve"><value>Explicit manual mapping</value></data>
+  <data name="ManualMapping.Help" xml:space="preserve"><value>Choose each compatible export yourself. No mapping is selected automatically. Connection values remain owned by Connected Services.</value></data>
+  <data name="ManageConnectedServices" xml:space="preserve"><value>Manage Connected Services</value></data>
+  <data name="ConnectedService" xml:space="preserve"><value>Connected Service</value></data>
+  <data name="ConnectedServices" xml:space="preserve"><value>Connected Services</value></data>
+  <data name="SelectService" xml:space="preserve"><value>Select an authorized Connected Service…</value></data>
+  <data name="SavedService" xml:space="preserve"><value>Saved service reference</value></data>
+  <data name="SavedServiceUnavailable" xml:space="preserve"><value>Saved service revision unavailable — choose explicitly to rebind</value></data>
+  <data name="Service.Help" xml:space="preserve"><value>Only enabled, ready services are offered. The API verifies authorization and use policy at save time. No credentials are read here.</value></data>
+  <data name="ServiceType" xml:space="preserve"><value>Pinned service type</value></data>
+  <data name="SelectExport" xml:space="preserve"><value>Select a compatible export…</value></data>
+  <data name="SavedExportUnavailable" xml:space="preserve"><value>Saved export is stale or incompatible</value></data>
+  <data name="Required" xml:space="preserve"><value>Required</value></data>
+  <data name="Optional" xml:space="preserve"><value>Optional</value></data>
+  <data name="Requirement" xml:space="preserve"><value>Requirement</value></data>
+  <data name="Export" xml:space="preserve"><value>Export</value></data>
+  <data name="ValueType" xml:space="preserve"><value>Value type</value></data>
+  <data name="Protection" xml:space="preserve"><value>Protection</value></data>
+  <data name="Mappings" xml:space="preserve"><value>Saved manual mappings</value></data>
+  <data name="NoMappings" xml:space="preserve"><value>No export mapping is recorded.</value></data>
+  <data name="LocalStorage" xml:space="preserve"><value>This Storage has no Connected Service.</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Storage configuration</value></data>
+  <data name="Envelope" xml:space="preserve"><value>Logical envelope</value></data>
+  <data name="Envelope.Help" xml:space="preserve"><value>The envelope fixes the logical authority of this Storage. Consumers cannot override its type, connection or envelope.</value></data>
+  <data name="Dependents" xml:space="preserve"><value>Dependent resources</value></data>
+  <data name="Dependents.Help" xml:space="preserve"><value>Deactivation preserves the resource and retained history. The API refuses unsafe changes while dependencies exist.</value></data>
+  <data name="NoDependents" xml:space="preserve"><value>No dependencies reported by the API.</value></data>
+  <data name="RelatedJourneys" xml:space="preserve"><value>Related administration</value></data>
+  <data name="DataSources" xml:space="preserve"><value>Data Sources</value></data>
+  <data name="KnowledgeSources" xml:space="preserve"><value>Knowledge Sources</value></data>
+  <data name="Diagnostics" xml:space="preserve"><value>Bounded diagnostics</value></data>
+  <data name="ObservedAt" xml:space="preserve"><value>Last observation</value></data>
+  <data name="NotObserved" xml:space="preserve"><value>Availability has not been observed.</value></data>
+  <data name="Availability" xml:space="preserve"><value>Availability</value></data>
+  <data name="DetailsSections" xml:space="preserve"><value>Storage detail sections</value></data>
+  <data name="Tab.Overview" xml:space="preserve"><value>Overview</value></data>
+  <data name="Tab.Definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="Tab.Access" xml:space="preserve"><value>Access</value></data>
+  <data name="Tab.YAML" xml:space="preserve"><value>YAML</value></data>
+  <data name="Yaml.Help" xml:space="preserve"><value>Read-only resource definition. It contains references and Storage configuration, never resolved connection secrets.</value></data>
+  <data name="Yaml.Label" xml:space="preserve"><value>Storage YAML definition</value></data>
+  <data name="ReadOnlyHelp" xml:space="preserve"><value>To edit this resource, select its owner context with resource write permission. Managed resources remain under their owner’s authority.</value></data>
+  <data name="Reconcile" xml:space="preserve"><value>Check drift</value></data>
+  <data name="Reconcile.Confirm" xml:space="preserve"><value>Observe availability and drift using the saved exact references? This does not replace any binding or invoke storage operations.</value></data>
+  <data name="Rebind" xml:space="preserve"><value>Confirm Storage changes</value></data>
+  <data name="Rebind.Confirm" xml:space="preserve"><value>Apply this complete configuration and its explicit mappings? The API will verify dependencies, permissions and exact revisions before accepting the change. Retained history is preserved.</value></data>
+  <data name="Deactivate" xml:space="preserve"><value>Deactivate</value></data>
+  <data name="Deactivate.Confirm" xml:space="preserve"><value>Deactivate this logical Storage? The API checks dependencies first. The resource and retained history will remain.</value></data>
+  <data name="Validation.Required" xml:space="preserve"><value>Enter a display name and a valid lowercase resource name. Select a type and explicitly bind every required export. Correct the schema validation errors before saving.</value></data>
+  <data name="Error.RefreshHelp" xml:space="preserve"><value>Refresh to inspect current references and permissions. Review the definition and confirm changes explicitly.</value></data>
+  <data name="Error.Conflict" xml:space="preserve"><value>This revision is stale. Refresh before editing again; your changes were not applied.</value></data>
+  <data name="Error.Mapping" xml:space="preserve"><value>Complete the required mappings using exports with compatible types and protection.</value></data>
+  <data name="Error.Export" xml:space="preserve"><value>An export is missing or stale. Inspect the service and explicitly select current exports before reconciling.</value></data>
+  <data name="Error.ServiceStale" xml:space="preserve"><value>The Connected Service UID or generation changed. Review the new service and explicitly rebind it.</value></data>
+  <data name="Error.Service" xml:space="preserve"><value>The Connected Service is disabled, incompatible or unavailable. Inspect it before retrying.</value></data>
+  <data name="Error.Drift" xml:space="preserve"><value>The saved type or bindings drifted. Review the exact version and confirm reconciliation in Definition.</value></data>
+  <data name="Error.Provider" xml:space="preserve"><value>The implementation provider is unavailable. The resource and its history are preserved. Restore the provider or explicitly select an available implementation.</value></data>
+  <data name="Error.Configuration" xml:space="preserve"><value>The configuration is invalid. Check the selected schema, configuration and logical envelope.</value></data>
+  <data name="Error.InUse" xml:space="preserve"><value>Dependencies prevent this change. Inspect dependent resources and their retention rules.</value></data>
+  <data name="Error.Forbidden" xml:space="preserve"><value>Access is denied in this context. Select an authorized context and verify resource use permissions.</value></data>
+  <data name="Error.NotFound" xml:space="preserve"><value>This exact resource is no longer visible. Return to the catalog and check its scope and namespace.</value></data>
+  <data name="Error.Generic" xml:space="preserve"><value>The Storage request failed. Refresh and retry after checking service availability.</value></data>
+  <data name="Availability.Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Availability.Stale" xml:space="preserve"><value>Stale</value></data>
+  <data name="Availability.Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="Availability.Disabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="Origin.User" xml:space="preserve"><value>User</value></data>
+  <data name="Origin.BuiltIn" xml:space="preserve"><value>Builtin</value></data>
+  <data name="Origin.Extension" xml:space="preserve"><value>Extension</value></data>
+  <data name="Origin.Pack" xml:space="preserve"><value>Pack</value></data>
+  <data name="Capability.List" xml:space="preserve"><value>List</value></data>
+  <data name="Capability.Stat" xml:space="preserve"><value>Inspect metadata</value></data>
+  <data name="Capability.Read" xml:space="preserve"><value>Read</value></data>
+  <data name="Capability.Write" xml:space="preserve"><value>Write</value></data>
+  <data name="Capability.Delete" xml:space="preserve"><value>Delete content</value></data>
+  <data name="Capability.StableVersions" xml:space="preserve"><value>Stable versions</value></data>
+  <data name="Capability.DurableRetention" xml:space="preserve"><value>Durable retention</value></data>
+  <data name="ValueType.Text" xml:space="preserve"><value>Text</value></data>
+  <data name="ValueType.WholeNumber" xml:space="preserve"><value>Integer</value></data>
+  <data name="ValueType.DecimalNumber" xml:space="preserve"><value>Number</value></data>
+  <data name="ValueType.Logical" xml:space="preserve"><value>Boolean</value></data>
+  <data name="Protection.Standard" xml:space="preserve"><value>Standard</value></data>
+  <data name="Protection.Secured" xml:space="preserve"><value>Protected</value></data>
+  <data name="Namespace" xml:space="preserve"><value>Namespace</value></data>
+  <data name="ScopeKind.Instance" xml:space="preserve"><value>Instance</value></data>
+  <data name="ScopeKind.Tenant" xml:space="preserve"><value>Tenant</value></data>
+  <data name="ScopeKind.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="SelectedType" xml:space="preserve"><value>Selected type reference</value></data>
+  <data name="SelectedService" xml:space="preserve"><value>Selected service revision</value></data>
+</root>

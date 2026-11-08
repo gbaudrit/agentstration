@@ -39,7 +39,7 @@ unchanged. Read-time observations do not create writes or change ETags.
 
 The Core `local` type supports management/resolution without a Connected Service.
 It advertises no unimplemented content capabilities. #1040 delivers actual
-ASP/AEP/Artifact adapters, #1046 the Console, and #1041/#1042 the dataset and
+ASP/AEP/Artifact adapters; [#1046 supplies the Console](../../reference/storage-console.md), and #1041/#1042 the dataset and
 Snapshot consumers. Existing acquisitions and Artifact histories are untouched.
 
 Fast tests exercise domain and authority invariants with deterministic ports.
@@ -75,3 +75,12 @@ The 12 skips are existing opt-in integrations: 2 PostgreSQL, 8 live Foundry,
 1 llama.cpp and 1 LocalAI. No Storage test was skipped. The final Integration
 pass completed after an environment restart interrupted an earlier attempt.
 There is no Storage Console change or new browser journey in #1045.
+
+The Console client and components reference only `Storage.Contracts`. The two
+existing composition roots register `IStoragesClient` over the product HTTP API.
+The UI preserves exact pins in drafts and separates metadata PUT, observation-only
+reconciliation and confirmed complete replacement. It never invokes ASP/AEP or
+Secret-resolution ports. Architecture checks explicitly permit this family contract
+while continuing to reject Storage services, API modules and concrete persistence
+from Console assemblies. This follows ADR-0199 and the existing Connected Service
+Console architecture; it introduces no new architectural decision or ADR.

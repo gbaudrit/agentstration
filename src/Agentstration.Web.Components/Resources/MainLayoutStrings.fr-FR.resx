@@ -38,4 +38,6 @@
   <data name="TenantAdministration" xml:space="preserve"><value>Administration du Tenant</value></data>
   <data name="ConfirmContextChange" xml:space="preserve"><value>Des modifications ne sont pas enregistrées. Les abandonner et changer de contexte ?</value></data>
   <data name="ContextChangeFailed" xml:space="preserve"><value>Échec du changement de contexte</value></data>
+  <data name="Nav.Storages" xml:space="preserve"><value>Stockages</value></data>
+  <data name="Command.CreateStorage" xml:space="preserve"><value>Créer un stockage</value></data>
 </root>

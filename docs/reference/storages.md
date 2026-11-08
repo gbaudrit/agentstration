@@ -175,3 +175,6 @@ Both resources use the existing scoped document store, with SQLite by default an
 the same PostgreSQL document-store behavior. No EF migration, legacy Storage
 contract or dual read/write is introduced. Other verticals and their histories
 are preserved. See [ADR-0199](../decisions/0199-storages-own-explicit-service-export-bindings.md).
+
+See [Console administration](storage-console.md) for scoped routes, explicit mapping,
+reconciliation and UI delivery boundaries.

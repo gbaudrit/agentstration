@@ -1,0 +1,31 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+@if (Choice is { } choice)
+{
+    @if (!string.IsNullOrWhiteSpace(choice.Resource.Definition.Description)) { <p>@choice.Resource.Definition.Description</p> }
+    <dl class="details-list storage-evidence">
+        <dt>@T("Type")</dt><dd><code>@choice.Resource.ScopeRef/@choice.Resource.Namespace/@choice.Resource.Name</code></dd>
+        <dt>@T("TypeUid")</dt><dd><code>@choice.Resource.Uid</code></dd>
+        <dt>@T("Version")</dt><dd>@choice.Version.Version</dd>
+        <dt>@T("Origin")</dt><dd>@T($"Origin.{choice.Resource.Governance.Origin.Kind}") · <code>@choice.Resource.Governance.Origin.Reference</code></dd>
+        <dt>@T("SchemaDigest")</dt><dd><code>@choice.Version.SchemaDigest</code></dd>
+        <dt>@T("EnvelopeDigest")</dt><dd><code>@choice.Version.EnvelopeSchemaDigest</code></dd>
+        <dt>@T("ContractDigest")</dt><dd><code>@choice.Version.ContractDigest</code></dd>
+        @if (choice.Version.Contribution is { } proof)
+        {
+            <dt>@T("Contribution")</dt><dd><code>@proof.Provider · @proof.ProviderUid · @proof.ProviderGeneration · @proof.ContributionId · @proof.Version · @proof.Digest</code></dd>
+        }
+        <dt>@T("Capabilities")</dt><dd data-testid="storage-capabilities">@string.Join(" · ", Capabilities(choice.Version.Capabilities))</dd>
+        <dt>@T("Limits")</dt><dd>@T("LimitsValue", choice.Version.Limits.MaximumPageSize, choice.Version.Limits.MaximumReadBytes, choice.Version.Limits.MaximumWriteBytes)</dd>
+        <dt>@T("Deprecated")</dt><dd>@T(choice.Version.Deprecated ? "Yes" : "No")</dd>
+    </dl>
+}
+@code {
+    [Parameter] public StorageTypeChoice? Choice { get; set; }
+    private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private IEnumerable<string> Capabilities(StorageCapabilities value)
+    {
+        var flags = new (string Name, bool Supported)[] { ("List", value.List), ("Stat", value.Stat), ("Read", value.Read), ("Write", value.Write), ("Delete", value.Delete), ("StableVersions", value.StableVersions), ("DurableRetention", value.DurableRetention) };
+        var supported = flags.Where(flag => flag.Supported).Select(flag => T($"Capability.{flag.Name}")).ToArray();
+        return supported.Length == 0 ? [T("NoCapabilities")] : supported;
+    }
+}

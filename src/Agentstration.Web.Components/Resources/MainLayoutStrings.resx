@@ -38,4 +38,6 @@
   <data name="TenantAdministration" xml:space="preserve"><value>Tenant administration</value></data>
   <data name="ConfirmContextChange" xml:space="preserve"><value>You have unsaved changes. Discard them and change context?</value></data>
   <data name="ContextChangeFailed" xml:space="preserve"><value>Context change failed</value></data>
+  <data name="Nav.Storages" xml:space="preserve"><value>Storages</value></data>
+  <data name="Command.CreateStorage" xml:space="preserve"><value>Create Storage</value></data>
 </root>

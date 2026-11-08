@@ -1,0 +1,3 @@
+p { overflow-wrap: anywhere; }
+.storage-evidence dd { min-width: 0; margin-inline-start: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .storage-evidence { display: grid; grid-template-columns: minmax(0, 1fr); } }
