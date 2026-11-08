@@ -28,6 +28,8 @@
   <data name="Description" xml:space="preserve"><value>Description</value></data>
   <data name="Scope" xml:space="preserve"><value>Owner scope</value></data>
   <data name="Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="Value.Yes" xml:space="preserve"><value>Yes</value></data>
+  <data name="Value.No" xml:space="preserve"><value>No</value></data>
   <data name="Uid" xml:space="preserve"><value>Resource UID</value></data>
   <data name="Generation" xml:space="preserve"><value>Generation</value></data>
   <data name="Type" xml:space="preserve"><value>Storage type</value></data>
@@ -138,4 +140,42 @@
   <data name="ScopeKind.Workspace" xml:space="preserve"><value>Workspace</value></data>
   <data name="SelectedType" xml:space="preserve"><value>Selected type reference</value></data>
   <data name="SelectedService" xml:space="preserve"><value>Selected service revision</value></data>
+  <data name="Type.Manage" xml:space="preserve"><value>Manage Storage types</value></data>
+  <data name="Type.ListHelp" xml:space="preserve"><value>Administer implementation contracts, immutable versions and scoped resource grants.</value></data>
+  <data name="Type.Create" xml:space="preserve"><value>Create Storage type</value></data>
+  <data name="Type.Edit" xml:space="preserve"><value>Edit type metadata</value></data>
+  <data name="Type.Publish" xml:space="preserve"><value>Publish a new version</value></data>
+  <data name="Type.Delete" xml:space="preserve"><value>Delete type</value></data>
+  <data name="Type.Back" xml:space="preserve"><value>Back to Storage types</value></data>
+  <data name="Type.Loading" xml:space="preserve"><value>Loading Storage types…</value></data>
+  <data name="Type.Search" xml:space="preserve"><value>Search Storage types</value></data>
+  <data name="Type.PreferredVersion" xml:space="preserve"><value>Preferred version</value></data>
+  <data name="Type.VersionContract" xml:space="preserve"><value>Immutable version contract</value></data>
+  <data name="Type.ImmutableHelp" xml:space="preserve"><value>Published versions cannot be changed or removed. Publish a new version to change schemas, requirements or capabilities. Existing Storages keep their exact selected version.</value></data>
+  <data name="Type.RequiresService" xml:space="preserve"><value>Requires a Connected Service</value></data>
+  <data name="Type.ConfigurationSchema" xml:space="preserve"><value>Configuration schema (JSON Schema)</value></data>
+  <data name="Type.EnvelopeSchema" xml:space="preserve"><value>Envelope schema (JSON Schema)</value></data>
+  <data name="Type.Requirements" xml:space="preserve"><value>Typed requirements (JSON)</value></data>
+  <data name="Type.RequirementsHelp" xml:space="preserve"><value>Enter a JSON array of requirement descriptors: id, required, type, protection and optional format. Use [] when no Connected Service is required. Credentials remain Secret references on the Connected Service.</value></data>
+  <data name="Type.CapabilitiesHelp" xml:space="preserve"><value>Declare only operations actually implemented by this version. Capabilities describe support; they do not grant user permissions or resource access.</value></data>
+  <data name="Type.MaximumPageSize" xml:space="preserve"><value>Maximum page size</value></data>
+  <data name="Type.MaximumReadBytes" xml:space="preserve"><value>Maximum read size (bytes)</value></data>
+  <data name="Type.MaximumWriteBytes" xml:space="preserve"><value>Maximum write size (bytes)</value></data>
+  <data name="Type.SetPreferred" xml:space="preserve"><value>Make this the preferred version for new selections</value></data>
+  <data name="Type.Validation" xml:space="preserve"><value>Enter valid, bounded JSON schemas and a requirements array. Review the version, metadata and limits before saving.</value></data>
+  <data name="Type.ReviewCurrent" xml:space="preserve"><value>Review current saved revision without discarding my draft</value></data>
+  <data name="Type.CurrentSaved" xml:space="preserve"><value>Current saved display name: {0}. Generation: {1}. Your draft is retained; review it before saving again.</value></data>
+  <data name="Type.ManagedBy" xml:space="preserve"><value>Managed by</value></data>
+  <data name="Type.ManagedHelp" xml:space="preserve"><value>Core or the contributing extension owns this definition and lifecycle. Permitted resource grants are administered separately in Access.</value></data>
+  <data name="Type.UsagesHelp" xml:space="preserve"><value>Only references discoverable in your current context are listed (up to 100). Other dependencies may still prevent disablement or deletion.</value></data>
+  <data name="Type.AccessHelp" xml:space="preserve"><value>For Storage and StorageType, saved Use grants authorize resource usage; a Tenant grant with descendant propagation includes its Workspaces. Discover alone does not authorize usage, and revocation removes it. Existing user permissions, scope and exact references, enablement, availability, configuration and mappings still apply. Embedded UsePolicy adds no extra access gate while its administration is deferred.</value></data>
+  <data name="Type.Yaml" xml:space="preserve"><value>Read-only Storage type YAML</value></data>
+  <data name="Type.DeleteConfirm" xml:space="preserve"><value>Delete this user-owned Storage type? Published contracts and references must be reviewed first. Any Storage dependency will prevent deletion.</value></data>
+  <data name="Error.TypeInUse" xml:space="preserve"><value>A Storage references this type. Review its dependencies before disabling or deleting it.</value></data>
+  <data name="Error.TypeImmutable" xml:space="preserve"><value>This version is already published and immutable. Publish a different version instead.</value></data>
+  <data name="Error.TypeManaged" xml:space="preserve"><value>This definition is managed by Core or an extension. Only permitted resource grants can be administered here.</value></data>
+  <data name="Type.DisableConfirm" xml:space="preserve"><value>Disable this type for new use? All Storage references must be reviewed first. Referenced types cannot be disabled.</value></data>
+  <data name="Type.GenericUse" xml:space="preserve"><value>Generic Use in this context</value></data>
+  <data name="Type.UseGranted" xml:space="preserve"><value>Generic Use granted</value></data>
+  <data name="Type.UseNotGranted" xml:space="preserve"><value>Generic Use not granted</value></data>
 </root>

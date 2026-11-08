@@ -583,7 +583,23 @@ public sealed class PostgreSqlResourceStore(
             .ToDictionaryAsync(value => value.ResourceUid, cancellationToken);
         return candidates.Where(value => value.Scope.Ref == targetRef.Value
             || policies.TryGetValue(value.Uid, out var policy)
+            && MatchesAccessIdentity(policy, value)
             && GrantsDiscover(policy.GrantsJson, targetRef, tenantRef)).ToArray();
+    }
+
+    private static bool MatchesAccessIdentity(ResourceAccessPolicyRow policy, ControlPlaneDocument document)
+    {
+        if (policy.OwnerScopeRef != document.Scope.Ref || policy.Namespace != document.Namespace
+            || policy.Kind != document.Kind) return false;
+        if (policy.Generation is null && policy.Version is null) return true;
+        using var payload = JsonDocument.Parse(document.Payload);
+        var root = payload.RootElement;
+        var generation = root.TryGetProperty("generation", out var generationValue)
+            && generationValue.TryGetInt64(out var parsed) ? parsed : 0;
+        var version = root.TryGetProperty("version", out var versionValue)
+            && versionValue.ValueKind == JsonValueKind.String ? versionValue.GetString() : null;
+        return (policy.Generation is null || policy.Generation == generation)
+            && (policy.Version is null || policy.Version == version);
     }
 
     private static bool GrantsDiscover(string grantsJson, ResourceScopeRef targetRef, ResourceScopeRef tenantRef) =>

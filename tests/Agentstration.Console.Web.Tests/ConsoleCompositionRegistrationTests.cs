@@ -38,6 +38,7 @@ public sealed class ConsoleCompositionRegistrationTests
         AssertSingle<IUserPreferencesClient>(services, ServiceLifetime.Scoped);
         AssertSingle<IConnectedServicesClient>(services, ServiceLifetime.Scoped);
         AssertSingle<IStoragesClient>(services, ServiceLifetime.Scoped);
+        AssertSingle<IStorageTypesClient>(services, ServiceLifetime.Scoped);
     }
 
     [TestMethod]

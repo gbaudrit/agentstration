@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.Storage.Contracts;
@@ -65,7 +66,11 @@ public sealed record StorageTypeResource : Resource
 {
     public StorageTypeProperties Definition { get; init; } = null!;
     public IReadOnlyList<StorageTypeVersionAvailability> ObservedVersions { get; init; } = [];
+    public StorageTypeAccessObservation? ObservedUse { get; init; }
 }
+
+/// <summary>Request-scoped generic grant decision; not persisted and not a promise of functional usability.</summary>
+public sealed record StorageTypeAccessObservation(ResourceScopeRef ConsumerScopeRef, ResourceAccessDecision Use);
 
 public sealed record StorageTypeVersionAvailability(string Version, StorageAvailability Availability);
 
@@ -168,3 +173,4 @@ public sealed record ReconcileStorageRequest(StorageProperties? Properties = nul
 public sealed record CreateStorageTypeRequest(string Name, StorageTypeProperties Properties,
     ResourceScopeRef? ScopeRef = null, ResourceNamespace? Namespace = null);
 public sealed record PutStorageTypeRequest(StorageTypeProperties Properties);
+public sealed record PublishStorageTypeVersionRequest(StorageTypeVersionDescriptor Version, bool SetPreferred = false);

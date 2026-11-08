@@ -22,6 +22,13 @@ public sealed class StorageLocalizationTests
         Assert.AreEqual(title, strings["Storages"].Value);
         Assert.AreEqual(cancel, strings["Cancel"].Value);
         foreach (var status in Enum.GetValues<StorageAvailability>()) Assert.IsFalse(strings[$"Availability.{status}"].ResourceNotFound);
+        foreach (var key in new[] { "Type.Create", "Type.Publish", "Type.ImmutableHelp", "Type.ManagedHelp", "Type.AccessHelp", "Type.ReviewCurrent", "Type.DisableConfirm", "Type.ConfigurationSchema", "Type.Requirements", "Value.Yes", "Value.No" })
+            Assert.IsFalse(strings[key].ResourceNotFound, key);
+        var accessStrings = services.GetRequiredService<IStringLocalizer<ResourceAccessPanelStrings>>();
+        foreach (var key in new[] { "CurrentPolicy", "ReviewedPolicy", "ExactTargetOnly" })
+            Assert.IsFalse(accessStrings[key].ResourceNotFound, key);
+        foreach (var key in new[] { "Title", "Help", "Allowed", "Denied", "SameScope", "ExactGrant", "PropagatedGrant", "PolicyMissing", "GrantMissing", "Stale", "Unavailable", "Unsaved", "Failed", "Action" })
+            Assert.IsFalse(accessStrings[$"Evaluation.{key}"].ResourceNotFound, key);
         foreach (var code in new[] { "storage_version_conflict", "storage_mapping_incomplete", "storage_exports_stale", "storage_service_stale", "storage_service_unavailable", "storage_type_stale", "storage_provider_unavailable", "storage_configuration_invalid", "storage_in_use", "storage_access_denied", "unknown" })
         {
             var key = StorageErrorKey.For(new AgentstrationApiException("PRIVATE", "id", HttpStatusCode.Conflict, code));

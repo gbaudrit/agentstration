@@ -50,7 +50,7 @@ public sealed partial class LocalStorageDefaultsProvisioner(IResourceStore resou
                 var type = await types.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default,
                     StoragePlatformResourceProvisioner.LocalTypeName, cancellationToken)
                     ?? throw new StorageException("storage_type_unavailable", "The builtin local Storage type is unavailable.");
-                var version = type.Value.Definition.Versions.Single(v => v.Version == StoragePlatformResourceProvisioner.ContentTypeVersion);
+                var version = type.Value.Definition.Versions.Single(v => v.Version == StoragePlatformResourceProvisioner.LocalTypeVersion);
                 var desired = new StorageResource
                 {
                     ApiVersion = ResourceApiVersions.CoreV1,

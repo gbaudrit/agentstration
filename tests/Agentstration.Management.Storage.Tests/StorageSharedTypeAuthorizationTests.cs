@@ -153,7 +153,7 @@ public sealed class StorageSharedTypeAuthorizationTests
 
     private static StorageResource Desired(StorageTypeResource type, Guid workspace)
     {
-        var version = type.Definition.Versions.Single(v => v.Version == StoragePlatformResourceProvisioner.ContentTypeVersion);
+        var version = type.Definition.Versions.Single(v => v.Version == StoragePlatformResourceProvisioner.LocalTypeVersion);
         return new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,

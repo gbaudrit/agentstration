@@ -1,4 +1,7 @@
 using System.Text;
+using Agentstration.Agents;
+using Agentstration.Flows.Application;
+using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Storage;
@@ -7,18 +10,19 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class StorageExecutionTests : ModelManagementApiTestBase
+public sealed class StorageExecutionTests
 {
     [TestMethod]
     public async Task InstanceDefaultIsFunctionalAndDifferentStoragesNeverShareContentAuthority()
     {
-        await using var factory = Factory();
-        var bootstrap = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
+        var bootstrap = factory.Context;
         var services = factory.Services;
         await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
         bootstrap = await InstanceContextAsync(services, bootstrap);
@@ -59,8 +63,8 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ProvisioningPreservesDefaultIdentityDisablementAndExistingAccessDecisions()
     {
-        await using var factory = Factory();
-        var bootstrap = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
+        var bootstrap = factory.Context;
         var services = factory.Services;
         var provisioning = services.GetRequiredService<IWorkspacePlatformResourceProvisioner>();
         using var system = services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
@@ -90,33 +94,34 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
-    public async Task MetadataOnlyLocalVersionRemainsImmutableAndExistingPinsAreNotAdopted()
+    public async Task FunctionalLocalV1AndExistingPinsRemainUnchangedAfterSynchronization()
     {
-        await using var factory = Factory();
-        _ = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
         var services = factory.Services;
         using var system = services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
         var provisioner = services.GetRequiredService<StoragePlatformResourceProvisioner>();
         await provisioner.EnsureAsync(default);
         var type = (await services.GetRequiredService<StorageTypeManagementService>().GetExactAsync(ResourceScopeRef.Instance,
             ResourceNamespace.Default, "local", default))!.Value;
-        var metadata = type.Definition.Versions.Single(v => v.Version == "1.0.0");
+        var version = type.Definition.Versions.Single(v => v.Version == "1.0.0");
+        Assert.HasCount(1, type.Definition.Versions);
+        Assert.AreEqual(version.Version, type.Definition.PreferredVersion);
         var resource = await services.GetRequiredService<StorageManagementService>().CreateAsync(new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = StorageResourceKinds.Storage,
             ScopeRef = ResourceScopeRef.Instance,
-            Metadata = new() { Name = "metadata-pin" },
+            Metadata = new() { Name = "local-pin" },
             Definition = new()
             {
-                DisplayName = "Metadata pin",
+                DisplayName = "Local pin",
                 Type = new()
                 {
                     Type = new(type.Name, type.ScopeRef, type.Namespace),
                     TypeUid = type.Uid,
-                    Version = metadata.Version,
-                    SchemaDigest = metadata.SchemaDigest,
-                    ContractDigest = metadata.ContractDigest
+                    Version = version.Version,
+                    SchemaDigest = version.SchemaDigest,
+                    ContractDigest = version.ContractDigest
                 },
                 Configuration = System.Text.Json.JsonSerializer.SerializeToElement(new { }),
                 Envelope = System.Text.Json.JsonSerializer.SerializeToElement(new { })
@@ -126,9 +131,13 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
         var context = await services.GetRequiredService<IStorageResolver>().ResolveAsync(Revision(resource.Value),
             new(ResourceScopeRef.Instance, resource.Value.Address));
         Assert.AreEqual("1.0.0", context.Type.Version);
-        Assert.IsFalse(context.Capabilities.Write);
-        Assert.IsFalse(context.Capabilities.Read);
-        Assert.IsFalse(type.Definition.Versions.Single(v => v.Version == "2.0.0").Capabilities.StableVersions);
+        Assert.IsTrue(context.Capabilities.Write);
+        Assert.IsTrue(context.Capabilities.Read);
+        Assert.IsFalse(context.Capabilities.StableVersions);
+        var synchronized = (await services.GetRequiredService<StorageTypeManagementService>().GetExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, "local", default))!.Value;
+        Assert.AreEqual(type.ETag, synchronized.ETag);
+        Assert.AreEqual(version.ContractDigest, synchronized.Definition.Versions.Single(v => v.Version == "1.0.0").ContractDigest);
     }
 
     private static StorageRevisionReference Revision(StorageResource resource) => new(
@@ -138,8 +147,8 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ContentInvocationRequiresExecutionPermissionExactContextAndAValidLocalEnvelope()
     {
-        await using var factory = Factory();
-        var bootstrap = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
+        var bootstrap = factory.Context;
         var services = factory.Services;
         var scopes = services.GetRequiredService<IRequestContextScopeFactory>();
         bootstrap = await InstanceContextAsync(services, bootstrap);
@@ -176,8 +185,8 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task RestrictedWorkspaceDefaultsRemainUnavailableWithoutChangingPoliciesOrBlockingOtherProvisioning()
     {
-        await using var factory = Factory();
-        var bootstrap = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
+        var bootstrap = factory.Context;
         var services = factory.Services;
         var scopes = services.GetRequiredService<IRequestContextScopeFactory>();
         using var system = scopes.PushSystem();
@@ -249,6 +258,54 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
         var collision = await Assert.ThrowsAsync<StorageException>(() => provisioner.EnsureAsync(colliding, default));
         Assert.AreEqual("storage_default_collision", collision.Code);
         Assert.AreEqual(foreign.ETag, (await resources.GetExactAsync<StorageResource>(address with { ScopeRef = ResourceScopeRef.Workspace(colliding.Id) }, default))!.ETag);
+    }
+
+    private static async Task<StorageFixture> FixtureAsync()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-storage-execution-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        string Connection(string name) => $"Data Source={Path.Combine(directory, name + ".db")};Pooling=False";
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(new LocalBootstrapOptions { GrantPlatformAdministrator = true });
+        services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(directory, "keys")));
+        services.AddAgentstration(directory,
+            controlPlaneConnectionString: Connection("management"),
+            workPlaneConnectionString: Connection("work"),
+            flowConnectionString: Connection("flow"),
+            runtimeConnectionString: Connection("runtime"),
+            enableHostedServices: false);
+        var provider = services.BuildServiceProvider();
+        try
+        {
+            using var system = provider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            await provider.GetRequiredService<IAgentstrationStorageInitializer>().InitializeAsync(default);
+            await provider.GetRequiredService<AgentManagementService>().InitializeAsync(default);
+            await provider.GetRequiredService<FlowService>().InitializeAsync(default);
+            await provider.GetRequiredService<FlowRunService>().InitializeAsync(default);
+            var context = await provider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+            await provider.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(default);
+            await provider.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
+            return new(directory, provider, context);
+        }
+        catch
+        {
+            await provider.DisposeAsync();
+            Directory.Delete(directory, recursive: true);
+            throw;
+        }
+    }
+
+    private sealed class StorageFixture(string directory, ServiceProvider services, RequestContext context) : IAsyncDisposable
+    {
+        public ServiceProvider Services { get; } = services;
+        public RequestContext Context { get; } = context;
+
+        public async ValueTask DisposeAsync()
+        {
+            await Services.DisposeAsync();
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     private static async Task<RequestContext> InstanceContextAsync(IServiceProvider services, RequestContext bootstrap)

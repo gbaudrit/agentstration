@@ -1,8 +1,8 @@
 using Agentstration.Api.Contracts;
-using Agentstration.Web.Security;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Storage.Api;
 
@@ -34,9 +34,11 @@ internal static class StorageEndpoints
             StorageTypeManagementService service, CancellationToken token) => await Execute(async () =>
                 Resource(await service.CreateAsync(new()
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = StorageResourceKinds.StorageType,
                     Metadata = new() { Name = body.Name, Namespace = body.Namespace ?? ResourceNamespace.Default },
-                    ScopeRef = body.ScopeRef, Definition = body.Properties
+                    ScopeRef = body.ScopeRef,
+                    Definition = body.Properties
                 }, token), response, 201)))
             .Produces<StorageTypeResource>(201).WithSummary("Create a governed Storage type")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
@@ -54,6 +56,19 @@ internal static class StorageEndpoints
                 return Results.NoContent();
             })).Produces(204).WithSummary("Delete an unused user-owned Storage type")
             .RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+        types.MapGet("/{name}/usages", async (string name, string scopeRef, string? @namespace,
+            StorageTypeManagementService service, CancellationToken token) => await Execute(async () =>
+                Results.Ok(new ValueResponse<StorageUsage>(await service.GetUsagesAsync(ResourceScopeRef.Parse(scopeRef),
+                    Ns(@namespace), name, token)))))
+            .Produces<ValueResponse<StorageUsage>>().WithSummary("List discoverable Storage references to an exact type")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        types.MapPost("/{name}/versions", async (string name, string scopeRef, string? @namespace,
+            PublishStorageTypeVersionRequest body, HttpRequest request, HttpResponse response,
+            StorageTypeManagementService service, CancellationToken token) => await Execute(async () =>
+                Resource(await service.PublishVersionAsync(ResourceScopeRef.Parse(scopeRef), Ns(@namespace), name,
+                    body, request.Headers.IfMatch.FirstOrDefault(), token), response)))
+            .Produces<StorageTypeResource>().WithSummary("Publish an additional immutable Storage type version using If-Match")
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
 
         var storages = endpoints.MapGroup("/api/storages").WithTags("Storages");
         storages.MapGet("/", async (string? scopeRef, int? skip, int? take, HttpRequest request,
@@ -85,9 +100,11 @@ internal static class StorageEndpoints
             StorageManagementService service, CancellationToken token) => await Execute(async () =>
                 Resource(await service.CreateAsync(new()
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.Storage,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = StorageResourceKinds.Storage,
                     Metadata = new() { Name = body.Name, Namespace = body.Namespace ?? ResourceNamespace.Default },
-                    ScopeRef = body.ScopeRef, Definition = body.Properties
+                    ScopeRef = body.ScopeRef,
+                    Definition = body.Properties
                 }, token), response, 201)))
             .Produces<StorageResource>(201).WithSummary("Create a Storage with explicit export mappings")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);

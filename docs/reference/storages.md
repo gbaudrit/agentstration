@@ -26,10 +26,11 @@ digest as `contractDigest`, in addition to `typeUid`, `version`, `schemaDigest` 
 the exact type `ResourceReference`. New versions are additive; published versions
 cannot change or disappear. Preferred-version updates never rebind Storages.
 
-The builtin Core-owned `local` version `1.0.0` requires no Connected Service. Its
-configuration and envelope are empty objects. It is an executable management and
-logical-resolution contract; it advertises no content operations. #1040 supplies
-the Artifact adapter and default Storage, and advertises their actual capabilities.
+The builtin Core-owned `local@1.0.0` requires no Connected Service. Configuration
+is `{}`; its envelope declares bounded content permissions and restrictions.
+It supports list/stat/read/write without stable historical versions or Snapshot
+retention. [Storage execution](storage-execution.md) describes its actual limits.
+#1040 supplies the Artifact adapter and guarded default provisioning.
 Existing Artifact Flows, acquisition Tools, durable reads and histories continue
 through their existing implementation.
 
@@ -51,6 +52,8 @@ optional `namespace` (default `default`). There is no second Storage identifier.
 | GET | `/api/storage-types/{name}` | Exact governed type and version availability |
 | POST | `/api/storage-types` | Create a type |
 | PUT | `/api/storage-types/{name}` | Update metadata or append immutable versions |
+| POST | `/api/storage-types/{name}/versions` | Explicitly append a new immutable version, optionally making it preferred |
+| GET | `/api/storage-types/{name}/usages` | Up to 100 discoverable Storage references, preserving exact scope/namespace |
 | DELETE | `/api/storage-types/{name}` | Delete an unused user-managed type |
 | GET | `/api/storages` | Scoped visible Storage collection |
 | GET | `/api/storages/{name}` | Exact resource, current diagnostics and ETag |
@@ -165,7 +168,55 @@ contexts. It owns actual caller authorization at the provider, AEP contributions
 ASP capabilities and Artifact integration. It must revalidate exact revisions at
 invocation, enforce limits and never accept lower-authority configuration overrides.
 #1041/#1042 select Storage revisions and supply dataset/Snapshot rules separately.
-#1046 supplies Console administration; this delivery adds no Storage UX.
+#1046 supplies Storage Console administration and #1064 adds independent
+StorageType administration plus the existing generic resource-grant journey.
+
+## StorageType administration and resource grants
+
+Publication accepts `{ version: /* complete StorageTypeVersionDescriptor */,
+setPreferred: false }` and requires the current type `If-Match`. Publishing an
+existing version returns `storage_type_version_exists` (409). Existing versions
+remain immutable, and changing the preferred version never rebinds Storages.
+Ordinary metadata edits preserve the existing version collection. Managed Core
+and extension definitions remain protected, including publication and lifecycle.
+A referenced type cannot be disabled or deleted (`storage_type_in_use`, 409).
+The usages endpoint lists only dependencies discoverable by the current caller;
+unlisted dependencies can still block lifecycle, without disclosing their identity.
+
+Generic access overlays use the existing `/api/resource-access-policies` API and
+its `/{resourceUid}/evaluate` operation. They remain independent from type/Storage
+definitions and ETags. Creation without an ETag is allowed only when no overlay
+exists; updating or deleting an existing overlay requires its current `If-Match`.
+Absent/stale update tokens return 409 without overwriting saved grants.
+
+Discover and Use are independent actions targeting exact descendant scopeRefs,
+with explicit permitted propagation. Missing policies/actions deny descendant
+access. Catalogues and exact metadata reads use the shared store's Discover
+filter, including owner/namespace/kind and optional generation/version pins.
+Same-name recreation receives a new UID and inherits no grants. The Console
+creates UID-bound, unpinned Storage overlays so mutable metadata and additional
+immutable versions preserve sharing; explicitly pinned policies fail closed
+after the pinned revision changes. Synchronizers do not write access overlays.
+
+The Access evaluator displays saved **generic** decisions, not unsaved draft
+grants. ResourceAccessPolicy.Use is the current usage authority for Storage and
+StorageType: a Tenant grant with IncludeDescendants permits its Workspaces;
+Discover alone, revocation and foreign Tenant targets remain refused. Embedded
+UsePolicy adds no second Storage-family gate while its administration is deferred,
+as recorded in [ADR-0200](../decisions/0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md).
+Existing contextual authorization, scopes, UIDs/generations, versions/digests,
+enablement, availability, configuration, mappings and capabilities still apply.
+Connected Services retain their own checks. User-permission expansion is deferred to
+[#1077](https://github.com/gbaudrit/agentstration/issues/1077), and UsePolicy
+administration to [#1078](https://github.com/gbaudrit/agentstration/issues/1078).
+The Instance-owned builtin uses functional `local@1.0.0`. There is no automatic grant, global exemption, ASP bypass
+or per-Workspace type copy. Synchronization and restart preserve grants/revocations.
+
+Type reads project `observedUse` with the authenticated consumer scope and the
+shared evaluator's generic Use decision. This projection is recomputed and never
+persisted. The Storage editor retains discoverable types for inspection while
+disabling new selection when that generic grant is absent, independently of
+provider availability. The server repeats its existing resolution checks.
 
 ## Bootstrap and persistence
 
