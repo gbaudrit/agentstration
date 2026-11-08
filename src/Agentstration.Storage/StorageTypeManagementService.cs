@@ -152,7 +152,7 @@ public sealed class StorageTypeManagementService(
                 throw new StorageException("storage_requirements_invalid", "Requirements must be unique, bounded and require a Connected Service.");
             foreach (var requirement in version.Requirements)
             {
-                StorageValidation.Name(requirement.Id);
+                StorageValidation.MemberId(requirement.Id);
                 if (!Enum.IsDefined(requirement.Type) || !Enum.IsDefined(requirement.Protection)
                     || requirement.Format?.Length > 128)
                     throw new StorageException("storage_requirement_invalid", "Invalid requirement type, protection or format.");

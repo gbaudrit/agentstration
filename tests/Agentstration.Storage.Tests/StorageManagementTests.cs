@@ -40,6 +40,28 @@ public sealed class StorageManagementTests
     }
 
     [TestMethod]
+    public async Task ProviderRequirementIdentifiersArePreservedAndBoundExplicitly()
+    {
+        var f = new StorageFixture();
+        var remote = await f.RemoteAsync();
+        var type = (await f.Types.GetExactAsync(StorageFixture.Tenant, ResourceNamespace.Default, "remote", default))!;
+        var version = type.Value.Definition.Versions.Single() with
+        {
+            Version = "2.0.0",
+            Requirements = [new("access_key_id", true, ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Secured)]
+        };
+        var updated = await f.Types.PutExactAsync(StorageFixture.Tenant, type.Value.Namespace, type.Value.Name,
+            type.Value.Definition with { Versions = [version], PreferredVersion = version.Version }, type.ETag, default);
+        var stored = await f.Storages.CreateAsync(remote with { Definition = remote.Definition with
+        {
+            Type = StorageFixture.Reference(updated.Value),
+            Bindings = [new("access_key_id", remote.Definition.Bindings.Single().Export)]
+        } }, default);
+        Assert.AreEqual("access_key_id", stored.Value.Definition.Bindings.Single().RequirementId);
+        await f.Storages.ResolveAsync(StorageFixture.Revision(stored.Value), new(StorageFixture.Tenant, stored.Value.Address));
+    }
+
+    [TestMethod]
     public async Task CompatibleNamesNeverCreateBindingsAutomatically()
     {
         var f = new StorageFixture();

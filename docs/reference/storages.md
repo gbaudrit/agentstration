@@ -93,6 +93,10 @@ selected export descriptor as `export`. The caller explicitly supplies these
 entries. Matching names, owners, formats or suggestions never generate a binding.
 One service may back multiple independent Storages.
 
+Requirement member identifiers use the Connected Service member convention: 1–64
+ASCII letters, digits, `.`, `_` or `-`, starting with a lowercase letter. They are
+preserved exactly, including provider ids such as `access_key_id`.
+
 Every mandatory requirement must be bound. Export ids must belong to the selected
 exact service type and still exist with the saved descriptor. Scalar type,
 standard/secured protection and any required format must agree. Disabled,

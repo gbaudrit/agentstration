@@ -70,6 +70,14 @@ internal static class StorageValidation
             throw new StorageException("storage_metadata_invalid", "Display names require 1 to 200 characters and descriptions at most 2000.");
     }
 
+    public static void MemberId(string? id)
+    {
+        if (id is not { Length: >= 1 and <= 64 } || id[0] is < 'a' or > 'z'
+            || id.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '.' and not '_' and not '-'))
+            throw new StorageException("storage_requirement_id_invalid",
+                "Requirement identifiers require 1 to 64 ASCII letters, digits, '.', '_' or '-', starting with a lowercase letter.");
+    }
+
     public static void ETag(string? expected, string current)
     {
         if (string.IsNullOrWhiteSpace(expected))
