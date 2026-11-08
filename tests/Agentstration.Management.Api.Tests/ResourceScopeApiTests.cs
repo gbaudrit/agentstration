@@ -573,7 +573,7 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
             _ = await policies.PutAsync(new ResourceAccessPolicy(
                 new(profile.Value.Uid, tenantScope, profile.Value.Namespace, profile.Value.Kind,
-                    Generation: null),
+                    profile.Value.Generation),
                 [new(workspaceScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
         var runtime = await factory.Services.GetRequiredService<IResourceStore>()
             .GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
@@ -597,8 +597,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.RuntimeProfilePin?.ScopeRef);
         Assert.AreEqual("maf-builtin", revision.Value.Definition.RuntimeProfilePin?.Name);
 
+        StoredResource<ModelProfileResource> updatedProfile;
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
-            _ = await profiles.PutAsync(profile.Value.Namespace, profile.Value.Name, tenantScope,
+            updatedProfile = await profiles.PutAsync(profile.Value.Namespace, profile.Value.Name, tenantScope,
                 profile.Value.Definition with { Description = "Generation two" }, profile.ETag, default);
         var staleAgent = agent with
         {
@@ -606,6 +607,17 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         };
         await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
             await agents.PutAgentAsync(staleAgent, null, true, default));
+
+        // Renew the explicit generation pin before testing the independent provider Use denial.
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
+        {
+            var currentProfilePolicy = await policies.GetAsync(profile.Value.Uid, default);
+            Assert.IsNotNull(currentProfilePolicy);
+            _ = await policies.PutAsync(currentProfilePolicy.Policy with
+            {
+                Resource = currentProfilePolicy.Policy.Resource with { Generation = updatedProfile.Value.Generation }
+            }, currentProfilePolicy.ETag, default);
+        }
 
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
         {
