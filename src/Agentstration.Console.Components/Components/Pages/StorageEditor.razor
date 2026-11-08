@@ -53,7 +53,7 @@ else
                         {
                             var savedExport = model.Bindings.SingleOrDefault(value => value.RequirementId == requirement.Id)?.Export;
                             var candidates = Exports.Where(value => Compatible(requirement, value)).ToArray();
-                            <label class="storage-requirement"><span><code>@requirement.Id</code> · @T(requirement.Required ? "Required" : "Optional") · @T($"ValueType.{requirement.Type}") · @T($"Protection.{requirement.Protection}")</span>
+                            <label class="storage-requirement"><span><code>@requirement.Id</code> · @T(requirement.Required ? "Required" : "Optional") · @T($"ValueType.{requirement.Type}") · @T($"Protection.{requirement.Protection}") @requirement.Format</span>
                                 <select value="@ExportKey(savedExport)" @onchange="args => ExportChanged(requirement.Id, args)" disabled="@(SelectedService is null)" data-testid="storage-export">
                                     <option value="">@T("SelectExport")</option>
                                     @if (savedExport is not null && !candidates.Contains(savedExport)) { <option value="@ExportKey(savedExport)" disabled>@savedExport.Id · @T("SavedExportUnavailable")</option> }

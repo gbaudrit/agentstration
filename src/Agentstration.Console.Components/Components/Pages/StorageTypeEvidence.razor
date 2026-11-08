@@ -1,6 +1,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 @if (Choice is { } choice)
 {
+    @if (!string.IsNullOrWhiteSpace(choice.Resource.Definition.Description)) { <p>@choice.Resource.Definition.Description</p> }
     <dl class="details-list storage-evidence">
         <dt>@T("Type")</dt><dd><code>@choice.Resource.ScopeRef/@choice.Resource.Namespace/@choice.Resource.Name</code></dd>
         <dt>@T("TypeUid")</dt><dd><code>@choice.Resource.Uid</code></dd>
