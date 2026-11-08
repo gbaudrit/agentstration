@@ -233,6 +233,8 @@ public sealed class DependencyTests
             "Agentstration.Application",
             "Agentstration.Infrastructure",
             "Agentstration.Management.Core",
+            "Agentstration.Storage",
+            "Agentstration.Storage.Api",
             "Agentstration.ModelProviders",
             "Agentstration.Runtime.MicrosoftAgentFramework",
             "Agentstration.Runtime.Core",
@@ -243,7 +245,8 @@ public sealed class DependencyTests
 
         Assert.IsFalse(references.Any(reference =>
             forbidden.Contains(reference, StringComparer.Ordinal)
-            || reference!.Contains(".Storage.", StringComparison.Ordinal)));
+            || (reference!.Contains(".Storage.", StringComparison.Ordinal)
+                && reference != "Agentstration.Storage.Contracts")));
     }
 
     [TestMethod]
@@ -277,6 +280,8 @@ public sealed class DependencyTests
             "Agentstration.Application",
             "Agentstration.Infrastructure",
             "Agentstration.Management.Core",
+            "Agentstration.Storage",
+            "Agentstration.Storage.Api",
             "Agentstration.ModelProviders",
             "Agentstration.Runtime.MicrosoftAgentFramework",
             "Agentstration.Runtime.Core",
@@ -287,7 +292,8 @@ public sealed class DependencyTests
 
         Assert.IsFalse(references.Any(reference =>
             forbidden.Contains(reference, StringComparer.Ordinal)
-            || reference!.Contains(".Storage.", StringComparison.Ordinal)));
+            || (reference!.Contains(".Storage.", StringComparison.Ordinal)
+                && reference != "Agentstration.Storage.Contracts")));
     }
 
     [TestMethod]

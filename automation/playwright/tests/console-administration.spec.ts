@@ -24,6 +24,8 @@ test('all Console administration routes render deterministic states @smoke', asy
   await authenticateConsole(context, {});
   const administration = pages.consoleAdministration;
 
+  await administration.open(product.consoleUrl, '/storages', 'storages');
+  await administration.open(product.consoleUrl, '/storages/new', 'storageEditor');
   await administration.open(product.consoleUrl, '/settings', 'settings');
   await administration.open(product.consoleUrl, '/settings/profile', 'profileSettings');
   await administration.open(product.consoleUrl, '/settings/organization', 'organization');

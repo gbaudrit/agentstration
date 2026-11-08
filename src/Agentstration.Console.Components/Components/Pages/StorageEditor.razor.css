@@ -1,0 +1,9 @@
+.storage-evidence dd, code, p { overflow-wrap: anywhere; }
+.storage-evidence dd { min-width: 0; margin-inline-start: 0; }
+.storage-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+select { width: 100%; max-width: 100%; min-width: 0; }
+.storage-requirement { display: grid; gap: .5rem; margin-block: 1rem; }
+@media (max-width: 640px) { .storage-evidence { display: grid; grid-template-columns: minmax(0, 1fr); } }
+
+.storage-fields label { display: grid; gap: .5rem; min-width: 0; max-width: 100%; }
+.storage-fields > section { min-width: 0; }

@@ -94,6 +94,7 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi, resilient: false);
         AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi, resilient: false);
         AddClient<ConnectedServicesApiClient, IConnectedServicesClient>(services, configured.ManagementApi);
+        AddClient<StoragesApiClient, IStoragesClient>(services, configured.ManagementApi);
         AddClient<SchemasApiClient, ISchemasClient>(services, configured.ManagementApi, resilient: false);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ResourceAccessPolicyApiClient, IResourceAccessPolicyClient>(services, configured.ManagementApi);

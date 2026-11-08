@@ -30,7 +30,7 @@ public partial class MainLayout
         new("Group.Observe", "observe", [new("Nav.AgentInstances", "/agent-instances", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Workplace", "workplace", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work")]),
         new("Group.Resources", "resources", [new("Nav.Packs", "/packs", "package"), new("Nav.DataSources", "/data-sources", "database", "tool", ["resources/read"]), new("Nav.KnowledgeSources", "/knowledge-sources", "brain", "tool", ["resources/read"]), new("Nav.Artifacts", "/artifacts", "file", "flow"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database-search")]),
-        new("Group.Integrations", "integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ConnectedServices", "/connected-services", "plug-connected", "source", ["resources/read"]), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "plug-connected", "source")]),
+        new("Group.Integrations", "integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ConnectedServices", "/connected-services", "plug-connected", "source", ["resources/read"]), new("Nav.Storages", "/storages", "database", "storage", ["resources/read"]), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "plug-connected", "source")]),
         new("Group.Configuration", "configuration", [new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key"), new("Nav.ResourceScopes", "/settings/resource-scopes", "binary-tree", RequiredPermissions: ["resources/read"])]),
         new("Group.System", "system", [new("Nav.RuntimeWorkers", "/settings/runtime-workers", "server"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Settings", "/settings", "settings")])
     ];
@@ -83,6 +83,8 @@ public partial class MainLayout
         new("Command.ProfileSettings", "/settings/profile", "user-circle", "Nav.Profile", "appearance theme personal preferences apparence thème préférences"),
         new("Nav.Extensions", "/extensions", "puzzle", "Group.Integrations", "AEP option contracts compatibility extensions"),
         new("Nav.ConnectedServices", "/connected-services", "plug-connected", "Group.Integrations", "connected services services connectés integrations", ["resources/read"]),
+        new("Nav.Storages", "/storages", "database", "Group.Integrations", "storages stockages", ["resources/read"]),
+        new("Command.CreateStorage", "/storages/new", "plus", "Command", "new nouveau storage stockage", ["resources/write"]),
         new("Command.CreateConnectedService", "/connected-services/new", "plus", "Command", "new nouveau connected service service connecté", ["resources/write"]),
         new("Nav.Cleanup", "/cleanup", "trash", "Group.System", "cleanup clean delete purge nettoyage suppression", ["resources/delete", "runs/delete"]),
         new("Nav.Organization", "/settings/organization", "building", "Group.System", "tenant organization organisation"),

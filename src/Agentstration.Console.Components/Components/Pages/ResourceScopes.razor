@@ -172,6 +172,7 @@ else
             SecretResourceKinds.Vault => $"/vaults/{name}?scopeRef={scopeRef}",
             SecretResourceKinds.Secret => $"/secrets/{name}?scopeRef={scopeRef}",
             ParameterResourceKinds.Parameter => $"/parameters/{name}?scopeRef={scopeRef}",
+            StorageResourceKinds.Storage => $"/storages/{name}?scopeRef={scopeRef}&namespace={resourceNamespace}",
             ConnectedServiceResourceKinds.ConnectedService => $"/connected-services/{name}?scopeRef={scopeRef}",
             ToolResourceKinds.Tool => $"/tools/{name}",
             ToolResourceKinds.ToolProvider => $"/tools/providers/{name}",

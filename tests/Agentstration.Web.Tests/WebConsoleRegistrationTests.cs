@@ -40,6 +40,7 @@ public sealed class WebConsoleRegistrationTests
         Assert.IsInstanceOfType<ManagementApiClient>(scope.ServiceProvider.GetRequiredService<IManagementApiClient>());
         Assert.IsInstanceOfType<WorkApiClient>(scope.ServiceProvider.GetRequiredService<IWorkApiClient>());
         Assert.IsInstanceOfType<EntryAdministrationApiClient>(scope.ServiceProvider.GetRequiredService<IEntryAdministrationApiClient>());
+        Assert.IsInstanceOfType<StoragesApiClient>(scope.ServiceProvider.GetRequiredService<IStoragesClient>());
         Assert.IsInstanceOfType<PacksApiClient>(scope.ServiceProvider.GetRequiredService<IPacksClient>());
         Assert.IsInstanceOfType<HttpAgentstrationEventStream>(scope.ServiceProvider.GetRequiredService<IAgentstrationEventStream>());
         Assert.IsInstanceOfType<ConsoleResourceSearchProvider>(scope.ServiceProvider.GetRequiredService<IResourceSearchProvider>());
