@@ -26,9 +26,11 @@ the original query. Reauthorization and exact resource checks run on every call.
 
 ## Builtin local type
 
-There is one Instance-owned `local` StorageType. Immutable `1.0.0` remains
-metadata-only. Version `2.0.0` implements list/stat/read/write; existing Storages
-remain on their chosen version until explicit reconciliation.
+There is one Instance-owned `local` StorageType with functional version `1.0.0`,
+implementing list/stat/read/write. Storage has not shipped; the maintainer chose
+one initial functional version rather than retaining intermediate metadata-only
+contracts. No migration or compatibility version is introduced. Published version
+immutability and explicit consumer pins remain enforced.
 
 Configuration is `{}`. The local envelope uses `StorageContentPolicy` fields:
 `list`, `stat`, `read`, `write`, `prefix`, `maximumPageSize`, `maximumReadBytes`,

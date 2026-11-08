@@ -13,7 +13,7 @@ public sealed class LocalStorageDefinitionValidator : IStorageDefinitionValidato
     {
         if (type.Governance.ManagedBy?.Kind != ResourceManagementAuthorityKind.Core
             || type.Governance.ManagedBy.Reference != "storage.local"
-            || version.Version != StoragePlatformResourceProvisioner.ContentTypeVersion) return;
+            || version.Version != StoragePlatformResourceProvisioner.LocalTypeVersion) return;
         try
         {
             var policy = definition.Envelope.Deserialize<StorageContentPolicy>(Json)

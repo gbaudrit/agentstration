@@ -32,8 +32,9 @@ else
                 <label><span>@T("Type")</span><select value="@TypeKey" @onchange="TypeChanged" data-testid="storage-type">
                     <option value="">@T("SelectType")</option>
                     @if (model.Type is not null && SelectedType is null) { <option value="@TypeKey" disabled>@T("SavedTypeUnavailable")</option> }
-                    @foreach (var choice in variants) { <option value="@choice.Key" disabled="@(!Available(choice))">@choice.Resource.Definition.DisplayName · @choice.Version.Version · @choice.Resource.ScopeRef/@choice.Resource.Namespace/@choice.Resource.Name · @T($"Origin.{choice.Resource.Governance.Origin.Kind}") · @T($"Availability.{TypeAvailability(choice)}")</option> }
+                    @foreach (var choice in variants) { <option value="@choice.Key" disabled="@(!Available(choice))">@choice.Resource.Definition.DisplayName · @choice.Version.Version · @choice.Resource.ScopeRef/@choice.Resource.Namespace/@choice.Resource.Name · @T($"Origin.{choice.Resource.Governance.Origin.Kind}") · @T($"Availability.{TypeAvailability(choice)}") · @T(choice.Resource.ObservedUse?.Use.Allowed == true ? "Type.UseGranted" : "Type.UseNotGranted")</option> }
                 </select></label>
+                <p role="note">@T("Type.AccessHelp")</p>
                 <StorageTypeEvidence Choice="SelectedType" />
             </section>
             @if (SelectedType is { } current)
@@ -162,7 +163,8 @@ else
     private static bool Compatible(StorageRequirementDescriptor requirement, ConnectedServiceExportDescriptor export) => requirement.Type == export.Type && requirement.Protection == export.Protection && (requirement.Format is null || requirement.Format == export.Format);
     private static bool ServiceAvailable(ConnectedServiceResource service) => service.Definition.Enabled && service.ObservedState?.Availability == ConnectedServiceAvailability.Ready;
     private static StorageAvailability TypeAvailability(StorageTypeChoice choice) => choice.Resource.ObservedVersions.FirstOrDefault(value => value.Version == choice.Version.Version)?.Availability ?? StorageAvailability.Unavailable;
-    private static bool Available(StorageTypeChoice choice) => choice.Resource.Definition.Enabled && TypeAvailability(choice) == StorageAvailability.Ready;
+    private static bool Available(StorageTypeChoice choice) => choice.Resource.Definition.Enabled
+        && choice.Resource.ObservedUse?.Use.Allowed == true && TypeAvailability(choice) == StorageAvailability.Ready;
     private async Task RequestSaveAsync()
     {
         validationFailed = !CanSave || string.IsNullOrWhiteSpace(model.DisplayName) || model.Name.Length is < 1 or > 128 || model.Name.Any(value => !char.IsAsciiLetterLower(value) && !char.IsAsciiDigit(value) && value is not '.' and not '-') || !char.IsAsciiLetterOrDigit(model.Name.FirstOrDefault());

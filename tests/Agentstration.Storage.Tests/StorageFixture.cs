@@ -28,14 +28,17 @@ internal sealed class StorageFixture
     {
         var scopes = new Scopes();
         var use = new DescendantResourceUseAuthorizer(scopes);
-        Types = new(Store, scopes, use, Governance, Availability, Context);
+        Types = new(Store, scopes, use, Governance, Availability, Context, Access, Context);
         Storages = new(Store, scopes, use, Access, Inspector, Availability, [Dependencies], Context, new Authorization(), new Authorization(), new FixedTime());
     }
 
     public static StorageTypeVersionDescriptor Version(bool remote = false) => new()
     {
-        Version = "1.0.0", ConfigurationSchema = Schema, SchemaDigest = StorageDigests.Schema(Schema),
-        EnvelopeSchema = Schema, EnvelopeSchemaDigest = StorageDigests.Schema(Schema),
+        Version = "1.0.0",
+        ConfigurationSchema = Schema,
+        SchemaDigest = StorageDigests.Schema(Schema),
+        EnvelopeSchema = Schema,
+        EnvelopeSchemaDigest = StorageDigests.Schema(Schema),
         RequiresConnectedService = remote,
         Requirements = remote ? [new("connection", true, ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Secured)] : [],
         Capabilities = new() { List = true, Read = true, Stat = true }
@@ -43,15 +46,19 @@ internal sealed class StorageFixture
 
     public static JsonElement Schema => JsonSerializer.SerializeToElement(new
     {
-        type = "object", properties = new { prefix = new { type = "string", maxLength = 20 } }, additionalProperties = false
+        type = "object",
+        properties = new { prefix = new { type = "string", maxLength = 20 } },
+        additionalProperties = false
     });
 
     public async Task<StorageTypeResource> TypeAsync(bool remote = false, ResourceScopeRef? scope = null)
     {
         var type = await Types.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.StorageType,
-            Metadata = new() { Name = remote ? "remote" : "local" }, ScopeRef = scope ?? Tenant,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.StorageType,
+            Metadata = new() { Name = remote ? "remote" : "local" },
+            ScopeRef = scope ?? Tenant,
             Definition = new() { DisplayName = "Type", PreferredVersion = "1.0.0", Versions = [Version(remote)] }
         }, default);
         return type.Value;
@@ -60,14 +67,22 @@ internal sealed class StorageFixture
     public static StorageTypeReference Reference(StorageTypeResource type, string? version = null)
     {
         var v = type.Definition.Versions.Single(v => v.Version == (version ?? type.Definition.PreferredVersion));
-        return new() { Type = new(type.Name, type.ScopeRef, type.Namespace), TypeUid = type.Uid,
-            Version = v.Version, SchemaDigest = v.SchemaDigest, ContractDigest = StorageDigests.Version(v) };
+        return new()
+        {
+            Type = new(type.Name, type.ScopeRef, type.Namespace),
+            TypeUid = type.Uid,
+            Version = v.Version,
+            SchemaDigest = v.SchemaDigest,
+            ContractDigest = StorageDigests.Version(v)
+        };
     }
 
     public static StorageResource Storage(StorageTypeResource type, string name = "storage", ResourceScopeRef? scope = null) => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.Storage,
-        Metadata = new() { Name = name }, ScopeRef = scope ?? Tenant,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = StorageResourceKinds.Storage,
+        Metadata = new() { Name = name },
+        ScopeRef = scope ?? Tenant,
         Definition = new() { DisplayName = "Storage", Type = Reference(type), Configuration = Empty, Envelope = Empty }
     };
 
@@ -76,12 +91,22 @@ internal sealed class StorageFixture
         var type = await TypeAsync(remote: true);
         var service = new ConnectedServiceResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedService,
-            Metadata = new() { Name = "account" }, ScopeRef = Tenant, Generation = 1,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ConnectedServiceResourceKinds.ConnectedService,
+            Metadata = new() { Name = "account" },
+            ScopeRef = Tenant,
+            Generation = 1,
             Definition = new()
             {
-                DisplayName = "Account", Type = new() { Type = new("account-type", Tenant), TypeUid = Guid.NewGuid(),
-                    Version = "1.0.0", SchemaDigest = "sha256:account" }, Options = Empty
+                DisplayName = "Account",
+                Type = new()
+                {
+                    Type = new("account-type", Tenant),
+                    TypeUid = Guid.NewGuid(),
+                    Version = "1.0.0",
+                    SchemaDigest = "sha256:account"
+                },
+                Options = Empty
             }
         };
         var stored = await Store.PutExactAsync(Tenant, service, null, true, default);
@@ -173,11 +198,13 @@ internal sealed class StorageFixture
     }
     public sealed class MemoryStore : IResourceStore
     {
+        public HashSet<ResourceScopeRef> ReadDeniedScopes { get; } = [];
         private readonly Dictionary<ScopedResourceAddress, (Resource Value, string ETag)> resources = [];
         private int revision;
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource =>
-            Task.FromResult(resources.TryGetValue(address, out var stored) ? new StoredResource<T>((T)stored.Value, stored.ETag, default) : null);
+            ReadDeniedScopes.Contains(address.ScopeRef) ? throw new ResourceScopeAccessDeniedException(address.ScopeRef)
+                : Task.FromResult(resources.TryGetValue(address, out var stored) ? new StoredResource<T>((T)stored.Value, stored.ETag, default) : null);
         public Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
         {
             var key = new ScopedResourceAddress(scopeRef, resource.Namespace, resource.Kind, resource.Name);

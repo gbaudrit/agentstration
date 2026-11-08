@@ -42,7 +42,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                     ModelResourceKinds.ModelProvider, provider.Value.Generation),
                 [new(ResourceScopeRef.Tenant(context.TenantId),
                     [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: false)]),
-                null, default);
+                (await policies.GetAsync(provider.Value.Uid, default))?.ETag, default);
         }
 
         using var client = factory.CreateClient();
@@ -86,7 +86,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                     ModelResourceKinds.ModelProvider, provider.Value.Generation),
                 [new(ResourceScopeRef.Tenant(context.TenantId),
                     [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]),
-                null, default);
+                (await policies.GetAsync(provider.Value.Uid, default))?.ETag, default);
         }
 
         using var client = factory.CreateClient();
