@@ -95,3 +95,18 @@ The existing native scenario [#1033](https://github.com/gbaudrit/agentstration/i
 remains under #1032 and blocked on explicit maintainer UX approval and relevant
 implementation merges. #1046 adds component/client tests and browser smoke
 validation; it does not start or duplicate that reusable integrated journey.
+
+## Validation evidence — 2026-11-08
+
+- `dotnet restore Agentstration.slnx`: passed.
+- `dotnet build Agentstration.slnx --configuration Release --no-restore`: passed, 0 warnings and 0 errors.
+- `dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4`: 998 passed, 0 failed/skipped.
+- `dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2`: 1,057 passed, 12 optional skips, 0 failed (1,069 discovered). Skips: PostgreSQL (2), live Foundry (8), llama.cpp (1), LocalAI (1).
+- TypeScript compilation and the three browser route-catalog checks: passed. Complete Docusaurus/ADR/LikeC4 build: passed.
+- Dedicated real-executable Storage smoke: en-US/fr-FR at 1440×1000 and 390×844; Instance builtin local, Tenant local fixture and Workspace remote metadata fixture; explicit complete protected/standard mappings, shared Connected Service, exact namespace/type/service pins, reload, YAML, real ETag conflict, confirmed new service generation, observation/deactivation, Escape, focus restoration and mobile actions above navigation all passed. Extension-contributed type evidence is covered by deterministic component fixtures; no live ASP/Artifact adapter is claimed.
+- General `npm run test:smoke` campaign: 102 passed and one existing organization-context read race failed. The helper now captures the validated scope in one read; all four organization locale/viewport cases passed on the focused rerun. System Chromium was used with video disabled; screenshots/traces were retained. Existing Data Source/acquisition/Artifact/Tool and navigation/localization cases passed.
+
+These implementation checks do not constitute maintainer UX approval. The reusable
+integrated scenario #1033 remains blocked as described above. The general smoke
+campaign and the targeted rerun are reported separately rather than treating the
+initial failed run as green.
