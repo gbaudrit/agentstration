@@ -169,7 +169,8 @@ internal sealed class AepSchemaFormatHandler : ISchemaFormatHandler
                 AepProtocol.JsonOptions);
             return ParseResult(result);
         }
-        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested
+        // HTTP/MCP transports can wrap cancellation in another exception type.
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested
             && timeout.IsCancellationRequested)
         {
             throw new SchemaFormatOperationException("schema_format_provider_timeout",
