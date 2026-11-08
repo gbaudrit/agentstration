@@ -10,9 +10,12 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Storage;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.AI;
@@ -353,6 +356,14 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
         var retry = await writer.ExecuteAsync(invocation, default);
         Assert.IsNotNull(first);
         Assert.AreEqual(first.Value.GetProperty("flowRunArtifactId").GetString(), retry!.Value.GetProperty("flowRunArtifactId").GetString());
+        var defaults = (await factory.Services.GetRequiredService<StorageManagementService>().GetExactAsync(
+            ResourceScopeRef.Workspace(context.WorkspaceId), ResourceNamespace.Default, LocalStorageDefaultsProvisioner.DefaultName, default))!;
+        using (factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.local-default", "1.0.0")))
+        {
+            var inUse = await Assert.ThrowsAsync<StorageException>(() => factory.Services.GetRequiredService<StorageManagementService>()
+                .DeactivateAsync(defaults.Value.ScopeRef!.Value, defaults.Value.Namespace, defaults.Value.Name, defaults.ETag, default));
+            Assert.AreEqual("storage_in_use", inUse.Code);
+        }
 
         var reader = factory.Services.GetRequiredService<ArtifactStorageReadMcpTool>();
         var materialized = await reader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
@@ -481,6 +492,51 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
         Assert.AreEqual("true", readFlow?.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual(ResourceScopeRef.Instance, writeFlow?.Value.ScopeRef);
         Assert.AreEqual(ResourceScopeRef.Instance, readFlow?.Value.ScopeRef);
+    }
+
+    [TestMethod]
+    public async Task SelectedStorageHonoursArtifactEnvelopeAndCommitsOnlyCompleteImmutableContent()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var services = factory.Services;
+        using var caller = services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var management = services.GetRequiredService<StorageManagementService>();
+        var resource = (await management.GetExactAsync(scope, ResourceNamespace.Default, LocalStorageDefaultsProvisioner.DefaultName, default))!;
+        using var authority = services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.local-default", "1.0.0"));
+        var changed = await management.ReconcileAsync(scope, resource.Value.Namespace, resource.Value.Name,
+            resource.Value.Definition with
+            {
+                Envelope = JsonSerializer.SerializeToElement(new { prefix = "artifacts/", write = true, maximumWriteBytes = 3, maximumReadBytes = 4 })
+            }, resource.ETag, default);
+        var adapter = services.GetRequiredService<WorkspaceArtifactStorage>();
+        var workspace = new WorkspaceId(context.WorkspaceId);
+        var bytes = Encoding.UTF8.GetBytes("complete-content");
+        var digest = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var reference = await adapter.CreateReferenceAsync(workspace, new string('b', 64), bytes.Length, digest, default);
+        Assert.AreEqual(3, await adapter.MaximumChunkBytesAsync(workspace, reference, true, default));
+        await adapter.ResetAsync(workspace, reference, default);
+        _ = await adapter.WriteAsync(workspace, reference, 0, bytes.AsMemory(0, 3), default);
+        await Assert.ThrowsAsync<ArtifactValidationException>(() => adapter.ReadAsync(workspace, reference, 0, 4, default));
+        var partial = await Assert.ThrowsAsync<StorageException>(() => adapter.StatAsync(workspace, reference, default));
+        Assert.AreEqual("storage_artifact_integrity_failed", partial.Code);
+        await adapter.ResetAsync(workspace, reference, default);
+        for (var offset = 0; offset < bytes.Length; offset += 3)
+            _ = await adapter.WriteAsync(workspace, reference, offset, bytes.AsMemory(offset, Math.Min(3, bytes.Length - offset)), default);
+        Assert.AreEqual(digest, (await adapter.StatAsync(workspace, reference, default)).Sha256);
+        await adapter.ResetAsync(workspace, reference, default);
+        var conflict = await Assert.ThrowsAsync<StorageException>(() => adapter.WriteAsync(workspace, reference, 0, new byte[] { 0 }, default));
+        Assert.AreEqual("storage_artifact_conflict", conflict.Code);
+        CollectionAssert.AreEqual(bytes[..4], (await adapter.ReadAsync(workspace, reference, 0, 4, default)).ToArray());
+        await Assert.ThrowsAsync<StorageException>(() => adapter.ReadAsync(workspace, reference, 0, 5, default));
+        _ = await management.ReconcileAsync(scope, changed.Value.Namespace, changed.Value.Name, changed.Value.Definition with
+        {
+            Envelope = JsonSerializer.SerializeToElement(new { prefix = "artifacts/", write = true, read = false })
+        }, changed.ETag, default);
+        var deniedReference = await adapter.CreateReferenceAsync(workspace, new string('c', 64), bytes.Length, digest, default);
+        var denied = await Assert.ThrowsAsync<StorageException>(() => adapter.ReadAsync(workspace, deniedReference, 0, 4, default));
+        Assert.AreEqual("storage_artifact_access_denied", denied.Code);
     }
 
     [TestMethod]

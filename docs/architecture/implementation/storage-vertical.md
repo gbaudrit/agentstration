@@ -38,9 +38,13 @@ rebinding or deactivation. Missing providers leave stored resources and evidence
 unchanged. Read-time observations do not create writes or change ETags.
 
 The Core `local` type supports management/resolution without a Connected Service.
-It advertises no unimplemented content capabilities. #1040 delivers actual
-ASP/AEP/Artifact adapters; [#1046 supplies the Console](../../reference/storage-console.md), and #1041/#1042 the dataset and
-Snapshot consumers. Existing acquisitions and Artifact histories are untouched.
+Its immutable metadata-only `1.0.0` remains unchanged. #1040 adds functional
+`2.0.0`, exact per-Workspace defaults, separate UID-bound directories and protected
+ASP/AEP/Artifact adapters. [Execution and deployment](../../reference/storage-execution.md)
+and [ADR-0200](../../decisions/0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md)
+describe runtime authority, policy preservation, current capability limits and
+historical Artifact handling. [#1046 supplies the Console](../../reference/storage-console.md);
+#1041/#1042 retain dataset and Snapshot ownership.
 
 Fast tests exercise domain and authority invariants with deterministic ports.
 Integration tests cover real HTTP/Problem Details, Bootstrap, Secret non-resolution,
@@ -84,3 +88,25 @@ Secret-resolution ports. Architecture checks explicitly permit this family contr
 while continuing to reject Storage services, API modules and concrete persistence
 from Console assemblies. This follows ADR-0199 and the existing Connected Service
 Console architecture; it introduces no new architectural decision or ADR.
+
+## Execution boundary
+
+`Storage.Contracts` owns content DTOs, restrictions and `IStorageContentGateway`.
+`Storage` still references no ASP/AEP implementation. Infrastructure composes the
+SDK adapters and the native local backend; the optional independent `Asp.Aep`
+library configures extension bindings without product-resource references.
+
+Every content call reauthorizes exact resource/type/service/export pins plus the
+current execution permission. Pure local envelope validation participates in
+management through a narrow port, without Secret resolution or physical I/O.
+Remote configuration layers travel through authenticated bounded AEP exchange;
+content Tool arguments carry only logical target selection and business inputs.
+
+Initialization target 3 reconciles existing Workspaces through the existing fenced
+startup mechanism. Defaults and first-grant markers are durable; subsequent
+provisioning preserves configuration, disablement and revocations. Operational
+defaults retain logical administrative ownership and exact operational access.
+
+New Artifact receipts pin their Storage UID/revision. Existing Artifact locations,
+receipts, leases and histories retain their original adapter. Receipt dependencies
+match exact UIDs; another resource at the same name does not inherit them.

@@ -7,8 +7,6 @@ using Agentstration.Agents.Contracts;
 using Agentstration.Application.Work;
 using Agentstration.Awp.Abstractions;
 using Agentstration.ConnectedServices;
-using Agentstration.Storage;
-using Agentstration.Storage.Contracts;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
@@ -44,6 +42,8 @@ using Agentstration.Secrets;
 using Agentstration.Security.Contracts;
 using Agentstration.Sources;
 using Agentstration.Sources.Contracts;
+using Agentstration.Storage;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
 using Agentstration.Tools.SourceRegistry;
 using Agentstration.Triggers;
@@ -885,6 +885,24 @@ public sealed class DependencyTests
             .SetEquals([ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace]));
         Assert.IsTrue(ResourceScopePolicy.AllowedScopes(StorageResourceKinds.StorageType)
             .SetEquals([ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace]));
+    }
+
+    [TestMethod]
+    public void StorageContentPortsRemainNeutralAndAspConfigurationCannotDependOnProductResources()
+    {
+        Assert.AreEqual(typeof(IStorageResolver).Assembly, typeof(IStorageContentGateway).Assembly);
+        var contracts = typeof(IStorageContentGateway).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+        Assert.IsFalse(contracts.Any(name => name.StartsWith("Agentstration.Asp.", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)
+            || name.Contains("EntityFramework", StringComparison.Ordinal)
+            || name is "Agentstration.Infrastructure" or "Agentstration.Web"));
+        var adapter = typeof(Agentstration.Asp.Aep.AspAepBindings).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+        Assert.IsFalse(adapter.Any(name => name.StartsWith("Agentstration.Storage", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.ConnectedServices", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Identity", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Work", StringComparison.Ordinal)
+            || name is "Agentstration.Infrastructure" or "Agentstration.Web" or "Agentstration.Resources"
+            || name.Contains("EntityFramework", StringComparison.Ordinal)));
     }
 
     [TestMethod]

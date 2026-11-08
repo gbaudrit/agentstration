@@ -18,7 +18,8 @@ public sealed class StorageManagementService(
     ICurrentRequestContext requestContext,
     IAuthorizationService authorization,
     IPlatformAuthorizationService platformAuthorization,
-    TimeProvider timeProvider) : IStorageResolver
+    TimeProvider timeProvider,
+    IEnumerable<IStorageDefinitionValidator>? definitionValidators = null) : IStorageResolver
 {
     public async Task<IReadOnlyList<StoredResource<StorageResource>>> ListAsync(
         ResourceScopeRef scope, int skip, int take, CancellationToken token)
@@ -94,7 +95,8 @@ public sealed class StorageManagementService(
             var definition = stored.Value.Definition with { Enabled = false };
             return await store.PutExactAsync(scope, stored.Value with
             {
-                Generation = checked(stored.Value.Generation + 1), Definition = definition,
+                Generation = checked(stored.Value.Generation + 1),
+                Definition = definition,
                 ObservedState = Ready(definition)
             }, etag, false, ct);
         }, token);
@@ -150,7 +152,8 @@ public sealed class StorageManagementService(
             await ValidateAsync(changed, ct);
             return await store.PutExactAsync(scope, changed with
             {
-                Generation = checked(stored.Value.Generation + 1), ObservedState = Ready(definition)
+                Generation = checked(stored.Value.Generation + 1),
+                ObservedState = Ready(definition)
             }, etag, false, ct);
         }, token);
     }
@@ -181,6 +184,7 @@ public sealed class StorageManagementService(
             throw new StorageException("storage_provider_unavailable", "The exact Storage provider is unavailable.", 409);
         await StorageValidation.InstanceAsync(version.ConfigurationSchema, definition.Configuration, token);
         await StorageValidation.InstanceAsync(version.EnvelopeSchema, definition.Envelope, token);
+        foreach (var validator in definitionValidators ?? []) validator.Validate(type, version, definition);
         await ValidateMappingAsync(resource, version, token);
         return version;
     }

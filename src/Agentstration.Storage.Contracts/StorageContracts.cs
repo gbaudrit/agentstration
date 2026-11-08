@@ -46,6 +46,7 @@ public sealed record StorageTypeVersionDescriptor
     public StorageCapabilities Capabilities { get; init; } = new();
     public StorageLimits Limits { get; init; } = new(100, 1024 * 1024, 1024 * 1024);
     public StorageContributionEvidence? Contribution { get; init; }
+    public StorageAspBindingDescriptor? Asp { get; init; }
     public bool Deprecated { get; init; }
     public string ContractDigest => StorageDigests.Version(this);
 }

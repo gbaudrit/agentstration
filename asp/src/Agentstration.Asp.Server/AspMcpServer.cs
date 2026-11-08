@@ -12,6 +12,21 @@ public sealed class AspMcpServer
     private readonly string toolPrefix;
     private readonly TimeProvider clock;
     private readonly AspReferences references;
+    private readonly Func<RequestContext<CallToolRequestParams>, AspStoreRef, CancellationToken, ValueTask<AspStoreBinding>>? resolveBinding;
+
+    /// <summary>The host resolves only previously configured bindings, from trusted transport context on every call.</summary>
+    public AspMcpServer(Func<RequestContext<CallToolRequestParams>, AspStoreRef, CancellationToken, ValueTask<AspStoreBinding>> resolveBinding,
+        TimeProvider? clock = null, string toolPrefix = "asp")
+    {
+        ArgumentNullException.ThrowIfNull(resolveBinding);
+        AspValidation.Require(toolPrefix.Length is > 0 and <= 64 && toolPrefix.All(c => char.IsAsciiLetterOrDigit(c) || c == '_'),
+            "invalid_policy", "Invalid Tool prefix.");
+        bindings = [];
+        this.resolveBinding = resolveBinding;
+        this.toolPrefix = toolPrefix;
+        this.clock = clock ?? TimeProvider.System;
+        references = new(this.clock);
+    }
 
     public AspMcpServer(IEnumerable<AspStoreBinding> bindings, TimeProvider? clock = null, string toolPrefix = "asp")
     {
@@ -64,9 +79,12 @@ public sealed class AspMcpServer
             var operation = parameters.Name[(toolPrefix.Length + 1)..];
             AspValidation.Require(Operations().Contains(operation, StringComparer.Ordinal), "unsupported_operation", "Operation is not supported.");
             AspValidation.Store(invocation.Store);
-            AspValidation.Require(bindings.TryGetValue(invocation.Store, out var binding), "forbidden", "The selected storage target is not configured or accessible.");
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            var binding = resolveBinding is null ? bindings.GetValueOrDefault(invocation.Store)
+                : await resolveBinding(request, invocation.Store, timeout.Token);
+            AspValidation.Require(binding is not null && binding.Store == invocation.Store,
+                "forbidden", "The selected storage target is not configured or accessible.");
             var context = Effective(binding, await binding.Authorize(request, timeout.Token));
             AspValidation.Require(Operations(binding).Contains(operation, StringComparer.Ordinal), "unsupported_operation", "The selected target does not support this operation.");
             var data = await ExecuteAsync(binding, context, operation, args, timeout.Token);
@@ -160,18 +178,23 @@ public sealed class AspMcpServer
         var policy = grant.Policy;
         AspValidation.Require(policy.Prefix.StartsWith(fixedPolicy.Prefix, StringComparison.Ordinal)
             || fixedPolicy.Prefix.StartsWith(policy.Prefix, StringComparison.Ordinal), "forbidden", "Disjoint authorized scope.");
-        return grant with { Policy = new(
+        return grant with
+        {
+            Policy = new(
             fixedPolicy.CanList && policy.CanList, fixedPolicy.CanStat && policy.CanStat,
             fixedPolicy.CanRead && policy.CanRead, fixedPolicy.CanWrite && policy.CanWrite && binding.Provider is IAspObjectWriter,
             policy.Prefix.Length >= fixedPolicy.Prefix.Length ? policy.Prefix : fixedPolicy.Prefix,
             Math.Min(policy.MaxReadBytes, fixedPolicy.MaxReadBytes), Math.Min(policy.MaxWriteBytes, fixedPolicy.MaxWriteBytes),
             Math.Min(policy.MaxPageSize, fixedPolicy.MaxPageSize),
-            MaxKey(policy.KeyFrom, fixedPolicy.KeyFrom), MinKey(policy.KeyBefore, fixedPolicy.KeyBefore)) };
+            MaxKey(policy.KeyFrom, fixedPolicy.KeyFrom), MinKey(policy.KeyBefore, fixedPolicy.KeyBefore))
+        };
     }
 
     private static string? MaxKey(string? left, string? right) => left is null ? right : right is null ? left : string.CompareOrdinal(left, right) >= 0 ? left : right;
     private static string? MinKey(string? left, string? right) => left is null ? right : right is null ? left : string.CompareOrdinal(left, right) <= 0 ? left : right;
-    private IEnumerable<string> Operations() => bindings.Values.SelectMany(Operations).Distinct(StringComparer.Ordinal);
+    private IEnumerable<string> Operations() => resolveBinding is null
+        ? bindings.Values.SelectMany(Operations).Distinct(StringComparer.Ordinal)
+        : ["describe", "list", "stat", "read", "write"];
     private static IEnumerable<string> Operations(AspStoreBinding binding)
     {
         yield return "describe";

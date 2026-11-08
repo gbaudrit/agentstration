@@ -2,7 +2,8 @@
 
 ASP is a standalone bounded content/object profile over MCP. Its contracts, MCP
 server and typed client have no dependency on the Agentstration product, AEP,
-EF Core or a provider SDK. See [the specification](docs/protocol.md).
+EF Core or a provider SDK. The optional `Agentstration.Asp.Aep` package adds AEP
+configuration integration without adding product-resource dependencies. See [the specification](docs/protocol.md).
 
 From this directory, using the .NET SDK selected by `global.json`:
 
@@ -37,6 +38,18 @@ applies the target policy and current grant. Use transport request-body limits.
 Physical configuration is opaque provider-defined JSON with the provider's own
 schema/version; ASP does not impose a bucket/path/table model or configure backends
 through content-call arguments. AEP/product integration owns that separate lifecycle.
+
+For dynamically configured AEP hosts, the optional `Agentstration.Asp.Aep` package
+provides `AspAepBindings` and `MapAspAepBindings()`. Publish immutable
+`aep.storage-types` contributions and implement `IAspAepBindingFactory` to validate
+your opaque configuration/envelope and authorize the actual authenticated caller.
+Use the dynamic `AspMcpServer` binding resolver with `AspAepBindings.ResolveAsync`.
+The bounded authenticated configuration endpoint issues short-lived, subject-bound
+leases selected through a protected HTTP header. Content arguments cannot configure
+targets. Effective policies may narrow requested rights and bounds; they cannot
+widen them. Each operation still requires independent provider authorization.
+See the [product integration contract](../docs/reference/storage-execution.md#aepasp-extension-contract)
+for composition and credential handling.
 
 A consumer supplies an already-authenticated `McpClient` to
 `AspClient.ConnectAsync(mcp, "asp", selectedStoreRef)`. The typed client validates

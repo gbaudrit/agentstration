@@ -178,3 +178,6 @@ are preserved. See [ADR-0199](../decisions/0199-storages-own-explicit-service-ex
 
 See [Console administration](storage-console.md) for scoped routes, explicit mapping,
 reconciliation and UI delivery boundaries.
+
+See [Storage execution](storage-execution.md) for the provider-neutral content port,
+functional local version, Workspace defaults, AEP/ASP bindings and Docker persistence.

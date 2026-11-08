@@ -415,7 +415,8 @@ public sealed record AepContributions(
     IReadOnlyList<AepDataSourceProfileBundleContribution>? DataSourceProfileBundles = null,
     IReadOnlyList<AepSchemaFormatContribution>? SchemaFormats = null,
     IReadOnlyList<AepConnectedServiceTypeContribution>? ConnectedServiceTypes = null,
-    IReadOnlyList<AepConnectedServiceOperationTypeContribution>? ConnectedServiceOperationTypes = null);
+    IReadOnlyList<AepConnectedServiceOperationTypeContribution>? ConnectedServiceOperationTypes = null,
+    IReadOnlyList<AepStorageTypeContribution>? StorageTypes = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<AepConnectedServiceOperationInteraction>))]
 public enum AepConnectedServiceOperationInteraction
@@ -653,6 +654,7 @@ public static class AepDescriptorValidator
             errors.Add("The aep.schema-formats capability needs at least one Schema format contribution.");
         ValidateConnectedServiceOperationTypes(descriptor, errors);
         ValidateConnectedServiceTypes(descriptor, errors);
+        errors.AddRange(AepStorageDescriptorValidator.Validate(descriptor));
         var sourceProviders = new HashSet<string>(StringComparer.Ordinal);
         foreach (var provider in descriptor.Contributions.SourceProviders ?? [])
         {
