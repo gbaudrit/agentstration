@@ -17,7 +17,9 @@ operational Workspace placement. These accepted boundaries remain in effect.
 The metadata-only immutable builtin `local@1.0.0` has no content capabilities.
 The maintainer requires a functional local default, separate physical directories
 and a persistent operator-owned root suitable for Docker mounting. #1064 owns
-complete access administration and must be able to preserve deliberate revocations.
+StorageType administration and existing generic resource grants, preserving
+deliberate revocations. New user-permission work belongs to #1077; UsePolicy
+authoring/composition belongs to #1078. Existing restrictive checks remain in force.
 
 ## Decision
 
@@ -81,7 +83,8 @@ Grant initialization is recorded once. Subsequent synchronization/provisioning
 does not restore missing rights, reset disablement or overwrite an existing
 default. Interrupted access initialization fails closed and requires explicit
 administrative repair; a name/ownership collision fails rather than replacing a
-user resource. #1064 administers policy and must retain these decisions and markers.
+user resource. #1064 administers generic grants and must retain these decisions
+and markers; a generic Use grant never overrides an existing UsePolicy denial.
 
 New builtin Artifact writes pin the selected default Storage in their receipt and
 use its separate directory. Existing unprefixed Artifact receipts retain the
@@ -100,7 +103,9 @@ The existing staging, lease, provenance and read/write Flow contracts remain int
 - #1041/#1042 own datasets, projection and Snapshot publication. The current ASP
   content profile is insufficient for durable Snapshots requiring stable versions
   and retention; those capabilities must actually exist before publication.
-- #1064/#1065 own administration refinements and their deferred UX scenario.
+- #1064/#1065 own StorageType administration, existing generic grants and their
+  deferred UX scenario. #1077/#1078 retain new user-permission and UsePolicy work;
+  no new authorization engine or policy-authoring surface is introduced here.
   #1033 retains its integrated scenario and approval/merge gate.
 - No EF migration, legacy Storage contract, additional product process or broker
   is introduced. Historical Artifact support preserves an already delivered

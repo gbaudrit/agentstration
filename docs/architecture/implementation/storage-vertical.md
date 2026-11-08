@@ -110,3 +110,43 @@ defaults retain logical administrative ownership and exact operational access.
 New Artifact receipts pin their Storage UID/revision. Existing Artifact locations,
 receipts, leases and histories retain their original adapter. Receipt dependencies
 match exact UIDs; another resource at the same name does not inherit them.
+
+## FR #1040 validation — 2026-11-08
+
+Execution behavior was verified against implementation `2746894` on
+`feature/fr-1040-storage-adapters`, based on `integration/fr-1032` at `a27d3d7`.
+The PR remains a draft pending the default-provisioning scope clarification below.
+
+| Check | Result |
+|---|---|
+| Solution restore and Release build | Passed; 0 warnings, 0 errors |
+| Required Fast command | 999 passed, 0 failed, 0 skipped |
+| Required Integration command | 1,087 discovered: 1,075 passed, 0 failed, 12 optional tests skipped |
+| Independent AEP SDK conformance | 59 passed, 0 failed, 0 skipped |
+| Optional `Agentstration.Asp.Aep` packaging | Passed; README, license and notices included |
+| ADR/LikeC4 and production Docusaurus build | Passed; 198 unique ADRs |
+| Standalone Development executable | Health 200, fixture login 204, StorageType catalogue 200 and Storage list 200; local versions 1.0.0/2.0.0 and Instance default present |
+| Real Docker remove/recreate | Passed; separate write/read containers retained two volumes, exact Workspace/Storage identities, content reference, Artifact receipt and historical Artifact content |
+
+Both functional commands used the repository's required minimum test counts
+(777/954) and maximum parallel module counts (4/2), without disabling analyzers
+or NuGet audit. The 12 skips remain the existing opt-in PostgreSQL/live-model
+integrations; no Storage execution test was skipped. Focused checks cover native
+filesystem isolation/restart/idempotency, the actual authenticated AEP/MCP exchange,
+late Secret grant redemption/redaction, narrowed provider envelopes, operational
+ownership, concurrent provisioning, collision safety and atomic Artifact copies.
+
+Docker used a locally assembled offline .NET 10.0.8 runtime image and the published
+`StorageVolumeProbe`, executing both phases with networking disabled. Pulling
+`mcr.microsoft.com/dotnet/aspnet:10.0` was refused by the registry in this execution
+environment. The checked-in Dockerfile using that official base was therefore not
+validated here; this does not replace the actual retained-volume container test.
+
+The updated #1040/#1064 scope defers new user-permission work to #1077 and UsePolicy
+authoring/composition to #1078. The current candidate initializes exact, recorded
+UsePolicy grants once for Core defaults, in addition to generic Discover/Use;
+it never globally exempts the type or restores revoked grants. Whether this
+initialization belongs in #1040 or must instead leave affected defaults blocked
+is awaiting maintainer clarification. Existing restrictive checks stay in force;
+a generic grant alone does not imply usable Storage. This validation is not a
+scope approval, UX approval or merge. No reusable browser journey was added.

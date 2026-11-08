@@ -50,8 +50,10 @@ They are not business Workspace choices.
 
 Initial exact Discover/Use and descendant UsePolicy decisions are recorded once.
 An intentional revocation survives restart and synchronization. Interrupted initial
-grant setup does not silently restore rights: inspect both policy layers through
-the owning access administration and explicitly repair the intended decision.
+grant setup does not silently restore rights. Existing UsePolicy checks remain
+independent of generic resource grants: a generic Use grant alone does not override
+a UsePolicy denial. #1064 administers existing generic grants; new user-permission
+work belongs to #1077 and UsePolicy authoring/composition to #1078.
 
 ## Operator configuration and Docker
 
@@ -151,8 +153,9 @@ Agent Tool; optional fixed-target exposure belongs to #1044.
 
 ## Remaining integrations
 
-- #1064: complete StorageType/Storage access administration; #1065: its gated
-  reusable UX scenario.
+- #1064: StorageType administration and existing generic scoped resource grants;
+  #1065: its gated reusable UX scenario. #1077 owns new user-permission work and
+  #1078 owns UsePolicy authoring/composition; current restrictive checks remain.
 - #1041: dataset/acquisition selection, rules, consumer authorization and execution.
 - #1042: projection, freshness, publication and retrieval. Durable Snapshots require
   real stable-version/retention guarantees beyond the current content profile.
