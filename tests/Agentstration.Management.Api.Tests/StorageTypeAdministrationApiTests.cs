@@ -24,7 +24,7 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         var context = await GetBootstrapContextAsync(factory);
         await PublicationAndLifecycleUseEtagsAndRetainPinnedStorageVersions(client, context);
         await GenericDiscoverAndUseAreIndependentAndHiddenExactReadsStayHidden(client, context);
-        await BuiltinGrantsRemainIndependentFromProtectedDefinitionAndUsePolicy(factory, client, context);
+        await BuiltinUseGrantsAuthorizeWorkspaceCreationWithoutChangingProtectedDefinitions(factory, client, context);
         await GenerationPinnedDiscoveryFailsClosedAfterMetadataUpdate(client, context);
     }
 
@@ -128,7 +128,7 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         }
     }
 
-    private static async Task BuiltinGrantsRemainIndependentFromProtectedDefinitionAndUsePolicy(
+    private static async Task BuiltinUseGrantsAuthorizeWorkspaceCreationWithoutChangingProtectedDefinitions(
         WebApplicationFactory<Program> factory, HttpClient client, RequestContext context)
     {
         var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
@@ -138,7 +138,8 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         var type = types!.Value.Single(value => value.Name == StoragePlatformResourceProvisioner.LocalTypeName);
         var identity = new ResourceAccessIdentity(type.Uid, type.ScopeRef!.Value, type.Namespace, type.Kind);
         var policyPath = $"/api/resource-access-policies/{type.Uid}";
-        var policy = new ResourceAccessPolicy(identity, [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]);
+        var tenant = ResourceScopeRef.Tenant(context.TenantId);
+        var policy = new ResourceAccessPolicy(identity, [new(tenant, [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]);
         using var put = await client.PutAsJsonAsync(policyPath, policy);
         Assert.AreEqual(HttpStatusCode.OK, put.StatusCode);
         var etag = put.Headers.ETag!.ToString();
@@ -148,8 +149,11 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         Assert.AreEqual(HttpStatusCode.Conflict, deleteWithoutEtag.StatusCode);
         using var denied = await Send(client, HttpMethod.Put, TypePath(type), new PutStorageTypeRequest(type.Definition with { DisplayName = "Forged" }), type.ETag!);
         Assert.AreEqual(HttpStatusCode.Conflict, denied.StatusCode);
+        var builtinVersion = type.Definition.Versions.Single(value => value.Version == "1.0.0");
+        Assert.HasCount(1, type.Definition.Versions);
+        Assert.IsTrue(builtinVersion.Capabilities.Write);
         using var deniedVersion = await Send(client, HttpMethod.Post, TypePath(type).Replace("?", "/versions?", StringComparison.Ordinal),
-            new PublishStorageTypeVersionRequest(type.Definition.Versions.Single() with { Version = "2.0.0" }), type.ETag!);
+            new PublishStorageTypeVersionRequest(builtinVersion with { Version = "2.0.0" }), type.ETag!);
         Assert.AreEqual(HttpStatusCode.Conflict, deniedVersion.StatusCode);
         await factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
         using var unchanged = await client.GetAsync(TypePath(type));
@@ -157,11 +161,13 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
         using var savedPolicy = await client.GetAsync(policyPath);
         Assert.AreEqual(etag, savedPolicy.Headers.ETag!.ToString());
         SelectConsoleContext(client, workspace);
-        Assert.IsTrue((await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types"))!.Value.Any(value => value.Uid == type.Uid));
-        var version = type.Definition.Versions.Single();
-        using var cannotBypass = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("cannot-bypass", new()
+        var visible = (await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types"))!.Value.Single(value => value.Uid == type.Uid);
+        Assert.AreEqual(workspace, visible.ObservedUse!.ConsumerScopeRef);
+        Assert.IsTrue(visible.ObservedUse.Use.Allowed);
+        var version = type.Definition.Versions.Single(value => value.Version == type.Definition.PreferredVersion);
+        var properties = new StorageProperties
         {
-            DisplayName = "Cannot bypass",
+            DisplayName = "Tenant-shared builtin",
             Type = new()
             {
                 Type = new(type.Name, type.ScopeRef),
@@ -172,14 +178,33 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
             },
             Configuration = JsonSerializer.SerializeToElement(new { }),
             Envelope = JsonSerializer.SerializeToElement(new { })
-        }, workspace));
-        Assert.AreEqual(HttpStatusCode.Forbidden, cannotBypass.StatusCode);
+        };
+        using var created = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("authorized-builtin", properties, workspace));
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
+        var storage = (await created.Content.ReadFromJsonAsync<StorageResource>())!;
+        Assert.AreEqual(type.Uid, storage.Definition.Type.TypeUid);
+        Assert.AreEqual(version.Version, storage.Definition.Type.Version);
+        Assert.IsEmpty(storage.Definition.UsePolicy.Grants);
         SelectConsoleContext(client, ResourceScopeRef.Instance);
-        using var revoke = await Send(client, HttpMethod.Put, policyPath, policy with { Grants = [] }, etag);
+        var discoverOnly = policy with { Grants = [new(tenant, [ResourceAccessAction.Discover], IncludeDescendants: true)] };
+        using var revoke = await Send(client, HttpMethod.Put, policyPath, discoverOnly, etag);
         Assert.AreEqual(HttpStatusCode.OK, revoke.StatusCode);
+        var revokedEtag = revoke.Headers.ETag!.ToString();
         await factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
+        using var preservedRevocation = await client.GetAsync(policyPath);
+        Assert.AreEqual(revokedEtag, preservedRevocation.Headers.ETag!.ToString());
+        using var staleOverlay = await Send(client, HttpMethod.Put, policyPath, policy, etag);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleOverlay.StatusCode);
+        using var preservedType = await client.GetAsync(TypePath(type));
+        Assert.AreEqual(type.ETag, preservedType.Headers.ETag!.ToString());
+        var preserved = (await preservedType.Content.ReadFromJsonAsync<StorageTypeResource>())!;
+        Assert.AreEqual(builtinVersion.ContractDigest, preserved.Definition.Versions.Single(value => value.Version == "1.0.0").ContractDigest);
+        Assert.IsEmpty(preserved.Definition.UsePolicy.Grants);
         SelectConsoleContext(client, workspace);
-        Assert.IsFalse((await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types"))!.Value.Any(value => value.Uid == type.Uid));
+        var revoked = (await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types"))!.Value.Single(value => value.Uid == type.Uid);
+        Assert.IsFalse(revoked.ObservedUse!.Use.Allowed);
+        using var refused = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("revoked-builtin", properties, workspace));
+        await Problem(refused, "storage_access_denied", HttpStatusCode.Forbidden);
     }
 
     private static async Task GenerationPinnedDiscoveryFailsClosedAfterMetadataUpdate(HttpClient client, RequestContext context)

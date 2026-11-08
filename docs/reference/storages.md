@@ -26,10 +26,11 @@ digest as `contractDigest`, in addition to `typeUid`, `version`, `schemaDigest` 
 the exact type `ResourceReference`. New versions are additive; published versions
 cannot change or disappear. Preferred-version updates never rebind Storages.
 
-The builtin Core-owned `local` version `1.0.0` requires no Connected Service. Its
-configuration and envelope are empty objects. It is an executable management and
-logical-resolution contract; it advertises no content operations. #1040 supplies
-the Artifact adapter and default Storage, and advertises their actual capabilities.
+The builtin Core-owned `local@1.0.0` requires no Connected Service. Configuration
+is `{}`; its envelope declares bounded content permissions and restrictions.
+It supports list/stat/read/write without stable historical versions or Snapshot
+retention. [Storage execution](storage-execution.md) describes its actual limits.
+#1040 supplies the Artifact adapter and guarded default provisioning.
 Existing Artifact Flows, acquisition Tools, durable reads and histories continue
 through their existing implementation.
 
@@ -145,10 +146,15 @@ a universal bucket/path/table contract.
 `IStorageResolver.ResolveAsync` consumes a `StorageRevisionReference` containing
 the canonical scoped address, UID, generation and `bindingDigest` from the
 resource's observed state. The consumer context must match the authenticated
-scope. Resolution checks the Storage UsePolicy and resource access policy, and
-revalidates the selected type, schemas, service, mappings and availability. Each
-ancestor dependency separately requires its use and access grants. Old/forged
-revisions and revoked grants fail on each call.
+scope. Storage and StorageType use is authorized by the existing generic
+`ResourceAccessPolicy.Use` decision, with exact identity and same/descendant scope
+checks. A Tenant grant with propagation authorizes its Workspaces; Discover alone
+does not authorize use. The embedded Storage-family UsePolicy metadata is not an
+additional authorization gate while that vertical is deferred to #1078. No grants
+are generated automatically. Resolution also revalidates type, schemas, service,
+manual mappings and availability. Connected Service inspection keeps the independent
+checks owned by that family. Old/forged revisions and revoked grants fail on each
+call.
 
 `ProtectedStorageContext` exposes a serializable logical revision and exact type/
 service evidence. Configuration, envelope and bindings remain separate protected
@@ -193,14 +199,18 @@ immutable versions preserve sharing; explicitly pinned policies fail closed
 after the pinned revision changes. Synchronizers do not write access overlays.
 
 The Access evaluator displays saved **generic** decisions, not unsaved draft
-grants or a promise of functional usability. Existing contextual authorization,
-UsePolicy, enablement, exact dependency contracts, provider availability and
-content capabilities still apply. User-permission expansion is deferred to
+grants. ResourceAccessPolicy.Use is the current usage authority for Storage and
+StorageType: a Tenant grant with IncludeDescendants permits its Workspaces;
+Discover alone, revocation and foreign Tenant targets remain refused. Embedded
+UsePolicy adds no second Storage-family gate while its administration is deferred,
+as recorded in [ADR-0200](../decisions/0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md).
+Existing contextual authorization, scopes, UIDs/generations, versions/digests,
+enablement, availability, configuration, mappings and capabilities still apply.
+Connected Services retain their own checks. User-permission expansion is deferred to
 [#1077](https://github.com/gbaudrit/agentstration/issues/1077), and UsePolicy
 administration to [#1078](https://github.com/gbaudrit/agentstration/issues/1078).
-In particular, granting Discover/Use to the single Instance-owned builtin local
-type does not bypass its existing descendant UsePolicy. There is no global
-automatic grant or per-Workspace type copy.
+The Instance-owned builtin uses functional `local@1.0.0`. There is no automatic grant, global exemption, ASP bypass
+or per-Workspace type copy. Synchronization and restart preserve grants/revocations.
 
 Type reads project `observedUse` with the authenticated consumer scope and the
 shared evaluator's generic Use decision. This projection is recomputed and never
@@ -224,3 +234,6 @@ are preserved. See [ADR-0199](../decisions/0199-storages-own-explicit-service-ex
 
 See [Console administration](storage-console.md) for scoped routes, explicit mapping,
 reconciliation and UI delivery boundaries.
+
+See [Storage execution](storage-execution.md) for the provider-neutral content port,
+functional local version, Workspace defaults, AEP/ASP bindings and Docker persistence.

@@ -123,6 +123,7 @@ internal static class StandaloneHostCompositionExtensions
         builder.Services.AddAgentstration(new AgentstrationCompositionOptions
         {
             DataDirectory = dataDirectory,
+            LocalStorageRootDirectory = builder.Configuration[Agentstration.Infrastructure.Storage.LocalStorageOptions.ConfigurationKey],
             Ai = aiOptions,
             Storage = storageOptions,
             ControlPlaneConnectionString = controlPlaneConnectionString,

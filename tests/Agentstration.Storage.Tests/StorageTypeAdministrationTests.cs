@@ -98,4 +98,26 @@ public sealed class StorageTypeAdministrationTests
         fixture.Availability.Available = true;
         Assert.AreEqual(StorageAvailability.Ready, (await fixture.Types.ListAsync(StorageFixture.Tenant, 0, 50, default)).Single().Value.ObservedVersions.Single().Availability);
     }
+
+    [TestMethod]
+    public async Task UseObservationFollowsCurrentConsumerAndRevocationWithoutPersistingRequestState()
+    {
+        var fixture = new StorageFixture();
+        var type = await fixture.TypeAsync(scope: ResourceScopeRef.Instance);
+        var address = new ScopedResourceAddress(ResourceScopeRef.Instance, type.Namespace, type.Kind, type.Name);
+        fixture.Context.AccessMode = Agentstration.Identity.Contracts.ControlPlaneAccessMode.Workspace;
+        var allowed = (await fixture.Types.GetExactAsync(ResourceScopeRef.Instance, type.Namespace, type.Name, default))!;
+        Assert.AreEqual(StorageFixture.Workspace, allowed.Value.ObservedUse!.ConsumerScopeRef);
+        Assert.IsTrue(allowed.Value.ObservedUse.Use.Allowed);
+        fixture.Access.Allowed = false;
+        var denied = (await fixture.Types.ListAsync(StorageFixture.Workspace, 0, 50, default)).Single();
+        Assert.IsFalse(denied.Value.ObservedUse!.Use.Allowed);
+        Assert.AreEqual(type.ETag, denied.ETag);
+        Assert.IsNull((await fixture.Store.GetExactAsync<StorageTypeResource>(address, default))!.Value.ObservedUse);
+        await fixture.Types.PutExactAsync(ResourceScopeRef.Instance, type.Namespace, type.Name,
+            type.Definition with { Description = "Updated metadata" }, type.ETag, default);
+        var saved = (await fixture.Store.GetExactAsync<StorageTypeResource>(address, default))!.Value;
+        Assert.IsNull(saved.ObservedUse);
+        Assert.IsEmpty(saved.ObservedVersions);
+    }
 }

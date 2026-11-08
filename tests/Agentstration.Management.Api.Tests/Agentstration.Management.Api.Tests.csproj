@@ -1,5 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../asp/src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
+    <ProjectReference Include="../../asp/samples/LocalStorage/LocalStorage.csproj" />
     <ProjectReference Include="../../src/Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
     <ProjectReference Include="../../src/Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />
     <Compile Include="../TestHostMetrics.cs" Link="TestHostMetrics.cs" />

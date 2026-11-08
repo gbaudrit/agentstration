@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../../asp/src/Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
+    <ProjectReference Include="../../asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
     <ProjectReference Include="../Agentstration.Storage/Agentstration.Storage.csproj" />
     <ProjectReference Include="../Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
     <ProjectReference Include="../Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />

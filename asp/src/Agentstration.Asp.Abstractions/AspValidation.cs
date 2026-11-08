@@ -1,5 +1,5 @@
-using System.Security.Cryptography;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Agentstration.Asp.Abstractions;
@@ -59,6 +59,16 @@ public static class AspValidation
         Require(prefix is not null && prefix.Length <= 256, "invalid_request", "Invalid prefix.");
         if (prefix.Length > 0) Key(prefix.EndsWith('/') ? prefix[..^1] : prefix);
     }
+
+    /// <summary>Checks that an effective policy cannot widen the caller's authorized restrictions.</summary>
+    public static bool IsNarrower(AspAccessPolicy actual, AspAccessPolicy requested) =>
+        (!actual.CanList || requested.CanList) && (!actual.CanStat || requested.CanStat)
+        && (!actual.CanRead || requested.CanRead) && (!actual.CanWrite || requested.CanWrite)
+        && actual.Prefix.StartsWith(requested.Prefix, StringComparison.Ordinal)
+        && actual.MaxReadBytes <= requested.MaxReadBytes && actual.MaxWriteBytes <= requested.MaxWriteBytes
+        && actual.MaxPageSize <= requested.MaxPageSize
+        && (requested.KeyFrom is null || actual.KeyFrom is not null && string.CompareOrdinal(actual.KeyFrom, requested.KeyFrom) >= 0)
+        && (requested.KeyBefore is null || actual.KeyBefore is not null && string.CompareOrdinal(actual.KeyBefore, requested.KeyBefore) <= 0);
 
     public static bool Allows(AspAccessPolicy policy, string key) => key.StartsWith(policy.Prefix, StringComparison.Ordinal)
         && (policy.KeyFrom is null || string.CompareOrdinal(key, policy.KeyFrom) >= 0)

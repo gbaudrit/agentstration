@@ -18,7 +18,8 @@ public sealed class StorageManagementService(
     ICurrentRequestContext requestContext,
     IAuthorizationService authorization,
     IPlatformAuthorizationService platformAuthorization,
-    TimeProvider timeProvider) : IStorageResolver
+    TimeProvider timeProvider,
+    IEnumerable<IStorageDefinitionValidator>? definitionValidators = null) : IStorageResolver
 {
     public async Task<IReadOnlyList<StoredResource<StorageResource>>> ListAsync(
         ResourceScopeRef scope, int skip, int take, CancellationToken token)
@@ -94,7 +95,8 @@ public sealed class StorageManagementService(
             var definition = stored.Value.Definition with { Enabled = false };
             return await store.PutExactAsync(scope, stored.Value with
             {
-                Generation = checked(stored.Value.Generation + 1), Definition = definition,
+                Generation = checked(stored.Value.Generation + 1),
+                Definition = definition,
                 ObservedState = Ready(definition)
             }, etag, false, ct);
         }, token);
@@ -127,7 +129,7 @@ public sealed class StorageManagementService(
         if (stored.Value.Uid != storage.StorageUid || stored.Value.Generation != storage.Generation
             || StorageDigests.Binding(stored.Value.Definition) != storage.BindingDigest)
             throw new StorageException("storage_revision_stale", "The selected Storage revision is stale.", 409);
-        await EnsureUseAsync(stored.Value, context.ConsumerScopeRef, stored.Value.Definition.UsePolicy, cancellationToken);
+        await EnsureUseAsync(stored.Value, context.ConsumerScopeRef, cancellationToken);
         if (!stored.Value.Definition.Enabled)
             throw new StorageException("storage_disabled", "The Storage is disabled.", 409);
         var version = await ValidateAsync(stored.Value, cancellationToken);
@@ -150,7 +152,8 @@ public sealed class StorageManagementService(
             await ValidateAsync(changed, ct);
             return await store.PutExactAsync(scope, changed with
             {
-                Generation = checked(stored.Value.Generation + 1), ObservedState = Ready(definition)
+                Generation = checked(stored.Value.Generation + 1),
+                ObservedState = Ready(definition)
             }, etag, false, ct);
         }, token);
     }
@@ -167,7 +170,7 @@ public sealed class StorageManagementService(
         var address = reference.Type.Resolve(resource.Namespace, StorageResourceKinds.StorageType);
         var type = (await store.GetExactAsync<StorageTypeResource>(new(typeScope, address.Namespace, address.Kind, address.Name), token))?.Value
             ?? throw new StorageException("storage_type_unavailable", "The pinned Storage type is missing or inaccessible.", 409);
-        await EnsureUseAsync(type, scope, type.Definition.UsePolicy, token);
+        await EnsureUseAsync(type, scope, token);
         if (type.Uid != reference.TypeUid)
             throw new StorageException("storage_type_stale", "The pinned Storage type identity is stale.", 409);
         if (!type.Definition.Enabled)
@@ -181,6 +184,7 @@ public sealed class StorageManagementService(
             throw new StorageException("storage_provider_unavailable", "The exact Storage provider is unavailable.", 409);
         await StorageValidation.InstanceAsync(version.ConfigurationSchema, definition.Configuration, token);
         await StorageValidation.InstanceAsync(version.EnvelopeSchema, definition.Envelope, token);
+        foreach (var validator in definitionValidators ?? []) validator.Validate(type, version, definition);
         await ValidateMappingAsync(resource, version, token);
         return version;
     }
@@ -200,7 +204,7 @@ public sealed class StorageManagementService(
         var service = (await store.GetExactAsync<ConnectedServiceResource>(new(selected.Service.ScopeRef,
             serviceAddress.Namespace, serviceAddress.Kind, serviceAddress.Name), token))?.Value
             ?? throw new StorageException("storage_service_unavailable", "The Connected Service is missing or inaccessible.", 409);
-        await EnsureUseAsync(service, resource.ScopeRef!.Value, service.Definition.UsePolicy, token);
+        await EnsureUseAsync(service, resource.ScopeRef!.Value, token);
         ConnectedServiceExportMetadata metadata;
         try
         {
@@ -254,14 +258,18 @@ public sealed class StorageManagementService(
         StorageValidation.Json(definition.Envelope);
     }
 
-    private async Task EnsureUseAsync(Resource resource, ResourceScopeRef consumer, DescendantUsePolicy policy, CancellationToken token)
+    private async Task EnsureUseAsync(Resource resource, ResourceScopeRef consumer, CancellationToken token)
     {
         var scope = resource.ScopeRef!.Value;
-        if (!await useAuthorizer.IsSameOrDescendantAsync(scope, consumer, token)
-            || !await useAuthorizer.CanUseAsync(scope, consumer, policy, token)
-            || !(await accessPolicies.EvaluateAsync(new(resource.Uid, scope, resource.Namespace, resource.Kind,
-                resource.Generation), consumer, ResourceAccessAction.Use, token)).Allowed)
-            throw new StorageException("storage_access_denied", "The resource cannot be used from this scope.", 403);
+        if (!await useAuthorizer.IsSameOrDescendantAsync(scope, consumer, token))
+            throw new StorageException("storage_access_denied", "The dependency is outside the consumer's scope hierarchy.", 403);
+        // Generic Use is the current Storage-family authority. Do not impose an unadministrable
+        // second grant layer while UsePolicy is deferred to #1078. Connected Service export
+        // inspection retains the independent restrictions owned by that family.
+        var decision = await accessPolicies.EvaluateAsync(new(resource.Uid, scope, resource.Namespace, resource.Kind,
+            resource.Generation), consumer, ResourceAccessAction.Use, token);
+        if (!decision.Allowed)
+            throw new StorageException("storage_access_denied", $"The resource cannot be used from this scope ({decision.ReasonCode}).", 403);
     }
 
     private void EnsureConsumerContext(ResourceScopeRef consumer)

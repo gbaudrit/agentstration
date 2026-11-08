@@ -153,6 +153,10 @@ model {
         description 'Governed Tool catalog, policy hooks, approvals, MCP publication, and invocation'
       }
 
+      storageExecution = component 'Storage execution adapters' {
+        description 'Infrastructure-owned exact Storage resolution, local UID-isolated content and Artifact adapters, protected AEP bindings and ASP MCP invocation'
+      }
+
       scheduling = component 'Scheduling and background processing' {
         description 'API-driven Trigger administration and run-now commands, plus internal scheduling, reconciliation, refresh, and recovery workers'
       }
@@ -184,6 +188,10 @@ model {
 
     runtimeData = container 'Runtime data' {
       description 'Workspace-owned technical Runtime Runs, events, attempts, and execution state, including protected operational Workspaces'
+    }
+
+    storageContent = container 'Storage content data' {
+      description 'Operator-mounted local root with separate exact Storage UID directories; historical Artifact locations and receipts remain preserved'
     }
   }
 
@@ -262,6 +270,11 @@ model {
   agentstration.server.runtime -> agentstration.server.resources 'Resolves immutable Agents and profiles'
   agentstration.server.runtime -> agentstration.server.tools 'Invokes assigned agent Tools'
   agentstration.server.tools -> agentstration.server.resources 'Resolves Tool definitions, providers, and policies'
+  agentstration.server.storageExecution -> agentstration.server.resources 'Resolves exact Storage, type, service and manual export pins'
+  agentstration.server.storageExecution -> agentstration.server.identity 'Checks current scoped use and execution rights'
+  agentstration.server.tools -> agentstration.server.storageExecution 'Uses native Artifact persistence under governed execution'
+  agentstration.server.storageExecution -> agentstration.storageContent 'Reads and writes isolated local content'
+  agentstration.server.storageExecution -> aepExtensions 'Configures protected bindings and invokes generic ASP operations'
   agentstration.server.identity -> agentstration.identityData 'Reads and writes'
   agentstration.server.resources -> agentstration.controlPlaneData 'Reads and writes'
   agentstration.server.work -> agentstration.workData 'Reads and writes'

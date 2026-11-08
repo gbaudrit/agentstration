@@ -4,6 +4,7 @@ using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.Resources;
 using Agentstration.Tools;
 
@@ -13,7 +14,8 @@ public sealed class ArtifactStorageWriteMcpTool(
     ArtifactManagementService artifacts,
     IArtifactDurableStore durable,
     ICurrentRequestContext current,
-    IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
+    IRequestContextScopeFactory scopes,
+    WorkspaceArtifactStorage? selectableStorage = null) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public const string Name = "artifact.storage.local.write";
 
@@ -30,11 +32,16 @@ public sealed class ArtifactStorageWriteMcpTool(
             throw Error("staged_artifact_not_sealed", "Only sealed staged content can be persisted.");
         var storageFlowRunId = invocation.RunId ?? OptionalString(invocation.Arguments, "storageFlowRunId") ?? invocation.CallId;
         var opaqueReference = StableReference(invocation.WorkspaceId, sourceId, storageFlowRunId);
+        if (selectableStorage is not null)
+            opaqueReference = await selectableStorage.CreateReferenceAsync(invocation.WorkspaceId, opaqueReference,
+                source.Value.Length, source.Value.Sha256!, cancellationToken);
+        var maximumChunkBytes = selectableStorage is null ? ArtifactManagementService.MaximumChunkBytes
+            : await selectableStorage.MaximumChunkBytesAsync(invocation.WorkspaceId, opaqueReference, true, cancellationToken);
         await durable.ResetAsync(invocation.WorkspaceId, opaqueReference, cancellationToken);
         long offset = 0;
         while (offset < source.Value.Length)
         {
-            var length = checked((int)Math.Min(ArtifactManagementService.MaximumChunkBytes, source.Value.Length - offset));
+            var length = checked((int)Math.Min(maximumChunkBytes, source.Value.Length - offset));
             var chunk = await Artifacts.ReadAsync(sourceId, offset, length, null, cancellationToken);
             var bytes = Convert.FromBase64String(chunk.ContentBase64);
             offset = await durable.WriteAsync(invocation.WorkspaceId, opaqueReference, offset, bytes, cancellationToken);
@@ -72,7 +79,8 @@ public sealed class ArtifactStorageReadMcpTool(
     ArtifactManagementService artifacts,
     IArtifactDurableStore durable,
     ICurrentRequestContext current,
-    IRequestContextScopeFactory scopes) : ArtifactBrokerInternalTool(artifacts, current, scopes)
+    IRequestContextScopeFactory scopes,
+    WorkspaceArtifactStorage? selectableStorage = null) : ArtifactBrokerInternalTool(artifacts, current, scopes)
 {
     public const string Name = "artifact.storage.local.read";
 
@@ -86,6 +94,8 @@ public sealed class ArtifactStorageReadMcpTool(
             FlowRunArtifactId.Parse(RequiredString(invocation.Arguments, "flowRunArtifactId")), cancellationToken)
             ?? throw Error("flow_run_artifact_not_found", "The FlowRunArtifact was not found.");
         var receipt = durableArtifact.Value.Receipt;
+        var maximumChunkBytes = selectableStorage is null ? ArtifactManagementService.MaximumChunkBytes
+            : await selectableStorage.MaximumChunkBytesAsync(invocation.WorkspaceId, receipt.OpaqueReference, false, cancellationToken);
         var binding = OptionalString(invocation.Arguments, "binding");
         var producer = new ArtifactProducer
         {
@@ -105,7 +115,7 @@ public sealed class ArtifactStorageReadMcpTool(
         long offset = 0;
         while (offset < receipt.Length)
         {
-            var length = checked((int)Math.Min(ArtifactManagementService.MaximumChunkBytes, receipt.Length - offset));
+            var length = checked((int)Math.Min(maximumChunkBytes, receipt.Length - offset));
             var bytes = await durable.ReadAsync(invocation.WorkspaceId, receipt.OpaqueReference, offset, length, cancellationToken);
             var updated = await Artifacts.WriteAsync(staged.Value.ArtifactId, offset, bytes, cancellationToken);
             offset = updated.Value.Length;

@@ -225,3 +225,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 197. [ADR-0197 — Connected Service bindings support typed literals](0197-connected-service-bindings-support-typed-literals.md)
 198. [ADR-0198 — Connected Service operations are typed discovered resources](0198-connected-service-operations-are-typed-discovered-resources.md)
 199. [ADR-0199 — Storages own explicit Connected Service export bindings](0199-storages-own-explicit-service-export-bindings.md)
+200. [ADR-0200 — Storage execution pins protected bindings and local Workspace defaults](0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md)

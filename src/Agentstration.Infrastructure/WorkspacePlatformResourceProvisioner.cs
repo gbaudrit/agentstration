@@ -27,6 +27,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     InternalMcpToolProjectionService internalTools,
     ConnectedServicePlatformResourceProvisioner connectedServiceTypes,
     StoragePlatformResourceProvisioner storageTypes,
+    LocalStorageDefaultsProvisioner localStorage,
     ArtifactPlatformResourceProvisioner artifacts,
     KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
 {
@@ -53,6 +54,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
         await storageTypes.EnsureAsync(cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
+        await localStorage.EnsureAsync(workspace, cancellationToken);
         var runtimeProfile = await EnsureStandardRuntimeProfileAsync(cancellationToken);
         if (OperationalTopologyIdentities.IsOperationalWorkspace(workspace))
             await RemoveWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);

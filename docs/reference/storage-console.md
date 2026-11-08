@@ -43,11 +43,15 @@ display name, generation, description, enablement and preferred version.
 
 New user-permission work is deferred to [#1077](https://github.com/gbaudrit/agentstration/issues/1077)
 and UsePolicy administration to [#1078](https://github.com/gbaudrit/agentstration/issues/1078).
-Current authorization and UsePolicy guards remain enforced. A saved generic Use
-grant does not promise functional usability: enablement, exact references,
-UsePolicy, provider availability and actual capabilities still apply. The single
-Instance-owned metadata-only `local@1.0.0` is not copied or globally shared.
-Its descendant UsePolicy cannot be administered by this increment.
+For Storage and StorageType, ResourceAccessPolicy.Use is the current usage
+authority, as recorded in [ADR-0200](../decisions/0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md).
+A Tenant grant with IncludeDescendants includes its Workspaces. Discover alone,
+revocation and foreign Tenant targets do not authorize usage. Embedded UsePolicy
+adds no second access gate during the deferral. Existing user permissions, scopes,
+UIDs/generations, versions/digests, enablement, availability, configuration and
+mappings remain checked by the backend. Connected Services retain their own checks.
+The Instance-owned `local` type uses functional `1.0.0`; it is neither copied nor
+automatically shared with Workspaces.
 
 The native focused scenario [#1065](https://github.com/gbaudrit/agentstration/issues/1065)
 remains blocked until explicit implemented-UX approval and implementation merge.
@@ -60,9 +64,11 @@ Detail links always preserve namespace and owner scope. `context` continues to
 select the administrative context independently of the resource's `scopeRef`.
 Creation uses that selected context. Resource write actions require write
 permission in the owner context; inherited or managed resources retain a read-only
-view. Every API request repeats authorization on the server. UsePolicy and resource
-access policy remain authoritative in the API, including for visible ancestor
-resources that cannot be used in the current context.
+view. Every API request repeats authorization on the server. The selector uses
+the request-scoped generic Use observation together with activation and version
+availability, without overriding the API. Observations are never persisted.
+Denial guidance is localized and bounded; it does not expose hidden resources,
+Secrets or physical paths.
 
 The navigation and command palette expose Storages according to resource
 permissions. Management, scoped resource inventory, Connected Services, Data
@@ -119,10 +125,11 @@ access-policy and responsive resource components supply the shared conventions.
 #1046 owns this Console administration surface and its API client, component,
 localization and host-composition coverage. It does not add another backend.
 
-The existing `local` type advertises no content capabilities and needs no Connected
-Service; its use from a descendant context still requires the type's explicit
-UsePolicy. #1040 owns the actual ASP/AEP and Artifact adapters and default Artifact
-Storage. This UI does not fabricate that default or advertise content operations
+The builtin `local@1.0.0` provides bounded local content operations without a
+Connected Service. Descendant use
+requires an explicit generic Use grant; synchronization and restart preserve
+grants and revocations. #1040 supplies ASP/AEP and Artifact adapters and guarded
+default provisioning. This UI does not fabricate defaults or advertise operations
 which the selected version does not support. Component fixtures cover an
 extension-provided type and typed standard/protected exports independently of a
 live provider.

@@ -8,6 +8,7 @@ namespace Agentstration.Infrastructure;
 public sealed record AgentstrationCompositionOptions
 {
     public required string DataDirectory { get; init; }
+    public string? LocalStorageRootDirectory { get; init; }
     public AiProviderOptions Ai { get; init; } = new("Deterministic", new Uri("http://localhost/"), "deterministic", null);
     public AgentstrationStorageOptions Storage { get; init; } = new();
     public string? ControlPlaneConnectionString { get; init; }
