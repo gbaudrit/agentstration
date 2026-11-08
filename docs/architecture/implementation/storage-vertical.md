@@ -119,6 +119,7 @@ tracked by #1077. Accepted ADRs remain unchanged. #1040 owns ASP/AEP/Artifact/lo
 execution and provisioning; #1041/#1042 retain consumer rules. #1065 remains
 blocked on explicit implemented-UX approval and implementation merge, independently
 of the required implementation smoke/regression checks.
+
 ## Execution boundary
 
 `Storage.Contracts` owns content DTOs, restrictions and `IStorageContentGateway`.

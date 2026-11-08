@@ -144,17 +144,41 @@ remains under #1032 and blocked on explicit maintainer UX approval and relevant
 implementation merges. #1046 adds component/client tests and browser smoke
 validation; it does not start or duplicate that reusable integrated journey.
 
-## Validation evidence — 2026-11-08
+## Validation evidence — combined #1064/#1040, 2026-11-08
 
 - `dotnet restore Agentstration.slnx`: passed.
 - `dotnet build Agentstration.slnx --configuration Release --no-restore`: passed, 0 warnings and 0 errors.
-- `dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4`: 998 passed, 0 failed/skipped.
-- `dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2`: 1,057 passed, 12 optional skips, 0 failed (1,069 discovered). Skips: PostgreSQL (2), live Foundry (8), llama.cpp (1), LocalAI (1).
-- TypeScript compilation and the three browser route-catalog checks: passed. Complete Docusaurus/ADR/LikeC4 build: passed.
-- Dedicated real-executable Storage smoke: en-US/fr-FR at 1440×1000 and 390×844; Instance builtin local, Tenant local fixture and Workspace remote metadata fixture; explicit complete protected/standard mappings, shared Connected Service, exact namespace/type/service pins, reload, YAML, real ETag conflict, confirmed new service generation, observation/deactivation, Escape, focus restoration and mobile actions above navigation all passed. Extension-contributed type evidence is covered by deterministic component fixtures; no live ASP/Artifact adapter is claimed.
-- General `npm run test:smoke` campaign: 102 passed and one existing organization-context read race failed. The helper now captures the validated scope in one read; all four organization locale/viewport cases passed on the focused rerun. System Chromium was used with video disabled; screenshots/traces were retained. Existing Data Source/acquisition/Artifact/Tool and navigation/localization cases passed.
+- Required Fast lane, minimum 777 and maximum 4 parallel modules: 1,025 passed,
+  0 failed/skipped. Includes architecture and localization checks.
+- Required Integration lane: combined-tree validation is in progress; no result
+  is claimed here until it completes.
+- Targeted checks: 38 Storage application tests, 15 Storage HTTP scenarios,
+  32 Storage Console/localization cases and 3 persistence cases passed. These
+  include Tenant propagation, Discover-only and revocation refusal, foreign
+  Tenant isolation, managed synchronization and real SQLite restarts.
+- The initial combined CI passed all 125 Management API cases but exceeded the
+  unchanged 2,560 MiB diagnostic limit at 2,683.6 MiB. Five service-only Storage
+  cases now use the repository's existing isolated ManagementServiceFixture
+  instead of HTTP hosts, preserving their names and assertions. All five passed
+  locally after the adaptation; the corrected diagnostic result is pending.
+- TypeScript compilation, all three route-catalog checks, changed C# whitespace,
+  ADR validation (198 records), LikeC4 and the complete Docusaurus build passed.
+- Real executable smoke passed en-US/fr-FR at 1440×1000 and 390×844. It covered
+  type creation, immutable publication, retained metadata/policy drafts and saved
+  comparisons, dependency-safe lifecycle, builtin protection, keyboard/focus and
+  no horizontal overflow. For the Instance builtin local@1.0.0, each case used the
+  Access panel to grant Tenant Discover-only with propagation (visible but not
+  selectable; API creation 403), add Use (Workspace Console creation succeeded),
+  then revoke Use (selection disabled again and API creation 403). No Console
+  authorization override was introduced.
+- Combined implementation tree: `66c5fe5c9708876cbe476cff150fbc3a088f7226`, including
+  merged #1080. Current [.NET CI](https://github.com/gbaudrit/agentstration/actions/runs/42504549843),
+  [Browser UX](https://github.com/gbaudrit/agentstration/actions/runs/42504555815)
+  and [Documentation](https://github.com/gbaudrit/agentstration/actions/runs/42504555813)
+  record remote outcomes. Documentation passed; remaining CI results are pending.
 
 These implementation checks do not constitute maintainer UX approval. The reusable
-integrated scenario #1033 remains blocked as described above. The general smoke
-campaign and the targeted rerun are reported separately rather than treating the
-initial failed run as green.
+integrated scenario #1033 and focused #1065 remain blocked as described above.
+No reusable journey is started, and no implementation merge is performed. Earlier
+validation counts in #1045/#1046 records cover their historical implementation
+trees and do not replace this combined-tree validation.

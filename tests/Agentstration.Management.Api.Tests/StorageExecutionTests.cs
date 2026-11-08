@@ -12,13 +12,13 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class StorageExecutionTests : ModelManagementApiTestBase
+public sealed class StorageExecutionTests
 {
     [TestMethod]
     public async Task InstanceDefaultIsFunctionalAndDifferentStoragesNeverShareContentAuthority()
     {
-        await using var factory = Factory();
-        var bootstrap = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
+        var bootstrap = factory.Context;
         var services = factory.Services;
         await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
         bootstrap = await InstanceContextAsync(services, bootstrap);
@@ -59,8 +59,8 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ProvisioningPreservesDefaultIdentityDisablementAndExistingAccessDecisions()
     {
-        await using var factory = Factory();
-        var bootstrap = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
+        var bootstrap = factory.Context;
         var services = factory.Services;
         var provisioning = services.GetRequiredService<IWorkspacePlatformResourceProvisioner>();
         using var system = services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
@@ -92,8 +92,7 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task FunctionalLocalV1AndExistingPinsRemainUnchangedAfterSynchronization()
     {
-        await using var factory = Factory();
-        _ = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
         var services = factory.Services;
         using var system = services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
         var provisioner = services.GetRequiredService<StoragePlatformResourceProvisioner>();
@@ -144,8 +143,8 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task ContentInvocationRequiresExecutionPermissionExactContextAndAValidLocalEnvelope()
     {
-        await using var factory = Factory();
-        var bootstrap = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
+        var bootstrap = factory.Context;
         var services = factory.Services;
         var scopes = services.GetRequiredService<IRequestContextScopeFactory>();
         bootstrap = await InstanceContextAsync(services, bootstrap);
@@ -182,8 +181,8 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
     [TestMethod]
     public async Task RestrictedWorkspaceDefaultsRemainUnavailableWithoutChangingPoliciesOrBlockingOtherProvisioning()
     {
-        await using var factory = Factory();
-        var bootstrap = await GetBootstrapContextAsync(factory);
+        await using var factory = await FixtureAsync();
+        var bootstrap = factory.Context;
         var services = factory.Services;
         var scopes = services.GetRequiredService<IRequestContextScopeFactory>();
         using var system = scopes.PushSystem();
@@ -255,6 +254,23 @@ public sealed class StorageExecutionTests : ModelManagementApiTestBase
         var collision = await Assert.ThrowsAsync<StorageException>(() => provisioner.EnsureAsync(colliding, default));
         Assert.AreEqual("storage_default_collision", collision.Code);
         Assert.AreEqual(foreign.ETag, (await resources.GetExactAsync<StorageResource>(address with { ScopeRef = ResourceScopeRef.Workspace(colliding.Id) }, default))!.ETag);
+    }
+
+    private static async Task<ManagementServiceFixture> FixtureAsync()
+    {
+        var fixture = await ManagementServiceFixture.CreateAsync();
+        try
+        {
+            using var system = fixture.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            await fixture.Services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(default);
+            await fixture.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
+            return fixture;
+        }
+        catch
+        {
+            await fixture.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task<RequestContext> InstanceContextAsync(IServiceProvider services, RequestContext bootstrap)
