@@ -22,6 +22,10 @@ Run both fast and integration solutions for complete required functional validat
 
 API integration tests run in four independent test assemblies: `Agentstration.Api.Flows.Tests`, `Agentstration.Api.Execution.Tests`, `Agentstration.Api.Resources.Tests`, and `Agentstration.Api.Tests`. These preserve the former consolidated module's cases and test names. The Resources module also owns the 38 Data Source and Artifact API cases moved from Management API after the combined 142-case module exceeded its retained memory budget (2725.1 MiB on Ubuntu CI). Each assembly owns its fixtures and runs its cases sequentially. Memory budgets remain unchanged; diagnostic minimum counts are 118 for Resources and 104 for Management API. The diagnostic job runs these assemblies one after another in separate processes so process memory is released between groups. The Integration lane and coverage shard B include all four projects.
 
+### Local Storage link rejection on Windows
+
+`LocalStorageContentTests.LinksAtStorageDirectoryAndContentFileAreRejected` creates real directory and file symbolic links before checking that Storage rejects them. The Windows test session must have permission to create those links. A privilege failure during setup is an environment limitation, not a successful Storage validation: report it explicitly and run the case in an environment with that capability. Keep the rejection assertions enabled; do not replace this check with a passing stub or silently skip it.
+
 ### SQLite connection pooling regression
 
 `SqliteConnectionPoolTests` in `Agentstration.Management.Storage.Tests` exercises concurrent pooled opens with active readers. Sixteen dedicated workers check that live logical connections retain distinct native handles and independent query results across 500 alternating cold and warm waves. The test uses its own temporary database, has a bounded execution time, and clears only that database's pool between cold waves and during cleanup. Its test output records the loaded managed driver and native SQLite versions.
