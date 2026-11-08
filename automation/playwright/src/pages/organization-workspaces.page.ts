@@ -210,9 +210,12 @@ export class OrganizationWorkspacesPage {
 
   public async currentScope(): Promise<string> {
     const shell = this.page.getByTestId(TestIds.console.shell);
-    await expect(shell).toHaveAttribute('data-context-scope', /.+/);
-    const scope = await shell.getAttribute('data-context-scope');
-    if (!scope) throw new Error('Current context scope is missing.');
+    let scope = '';
+    // Capture the validated read itself: hydration can replace the shell between two reads.
+    await expect.poll(async () => {
+      scope = await shell.getAttribute('data-context-scope') ?? '';
+      return scope;
+    }).toMatch(/^\/(?:instance|(?:tenants|workspaces)\/[0-9a-f-]{36})$/);
     return scope;
   }
 
