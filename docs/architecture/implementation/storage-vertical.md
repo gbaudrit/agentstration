@@ -205,3 +205,18 @@ assertions and request-observation/selector regressions now follow ADR-0200.
 Combined validation and the isolated service-fixture correction are recorded in
 [the Console reference](../../reference/storage-console.md#validation-evidence--combined-10641040-2026-11-08)
 and PR #1079. These checks do not approve the UX or authorize a merge.
+
+## OpenDAL extension — FR #1039
+
+The autonomous Agentstration.Extensions.OpenDal host consumes Apache.OpenDAL 0.3.1
+through ASP.Server/ASP.Aep. It contributes executable opendal.fs@1.0.0 and
+non-executable S3/Azure preview descriptors. Product modules retain their existing
+provider-neutral ports and never acquire native dependencies. See
+[the OpenDAL reference](../../reference/opendal-extension.md) and
+[ADR-0201](../../decisions/0201-opendal-runs-in-an-autonomous-asp-extension.md).
+
+The extension's test project belongs to the required Integration lane and coverage
+shard B. Management API tests exercise real product resolution, AEP contributions,
+protected configuration, MCP and native filesystem access, including disablement.
+The standalone sample and distribution runner verify publication and a process
+restart without a running Agentstration product.

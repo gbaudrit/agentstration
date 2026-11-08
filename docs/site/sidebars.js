@@ -126,6 +126,7 @@ const sidebars = {
         'reference/api/overview',
         'reference/storages',
         'reference/storage-execution',
+        'reference/opendal-extension',
         'reference/resources/overview',
         'reference/packs',
         'reference/source-registries',

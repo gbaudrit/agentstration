@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../../asp/src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
+    <PackageReference Include="Apache.OpenDAL" GeneratePathProperty="true" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(PkgApache_OpenDAL)/LICENSE;$(PkgApache_OpenDAL)/NOTICE;$(PkgApache_OpenDAL)/LICENSE-MPL-2.0.txt;$(PkgApache_OpenDAL)/LICENSE-CC0-1.0.txt;$(PkgApache_OpenDAL)/README.md"
+      Link="licenses/opendal/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
