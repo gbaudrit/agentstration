@@ -8,17 +8,26 @@ using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBase
 {
+    private static WebApplicationFactory<Program> factory = null!;
+
+    [ClassInitialize]
+    public static void Initialize(TestContext _) => factory = Factory();
+
+    [ClassCleanup]
+    public static async Task CleanupAsync() => await factory.DisposeAsync();
+
     [TestMethod]
     public async Task PublicationAndLifecycleUseEtagsAndRetainPinnedStorageVersions()
     {
-        await using var factory = Factory();
         using var client = factory.CreateClient();
         var context = await GetBootstrapContextAsync(factory);
         var scope = ResourceScopeRef.Tenant(context.TenantId);
@@ -76,13 +85,13 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
     [TestMethod]
     public async Task GenericDiscoverAndUseAreIndependentAndHiddenExactReadsStayHidden()
     {
-        await using var factory = Factory();
         using var client = factory.CreateClient();
         var context = await GetBootstrapContextAsync(factory);
         var owner = ResourceScopeRef.Tenant(context.TenantId);
         var consumer = ResourceScopeRef.Workspace(context.WorkspaceId);
         SelectConsoleContext(client, owner);
-        using var response = await client.PostAsJsonAsync("/api/storage-types", new CreateStorageTypeRequest("shared", Definition(), owner));
+        using var response = await client.PostAsJsonAsync("/api/storage-types", new CreateStorageTypeRequest("shared", Definition(), owner,
+            ResourceNamespace.Parse("grant-matrix")));
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
         var type = (await response.Content.ReadFromJsonAsync<StorageTypeResource>())!;
         var identity = new ResourceAccessIdentity(type.Uid, owner, type.Namespace, type.Kind);
@@ -109,7 +118,7 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
                 Assert.AreEqual(action == ResourceAccessAction.Discover ? discover : use, decision.Allowed);
             }
             SelectConsoleContext(client, consumer);
-            var list = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types?take=1");
+            var list = await client.GetFromJsonAsync<PagedResponse<StorageTypeResource>>("/api/storage-types?namespace=grant-matrix&take=1");
             Assert.AreEqual(discover, list!.Value.Any(value => value.Uid == type.Uid));
             if (discover)
             {
@@ -125,7 +134,6 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
     [TestMethod]
     public async Task BuiltinGrantsRemainIndependentFromProtectedDefinitionAndUsePolicy()
     {
-        await using var factory = Factory();
         using var client = factory.CreateClient();
         var context = await GetBootstrapContextAsync(factory);
         var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
@@ -182,7 +190,6 @@ public sealed class StorageTypeAdministrationApiTests : ModelManagementApiTestBa
     [TestMethod]
     public async Task GenerationPinnedDiscoveryFailsClosedAfterMetadataUpdate()
     {
-        await using var factory = Factory();
         using var client = factory.CreateClient();
         var context = await GetBootstrapContextAsync(factory);
         var scope = ResourceScopeRef.Tenant(context.TenantId);
