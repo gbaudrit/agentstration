@@ -121,7 +121,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             context.TenantId, new(context.WorkspaceId), context.PrincipalId, default, "protected-input.v1.0.0", "protected", null,
             JsonSerializer.SerializeToElement(new { message = "synthetic-sensitive-value" }), ToolDefinitionCallerKind.Mcp,
             ExecutionContext: new(HasSensitiveArguments: true)), default));
-        Assert.AreEqual("tool_definition_protected_flow_input_unsupported", failure.Code);
+        Assert.AreEqual("tool_definition_protected_input_reference_required", failure.Code);
         var runs = await factory.Services.GetRequiredService<IFlowRepository>().ListRunsAsync(
             new(context.TenantId, new(context.WorkspaceId), context.PrincipalId), null, null, 0, 100, default);
         Assert.IsFalse(runs.Items.Any(run => run.Value.FlowId.Value == "protected-input-flow"));

@@ -15,6 +15,23 @@ public sealed class ManagedToolExecutionHookTests
     private static readonly WorkspaceId Workspace = new(Guid.Parse("22222222-2222-2222-2222-222222222222"));
 
     [TestMethod]
+    public async Task ValidationOnlyChecksGovernanceWithoutProviderCallsOrLifecycleWrites()
+    {
+        var calls = 0;
+        var sink = new RecordingSink();
+        var invoker = new DelegateInvoker((_, _) => { calls++; return ValueTask.FromResult<JsonElement?>(null); });
+        var denied = new ToolExecutionPipeline(invoker, [],
+            new ManagementToolExecutionHookResolver(new HookResourceStore([Hook()]), new TestScopeResolver()), [sink], TimeProvider.System);
+        var error = await Assert.ThrowsAsync<ToolExecutionDeniedException>(() => denied.ValidateAsync(Context(), default).AsTask());
+        Assert.AreEqual("managed_hook_denied", error.Code);
+        var allowed = new ToolExecutionPipeline(invoker, [],
+            new ManagementToolExecutionHookResolver(new HookResourceStore([]), new TestScopeResolver()), [sink], TimeProvider.System);
+        await allowed.ValidateAsync(Context(), default);
+        Assert.AreEqual(0, calls);
+        Assert.HasCount(0, sink.Events);
+    }
+
+    [TestMethod]
     public async Task MatchingManagedDenyHookStopsProviderAndPreservesConfiguredDiagnostic()
     {
         var providerCalls = 0;

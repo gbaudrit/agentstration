@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Runtime.Abstractions;
 
@@ -325,6 +326,7 @@ public sealed record ToolExecutionScope
 
 public sealed record ToolExecutionContext
 {
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
     public bool HasSensitiveArguments { get; init; }
     public ToolExecutionOwnerKind OwnerKind { get; init; }
     public required string ToolCallId { get; init; }
@@ -381,6 +383,9 @@ public sealed record ToolExecutionCaptureOptions
 
 public interface IToolExecutionPipeline
 {
+    ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
+        ValueTask.FromException(new InvalidOperationException("Tool validation is unavailable."));
+
     ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
 
     async ValueTask<ToolInvocationResult> ExecuteDetailedAsync(

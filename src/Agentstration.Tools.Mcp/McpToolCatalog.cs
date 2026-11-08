@@ -5,6 +5,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Tools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -388,21 +389,52 @@ public sealed class McpToolInvoker(
     IRequestContextScopeFactory? requestScopes = null,
     Lazy<IToolDefinitionExecutor>? internalTools = null,
     Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null,
-    ICurrentRequestContext? requestContext = null) : IToolInvoker
+    ICurrentRequestContext? requestContext = null,
+    Lazy<ISecretInputResolver>? secretInputs = null) : IToolInvoker
 {
     public async ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
         (await InvokeDetailedAsync(context, cancellationToken)).Output;
 
     public async ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
-        var (tool, _) = await ResolveAsync(context, cancellationToken);
-        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, context.Arguments ?? JsonSerializer.SerializeToElement(new { }));
+        var (tool, provider) = await ResolveAsync(context, cancellationToken);
+        using var resolved = await ResolveInputsAsync(context, cancellationToken);
+        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, resolved.Value);
+        var externalId = tool.Definition.ExternalId ?? tool.Name;
+        if (provider.Definition.Mcp?.Internal == true && internalTools is not null
+            && builtInTools?.Value.Any(value => value.Definition.Name == externalId) != true)
+        {
+            if (context.TenantId is not { } tenant || context.WorkspaceId is not { } workspace || context.PrincipalId is not { } principal)
+                throw new ToolResolutionException("tool_execution_scope_required", "Trusted execution scope is required.");
+            _ = await internalTools.Value.SimulateAsync(new(tenant, workspace, principal, tool.Namespace, externalId,
+                context.ToolCallId, context.CorrelationId, context.Arguments ?? JsonSerializer.SerializeToElement(new { }),
+                CallerKind(context), ExecutionContext: InvocationContext(context))
+            { DefinitionScopeRef = tool.ScopeRef }, cancellationToken);
+        }
     }
 
     public async ValueTask<ToolInvocationResult> InvokeDetailedAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
+        try { return await InvokeCoreAsync(context, cancellationToken); }
+        catch (Exception exception) when (exception is not OperationCanceledException && context.SecretInputs.Count > 0)
+        {
+            var code = exception switch
+            {
+                ToolDefinitionInvocationException invocation => invocation.Code,
+                ToolResolutionException resolution => resolution.Code,
+                ToolExecutionDeniedException denied => denied.Code,
+                ToolInputValidationException => "tool_definition_binding_invalid",
+                _ => "tool_definition_execution_failed"
+            };
+            throw new ToolDefinitionInvocationException(code, "The Tool invocation with protected inputs could not be completed.");
+        }
+    }
+
+    private async ValueTask<ToolInvocationResult> InvokeCoreAsync(ToolExecutionContext context, CancellationToken cancellationToken)
+    {
         var (tool, provider) = await ResolveAsync(context, cancellationToken);
-        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, context.Arguments ?? JsonSerializer.SerializeToElement(new { }));
+        using var resolved = await ResolveInputsAsync(context, cancellationToken);
+        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, resolved.Value);
         if (provider.Definition.Mcp?.Internal == true)
         {
             if (context.TenantId is not { } tenantId || context.WorkspaceId is not { } workspaceId || context.PrincipalId is not { } principalId)
@@ -412,17 +444,17 @@ public sealed class McpToolInvoker(
             var callerId = context.AgentId is not null ? $"agent:{context.AgentId}" : context.RunId is not null ? $"flow:{context.RunId}" : context.OwnerKind == ToolExecutionOwnerKind.Console ? $"console:{principalId:D}" : null;
             var builtIn = builtInTools?.Value.SingleOrDefault(value => string.Equals(value.Definition.Name, externalId, StringComparison.Ordinal));
             if (builtIn is not null)
-                return new ToolInvocationResult(await builtIn.ExecuteAsync(new InternalMcpToolInvocation(
+                return new ToolInvocationResult(resolved.Protect(await builtIn.ExecuteAsync(new InternalMcpToolInvocation(
                     tenantId,
                     workspaceId,
                     principalId,
                     context.ToolCallId,
                     context.CorrelationId,
-                    context.Arguments ?? JsonSerializer.SerializeToElement(new { }),
+                    resolved.Value,
                     callerKind,
                     callerId,
                     context.RunId,
-                    context.FlowStepId), cancellationToken), null);
+                    context.FlowStepId), cancellationToken)), null);
             if (internalTools is null) throw new ToolResolutionException("internal_tool_executor_unavailable", "The Agentstration ToolDefinition executor is unavailable.");
             var result = await internalTools.Value.ExecuteAsync(new ToolDefinitionInvocation(
                 tenantId,
@@ -454,18 +486,19 @@ public sealed class McpToolInvoker(
                 receipt["relay.sourceGeneration"] = relay.SourceGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (relay.SourceVersion is { } sourceVersion) receipt["relay.sourceVersion"] = sourceVersion;
             }
-            return new ToolInvocationResult(result.Output?.Clone(), receipt);
+            return new ToolInvocationResult(resolved.Protect(result.Output), receipt);
         }
-        return new ToolInvocationResult(await providers.InvokeAsync(provider, tool, context.Arguments, cancellationToken), null);
+        return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken)), null);
     }
 
     public async ValueTask<ToolInvocationResult> SimulateDetailedAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
         var (tool, provider) = await ResolveAsync(context, cancellationToken);
         var arguments = context.Arguments ?? JsonSerializer.SerializeToElement(new { });
-        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, arguments);
+        using var resolved = await ResolveInputsAsync(context, cancellationToken);
+        ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, resolved.Value);
         if (provider.Definition.Mcp?.Internal != true)
-            return new ToolInvocationResult(await providers.InvokeAsync(provider, tool, arguments, cancellationToken), null);
+            return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken)), null);
 
         if (context.TenantId is not { } tenantId || context.WorkspaceId is not { } workspaceId || context.PrincipalId is not { } principalId)
             throw new ToolResolutionException("tool_execution_scope_required", "An internal Tool invocation requires trusted Tenant, Workspace, and Principal scope.");
@@ -473,16 +506,25 @@ public sealed class McpToolInvoker(
         var callerKind = CallerKind(context);
         var callerId = context.AgentId is not null ? $"agent:{context.AgentId}" : context.RunId is not null ? $"flow:{context.RunId}" : context.OwnerKind == ToolExecutionOwnerKind.Console ? $"console:{principalId:D}" : null;
         var invocation = new InternalMcpToolInvocation(tenantId, workspaceId, principalId, context.ToolCallId, context.CorrelationId,
-            arguments, callerKind, callerId, context.RunId, context.FlowStepId);
+            resolved.Value, callerKind, callerId, context.RunId, context.FlowStepId);
         var builtIn = builtInTools?.Value.SingleOrDefault(value => string.Equals(value.Definition.Name, externalId, StringComparison.Ordinal));
         if (builtIn is not null)
-            return new ToolInvocationResult(await builtIn.ExecuteAsync(invocation, cancellationToken), null);
+            return new ToolInvocationResult(resolved.Protect(await builtIn.ExecuteAsync(invocation, cancellationToken)), null);
         if (internalTools is null)
             throw new ToolResolutionException("internal_tool_executor_unavailable", "The Agentstration ToolDefinition executor is unavailable.");
         return new ToolInvocationResult(await internalTools.Value.SimulateAsync(new ToolDefinitionInvocation(
             tenantId, workspaceId, principalId, tool.Namespace, externalId, context.ToolCallId, context.CorrelationId,
             arguments, callerKind, callerId, InvocationContext(context))
         { DefinitionScopeRef = tool.ScopeRef }, cancellationToken), null);
+    }
+
+    private Task<ResolvedSecretInputs> ResolveInputsAsync(ToolExecutionContext context, CancellationToken cancellationToken)
+    {
+        var arguments = context.Arguments ?? JsonSerializer.SerializeToElement(new { });
+        if (secretInputs is not null) return secretInputs.Value.ResolveAsync(arguments, context.SecretInputs, cancellationToken);
+        if (context.SecretInputs.Count > 0)
+            throw new ToolResolutionException("secret_input_resolver_unavailable", "Protected input resolution is unavailable.");
+        return Task.FromResult(new ResolvedSecretInputs(arguments, new Dictionary<string, string>()));
     }
 
     private async ValueTask<(ToolResource Tool, ToolProviderResource Provider)> ResolveAsync(
@@ -555,7 +597,8 @@ public sealed class McpToolInvoker(
         context.OwnerKind == ToolExecutionOwnerKind.RuntimeRun ? context.RunId : null,
         context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? context.RunId : null,
         context.FlowStepId,
-        context.InvocationId, context.AgentVersion, context.AgentGeneration, context.HasSensitiveArguments);
+        context.InvocationId, context.AgentVersion, context.AgentGeneration, context.HasSensitiveArguments)
+    { SecretInputs = context.SecretInputs };
 
     private static ToolDefinitionCallerKind CallerKind(ToolExecutionContext context) => context.OwnerKind switch
     {

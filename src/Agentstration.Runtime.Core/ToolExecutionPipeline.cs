@@ -193,7 +193,22 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
         return result;
     }
 
+    public async ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        _ = await ValidateGovernanceAsync(context, cancellationToken);
+        await invoker.ValidateAsync(context, cancellationToken);
+    }
+
     public async ValueTask<ToolExecutionSimulation> SimulateAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var evaluations = await ValidateGovernanceAsync(context, cancellationToken);
+        var result = await invoker.SimulateDetailedAsync(context, cancellationToken);
+        return new ToolExecutionSimulation(evaluations, result.Output);
+    }
+
+    private async ValueTask<IReadOnlyList<ToolExecutionHookEvaluation>> ValidateGovernanceAsync(
         ToolExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -230,8 +245,7 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
                     new InvalidOperationException($"Unsupported Tool execution hook decision '{decision.Kind}'."));
             evaluations.Add(new ToolExecutionHookEvaluation(hook.Identity, ToolExecutionHookEvaluationKind.Allowed));
         }
-        var result = await invoker.SimulateDetailedAsync(context, cancellationToken);
-        return new ToolExecutionSimulation(evaluations, result.Output);
+        return evaluations;
     }
 
     private static IReadOnlyList<IToolExecutionHook> OrderHooks(IEnumerable<IToolExecutionHook> hooks)

@@ -227,3 +227,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 199. [ADR-0199 — Storages own explicit Connected Service export bindings](0199-storages-own-explicit-service-export-bindings.md)
 200. [ADR-0200 — Storage execution pins protected bindings and local Workspace defaults](0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md)
 201. [ADR-0201 — ToolDefinitions publish independent governed relay versions](0201-tool-definitions-publish-independent-governed-relay-versions.md)
+202. [ADR-0202 — Durable Flow inputs retain live Secret references](0202-durable-flow-inputs-retain-live-secret-references.md)

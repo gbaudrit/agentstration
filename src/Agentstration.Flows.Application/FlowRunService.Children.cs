@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows.Application;
 
@@ -137,7 +138,7 @@ public sealed partial class FlowRunService
         var requestedVersion = call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? call.Flow.Version : null;
         var resolved = await ResolveVersionAsync(parent.Scope.AccessScopeRef, targetId, requestedVersion,
             call.Flow.ScopeRef, cancellationToken);
-        ValidateInput(resolved.Graph?.InputSchema, input);
+        ValidateInput(resolved.Graph?.InputSchema, SecretInputs.ForTypeValidation(input, parent.SecretInputs));
         var now = timeProvider.GetUtcNow();
         var child = new FlowRun
         {
@@ -163,6 +164,7 @@ public sealed partial class FlowRunService
             TriggerMessageId = parent.TriggerMessageId,
             Scope = parent.Scope,
             Input = input.Clone(),
+            SecretInputs = parent.SecretInputs,
             CreatedAt = now,
             Steps = CreateSteps(resolved, input)
         };

@@ -5,10 +5,14 @@ using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Notifications;
+using Agentstration.Infrastructure.Runtime;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets;
@@ -94,6 +98,42 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         Assert.AreEqual(operational.Id, handler.LastWorkspaceId);
         Assert.AreNotEqual(business.WorkspaceId, handler.LastWorkspaceId);
         Assert.AreEqual(1, handler.Calls);
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        foreach (var key in new[]
+        {
+            new ResourceKey(ToolResourceKinds.Tool, "agentstration.administrative-relay.v4.2.0"),
+            new ResourceKey(ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name)
+        })
+        {
+            var identity = (await store.ListExactInventoryAsync(owner, 0, 1000, default)).Single(value => value.Kind == key.Kind && value.Name == key.Name && value.Namespace == key.Namespace);
+            var previousPolicy = await policies.GetAsync(identity.Uid, default);
+            _ = await policies.PutAsync(new ResourceAccessPolicy(new(identity.Uid, owner, identity.Namespace, identity.Kind),
+                (previousPolicy?.Policy.Grants ?? []).Append(new(ResourceScopeRef.Workspace(business.WorkspaceId),
+                    [ResourceAccessAction.Discover, ResourceAccessAction.Use])).ToArray()), previousPolicy?.ETag, default);
+        }
+        using (scopes.Push(business))
+        {
+            var agents = factory.Services.GetRequiredService<AgentManagementService>();
+            var consumer = await agents.PutAgentAsync(new AgentResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = AgentResourceKinds.Agent,
+                Metadata = new() { Name = "descendant-relay-consumer" },
+                ScopeRef = ResourceScopeRef.Workspace(business.WorkspaceId),
+                Definition = new()
+                {
+                    DisplayName = "Descendant consumer",
+                    Instructions = "Use the assigned Tool.",
+                    ModelProfile = new("reasoning-default"),
+                    Tools = [new("agentstration.administrative-relay.v4.2.0", owner)]
+                }
+            }, null, true, default);
+            _ = await agents.CreateRevisionAsync(consumer.Value.Name, new AgentDeploymentSpec
+            { Environment = "local", RuntimeProfileName = "maf-builtin", HostingMode = AgentHostingMode.InProcess }, default);
+        }
+        var consumers = await factory.Services.GetRequiredService<ToolDefinitionService>().ListUsagesAsync("administrative-relay", default, default);
+        Assert.IsTrue(consumers.Any(usage => usage.Kind == "Agent" && usage.Name == "descendant-relay-consumer"
+            && usage.ScopeRef == ResourceScopeRef.Workspace(business.WorkspaceId) && usage.RelayVersion == "4.2.0"));
         client.DefaultRequestHeaders.Remove("X-Agentstration-Context");
         client.DefaultRequestHeaders.Add("X-Agentstration-Context", ResourceScopeRef.Workspace(business.WorkspaceId).Value);
         using var wrongContext = await client.PostAsJsonAsync($"/api/tools/agentstration.administrative-relay.v4.2.0/run?scopeRef={Uri.EscapeDataString(owner.Value)}",
@@ -185,10 +225,113 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         Assert.IsFalse(published.Contains("synthetic-", StringComparison.Ordinal));
         Assert.IsFalse(first.Output?.GetRawText().Contains("synthetic-", StringComparison.Ordinal));
         Assert.IsTrue((await secrets.GetSecretUsagesAsync(scope, secret.Value.Name, default)).Any(usage => usage.Kind == ToolResourceKinds.ToolDefinitionVersion));
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        var flowSchema = handler.Definition.InputSchema;
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            InputSchema = flowSchema,
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input", Schema = flowSchema },
+                new ToolFlowStepDefinition { Name = "invoke", Tool = new(source.Name, ScopeRef: scope), ArgumentsMapping = Json("\"${input}\"") },
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = Json("\"${steps.invoke.output}\"") }
+            ],
+            Transitions = [new("input-tool", "input", "completed", "invoke"), new("tool-output", "invoke", "success", "output")]
+        };
+        var definition = new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []);
+        await flows.CreateAsync(new(context.WorkspaceId), new CreateFlowCommand("secret-consumer", null, "1.0.0", true, definition, Graph: graph), default);
+        await flows.PublishVersionAsync(new(context.WorkspaceId), new("secret-consumer"), "1.0.0", true, default);
+        await definitions.PutAsync(new ToolDefinitionResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolDefinition,
+            Metadata = new() { Name = "secret-flow" },
+            ScopeRef = scope,
+            Definition = new FlowToolDefinitionProperties
+            {
+                DisplayName = "Secret Flow",
+                Publish = true,
+                InputSchema = flowSchema,
+                Flow = new() { Name = "secret-consumer", Version = "1.0.0", UseActiveVersion = false }
+            }
+        }, null, true, default);
+        var flowTool = (await store.GetExactAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, "agentstration.secret-flow.v1.0.0").AtScope(scope), default))!.Value;
+        await definitions.PutAsync(new ToolDefinitionResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolDefinition,
+            Metadata = new() { Name = "durable-relay" },
+            ScopeRef = scope,
+            Definition = properties with { Target = new() { Name = flowTool.Name, ScopeRef = scope, Uid = flowTool.Uid, Generation = flowTool.Generation } }
+        }, null, true, default);
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var durable = await executor.ExecuteAsync(invocation with { ToolName = "durable-relay.v1.0.0", CallId = "durable" }, default);
+        Assert.IsNotNull(durable.Receipt.FlowRunId);
+        var repository = factory.Services.GetRequiredService<IFlowRepository>();
+        var run = (await repository.GetRunExactAsync(scope, durable.Receipt.FlowRunId, default))!.Value;
+        Assert.AreEqual("synthetic-second", handler.LastSecret);
+        Assert.HasCount(1, run.SecretInputs);
+        Assert.IsFalse(JsonSerializer.Serialize(run).Contains("synthetic-", StringComparison.Ordinal));
+        Assert.IsTrue(SecretInputs.IsReference(run.Input.GetProperty("accessCode"), run.SecretInputs));
+        // A later attempt loads the reference from persisted run state and resolves its current value.
+        var reloaded = JsonSerializer.Deserialize<FlowRun>(JsonSerializer.Serialize(run))!;
+        var pending = reloaded with
+        {
+            Id = $"secret-recovery-{Guid.NewGuid():N}",
+            Status = FlowRunStatus.Pending,
+            IdempotencyKey = null,
+            WorkItemResourceId = null,
+            WorkTaskId = null,
+            StartedAt = null,
+            CompletedAt = null,
+            Output = null,
+            Error = null,
+            ExecutionLeaseId = null,
+            ExecutionLeaseExpiresAt = null,
+            Steps = reloaded.Steps.Select(step => new FlowStepRun
+            { StepName = step.StepName, StepType = step.StepType, DeclaredInput = step.DeclaredInput }).ToArray()
+        };
+        _ = await repository.CreateRunAsync(pending, default);
+        using (var value = new SecretValue(Encoding.UTF8.GetBytes("synthetic-after-recovery")))
+            await secrets.SetValueExactAsync(scope, secret.Value.Name, value, default);
+        var resolver = new ToolSecretInputResolver(definitions, factory.Services.GetRequiredService<ISecretResolver>(),
+            factory.Services.GetRequiredService<ICurrentRequestContext>(), factory.Services.GetRequiredService<IResourceScopeResolver>());
+        using (var recovered = await resolver.ResolveAsync(reloaded.Input, reloaded.SecretInputs, default))
+            Assert.AreEqual("synthetic-after-recovery", recovered.Value.GetProperty("accessCode").GetString());
+        var recoveredService = new FlowRunService(repository, factory.Services.GetRequiredService<IFlowRunQueue>(),
+            factory.Services.GetRequiredService<IFlowRunCancellationRegistry>(), factory.Services.GetRequiredService<IFlowRunEventSink>(),
+            factory.Services.GetRequiredService<TimeProvider>(), flowDefinitions: flows);
+        await recoveredService.InitializeAsync(default);
+        using (var recoveryTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(20)))
+        {
+            while (true)
+            {
+                var recovered = (await repository.GetRunExactAsync(scope, pending.Id, recoveryTimeout.Token))!.Value;
+                if (recovered.Status.IsTerminal())
+                {
+                    Assert.AreEqual(FlowRunStatus.Succeeded, recovered.Status, recovered.Error?.Message);
+                    Assert.IsFalse(JsonSerializer.Serialize(recovered).Contains("synthetic-", StringComparison.Ordinal));
+                    break;
+                }
+                await Task.Delay(20, recoveryTimeout.Token);
+            }
+        }
+        Assert.AreEqual("synthetic-after-recovery", handler.LastSecret);
+        Assert.IsFalse(JsonSerializer.Serialize(reloaded).Contains("synthetic-", StringComparison.Ordinal));
+        using (var value = new SecretValue(Encoding.UTF8.GetBytes(string.Empty)))
+            await secrets.SetValueExactAsync(scope, secret.Value.Name, value, default);
+        var invalidCurrent = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => executor.SimulateAsync(invocation, default));
+        Assert.AreEqual("tool_definition_binding_invalid", invalidCurrent.Code);
+        using (var value = new SecretValue(Encoding.UTF8.GetBytes(new string('\0', 16_384))))
+            await secrets.SetValueExactAsync(scope, secret.Value.Name, value, default);
+        var oversized = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => executor.SimulateAsync(invocation, default));
+        Assert.AreEqual("tool_definition_binding_unavailable", oversized.Code);
         await store.DeleteExactAsync(new ResourceKey(SecretResourceKinds.Secret, secret.Value.Name).AtScope(scope), secret.ETag, default);
         var missing = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => executor.ExecuteAsync(invocation with { CallId = "missing" }, default));
         Assert.AreEqual("tool_definition_binding_unavailable", missing.Code);
-        Assert.AreEqual(2, handler.Calls);
+        Assert.AreEqual(4, handler.Calls);
+        await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => resolver.ResolveAsync(reloaded.Input, reloaded.SecretInputs, default));
     }
     [TestMethod]
     public async Task RelayPublicationsRetainIndependentVersionsAndDoNotMutateConsumers()
@@ -362,6 +505,11 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
             ScopeRef = scope,
             Definition = Relay(source.Value, "1.0.0", "hr") with { Publish = true }
         }, null, true, default);
+        var simulated = await executorForSimulation().SimulateAsync(new(context.TenantId, new(context.WorkspaceId), context.PrincipalId,
+            default, "guarded-relay.v1.0.0", "preview", null, Json("""{"query":"a"}"""), ToolDefinitionCallerKind.Console), default);
+        Assert.AreEqual(true, simulated?.GetProperty("inputAccepted").GetBoolean());
+        Assert.AreEqual(0, handler.Calls, "Relay simulation must never invoke the source implementation.");
+        IToolDefinitionExecutor executorForSimulation() => factory.Services.GetRequiredService<IToolDefinitionExecutor>();
         await store.PutAsync(new ToolExecutionHookResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -379,10 +527,13 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         var executor = factory.Services.GetRequiredService<IToolDefinitionExecutor>();
         var invocation = new ToolDefinitionInvocation(context.TenantId, new(context.WorkspaceId), context.PrincipalId,
             default, "guarded-relay.v1.0.0", "guarded", null, Json("""{"query":"a"}"""), ToolDefinitionCallerKind.Console);
+        await Assert.ThrowsAsync<ToolExecutionDeniedException>(() => executor.SimulateAsync(invocation, default));
         await Assert.ThrowsAsync<ToolExecutionDeniedException>(() => executor.ExecuteAsync(invocation, default));
         Assert.AreEqual(0, handler.Calls);
         using (factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("tools.internal-mcp")))
             await store.PutAsync(source.Value with { Generation = source.Value.Generation + 1 }, source.ETag, false, default);
+        var previewStale = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => executor.SimulateAsync(invocation, default));
+        Assert.AreEqual("tool_definition_target_stale", previewStale.Code);
         var stale = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => executor.ExecuteAsync(invocation, default));
         Assert.AreEqual("tool_definition_target_stale", stale.Code);
         Assert.AreEqual(0, handler.Calls);
@@ -408,7 +559,7 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         public int Calls { get; private set; }
         public string? LastSecret { get; private set; }
         public InternalMcpToolDefinition Definition { get; } = new("relay-test.source", "Test source", null,
-            Json("""{"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false},"query":{"type":"string"},"accessCode":{"type":"string"}},"required":["store","query"],"additionalProperties":false}"""));
+            Json("""{"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false},"query":{"type":"string"},"accessCode":{"type":"string","minLength":1}},"required":["store","query"],"additionalProperties":false}"""));
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows;
 
@@ -142,6 +143,7 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public WorkspaceId WorkspaceId { get; init; }
     public required string Id { get; init; }

@@ -549,7 +549,7 @@ public sealed class ManagedFlowToolExecutor(
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no external Tool identity.");
         var schema = tool.Definition.Schema?.Input
             ?? throw Error("tool_schema_missing", $"Tool resource '{tool.Address}' has no input schema.");
-        ValidateArguments(request.Arguments, schema);
+        ValidateArguments(Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(request.Arguments, request.SecretInputs), schema);
 
         var logicalCallId = $"flow:{request.RunId}:step:{request.StepName}";
         var invocationId = $"{logicalCallId}:attempt:{request.Attempt}";
@@ -578,6 +578,9 @@ public sealed class ManagedFlowToolExecutor(
                 RunId = request.RunId,
                 FlowStepId = request.StepName,
                 CorrelationId = request.CorrelationId,
+                SecretInputs = request.SecretInputs,
+                HasSensitiveArguments = request.SecretInputs.Count > 0,
+                PersistArguments = request.SecretInputs.Count > 0 ? false : null,
                 Arguments = request.Arguments.Clone()
             }, cancellationToken);
             return new(

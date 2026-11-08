@@ -38,7 +38,7 @@ else
         <section class="panel"><h2>@T("RelayUsages")</h2><p>@T("ConsumerAdoptionHelp")</p>
             <table class="data-table"><thead><tr><th>@T("Tool")</th><th>@T("Version")</th><th>@T("RelayVersion")</th></tr></thead><tbody>
                 @foreach (var usage in usages)
-                { <tr><td data-label="@T("Tool")"><a href="@UsageUrl(usage)">@usage.Namespace/@usage.Name</a> · @T($"UsageKind.{usage.Kind}")</td><td data-label="@T("Version")">@usage.Version</td><td data-label="@T("RelayVersion")">@usage.RelayVersion</td></tr> }
+                { <tr><td data-label="@T("Tool")"><a href="@UsageUrl(usage)">@usage.Namespace/@usage.Name</a> <ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact /> · @T($"UsageKind.{usage.Kind}")</td><td data-label="@T("Version")">@usage.Version</td><td data-label="@T("RelayVersion")">@usage.RelayVersion</td></tr> }
             </tbody></table>
         </section>
     }
@@ -430,7 +430,7 @@ else
     private static ScopedResourceAddress ResourceAddress(Resource resource) => ScopedResourceAddress.Create(resource.ScopeRef!.Value, resource.Namespace, resource.Kind, resource.Name);
     private string SourceVersion(ToolResource? tool) => tool is null ? T("SourceUnavailable") : tool.Definition.Version ?? T("CatalogRevision", tool.Generation);
     private static string Pretty(JsonElement? value) => value is null ? "" : JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
-    private static string UsageUrl(ToolDefinitionUsage usage) => $"/{usage.Kind switch { "Agent" => "agents", "Flow" => "flows", _ => "tools/sets" }}/{Uri.EscapeDataString(usage.Name)}?namespace={Uri.EscapeDataString(usage.Namespace.Value)}&scopeRef={Uri.EscapeDataString(usage.ScopeRef.Value)}";
+    private static string UsageUrl(ToolDefinitionUsage usage) => $"/{usage.Kind switch { "Agent" => "agents", "Flow" => "flows", _ => "tools/sets" }}/{Uri.EscapeDataString(usage.Name)}?namespace={Uri.EscapeDataString(usage.Namespace.Value)}&context={Uri.EscapeDataString(usage.ScopeRef.Value)}";
     public void Dispose() { bindingEditContext.OnValidationStateChanged -= BindingValidationChanged; cancellation.Cancel(); cancellation.Dispose(); }
     private sealed class BindingRow
     {

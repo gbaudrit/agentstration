@@ -8,7 +8,7 @@ Create/update drafts through `/api/tooldefinitions`. Select an explicit `major.m
 
 List immutable publications at `GET /api/tooldefinitions/{name}/versions` and consumers at `GET /api/tooldefinitions/{name}/usages`, using the definition's `namespace` query parameter and existing authenticated scope/resource permissions.
 
-The Usages view lists published Agent revisions, ToolSet versions and Flow versions in the definition's owner scope. It is a planning aid, not a global inventory of descendant-scope consumers; authoring in another scope still requires explicit adoption there.
+The Usages view lists published Agent revisions, ToolSet versions and Flow versions in the definition's owner scope and authorized descendant scopes. Results show each consumer's actual owner scope and exact relay version. Existing scope-inventory permissions bound discovery; unauthorized tenants and workspaces are never included. Adoption remains explicit in each consumer's own scope.
 
 Each publication produces an ordinary Tool named `agentstration.<definition-name>.v<version>`. Its MCP name is `<definition-name>.v<version>` (prefixed by the namespace when needed). Select that Tool in Agent, ToolSet and Flow authoring.
 
@@ -91,7 +91,7 @@ This boundary is covered against the merged acquisition implementation. The para
 
 Changing the value of the same Parameter or rotating the same Secret affects subsequent calls after revalidation without relay/consumer republication. Changing reference identity, binding kind, literal or source requires a new publication. Deleted/recreated resources do not satisfy old UID pins. Missing, unauthorized or invalid values fail without fallback. Drafts and immutable publications participate in Parameter/Secret usage reporting.
 
-Resolved Secret values cannot be submitted as durable Flow input: that invocation fails explicitly before Work/FlowRun creation. Source ToolDefinitions backed by a Flow therefore cannot receive resolved Secret bindings until a protected durable-input mechanism exists. This also applies through a chain of relays. Direct Tool invocations retain Secret protection and propagate sensitivity through the chain.
+Durable Flow inputs retain symbolic Secret references, never resolved values. Trusted references carry the exact Secret UID, scope and original consumer context; public input JSON cannot grant resolution authority. Mappings and child Flows preserve the references. Each server-side Tool attempt resolves and validates the current value again, including after recovery or rotation. Completed steps are not repeated. Missing, revoked, replaced or invalid references fail explicitly without an earlier-value fallback. The Worker, Work/Flow/step state and execution material receive symbolic inputs. Exact Secret echoes become references and embedded echoes are redacted before outputs cross the durable boundary. This applies to nested relays and Knowledge dispatch as well as ordinary Flow-backed Tools. See [ADR-0202](../decisions/0202-durable-flow-inputs-retain-live-secret-references.md).
 
 Paths are non-root JSON Pointers over declared object properties: `/a~1b~0c` addresses `a/b~c`. Reject duplicates, parent/child overlaps and duplicate JSON keys. Traversal through arrays or nullable/non-object ancestors is unsupported; fix the whole value instead. No text interpolation is performed.
 
@@ -99,7 +99,7 @@ The derived schema removes fixed fields and updates required ancestors. If recon
 
 The profile reuses the existing Tool validator: declared object properties/required inputs, primitive type unions, arrays/items, enum, string lengths/pattern/URI and numeric bounds. References, conditional/composition schemas, pattern/schema-valued additional properties and unsupported constraints fail explicitly rather than being silently advertised as validated.
 
-Limits: 64 bindings, twelve object levels and 1,024 characters per path, eight relay levels, 65,536 JSON characters for source schema/fixed configuration/reconstructed request, and the configured 1–900 second timeout. Scope, Principal and correlation are trusted context outside model-controlled arguments. Source approvals/hooks remain enforced. Secret values are absent from exports/previews/receipts; inner argument capture is suppressed and sensitive failure diagnostics are redacted.
+Limits: 64 bindings, twelve object levels and 1,024 characters per path, eight relay levels, 65,536 JSON characters for source schema/fixed configuration/reconstructed request, and the configured 1–900 second timeout. Scope, Principal and correlation are trusted context outside model-controlled arguments. Relay simulation validates the exact source, current binding values and source governance without invoking the source implementation. Source approvals/hooks remain enforced. Secret values are absent from exports/previews/receipts; inner argument capture is suppressed and sensitive failure diagnostics are redacted.
 
 ## Console workflow
 

@@ -29,6 +29,11 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolRelayExecutor>();
+        services.AddSingleton(provider => new Lazy<Agentstration.Secrets.Abstractions.ISecretInputResolver>(
+            provider.GetRequiredService<Agentstration.Secrets.Abstractions.ISecretInputResolver>));
+        services.AddSingleton(provider => new Lazy<Agentstration.Identity.ResourceScopeInventoryService>(
+            provider.GetRequiredService<Agentstration.Identity.ResourceScopeInventoryService>));
+        services.AddSingleton<Agentstration.Secrets.Abstractions.ISecretInputResolver, ToolSecretInputResolver>();
         services.AddSingleton<IToolDefinitionUsageReader, ToolDefinitionUsageReader>();
         services.AddSingleton<Agentstration.Parameters.IParameterUsageProvider, ToolDefinitionValueUsages>();
         services.AddSingleton<Agentstration.Secrets.ISecretUsageProvider, ToolDefinitionValueUsages>();

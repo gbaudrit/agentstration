@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Identity.Contracts;
@@ -15,11 +16,19 @@ public sealed class ToolRelayExecutor(
     ToolDefinitionService definitions,
     IToolExecutionPipeline pipeline,
     IParameterResolver parameters,
-    ISecretResolver secrets,
+    ISecretInputResolver secretInputs,
     ICurrentRequestContext current)
 {
     public async Task<ToolDefinitionInvocationResult> ExecuteAsync(ToolDefinitionResource definition,
         RelayToolDefinitionProperties relay, ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
+        => await ExecuteCoreAsync(definition, relay, invocation, false, cancellationToken);
+
+    public Task<ToolDefinitionInvocationResult> SimulateAsync(ToolDefinitionResource definition,
+        RelayToolDefinitionProperties relay, ToolDefinitionInvocation invocation, CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(definition, relay, invocation, true, cancellationToken);
+
+    private async Task<ToolDefinitionInvocationResult> ExecuteCoreAsync(ToolDefinitionResource definition,
+        RelayToolDefinitionProperties relay, ToolDefinitionInvocation invocation, bool simulate, CancellationToken cancellationToken)
     {
         if (current.AccessMode is not (ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration)
             || current.Current.TenantId == Guid.Empty || current.Current.WorkspaceId == Guid.Empty || current.Current.PrincipalId == Guid.Empty
@@ -41,6 +50,7 @@ public sealed class ToolRelayExecutor(
                 || source.Tool.Definition.ExternalId != pinned.Tool.Definition.ExternalId)
                 throw Error("tool_definition_target_stale", "The source provider no longer matches its published revision.");
             var values = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            var references = (invocation.ExecutionContext?.SecretInputs ?? []).ToList();
             foreach (var binding in relay.Bindings)
             {
                 switch (binding)
@@ -61,16 +71,19 @@ public sealed class ToolRelayExecutor(
                             throw Error("tool_definition_binding_invalid", "A Secret binding requires an exact scope.");
                         await VerifyIdentityAsync(ScopedResourceAddress.Create(secretScope, secret.Secret.Address.Namespace,
                             secret.Secret.Address.Kind, secret.Secret.Address.Name), binding.Path);
-                        using (var resolvedSecret = await secrets.ResolveAsync(secret.Secret,
-                            new(definition.ScopeRef.Value, definition.Address), token)
-                            ?? throw Error("tool_definition_binding_unavailable", "A bound Secret is unavailable."))
-                            values[binding.Path] = JsonSerializer.SerializeToElement(new UTF8Encoding(false, true).GetString(resolvedSecret.Value.AccessValue().Span));
+                        var identity = publication.Value.BindingIdentities.Single(value => value.Path == binding.Path).Uid;
+                        var id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{publication.Value.Uid:D}:{binding.Path}:{identity:D}")));
+                        var reference = new SecretInputReference(id, secret.Secret, identity, new(definition.ScopeRef.Value, definition.Address));
+                        if (!references.Any(value => value.Id == id)) references.Add(reference);
+                        values[binding.Path] = SecretInputs.Marker(id);
                         break;
                 }
             }
-            var arguments = ToolRelayArguments.Reconstruct(invocation.Arguments, relay.Bindings, values, pinned.Tool.Definition.Schema!.Input);
+            var arguments = ToolRelayArguments.Reconstruct(invocation.Arguments, relay.Bindings, values, pinned.Tool.Definition.Schema!.Input, references);
+            using var resolvedInputs = await secretInputs.ResolveAsync(arguments, references, token);
+            ToolInputSchemaValidator.Validate(pinned.Tool.Definition.Schema.Input, resolvedInputs.Value);
             var execution = invocation.ExecutionContext;
-            var result = await pipeline.ExecuteDetailedAsync(new ToolExecutionContext
+            var context = new ToolExecutionContext
             {
                 OwnerKind = invocation.CallerKind == ToolDefinitionCallerKind.Console ? ToolExecutionOwnerKind.Console
                     : invocation.CallerKind == ToolDefinitionCallerKind.Mcp ? ToolExecutionOwnerKind.Mcp
@@ -100,9 +113,17 @@ public sealed class ToolRelayExecutor(
                 AgentGeneration = execution?.AgentGeneration,
                 CorrelationId = invocation.CorrelationId,
                 PersistArguments = false,
+                SecretInputs = references,
                 HasSensitiveArguments = execution?.HasSensitiveArguments == true || relay.Bindings.Any(binding => binding is SecretToolArgumentBinding),
                 Arguments = arguments
-            }, token);
+            };
+            if (simulate)
+            {
+                await pipeline.ValidateAsync(context, token);
+                return new(JsonSerializer.SerializeToElement(new { dryRun = true, inputAccepted = true }),
+                    new(null, null, null, definition.Namespace, null, invocation.CorrelationId ?? invocation.CallId, false));
+            }
+            var result = await pipeline.ExecuteDetailedAsync(context, token);
             string? workItemId = null, flowRunId = null;
             result.Receipt?.TryGetValue("workItemId", out workItemId);
             result.Receipt?.TryGetValue("flowRunId", out flowRunId);
@@ -132,6 +153,7 @@ public sealed class ToolRelayExecutor(
                 ToolDefinitionInvocationException invocationError => invocationError.Code,
                 ToolResolutionException resolutionError => resolutionError.Code,
                 ToolExecutionDeniedException denied => denied.Code,
+                ToolInputValidationException => "tool_definition_binding_invalid",
                 _ => "tool_definition_execution_failed"
             };
             throw Error(code, "The Tool invocation with protected inputs could not be completed.");

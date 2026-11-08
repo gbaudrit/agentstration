@@ -214,7 +214,10 @@ public sealed record ToolDefinitionInvocationContext(
     string? InvocationId = null,
     long? AgentVersion = null,
     long? AgentGeneration = null,
-    bool HasSensitiveArguments = false);
+    bool HasSensitiveArguments = false)
+{
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
+}
 
 public sealed record ToolDefinitionInvocation(
     Guid TenantId,

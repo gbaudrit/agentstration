@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Tools;
 
@@ -67,11 +68,12 @@ public static class ToolRelayArguments
     }
 
     public static JsonElement Reconstruct(JsonElement caller, IReadOnlyList<ToolArgumentBinding> bindings,
-        IReadOnlyDictionary<string, JsonElement> values, JsonElement sourceSchema)
+        IReadOnlyDictionary<string, JsonElement> values, JsonElement sourceSchema,
+        IReadOnlyList<SecretInputReference>? secretInputs = null)
     {
         ValidatePaths(bindings);
         ValidateCaller(caller, bindings);
-        try { ToolInputSchemaValidator.Validate(PublicSchema(sourceSchema, bindings), caller); }
+        try { ToolInputSchemaValidator.Validate(PublicSchema(sourceSchema, bindings), caller, secretInputs); }
         catch (ToolInputValidationException) { throw Invalid("Caller input does not satisfy the effective relay contract."); }
         var root = JsonNode.Parse(caller.GetRawText())!.AsObject();
         foreach (var binding in bindings)
@@ -93,7 +95,7 @@ public static class ToolRelayArguments
         }
         var result = JsonSerializer.SerializeToElement(root);
         if (result.GetRawText().Length > MaximumPayloadLength) throw Invalid("Reconstructed Tool input exceeds its payload limit.");
-        try { ToolInputSchemaValidator.Validate(sourceSchema, result); }
+        try { ToolInputSchemaValidator.Validate(sourceSchema, result, secretInputs); }
         catch (ToolInputValidationException) { throw Invalid("Reconstructed Tool input does not satisfy its pinned source contract."); }
         return result;
     }
