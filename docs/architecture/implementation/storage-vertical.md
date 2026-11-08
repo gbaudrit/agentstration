@@ -46,3 +46,32 @@ Fast tests exercise domain and authority invariants with deterministic ports.
 Integration tests cover real HTTP/Problem Details, Bootstrap, Secret non-resolution,
 SQLite restart and concurrency. Architecture tests enforce project direction and
 keep provider/transport implementations outside the family.
+
+## Validation evidence — 2026-11-08
+
+Verified with .NET SDK 10.0.300 against implementation commit `1610290` on
+`feature/fr-1045-storage-api`, based on `integration/fr-1032` at `09de3fc`.
+
+| Check | Result |
+|---|---|
+| Solution restore | Passed; all projects restored |
+| Release build without restore | Passed; 0 warnings, 0 errors |
+| Required Fast lane | 969 passed, 0 failed, 0 skipped |
+| Required Integration lane | 1069 discovered: 1057 passed, 0 failed, 12 optional tests skipped |
+| LikeC4 and ADR validation | Passed; 3 model files and 197 unique ADRs |
+| Production Docusaurus build | Passed |
+| Isolated Development bootstrap/server smoke | Health 200, local fixture login 204, type catalog 200, Storage creation 201 and exact detail 200/ready |
+
+Required commands were run from the repository root:
+
+```text
+dotnet restore Agentstration.slnx
+dotnet build Agentstration.slnx --configuration Release --no-restore
+dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4
+dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2
+```
+
+The 12 skips are existing opt-in integrations: 2 PostgreSQL, 8 live Foundry,
+1 llama.cpp and 1 LocalAI. No Storage test was skipped. The final Integration
+pass completed after an environment restart interrupted an earlier attempt.
+There is no Storage Console change or new browser journey in #1045.
