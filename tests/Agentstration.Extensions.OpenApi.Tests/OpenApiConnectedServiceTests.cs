@@ -2,8 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Aep.Client;
 using Agentstration.Aep.AspNetCore;
+using Agentstration.Aep.Client;
 using Agentstration.Extensions.OpenApi;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -104,7 +104,8 @@ public sealed partial class OpenApiExtensionTests
         using var http = new HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
         {
             Content = new StringContent(new string('x', AepConnectedServiceDiscoveryProtocol.MaximumResponseBytes + 1))
-        }))) { BaseAddress = new("https://extension.example.test") };
+        })))
+        { BaseAddress = new("https://extension.example.test") };
         var error = await Assert.ThrowsAsync<AepProtocolException>(() => new AepClient(http)
             .DiscoverConnectedServiceOperationsAsync(new("openapi", "1.0.0", JsonSerializer.SerializeToElement(new { }), [], "bounded")));
         Assert.AreEqual("response_too_large", error.Code);

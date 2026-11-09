@@ -1,5 +1,4 @@
 extern alias openapi;
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -7,8 +6,8 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
-using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions.Aep;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
@@ -77,10 +76,16 @@ public sealed partial class ConnectedServiceApiTests
         {
             var registration = (await store.PutExactAsync(owner, new ExtensionRegistrationResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration,
-                Metadata = new() { Name = "openapi-test" }, ScopeRef = owner,
-                Definition = new() { DisplayName = "OpenAPI test", Endpoint = new("https://extension.example.test"),
-                    ExpectedExtensionId = manifest.Extension.Id }
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
+                Metadata = new() { Name = "openapi-test" },
+                ScopeRef = owner,
+                Definition = new()
+                {
+                    DisplayName = "OpenAPI test",
+                    Endpoint = new("https://extension.example.test"),
+                    ExpectedExtensionId = manifest.Extension.Id
+                }
             }, null, true, default)).Value;
             foreach (var provisioner in factory.Services.GetServices<IAepEnrollmentResourceProvisioner>())
                 await provisioner.ProvisionAsync(registration, manifest, default);
@@ -94,8 +99,12 @@ public sealed partial class ConnectedServiceApiTests
             CollectionAssert.AreEquivalent(installed.Select(item => item.ETag).ToArray(), repeated.Select(item => item.ETag).ToArray());
         }
         using var parameter = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest("openapi-origin",
-            new() { DisplayName = "OpenAPI origin", ValueType = ParameterValueType.Text,
-                Value = JsonSerializer.SerializeToElement("https://origin.example.test") }, owner));
+            new()
+            {
+                DisplayName = "OpenAPI origin",
+                ValueType = ParameterValueType.Text,
+                Value = JsonSerializer.SerializeToElement("https://origin.example.test")
+            }, owner));
         Assert.AreEqual(HttpStatusCode.Created, parameter.StatusCode);
         using var vault = await client.PostAsJsonAsync("/api/vaults", new CreateVaultRequest("openapi-vault",
             new() { DisplayName = "OpenAPI Vault", ProviderType = "local" }, owner));
@@ -116,8 +125,14 @@ public sealed partial class ConnectedServiceApiTests
         using var created = await client.PostAsJsonAsync("/api/connected-services", new CreateConnectedServiceRequest("orders",
             new()
             {
-                DisplayName = "Orders", Type = new() { Type = new("openapi", owner, type.Namespace), TypeUid = type.Uid,
-                    Version = version.Version, SchemaDigest = version.SchemaDigest },
+                DisplayName = "Orders",
+                Type = new()
+                {
+                    Type = new("openapi", owner, type.Namespace),
+                    TypeUid = type.Uid,
+                    Version = version.Version,
+                    SchemaDigest = version.SchemaDigest
+                },
                 Options = JsonSerializer.SerializeToElement(new { candidatePaths = new[] { "/openapi.json" } }),
                 Bindings =
                 [

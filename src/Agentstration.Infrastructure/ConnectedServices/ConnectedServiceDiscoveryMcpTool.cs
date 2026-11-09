@@ -114,7 +114,9 @@ public sealed class ConnectedServiceDiscoveryExecutor(
             {
                 Operations = result.Operations.Select(operation => new ConnectedServiceOperationCandidate
                 {
-                    ExternalId = operation.ExternalId, DisplayName = operation.DisplayName, Description = operation.Description,
+                    ExternalId = operation.ExternalId,
+                    DisplayName = operation.DisplayName,
+                    Description = operation.Description,
                     Type = version.OperationDiscovery!.ProducedTypes.SingleOrDefault(reference =>
                         reference.Type.Name == operation.TypeId && reference.Version == operation.TypeVersion)
                         ?? throw Error("connected_service_operation_type_not_allowed"),
@@ -142,12 +144,14 @@ public sealed class ConnectedServiceDiscoveryMcpTool(ConnectedServiceDiscoveryEx
     public InternalMcpToolDefinition Definition { get; } = new(Name, Name, null,
         JsonSerializer.SerializeToElement(new
         {
-            type = "object", properties = new
+            type = "object",
+            properties = new
             {
                 discoveryId = new { type = "string", minLength = 1, maxLength = 128 },
                 discoveryNamespace = new { type = "string", minLength = 1, maxLength = 128 }
             },
-            required = new[] { "discoveryId", "discoveryNamespace" }, additionalProperties = false
+            required = new[] { "discoveryId", "discoveryNamespace" },
+            additionalProperties = false
         }), ExposeThroughMcp: false);
 
     public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>

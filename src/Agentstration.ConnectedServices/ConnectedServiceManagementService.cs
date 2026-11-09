@@ -174,8 +174,11 @@ public sealed class ConnectedServiceManagementService(
                 inputs.Add(await ResolveBindingAsync(binding, resource, cancellationToken));
             return new ResolvedConnectedService
             {
-                Reference = service, Type = resource.Definition.Type,
-                Options = resource.Definition.Options.Clone(), Exports = version.Exports, Inputs = inputs
+                Reference = service,
+                Type = resource.Definition.Type,
+                Options = resource.Definition.Options.Clone(),
+                Exports = version.Exports,
+                Inputs = inputs
             };
         }
         catch
@@ -528,12 +531,12 @@ public sealed class ConnectedServiceManagementService(
         ConnectedServiceAvailability availability,
         string? code = null,
         string? message = null) => new()
-    {
-        Availability = availability,
-        ObservedAt = timeProvider.GetUtcNow(),
-        Code = code,
-        Message = message
-    };
+        {
+            Availability = availability,
+            ObservedAt = timeProvider.GetUtcNow(),
+            Code = code,
+            Message = message
+        };
 
     private static bool Matches(JsonElement value, ConnectedServiceValueType type) => type switch
     {
