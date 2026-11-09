@@ -74,6 +74,29 @@ reference or callback. Secured inputs still reject literals, and unsupported
 binding kinds fail explicitly. The OpenAPI regression matrix includes literal
 URLs with and without the optional authentication Secret in all three scopes.
 
+## Dataset Console sections
+
+Saved native datasets open on Overview, with their saved service → operation →
+Data Source → Storage composition, readiness, latest acquisition and three recent
+runs. Definition, Acquisitions, Content, Access and YAML separate the remaining
+surfaces. The optional `view` query opens a named section directly; Access remains
+limited to administrators who can manage the owner resource. Tabs support arrow,
+Home and End keys. Opening history or acquired content focuses the selected tab
+after rendering, keeping it visible in the mobile tab bar.
+
+Definition groups identity, the saved acquisition call and Storage destination.
+Switching tabs preserves draft fields and schema parameters. Overview and the
+read-only YAML manifest always describe the persisted definition; Cancel reloads
+that definition. Acquisition starts use persisted configuration and open history.
+Content opens a bounded, escaped preview of an explicitly selected acquisition,
+including when navigated from history. No polling, editing of acquired content,
+new Storage configuration or Knowledge Snapshot contract is introduced.
+
+Creation retains a single definition form until the resource is saved. Historical
+profile-based Data Sources retain their existing journey. Discovery and operation
+enablement stay on the Connected Service. This implements the maintainer-approved
+tab mockup; it does not remove #1033's implemented-UX review and merge gates.
+
 ## Knowledge form submission
 
 The Knowledge Source editor names its form and disables fields until the Blazor
@@ -123,7 +146,37 @@ source or acquired content, or implement native Knowledge Snapshot composition.
   #1044. No dataset-specific replacement relay is introduced. Historical fixed
   acquisition Tools continue to use their original implementation.
 
-## Validation evidence
+## Tabbed dataset UI validation
+
+Follow-up checks on 2026-11-09 against the same integration base:
+
+- Release solution build: zero warnings and errors. Fast lane: 1,046 passed,
+  zero failures or skips. Twelve dataset editor cases include three new localized
+  draft/cancel, persisted-summary/YAML and history/content-navigation cases.
+- The complete Integration lane ran 1,132 tests: 1,119 passed, 12 existing optional
+  cases skipped, and one existing MCP timeout assertion failed. Its configured
+  100 ns timeout returned `schema_format_provider_failed` instead of
+  `schema_format_provider_timeout`. The isolated case passed, then all 23 tests
+  in its `Agentstration.Api.Tests` module passed on rerun. No production MCP code
+  or timeout assertion was changed. The initial full lane remains recorded as
+  failed; the rerun does not erase that result.
+- All eight existing source/schema browser regressions passed with system
+  Chromium, including desktop, mobile and French variants. The first launcher
+  attempt expected an unavailable downloaded browser; the rerun used the
+  preinstalled Chromium executable.
+
+- Four temporary native-dataset browser variants passed in en-US/fr-FR at
+  1,440/390 px, covering creation, localized validation, draft preservation,
+  cancellation, saved YAML, Access, keyboard navigation, direct section links,
+  acquisition and bounded content. Selected-tab focus and horizontal visibility
+  are asserted after content navigation. Light-theme checks also passed at both
+  widths. The mobile content overflow found during the first iteration is fixed;
+  final runs report no page errors or document overflow.
+- Changed C#/Razor formatting, JavaScript syntax checking, TypeScript checking,
+  localization catalog symmetry and `git diff --check` passed. Documentation
+  validation includes the ADR registry, LikeC4 and the full Docusaurus build.
+
+## Earlier composition validation evidence
 
 Checks completed on 2026-11-09 against integration base `03ad8f0`:
 

@@ -118,4 +118,22 @@
   <data name="DatasetParametersInvalid" xml:space="preserve"><value>Les paramètres sauvegardés ne respectent pas le schéma d’entrée de l’opération.</value></data>
   <data name="DatasetPrefixInvalid" xml:space="preserve"><value>Utilisez un préfixe de répertoire relatif se terminant par /, sans .. ni le segment réservé datasets.</value></data>
   <data name="DatasetErrorReference" xml:space="preserve"><value>Référence de l’erreur :</value></data>
+  <data name="DatasetEdit" xml:space="preserve"><value>Modifier</value></data>
+  <data name="DatasetCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="DatasetSections" xml:space="preserve"><value>Sections de la source de données</value></data>
+  <data name="DatasetContentTab" xml:space="preserve"><value>Contenu</value></data>
+  <data name="DatasetComposition" xml:space="preserve"><value>Composition du dataset</value></data>
+  <data name="DatasetDataSource" xml:space="preserve"><value>Source de données</value></data>
+  <data name="DatasetBytes" xml:space="preserve"><value>{0:N0} octets</value></data>
+  <data name="DatasetViewFlowRun" xml:space="preserve"><value>Voir l’exécution du Flow</value></data>
+  <data name="DatasetSavedConfiguration" xml:space="preserve"><value>Configuration sauvegardée</value></data>
+  <data name="DatasetIdentity" xml:space="preserve"><value>Identité</value></data>
+  <data name="DatasetSavedAcquisition" xml:space="preserve"><value>Acquisition configurée</value></data>
+  <data name="DatasetDestination" xml:space="preserve"><value>Destination du dataset</value></data>
+  <data name="DatasetIsolatedContent" xml:space="preserve"><value>Chaque Data Source conserve son propre dataset. Les contraintes du Storage restent appliquées.</value></data>
+  <data name="DatasetRecentAcquisitions" xml:space="preserve"><value>Dernières acquisitions</value></data>
+  <data name="DatasetAllHistory" xml:space="preserve"><value>Tout l’historique</value></data>
+  <data name="DatasetNoContent" xml:space="preserve"><value>Aucun contenu acquis n’est disponible pour le moment. Lancez une acquisition, puis actualisez son historique.</value></data>
+  <data name="DatasetContentAcquisition" xml:space="preserve"><value>Acquisition à consulter</value></data>
+  <data name="DatasetYamlHelp" xml:space="preserve"><value>Manifeste en lecture seule de la source de données sauvegardée. Utilisez l’onglet Définition pour modifier sa configuration.</value></data>
 </root>

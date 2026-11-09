@@ -1,12 +1,48 @@
-.form-section { min-width: 0; width: 100%; box-sizing: border-box; }
-select, input, textarea { max-width: 100%; }
-pre, code, small { overflow-wrap: anywhere; }
+.form-section { grid-template-columns: minmax(0, 1fr); min-width: 0; width: 100%; box-sizing: border-box; }
+select, input, textarea { min-width: 0; max-width: 100%; }
+.form-field-wide { grid-column: 1 / -1; }
+.panel-header > div { min-width: 0; }
+pre, code, small, dd, strong { overflow-wrap: anywhere; }
 pre { white-space: pre-wrap; max-height: 28rem; overflow: auto; }
-small { display: block; }
+small { display: block; color: var(--muted); }
+h2 { margin-top: 0; }
+.dataset-identity { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: -.5rem 0 1.25rem; color: var(--muted); }
+.dataset-tab-list { display: flex; gap: .25rem; min-width: max-content; }
+.dataset-composition { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 1rem; padding: 1.5rem; margin-bottom: 1.25rem; }
+.dataset-composition > div { display: grid; gap: .5rem; min-width: 0; }
+.dataset-composition span { color: var(--muted); font-size: .8rem; }
+.dataset-composition a { color: var(--primary); font-weight: 600; overflow-wrap: anywhere; }
+.dataset-composition .dataset-composition-arrow { font-size: 1.25rem; color: var(--muted); }
+.dataset-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem; }
+.dataset-summary-grid .form-section { margin-top: 0; align-content: start; }
+.dataset-summary-grid h2 { margin-bottom: .5rem; font-size: 1.15rem; }
+.dataset-summary-grid p { margin: .25rem 0; }
+.dataset-summary-grid .form-actions { justify-content: flex-start; margin-top: .5rem; }
+.dataset-content-size { color: var(--muted); }
+.dataset-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: .75rem 1rem; margin: .5rem 0; }
+.dataset-details dt { color: var(--muted); }
+.dataset-details dd { margin: 0; }
+.dataset-form-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
+.dataset-form-toolbar h2 { margin: 0; }
+.dataset-definition-grid { margin-top: 1.25rem; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.dataset-definition-grid .form-section { margin-top: 0; }
+.dataset-note { display: flex; gap: .75rem; align-items: flex-start; padding: 1rem; background: var(--primary-soft); border-radius: .5rem; color: var(--muted); font-size: .875rem; line-height: 1.6; }
+.dataset-note ::deep svg { width: 1.25rem; height: 1.25rem; flex-shrink: 0; color: var(--primary); }
+.dataset-content-picker select { width: 100%; }
+.dataset-content-picker { min-width: 0; width: 100%; display: grid; gap: .5rem; max-width: 42rem; margin-bottom: 1.5rem; }
 .form-section ::deep .resource-access-panel { grid-template-columns: minmax(0, 1fr); }
 .form-section ::deep .resource-access-panel select { min-width: 0; max-width: 100%; }
+.form-alert-danger { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+@media (max-width: 900px) {
+    .dataset-definition-grid, .dataset-summary-grid { grid-template-columns: minmax(0, 1fr); }
+    .dataset-composition { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+    .dataset-composition > .dataset-composition-arrow:nth-of-type(2) { display: none; }
+}
 @media (max-width: 620px) {
     .panel-header { flex-direction: column; align-items: stretch; }
+    .dataset-composition { grid-template-columns: minmax(0, 1fr); padding: 1.25rem; }
+    .dataset-composition > .dataset-composition-arrow { display: none; }
+    .dataset-composition > div:not(:first-child) { padding-top: .75rem; border-top: 1px solid var(--border); }
+    .dataset-details { grid-template-columns: minmax(0, 1fr); gap: .4rem; }
+    .dataset-details dd { margin-bottom: .65rem; }
 }
-
-.form-alert-danger { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; }

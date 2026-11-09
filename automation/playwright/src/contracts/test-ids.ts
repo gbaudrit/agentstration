@@ -150,6 +150,9 @@ export const TestIds = {
     historyRow: 'connected-service-discovery-row', flowRun: 'connected-service-discovery-flow-link',
   },
   datasetComposition: {
+    overviewTab: 'dataset-overview-tab', definitionTab: 'dataset-definition-tab', acquisitionsTab: 'dataset-acquisitions-tab',
+    contentTab: 'dataset-content-tab', accessTab: 'dataset-access-tab', yamlTab: 'dataset-yaml-tab',
+    latestAcquisition: 'dataset-latest-acquisition', savedConfiguration: 'dataset-saved-configuration', yaml: 'dataset-yaml',
     editor: 'data-source-dataset-editor', fields: 'dataset-definition-fields', storage: 'dataset-storage', prefix: 'dataset-prefix',
     service: 'dataset-service', serviceDiscovery: 'dataset-service-discovery-link', operation: 'dataset-operation', parameters: 'dataset-parameters',
     ineligibleOperation: 'dataset-operation-ineligible', errorCode: 'dataset-error-code', acquisitions: 'dataset-acquisitions', readContent: 'dataset-read-content', content: 'dataset-content',

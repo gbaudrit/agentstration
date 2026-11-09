@@ -118,4 +118,22 @@
   <data name="DatasetParametersInvalid" xml:space="preserve"><value>The saved parameters do not satisfy the operation input schema.</value></data>
   <data name="DatasetPrefixInvalid" xml:space="preserve"><value>Use a relative directory prefix ending in /, without .. or the reserved datasets segment.</value></data>
   <data name="DatasetErrorReference" xml:space="preserve"><value>Error reference:</value></data>
+  <data name="DatasetEdit" xml:space="preserve"><value>Edit</value></data>
+  <data name="DatasetCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="DatasetSections" xml:space="preserve"><value>Data Source sections</value></data>
+  <data name="DatasetContentTab" xml:space="preserve"><value>Content</value></data>
+  <data name="DatasetComposition" xml:space="preserve"><value>Dataset composition</value></data>
+  <data name="DatasetDataSource" xml:space="preserve"><value>Data Source</value></data>
+  <data name="DatasetBytes" xml:space="preserve"><value>{0:N0} bytes</value></data>
+  <data name="DatasetViewFlowRun" xml:space="preserve"><value>View Flow Run</value></data>
+  <data name="DatasetSavedConfiguration" xml:space="preserve"><value>Saved configuration</value></data>
+  <data name="DatasetIdentity" xml:space="preserve"><value>Identity</value></data>
+  <data name="DatasetSavedAcquisition" xml:space="preserve"><value>Configured acquisition</value></data>
+  <data name="DatasetDestination" xml:space="preserve"><value>Dataset destination</value></data>
+  <data name="DatasetIsolatedContent" xml:space="preserve"><value>Each Data Source keeps its own dataset. Storage constraints remain applied.</value></data>
+  <data name="DatasetRecentAcquisitions" xml:space="preserve"><value>Recent acquisitions</value></data>
+  <data name="DatasetAllHistory" xml:space="preserve"><value>Full history</value></data>
+  <data name="DatasetNoContent" xml:space="preserve"><value>No acquired content is available yet. Start an acquisition, then refresh its history.</value></data>
+  <data name="DatasetContentAcquisition" xml:space="preserve"><value>Acquisition to read</value></data>
+  <data name="DatasetYamlHelp" xml:space="preserve"><value>Read-only manifest of the saved Data Source. Use the Definition tab to edit its configuration.</value></data>
 </root>
