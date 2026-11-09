@@ -29,6 +29,7 @@ else
             }
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
             <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
+            @if (HasNativeDatasetInput) { <p class="form-alert form-alert-info form-span-2" role="status">@T("NativeDatasetDraftHelp")</p> }
             <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <label><span>@T("RetrievalFlow")</span><select @bind="retrievalFlowKey" required data-testid="knowledge-source-retrieval-flow"><option value="">@T("SelectRetrievalFlow")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
@@ -68,6 +69,7 @@ else
         description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
     private bool enabled, busy, interactive, loading = true;
+    private bool HasNativeDatasetInput => bindings.Any(binding => dataSources.Any(source => source.Definition.Dataset is not null && DataSourceKey(source) == binding.DataSourceKey));
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
     private string DetailsUrl => ExistingNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name!)}" : $"/knowledge-sources/{Uri.EscapeDataString(Name!)}?namespace={Uri.EscapeDataString(ExistingNamespace.Value)}";

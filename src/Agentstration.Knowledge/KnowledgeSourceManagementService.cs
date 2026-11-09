@@ -228,14 +228,14 @@ public sealed class KnowledgeSourceManagementService(
                 && value.Value.KnowledgeSourceScopeRef == sourceScopeRef);
     }
 
-    private async Task<(KnowledgeSourceReadiness Readiness, ResolvedKnowledgeSourceComposition Composition)> ValidateAsync(
+    private async Task<(KnowledgeSourceReadiness Readiness, ResolvedKnowledgeSourceComposition? Composition)> ValidateAsync(
         KnowledgeSourceResource resource,
         CancellationToken cancellationToken)
     {
         ValidateStructure(resource);
         var composition = await ResolveCompositionAsync(resource, cancellationToken);
         var readiness = await EvaluateReadinessAsync(resource with { Composition = composition }, RequireScope(resource),
-            includeOperationalState: false, rejectInvalidBindings: true, cancellationToken);
+            includeOperationalState: false, rejectInvalidBindings: composition is not null, cancellationToken);
         return (readiness, composition);
     }
 
@@ -300,7 +300,7 @@ public sealed class KnowledgeSourceManagementService(
         if (composition is null)
         {
             AddOrThrow("knowledge_source_composition_missing",
-                "The KnowledgeSource does not retain an exact dependency composition and must be recreated.");
+                "The KnowledgeSource has no executable dependency composition. Save a supported definition to resolve its exact dependencies.");
         }
         else
         {
@@ -369,7 +369,7 @@ public sealed class KnowledgeSourceManagementService(
         }
     }
 
-    private async Task<ResolvedKnowledgeSourceComposition> ResolveCompositionAsync(
+    private async Task<ResolvedKnowledgeSourceComposition?> ResolveCompositionAsync(
         KnowledgeSourceResource resource,
         CancellationToken cancellationToken)
     {
@@ -387,11 +387,24 @@ public sealed class KnowledgeSourceManagementService(
         var retrieval = await flows.ResolveAsync(ownerScope, resource.Namespace, retrievalTarget, cancellationToken);
         var dependencies = new List<ResolvedKnowledgeDataSourceBinding>(resource.Definition.DataSources.Count);
         var transformations = new Dictionary<string, ResolvedKnowledgeFlowBinding>(StringComparer.Ordinal);
+        var unsupportedDataset = false;
         foreach (var binding in resource.Definition.DataSources)
         {
             if (projectionInputs is not null)
-                dependencies.Add(await projectionInputs.ResolveDependencyAsync(ownerScope, resource.Namespace,
-                    binding, cancellationToken));
+            {
+                try
+                {
+                    dependencies.Add(await projectionInputs.ResolveDependencyAsync(ownerScope, resource.Namespace,
+                        binding, cancellationToken));
+                }
+                catch (KnowledgeSourceValidationException exception) when (!resource.Definition.Enabled
+                    && exception.Code == "knowledge_projection_dataset_input_unsupported")
+                {
+                    // The resolver has authorized this input. Continue validating every remaining
+                    // reference, but never persist partial or fabricated executable dependency pins.
+                    unsupportedDataset = true;
+                }
+            }
             if (binding.TransformationFlow is null) continue;
             var transformation = await flows.ResolveAsync(ownerScope, resource.Namespace,
                 binding.TransformationFlow, cancellationToken);
@@ -400,6 +413,7 @@ public sealed class KnowledgeSourceManagementService(
                     $"Transformation Flow for binding '{binding.Name}' must declare flow.contract '{KnowledgeFlowContracts.ArtifactTransformation}'.");
             transformations.Add(binding.Name, transformation);
         }
+        if (unsupportedDataset) return null;
         var evidence = JsonSerializer.SerializeToElement(new
         {
             projection = FlowEvidence(projection),

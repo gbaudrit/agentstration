@@ -28,6 +28,130 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
     private static readonly JsonElement Empty = JsonSerializer.SerializeToElement(new { });
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task DisabledNativeKnowledgeDraftRetainsValidationAndRequiresSupportedCompositionBeforeActivation(bool workspaceOwner)
+    {
+        await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var fixture = await PrepareAsync(factory.Services);
+        var bootstrap = await GetBootstrapContextAsync(factory);
+        var workspace = ResourceScopeRef.Workspace(bootstrap.WorkspaceId);
+        var knowledgeOwner = workspaceOwner ? workspace : Owner;
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
+        var sources = factory.Services.GetRequiredService<DataSourceManagementService>();
+        var input = await sources.CreateAsync(Source("draft-input", fixture, JsonSerializer.SerializeToElement(new { dataset = "draft" })), default);
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, knowledgeOwner);
+        var properties = new KnowledgeSourceProperties
+        {
+            DisplayName = "Prepared Knowledge",
+            Enabled = false,
+            ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner, Version = "1.0.0", UseActiveVersion = false },
+            RetrievalFlow = new() { Name = "knowledge-retrieval-builtin", ScopeRef = Owner, Version = "1.0.0", UseActiveVersion = false },
+            DataSources = [new() { Name = "dataset", DataSource = new(input.Value.Name, Owner) }]
+        };
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        async Task GrantUseAsync(Resource resource) => _ = await policies.PutAsync(new(new(resource.Uid,
+            resource.ScopeRef!.Value, resource.Namespace, resource.Kind),
+            [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
+        if (workspaceOwner)
+        {
+            using var denied = await client.PostAsJsonAsync("/api/knowledgesources", new CreateKnowledgeSourceRequest("denied-draft", properties, ScopeRef: knowledgeOwner));
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, denied.StatusCode, await denied.Content.ReadAsStringAsync());
+            Assert.Contains("data_source_not_found", await denied.Content.ReadAsStringAsync());
+            await GrantUseAsync(input.Value);
+        }
+        using var created = await client.PostAsJsonAsync("/api/knowledgesources", new CreateKnowledgeSourceRequest("native-draft", properties, ScopeRef: knowledgeOwner));
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
+        var draft = (await created.Content.ReadFromJsonAsync<KnowledgeSourceResource>())!;
+        Assert.IsFalse(draft.Definition.Enabled);
+        Assert.IsNull(draft.Composition);
+        Assert.AreEqual("False", draft.Status!.Conditions.Single(condition => condition.Type == "Ready").Status);
+        Assert.AreEqual(input.Value.Name, draft.Definition.DataSources.Single().DataSource.Name);
+        var path = $"/api/knowledgesources/native-draft?scopeRef={Uri.EscapeDataString(knowledgeOwner.Value)}";
+        var readiness = (await client.GetFromJsonAsync<KnowledgeSourceReadiness>($"/api/knowledgesources/native-draft/readiness?scopeRef={Uri.EscapeDataString(knowledgeOwner.Value)}"))!;
+        Assert.IsFalse(readiness.Ready);
+        Assert.IsFalse(readiness.Enabled);
+
+        using var editRequest = new HttpRequestMessage(HttpMethod.Put, path)
+        { Content = JsonContent.Create(new PutKnowledgeSourceRequest(properties with { DisplayName = "Edited draft" })) };
+        editRequest.Headers.IfMatch.Add(created.Headers.ETag!);
+        using var edited = await client.SendAsync(editRequest);
+        Assert.AreEqual(HttpStatusCode.OK, edited.StatusCode, await edited.Content.ReadAsStringAsync());
+        var saved = (await edited.Content.ReadFromJsonAsync<KnowledgeSourceResource>())!;
+        Assert.AreEqual("Edited draft", saved.Definition.DisplayName);
+        Assert.IsFalse(saved.Definition.Enabled);
+        Assert.IsNull(saved.Composition);
+        using var enableRequest = new HttpRequestMessage(HttpMethod.Put,
+            $"/api/knowledgesources/native-draft/enabled?scopeRef={Uri.EscapeDataString(knowledgeOwner.Value)}")
+        { Content = JsonContent.Create(new SetKnowledgeSourceEnabledRequest(true)) };
+        enableRequest.Headers.IfMatch.Add(edited.Headers.ETag!);
+        using var enabled = await client.SendAsync(enableRequest);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, enabled.StatusCode, await enabled.Content.ReadAsStringAsync());
+        Assert.Contains("knowledge_projection_dataset_input_unsupported", await enabled.Content.ReadAsStringAsync());
+        using var enabledPutRequest = new HttpRequestMessage(HttpMethod.Put, path)
+        { Content = JsonContent.Create(new PutKnowledgeSourceRequest(saved.Definition with { Enabled = true })) };
+        enabledPutRequest.Headers.IfMatch.Add(edited.Headers.ETag!);
+        using var enabledPut = await client.SendAsync(enabledPutRequest);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, enabledPut.StatusCode, await enabledPut.Content.ReadAsStringAsync());
+        var unchanged = (await client.GetFromJsonAsync<KnowledgeSourceResource>(path))!;
+        Assert.AreEqual(saved.Generation, unchanged.Generation);
+        Assert.IsFalse(unchanged.Definition.Enabled);
+
+        // An unsupported native input must not hide invalid or foreign references later in the graph.
+        var invalidDefinitions = new[]
+        {
+            properties with { DataSources = [properties.DataSources[0], new() { Name = "foreign", DataSource = new("foreign", ResourceScopeRef.Workspace(Guid.NewGuid())) }] },
+            properties with { DataSources = [properties.DataSources[0] with { TransformationFlow = new() { Name = "missing-transformation", ScopeRef = Owner } }] }
+        };
+        for (var index = 0; index < invalidDefinitions.Length; index++)
+        {
+            using var invalid = await client.PostAsJsonAsync("/api/knowledgesources", new CreateKnowledgeSourceRequest($"invalid-draft-{index}", invalidDefinitions[index], ScopeRef: knowledgeOwner));
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode, await invalid.Content.ReadAsStringAsync());
+            Assert.DoesNotContain("knowledge_projection_dataset_input_unsupported", await invalid.Content.ReadAsStringAsync());
+            using var absent = await client.GetAsync($"/api/knowledgesources/invalid-draft-{index}?scopeRef={Uri.EscapeDataString(knowledgeOwner.Value)}");
+            Assert.AreEqual(HttpStatusCode.NotFound, absent.StatusCode);
+        }
+        if (!workspaceOwner) await GrantUseAsync(saved);
+        SelectConsoleContext(client, workspace);
+        using var projection = await client.PostAsJsonAsync($"/api/knowledgesources/native-draft/projections?scopeRef={Uri.EscapeDataString(knowledgeOwner.Value)}", new StartKnowledgeProjectionRequest());
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, projection.StatusCode, await projection.Content.ReadAsStringAsync());
+        Assert.Contains("knowledge_projection_source_disabled", await projection.Content.ReadAsStringAsync());
+        Assert.IsEmpty((await client.GetFromJsonAsync<KnowledgeProjectionResource[]>($"/api/knowledgesources/native-draft/projections?scopeRef={Uri.EscapeDataString(knowledgeOwner.Value)}"))!);
+        SelectConsoleContext(client, knowledgeOwner);
+
+        // Replacing the unsupported input resolves a complete fresh graph before enabling.
+        var legacy = await sources.CreateAsync(new DataSourceResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSource,
+            Metadata = new() { Name = "supported-input" },
+            ScopeRef = Owner,
+            Definition = new()
+            {
+                DisplayName = "Supported input",
+                Profile = new("artifact-import-builtin", Owner),
+                Configuration = JsonSerializer.SerializeToElement(new { artifactIds = Array.Empty<string>() })
+            }
+        }, default);
+        if (workspaceOwner) await GrantUseAsync(legacy.Value);
+        using var supportedRequest = new HttpRequestMessage(HttpMethod.Put, path)
+        {
+            Content = JsonContent.Create(new PutKnowledgeSourceRequest(properties with
+            { Enabled = true, DataSources = [properties.DataSources[0] with { DataSource = new(legacy.Value.Name, Owner) }] }))
+        };
+        supportedRequest.Headers.IfMatch.Add(edited.Headers.ETag!);
+        using var supported = await client.SendAsync(supportedRequest);
+        Assert.AreEqual(HttpStatusCode.OK, supported.StatusCode, await supported.Content.ReadAsStringAsync());
+        var executable = (await supported.Content.ReadFromJsonAsync<KnowledgeSourceResource>())!;
+        Assert.IsTrue(executable.Definition.Enabled);
+        Assert.IsNotNull(executable.Composition);
+        Assert.AreEqual(legacy.Value.Uid, executable.Composition.DataSources.Single().DataSourceUid);
+        Assert.AreEqual(legacy.Value.Generation, executable.Composition.DataSources.Single().DataSourceGeneration);
+    }
+
+    [TestMethod]
     public async Task RealOperationAcquiresTwoIsolatedDatasetsIntoOneLocalStorageAndRetainsHistory()
     {
         await using var factory = Factory();

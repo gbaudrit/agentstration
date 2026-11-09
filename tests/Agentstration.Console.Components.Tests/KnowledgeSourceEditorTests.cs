@@ -73,7 +73,7 @@ public sealed class KnowledgeSourceEditorTests
     [TestMethod]
     [DataRow("en-US", "not available yet")]
     [DataRow("fr-FR", "n’est pas encore disponible")]
-    public void UnsupportedNativeProjectionShowsLocalizedValidationWithoutLosingInteractivity(string cultureName, string expected)
+    public void UnsupportedNativeProjectionKeepsTheFormInteractiveAndCanBeSavedDisabled(string cultureName, string expected)
     {
         using var culture = new TestCultureScope(cultureName);
         var client = new KnowledgeClientStub { RejectNativeDataset = true };
@@ -82,12 +82,38 @@ public sealed class KnowledgeSourceEditorTests
         rendered.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
             .Change($"{DataSourceScope.Value}|default|documentation");
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Dataset Knowledge");
+        rendered.Find("[data-testid=knowledge-source-editor-enabled-option] input").Change(true);
         rendered.Find("form").Submit();
         rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Find("[role='alert']").TextContent));
         Assert.DoesNotContain("private-response-detail", rendered.Markup);
         Assert.IsNull(client.CreatedRequest);
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Still interactive");
         Assert.AreEqual("still-interactive", rendered.Find("[data-testid='knowledge-source-name']").GetAttribute("value"));
+        rendered.Find("[data-testid=knowledge-source-editor-enabled-option] input").Change(false);
+        rendered.Find("form").Submit();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.CreatedRequest));
+        Assert.IsFalse(client.CreatedRequest!.Properties.Enabled);
+        Assert.AreEqual("Still interactive", client.CreatedRequest.Properties.DisplayName);
+        Assert.AreEqual("documentation", client.CreatedRequest.Properties.DataSources.Single().DataSource.Name);
+        Assert.IsEmpty(rendered.FindAll("[role=alert]"));
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Saved as a disabled draft")]
+    [DataRow("fr-FR", "Configuration enregistrée désactivée")]
+    public void DisabledDraftShowsLocalizedReadinessAndCannotStartProjection(string cultureName, string expected)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var source = ProjectedSource();
+        var client = new KnowledgeClientStub(source with { Definition = source.Definition with { Enabled = false }, Composition = null });
+        using var context = CreateContext(client);
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(component => component.Name, source.Name));
+        rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Markup));
+        Assert.DoesNotContain("Non-executable draft", rendered.Markup);
+        Assert.DoesNotContain("ResolvedFlowsHelp", rendered.Markup);
+        rendered.Find("[data-testid=knowledge-source-projections-tab]").Click();
+        Assert.IsTrue(rendered.Find("[data-testid=knowledge-start-projection]").HasAttribute("disabled"));
+        Assert.IsNull(client.StartedProjectionRequest);
     }
 
     [TestMethod]
@@ -693,7 +719,7 @@ public sealed class KnowledgeSourceEditorTests
             source is not null ? Task.FromResult(new ResourceSnapshot<KnowledgeSourceResource>(source, "\"etag-1\"")) : throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeSourceResource>> CreateAsync(CreateKnowledgeSourceRequest request, CancellationToken cancellationToken = default)
         {
-            if (RejectNativeDataset) throw new AgentstrationApiException("private-response-detail", "test-error", System.Net.HttpStatusCode.UnprocessableEntity)
+            if (RejectNativeDataset && request.Properties.Enabled) throw new AgentstrationApiException("private-response-detail", "test-error", System.Net.HttpStatusCode.UnprocessableEntity)
             { ProblemType = "https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported" };
             CreatedRequest = request;
             var created = new KnowledgeSourceResource
@@ -716,7 +742,9 @@ public sealed class KnowledgeSourceEditorTests
         public Task<ResourceSnapshot<KnowledgeSourceResource>> SetEnabledAsync(ResourceNamespace @namespace, string name, bool enabled, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<KnowledgeSourceReadiness> GetReadinessAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new KnowledgeSourceReadiness(true, true,
+            source is { Definition.Enabled: false, Composition: null }
+                ? Task.FromResult(new KnowledgeSourceReadiness(false, false, null, ["Non-executable draft"]))
+                : Task.FromResult(new KnowledgeSourceReadiness(true, true,
                 new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
                 [],
                 new ResolvedKnowledgeFlowBinding("knowledge-projection-builtin", ResourceNamespace.Default, "1.0.0", true, ProjectionInputSchema, null, KnowledgeFlowContracts.Projection),

@@ -113,10 +113,21 @@ after which a submit could fall back to an unnamed HTML POST.
 
 Native dataset inputs are not yet supported by the existing Knowledge projection
 pipeline, which still pins Profile/Artifact dependencies. This remains #1042.
-Creating a Knowledge Source with such an input now returns an explicit HTTP 422
-`knowledge_projection_dataset_input_unsupported`, localized by the editor, rather
-than a server error. This correction does not fabricate a Profile, rewrite a
-source or acquired content, or implement native Knowledge Snapshot composition.
+An enabled Knowledge Source with such an input returns the explicit HTTP 422
+`knowledge_projection_dataset_input_unsupported`, localized by the editor.
+A disabled configuration can be created and edited as a non-executable draft.
+All Data Source references still resolve and authorize use; all Flow references,
+transformations and later bindings remain validated. Only the unsupported-native
+input error is tolerated when disabled. The draft retains `Enabled=false`,
+`Composition=null` and `Ready=false`, without partial or fabricated Profile pins.
+
+Activation through either definition update or the enable endpoint revalidates
+and resolves the complete graph. Unsupported native inputs remain refused without
+mutating the saved draft, and direct projection requests on a disabled source
+are refused before execution. Replacing the input with a supported composition
+builds fresh exact dependency pins before enabling. The editor explains how to
+save disabled and shows localized draft readiness. This does not rewrite a Data
+Source or acquired content, or implement native Knowledge Snapshot composition.
 
 ## Lifecycle and limits
 
@@ -145,6 +156,32 @@ source or acquired content, or implement native Knowledge Snapshot composition.
 - Generic relay and parameterized Tool exposure remains dependent on unmerged
   #1044. No dataset-specific replacement relay is introduced. Historical fixed
   acquisition Tools continue to use their original implementation.
+
+## Disabled Knowledge configuration validation
+
+Follow-up to the tabbed Console on 2026-11-09:
+
+- Release solution build: zero warnings/errors. Fast lane: 1,048 passed, no
+  failures or skips. All 22 Knowledge editor/detail cases pass, including
+  localized rejection/retry as disabled and non-executable draft readiness.
+- Two new Instance/Workspace API lifecycle variants pass. The red regression
+  reproduced the disabled-save refusal before correction. Coverage verifies
+  create/edit/reload, grant enforcement, later foreign/invalid references,
+  both activation routes, unchanged generation after refusal, no projection
+  record for a disabled source, and fresh exact pins after a supported input
+  replaces the native dataset. The complete resource API module passes.
+- Four temporary en-US/fr-FR browser variants pass at 1,440/390 px, including
+  delayed Blazor startup, named-form routing, rejected enabled save, disabled
+  save and embedded edit, reload and blocked projection. No document POST,
+  JavaScript error or horizontal overflow is observed. All eight existing
+  source/schema browser regressions also pass.
+- The complete Integration invocation ran 1,134 tests: 1,121 passed, 12 existing
+  optional skips and one failure in the existing MCP 100 ns timeout assertion.
+  All 23 tests in its module pass on rerun. The initial invocation remains
+  recorded as failed; no assertion, production MCP code or skip was changed.
+- Changed C#/Razor formatting, catalog symmetry, `git diff --check`, ADR registry,
+  LikeC4 and the complete Docusaurus build pass. #1033 retains its implemented-UX
+  approval and merge gates; native Snapshot projection remains #1042.
 
 ## Tabbed dataset UI validation
 

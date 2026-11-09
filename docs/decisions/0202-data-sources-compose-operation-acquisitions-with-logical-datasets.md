@@ -103,6 +103,19 @@ parameterized and relay Tool exposure is owned by #1044. Dataset acquisitions
 do not fake a legacy Profile/Flow target to enter the historical Tool factory.
 There is no second relay engine. Knowledge Snapshot composition remains #1042.
 
+A Knowledge Source referencing a native dataset may be saved and edited while
+explicitly disabled as a preparatory, non-executable definition. Its references
+and use permissions remain validated, including later bindings and transformation
+Flows. The unsupported native-input error alone does not prevent disabled save.
+No partial executable composition or fabricated Profile pins are retained.
+Activation must resolve a complete supported graph under the existing exact-pin
+rules; native projection still requires #1042. This uses the existing Enabled,
+nullable Composition and readiness fields without a new resource or version.
+This narrowly relaxes ADR-0183’s complete-composition requirement for disabled
+native-dataset preparations; its exact-pin requirements remain mandatory before
+activation. ADR-0183 itself is unchanged.
+
+
 ## Consequences
 
 - Console routes remain `/data-sources`, `/data-sources/new` and

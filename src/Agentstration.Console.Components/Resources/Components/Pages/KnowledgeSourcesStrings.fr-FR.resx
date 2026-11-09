@@ -68,5 +68,8 @@
   <data name="SelectAcquisitionTarget" xml:space="preserve"><value>Sélectionner une cible d’acquisition</value></data>
   <data name="Tab.Access" xml:space="preserve"><value>Accès</value></data>
   <data name="AcquisitionTargetsLoadFailed" xml:space="preserve"><value>Impossible de charger les cibles d’acquisition. Vérifiez l’accès à la Data Source, puis sélectionnez-la à nouveau pour réessayer.</value></data>
-  <data name="NativeDatasetProjectionUnavailable" xml:space="preserve"><value>La projection Knowledge depuis cette composition de dataset n’est pas encore disponible. La Data Source et son contenu acquis sont conservés.</value></data>
+  <data name="NativeDatasetProjectionUnavailable" xml:space="preserve"><value>La projection Knowledge depuis cette composition de dataset n’est pas encore disponible. Décochez Activée pour enregistrer la configuration désactivée.</value></data>
+  <data name="NativeDatasetDraftHelp" xml:space="preserve"><value>La projection des datasets natifs n’est pas encore disponible. Vous pouvez enregistrer cette configuration en décochant Activée.</value></data>
+  <data name="DisabledDraftNotReady" xml:space="preserve"><value>Configuration enregistrée désactivée. Une définition prise en charge est nécessaire avant l’activation et la projection.</value></data>
+  <data name="ResolvedFlowsHelp" xml:space="preserve"><value>Les Flows disponibles dépendent de la composition validée de cette source.</value></data>
 </root>
