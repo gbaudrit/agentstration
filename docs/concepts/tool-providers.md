@@ -59,4 +59,4 @@ STDIO environment values are not persisted. `environmentReferences` maps child-p
 
 ## Product-owned ToolDefinitions
 
-ToolDefinitions publish Flow, relay and acquisition Tools using `toolKind` variants and independent immutable versions. Relays bind literal, Parameter or Secret inputs and keep exact source revisions under normal governance. See [ToolDefinitions and parameter relays](../reference/tool-relays.md) and [ADR-0201](../decisions/0201-tool-definitions-publish-independent-governed-relay-versions.md).
+ToolDefinitions publish Flow, relay and acquisition Tools using `toolKind` variants and independent immutable versions. Relays bind literal, Parameter or Secret inputs and keep exact source revisions under normal governance. See [ToolDefinitions and parameter relays](../reference/tool-relays.md) and [ADR-0202](../decisions/0202-tool-definitions-publish-independent-governed-relay-versions.md).

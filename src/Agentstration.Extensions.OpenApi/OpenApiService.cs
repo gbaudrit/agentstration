@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace Agentstration.Extensions.OpenApi;
 
-public sealed class OpenApiService(
+public sealed partial class OpenApiService(
     HttpClient client,
     OpenApiDestinationPolicy destinations,
     OpenApiContractParser parser,
@@ -289,10 +289,11 @@ public sealed class OpenApiService(
     }
 
     private async Task<(string MediaType, byte[] Content)?> FetchAsync(Uri uri, int maximumBytes,
-        IReadOnlyList<string> allowedMediaTypes, string prefix, CancellationToken cancellationToken)
+        IReadOnlyList<string> allowedMediaTypes, string prefix, CancellationToken cancellationToken, string? bearerToken = null)
     {
         _ = await destinations.ValidateAsync(uri.AbsoluteUri, cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        if (bearerToken is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         using var response = await SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         await EnsureSuccessAsync(response);

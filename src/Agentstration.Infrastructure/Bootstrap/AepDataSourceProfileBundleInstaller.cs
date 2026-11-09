@@ -28,7 +28,11 @@ public sealed class AepDataSourceProfileBundleInstaller(IEnumerable<IBootstrapRe
             throw new InvalidOperationException($"Data Source Profile bundle '{bundle.Id}' requires Tool bindings: {string.Join(", ", missing)}.");
 
         var documents = ResolveDocuments(bundle, toolBindings);
-        if (!documents.Any(value => string.Equals(value.Kind, "DataSourceProfile", StringComparison.Ordinal)))
+        var discoveryOnly = documents.Count > 0 && documents.All(value => value.Kind == "Flow"
+            && value.Definition.TryGetProperty("metadata", out var metadata)
+            && metadata.TryGetProperty("flow.contract", out var contract)
+            && contract.GetString() == "connected-service-operation-discovery/v1");
+        if (!discoveryOnly && !documents.Any(value => string.Equals(value.Kind, "DataSourceProfile", StringComparison.Ordinal)))
             throw new InvalidOperationException($"Data Source Profile bundle '{bundle.Id}' does not declare a DataSourceProfile resource.");
 
         var operation = new BootstrapResourceOperationContext(

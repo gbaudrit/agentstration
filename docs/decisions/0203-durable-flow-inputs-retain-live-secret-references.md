@@ -1,4 +1,4 @@
-# ADR-0202: Durable Flow inputs retain live Secret references
+# ADR-0203: Durable Flow inputs retain live Secret references
 
 ## Status
 
@@ -6,11 +6,11 @@ Accepted — maintainer clarification for [#1044](https://github.com/gbaudrit/ag
 
 ## Context
 
-ADR-0201 refused Secret-bearing Flow submissions because resolving a Secret into ordinary JSON would retain its value in Work inputs, Flow Run inputs and step state. Secrets are a required part of the relay capability. The maintainer requires durable references and resolution of the current value on execution and recovery, including after rotation.
+ADR-0202 refused Secret-bearing Flow submissions because resolving a Secret into ordinary JSON would retain its value in Work inputs, Flow Run inputs and step state. Secrets are a required part of the relay capability. The maintainer requires durable references and resolution of the current value on execution and recovery, including after rotation.
 
 ## Decision
 
-- Supersede ADR-0201's temporary refusal of Secret inputs to durable Flows. Reuse the existing scoped SecretReference, UID identity checks and Secret resolver. Freeze the referenced identity, never the value.
+- Supersede ADR-0202's temporary refusal of Secret inputs to durable Flows. Reuse the existing scoped SecretReference, UID identity checks and Secret resolver. Freeze the referenced identity, never the value.
 - A relay creates a stable symbolic input identifier and a trusted reference carrying the Secret identity and consumer context. JSON inputs carry symbolic markers. Work submission retains the references as metadata; the Flow Run retains its trusted reference set. Public request JSON and caller-supplied metadata cannot establish this authority. Reject caller or literal JSON that collides with a newly introduced trusted identifier; preserve unrelated marker-like JSON as ordinary literal data.
 - Pass symbolic inputs through mappings, stored step state and child Flows. Load trusted references from the persisted Flow Run on the server for each Tool attempt. The Worker and execution-material documents receive symbolic inputs, never materialized Secret values. Secret references are opaque to ordinary Flow expressions; they may be forwarded to Tool inputs without exposing their values to models or transforms.
 - Resolve current values only at the server execution boundary, rechecking exact UID, scope, authorization, availability and the complete Tool input contract. New attempts and recovered runs resolve again; rotation therefore affects subsequent attempts. Completed steps are not automatically repeated. Missing, replaced or revoked resources fail explicitly without fallback to an earlier value.
