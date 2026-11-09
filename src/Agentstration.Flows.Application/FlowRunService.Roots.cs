@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows.Application;
 
@@ -25,6 +26,7 @@ public sealed record EnsureRootFlowRunCommand(
     FlowRunScope Scope)
 {
     public ResourceScopeRef? DefinitionScopeRef { get; init; }
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
 }
 
 public sealed partial class FlowRunService
@@ -42,7 +44,7 @@ public sealed partial class FlowRunService
         }
 
         var resolved = await ResolveVersionAsync(command.Scope.AccessScopeRef, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
-        ValidateInput(resolved.Graph?.InputSchema, command.Input);
+        ValidateInput(resolved.Graph?.InputSchema, SecretInputs.ForTypeValidation(command.Input, command.SecretInputs));
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {
@@ -66,6 +68,7 @@ public sealed partial class FlowRunService
             TriggerMessageId = command.TriggerMessageId,
             Scope = command.Scope,
             Input = command.Input.Clone(),
+            SecretInputs = command.SecretInputs.ToArray(),
             CreatedAt = now,
             DefinitionSnapshot = resolved,
             DefinitionHash = resolved.DefinitionHash,

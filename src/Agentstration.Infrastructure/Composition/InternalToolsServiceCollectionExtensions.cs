@@ -1,6 +1,6 @@
 using Agentstration.Infrastructure.Artifacts;
-using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Assistant;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.ResourcePlanning;

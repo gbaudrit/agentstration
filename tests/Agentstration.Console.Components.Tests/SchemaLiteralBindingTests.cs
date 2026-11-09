@@ -11,6 +11,109 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ModelProviderNavigationTests
 {
     [TestMethod]
+    [DataRow("en-US", "Value", "Advanced editing", "Enter a value.")]
+    [DataRow("fr-FR", "Valeur", "Édition avancée", "Saisissez une valeur.")]
+    public void CompactTextLiteralIsDirectlyEditableAndDoesNotRepeatItsDescription(string locale, string label, string advanced, string hint)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = CreateContext(out _);
+        var editContext = new EditContext(new object());
+        ValueBindingSelection? selected = null;
+        var schema = ParseLiteral("""{"type":"string","minLength":1,"maxLength":4000,"description":"Notification body"}""");
+        var rendered = RenderSchemaLiteral(context, editContext, schema.GetRawText(), value => selected = value);
+        rendered.FindComponent<ValueBindingRequirementEditor>().Render(parameters => parameters.Add(value => value.Requirement,
+            new("message", true, "string", Description: "Notification body", LiteralSchema: schema)));
+
+        var input = rendered.Find("textarea.schema-long-text");
+        Assert.AreEqual("3", input.GetAttribute("rows"));
+        StringAssert.Contains(input.ParentElement!.TextContent, label);
+        Assert.AreEqual(1, rendered.Markup.Split("Notification body", StringSplitOptions.None).Length - 1);
+        Assert.AreEqual(advanced, rendered.Find("[data-testid='schema-raw-mode']").TextContent);
+        StringAssert.Contains(rendered.Markup, hint);
+        Assert.HasCount(0, rendered.FindAll("[data-testid='schema-form-mode']"));
+        Assert.HasCount(0, rendered.FindAll("[role='alert']"));
+        Assert.IsFalse(editContext.Validate());
+
+        input.Input("A useful message");
+        Assert.AreEqual("A useful message", selected!.Literal!.Value.GetString());
+        Assert.IsTrue(editContext.Validate());
+        rendered.Find("[data-testid='schema-raw-mode']").Click();
+        Assert.AreEqual("\"A useful message\"", rendered.Find("textarea").GetAttribute("value"));
+        rendered.Find("[data-testid='schema-form-mode']").Click();
+        Assert.AreEqual("A useful message", rendered.Find("textarea.schema-long-text").GetAttribute("value"));
+    }
+
+    [TestMethod]
+    [DataRow("true", JsonValueKind.True)]
+    [DataRow("false", JsonValueKind.False)]
+    public void CompactBooleanKeepsMissingSeparateFromAnExplicitChoice(string choice, JsonValueKind expected)
+    {
+        using var context = CreateContext(out _);
+        var editContext = new EditContext(new object());
+        ValueBindingSelection? selected = null;
+        var rendered = RenderSchemaLiteral(context, editContext, """{"type":"boolean"}""", value => selected = value);
+        Assert.IsNull(selected);
+        Assert.IsFalse(editContext.Validate());
+        rendered.Find("[data-schema-path='$'] select").Change(choice);
+        Assert.AreEqual(expected, selected!.Literal!.Value.ValueKind);
+        Assert.IsTrue(editContext.Validate());
+        rendered.Find("[data-schema-path='$'] select").Change(string.Empty);
+        Assert.IsNull(selected.Literal);
+        Assert.IsFalse(editContext.Validate());
+    }
+
+    [TestMethod]
+    public void CompactTextCanExplicitlyChooseAnEmptyStringWithoutApplyingItsDefault()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(out _);
+        var editContext = new EditContext(new object());
+        ValueBindingSelection? selected = null;
+        var rendered = RenderSchemaLiteral(context, editContext, """{"type":"string","default":"do not configure automatically"}""", value => selected = value);
+        Assert.IsNull(selected);
+        Assert.IsFalse(editContext.Validate());
+        rendered.FindAll("button").Single(button => button.TextContent == "Use empty text").Click();
+        Assert.AreEqual(string.Empty, selected!.Literal!.Value.GetString());
+        Assert.IsTrue(editContext.Validate());
+        rendered.FindAll("button").Single(button => button.TextContent == "Clear value").Click();
+        Assert.IsNull(selected.Literal);
+        Assert.IsFalse(editContext.Validate());
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void CompactLiteralShowsOneErrorForSchemaEnumsOrAdditionalAllowlists(bool schemaEnum)
+    {
+        using var context = CreateContext(out _);
+        var editContext = new EditContext(new object());
+        var schema = schemaEnum ? """{"type":"string","enum":["ok"]}""" : """{"type":"string"}""";
+        var rendered = RenderSchemaLiteral(context, editContext, schema, _ => { });
+        rendered.FindComponent<ValueBindingRequirementEditor>().Render(parameters => parameters.Add(value => value.Requirement,
+            new("choice", true, "string", AllowedValues: [ParseLiteral("\"ok\"")], LiteralSchema: ParseLiteral(schema))));
+        EnterSchemaJson(rendered, "\"invalid\"");
+        Assert.IsFalse(editContext.Validate());
+        Assert.HasCount(1, rendered.FindAll("[role='alert']"));
+        rendered.Find("textarea").Input("\"ok\"");
+        Assert.IsTrue(editContext.Validate());
+        Assert.HasCount(0, rendered.FindAll("[role='alert']"));
+    }
+
+    [TestMethod]
+    public void CompactLiteralShowsOneConstraintErrorWhileKeepingFormValidation()
+    {
+        using var context = CreateContext(out _);
+        var editContext = new EditContext(new object());
+        var rendered = RenderSchemaLiteral(context, editContext, """{"type":"string","minLength":3}""", _ => { });
+        rendered.Find("[data-schema-path='$'] input").Input("x");
+        Assert.IsFalse(editContext.Validate());
+        Assert.HasCount(1, rendered.FindAll("[role='alert']"));
+        rendered.Find("[data-schema-path='$'] input").Input("valid");
+        Assert.IsTrue(editContext.Validate());
+        Assert.HasCount(0, rendered.FindAll("[role='alert']"));
+    }
+
+    [TestMethod]
     [DataRow("{\"type\":\"object\",\"properties\":{\"items\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}}},\"required\":[\"items\"]}", "{\"items\":[{\"name\":\"first\"}]}")]
     [DataRow("{\"type\":\"array\",\"items\":{\"type\":\"array\",\"items\":{\"type\":\"integer\"}}}", "[[1,2],[3]]")]
     public void SchemaLiteralPreservesNestedObjectsAndArrays(string schema, string json)

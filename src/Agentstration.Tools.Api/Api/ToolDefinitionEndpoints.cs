@@ -13,6 +13,18 @@ internal static class ToolDefinitionEndpoints
 {
     public static void Map(RouteGroupBuilder definitions)
     {
+        definitions.MapGet("/{name}/usages", UsagesAsync)
+            .Produces<ValueResponse<ToolDefinitionUsage>>()
+            .WithSummary("List published consumers and their pinned ToolDefinition versions")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        definitions.MapGet("/{name}/versions", VersionsAsync)
+            .Produces<ValueResponse<ToolDefinitionVersionResource>>()
+            .WithSummary("List immutable ToolDefinition publications")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        definitions.MapPost("/{name}/versions", PublishAsync)
+            .Produces<ToolDefinitionVersionResource>(StatusCodes.Status201Created)
+            .WithSummary("Publish the ToolDefinition draft without changing consumers")
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         definitions.MapGet("/", ListAsync)
             .Produces<ValueResponse<ToolDefinitionResource>>()
             .WithSummary("List ToolDefinitions")
@@ -42,6 +54,21 @@ internal static class ToolDefinitionEndpoints
             .WithSummary("Delete a ToolDefinition")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
+
+    private static Task<IResult> UsagesAsync(string name, string? @namespace, ToolDefinitionService service,
+        CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
+            Results.Ok(new ValueResponse<ToolDefinitionUsage>(await service.ListUsagesAsync(name,
+                ResourceNamespace.Parse(@namespace), cancellationToken))));
+
+    private static Task<IResult> VersionsAsync(string name, string? @namespace, ToolDefinitionService service,
+        CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
+            Results.Ok(new ValueResponse<ToolDefinitionVersionResource>(await service.ListVersionsAsync(name,
+                ResourceNamespace.Parse(@namespace), cancellationToken))));
+
+    private static Task<IResult> PublishAsync(string name, string? @namespace, PublishToolDefinitionRequest body,
+        ToolDefinitionService service, CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
+            Results.Created($"/api/tooldefinitions/{Uri.EscapeDataString(name)}/versions/{Uri.EscapeDataString(body.Version)}",
+                await service.PublishAsync(name, ResourceNamespace.Parse(@namespace), body.Version, cancellationToken, body.ExpectedETag)));
 
     private static Task<IResult> ListAsync(string? @namespace, ToolDefinitionService service, ICurrentRequestContext current,
         IRequestContextScopeFactory scopes, CancellationToken cancellationToken) =>
@@ -74,12 +101,12 @@ internal static class ToolDefinitionEndpoints
         CreateToolDefinitionRequest body,
         HttpResponse response,
         ToolDefinitionService service,
-        ICurrentRequestContext context,
+        IResourceScopeOperations scopeOperations,
         CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var ns = ResourceNamespace.Parse(body.Namespace);
-            var resource = Resource(body.Name, ns, body.Properties, ResourceScopeRef.Workspace(context.Current.WorkspaceId));
+            var resource = Resource(body.Name, ns, body.Properties, body.ScopeRef ?? scopeOperations.DefaultScopeRef(ToolResourceKinds.ToolDefinition));
             var stored = await service.PutAsync(resource, null, true, cancellationToken);
             response.Headers.Location = $"/api/tooldefinitions/{Uri.EscapeDataString(body.Name)}?namespace={Uri.EscapeDataString(ns.Value)}";
             return ToolsApiHttp.ResourceResult(stored, response, 201);
@@ -97,7 +124,7 @@ internal static class ToolDefinitionEndpoints
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var ns = ResourceNamespace.Parse(@namespace);
-            var owner = body.Properties.Acquisition is null ? null : context.AccessMode switch
+            var owner = context.AccessMode switch
             {
                 ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
                 ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(context.Current.TenantId),

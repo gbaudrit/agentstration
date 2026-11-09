@@ -10,6 +10,7 @@ namespace Agentstration.Web.Console;
 public interface IParametersClient
 {
     Task<IReadOnlyList<ParameterResource>> GetParametersAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<ParameterResource>> GetParametersAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) => GetParametersAsync(cancellationToken);
     Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<ParameterResource>> GetParameterAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ParameterResource>> CreateParameterAsync(CreateParameterRequest request, CancellationToken cancellationToken);
@@ -22,6 +23,9 @@ public sealed class ParametersApiClient(HttpClient httpClient) : IParametersClie
 {
     public async Task<IReadOnlyList<ParameterResource>> GetParametersAsync(CancellationToken token) =>
         await ApiResponse.ReadAsync<ParameterResource[]>(httpClient, "api/parameters", token);
+
+    public async Task<IReadOnlyList<ParameterResource>> GetParametersAsync(ResourceScopeRef contextScope, CancellationToken token) =>
+        await ApiResponse.ReadAsync<ParameterResource[]>(httpClient, "api/parameters", contextScope, token);
 
     public async Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) =>
         await ApiResponse.ReadAsync<ResourceScopeTargetResponse[]>(httpClient,

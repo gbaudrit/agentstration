@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -12,6 +13,10 @@ public sealed record ResolvedRootFlowTarget(FlowReference Reference);
 
 public interface IRootFlowTargetResolver
 {
+    Task<ResolvedRootFlowTarget> ResolveAsync(FlowRunScope scope, FlowReference target, JsonElement input,
+        IReadOnlyList<SecretInputReference> secretInputs, CancellationToken cancellationToken) =>
+        ResolveAsync(scope, target, input, cancellationToken);
+
     Task<ResolvedRootFlowTarget> ResolveAsync(
         FlowRunScope scope,
         FlowReference target,
@@ -35,7 +40,10 @@ public sealed record RootFlowRunRequest(
     string? InteractionId,
     string? WorkTaskId,
     string? TriggerMessageId,
-    FlowRunScope Scope);
+    FlowRunScope Scope)
+{
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
+}
 
 public sealed record RootFlowRunResult(FlowRun Run, string ETag);
 
@@ -72,6 +80,7 @@ public sealed record SubmitRootFlowCommand(
     WorkItemId? WorkItemId = null)
 {
     public ResourceScopeRef? ExecutionScopeRef { get; init; }
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
 }
 
 public sealed record RootFlowSubmission(StoredWorkItem WorkItem, RootFlowRunResult FlowRun, bool Recovered);
@@ -148,13 +157,16 @@ public sealed class RootFlowSubmissionService(
             return new(existing, recoveredRun, true);
         }
 
-        var resolved = await targets.ResolveAsync(scope, command.Target, command.Input, cancellationToken);
+        var resolved = await targets.ResolveAsync(scope, command.Target, command.Input, command.SecretInputs, cancellationToken);
         var correlation = string.IsNullOrWhiteSpace(command.CorrelationId)
             ? $"flow:{workItemId.Value:N}"
             : command.CorrelationId;
         var metadata = command.Metadata is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(command.Metadata, StringComparer.Ordinal);
+        metadata.Remove("flowInvocation.secretInputs"); // Request metadata never grants Secret resolution authority.
+        if (command.SecretInputs.Count > 0)
+            metadata["flowInvocation.secretInputs"] = JsonSerializer.Serialize(command.SecretInputs);
         metadata[RootRunIdMetadata] = runId;
         metadata[OriginMetadata] = command.Origin.ToString();
         metadata[TriggerMetadata] = command.Trigger.ToString();
@@ -225,7 +237,10 @@ public sealed class RootFlowSubmissionService(
             command.InteractionId ?? item.Metadata.GetValueOrDefault("workplace.interactionId"),
             command.WorkTaskId ?? item.Metadata.GetValueOrDefault("workplace.taskId") ?? item.Id.Value.ToString("D"),
             command.TriggerMessageId ?? item.Metadata.GetValueOrDefault("workplace.triggerMessageId"),
-            scope), cancellationToken);
+            scope)
+        {
+            SecretInputs = command.SecretInputs
+        }, cancellationToken);
     }
 
     private static void ValidateExisting(WorkItem item, SubmitRootFlowCommand command, string runId, string inputHash)

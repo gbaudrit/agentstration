@@ -1,0 +1,445 @@
+@using System.Text.Json.Nodes
+@using Agentstration.Secrets.Abstractions
+@implements IDisposable
+@inject IToolDefinitionsClient Definitions
+@inject IToolsClient Tools
+@inject IParametersClient Parameters
+@inject ISecretsClient Secrets
+@inject IConsoleNavigationContext NavigationContext
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
+
+<div data-testid="tool-relay-editor" data-interactive="@((interactive && !loading).ToString().ToLowerInvariant())">
+@if (loading) { <LoadingState Message="@T("LoadingDefinitions")" /> }
+else
+{
+    @if (error is not null) { <ErrorState Message="@error" /> }
+    @if (CreationIdentity is null)
+    {
+    <ResourceTabs Label="@T("RelayViews")">
+        <button class="@(view == "configuration" ? "active" : null)" @onclick='() => view = "configuration"'>@T("RelayConfiguration")</button>
+        <button class="@(view == "versions" ? "active" : null)" @onclick='() => view = "versions"'>@T("RelayVersions")</button>
+        <button class="@(view == "usages" ? "active" : null)" @onclick='() => view = "usages"'>@T("RelayUsages")</button>
+    </ResourceTabs>
+    }
+    @if (view == "versions")
+    {
+        <section class="panel"><h2>@T("RelayVersions")</h2>
+            <table class="data-table"><thead><tr><th>@T("RelayVersion")</th><th>@T("SourceToolVersion")</th><th>@T("PublishedAt")</th><th></th></tr></thead><tbody>
+                @foreach (var version in versions)
+                {
+                    <tr><td data-label="@T("RelayVersion")">@version.Definition.Version</td><td data-label="@T("SourceToolVersion")">@version.Source?.Tool.Name · @SourceVersion(version.Source?.Tool)</td><td data-label="@T("PublishedAt")">@version.PublishedAt.ToLocalTime().ToString("g")</td><td><button class="button-secondary" disabled="@(!CanManage)" @onclick="() => NewDraft(version)">@T("NewVersion")</button></td></tr>
+                }
+            </tbody></table>
+        </section>
+    }
+    else if (view == "usages")
+    {
+        <section class="panel"><h2>@T("RelayUsages")</h2><p>@T("ConsumerAdoptionHelp")</p>
+            <table class="data-table"><thead><tr><th>@T("Tool")</th><th>@T("Version")</th><th>@T("RelayVersion")</th></tr></thead><tbody>
+                @foreach (var usage in usages)
+                { <tr><td data-label="@T("Tool")"><a href="@UsageUrl(usage)">@usage.Namespace/@usage.Name</a> <ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact /> · @T($"UsageKind.{usage.Kind}")</td><td data-label="@T("Version")">@usage.Version</td><td data-label="@T("RelayVersion")">@usage.RelayVersion</td></tr> }
+            </tbody></table>
+        </section>
+    }
+    else
+    {
+        <section class="panel">
+        @if (CreationIdentity is { } identity)
+        {
+            <div class="panel-header tool-create-section-header"><div><p class="eyebrow">@T("CreationRelayEyebrow")</p><h2>@T("CreationRelayTitle")</h2><p>@T("CreationRelayHelp")</p></div><span class="tool-create-section-number">02</span></div>
+            <div class="tool-create-summary"><span><strong>@identity.DisplayName</strong><code>@identity.Name</code><ResourceScopeBadge ScopeRef="identity.ScopeRef" Compact /></span><span>@T("RelayVersion") <strong>@identity.Version</strong></span></div>
+        }
+        else { <h2>@T("RelayConfiguration")</h2> }
+        <div class="form-grid">
+            @if (CreationIdentity is null)
+            {
+            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@(snapshot is null)" />
+            <label><span>@T("Namespace")</span><input @bind="resourceNamespace" disabled="@(snapshot is not null)" /></label>
+            <label><span>@T("RelayVersion")</span><input data-testid="relay-version" @bind="relayVersion" disabled="@(!CanManage)" /></label>
+            <label class="form-span-2"><span>@T("DefinitionDescription")</span><textarea @bind="description" disabled="@(!CanManage)"></textarea></label>
+            }
+            @if (CreationIdentity is not null)
+            {
+                <label><span>@T("CreationSourceTool")</span><select data-testid="relay-source-tool" value="@SourceGroup" @onchange="SourceGroupChanged" disabled="@(!CanManage)"><option value="">@T("CreationSelectSource")</option>@foreach (var group in tools.GroupBy(SourceGroupKey)) { var tool = group.First(); <option value="@group.Key">@tool.Definition.DisplayName · @tool.ScopeRef · @tool.Namespace</option> }</select></label>
+                <label><span>@T("SourceToolVersion")</span><select data-testid="relay-source" value="@SelectedKey" @onchange="SourceChanged" disabled="@(!CanManage || string.IsNullOrEmpty(SourceGroup))"><option value="">@T("CreationSelectVersion")</option>@foreach (var tool in tools.Where(tool => SourceGroupKey(tool) == SourceGroup)) { <option value="@ToolKey(tool)">@SourceVersion(tool) · @tool.Namespace/@tool.Name</option> }</select></label>
+            }
+            <label class="relay-toggle"><input type="checkbox" @bind="enabled" disabled="@(!CanManage)" />@T("Enabled")</label>
+            <label class="relay-toggle"><input type="checkbox" @bind="requiresApproval" disabled="@(!CanManage || selected?.Definition.RequiresApproval == true)" />@T("RequiresApproval")</label>
+            <label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="900" @bind="timeout" disabled="@(!CanManage)" /></label>
+            @if (CreationIdentity is null)
+            {
+            <label class="form-span-2"><span>@T("SourceToolVersion")</span>
+                <select data-testid="relay-source" value="@SelectedKey" @onchange="SourceChanged" disabled="@(!CanManage)">
+                    <option value="">@T("SelectSourceTool")</option>
+                    @if (selected is not null && !tools.Any(tool => tool.Uid == selected.Uid && tool.Generation == selected.Generation))
+                    { <option value="@SelectedKey">@T("PinnedSourceUnavailable", selected.Name, SourceVersion(selected))</option> }
+                    @foreach (var tool in tools)
+                    { <option value="@ToolKey(tool)">@tool.Definition.DisplayName · @SourceVersion(tool) · @tool.ScopeRef · @tool.Namespace/@tool.Name</option> }
+                </select>
+            </label>
+            }
+        </div><p class="inline-info">@T(CreationIdentity is null ? "SourceSelectionHelp" : "CreationIndependentVersions")</p></section>
+        @if (sourceUpdateRequested) { <p class="inline-info" role="status">@T("ChooseNewSource")</p> }
+        @if (baseline is not null)
+        {
+            <div class="page-actions"><button class="button-secondary" disabled="@(!CanManage)" @onclick="() => NewDraft(baseline)">@T("NewVersion")</button><button class="button-secondary" disabled="@(!CanManage)" @onclick="UpdateSource">@T("UpdateSource")</button></div>
+        }
+        @if (selected is not null)
+        {
+            <section class="panel"><h2>@T("FixedInputBindings")</h2><p>@T("LiveBindingHelp")</p>
+                <CascadingValue Value="bindingEditContext" IsFixed="true">
+                @foreach (var row in rows)
+                {
+                    <div class="relay-binding" data-binding-path="@row.Path" @key="row.Path">
+                        <ValueBindingRequirementEditor Requirement="@BindingRequirement(row)" AllowedSources="@BindingSources(row)"
+                            Options="@BindingOptions(row)" Selection="@BindingSelection(row)" SelectionChanged="value => BindingChanged(row, value)"
+                            CreationContext="@BindingCreationContext(row)" ResourceCreated="ValueCreatedAsync" Disabled="@(!CanManage)" TestIdPrefix="relay" />
+                    </div>
+                }
+                </CascadingValue>
+            </section>
+            <section class="panel"><h2>@T("InputContract")</h2>
+                @if (HasInvalidBindings) { <p class="inline-warning" role="alert">@T("RelayBindingInvalid")</p> }
+                else { <pre data-testid="relay-public-schema">@preview</pre> }
+                <h3>@T("OutputContract")</h3><pre>@Pretty(selected.Definition.Schema?.Output)</pre>
+            </section>
+            @if (baseline is not null)
+            {
+                <section class="panel"><h2>@T("PublicationChanges")</h2><dl class="resource-details">
+                    <dt>@T("RelayVersion")</dt><dd>@baseline.Definition.Version → @relayVersion</dd>
+                    <dt>@T("SourceToolVersion")</dt><dd>@SourceVersion(baseline.Source?.Tool) → @SourceVersion(selected)</dd>
+                    <dt>@T("FixedInputBindings")</dt><dd>@T("ReviewFixedBindings")</dd>
+                    <dt>@T("InputContract")</dt><dd>@T(ToolDefinitionService.SameSchema(baseline.Definition.InputSchema, PreviewSchema) ? "ContractUnchanged" : "ContractChanged")</dd>
+                    <dt>@T("OutputContract")</dt><dd>@T(ToolDefinitionService.SameSchema(baseline.Definition.OutputSchema, selected.Definition.Schema?.Output) ? "ContractUnchanged" : "ContractChanged")</dd>
+                </dl><p>@T("ConsumerAdoptionHelp")</p></section>
+                <section class="panel"><details><summary>@T("FixedInputChanges")</summary>
+                    <h3>@T("PublishedBindings")</h3><pre>@JsonSerializer.Serialize(baseline.Definition.Bindings, IndentedJson)</pre>
+                    <h3>@T("DraftBindings")</h3><pre>@DraftBindings</pre>
+                </details><details><summary>@T("SourceContractChanges")</summary>
+                    <h3>@T("PublishedSourceInput")</h3><pre>@Pretty(baseline.Source?.Tool.Definition.Schema?.Input)</pre>
+                    <h3>@T("DraftSourceInput")</h3><pre>@Pretty(selected.Definition.Schema?.Input)</pre>
+                </details></section>
+            }
+        }
+        @if (CreationIdentity is not null)
+        {
+            @if (CreationActive)
+            {
+            <div class="tool-create-actions"><span><strong>@T("CreationReady")</strong><small>@T("CreationDraftHelp")</small></span><div><button type="button" class="button-secondary" data-testid="tool-definition-back" disabled="@busy" @onclick="() => OnBack.InvokeAsync()">@T("CreationBack")</button><button type="button" class="button-primary" data-testid="tool-definition-create-draft" disabled="@(busy || !CanManage || selected is null || HasInvalidBindings)" @onclick="CreateDraftAsync">@T(busy ? "CreationCreating" : "CreationCreateDraft")</button></div></div>
+            }
+        }
+        else
+        {
+        <div class="page-actions">
+            <button class="button-secondary" data-testid="relay-save-draft" disabled="@(busy || !CanManage || selected is null || HasInvalidBindings)" @onclick="SaveAsync">@T("SaveDraft")</button>
+            <button class="button-primary" data-testid="relay-publish-review" disabled="@(busy || !CanManage || selected is null || HasInvalidBindings)" @onclick="ReviewPublication">@T("PublishVersion")</button>
+        </div>
+        }
+        @if (reviewing)
+        {
+            <section class="panel" data-testid="relay-publication-review"><h2>@T("ReviewPublication")</h2><p>@T("ReviewVersionPair", relayVersion, SourceVersion(selected))</p><p>@T("ConsumerAdoptionHelp")</p>
+                <button class="button-secondary" @onclick="() => reviewing = false">@T("Cancel")</button><button class="button-primary" disabled="@(busy || HasInvalidBindings)" @onclick="PublishAsync">@T("ConfirmPublication")</button>
+            </section>
+        }
+    }
+}
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? NamespaceQuery { get; set; }
+    [Parameter] public string? Source { get; set; }
+    [Parameter] public ToolDefinitionCreationIdentity? CreationIdentity { get; set; }
+    [Parameter] public bool CreationActive { get; set; } = true;
+    [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public EventCallback<ToolDefinitionResource> OnCreated { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ResourceSnapshot<ToolDefinitionResource>? snapshot;
+    private IReadOnlyList<ToolResource> tools = [];
+    private IReadOnlyList<ParameterResource> parameters = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private IReadOnlyList<ToolDefinitionVersionResource> versions = [];
+    private IReadOnlyList<ToolDefinitionUsage> usages = [];
+    private readonly List<BindingRow> rows = [];
+    private readonly EditContext bindingEditContext = new(new object());
+    private bool editorValidationInvalid;
+    private ToolResource? selected;
+    private ToolDefinitionVersionResource? baseline;
+    private string name = "", resourceNamespace = "default", displayName = "", description = "", relayVersion = "1.0.0", view = "configuration", preview = "";
+    private string? error, validationError, pendingSourceGroup;
+    private bool loading = true, busy, enabled = true, requiresApproval, reviewing, sourceUpdateRequested, interactive;
+    private static readonly JsonSerializerOptions IndentedJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    private bool HasInvalidBindings => validationError is not null || editorValidationInvalid;
+    private JsonElement? PreviewSchema => HasInvalidBindings || string.IsNullOrWhiteSpace(preview) ? null : JsonSerializer.Deserialize<JsonElement>(preview);
+    private string DraftBindings { get { try { return HasInvalidBindings ? T("RelayBindingInvalid") : JsonSerializer.Serialize(BuildBindings(), IndentedJson); } catch (InvalidOperationException) { return T("RelayBindingInvalid"); } } }
+    private int timeout = 90;
+    private ResourceScopeRef? OwnerScope => CreationIdentity?.ScopeRef ?? snapshot?.Value.ScopeRef ?? (string.IsNullOrWhiteSpace(NavigationContext.ScopeRef) ? null : ResourceScopeRef.Parse(NavigationContext.ScopeRef));
+    private bool CanManage => OwnerScope is { } scope && (CreationIdentity is not null || ResourceOwnershipContext.CanManage(scope, NavigationContext));
+    private string SelectedKey => selected is null ? "" : ToolKey(selected);
+    private string SourceGroup => selected is null ? pendingSourceGroup ?? "" : SourceGroupKey(selected);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        interactive = true;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        bindingEditContext.OnValidationStateChanged += BindingValidationChanged;
+        try
+        {
+            tools = (CreationIdentity?.ScopeRef is { } creationScope
+                ? await Tools.GetToolsAsync(creationScope, cancellationToken: cancellation.Token)
+                : await Tools.GetToolsAsync(cancellationToken: cancellation.Token)).Where(tool => tool.Definition.Enabled && tool.Definition.Discovery?.Available == true).ToArray();
+            if (!string.IsNullOrWhiteSpace(Name))
+            {
+                snapshot = await Definitions.GetAsync(Name, ResourceNamespace.Parse(NamespaceQuery), cancellation.Token);
+                var relay = (RelayToolDefinitionProperties)snapshot.Value.Definition;
+                name = snapshot.Value.Name; resourceNamespace = snapshot.Value.Namespace.Value; displayName = relay.DisplayName;
+                description = relay.Description ?? ""; relayVersion = relay.Version; enabled = relay.Enabled; requiresApproval = relay.RequiresApproval; timeout = relay.InvocationTimeoutSeconds;
+                versions = await Definitions.GetVersionsAsync(name, snapshot.Value.Namespace, cancellation.Token);
+                usages = await Definitions.GetUsagesAsync(name, snapshot.Value.Namespace, cancellation.Token);
+                baseline = versions.FirstOrDefault();
+                selected = tools.FirstOrDefault(tool => tool.Uid == relay.Target.Uid && tool.Generation == relay.Target.Generation)
+                    ?? versions.Select(version => version.Source?.Tool).FirstOrDefault(tool => tool?.Uid == relay.Target.Uid && tool.Generation == relay.Target.Generation);
+                BuildRows(relay.Bindings);
+            }
+            else if (Source is not null)
+            {
+                selected = tools.FirstOrDefault(tool => ToolResourceIdentity.CatalogId(tool.Namespace, tool.Name) == Source);
+                BuildRows([]);
+            }
+            if (OwnerScope is { } owner)
+            {
+                parameters = await Parameters.GetParametersAsync(owner, cancellation.Token);
+                secrets = await Secrets.GetSecretsInContextAsync(owner, cancellation.Token);
+            }
+            if (selected?.Definition.RequiresApproval == true) requiresApproval = true;
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; Preview(); }
+    }
+
+    private void SourceChanged(ChangeEventArgs args)
+    {
+        try
+        {
+            var bindings = BuildBindings();
+            var previousGroup = SourceGroup;
+            selected = tools.FirstOrDefault(tool => ToolKey(tool) == args.Value?.ToString());
+            pendingSourceGroup = selected is null ? previousGroup : SourceGroupKey(selected);
+            if (selected?.Definition.RequiresApproval == true) requiresApproval = true;
+            BuildRows(bindings); reviewing = false;
+        }
+        catch (Exception exception) { error = exception.Message; }
+    }
+
+    private void SourceGroupChanged(ChangeEventArgs args)
+    {
+        pendingSourceGroup = args.Value?.ToString();
+        var candidates = tools.Where(tool => SourceGroupKey(tool) == pendingSourceGroup).ToArray();
+        if (candidates.Length == 1) { SourceChanged(new ChangeEventArgs { Value = ToolKey(candidates[0]) }); return; }
+        selected = null; preview = ""; reviewing = false;
+    }
+
+    private static string SourceGroupKey(ToolResource tool) => tool.Definition.Metadata.TryGetValue("agentstration.toolDefinitionUid", out var uid)
+        && uid.ValueKind == JsonValueKind.String ? $"{tool.ScopeRef}|{tool.Namespace}|{uid.GetString()}" : ToolKey(tool);
+
+    private void BuildRows(IReadOnlyList<ToolArgumentBinding> bindings)
+    {
+        rows.Clear();
+        if (selected?.Definition.Schema is not { } schema) return;
+        AddProperties(schema.Input, "", 0);
+        foreach (var binding in bindings)
+        {
+            var row = rows.FirstOrDefault(row => row.Path == binding.Path);
+            if (row is null) { row = new() { Path = binding.Path, Schema = JsonSerializer.SerializeToElement(new { }), Missing = true }; rows.Add(row); }
+            switch (binding)
+            {
+                case LiteralToolArgumentBinding literal: row.Kind = "literal"; row.Literal = literal.Value.Clone(); break;
+                case ParameterToolArgumentBinding parameter: row.Kind = "parameter"; row.Resource = ScopedResourceAddress.Create(parameter.Parameter.ScopeRef, parameter.Parameter.Address.Namespace, parameter.Parameter.Address.Kind, parameter.Parameter.Address.Name); break;
+                case SecretToolArgumentBinding secret when secret.Secret.ScopeRef is { } owner: row.Kind = "secret"; row.Resource = ScopedResourceAddress.Create(owner, secret.Secret.Address.Namespace, secret.Secret.Address.Kind, secret.Secret.Address.Name); break;
+            }
+        }
+        Preview();
+    }
+
+    private void AddProperties(JsonElement schema, string prefix, int depth)
+    {
+        if (depth >= 12 || !schema.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object) return;
+        foreach (var property in properties.EnumerateObject())
+        {
+            var path = prefix + "/" + property.Name.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
+            var required = schema.TryGetProperty("required", out var requiredProperties) && requiredProperties.ValueKind == JsonValueKind.Array
+                && requiredProperties.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String && value.GetString() == property.Name);
+            rows.Add(new() { Path = path, Schema = property.Value.Clone(), Required = required });
+            AddProperties(property.Value, path, depth + 1);
+        }
+    }
+
+    private IReadOnlyList<ToolArgumentBinding> BuildBindings() => rows.Where(row => row.Kind != "caller").Select<BindingRow, ToolArgumentBinding>(row => row.Kind switch
+    {
+        "literal" when row.Literal is { ValueKind: not JsonValueKind.Undefined } value => new LiteralToolArgumentBinding { Path = row.Path, Value = value.Clone() },
+        "parameter" when parameters.FirstOrDefault(parameter => ResourceAddress(parameter) == row.Resource && CompatibleParameter(parameter, row.Schema)) is { } parameter => new ParameterToolArgumentBinding { Path = row.Path, Parameter = new(parameter.Address, parameter.ScopeRef!.Value) },
+        "secret" when IsString(row.Schema) && secrets.FirstOrDefault(secret => ResourceAddress(secret.Resource) == row.Resource && secret.ValueConfigured) is { } secret => new SecretToolArgumentBinding { Path = row.Path, Secret = new(secret.Resource.Address, secret.Resource.ScopeRef) },
+        _ => throw new InvalidOperationException(T("RelayBindingInvalid"))
+    }).ToArray();
+
+    private void Preview()
+    {
+        reviewing = false; validationError = null;
+        try
+        {
+            if (rows.Any(row => row.Missing && row.Kind != "caller")) throw new InvalidOperationException(T("RelayBindingInvalid"));
+            if (selected?.Definition.Schema is { } schema) preview = Pretty(ToolRelayArguments.PublicSchema(schema.Input, BuildBindings()));
+        }
+        catch (Exception exception) { validationError = exception.Message; preview = ""; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || !CanManage || selected is null || HasInvalidBindings || !bindingEditContext.Validate()) return;
+        if (CreationIdentity is { } identity)
+        {
+            if (!identity.IsComplete) { error = T("CreationIdentityInvalid"); return; }
+            name = identity.Name; displayName = identity.DisplayName; resourceNamespace = identity.Namespace;
+            relayVersion = identity.Version; description = identity.Description;
+        }
+        busy = true; error = null;
+        try
+        {
+            var properties = new RelayToolDefinitionProperties
+            {
+                DisplayName = displayName, Description = description, Version = relayVersion, Enabled = enabled,
+                RequiresApproval = requiresApproval, InvocationTimeoutSeconds = timeout, Bindings = BuildBindings(),
+                Target = new() { Name = selected.Name, Namespace = selected.Namespace, ScopeRef = selected.ScopeRef!.Value, Uid = selected.Uid, Generation = selected.Generation }
+            };
+            snapshot = snapshot is null
+                ? await Definitions.CreateAsync(new(name, properties, resourceNamespace, OwnerScope), cancellation.Token)
+                : await Definitions.UpdateAsync(name, ResourceNamespace.Parse(resourceNamespace), new(properties), snapshot.ETag, cancellation.Token);
+            if (CreationIdentity is not null) await OnCreated.InvokeAsync(snapshot.Value);
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+
+    public Task CreateDraftAsync() => CreationIdentity is null ? Task.CompletedTask : SaveAsync();
+
+    private void ReviewPublication()
+    {
+        if (!busy && CanManage && selected is not null && !HasInvalidBindings && bindingEditContext.Validate()) reviewing = true;
+    }
+
+    private async Task PublishAsync()
+    {
+        if (busy || !CanManage || selected is null || HasInvalidBindings || !bindingEditContext.Validate()) return;
+        await SaveAsync();
+        if (error is not null || snapshot is null || HasInvalidBindings || !bindingEditContext.Validate()) return;
+        busy = true;
+        try
+        {
+            _ = await Definitions.PublishAsync(name, snapshot.Value.Namespace, relayVersion, cancellation.Token, snapshot.ETag);
+            versions = await Definitions.GetVersionsAsync(name, snapshot.Value.Namespace, cancellation.Token);
+            usages = await Definitions.GetUsagesAsync(name, snapshot.Value.Namespace, cancellation.Token);
+            baseline = versions.FirstOrDefault(); reviewing = false; view = "versions";
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private void NewDraft(ToolDefinitionVersionResource version)
+    {
+        baseline = version;
+        sourceUpdateRequested = false;
+        displayName = version.Definition.DisplayName; description = version.Definition.Description ?? "";
+        requiresApproval = version.Definition.RequiresApproval; timeout = version.Definition.InvocationTimeoutSeconds;
+        selected = version.Source?.Tool;
+        var parts = version.Definition.Version.Split('.');
+        relayVersion = $"{parts[0]}.{parts[1]}.{int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture) + 1}";
+        BuildRows(version.Definition.Bindings); view = "configuration";
+    }
+
+    private void UpdateSource()
+    {
+        if (baseline is null) return;
+        NewDraft(baseline);
+        sourceUpdateRequested = true;
+        // Selecting another exact revision is deliberate; no latest-source selection is saved automatically.
+        view = "configuration";
+    }
+
+    private void BindingValidationChanged(object? sender, ValidationStateChangedEventArgs args)
+    {
+        var invalid = bindingEditContext.GetValidationMessages().Any();
+        if (invalid == editorValidationInvalid) return;
+        editorValidationInvalid = invalid;
+        if (invalid) reviewing = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static ValueBindingRequirement BindingRequirement(BindingRow row) => new(row.Path, row.Required || row.Kind == "literal",
+        row.Schema.TryGetProperty("type", out var type) ? type.ValueKind == JsonValueKind.String ? type.GetString()! : type.GetRawText() : "any",
+        Description: SchemaText(row.Schema, "description"), Format: SchemaText(row.Schema, "format"),
+        AllowedValues: row.Schema.TryGetProperty("enum", out var values) && values.ValueKind == JsonValueKind.Array ? values.EnumerateArray().Select(value => value.Clone()).ToArray() : null,
+        LiteralSchema: row.Schema);
+    private static string? SchemaText(JsonElement schema, string property) => schema.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    private static IReadOnlyList<ValueBindingSourceKind> BindingSources(BindingRow row) => IsString(row.Schema)
+        ? [ValueBindingSourceKind.Caller, ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret]
+        : Scalar(row.Schema) ? [ValueBindingSourceKind.Caller, ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter]
+        : [ValueBindingSourceKind.Caller, ValueBindingSourceKind.Literal];
+    private IReadOnlyList<ValueBindingOption> BindingOptions(BindingRow row) => parameters
+        .Where(value => Scalar(row.Schema) && CompatibleParameter(value, row.Schema))
+        .Select(value => new ValueBindingOption(ValueBindingSourceKind.Parameter, ResourceAddress(value), value.Definition.DisplayName))
+        .Concat(secrets.Where(value => IsString(row.Schema) && value.ValueConfigured)
+            .Select(value => new ValueBindingOption(ValueBindingSourceKind.Secret, ResourceAddress(value.Resource), value.Resource.Definition.DisplayName))).ToArray();
+    private static ValueBindingSelection BindingSelection(BindingRow row) => new(Enum.Parse<ValueBindingSourceKind>(row.Kind, ignoreCase: true), row.Resource, row.Literal);
+    private void BindingChanged(BindingRow row, ValueBindingSelection value)
+    {
+        if (!CanManage || !BindingSources(row).Contains(value.Kind)) return;
+        row.Kind = value.Kind.ToString().ToLowerInvariant();
+        row.Resource = value.Kind is ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret ? value.Resource : null;
+        row.Literal = value.Kind == ValueBindingSourceKind.Literal && value.Literal is { } literal
+            ? literal.Clone() : null;
+        Preview();
+    }
+    private ContextualValueCreationContext? BindingCreationContext(BindingRow row) => OwnerScope is { } owner
+        ? new(owner, "", "", Namespace: ResourceNamespace.Parse(CreationIdentity?.Namespace ?? resourceNamespace), ValueType: ParameterType(row.Schema)) : null;
+    private async Task ValueCreatedAsync(ScopedResourceAddress address)
+    {
+        try
+        {
+            if (OwnerScope is not { } owner) return;
+            parameters = await Parameters.GetParametersAsync(owner, cancellation.Token);
+            secrets = await Secrets.GetSecretsInContextAsync(owner, cancellation.Token);
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { Preview(); }
+    }
+    private static bool IsString(JsonElement schema) => schema.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "string";
+    private static ParameterValueType? ParameterType(JsonElement schema) => schema.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String ? type.GetString() switch { "string" => ParameterValueType.Text, "integer" => ParameterValueType.WholeNumber, "number" => ParameterValueType.DecimalNumber, "boolean" => ParameterValueType.Logical, _ => null } : null;
+    private static bool Scalar(JsonElement schema) => ParameterType(schema) is not null;
+    private static bool CompatibleParameter(ParameterResource parameter, JsonElement schema)
+    {
+        try { ToolInputSchemaValidator.Validate(schema, parameter.Definition.Value); return true; }
+        catch (ToolInputValidationException) { return false; }
+    }
+    private static string ToolKey(ToolResource tool) => $"{tool.Uid:D}:{tool.Generation}";
+    private static ScopedResourceAddress ResourceAddress(Resource resource) => ScopedResourceAddress.Create(resource.ScopeRef!.Value, resource.Namespace, resource.Kind, resource.Name);
+    private string SourceVersion(ToolResource? tool) => tool is null ? T("SourceUnavailable") : tool.Definition.Version ?? T("CatalogRevision", tool.Generation);
+    private static string Pretty(JsonElement? value) => value is null ? "" : JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+    private static string UsageUrl(ToolDefinitionUsage usage) => $"/{usage.Kind switch { "Agent" => "agents", "Flow" => "flows", _ => "tools/sets" }}/{Uri.EscapeDataString(usage.Name)}?namespace={Uri.EscapeDataString(usage.Namespace.Value)}&context={Uri.EscapeDataString(usage.ScopeRef.Value)}";
+    public void Dispose() { bindingEditContext.OnValidationStateChanged -= BindingValidationChanged; cancellation.Cancel(); cancellation.Dispose(); }
+    private sealed class BindingRow
+    {
+        public required string Path { get; init; }
+        public required JsonElement Schema { get; init; }
+        public string Kind { get; set; } = "caller";
+        public ScopedResourceAddress? Resource { get; set; }
+        public JsonElement? Literal { get; set; }
+        public bool Missing { get; init; }
+        public bool Required { get; init; }
+    }
+}

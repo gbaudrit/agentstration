@@ -198,6 +198,7 @@ transitions:
       required: ['message'],
     };
     const properties = (displayName: string, requiresApproval: boolean) => ({
+      toolKind: 'flow', version: '1.0.0', publish: true,
       displayName, enabled: true, requiresApproval, inputSchema, outputSchema,
       flow: { name: flowName, useActiveVersion: true }, invocationTimeoutSeconds: 90,
     });
@@ -210,8 +211,8 @@ transitions:
       data: { name: approvalDefinition, properties: properties('Playwright approval required', true) },
     }), 201, 'create approval ToolDefinition');
     return {
-      executable: `agentstration.${executableDefinition}`,
-      approvalRequired: `agentstration.${approvalDefinition}`,
+      executable: `agentstration.${executableDefinition}.v1.0.0`,
+      approvalRequired: `agentstration.${approvalDefinition}.v1.0.0`,
     };
   }
 

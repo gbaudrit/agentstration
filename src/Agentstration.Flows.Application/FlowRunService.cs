@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows.Application;
 
@@ -16,7 +17,10 @@ public sealed record FlowToolExecutionRequest(
     string CorrelationId,
     FlowToolReference Tool,
     JsonElement Arguments,
-    ResolvedFlowToolRoute? Route = null);
+    ResolvedFlowToolRoute? Route = null)
+{
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
+}
 
 public sealed record FlowToolExecutionResult(
     JsonElement? Output,

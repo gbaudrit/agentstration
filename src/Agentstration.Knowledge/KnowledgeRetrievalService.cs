@@ -3,6 +3,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
 
@@ -23,7 +24,13 @@ public sealed record KnowledgeRetrievalExecutionContext(
     string? FlowRunId = null,
     string? FlowStepId = null,
     string? ToolCallId = null,
-    string? ToolInvocationId = null);
+    string? ToolInvocationId = null)
+{
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
+    public JsonElement? SymbolicRequest { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<JsonElement, JsonElement>? ProtectState { get; init; }
+}
 
 public sealed record KnowledgeRetrievalFlowRequest(
     Guid TenantId,
@@ -234,6 +241,10 @@ public sealed class KnowledgeRetrievalService(
 
             var retrievalId = $"retrieval-{Guid.NewGuid():N}";
             var effectiveCorrelationId = string.IsNullOrWhiteSpace(correlationId) ? retrievalId : correlationId.Trim();
+            if (executionContext?.ProtectState is { } protectCorrelation
+                && !JsonElement.DeepEquals(protectCorrelation(JsonSerializer.SerializeToElement(effectiveCorrelationId)),
+                    JsonSerializer.SerializeToElement(effectiveCorrelationId)))
+                effectiveCorrelationId = retrievalId;
             if (effectiveCorrelationId.Length > 200)
                 throw Error("knowledge_retrieval_correlation_invalid", "Correlation identifiers cannot exceed 200 characters.");
             var input = JsonSerializer.SerializeToElement(new KnowledgeRetrievalInput
@@ -248,7 +259,8 @@ public sealed class KnowledgeRetrievalService(
                     Uid = snapshot.Uid,
                     Artifacts = snapshot.Artifacts
                 },
-                Request = request.Clone(),
+                Request = executionContext?.SymbolicRequest is { } symbolic
+                    ? SecretInputs.PreserveReferences(request, symbolic, executionContext.SecretInputs) : request.Clone(),
                 Caller = new()
                 {
                     PrincipalId = context.PrincipalId,
@@ -265,6 +277,7 @@ public sealed class KnowledgeRetrievalService(
                 CorrelationId = effectiveCorrelationId,
                 RetrievalId = retrievalId
             }, JsonOptions);
+            if (executionContext?.ProtectState is { } protectState) input = protectState(input);
             KnowledgeRetrievalFlowResult completed;
             try
             {

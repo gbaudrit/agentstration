@@ -13,15 +13,19 @@ public static class OpenApiConnectedService
     public const string FlowName = "openapi-operation-discovery";
     public static JsonElement OptionsSchema { get; } = JsonSerializer.SerializeToElement(new
     {
-        type = "object", properties = new
+        type = "object",
+        properties = new
         {
             candidatePaths = new { type = "array", minItems = 1, maxItems = 8, items = new { type = "string", minLength = 1, maxLength = 512 } }
-        }, required = new[] { "candidatePaths" }, additionalProperties = false
+        },
+        required = new[] { "candidatePaths" },
+        additionalProperties = false
     });
 
     public static JsonElement DefinitionSchema { get; } = JsonSerializer.SerializeToElement(new
     {
-        type = "object", properties = new
+        type = "object",
+        properties = new
         {
             contractUri = new { type = "string", maxLength = 2048 },
             contractDigest = new { type = "string", minLength = 64, maxLength = 64 },
@@ -30,8 +34,10 @@ public static class OpenApiConnectedService
             method = new { type = "string", minLength = 1, maxLength = 16 },
             path = new { type = "string", minLength = 1, maxLength = 2048 },
             readOnly = new { type = "boolean" },
-            requestShape = new { type = "object" }, responseShape = new { type = "object" }
-        }, required = new[] { "contractUri", "contractDigest", "server", "operationId", "method", "path", "readOnly" },
+            requestShape = new { type = "object" },
+            responseShape = new { type = "object" }
+        },
+        required = new[] { "contractUri", "contractDigest", "server", "operationId", "method", "path", "readOnly" },
         additionalProperties = false
     });
 
@@ -176,9 +182,13 @@ public sealed partial class OpenApiService
                     var externalId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{candidate.AbsoluteUri}\n{operation.OperationId}")));
                     var definition = new Dictionary<string, object?>
                     {
-                        ["contractUri"] = candidate.AbsoluteUri, ["contractDigest"] = contract.Sha256,
-                        ["server"] = contract.Servers[0], ["operationId"] = operation.OperationId,
-                        ["method"] = operation.Method, ["path"] = operation.Path, ["readOnly"] = operation.ReadOnly
+                        ["contractUri"] = candidate.AbsoluteUri,
+                        ["contractDigest"] = contract.Sha256,
+                        ["server"] = contract.Servers[0],
+                        ["operationId"] = operation.OperationId,
+                        ["method"] = operation.Method,
+                        ["path"] = operation.Path,
+                        ["readOnly"] = operation.ReadOnly
                     };
                     if (operation.RequestShape is { } input) definition["requestShape"] = input;
                     if (operation.ResponseShape is { } output) definition["responseShape"] = output;

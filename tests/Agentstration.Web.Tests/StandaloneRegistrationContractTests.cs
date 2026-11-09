@@ -117,11 +117,11 @@ public sealed class StandaloneRegistrationContractTests
     {
         var contributions = new Dictionary<Type, int>
         {
+            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 3,
             [typeof(ISecretVaultProvider)] = 2,
             [typeof(IBootstrapResourceHandler)] = 21,
             [typeof(IPackResourceHandler)] = 11,
             [typeof(IAepEnrollmentResourceProvisioner)] = 5,
-            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 2,
             [typeof(IToolExecutionEventSink)] = 2,
             [typeof(IInternalMcpToolDefinitionProvider)] = 35,
             [typeof(IInternalMcpToolHandler)] = 35,

@@ -1492,7 +1492,7 @@ public sealed class DependencyTests
 
                 // This opt-in instrumentation is owned by the test root, not another module.
                 if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
-                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
 
                 var normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
                 var sourcePath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));

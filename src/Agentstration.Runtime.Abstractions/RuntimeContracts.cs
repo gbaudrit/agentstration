@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Runtime.Abstractions;
 
@@ -307,7 +308,7 @@ public interface IToolCatalog
         CancellationToken cancellationToken = default) => ResolveAsync(tools.Select(value => value.Id), cancellationToken);
 }
 
-public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console }
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console, Mcp }
 
 public sealed record ToolExecutionScope
 {
@@ -325,6 +326,8 @@ public sealed record ToolExecutionScope
 
 public sealed record ToolExecutionContext
 {
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
+    public bool HasSensitiveArguments { get; init; }
     public ToolExecutionOwnerKind OwnerKind { get; init; }
     public required string ToolCallId { get; init; }
     public required string InvocationId { get; init; }
@@ -380,6 +383,9 @@ public sealed record ToolExecutionCaptureOptions
 
 public interface IToolExecutionPipeline
 {
+    ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
+        ValueTask.FromException(new InvalidOperationException("Tool validation is unavailable."));
+
     ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
 
     async ValueTask<ToolInvocationResult> ExecuteDetailedAsync(
