@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Extensions.OpenApi;
 using Microsoft.AspNetCore.Hosting;
@@ -15,7 +16,7 @@ using ModelContextProtocol.Client;
 namespace Agentstration.Extensions.OpenApi.Tests;
 
 [TestClass]
-public sealed class OpenApiExtensionTests
+public sealed partial class OpenApiExtensionTests
 {
     private const string JsonContract = """
         {
@@ -400,9 +401,13 @@ public sealed class OpenApiExtensionTests
         Assert.AreEqual("openapi", manifest.Contributions.SchemaFormats?.Single().Format);
         CollectionAssert.AreEquivalent(new[] { "openapi.contract.discover", "openapi.operation.invoke" },
             manifest.Contributions.Tools?.Select(value => value.Id).ToArray());
-        var bundle = manifest.Contributions.DataSourceProfileBundles?.Single();
+        var bundle = manifest.Contributions.DataSourceProfileBundles?.Single(value => value.Id == "openapi-governed");
         Assert.AreEqual("openapi-governed", bundle?.Id);
         Assert.HasCount(4, bundle!.ResourceManifests);
+        Assert.HasCount(2, manifest.Contributions.DataSourceProfileBundles!);
+        Assert.AreEqual("openapi", manifest.Contributions.ConnectedServiceTypes!.Single().Id);
+        Assert.AreEqual("openapi-operation", manifest.Contributions.ConnectedServiceOperationTypes!.Single().Id);
+        Assert.IsEmpty(AepDescriptorValidator.Validate(manifest));
         Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("flow.contract: datasource.discovery/v1", StringComparison.Ordinal)));
         Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("flow.contract: datasource.acquisition/v1", StringComparison.Ordinal)));
         Assert.IsTrue(bundle.ResourceManifests.Any(value => value.Contains("kind: DataSourceProfile", StringComparison.Ordinal)));

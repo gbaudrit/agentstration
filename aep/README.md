@@ -59,6 +59,11 @@ Protocol-specific operation contracts are separate `connected-service-operation-
 
 ## Authenticate AEP traffic
 
+Connected Service operation providers can additionally implement the opt-in
+[protected operation discovery contract](docs/connected-service-operation-discovery.md).
+It reuses Bound Values and one-use Secret capabilities without sending configured
+product identities or resolved connection values through ordinary Flow inputs.
+
 The client accepts a request-scoped credential provider. It applies the Bearer to each request without changing shared `HttpClient.DefaultRequestHeaders`:
 
 ```csharp
