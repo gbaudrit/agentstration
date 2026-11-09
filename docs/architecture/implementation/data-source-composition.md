@@ -97,14 +97,16 @@ Checks completed on 2026-11-09 after integrating `integration/fr-1032` at
 
 - Release solution build: zero warnings and errors.
 - Required Fast lane: 1,032 passed, zero failed or skipped.
-- Required Integration lane: 1,103 passed, zero failed, 12 existing optional
+- Required Integration lane: 1,109 passed, zero failed, 12 existing optional
   integrations skipped (two PostgreSQL and ten live-model cases).
 - The five native dataset integration tests passed separately on the merged
   base and are also included in the successful complete Integration lane.
 - Fifteen protected OpenAPI discovery scenarios passed after the host context and binding fixes,
   with real AWP execution and Secret callbacks. Before correction, the Instance
   and Tenant success cases failed at the host guard before the extension call.
-  Both required functional lanes passed again after correction.
+  The six added literal URL cases reproduced the Secret-capability error before
+  the binding fix; afterwards all fifteen passed, with zero Secret callbacks for
+  literal-only connections. Both functional lanes passed again after correction.
 - Ten focused Console tests cover the service-owned discovery tab, scoped
   history links, explicit activation with ETag, read-only controls, service and
   operation selection, parameter reset and preservation of saved older pins.
