@@ -36,7 +36,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Verify native backend MCP and provider contracts
-        run: dotnet test --project tests/Agentstration.Extensions.OpenDal.Tests --configuration Release --minimum-expected-tests 17
+        run: dotnet test --project tests/Agentstration.Extensions.OpenDal.Tests --configuration Release --minimum-expected-tests 18
       - name: Publish the standalone extension
         run: dotnet publish src/Agentstration.Extensions.OpenDal --configuration Release --runtime ${{ matrix.rid }} --self-contained false --output artifacts/opendal/${{ matrix.rid }}
       - name: Build the independent MCP consumer

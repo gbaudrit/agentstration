@@ -14,6 +14,8 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
     private readonly Action<string>? checkKey;
     private readonly OpenDalExecutionGate execution;
     private readonly Capability capability;
+    private readonly Func<string, string>? encodeKey;
+    private readonly Func<string, string?>? decodeKey;
     public string ProviderId { get; }
     public string ProviderVersion => OpenDalStorageTypes.Version;
     public JsonElement ConfigurationSchema { get; }
@@ -21,10 +23,12 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
     public AspCapabilities Capabilities => new(capability.List, capability.Stat, capability.Read, capability.Write, false, false, false);
 
     public OpenDalObjectProvider(AspStoreRef store, string providerId, JsonElement schema, Func<Operator> create,
-        OpenDalExecutionGate execution, Action<string>? checkKey = null)
+        OpenDalExecutionGate execution, Action<string>? checkKey = null,
+        Func<string, string>? encodeKey = null, Func<string, string?>? decodeKey = null)
     {
         this.store = store; ProviderId = providerId; ConfigurationSchema = schema;
         this.create = create; this.execution = execution; this.checkKey = checkKey;
+        this.encodeKey = encodeKey; this.decodeKey = decodeKey;
         using var op = create(); capability = op.Info.Capability;
         // The 0.3.1 Stream completion API returns no native metadata. Append cannot give the
         // exact resulting object length, and version write conditions have no managed option.
@@ -47,10 +51,10 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
         // not a global lexical limit; sort/filter before exposing the bounded ASP page.
         return await RunAsync(async op =>
         {
-            var directory = prefix.Contains('/') ? prefix[..(prefix.LastIndexOf('/') + 1)] : "";
+            var directory = encodeKey is null && prefix.Contains('/') ? prefix[..(prefix.LastIndexOf('/') + 1)] : "";
             var entries = await op.ListAsync(directory, new ListOptions { Recursive = true }, CancellationToken.None);
             ct.ThrowIfCancellationRequested();
-            var keys = entries.Where(e => e.Metadata.IsFile).Select(e => e.Path)
+            var keys = entries.Where(e => e.Metadata.IsFile).Select(e => decodeKey is null ? e.Path : decodeKey(e.Path)).OfType<string>()
                 .Where(k => k.StartsWith(prefix, StringComparison.Ordinal) && AspValidation.Allows(context.Policy, k)
                     && (afterKey is null || string.CompareOrdinal(k, afterKey) > 0))
                 .OrderBy(k => k, StringComparer.Ordinal).Take(limit + 1).ToArray();
@@ -58,7 +62,7 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
             foreach (var key in keys.Take(limit))
             {
                 ValidateKey(context, key);
-                page.Add(Map(key, await op.StatAsync(key, cancellationToken: CancellationToken.None)));
+                page.Add(Map(key, await op.StatAsync(NativeKey(key), cancellationToken: CancellationToken.None)));
                 ct.ThrowIfCancellationRequested();
             }
             return new AspProviderPage(page, keys.Length > limit ? page[^1].Key : null);
@@ -73,7 +77,7 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
     private async Task<AspProviderObject> StatCoreAsync(Operator op, string key, string? version, string? etag, CancellationToken ct)
     {
         AspValidation.Require(version is null || capability.StatWithVersion, "unsupported_option", "Native version selection is unavailable.");
-        var item = Map(key, await op.StatAsync(key, new StatOptions
+        var item = Map(key, await op.StatAsync(NativeKey(key), new StatOptions
         {
             Version = version,
             IfMatch = capability.StatWithIfMatch ? etag : null
@@ -95,7 +99,7 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
             AspValidation.Require((version is null || capability.ReadWithVersion) && (etag is null || capability.ReadWithIfMatch),
                 "unsupported_option", "The native reader cannot protect this object identity.");
             var length = Math.Min(range?.Length ?? long.MaxValue, item.Length - offset);
-            Stream input = length == 0 ? Stream.Null : op.OpenReadStream(key,
+            Stream input = length == 0 ? Stream.Null : op.OpenReadStream(NativeKey(key),
                 new ReadOptions { Offset = offset, Length = length, Version = version, IfMatch = etag, Chunk = 16_384, Concurrent = 1 });
             return new(item, new NativeStream(input, op, execution), offset, length);
         }
@@ -127,8 +131,8 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
                 UserMetadata = metadata?.UserMetadata,
                 Concurrent = 1
             };
-            if (!capability.WriteCanMulti) return new SingleWriter(op, execution, options, nativeOptions, context.Policy.MaxWriteBytes);
-            var output = op.OpenWriteStream(options.Key, nativeOptions);
+            if (!capability.WriteCanMulti) return new SingleWriter(op, execution, options, nativeOptions, context.Policy.MaxWriteBytes, NativeKey(options.Key));
+            var output = op.OpenWriteStream(NativeKey(options.Key), nativeOptions);
             return new Writer(new NativeStream(output, op, execution), output, options);
         }
         catch (OpenDALException error) { op?.Dispose(); execution.Slots.Release(); throw Error(error); }
@@ -146,6 +150,7 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
         catch (OpenDALException error) { throw Error(error); }
         finally { execution.Slots.Release(); }
     }
+    private string NativeKey(string key) => encodeKey is null ? key : encodeKey(key);
     private void Validate(AspAccessContext context)
     {
         AspValidation.Context(context);
@@ -170,7 +175,7 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
     }, "The OpenDAL operation did not produce a confirmed result.");
 
     private sealed class SingleWriter(Operator op, OpenDalExecutionGate execution, AspWriteOptions options,
-        WriteOptions nativeOptions, int limit) : IAspWriteHandle
+        WriteOptions nativeOptions, int limit, string nativeKey) : IAspWriteHandle
     {
         private readonly MemoryStream buffer = new();
         private bool disposed;
@@ -181,7 +186,7 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
             AspValidation.Require(buffer.Length <= limit, "limit_exceeded", "Non-progressive native writes are bounded to one ASP chunk.");
             try
             {
-                var metadata = await op.WriteAsync(options.Key, buffer.ToArray(), nativeOptions, CancellationToken.None);
+                var metadata = await op.WriteAsync(nativeKey, buffer.ToArray(), nativeOptions, CancellationToken.None);
                 ct.ThrowIfCancellationRequested(); return Map(options.Key, metadata);
             }
             catch (OpenDALException error) { throw Error(error); }

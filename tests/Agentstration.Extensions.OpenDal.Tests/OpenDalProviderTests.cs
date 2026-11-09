@@ -79,12 +79,31 @@ public sealed class OpenDalProviderTests
         if (OperatingSystem.IsWindows()) return; // CI Windows accounts need not have link creation rights.
         var provider = Provider;
         var data = Directory.GetDirectories(root, "data", SearchOption.AllDirectories).Single();
-        Directory.CreateDirectory(Path.Combine(data, "notes"));
-        File.CreateSymbolicLink(Path.Combine(data, "notes", "linked"), Path.Combine(root, "missing-target"));
+        var name = Convert.ToHexStringLower(System.Text.Encoding.UTF8.GetBytes("notes/linked")) + ".blob";
+        File.CreateSymbolicLink(Path.Combine(data, name), Path.Combine(root, "missing-target"));
         await Error("forbidden", async () => await provider.OpenWriteAsync(Context, new("notes/linked"), default));
-        Directory.CreateSymbolicLink(Path.Combine(data, "notes", "external"), Path.GetTempPath());
-        await Error("forbidden", async () => await provider.OpenReadAsync(Context, "notes/external/value", null, null, null, default));
-        File.Delete(Path.Combine(data, "notes", "linked")); Directory.Delete(Path.Combine(data, "notes", "external"));
+        File.Delete(Path.Combine(data, name));
+        Directory.Delete(data);
+        Directory.CreateSymbolicLink(data, Path.GetTempPath());
+        await Error("forbidden", async () => await provider.OpenReadAsync(Context, "notes/linked", null, null, null, default));
+        Directory.Delete(data);
     }
+    [TestMethod]
+    public async Task FilesystemAliasesCannotCrossOrdinalKeyPolicyBoundaries()
+    {
+        var provider = Provider;
+        foreach (var key in new[] { "notes/Private/a", "notes/private/a", "notes/name.", "notes/name", "notes/CON", "notes/é😀", "notes/" + new string('x',250) })
+        {
+            await using var writer = await provider.OpenWriteAsync(Context, new(key), default);
+            await writer.Content.WriteAsync(System.Text.Encoding.UTF8.GetBytes(key)); await writer.CompleteAsync(default);
+        }
+        var narrowed = Context with { Policy = Context.Policy with { Prefix = "notes/private/" } };
+        await using (var writer = await provider.OpenWriteAsync(narrowed, new("notes/private/a", "replace"), default)) { await writer.Content.WriteAsync("lower"u8.ToArray()); await writer.CompleteAsync(default); }
+        await using var original = await provider.OpenReadAsync(Context, "notes/Private/a", null, null, null, default);
+        using var output = new MemoryStream(); await original.Content.CopyToAsync(output);
+        Assert.AreEqual("notes/Private/a", System.Text.Encoding.UTF8.GetString(output.ToArray()));
+        Assert.HasCount(7, (await provider.ListAsync(Context, "notes/", null, 10, default)).Objects);
+    }
+
     private static async Task Error(string code, Func<Task> operation) => Assert.AreEqual(code, (await Assert.ThrowsAsync<AspException>(operation)).Code);
 }

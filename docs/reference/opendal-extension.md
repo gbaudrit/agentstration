@@ -109,9 +109,12 @@ policy remain separate. Agents continue to see generic logical content operation
 ## Storage semantics and limits
 
 Each logical StoreId/BindingId pair receives an isolated SHA-256 partition. Filesystem
-placement is `<operator-root>/<partition>/data/<logical-key>`; remote placement adds
-that partition to the configured bucket/container root. These are ordinary native
-objects/keys: a key does not imply a filesystem. There is no `objects.json`, shared
+placement is `<operator-root>/<partition>/data/<encoded-key>.blob`. Keys use
+reversible lowercase UTF-8 hex split into bounded path components, preserving exact
+logical names while avoiding Windows case, reserved-name and trailing-dot aliases
+across ordinal authorization boundaries. This is one physical object per key, with
+no lookup index. Remote keys retain their original spelling and add the partition
+to the configured bucket/container root. A logical key does not imply a filesystem. There is no `objects.json`, shared
 content serialization, object/version index or persisted protocol receipt ledger.
 Filesystem-specific containment/link checks protect the local mapping; all actual
 content I/O uses the same OpenDAL Operator/Stream methods as remote backends.

@@ -66,7 +66,7 @@ public sealed class OpenDalMcpTests
         Assert.AreEqual("DAL réel", Encoding.UTF8.GetString(Convert.FromBase64String(rest.ContentBase64)));
         Assert.IsTrue(rest.Final);
         Assert.IsEmpty(Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories));
-        Assert.AreEqual("OpenDAL réel", await File.ReadAllTextAsync(Directory.GetFiles(root, "a", SearchOption.AllDirectories).Single()));
+        Assert.AreEqual("OpenDAL réel", await File.ReadAllTextAsync(Directory.GetFiles(root, "*.blob", SearchOption.AllDirectories).Single()));
     }
 
     [TestMethod]
@@ -193,7 +193,7 @@ public sealed class OpenDalMcpTests
         using var actual = IncrementalHash.CreateHash(HashAlgorithmName.SHA256); int read; long total = 0;
         while ((read = await input.ReadAsync(block)) != 0) { total += read; actual.AppendData(block, 0, read); }
         Assert.AreEqual(receipt.WrittenBytes, total); Assert.AreEqual(digest, Convert.ToHexStringLower(actual.GetHashAndReset()));
-        Assert.AreEqual(receipt.WrittenBytes, new FileInfo(Directory.GetFiles(root, "large", SearchOption.AllDirectories).Single()).Length);
+        Assert.AreEqual(receipt.WrittenBytes, new FileInfo(Directory.GetFiles(root, "*.blob", SearchOption.AllDirectories).Single()).Length);
     }
 
     [TestMethod]

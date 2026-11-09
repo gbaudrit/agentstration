@@ -150,7 +150,7 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
             { Definition = registration.Value.Definition with { Enabled = false } }, registration.ETag, false, default);
             await Assert.ThrowsAsync<StorageException>(() => gateway.ReadAsync(target, written.Reference, 0, 100));
             Assert.IsEmpty(Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories));
-            Assert.HasCount(1, Directory.GetFiles(root, "a", SearchOption.AllDirectories));
+            Assert.HasCount(1, Directory.GetFiles(root, "*.blob", SearchOption.AllDirectories));
         }
         finally
         {

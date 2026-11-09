@@ -23,7 +23,7 @@ is introduced. No fork or Rust compiler is needed for normal builds.
 Use one ASP-to-Operator adapter for filesystem, S3 and Azure Blob. Contribute all
 three executable StorageTypes at 1.0.0 with typed requirements and schemas; other
 native compiled services are not silently advertised as integrated. The adapter
-stores logical keys directly through OpenDAL. The SDK owns session sequencing,
+stores each logical object independently through OpenDAL. The SDK owns session sequencing,
 text conversion and in-process replay. There is no aggregate content JSON, custom
 object/version index, persistent receipt ledger or extension store-size quota.
 
@@ -36,7 +36,10 @@ remain mandatory on every operation; intersect restrictions without widening.
 
 Partition physical roots by logical StoreId/BindingId. Filesystem roots are absolute
 operator-owned configuration, never caller content parameters. Validate relative
-key containment and reject reparse/dangling/symbolic links. Remote bucket/container
+key containment and reject reparse/dangling/symbolic links. Encode filesystem keys
+reversibly as lowercase UTF-8 hex path components so case-insensitive names, reserved
+names and trailing-dot aliases cannot cross ordinal ASP policy boundaries. No
+content index is needed. Remote bucket/container
 and optional prefix are protected configuration, with the same partition appended.
 No unconfigured raw native settings or ambient S3 credentials are accepted.
 
