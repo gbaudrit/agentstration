@@ -179,7 +179,7 @@ export class SourceLifecyclePage {
 
     // Optional input failure is visible in provenance while the valid input publishes.
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox').uncheck();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).uncheck();
     await this.saveKnowledge();
     const partial = await this.runProjection(consoleUrl);
     expect(partial.inputIssues).toEqual([expect.objectContaining({ bindingName: 'secondary', code: 'knowledge_projection_acquisition_missing' })]);
@@ -189,7 +189,7 @@ export class SourceLifecyclePage {
 
     const second = await this.acquire(consoleUrl, f.sources[1]);
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox').check();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).check();
     await this.saveKnowledge();
     const aggregate = await this.runProjection(consoleUrl);
     expect(aggregate.inputIssues).toEqual([]);
