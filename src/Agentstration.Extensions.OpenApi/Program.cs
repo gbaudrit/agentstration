@@ -13,6 +13,7 @@ builder.Services.AddSingleton<OpenApiDestinationPolicy>();
 builder.Services.AddSingleton<OpenApiContractParser>();
 builder.Services.AddHttpClient("openapi-secret-access").ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
 builder.Services.AddTransient<IAepConnectedServiceOperationDiscovery, OpenApiConnectedServiceDiscovery>();
+builder.Services.AddTransient<IAepConnectedServiceOperationAcquisition, OpenApiConnectedServiceAcquisition>();
 builder.Services.AddHttpClient<OpenApiService>()
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
     {
@@ -37,8 +38,8 @@ builder.Services.AddAgentstrationAep(options =>
         "Invoke exactly one promoted selector tied to an exact discovered contract digest."));
     options.DataSourceProfileBundles.Add(OpenApiDataSourceProfileBundle.Create());
     OpenApiConnectedService.Contribute(options);
-    options.DataSourceProfileBundles.Add(new("openapi-connected-services", "OpenAPI Connected Service discovery", "1.0.0",
-        [OpenApiConnectedService.Flow], RequiredTools: []));
+    options.DataSourceProfileBundles.Add(new("openapi-connected-services", "OpenAPI Connected Service operations", "1.0.0",
+        [OpenApiConnectedService.Flow, OpenApiConnectedService.AcquisitionFlow], RequiredTools: []));
 });
 builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();

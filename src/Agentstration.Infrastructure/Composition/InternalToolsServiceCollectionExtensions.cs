@@ -26,6 +26,9 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<DateTimeMcpTool>(services);
         AddInternalTool<ConnectedServiceDiscoveryMcpTool>(services);
         services.AddSingleton<ConnectedServiceDiscoveryExecutor>();
+        services.AddSingleton<ConnectedServiceBoundValues>();
+        AddInternalTool<ConnectedServiceAcquisitionMcpTool>(services);
+        services.AddSingleton<ConnectedServiceAcquisitionExecutor>();
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);

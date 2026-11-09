@@ -333,8 +333,8 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var artifact = primary.Acquisition.Manifest?.Artifacts.Single();
         Assert.IsNotNull(artifact);
         Assert.AreEqual(DataSourceArtifactDisposition.Publishable, artifact.Disposition);
-        Assert.AreEqual("web-builtin", primary.Acquisition.Composition.Profile.Name);
-        Assert.AreEqual(DataSourceFlowContracts.Acquisition, primary.Acquisition.Composition.Flow.Contract);
+        Assert.AreEqual("web-builtin", primary.Acquisition.Composition!.Profile.Name);
+        Assert.AreEqual(DataSourceFlowContracts.Acquisition, primary.Acquisition.Composition!.Flow.Contract);
         var durable = await factory.Services.GetRequiredService<ArtifactManagementService>()
             .GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(artifact.ArtifactId), default);
         Assert.IsNotNull(durable);

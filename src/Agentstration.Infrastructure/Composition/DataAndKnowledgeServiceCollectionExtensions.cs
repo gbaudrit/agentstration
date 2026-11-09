@@ -15,6 +15,9 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
         var enableHostedServices = context.Options.EnableHostedServices;
         services.AddSingleton<DataSourceProfileService>();
         services.AddSingleton<DataSourceManagementService>();
+        services.AddSingleton<DataSourceDatasetCompositionService>();
+        services.AddSingleton<DataSourceDatasetAcquisitionService>();
+        services.AddSingleton<Agentstration.Storage.Contracts.IStorageUsageProvider, DataSourceStorageUsageProvider>();
         services.AddSingleton<DataSourceAcquisitionService>();
         services.AddSingleton<DataSourceDiscoveryService>();
         services.AddSingleton<DataSourceAcquisitionTargetService>();

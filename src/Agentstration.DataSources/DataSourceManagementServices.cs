@@ -287,9 +287,9 @@ public sealed class DataSourceProfileService(
         await EnsureProtectedMutationAllowedAsync(profile.Value, cancellationToken);
         var exact = RequireScope(profile.Value);
         var usages = (await store.ListAllAsync<DataSourceResource>(DataSourceResourceKinds.DataSource, cancellationToken))
-            .Where(value => value.Value.Definition.Profile.Name == profile.Value.Name
-                && (value.Value.Definition.Profile.Namespace ?? value.Value.Namespace) == profile.Value.Namespace
-                && (value.Value.Definition.Profile.ScopeRef is null || value.Value.Definition.Profile.ScopeRef == exact))
+            .Where(value => value.Value.Definition.Profile is { } reference && reference.Name == profile.Value.Name
+                && (reference.Namespace ?? value.Value.Namespace) == profile.Value.Namespace
+                && (reference.ScopeRef is null || reference.ScopeRef == exact))
             .ToArray();
         if (usages.Length != 0)
             throw Error("data_source_profile_in_use", $"Data Source Profile '{profile.Value.Address}' is referenced by {usages.Length} Data Source(s).");
@@ -483,7 +483,9 @@ public sealed class DataSourceManagementService(
     DataSourceProfileService profiles,
     IDataSourceAcquisitionCompositionResolver compositions,
     ICurrentRequestContext requestContext,
-    ISecurityAuditWriter audit)
+    ISecurityAuditWriter audit,
+    DataSourceDatasetCompositionService? datasets = null,
+    IAuthorizationService? authorization = null)
 {
     public const int MaximumConfigurationBytes = 64 * 1024;
 
@@ -499,7 +501,7 @@ public sealed class DataSourceManagementService(
     public async Task<StoredResource<DataSourceResource>> CreateAsync(DataSourceResource resource, CancellationToken cancellationToken)
     {
         var scope = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(DataSourceResourceKinds.DataSource);
-        var desired = resource with { ScopeRef = scope, Generation = 1 };
+        var desired = resource with { ScopeRef = scope, Generation = 1, Uid = Guid.NewGuid() };
         var readiness = await ValidateAndResolveAsync(desired, false, cancellationToken);
         desired = PinProfile(desired, readiness) with { Status = Status(readiness) };
         var stored = await scopeOperations.WriteAsync(desired, scope, AuthorizationPermissions.ResourcesWrite,
@@ -514,6 +516,8 @@ public sealed class DataSourceManagementService(
         var existing = await GetAsync(ns, name, scopeRef, cancellationToken) ?? throw NotFound(name, ns);
         var scope = existing.Value.ScopeRef ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
         var updated = existing.Value with { Generation = checked(existing.Value.Generation + 1), Definition = definition };
+        if ((existing.Value.Definition.Dataset is null) != (definition.Dataset is null))
+            throw Error("data_source_composition_mode_fixed", "Create a separate Data Source to change its composition mode.");
         var readiness = await ValidateAndResolveAsync(updated, false, cancellationToken);
         updated = PinProfile(updated, readiness) with { Status = Status(readiness) };
         var stored = await scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
@@ -526,7 +530,11 @@ public sealed class DataSourceManagementService(
         ResourceScopeRef? scopeRef, CancellationToken cancellationToken)
     {
         var source = await GetAsync(ns, name, scopeRef, cancellationToken) ?? throw NotFound(name, ns);
-        return await ResolveReadinessAsync(source.Value, cancellationToken);
+        var readiness = await ResolveReadinessAsync(source.Value, cancellationToken);
+        var canAcquire = readiness.Ready && authorization is not null
+            && requestContext.AccessMode is ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration
+            && await authorization.HasPermissionAsync(requestContext.Current, AuthorizationPermissions.RunsExecute, cancellationToken);
+        return readiness with { CanAcquire = canAcquire };
     }
 
     public async Task<StoredResource<DataSourceResource>> ResolveForUseAsync(ResourceNamespace ns, string name,
@@ -567,8 +575,8 @@ public sealed class DataSourceManagementService(
         bool requirePinnedProfile, CancellationToken cancellationToken)
     {
         Validate(resource);
-        var readiness = await ResolveReadinessAsync(resource, requirePinnedProfile, cancellationToken);
-        if (!readiness.Ready) throw Error("data_source_not_ready", string.Join(' ', readiness.Issues));
+        var readiness = await ResolveReadinessAsync(resource, requirePinnedProfile, cancellationToken, throwDatasetFailures: resource.Definition.Enabled);
+        if (resource.Definition.Enabled && !readiness.Ready) throw Error("data_source_not_ready", string.Join(' ', readiness.Issues));
         return readiness;
     }
 
@@ -576,16 +584,34 @@ public sealed class DataSourceManagementService(
         CancellationToken cancellationToken) => ResolveReadinessAsync(resource, true, cancellationToken);
 
     private async Task<DataSourceReadiness> ResolveReadinessAsync(DataSourceResource resource,
-        bool requirePinnedProfile, CancellationToken cancellationToken)
+        bool requirePinnedProfile, CancellationToken cancellationToken, bool throwDatasetFailures = false)
     {
         if (!resource.Definition.Enabled) return new(false, false, null, ["The Data Source is disabled."]);
+        if (resource.Definition.Dataset is not null)
+        {
+            try
+            {
+                var resolved = await (datasets ?? throw Error("data_source_dataset_unavailable", "Dataset composition is unavailable."))
+                    .ResolveAsync(resource, resource.ScopeRef!.Value, cancellationToken);
+                return new(true, true, null, []) { Dataset = resolved };
+            }
+            catch (Exception exception) when (exception is DataSourceValidationException or DataSourceAcquisitionException
+                or Agentstration.ConnectedServices.ConnectedServiceOperationDiscoveryException
+                or Agentstration.ConnectedServices.Contracts.ConnectedServiceExportInspectionException
+                or Agentstration.ConnectedServices.ConnectedServiceOperationTypeValidationException
+                or Agentstration.ConnectedServices.ConnectedServiceOperationTypeRevisionException)
+            {
+                if (throwDatasetFailures && exception is DataSourceValidationException) throw;
+                return new(false, true, null, [exception.Message]);
+            }
+        }
         if (requirePinnedProfile && resource.ProfileUid is null)
             return new(false, true, null,
                 ["The Data Source does not pin an exact Data Source Profile identity."]);
         try
         {
             var profile = await profiles.ResolveActiveAsync(resource.ScopeRef!.Value, resource.Namespace,
-                resource.Definition.Profile, resource.ProfileUid, cancellationToken);
+                resource.Definition.Profile!, resource.ProfileUid, cancellationToken);
             var issues = DataSourceProfileService.ValidateConfiguration(profile.Definition.ConfigurationSchema,
                 resource.Definition.Configuration);
             if (issues.Count != 0) return new(false, true, profile, issues);
@@ -610,9 +636,18 @@ public sealed class DataSourceManagementService(
             throw Error("data_source_identity_invalid", "Data Source name and display name are required.");
         if (resource.Definition.DisplayName.Length > 200 || resource.Definition.Description?.Length > 2000)
             throw Error("data_source_metadata_invalid", "Data Source display name or description is too long.");
+        if ((resource.Definition.Profile is null) == (resource.Definition.Dataset is null))
+            throw Error("data_source_composition_required", "Select exactly one dataset composition or a legacy profile.");
         if (resource.Definition.Configuration.ValueKind != JsonValueKind.Object
             || Encoding.UTF8.GetByteCount(resource.Definition.Configuration.GetRawText()) > MaximumConfigurationBytes)
             throw Error("data_source_configuration_invalid", "Data Source configuration must be a bounded JSON object.");
+        if (resource.Definition.Dataset is { } dataset)
+        {
+            if (dataset.Storage is null || dataset.Rule is null || dataset.Acquisition?.Operation is null)
+                throw Error("data_source_composition_required", "Dataset Storage, rule and acquisition are required.");
+            if (resource.Definition.Configuration.EnumerateObject().Any())
+                throw Error("data_source_connection_override", "Dataset Data Sources cannot carry connection configuration.");
+        }
     }
 
     private Task AuditAsync(string action, ResourceScopeRef scope, string reason, CancellationToken cancellationToken)
@@ -636,6 +671,8 @@ public sealed class DataSourceManagementService(
     };
     private static DataSourceResource PinProfile(DataSourceResource resource, DataSourceReadiness readiness)
     {
+        if (!resource.Definition.Enabled) return resource;
+        if (readiness.Dataset is not null) return resource with { ProfileUid = null };
         var profile = readiness.Profile
             ?? throw Error("data_source_profile_not_found", "The resolved Data Source Profile is unavailable.");
         return resource with

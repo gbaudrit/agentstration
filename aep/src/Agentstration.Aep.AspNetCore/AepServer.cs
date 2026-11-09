@@ -96,6 +96,7 @@ public static partial class AepServerExtensions
             Results.Json(CreateConfigurationCatalog(options.Value.OptionSets, migrators), AepProtocol.JsonOptions)));
         protocolEndpoints.Add(endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync));
         protocolEndpoints.Add(endpoints.MapPost(AepConnectedServiceDiscoveryProtocol.Path, DiscoverConnectedServiceOperationsAsync));
+        protocolEndpoints.Add(endpoints.MapPost(AepConnectedServiceAcquisitionProtocol.Path, AcquireConnectedServiceOperationAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync));

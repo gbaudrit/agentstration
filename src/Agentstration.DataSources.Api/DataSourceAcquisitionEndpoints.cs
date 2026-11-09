@@ -2,6 +2,7 @@ using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Storage;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Mvc;
 
@@ -28,6 +29,14 @@ internal static class DataSourceAcquisitionEndpoints
         acquisitions.MapGet("/{id}", GetAsync)
             .WithSummary("Get a Data Source acquisition")
             .Produces<DataSourceAcquisitionResource>()
+            .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        acquisitions.MapGet("/{id}/content", async (string id, string? @namespace, long? offset, int? maximumBytes,
+            DataSourceAcquisitionService service, DataSourceDatasetAcquisitionService datasets, CancellationToken token) =>
+            await ExecuteAsync(async () => Results.Ok(await datasets.ReadAsync(
+                (await service.GetAsync(ResourceNamespace.Parse(@namespace), id, token)).Value,
+                offset ?? 0, maximumBytes ?? 65536, token))))
+            .WithSummary("Read bounded content from an exact authorized dataset acquisition")
+            .Produces<Agentstration.Storage.Contracts.StorageObjectContent>()
             .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         acquisitions.MapPost("/{id}/cancel", CancelAsync)
             .WithSummary("Cancel a Data Source acquisition")
@@ -106,6 +115,12 @@ internal static class DataSourceAcquisitionEndpoints
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
         try { return await action(); }
+        catch (StorageException exception)
+        { return Problem(exception.Code, "Storage operation refused", exception.StatusCode, exception.Message); }
+        catch (Agentstration.ConnectedServices.ConnectedServiceOperationDiscoveryException exception)
+        { return Problem(exception.Code, "Operation unavailable", 422, exception.Message); }
+        catch (Agentstration.ConnectedServices.Contracts.ConnectedServiceExportInspectionException)
+        { return Problem("data_source_service_unavailable", "Service unavailable", 422, "The exact authorized service is unavailable."); }
         catch (DataSourceAcquisitionException exception)
         {
             var status = exception.Code switch

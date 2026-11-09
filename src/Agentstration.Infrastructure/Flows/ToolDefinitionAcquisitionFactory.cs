@@ -39,6 +39,8 @@ public sealed class ToolDefinitionAcquisitionFactory(
         };
 
         var template = await GetTemplateAsync(templateNamespace, templateId, cancellationToken);
+        if (template.Dataset is not null)
+            throw Invalid("tool_definition_dataset_relay_unavailable", "Native dataset acquisitions are not yet supported by acquisition Tool exposure.");
         if (template.State != DataSourceAcquisitionState.Succeeded || template.Manifest is null)
             throw Invalid("tool_definition_acquisition_not_successful", "Only a successful acquisition can be used to create a Tool.");
         await ValidateSourceAsync(template, logicalScope, cancellationToken);
@@ -54,7 +56,7 @@ public sealed class ToolDefinitionAcquisitionFactory(
         if (template.Manifest.Artifacts.Count(artifact => MatchesArtifact(binding, artifact)) != 1)
             throw Invalid("tool_definition_acquisition_artifact_ambiguous", "The selected artifact must be identifiable by its kind and name.");
 
-        var flow = template.Composition.Flow;
+        var flow = template.Composition!.Flow;
         return await definitions.CreateFromAcquisitionAsync(new ToolDefinitionResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,

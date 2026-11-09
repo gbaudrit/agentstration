@@ -67,4 +67,9 @@
   <data name="AcquisitionTarget" xml:space="preserve"><value>Acquisition target</value></data>
   <data name="SelectAcquisitionTarget" xml:space="preserve"><value>Select an acquisition target</value></data>
   <data name="Tab.Access" xml:space="preserve"><value>Access</value></data>
+  <data name="AcquisitionTargetsLoadFailed" xml:space="preserve"><value>Acquisition targets could not be loaded. Check access to the Data Source, then select it again to retry.</value></data>
+  <data name="NativeDatasetProjectionUnavailable" xml:space="preserve"><value>Knowledge projection from this dataset composition is not available yet. Clear Enabled to save the configuration as a disabled draft.</value></data>
+  <data name="NativeDatasetDraftHelp" xml:space="preserve"><value>Native datasets are not yet supported for projection. You can save this configuration with Enabled cleared.</value></data>
+  <data name="DisabledDraftNotReady" xml:space="preserve"><value>Saved as a disabled draft. A supported definition is required before activation and projection.</value></data>
+  <data name="ResolvedFlowsHelp" xml:space="preserve"><value>Available Flows depend on the validated composition of this source.</value></data>
 </root>

@@ -143,6 +143,20 @@ export const TestIds = {
     snapshotDetails: 'knowledge-snapshot-details', retrievalText: 'knowledge-retrieval-text',
     retrievalRun: 'knowledge-retrieval-run', retrievalResult: 'knowledge-retrieval-result',
   },
+  connectedServiceDiscovery: {
+    tab: 'connected-service-discovery-tab', panel: 'connected-service-discovery', start: 'connected-service-start-discovery',
+    refresh: 'connected-service-refresh-discovery', operationRow: 'connected-service-operation-row',
+    activation: 'connected-service-operation-enabled', emptyOperations: 'connected-service-no-operations',
+    historyRow: 'connected-service-discovery-row', flowRun: 'connected-service-discovery-flow-link',
+  },
+  datasetComposition: {
+    overviewTab: 'dataset-overview-tab', definitionTab: 'dataset-definition-tab', acquisitionsTab: 'dataset-acquisitions-tab',
+    contentTab: 'dataset-content-tab', accessTab: 'dataset-access-tab', yamlTab: 'dataset-yaml-tab',
+    latestAcquisition: 'dataset-latest-acquisition', savedConfiguration: 'dataset-saved-configuration', yaml: 'dataset-yaml',
+    editor: 'data-source-dataset-editor', fields: 'dataset-definition-fields', storage: 'dataset-storage', prefix: 'dataset-prefix',
+    service: 'dataset-service', serviceDiscovery: 'dataset-service-discovery-link', operation: 'dataset-operation', parameters: 'dataset-parameters',
+    ineligibleOperation: 'dataset-operation-ineligible', errorCode: 'dataset-error-code', acquisitions: 'dataset-acquisitions', readContent: 'dataset-read-content', content: 'dataset-content',
+  },
   schemaDrivenSources: {
     dataSourceEditor: 'data-source-editor',
     dataSourceDisplayName: 'data-source-display-name',
@@ -166,6 +180,7 @@ export const TestIds = {
     dataSourceStartAcquisition: 'data-source-start-acquisition',
     dataSourceAcquisitionRow: 'data-source-acquisition-row',
     knowledgeSourceEditor: 'knowledge-source-editor',
+    knowledgeSourceFields: 'knowledge-source-definition-fields',
     knowledgeSourceDisplayName: 'knowledge-source-display-name',
     knowledgeSourceName: 'knowledge-source-name',
     knowledgeSourceProjectionFlow: 'knowledge-source-projection-flow',

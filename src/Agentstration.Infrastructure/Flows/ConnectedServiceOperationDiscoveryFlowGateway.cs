@@ -9,12 +9,20 @@ namespace Agentstration.Infrastructure.Flows;
 
 public sealed class ConnectedServiceOperationDiscoveryFlowGateway(
     FlowService flows,
-    FlowRunService runs) : IConnectedServiceOperationDiscoveryFlowGateway
+    FlowRunService runs,
+    IRequestContextScopeFactory requestScopes) : IConnectedServiceOperationDiscoveryFlowGateway
 {
     public async Task<ConnectedServiceDiscoveryFlowRunSnapshot> StartAsync(
         ConnectedServiceDiscoveryFlowRunRequest request,
         CancellationToken cancellationToken)
     {
+        var caller = new RequestContext(request.PrincipalId, request.TenantId, request.WorkspaceId);
+        using var selected = request.LogicalScopeRef?.Kind switch
+        {
+            ResourceScopeKind.Instance => requestScopes.PushInstance(caller),
+            ResourceScopeKind.Tenant => requestScopes.PushTenantAdministration(caller),
+            _ => requestScopes.Push(caller)
+        };
         var target = request.Flow.Flow;
         var scope = target.ScopeRef
             ?? throw Error("connected_service_discovery_flow_scope_required", "The discovery Flow reference must be exact.");
@@ -51,7 +59,8 @@ public sealed class ConnectedServiceOperationDiscoveryFlowGateway(
                 null,
                 null,
                 null,
-                new FlowRunScope(request.TenantId, new WorkspaceId(request.WorkspaceId), request.PrincipalId))
+                new FlowRunScope(request.TenantId, new WorkspaceId(request.WorkspaceId), request.PrincipalId)
+                { LogicalScopeRef = request.LogicalScopeRef })
             {
                 DefinitionScopeRef = scope
             }, cancellationToken);

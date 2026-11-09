@@ -61,6 +61,9 @@ Protocol-specific operation contracts are separate `connected-service-operation-
 
 Connected Service operation providers can additionally implement the opt-in
 [protected operation discovery contract](docs/connected-service-operation-discovery.md).
+The corresponding [protected acquisition contract](docs/connected-service-operation-acquisition.md)
+lets operation types supply an acquisition Flow declaration and execute read-only
+operations through the same protected boundary.
 It reuses Bound Values and one-use Secret capabilities without sending configured
 product identities or resolved connection values through ordinary Flow inputs.
 

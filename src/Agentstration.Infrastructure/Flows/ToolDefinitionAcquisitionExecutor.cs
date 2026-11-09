@@ -94,7 +94,7 @@ public sealed class ToolDefinitionAcquisitionExecutor(
                 artifact = new { artifact.ArtifactId, kind = target.ArtifactKind, artifact.Name, artifact.MediaType },
                 acquisitionId = completed.Name
             }, OutputJson);
-            var flow = completed.Composition.Flow;
+            var flow = completed.Composition!.Flow;
             return new(output, new ToolDefinitionOperationReceipt(
                 null, completed.FlowRunId, flow.Name, flow.Namespace,
                 flow.Version, completed.CorrelationId, false));

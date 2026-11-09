@@ -119,12 +119,13 @@ public sealed class StandaloneRegistrationContractTests
         {
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 3,
             [typeof(ISecretVaultProvider)] = 2,
+            [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 2,
             [typeof(IBootstrapResourceHandler)] = 21,
             [typeof(IPackResourceHandler)] = 11,
             [typeof(IAepEnrollmentResourceProvisioner)] = 5,
             [typeof(IToolExecutionEventSink)] = 2,
-            [typeof(IInternalMcpToolDefinitionProvider)] = 35,
-            [typeof(IInternalMcpToolHandler)] = 35,
+            [typeof(IInternalMcpToolDefinitionProvider)] = 36,
+            [typeof(IInternalMcpToolHandler)] = 36,
             [typeof(IFlowVersionActivationGuard)] = 4,
             [typeof(IFlowDeletionGuard)] = 3,
             [typeof(IWorkExecutionScopeAccessor)] = 2
