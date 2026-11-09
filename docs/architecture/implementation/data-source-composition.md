@@ -71,15 +71,15 @@ method or from its read-only flag.
 
 ## Validation evidence
 
-Checks completed on 2026-11-08:
+Checks completed on 2026-11-09 after integrating `integration/fr-1032` at
+`03ad8f0` (#1079 and #1059):
 
 - Release solution build: zero warnings and errors.
-- Required Fast lane: 1,001 passed, zero failed or skipped.
-- Required Integration lane: 1,083 passed, zero failed, 12 existing optional
+- Required Fast lane: 1,027 passed, zero failed or skipped.
+- Required Integration lane: 1,097 passed, zero failed, 12 existing optional
   integrations skipped (two PostgreSQL and ten live-model cases).
-- After the final permission projection and partition-prefix hardening, the
-  five native dataset integration tests and the Fast lane passed again. The
-  full Integration lane was completed before those final focused changes.
+- The five native dataset integration tests passed separately on the merged
+  base and are also included in the successful complete Integration lane.
 - Ten existing schema-driven source, source lifecycle and artifact-content
   Playwright regressions passed against the local product.
 - Temporary implementation smoke checks created, acquired and read a native
