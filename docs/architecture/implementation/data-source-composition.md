@@ -51,9 +51,16 @@ a valid operational Workspace while `ICurrentRequestContext.IsInitialized` is
 false (that property describes Workspace selection only). The executor checks
 the actual operational identity and accepted discovery's logical scope, and
 authorizes the service in that scope. It never substitutes Workspace authority
-for an administrative call. Nine real OpenAPI/Flow/Secret callback scenarios
+for an administrative call. Fifteen real OpenAPI/Flow/Secret callback scenarios
 cover success, disabled services and changed revisions in all three contexts;
 forged identities/scopes are refused before the provider discovery request.
+
+Discovery transports standard Literal bindings as typed inline values, resolves
+Parameter bindings through their governed resolver, and issues protected Secret
+capabilities only for Secret bindings. A literal URL does not require a Secret
+reference or callback. Secured inputs still reject literals, and unsupported
+binding kinds fail explicitly. The OpenAPI regression matrix includes literal
+URLs with and without the optional authentication Secret in all three scopes.
 
 ## Lifecycle and limits
 
@@ -94,7 +101,7 @@ Checks completed on 2026-11-09 after integrating `integration/fr-1032` at
   integrations skipped (two PostgreSQL and ten live-model cases).
 - The five native dataset integration tests passed separately on the merged
   base and are also included in the successful complete Integration lane.
-- Nine protected OpenAPI discovery scenarios passed after the host context fix,
+- Fifteen protected OpenAPI discovery scenarios passed after the host context and binding fixes,
   with real AWP execution and Secret callbacks. Before correction, the Instance
   and Tenant success cases failed at the host guard before the extension call.
   Both required functional lanes passed again after correction.

@@ -34,20 +34,27 @@ namespace Agentstration.Management.Tests;
 public sealed partial class ConnectedServiceApiTests
 {
     [TestMethod]
-    [DataRow("success", "workspace")]
-    [DataRow("changed-generation", "workspace")]
-    [DataRow("disabled", "workspace")]
-    [DataRow("success", "instance")]
-    [DataRow("changed-generation", "instance")]
-    [DataRow("disabled", "instance")]
-    [DataRow("success", "tenant")]
-    [DataRow("changed-generation", "tenant")]
-    [DataRow("disabled", "tenant")]
-    public async Task OpenApiPublishedDiscoveryFlowUsesExactServiceAndSecretCallbackAndMaterializesOperations(string scenario, string ownerKind)
+    [DataRow("success", "workspace", "parameter")]
+    [DataRow("changed-generation", "workspace", "parameter")]
+    [DataRow("disabled", "workspace", "parameter")]
+    [DataRow("success", "instance", "parameter")]
+    [DataRow("changed-generation", "instance", "parameter")]
+    [DataRow("disabled", "instance", "parameter")]
+    [DataRow("success", "tenant", "parameter")]
+    [DataRow("changed-generation", "tenant", "parameter")]
+    [DataRow("disabled", "tenant", "parameter")]
+    [DataRow("success", "workspace", "literal")]
+    [DataRow("success", "workspace", "literal-no-secret")]
+    [DataRow("success", "instance", "literal")]
+    [DataRow("success", "instance", "literal-no-secret")]
+    [DataRow("success", "tenant", "literal")]
+    [DataRow("success", "tenant", "literal-no-secret")]
+    public async Task OpenApiPublishedDiscoveryFlowUsesExactServiceAndSecretCallbackAndMaterializesOperations(string scenario, string ownerKind, string baseBinding)
     {
         const string credential = "synthetic-openapi-connection-credential";
         var calls = 0;
         var providerCalls = 0;
+        var secretCallbacks = 0;
         WebApplicationFactory<Program>? authority = null;
         await using var extension = new WebApplicationFactory<openapi::Program>().WithWebHostBuilder(builder =>
         {
@@ -57,8 +64,9 @@ public sealed partial class ConnectedServiceApiTests
                 services.RemoveAll<OpenApi.IOpenApiAddressResolver>();
                 services.AddSingleton<OpenApi.IOpenApiAddressResolver, PublicAddressResolver>();
                 services.AddHttpClient<OpenApi.OpenApiService>().ConfigurePrimaryHttpMessageHandler(() => new ContractHandler(() =>
-                    Interlocked.Increment(ref calls), credential));
-                services.AddHttpClient("openapi-secret-access").ConfigurePrimaryHttpMessageHandler(() => authority!.Server.CreateHandler());
+                    Interlocked.Increment(ref calls), baseBinding == "literal-no-secret" ? null : credential));
+                services.AddHttpClient("openapi-secret-access").ConfigurePrimaryHttpMessageHandler(() =>
+                    new SecretCallbackHandler(authority!.Server.CreateHandler(), () => Interlocked.Increment(ref secretCallbacks)));
             });
         });
         await using var factory = Factory().WithWebHostBuilder(builder =>
@@ -135,6 +143,21 @@ public sealed partial class ConnectedServiceApiTests
             type = (await factory.Services.GetRequiredService<ConnectedServiceTypeManagementService>()
                 .GetExactAsync(owner, ResourceNamespace.Parse(manifest.Extension.Id), "openapi", default))!.Value;
         var version = type.Definition.Versions.Single();
+        var bindings = new List<ConnectedServiceValueBinding>
+        {
+            baseBinding == "parameter"
+                ? new() { InputId = "baseUrl", Kind = ConnectedServiceBindingKind.Parameter,
+                    Parameter = new(ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "openapi-origin"), owner) }
+                : new() { InputId = "baseUrl", Kind = ConnectedServiceBindingKind.Literal,
+                    Literal = JsonSerializer.SerializeToElement("https://origin.example.test") }
+        };
+        if (baseBinding != "literal-no-secret")
+            bindings.Add(new()
+            {
+                InputId = "bearerToken",
+                Kind = ConnectedServiceBindingKind.Secret,
+                Secret = new(ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Secret, "openapi-token"), owner)
+            });
         using var created = await client.PostAsJsonAsync("/api/connected-services", new CreateConnectedServiceRequest("orders",
             new()
             {
@@ -147,20 +170,24 @@ public sealed partial class ConnectedServiceApiTests
                     SchemaDigest = version.SchemaDigest
                 },
                 Options = JsonSerializer.SerializeToElement(new { candidatePaths = new[] { "/openapi.json" } }),
-                Bindings =
-                [
-                    new() { InputId = "baseUrl", Kind = ConnectedServiceBindingKind.Parameter,
-                        Parameter = new(ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, "openapi-origin"), owner) },
-                    new() { InputId = "bearerToken", Kind = ConnectedServiceBindingKind.Secret,
-                        Secret = new(ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Secret, "openapi-token"), owner) }
-                ]
+                Bindings = bindings
             }, owner));
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
+        var service = (await created.Content.ReadFromJsonAsync<ConnectedServiceResource>())!;
+        if (baseBinding != "parameter")
+        {
+            using var invalid = await client.PostAsJsonAsync("/api/connected-services", new CreateConnectedServiceRequest("invalid-inline-credential",
+                service.Definition with
+                {
+                    Bindings = [bindings[0], new() { InputId = "bearerToken", Kind = ConnectedServiceBindingKind.Literal,
+                    Literal = JsonSerializer.SerializeToElement(credential) }]
+                }, owner));
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+        }
         using var start = await client.PostAsJsonAsync($"/api/connected-services/orders/operation-discoveries?scopeRef={Uri.EscapeDataString(owner.Value)}",
             new StartConnectedServiceOperationDiscoveryRequest(IdempotencyKey: "openapi-real-flow"));
         Assert.AreEqual(HttpStatusCode.Accepted, start.StatusCode, await start.Content.ReadAsStringAsync());
         var discovery = (await start.Content.ReadFromJsonAsync<ConnectedServiceOperationDiscoveryResource>())!;
-        var service = (await created.Content.ReadFromJsonAsync<ConnectedServiceResource>())!;
         context = new(discovery.CreatedBy, discovery.TenantId, discovery.WorkspaceId);
         using (ownerKind switch
         {
@@ -219,6 +246,7 @@ public sealed partial class ConnectedServiceApiTests
         Assert.AreEqual(ConnectedServiceOperationDiscoveryState.Succeeded, discovery.State, $"{discovery.ErrorCode}: {discovery.ErrorMessage}");
         Assert.AreEqual(1, calls);
         Assert.AreEqual(1, providerCalls);
+        Assert.AreEqual(baseBinding == "literal-no-secret" ? 0 : 1, secretCallbacks);
         var operations = (await client.GetFromJsonAsync<ConnectedServiceOperationResource[]>(
             $"/api/connected-services/orders/operations?scopeRef={Uri.EscapeDataString(owner.Value)}"))!;
         Assert.HasCount(1, operations);
@@ -238,6 +266,15 @@ public sealed partial class ConnectedServiceApiTests
         Assert.DoesNotContain("secretGrant", evidence, StringComparison.OrdinalIgnoreCase);
     }
 
+    private sealed class SecretCallbackHandler(HttpMessageHandler inner, Action called) : DelegatingHandler(inner)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            called();
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
+
     private sealed class DiscoveryRequestHandler(HttpMessageHandler inner, Action called) : DelegatingHandler(inner)
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -253,11 +290,11 @@ public sealed partial class ConnectedServiceApiTests
             Task.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("8.8.8.8")]);
     }
 
-    private sealed class ContractHandler(Action called, string token) : HttpMessageHandler
+    private sealed class ContractHandler(Action called, string? token) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Assert.AreEqual("Bearer " + token, request.Headers.Authorization?.ToString());
+            Assert.AreEqual(token is null ? null : "Bearer " + token, request.Headers.Authorization?.ToString());
             called();
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {

@@ -93,14 +93,22 @@ public sealed class ConnectedServiceDiscoveryExecutor(
             var declared = version.Inputs.Select(input => input.Id).ToArray();
             foreach (var binding in service.Definition.Bindings)
             {
-                if (binding.Kind == ConnectedServiceBindingKind.Parameter)
+                if (binding.Kind == ConnectedServiceBindingKind.Literal)
+                {
+                    if (binding.Literal is not { ValueKind: not JsonValueKind.Undefined } literal
+                        || !version.Inputs.Any(input => input.Id == binding.InputId
+                            && input.Protection == ConnectedServiceValueProtection.Standard))
+                        throw Error("connected_service_literal_binding_invalid");
+                    values.Add(AepBoundValue.Inline(binding.InputId, literal.Clone()));
+                }
+                else if (binding.Kind == ConnectedServiceBindingKind.Parameter)
                 {
                     var parameter = await parameters.ResolveAsync(binding.Parameter!,
                         new(service.ScopeRef!.Value, service.Address), cancellationToken)
                         ?? throw Error("connected_service_parameter_unavailable");
                     values.Add(AepBoundValue.Inline(binding.InputId, parameter.Value));
                 }
-                else
+                else if (binding.Kind == ConnectedServiceBindingKind.Secret)
                 {
                     if (!manifest.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var access)
                         || access.Version != AepProtocol.SecretAccessVersion)
@@ -119,6 +127,7 @@ public sealed class ConnectedServiceDiscoveryExecutor(
                         new Uri(baseUri, AepProtocol.SecretAccessPath), manifest.Extension.Id,
                         binding.InputId, invocation.CallId, handle.RevealForTransport())));
                 }
+                else throw Error("connected_service_binding_kind_invalid");
             }
             var result = await client.DiscoverConnectedServiceOperationsAsync(new(type.Name, version.Version,
                 resolved.Definition.Options, values, discovery.CorrelationId), cancellationToken);
