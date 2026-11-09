@@ -129,8 +129,9 @@ Checks completed on 2026-11-09 against integration base `03ad8f0`:
 
 - Release solution build: zero warnings and errors.
 - Required Fast lane: 1,043 passed, zero failures or skips.
-- The complete Integration rerun for the Knowledge form correction is in progress.
-  The preceding OpenAPI acquisition baseline passed 1,120 tests with 12 optional skips.
+- Required Integration lane after the Knowledge form correction: 1,120 passed,
+  zero failures, 12 existing optional integrations skipped (two PostgreSQL and
+  ten live-model cases), 1,132 total.
 - Five native dataset integration scenarios and fifteen protected real OpenAPI
   Flow/Secret callback scenarios passed in focused runs. Successful OpenAPI rows
   now save and acquire two datasets with different parameters into one local
@@ -143,6 +144,13 @@ Checks completed on 2026-11-09 against integration base `03ad8f0`:
   reflection, effective/default response schemas and case-sensitive query names.
 - Six standalone registration graph cases passed after adding the acquisition
   Tool; the Infrastructure registration/lifetime contract also passes.
+- Eight affected existing source/schema Playwright smoke regressions passed after
+  the Knowledge form correction, covering normal creation/editing and legacy
+  projection in desktop, mobile and French variants. Four additional temporary
+  en-US/fr-FR desktop/mobile checks passed with Blazor startup deliberately paused:
+  the named prerendered form is disabled, then enables after connection; native
+  selection and loaded-form validation preserve interactivity without a document
+  POST, page error or horizontal overflow.
 - Twenty focused Knowledge editor tests pass, including six new prerender,
   failed-lookup/retry and native-input validation cases. Five native dataset API
   scenarios pass with target-list and explicit Knowledge refusal assertions.
