@@ -14,8 +14,10 @@
   --color-border-strong: #c5d1e0;
   --color-text-primary: #111827;
   --color-text-secondary: #64748b;
-  --color-text-muted: #8492a6;
-  --color-action-primary: #3678f6;
+  --color-text-muted: #64748b;
+  --color-action-primary: #2563eb;
+  --color-action-on-primary: #fff;
+  --color-backdrop: rgb(6 13 24 / 45%);
   --color-action-primary-soft: #eaf1ff;
   --color-agent: #4387ff;
   --color-runtime: #20c9d7;
@@ -25,7 +27,7 @@
   --color-execution: #4387ff;
   --color-success: #28a66f;
   --color-warning: #dc8a22;
-  --color-danger: #d84a57;
+  --color-danger: #b91c1c;
   --color-info: #3678f6;
   --space-1: .25rem;
   --space-2: .5rem;
@@ -75,8 +77,11 @@
   --color-border-strong: #354a65;
   --color-text-primary: #f4f7fb;
   --color-text-secondary: #9cb0c9;
-  --color-text-muted: #7389a5;
+  --color-text-muted: #8fa2bb;
   --color-action-primary: #6c98ff;
+  --color-action-on-primary: #08111f;
+  --color-danger: #fca5a5;
+  --color-backdrop: rgb(0 0 0 / 65%);
   --color-action-primary-soft: #172e54;
   --shadow-sm: 0 2px 8px rgb(0 0 0 / 18%);
   --shadow-md: 0 16px 40px rgb(0 0 0 / 26%);
@@ -329,7 +334,7 @@
 }
 .form-field { display: grid; align-content: start; min-width: 0; gap: var(--space-2); }
 .form-field-heading { display: flex; align-items: center; gap: var(--space-2); }
-.form-field-heading > label { color: var(--text); font-size: var(--font-size-sm); font-weight: 650; }
+.form-grid .form-field-heading > label, .form-field-heading > label { display: block; color: var(--text); font-size: var(--font-size-sm); font-weight: 650; }
 .form-field > small { color: var(--muted); font-size: var(--font-size-xs); }
 .clearable-field { position: relative; display: grid; min-width: 0; width: 100%; }
 .app-shell .clearable-field > :is(input,textarea,select) { width: 100%; min-width: 0; padding-right: calc(var(--form-action-size) + var(--space-3)); }
@@ -349,3 +354,23 @@ fieldset:disabled .field-clear { display: none; }
 .resource-reference-choice small,.resource-reference-choice code { display: block; color: var(--muted); }
 .resource-reference-summary { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 @media(max-width:620px) { .field-clear { min-width: 38px; min-height: 38px; } .resource-reference-choice { align-items: flex-start; flex-direction: column; } }
+
+.dialog:modal { max-width: calc(100vw - var(--space-8)); max-height: calc(100dvh - var(--space-8)); margin: auto; overflow: auto; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
+.dialog::backdrop { background: var(--color-backdrop); }
+.resource-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.resource-reference-value { min-width: 0; padding-right: var(--form-action-size); }
+.resource-reference-value code { display: block; overflow-wrap: anywhere; color: var(--muted); }
+.search-box .clearable-field { flex: 1; }
+.app-shell .search-box .clearable-field input { min-height: calc(var(--field-height) - var(--space-2)); padding-right: var(--form-action-size); }
+
+.form-field-messages:empty { display: none; }
+.resource-reference-results { max-height: min(65vh, 42rem); overflow-y: auto; }
+.model-profile-usage-list { max-height: min(60vh, 40rem); overflow-y: auto; }
+
+.field-required { color: var(--form-error-color); }
+.field-requirement { margin-inline-start: .35rem; font-weight: 400; color: var(--muted); font-size: var(--font-size-xs); }
+
+.resource-editor-view[hidden] { display: none; }
+
+.app-shell .button-primary { background: var(--primary); color: var(--color-action-on-primary); }
+.app-shell :is(.validation-message,.validation-errors) { color: var(--form-error-color); }

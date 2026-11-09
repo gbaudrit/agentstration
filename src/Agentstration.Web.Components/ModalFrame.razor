@@ -1,0 +1,49 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@if (IsOpen)
+{
+    <dialog @ref="dialog" class="dialog @Class" role="@Role" aria-modal="true" aria-labelledby="@TitleId" aria-busy="@Busy.ToString().ToLowerInvariant()">
+        <button type="button" hidden data-modal-close @onclick="CloseAsync"></button>
+        @ChildContent
+    </dialog>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter, EditorRequired] public string TitleId { get; set; } = string.Empty;
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string Role { get; set; } = "dialog";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private ElementReference dialog;
+    private IJSObjectReference? module;
+    private IJSObjectReference? registration;
+    private bool opened;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (IsOpen && !opened)
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/dialog.js");
+            registration = await module.InvokeAsync<IJSObjectReference>("openDialog", dialog);
+            opened = true;
+        }
+        else if (!IsOpen && opened && module is not null)
+        {
+            if (registration is not null) { await registration.InvokeVoidAsync("dispose"); await registration.DisposeAsync(); registration = null; }
+            opened = false;
+        }
+    }
+    private Task CloseAsync() => Busy ? Task.CompletedTask : OnClose.InvokeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        if (module is null) return;
+        try
+        {
+            if (registration is not null) { await registration.InvokeVoidAsync("dispose"); await registration.DisposeAsync(); }
+            await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+    }
+}

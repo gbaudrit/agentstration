@@ -62,14 +62,13 @@ else
             <section id="tasks-panel" class="activity-panel tasks-section" role="tabpanel" aria-labelledby="tasks-tab">
                 <div class="tasks-toolbar">
                     <FilterBar>
-                        <label class="sr-only" for="task-status">@T("FilterByStatus")</label>
-                        <select id="task-status" @bind="filter">
+                        <FormField Label="@T("FilterByStatus")" Id="task-status"><ClearableSelect TValue="string" @bind-Value="filter">
                             <option value="">@T("AllStatuses")</option>
                             @foreach (var value in Enum.GetValues<WorkTaskStatus>())
                             {
                                 <option value="@value">@TaskStatusLabel(value)</option>
                             }
-                        </select>
+                        </ClearableSelect></FormField>
                     </FilterBar>
                 </div>
 

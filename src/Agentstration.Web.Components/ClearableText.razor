@@ -5,20 +5,21 @@
 <span class="clearable-field @(Multiline ? "clearable-multiline" : null)">
     @if (Multiline)
     {
-        <textarea @attributes="AdditionalAttributes" id="@ControlId" aria-describedby="@DescriptionId" class="@CssClass" value="@CurrentValueAsString" @oninput="Input" @onchange="Input" readonly="@ReadOnly" disabled="@Disabled" @ref="control"></textarea>
+        <textarea @attributes="AdditionalAttributes" id="@ControlId" aria-describedby="@DescriptionId" aria-required="@(Field?.Required == true ? "true" : null)" class="@CssClass" value="@CurrentValueAsString" @oninput="Input" @onchange="Change" readonly="@ReadOnly" disabled="@Disabled" @ref="control"></textarea>
     }
     else
     {
-        <input @attributes="AdditionalAttributes" id="@ControlId" aria-describedby="@DescriptionId" type="@Type" class="@CssClass" value="@CurrentValueAsString" @oninput="Input" @onchange="Input" readonly="@ReadOnly" disabled="@Disabled" @ref="control" />
+        <input @attributes="AdditionalAttributes" id="@ControlId" aria-describedby="@DescriptionId" aria-required="@(Field?.Required == true ? "true" : null)" type="@Type" class="@CssClass" value="@CurrentValueAsString" @oninput="Input" @onchange="Change" readonly="@ReadOnly" disabled="@Disabled" @ref="control" />
     }
     @if (CanClear)
     {
-        <button class="field-clear" type="button" aria-label="@Localizer["ClearValue"]" @onclick="ClearAsync" @onclick:stopPropagation><span aria-hidden="true">×</span></button>
+        <button class="field-clear" type="button" aria-label="@(Field?.Label is { } label ? Localizer["ClearField", label] : Localizer["ClearValue"])" @onclick="ClearAsync" @onclick:stopPropagation><span aria-hidden="true">×</span></button>
     }
 </span>
 
 @code {
     [Parameter] public bool Multiline { get; set; }
+    [Parameter] public bool UpdateOnInput { get; set; } = true;
     [Parameter] public string Type { get; set; } = "text";
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public bool Disabled { get; set; }
@@ -29,7 +30,9 @@
     private string? DescriptionId => AdditionalAttributes?.GetValueOrDefault("aria-describedby")?.ToString() ?? Field?.DescriptionId;
     private bool CanClear => !ReadOnly && !Disabled && !string.IsNullOrEmpty(CurrentValueAsString);
     public ClearableText() { ValueExpression = () => Value; }
-    private void Input(ChangeEventArgs args) => CurrentValueAsString = args.Value?.ToString() ?? string.Empty;
+    private void Input(ChangeEventArgs args) { if (UpdateOnInput) Change(args); }
+    private void Change(ChangeEventArgs args) => CurrentValueAsString = args.Value?.ToString() ?? string.Empty;
+    public ValueTask FocusAsync() => control.FocusAsync();
     private async Task ClearAsync()
     {
         if (!CanClear) return;

@@ -162,26 +162,50 @@ export class ModelProfileCrossScopePage {
   }
 
   public async assertUsages(expectedNames: string[], excludedNames: string[] = []): Promise<void> {
-    const usages = this.page.getByTestId(TestIds.modelAdministration.profileUsage);
-    await expect(usages).toHaveCount(expectedNames.length);
-    for (const name of expectedNames) {
-      await expect(usages.filter({ hasText: name })).toHaveCount(1);
-    }
-    for (const name of excludedNames) {
-      await expect(usages.filter({ hasText: name })).toHaveCount(0);
-    }
+    const names = await this.allUsageNames();
+    expect(names).toHaveLength(expectedNames.length);
+    for (const name of expectedNames) expect(names.filter(value => value.includes(name))).toHaveLength(1);
+    for (const name of excludedNames) expect(names.filter(value => value.includes(name))).toHaveLength(0);
   }
 
   public async assertImpactCount(count: number): Promise<void> {
     const banner = this.page.getByTestId(TestIds.modelAdministration.profileImpactBanner);
     await expect(banner).toBeVisible();
-    await expect(banner.locator('strong')).toContainText(count.toString());
+    // Exact totals are optional: the bounded collection remains the source of truth.
+    expect(await this.allUsageNames()).toHaveLength(count);
+    await expect(banner.locator('strong')).not.toBeEmpty();
+  }
+
+  private async allUsageNames(): Promise<string[]> {
+    const pager = this.usagesPanel.locator('.collection-pager');
+    const previous = pager.locator('button').first();
+    const next = pager.locator('button').last();
+    const settle = async (): Promise<void> => {
+      await expect(this.usagesPanel.locator('.spinner')).toHaveCount(0);
+    };
+    const turn = async (button: Locator): Promise<void> => {
+      const label = await pager.getAttribute('aria-label');
+      await button.click();
+      await expect(pager).not.toHaveAttribute('aria-label', label!);
+      await settle();
+    };
+    await settle();
+    while (await previous.isEnabled()) await turn(previous);
+    const names: string[] = [];
+    for (let page = 0; page < 100; page++) {
+      names.push(...await this.page.getByTestId(TestIds.modelAdministration.profileUsage).allTextContents());
+      if (!await next.isEnabled()) break;
+      await turn(next);
+    }
+    // Keep the first page available for existing navigation checkpoints.
+    while (await previous.isEnabled()) await turn(previous);
+    return names;
   }
 
   public async openWorkspaceUsage(fixture: ExecutionScopeFixture): Promise<void> {
     await this.usageLink(workspaceAgentName).click();
     await this.expectContext(fixture.scopes.workspace);
-    await this.page.getByTestId(TestIds.agentEditor.form).waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
     await expect(this.page).toHaveURL(new RegExp(`/agents/${workspaceAgentName}\\?`));
   }
 
@@ -193,7 +217,7 @@ export class ModelProfileCrossScopePage {
   public async assertHistoryRoundTrip(fixture: ExecutionScopeFixture): Promise<void> {
     await this.page.goBack({ waitUntil: 'domcontentloaded' });
     await this.expectContext(fixture.scopes.workspace);
-    await this.page.getByTestId(TestIds.agentEditor.form).waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
     await this.page.goForward({ waitUntil: 'domcontentloaded' });
     await this.expectProfileUsages(fixture);
   }
@@ -201,7 +225,7 @@ export class ModelProfileCrossScopePage {
   public async assertReloadKeepsWorkspaceContext(fixture: ExecutionScopeFixture): Promise<void> {
     await this.page.reload({ waitUntil: 'domcontentloaded' });
     await this.expectContext(fixture.scopes.workspace);
-    await this.page.getByTestId(TestIds.agentEditor.form).waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
   }
 
   public async assertNewTabIsolation(fixture: ExecutionScopeFixture): Promise<void> {

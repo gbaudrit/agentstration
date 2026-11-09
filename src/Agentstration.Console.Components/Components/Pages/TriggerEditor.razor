@@ -11,6 +11,7 @@
 @inject TimeProvider TimeProvider
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
 
+<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <PageTitle>@(IsNew ? T("NewTrigger") : T("EditTrigger")) · Agentstration</PageTitle>
 @if (loading || model is null)
 {
@@ -30,47 +31,47 @@ else
     @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert" data-testid="trigger-error">@error</div> }
 
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="trigger-editor" class="resource-form" @oninput="MarkDirty" @onchange="MarkDirty">
-        <DataAnnotationsValidator />
+        <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
         <ValidationSummary />
 
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("TriggerResource")</h2></div>@if (!IsNew) { <StatusBadge Text="@(existing!.Value.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(existing.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /> }</div>
-            <div class="form-grid">
+            <FormGrid>
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Trigger" IsNew="@IsNew" TechnicalNameHelp="@T("ImmutableNameHelp")" DisplayNameTestId="trigger-display-name" TechnicalNameTestId="trigger-name" />
-                <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
-            </div>
+                <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
+            </FormGrid>
         </section>
 
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Target")</p><h2>@T("PublishedFlow")</h2></div></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>@T("Flow")</span><InputSelect @bind-Value="model.FlowKey" data-testid="trigger-flow"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.ScopeRef · @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</InputSelect><ValidationMessage For="() => model.FlowKey" /><small>@T("FlowResolutionHelp")</small></label>
-            </div>
+            <FormGrid>
+                <FormField Required="true" Label="@T("Flow")" Class="form-span-2"><ChildContent><ClearableSelect @bind-Value="model.FlowKey" data-testid="trigger-flow"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.ScopeRef · @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</ClearableSelect><small>@T("FlowResolutionHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.FlowKey" /></Validation></FormField>
+            </FormGrid>
         </section>
 
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("When")</p><h2>@T("Schedule")</h2></div><button class="button-secondary" type="button" @onclick="PreviewAsync">@T("Preview")</button></div>
-            <div class="form-grid">
-                <label><span>@T("ScheduleType")</span><InputSelect @bind-Value="model.ScheduleType"><option value="@TriggerScheduleType.Once">@T("ScheduleType.Once")</option><option value="@TriggerScheduleType.Interval">@T("ScheduleType.Interval")</option><option value="@TriggerScheduleType.Cron">@T("ScheduleType.Cron")</option></InputSelect></label>
-                <label><span>@T("TimeZone")</span><InputSelect @bind-Value="model.TimeZone">@foreach (var zone in timeZones) { <option value="@zone">@zone</option> }</InputSelect><small>@T("TimeZoneHelp")</small></label>
+            <FormGrid>
+                <FormField Required="true" Label="@T("ScheduleType")"><ChildContent><ClearableSelect @bind-Value="model.ScheduleType"><option value="@TriggerScheduleType.Once">@T("ScheduleType.Once")</option><option value="@TriggerScheduleType.Interval">@T("ScheduleType.Interval")</option><option value="@TriggerScheduleType.Cron">@T("ScheduleType.Cron")</option></ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ScheduleType" /></Validation></FormField>
+                <FormField Required="true" Label="@T("TimeZone")"><ChildContent><ClearableSelect @bind-Value="model.TimeZone">@foreach (var zone in timeZones) { <option value="@zone">@zone</option> }</ClearableSelect><small>@T("TimeZoneHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.TimeZone" /></Validation></FormField>
                 @if (model.ScheduleType == TriggerScheduleType.Once)
                 {
                     <label class="form-span-2"><span>@T("RunAt")</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" data-testid="trigger-run-at" /><ValidationMessage For="() => model.LocalAt" /></label>
                 }
                 else if (model.ScheduleType == TriggerScheduleType.Interval)
                 {
-                    <label><span>@T("RepeatEvery")</span><InputNumber @bind-Value="model.IntervalValue" min="1" /><ValidationMessage For="() => model.IntervalValue" /></label>
-                    <label><span>@T("Unit")</span><InputSelect @bind-Value="model.IntervalUnit"><option value="minutes">@T("Unit.Minutes")</option><option value="hours">@T("Unit.Hours")</option><option value="days">@T("Unit.Days")</option></InputSelect></label>
+                    <FormField Label="@T("RepeatEvery")"><ChildContent><ClearableNumber @bind-Value="model.IntervalValue" min="1" /></ChildContent><Validation><ValidationMessage For="() => model.IntervalValue" /></Validation></FormField>
+                    <FormField Required="true" Label="@T("Unit")"><ChildContent><ClearableSelect @bind-Value="model.IntervalUnit"><option value="minutes">@T("Unit.Minutes")</option><option value="hours">@T("Unit.Hours")</option><option value="days">@T("Unit.Days")</option></ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.IntervalUnit" /></Validation></FormField>
                     <label class="form-span-2"><span>@T("StartAt")</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /><ValidationMessage For="() => model.LocalAt" /></label>
                 }
                 else
                 {
                     <label><span>@T("Preset")</span><select value="@cronPreset" @onchange="ApplyCronPreset"><option value="advanced">@T("Preset.Advanced")</option><option value="weekdayMorning">@T("Preset.WeekdaysMorning")</option><option value="dailyMorning">@T("Preset.DailyMorning")</option><option value="weeklyMonday">@T("Preset.MondayMorning")</option></select></label>
-                    <label><span>@T("CronExpression")</span><InputText @bind-Value="model.CronExpression" /><ValidationMessage For="() => model.CronExpression" /><small>@T("CronHelp")</small></label>
+                    <FormField Label="@T("CronExpression")"><ChildContent><ClearableText @bind-Value="model.CronExpression" /><small>@T("CronHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.CronExpression" /></Validation></FormField>
                 }
-                <label><span>@T("MissedOccurrence")</span><InputSelect @bind-Value="model.MisfirePolicy"><option value="@TriggerMisfirePolicy.FireOnce">@T("Misfire.FireOnce")</option><option value="@TriggerMisfirePolicy.Skip">@T("Misfire.Skip")</option></InputSelect><small>@T("MisfireHelp")</small></label>
-                <label><span>@T("PreviousWorkActive")</span><InputSelect @bind-Value="model.ConcurrencyPolicy"><option value="@TriggerConcurrencyPolicy.Skip">@T("Concurrency.Skip")</option><option value="@TriggerConcurrencyPolicy.Allow">@T("Concurrency.Allow")</option></InputSelect><small>@T("ConcurrencyHelp")</small></label>
-            </div>
+                <FormField Label="@T("MissedOccurrence")"><ChildContent><ClearableSelect @bind-Value="model.MisfirePolicy"><option value="@TriggerMisfirePolicy.FireOnce">@T("Misfire.FireOnce")</option><option value="@TriggerMisfirePolicy.Skip">@T("Misfire.Skip")</option></ClearableSelect><small>@T("MisfireHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.MisfirePolicy" /></Validation></FormField>
+                <FormField Label="@T("PreviousWorkActive")"><ChildContent><ClearableSelect @bind-Value="model.ConcurrencyPolicy"><option value="@TriggerConcurrencyPolicy.Skip">@T("Concurrency.Skip")</option><option value="@TriggerConcurrencyPolicy.Allow">@T("Concurrency.Allow")</option></ClearableSelect><small>@T("ConcurrencyHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.ConcurrencyPolicy" /></Validation></FormField>
+            </FormGrid>
             @if (!string.IsNullOrWhiteSpace(scheduleError)) { <p class="form-alert form-alert-danger" role="alert">@scheduleError</p> }
             @if (preview.Count > 0)
             {
@@ -80,19 +81,19 @@ else
 
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("StaticInput")</h2></div><button class="text-button" type="button" @onclick="FormatInput">@T("FormatJson")</button></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>@T("JsonObject")</span><InputTextArea @bind-Value="model.InputJson" rows="10" class="trigger-json form-code-editor" data-testid="trigger-input" /><ValidationMessage For="() => model.InputJson" /><small>@T("StaticInputHelp")</small></label>
-            </div>
+            <FormGrid>
+                <FormField Label="@T("JsonObject")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.InputJson" rows="10" class="trigger-json form-code-editor" data-testid="trigger-input" /><small>@T("StaticInputHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.InputJson" /></Validation></FormField>
+            </FormGrid>
             @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="form-alert form-alert-danger" role="alert">@inputError</p> }
         </section>
 
         @if (IsNew)
         {
-            <div class="form-actions"><a class="button-secondary" href="/triggers">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)" data-testid="trigger-create">@(saving ? T("Creating") : T("CreateDisabledTrigger"))</button></div>
+            <FormActions Busy="@saving"><a class="button-secondary" href="/triggers">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)" data-testid="trigger-create">@(saving ? T("Creating") : T("CreateDisabledTrigger"))</button></FormActions>
         }
         else
         {
-            <UnsavedChangesBar IsVisible="@dirty" Message="@T("UnsavedMessage")">
+            <UnsavedChangesBar IsVisible="@IsDirty" Message="@T("UnsavedMessage")">
                 <Actions><a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(model.Name)}")">@T("Discard")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? T("Saving") : T("SaveChanges"))</button></Actions>
             </UnsavedChangesBar>
         }
@@ -106,7 +107,7 @@ else
     private IReadOnlyList<FlowSummary> availableFlows = [];
     private IReadOnlyList<string> timeZones = [];
     private IReadOnlyList<DateTimeOffset> preview = [];
-    private bool loading = true, notFound, saving, dirty;
+    private bool loading = true, notFound, saving;
     private string? error, scheduleError, inputError;
     private string cronPreset = "weekdayMorning";
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
@@ -134,10 +135,10 @@ else
                 if (existing is null) { notFound = true; return; }
                 model = From(existing.Value);
             }
-            await PreviewAsync(); dirty = false;
+            await PreviewAsync();
         }
         catch (Exception exception) { error = TriggerUi.ErrorMessage(exception, Localizer); }
-        finally { loading = false; }
+        finally { loading = false; savedFingerprint = Fingerprint; }
     }
 
     private TriggerEditorModel From(TriggerResource resource)
@@ -153,7 +154,11 @@ else
         return new() { Name = resource.Name, DisplayName = resource.Definition.DisplayName, Description = resource.Definition.Description, FlowKey = ExistingFlowKey(flow, resource.Namespace), ScheduleType = schedule.Type, TimeZone = zone, LocalAt = TriggerUi.LocalInput(at, zone), IntervalValue = intervalValue, IntervalUnit = intervalUnit, CronExpression = schedule.Expression ?? "0 0 8 ? * MON-FRI", MisfirePolicy = resource.Definition.MisfirePolicy, ConcurrencyPolicy = resource.Definition.ConcurrencyPolicy, InputJson = resource.Definition.Input.GetRawText() };
     }
 
-    private void MarkDirty() => dirty = true;
+    private void MarkDirty() { }
+    private bool invalidInput;
+    private string savedFingerprint = string.Empty;
+    private string Fingerprint => JsonSerializer.Serialize(model);
+    private bool IsDirty => model is not null && CanManage && (Fingerprint != savedFingerprint || invalidInput);
     private async Task PreviewAsync()
     {
         if (model is null) return;
@@ -177,8 +182,8 @@ else
         catch (Exception exception) when (exception is JsonException or FormatException) { inputError = exception.Message; throw; }
     }
 
-    private void FormatInput() { try { var value = ParseInput(); model!.InputJson = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }); dirty = true; } catch (JsonException) { } }
-    private void ApplyCronPreset(ChangeEventArgs args) { cronPreset = args.Value?.ToString() ?? "advanced"; if (cronPreset != "advanced") model!.CronExpression = CronFor(cronPreset); dirty = true; _ = PreviewAsync(); }
+    private void FormatInput() { try { var value = ParseInput(); model!.InputJson = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });  } catch (JsonException) { } }
+    private void ApplyCronPreset(ChangeEventArgs args) { cronPreset = args.Value?.ToString() ?? "advanced"; if (cronPreset != "advanced") model!.CronExpression = CronFor(cronPreset);  _ = PreviewAsync(); }
     private static string CronFor(string preset) => preset switch { "dailyMorning" => "0 0 8 ? * *", "weeklyMonday" => "0 0 9 ? * MON", _ => "0 0 8 ? * MON-FRI" };
     private static string PresetFor(string? expression) => expression switch { "0 0 8 ? * *" => "dailyMorning", "0 0 9 ? * MON" => "weeklyMonday", "0 0 8 ? * MON-FRI" => "weekdayMorning", _ => "advanced" };
     private static string FlowKey(FlowSummary flow) => flow.ScopeRef is null ? string.Empty : $"{flow.ScopeRef.Value.Value}|{flow.Namespace.Value}|{flow.Id}";
@@ -204,6 +209,7 @@ else
             var resource = new TriggerResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = TriggerResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition, ScopeRef = existing?.Value.ScopeRef };
             var saved = await Client.SaveAsync(resource, IsNew ? null : existing!.ETag, CancellationToken.None);
             Notifications.Add(new(Guid.NewGuid(), IsNew ? T("Notification.Created") : T("Notification.Updated"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
+            savedFingerprint = Fingerprint;
             Navigation.NavigateTo($"/triggers/{Uri.EscapeDataString(saved.Value.Name)}");
         }
         catch (Exception exception) { error = TriggerUi.ErrorMessage(exception, Localizer); }
@@ -220,7 +226,7 @@ else
         [Required] public string TimeZone { get; set; } = "Europe/Paris";
         public DateTime LocalAt { get; set; }
         [Range(1, 100000)] public int IntervalValue { get; set; } = 6;
-        public string IntervalUnit { get; set; } = "hours";
+        [Required] public string IntervalUnit { get; set; } = "hours";
         [Required] public string CronExpression { get; set; } = "0 0 8 ? * MON-FRI";
         public TriggerMisfirePolicy MisfirePolicy { get; set; } = TriggerMisfirePolicy.FireOnce;
         public TriggerConcurrencyPolicy ConcurrencyPolicy { get; set; } = TriggerConcurrencyPolicy.Skip;

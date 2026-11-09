@@ -1,10 +1,24 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+
 @if (IsOpen)
 {
-    <div class="dialog-backdrop" role="presentation" @onclick="CancelAsync">
-        <section class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" @onclick:stopPropagation data-testid="@TestId">
-            <h2 id="confirmation-title">@Title</h2><p>@Message</p>
-            <div class="dialog-actions"><button class="button-secondary" @onclick="CancelAsync">Cancel</button><button class="button-danger" @onclick="ConfirmAsync" data-testid="@(TestId is null ? null : $"{TestId}-confirm")">@ConfirmLabel</button></div>
-        </section>
-    </div>
+    <ModalFrame IsOpen="true" TitleId="@titleId" OnClose="CancelAsync" Role="alertdialog">
+        <div data-testid="@TestId">
+            <h2 id="@titleId">@(Title ?? Localizer["ConfirmTitle"])</h2><p>@(Message ?? Localizer["ConfirmMessage"])</p>
+            <div class="dialog-actions"><button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["Cancel"]</button><button type="button" class="button-danger" @onclick="ConfirmAsync" data-testid="@(TestId is null ? null : $"{TestId}-confirm")">@(ConfirmLabel ?? Localizer["Confirm"])</button></div>
+        </div>
+    </ModalFrame>
 }
-@code { [Parameter] public bool IsOpen { get; set; } [Parameter] public string Title { get; set; } = "Confirm action"; [Parameter] public string Message { get; set; } = "This action cannot be undone."; [Parameter] public string ConfirmLabel { get; set; } = "Confirm"; [Parameter] public string? TestId { get; set; } [Parameter] public EventCallback OnConfirm { get; set; } [Parameter] public EventCallback OnCancel { get; set; } private Task ConfirmAsync() => OnConfirm.InvokeAsync(); private Task CancelAsync() => OnCancel.InvokeAsync(); }
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string? ConfirmLabel { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    private readonly string titleId = $"confirmation-{Guid.NewGuid():N}";
+    private Task ConfirmAsync() => OnConfirm.InvokeAsync();
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}

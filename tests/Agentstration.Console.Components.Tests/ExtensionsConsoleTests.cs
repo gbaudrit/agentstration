@@ -25,6 +25,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -70,6 +71,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(
             configured: false,
@@ -98,6 +100,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.Setup<bool>("agentstrationEnrollment.postAndOpen", _ => true).SetResult(true);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -143,6 +146,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: true));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -166,6 +170,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -189,6 +194,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
@@ -219,6 +225,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -244,6 +251,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -273,6 +281,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -306,6 +315,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -331,6 +341,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -361,6 +372,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -389,6 +401,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false, availableEnrollment: true));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -417,6 +430,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false, source: true));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -440,6 +454,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
@@ -478,6 +493,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient(state));
@@ -501,6 +517,7 @@ public sealed class ExtensionsConsoleTests
     public void ExactScopedToolProviderKeepsManagedContentReadOnlyAndOrdinaryContentEditable(bool managed)
     {
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new BundleToolsClient(managedProvider: managed);
         context.Services.AddSingleton<IToolsClient>(client);
@@ -524,6 +541,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient(ExtensionBundleInstallationState.Degraded));
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
@@ -552,6 +570,7 @@ public sealed class ExtensionsConsoleTests
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());

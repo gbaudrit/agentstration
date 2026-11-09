@@ -5,21 +5,23 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ParameterStrings> Localizer
 
+<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <PageTitle>@(IsNew ? T("CreateParameter") : $"{Name} · {T("Parameter")}") · Agentstration</PageTitle>
 <PageHeader Title="@(IsNew ? T("CreateParameter") : model.DisplayName)" Description="@T("Editor.Description")" TestId="resource-parameter-editor"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete" data-testid="parameter-delete">@T("Delete")</button> }<a class="button-secondary" href="/parameters">@T("Back")</a></Actions></PageHeader>
 <div class="form-alert form-alert-info"><strong>@T("ReadableConfiguration")</strong><span>@T("SecretGuidance")</span></div>
 @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
 @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("Referenced", usages.Count)</div> }
-<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="parameter-editor" class="resource-form" data-testid="parameter-form"><DataAnnotationsValidator /><ValidationSummary />
-    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ParameterResource")</h2></div></div><div class="form-grid">
+<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="parameter-editor" class="resource-form" data-testid="parameter-form"><DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><ValidationSummary />
+    <fieldset class="resource-definition-fields" disabled="@busy"><section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ParameterResource")</h2></div></div><FormGrid>
         <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Parameter" IsNew="@IsNew" DisplayNameTestId="parameter-display-name" TechnicalNameTestId="parameter-name" />
-        <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
+        <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
         @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
-        <label><span>@T("ValueType")</span><InputSelect @bind-Value="model.ValueType" data-testid="parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</InputSelect></label>
-        <label class="form-span-2"><span>@T("Value")</span><InputText @bind-Value="model.Value" data-testid="parameter-value" /><small>@T("Value.Help")</small></label>
-    </div></section>
+        <FormField Required="true" Label="@T("ValueType")"><ChildContent><ClearableSelect @bind-Value="model.ValueType" data-testid="parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ValueType" /></Validation></FormField>
+        <FormField Label="@T("Value")" Class="form-span-2"><ChildContent><ClearableText @bind-Value="model.Value" data-testid="parameter-value" /><small>@T("Value.Help")</small></ChildContent><Validation><ValidationMessage For="() => model.Value" /></Validation></FormField>
+    </FormGrid></section>
     <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" />
-    <div class="form-actions"><a class="button-secondary" href="/parameters">@T("Cancel")</a><button type="submit" class="button-primary" disabled="@busy" data-testid="parameter-save">@(busy ? T("Saving") : T("Save"))</button></div>
+    </fieldset>
+    <FormActions Busy="@busy"><a class="button-secondary" href="/parameters">@T("Cancel")</a><button type="submit" class="button-primary" disabled="@busy" data-testid="parameter-save">@(busy ? T("Saving") : T("Save"))</button></FormActions>
 </EditForm>
 @if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("Usages")</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><a href="@usage.Url"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul></section> }
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteParameter")" Message="@T("DeleteMessage", Name ?? string.Empty)" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
@@ -35,6 +37,10 @@
     private string? etag;
     private bool busy, confirmDelete;
     private Exception? error;
+    private string savedFingerprint = string.Empty;
+    private bool invalidInput;
+    private string Fingerprint => JsonSerializer.Serialize(new { model, selectedScope });
+    private bool IsDirty => Fingerprint != savedFingerprint || invalidInput;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnParametersSetAsync()
@@ -52,24 +58,27 @@
             usages = (await Client.GetParameterUsagesAsync(Name!, scope, cancellation.Token)).Value;
         }
         catch (Exception exception) { error = exception; }
+        finally { savedFingerprint = Fingerprint; invalidInput = false; }
     }
     private async Task SaveAsync()
     {
         if (selectedScope is null) { error = new ArgumentException(T("ScopeRequired")); return; }
+        if (busy) return;
         busy = true; error = null;
         try
         {
             var snapshot = IsNew
                 ? await Client.CreateParameterAsync(new(model.Name, model.Properties(), selectedScope), cancellation.Token)
                 : await Client.UpdateParameterAsync(model.Name, selectedScope.Value, new(model.Properties()), etag!, cancellation.Token);
+            savedFingerprint = Fingerprint; invalidInput = false;
             if (IsNew) Navigation.NavigateTo(ResourceUrl(snapshot.Value));
-            else { model = ParameterEditorModel.From(snapshot.Value); etag = snapshot.ETag; }
+            else { model = ParameterEditorModel.From(snapshot.Value); etag = snapshot.ETag; savedFingerprint = Fingerprint; }
         }
         catch (Exception exception) { error = exception; }
         finally { busy = false; }
     }
     private void RequestDelete() { if (usages.Count > 0) error = new AgentstrationApiException(T("InUse", usages.Count), Guid.NewGuid().ToString("N")); else confirmDelete = true; }
-    private async Task DeleteAsync() { confirmDelete = false; try { await Client.DeleteParameterAsync(model.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/parameters"); } catch (Exception exception) { error = exception; } }
+    private async Task DeleteAsync() { confirmDelete = false; try { await Client.DeleteParameterAsync(model.Name, selectedScope!.Value, etag!, cancellation.Token); savedFingerprint = Fingerprint; invalidInput = false; Navigation.NavigateTo("/parameters"); } catch (Exception exception) { error = exception; } }
     private static string ResourceUrl(ParameterResource resource) => $"/parameters/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

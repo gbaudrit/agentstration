@@ -63,7 +63,8 @@ public sealed class WorkOperationsComponentTests
     [TestMethod]
     public void RealtimeStateNeverPretendsOfflineIsLive()
     {
-        using var context = new BunitContext();
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext();
         var rendered = context.Render<RealtimeStatus>(parameters => parameters.Add(value => value.State, WorkOperationsRealtimeState.Offline));
         Assert.IsTrue(rendered.Markup.Contains("Offline", StringComparison.Ordinal)); Assert.IsFalse(rendered.Markup.Contains("> Live<", StringComparison.Ordinal));
     }

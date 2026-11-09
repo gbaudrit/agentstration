@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <root>
   <data name="ClearValue" xml:space="preserve">
     <value>Vider la valeur</value>
@@ -107,5 +107,53 @@
   </data>
   <data name="DiscardYaml" xml:space="preserve">
     <value>Abandonner le brouillon YAML</value>
+  </data>
+  <data name="ContinueSearch" xml:space="preserve">
+    <value>Aucune correspondance dans cette fenêtre. Poursuivez la recherche dans les pages suivantes.</value>
+  </data>
+  <data name="NoMatchesPage" xml:space="preserve">
+    <value>Aucun résultat correspondant sur cette page.</value>
+  </data>
+  <data name="MayAffect" xml:space="preserve">
+    <value>Modifier ce profil peut affecter les agents qui l’utilisent. Consultez les utilisations avant d’enregistrer.</value>
+  </data>
+  <data name="Realtime.Live" xml:space="preserve">
+    <value>En direct</value>
+  </data>
+  <data name="Realtime.Reconnecting" xml:space="preserve">
+    <value>Reconnexion</value>
+  </data>
+  <data name="Realtime.Connecting" xml:space="preserve">
+    <value>Connexion</value>
+  </data>
+  <data name="Realtime.Offline" xml:space="preserve">
+    <value>Hors ligne</value>
+  </data>
+  <data name="LoadedResults" xml:space="preserve">
+    <value>{0} ressources chargées</value>
+  </data>
+  <data name="ClearField" xml:space="preserve">
+    <value>Vider {0}</value>
+  </data>
+  <data name="LookupError" xml:space="preserve">
+    <value>Impossible de charger les profils de modèles. Réessayez.</value>
+  </data>
+  <data name="UsageError" xml:space="preserve">
+    <value>Impossible de charger les utilisations. Réessayez.</value>
+  </data>
+  <data name="ProviderName" xml:space="preserve">
+    <value>Nom technique du fournisseur</value>
+  </data>
+  <data name="NumberRequired" xml:space="preserve">
+    <value>Saisissez un nombre pour {0}.</value>
+  </data>
+  <data name="SelectionRequired" xml:space="preserve">
+    <value>Sélectionnez une valeur pour {0}.</value>
+  </data>
+  <data name="SelectValue" xml:space="preserve">
+    <value>Sélectionner une valeur</value>
+  </data>
+  <data name="Optional" xml:space="preserve">
+    <value>facultatif</value>
   </data>
 </root>

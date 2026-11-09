@@ -1,7 +1,9 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
 <div class="form-field @Class">
-    <div class="form-field-heading"><label for="@ControlId">@Label</label>@if (!string.IsNullOrWhiteSpace(Tooltip)) { <HelpTooltip Text="@Tooltip" /> }</div>
+    <div class="form-field-heading"><label for="@ControlId">@Label@if (Required) { <span aria-hidden="true" class="field-required"> *</span> } else if (Optional) { <span class="field-requirement"> @Localizer["Optional"]</span> }</label>@if (!string.IsNullOrWhiteSpace(Tooltip)) { <HelpTooltip Text="@Tooltip" /> }</div>
     <CascadingValue Value="Presentation" IsFixed="false">@ChildContent</CascadingValue>
     @if (!string.IsNullOrWhiteSpace(Help)) { <small id="@(ControlId + "-help")">@Help</small> }
+    @if (Validation is not null) { <div id="@(ControlId + "-messages")" class="form-field-messages" aria-live="polite">@Validation</div> }
 </div>
 
 @code {
@@ -10,8 +12,12 @@
     [Parameter] public string? Help { get; set; }
     [Parameter] public string? Tooltip { get; set; }
     [Parameter] public string? Class { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool Optional { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Validation { get; set; }
     private readonly string generatedId = $"field-{Guid.NewGuid():N}";
     private string ControlId => Id ?? generatedId;
-    private FormFieldPresentation Presentation => new(ControlId, string.IsNullOrWhiteSpace(Help) ? null : ControlId + "-help");
+    private FormFieldPresentation Presentation => new(ControlId,
+        string.Join(" ", new[] { string.IsNullOrWhiteSpace(Help) ? null : ControlId + "-help", Validation is null ? null : ControlId + "-messages" }.Where(value => value is not null)), Label, Required);
 }

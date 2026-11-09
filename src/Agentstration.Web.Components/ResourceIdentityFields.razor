@@ -3,32 +3,14 @@
 @using Microsoft.AspNetCore.Components.Forms
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> Localizer
 
-<label>
-    <span>@Localizer["DisplayName"]</span>
-    @if (DisplayNameExpression is null || CurrentEditContext is null)
-    {
-        <input value="@currentDisplayName" @oninput="DisplayNameInput" autofocus="@IsNew" data-testid="@DisplayNameTestId" />
-    }
-    else
-    {
-        <InputText Value="@currentDisplayName" ValueChanged="DisplayNameInput" ValueExpression="@DisplayNameExpression" autofocus="@IsNew" data-testid="@DisplayNameTestId" />
-        <ValidationMessage For="@DisplayNameExpression" />
-    }
-    @if (!string.IsNullOrWhiteSpace(DisplayNameHelp)) { <small>@DisplayNameHelp</small> }
-</label>
-<label>
-    <span>@Localizer["TechnicalName"]</span>
-    @if (TechnicalNameExpression is null || CurrentEditContext is null)
-    {
-        <input value="@currentTechnicalName" @oninput="TechnicalNameInput" readonly="@(!IsNew)" disabled="@(!IsNew)" data-testid="@TechnicalNameTestId" />
-    }
-    else
-    {
-        <InputText Value="@currentTechnicalName" ValueChanged="TechnicalNameInput" ValueExpression="@TechnicalNameExpression" readonly="@(!IsNew)" disabled="@(!IsNew)" data-testid="@TechnicalNameTestId" />
-        <ValidationMessage For="@TechnicalNameExpression" />
-    }
-    <small>@(TechnicalNameHelp ?? Localizer["TechnicalNameHelp"])</small>
-</label>
+<FormField Required="true" Label="@Localizer["DisplayName"]" Help="@DisplayNameHelp"><ChildContent>
+    <ClearableText Value="@currentDisplayName" ValueChanged="DisplayNameInput" ValueExpression="@(DisplayNameExpression ?? (() => currentDisplayName))" autofocus="@IsNew" data-testid="@DisplayNameTestId" />
+</ChildContent><Validation>    @if (DisplayNameExpression is not null && CurrentEditContext is not null) { <ValidationMessage For="@DisplayNameExpression" /> }
+</Validation></FormField>
+<FormField Required="@IsNew" Label="@Localizer["TechnicalName"]" Help="@(TechnicalNameHelp ?? Localizer["TechnicalNameHelp"])"><ChildContent>
+    <ClearableText Value="@currentTechnicalName" ValueChanged="TechnicalNameInput" ValueExpression="@(TechnicalNameExpression ?? (() => currentTechnicalName))" ReadOnly="@(!IsNew)" Disabled="@(!IsNew)" data-testid="@TechnicalNameTestId" />
+</ChildContent><Validation>    @if (TechnicalNameExpression is not null && CurrentEditContext is not null) { <ValidationMessage For="@TechnicalNameExpression" /> }
+</Validation></FormField>
 
 @code {
     [Parameter, EditorRequired] public string DisplayName { get; set; } = string.Empty;

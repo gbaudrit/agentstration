@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
 
+<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <PageTitle>@T(IsNew ? "NewDefinition" : "EditDefinition") · Agentstration</PageTitle>
 <PageHeader Title="@T(IsNew ? "NewDefinition" : "EditDefinition")" Description="@T("DefinitionEditorDescription")" TestId="resource-tool-definition-editor" />
 
@@ -12,15 +13,16 @@
 else
 {
     @if (error is not null) { <ErrorState Message="@error" /> }
+    <fieldset class="resource-definition-fields" disabled="@saving">
     <section class="panel"><div class="panel-header"><h2>@T("Definition")</h2></div>
-        <div class="form-grid">
+        <FormGrid>
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" />
-            <label><span>@T("Namespace")</span><input @bind="namespaceValue" disabled="@(!IsNew)" /></label>
-            <label class="form-span-2"><span>@T("DefinitionDescription")</span><textarea @bind="description" rows="2"></textarea></label>
+            <FormField Label="@T("Namespace")"><ClearableText @bind-Value="namespaceValue" Disabled="@(!IsNew)" /></FormField>
+            <FormField Optional="true" Label="@T("DefinitionDescription")" Class="form-span-2"><ClearableText Multiline @bind-Value="description" rows="2" /></FormField>
             <label><input type="checkbox" @bind="enabled" /> <span>@T("Enabled")</span></label>
             <label><input type="checkbox" @bind="requiresApproval" /> <span>@T("RequiresApproval")</span></label>
-            <label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="900" @bind="timeoutSeconds" /></label>
-        </div>
+            <FormField Required="true" Label="@T("TimeoutSeconds")"><ClearableNumber @bind-Value="timeoutSeconds" min="1" max="900" /></FormField>
+        </FormGrid>
     </section>
     @if (acquisitionDefinition?.Acquisition is { } acquisition)
     {
@@ -36,10 +38,10 @@ else
     else
     {
     <section class="panel"><div class="panel-header"><h2>@T("FlowImplementation")</h2></div>
-        <div class="form-grid">
-            <label><span>@T("Flow")</span><select data-testid="tool-definition-flow" @bind="selectedFlow" @bind:after="FlowSelectionChangedAsync"><option value="">—</option>@foreach(var flow in flows){<option value="@FlowKey(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name (@flow.ActiveVersion)</option>}</select></label>
+        <FormGrid>
+            <FormField Required="true" Label="@T("Flow")"><ClearableSelect TValue="string" data-testid="tool-definition-flow" @bind-Value="selectedFlow" @bind-Value:after="FlowSelectionChangedAsync"><option value="">—</option>@foreach(var flow in flows){<option value="@FlowKey(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name (@flow.ActiveVersion)</option>}</ClearableSelect></FormField>
             <label><input type="checkbox" data-testid="tool-definition-use-active-version" @bind="useActiveVersion" @bind:after="LoadContractAsync" /> <span>@T("UseActiveVersion")</span></label>
-            @if (!useActiveVersion) { <label><span>@T("Version")</span><input data-testid="tool-definition-version" @bind="flowVersion" @bind:after="LoadContractAsync" /></label> }
+            @if (!useActiveVersion) { <FormField Label="@T("Version")"><ClearableText UpdateOnInput="false" data-testid="tool-definition-version" @bind-Value="flowVersion" @bind-Value:after="LoadContractAsync" /></FormField> }
             <div class="form-span-2">
                 @if (loadingContract)
                 {
@@ -67,18 +69,22 @@ else
                     </ContractDirectionTabs>
                 }
             </div>
-        </div>
+        </FormGrid>
     </section>
     }
-    <div class="page-actions"><button class="button-primary" data-testid="tool-definition-save" @onclick="SaveAsync" disabled="@(saving || loadingContract || acquisitionDefinition is null && !contractLoaded)">@T("Save")</button><a class="button-secondary" href="/tools/definitions">@T("Cancel")</a>@if(!IsNew){<button class="button-danger" @onclick="DeleteAsync">@T("Delete")</button>}</div>
+    <FormActions Busy="saving"><button class="button-primary" data-testid="tool-definition-save" @onclick="SaveAsync" disabled="@(saving || loadingContract || acquisitionDefinition is null && !contractLoaded)">@T("Save")</button><a class="button-secondary" href="/tools/definitions">@T("Cancel")</a>@if(!IsNew){<button class="button-danger" @onclick="DeleteAsync">@T("Delete")</button>}</FormActions>
+    </fieldset>
 }
 
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name="namespace")] public string? NamespaceQuery { get; set; }
-    private IReadOnlyList<FlowSummary> flows=[]; private string name="",namespaceValue="default",displayName="",description="",selectedFlow="",flowVersion="",inputSchema="{\n  \"type\": \"object\"\n}",outputSchema="",loadedContractVersion=""; private bool enabled=true,requiresApproval,useActiveVersion=true,loading=true,saving,loadingContract,contractLoaded; private int timeoutSeconds=90; private string? etag,error;
+    private IReadOnlyList<FlowSummary> flows=[]; private string name="",namespaceValue="default",displayName="",description="",selectedFlow="",flowVersion="",inputSchema="{\n  \"type\": \"object\"\n}",outputSchema="",loadedContractVersion=""; private bool enabled=true,requiresApproval,useActiveVersion=true,loading=true,saving,loadingContract,contractLoaded; private int? timeoutSeconds=90; private string? etag,error;
     private ToolDefinitionProperties? acquisitionDefinition;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string savedFingerprint = string.Empty;
+    private string Fingerprint => JsonSerializer.Serialize(new { name, namespaceValue, displayName, description, enabled, requiresApproval, timeoutSeconds, selectedFlow, useActiveVersion, flowVersion });
+    private bool IsDirty => !loading && Fingerprint != savedFingerprint;
     private string T(string key, params object[] arguments)=>Localizer[key,arguments];
     protected override async Task OnParametersSetAsync()
     {
@@ -104,7 +110,7 @@ else
             if (acquisitionDefinition is null) await RefreshContractAsync();
         }
         catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
+        finally { loading = false; savedFingerprint = Fingerprint; }
     }
     private void From(ToolDefinitionResource value){name=value.Name;namespaceValue=value.Namespace.Value;displayName=value.Definition.DisplayName;description=value.Definition.Description??"";enabled=value.Definition.Enabled;requiresApproval=value.Definition.RequiresApproval;timeoutSeconds=value.Definition.InvocationTimeoutSeconds;useActiveVersion=value.Definition.Flow.UseActiveVersion;flowVersion=value.Definition.Flow.Version??"";selectedFlow=ExistingFlowKey(value.Definition.Flow,value.Namespace);inputSchema=Pretty(value.Definition.InputSchema);outputSchema=value.Definition.OutputSchema is null?"":Pretty(value.Definition.OutputSchema.Value);}
     private async Task FlowSelectionChangedAsync(){var flow=Selected();flowVersion=flow?.ActiveVersion??"";if(flow is null){ClearContract();return;}await RefreshContractAsync();}
@@ -113,6 +119,8 @@ else
     private void ClearContract(){error=null;inputSchema="{}";outputSchema="";loadedContractVersion="";contractLoaded=false;}
     private async Task SaveAsync()
     {
+        if (saving) return;
+        if (timeoutSeconds is not { } requestedTimeout || requestedTimeout < 1 || requestedTimeout > 900) { error = T("TimeoutRange"); return; }
         saving = true;
         error = null;
         try
@@ -142,18 +150,18 @@ else
                 Description = string.IsNullOrWhiteSpace(description) ? null : description,
                 Enabled = enabled,
                 RequiresApproval = requiresApproval,
-                InvocationTimeoutSeconds = timeoutSeconds
+                InvocationTimeoutSeconds = requestedTimeout
             };
             if (IsNew)
                 await Client.CreateAsync(new CreateToolDefinitionRequest(name, properties, namespaceValue), default);
             else
                 await Client.UpdateAsync(name, ResourceNamespace.Parse(namespaceValue), new PutToolDefinitionRequest(properties), etag!, default);
-            Navigation.NavigateTo("/tools/definitions");
+            savedFingerprint = Fingerprint; Navigation.NavigateTo("/tools/definitions");
         }
         catch (Exception exception) { error = exception.Message; }
         finally { saving = false; }
     }
-    private async Task DeleteAsync(){try{await Client.DeleteAsync(name,ResourceNamespace.Parse(namespaceValue),etag!,default);Navigation.NavigateTo("/tools/definitions");}catch(Exception ex){error=ex.Message;}}
+    private async Task DeleteAsync(){try{await Client.DeleteAsync(name,ResourceNamespace.Parse(namespaceValue),etag!,default);savedFingerprint = Fingerprint; Navigation.NavigateTo("/tools/definitions");}catch(Exception ex){error=ex.Message;}}
     private FlowSummary? Selected()=>flows.SingleOrDefault(value=>FlowKey(value)==selectedFlow);
     private static string FlowKey(FlowSummary flow)=>flow.ScopeRef is null?string.Empty:$"{flow.ScopeRef.Value.Value}|{flow.Namespace.Value}|{flow.Id}";
     private string ExistingFlowKey(ToolDefinitionFlowTarget target,ResourceNamespace owner){var ns=target.Namespace??owner;var scope=target.ScopeRef??flows.Where(value=>value.Namespace==ns&&value.Id==target.Name).Select(value=>value.ScopeRef).SingleOrDefault();return scope is null?string.Empty:$"{scope.Value.Value}|{ns.Value}|{target.Name}";}

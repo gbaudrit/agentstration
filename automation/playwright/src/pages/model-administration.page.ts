@@ -81,6 +81,7 @@ export class ModelAdministrationPage {
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.profileModel));
     await this.page.getByTestId(TestIds.modelAdministration.profileSave).click();
     await this.page.waitForURL(url => url.pathname === `/modelprofiles/${definition.profileName}`);
+    await this.openProfileEdit();
     await this.waitForPersisted(TestIds.modelAdministration.profileForm);
     return this.page.getByTestId(TestIds.resourceAdministration.modelProfileEditor);
   }
@@ -153,6 +154,7 @@ export class ModelAdministrationPage {
       `/modelprofiles/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}&context=${encodeURIComponent(scopeRef)}`,
       TestIds.resourceAdministration.modelProfileEditor,
     );
+    await this.openProfileEdit();
     await this.waitForPersisted(TestIds.modelAdministration.profileForm);
     await this.page.getByTestId(TestIds.modelAdministration.profileAccessTab).click();
     await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
@@ -169,6 +171,15 @@ export class ModelAdministrationPage {
     await save.click();
     await expect.poll(() => form.getAttribute('data-resource-etag')).not.toBe(previousEtag);
     await expect(input).toHaveValue(value);
+  }
+
+  private async openProfileEdit(): Promise<void> {
+    const tab = this.page.getByTestId(TestIds.modelAdministration.profileEditTab);
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await expect(this.page.getByTestId(TestIds.modelAdministration.profileForm)).toBeVisible();
+    }).toPass();
   }
 
   private async waitForInteractive(testId: string): Promise<void> {

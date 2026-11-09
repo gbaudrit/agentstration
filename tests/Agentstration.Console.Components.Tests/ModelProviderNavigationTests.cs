@@ -424,7 +424,7 @@ public sealed partial class ModelProviderNavigationTests
             Assert.AreEqual(7, rendered.FindAll(".metric-help").Count);
             Assert.IsTrue(rendered.FindAll(".metric-help").All(element => element.GetAttribute("tabindex") == "0"));
             Assert.IsTrue(rendered.FindAll(".metric-tooltip").All(element => element.GetAttribute("role") == "tooltip"));
-            Assert.IsTrue(rendered.FindAll("label > span").Any(element => element.TextContent.StartsWith("Seed", StringComparison.Ordinal)));
+            Assert.IsTrue(rendered.FindAll(".form-field label").Any(element => element.TextContent.StartsWith("Seed", StringComparison.Ordinal)));
             Assert.IsFalse(rendered.Markup.Contains("Graine", StringComparison.Ordinal));
             Assert.IsTrue(rendered.FindAll(".metric-tooltip").Any(element => element.TextContent.Contains("variabilité des réponses", StringComparison.Ordinal)));
             Assert.IsTrue(rendered.FindAll(".metric-tooltip").Any(element => element.TextContent.Contains("visible depuis ce périmètre", StringComparison.Ordinal)));
@@ -450,6 +450,10 @@ public sealed partial class ModelProviderNavigationTests
             Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-impact-banner']"));
             Assert.IsTrue(rendered.Markup.Contains("Review these dependencies", StringComparison.Ordinal));
         });
+        Assert.AreEqual("true", rendered.Find("#model-profile-page-overview").GetAttribute("aria-selected"));
+        rendered.Find("[data-testid='model-profile-edit-tab']").Click();
+        Assert.AreEqual("true", rendered.Find("#model-profile-page-edit").GetAttribute("aria-selected"));
+        Assert.AreEqual("false", rendered.Find("#model-profile-page-overview").GetAttribute("aria-selected"));
         rendered.Find("[data-testid='model-profile-review-usages']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -486,7 +490,7 @@ public sealed partial class ModelProviderNavigationTests
         using var context = CreateContext(out var providers);
         context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(
-            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}");
+            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}&tab=edit");
 
         var rendered = context.Render<ModelProfileEditor>(parameters => parameters
             .Add(value => value.Name, "shared-reasoning"));
