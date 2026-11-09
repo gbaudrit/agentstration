@@ -39,6 +39,11 @@ public sealed record DataSourceFlowRunSnapshot(
 
 public interface IDataSourceAcquisitionCompositionResolver
 {
+    Task<ResolvedDataSourceFlowBinding> ResolveOperationAsync(ResourceScopeRef consumerScope,
+        Agentstration.ConnectedServices.Contracts.ConnectedServiceDiscoveryFlowReference flow,
+        CancellationToken cancellationToken) => throw new DataSourceAcquisitionException(
+            "data_source_operation_adapter_unavailable", "The operation execution adapter is unavailable.");
+
     Task<ResolvedDataSourceFlowBinding> ResolveFlowAsync(
         ResourceScopeRef ownerScope,
         ResourceNamespace ownerNamespace,
@@ -88,7 +93,8 @@ public sealed class DataSourceAcquisitionService(
     IDataSourceAcquisitionCompositionResolver compositions,
     IDataSourceAcquisitionFlowGateway flowRuns,
     IDataSourceArtifactReferenceValidator artifacts,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    DataSourceDatasetAcquisitionService? datasets = null)
 {
     private readonly DataSourceExecutionContext execution = new(requestContext, requestScopes);
     private readonly ConcurrentDictionary<(Guid WorkspaceId, Guid SourceUid), SemaphoreSlim> startGates = new();
@@ -161,11 +167,22 @@ public sealed class DataSourceAcquisitionService(
         {
             if (!source.Value.Definition.Enabled)
                 throw Error("data_source_disabled", $"Data Source '{source.Value.Address}' is disabled.");
+            if (source.Value.Definition.Dataset is not null)
+            {
+                if (targetName is not null) throw Error("data_source_parameters_fixed", "Dataset acquisitions do not accept legacy targets.");
+                if (template is not null && template.DataSourceGeneration != source.Value.Generation)
+                    throw Error("data_source_acquisition_template_source_changed", "The fixed dataset composition has changed.");
+                var datasetResult = await (datasets ?? throw Error("data_source_dataset_unavailable", "Dataset acquisition is unavailable."))
+                    .StartAsync(source.Value, template is null ? parameters : JsonSerializer.SerializeToElement(new { }),
+                        correlationId, idempotencyKey, cancellationToken);
+                await AuditAsync(SecurityAuditActions.DataSourceAcquisitionStarted, datasetResult.Value.Name, context, cancellationToken);
+                return datasetResult;
+            }
             var profileUid = source.Value.ProfileUid
                 ?? throw Error("data_source_profile_pin_missing",
                     $"Data Source '{source.Value.Address}' does not pin an exact Data Source Profile identity.");
             var profile = await profiles.ResolveActiveAsync(sourceOwnerScope, source.Value.Namespace,
-                source.Value.Definition.Profile, profileUid, cancellationToken);
+                source.Value.Definition.Profile!, profileUid, cancellationToken);
             var configurationIssues = DataSourceProfileService.ValidateConfiguration(
                 profile.Definition.ConfigurationSchema, source.Value.Definition.Configuration);
             if (configurationIssues.Count != 0)
@@ -411,8 +428,15 @@ public sealed class DataSourceAcquisitionService(
         var original = await GetCoreAsync(@namespace, acquisitionId, context, cancellationToken);
         if (!IsTerminal(original.Value.State))
             throw Error("data_source_acquisition_retry_not_terminal", "Only a terminal acquisition can be retried.");
+        if (original.Value.Dataset is not null)
+        {
+            var source = await sources.ResolveForUseAsync(original.Value.DataSourceNamespace, original.Value.DataSourceName,
+                original.Value.DataSourceScopeRef, execution.ConsumerScope, cancellationToken);
+            if (source.Value.Generation != original.Value.DataSourceGeneration)
+                throw Error("data_source_acquisition_template_source_changed", "The original dataset configuration has changed. Start a new acquisition explicitly.");
+        }
         var retried = await StartAsync(original.Value.DataSourceNamespace, original.Value.DataSourceName,
-            original.Value.DataSourceScopeRef, original.Value.Parameters, correlationId, null,
+            original.Value.DataSourceScopeRef, original.Value.Dataset is null ? original.Value.Parameters : JsonSerializer.SerializeToElement(new { }), correlationId, null,
             original.Value.Target?.Name, cancellationToken);
         var updated = retried.Value with
         {
@@ -429,12 +453,45 @@ public sealed class DataSourceAcquisitionService(
     {
         var pending = (await store.ListAllAsync<DataSourceAcquisitionResource>(
             DataSourceResourceKinds.DataSourceAcquisition, cancellationToken))
-            .Where(item => item.Value.State == DataSourceAcquisitionState.Pending)
+            .Where(item => item.Value.State == DataSourceAcquisitionState.Pending
+                || item.Value.Dataset is not null && !IsTerminal(item.Value.State))
             .ToArray();
         foreach (var stored in pending)
         {
             var value = stored.Value;
             if (value.ScopeRef is not { Kind: ResourceScopeKind.Workspace, TargetId: { } workspaceId }) continue;
+            if (value.Dataset is not null)
+            {
+                var caller = new RequestContext(value.CreatedBy, value.TenantId, workspaceId);
+                using var nativeScope = value.LogicalScopeRef?.Kind switch
+                {
+                    ResourceScopeKind.Instance => requestScopes.PushInstance(caller),
+                    ResourceScopeKind.Tenant => requestScopes.PushTenantAdministration(caller),
+                    _ => requestScopes.Push(caller)
+                };
+                if (datasets is not null)
+                {
+                    try
+                    {
+                        await datasets.EnsureStartedAsync(value, cancellationToken);
+                        _ = await datasets.SynchronizeAsync(stored, cancellationToken);
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    {
+                        var failed = value with
+                        {
+                            Generation = checked(value.Generation + 1),
+                            State = DataSourceAcquisitionState.Failed,
+                            CompletedAt = timeProvider.GetUtcNow(),
+                            ErrorCode = "data_source_recovery_refused",
+                            ErrorMessage = "The accepted acquisition could not be recovered with its original authorized dependencies."
+                        };
+                        try { await execution.InWorkspaceAsync(() => store.PutExactAsync(value.ScopeRef.Value, failed, stored.ETag, false, cancellationToken)); }
+                        catch (ResourceConcurrencyException) { /* Another observer already advanced the acquisition. */ }
+                    }
+                }
+                continue;
+            }
             if (await flowRuns.GetAsync(workspaceId, value.FlowRunId, value.TenantId, value.CreatedBy,
                     cancellationToken) is not null) continue;
             var input = JsonSerializer.SerializeToElement(new DataSourceAcquisitionInput
@@ -442,7 +499,7 @@ public sealed class DataSourceAcquisitionService(
                 DataSourceId = $"{value.DataSourceNamespace}/{value.DataSourceName}",
                 DataSourceUid = value.DataSourceUid,
                 DataSourceGeneration = value.DataSourceGeneration,
-                Profile = value.Composition.Profile,
+                Profile = value.Composition!.Profile,
                 SourceConfiguration = value.SourceConfiguration.Clone(),
                 Parameters = value.Parameters.Clone(),
                 Caller = new(value.CreatedBy, value.TenantId, workspaceId),
@@ -453,7 +510,7 @@ public sealed class DataSourceAcquisitionService(
             }, JsonSerializerOptions.Web);
             try
             {
-                _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Composition.Flow, input,
+                _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Composition!.Flow, input,
                     value.CreatedBy.ToString("D"), value.CorrelationId, value.IdempotencyKey,
                     value.TenantId, workspaceId, value.CreatedBy)
                 { LogicalScopeRef = value.LogicalScopeRef }, cancellationToken);
@@ -493,6 +550,9 @@ public sealed class DataSourceAcquisitionService(
         RequestContext context,
         CancellationToken cancellationToken)
     {
+        if (stored.Value.Dataset is not null)
+            return await (datasets ?? throw Error("data_source_dataset_unavailable", "Dataset acquisition is unavailable."))
+                .SynchronizeAsync(stored, cancellationToken);
         var run = await flowRuns.GetAsync(context.WorkspaceId, stored.Value.FlowRunId,
             context.TenantId, context.PrincipalId, cancellationToken);
         if (run is null || run.State == stored.Value.State && (!IsTerminal(run.State) || stored.Value.CompletedAt is not null))

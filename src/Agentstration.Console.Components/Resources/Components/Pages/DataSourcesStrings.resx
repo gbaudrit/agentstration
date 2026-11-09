@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
-  <data name="DataSources" xml:space="preserve"><value>Data Sources</value></data><data name="DataSourcesHelp" xml:space="preserve"><value>Manage governed origins independently from the projections that consume their artifacts.</value></data>
+  <data name="DataSources" xml:space="preserve"><value>Data Sources</value></data><data name="DataSourcesHelp" xml:space="preserve"><value>Compose governed operation acquisitions into logical datasets in existing Storages.</value></data>
   <data name="Profiles" xml:space="preserve"><value>Data Source Profiles</value></data><data name="ProfilesHelp" xml:space="preserve"><value>Define reusable configuration and acquisition contracts.</value></data>
   <data name="Create" xml:space="preserve"><value>Create</value></data><data name="Refresh" xml:space="preserve"><value>Refresh</value></data><data name="Loading" xml:space="preserve"><value>Loading…</value></data><data name="Open" xml:space="preserve"><value>Open</value></data><data name="Back" xml:space="preserve"><value>Back</value></data><data name="Delete" xml:space="preserve"><value>Delete</value></data><data name="Save" xml:space="preserve"><value>Save</value></data><data name="Saving" xml:space="preserve"><value>Saving…</value></data>
   <data name="EmptySources" xml:space="preserve"><value>No Data Source has been created.</value></data><data name="EmptyProfiles" xml:space="preserve"><value>No Data Source Profile is visible in this context.</value></data>
@@ -82,4 +82,58 @@
   <data name="AcquisitionToolForbidden"><value>You do not have permission to create a Tool from this acquisition.</value></data>
   <data name="AcquisitionToolCreateFailed"><value>The Tool could not be created from this acquisition.</value></data>
   <data name="Cancel"><value>Cancel</value></data>
+  <data name="DatasetStorageOrProfile" xml:space="preserve"><value>Storage / profile</value></data>
+  <data name="DatasetHelp" xml:space="preserve"><value>A logical dataset acquired from a governed operation into an existing Storage.</value></data>
+  <data name="DatasetStorage" xml:space="preserve"><value>Storage</value></data>
+  <data name="DatasetPinnedUnavailable" xml:space="preserve"><value>Pinned revision unavailable — select a current revision explicitly.</value></data>
+  <data name="DatasetStorageHelp" xml:space="preserve"><value>The selected Storage owns its connection, mappings and fixed envelope.</value></data>
+  <data name="DatasetPrefix" xml:space="preserve"><value>Dataset prefix</value></data>
+  <data name="DatasetPrefixHelp" xml:space="preserve"><value>Optional relative directory ending with /. The datasets segment is reserved; a unique dataset partition is always added.</value></data>
+  <data name="DatasetOperation" xml:space="preserve"><value>Operation</value></data>
+  <data name="DatasetOperationHelp" xml:space="preserve"><value>Select an exact read-only operation revision. Actions require a separate journey.</value></data>
+  <data name="DatasetNoConfiguration" xml:space="preserve"><value>No configuration</value></data>
+  <data name="DatasetParametersHelp" xml:space="preserve"><value>These saved call parameters are validated and fixed for each acquisition. Schema defaults are never filled automatically.</value></data>
+  <data name="DatasetLegacyProfile" xml:space="preserve"><value>From a legacy profile</value></data>
+  <data name="DatasetService" xml:space="preserve"><value>Connected Service</value></data>
+  <data name="DatasetFixedCallHelp" xml:space="preserve"><value>Acquisition uses the saved operation, parameters and Storage. Caller overrides are refused.</value></data>
+  <data name="DatasetNotReady" xml:space="preserve"><value>The saved composition is unavailable. Review its exact revisions, activation and access before acquiring.</value></data>
+  <data name="DatasetContent" xml:space="preserve"><value>Acquired content</value></data>
+  <data name="DatasetReadContent" xml:space="preserve"><value>Read content</value></data>
+  <data name="DatasetExecutionFailed" xml:space="preserve"><value>Acquisition failed.</value></data>
+  <data name="DatasetContentUntrusted" xml:space="preserve"><value>Content is displayed as data and is never executed.</value></data>
+  <data name="DatasetContentTruncated" xml:space="preserve"><value>This preview is limited to the first content segment.</value></data>
+  <data name="DatasetCloseContent" xml:space="preserve"><value>Close content</value></data>
+  <data name="DatasetLoadFailed" xml:space="preserve"><value>The dataset or its available dependencies could not be loaded.</value></data>
+  <data name="DatasetActionFailed" xml:space="preserve"><value>The action was refused or could not complete. Review the current revisions, input values and access, then retry explicitly.</value></data>
+  <data name="DatasetAcquisitionNotAuthorized" xml:space="preserve"><value>You are not authorized to start acquisitions in the operational Workspace.</value></data>
+  <data name="DatasetServiceHelp" xml:space="preserve"><value>Choose the Connected Service that owns the acquisition operation. Discovery and activation are managed on that service.</value></data>
+  <data name="DatasetManageOperations" xml:space="preserve"><value>Open service discovery and operations</value></data>
+  <data name="DatasetSelectOperationFirst" xml:space="preserve"><value>Choose a Connected Service, then an operation to configure its saved call parameters.</value></data>
+  <data name="DatasetNoServiceOperations" xml:space="preserve"><value>No operations are currently available for this service. Open its Discovery tab to discover and review operations.</value></data>
+  <data name="DatasetOperationTypeUnavailable" xml:space="preserve"><value>The exact operation type version is unavailable. Review its reference and access.</value></data>
+  <data name="DatasetOperationAdapterUnavailable" xml:space="preserve"><value>This operation type does not provide an acquisition Flow. It cannot feed an enabled Data Source.</value></data>
+  <data name="DatasetOperationNotReadOnly" xml:space="preserve"><value>Acquisition requires a read-only request-response operation.</value></data>
+  <data name="DatasetOperationSchemaMissing" xml:space="preserve"><value>The effective input or output schema is missing or unsupported for acquisition.</value></data>
+  <data name="DatasetParametersUnavailable" xml:space="preserve"><value>Parameters become available when the operation supports acquisition.</value></data>
+  <data name="DatasetParametersInvalid" xml:space="preserve"><value>The saved parameters do not satisfy the operation input schema.</value></data>
+  <data name="DatasetPrefixInvalid" xml:space="preserve"><value>Use a relative directory prefix ending in /, without .. or the reserved datasets segment.</value></data>
+  <data name="DatasetErrorReference" xml:space="preserve"><value>Error reference:</value></data>
+  <data name="DatasetEdit" xml:space="preserve"><value>Edit</value></data>
+  <data name="DatasetCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="DatasetSections" xml:space="preserve"><value>Data Source sections</value></data>
+  <data name="DatasetContentTab" xml:space="preserve"><value>Content</value></data>
+  <data name="DatasetComposition" xml:space="preserve"><value>Dataset composition</value></data>
+  <data name="DatasetDataSource" xml:space="preserve"><value>Data Source</value></data>
+  <data name="DatasetBytes" xml:space="preserve"><value>{0:N0} bytes</value></data>
+  <data name="DatasetViewFlowRun" xml:space="preserve"><value>View Flow Run</value></data>
+  <data name="DatasetSavedConfiguration" xml:space="preserve"><value>Saved configuration</value></data>
+  <data name="DatasetIdentity" xml:space="preserve"><value>Identity</value></data>
+  <data name="DatasetSavedAcquisition" xml:space="preserve"><value>Configured acquisition</value></data>
+  <data name="DatasetDestination" xml:space="preserve"><value>Dataset destination</value></data>
+  <data name="DatasetIsolatedContent" xml:space="preserve"><value>Each Data Source keeps its own dataset. Storage constraints remain applied.</value></data>
+  <data name="DatasetRecentAcquisitions" xml:space="preserve"><value>Recent acquisitions</value></data>
+  <data name="DatasetAllHistory" xml:space="preserve"><value>Full history</value></data>
+  <data name="DatasetNoContent" xml:space="preserve"><value>No acquired content is available yet. Start an acquisition, then refresh its history.</value></data>
+  <data name="DatasetContentAcquisition" xml:space="preserve"><value>Acquisition to read</value></data>
+  <data name="DatasetYamlHelp" xml:space="preserve"><value>Read-only manifest of the saved Data Source. Use the Definition tab to edit its configuration.</value></data>
 </root>

@@ -114,4 +114,36 @@
   <data name="YamlReadOnlyHelp"><value>This manifest reflects the saved resource definition. Edit it through the Definition tab.</value></data>
   <data name="ReadOnly"><value>Read-only</value></data>
   <data name="YamlDefinition"><value>Connected Service YAML definition</value></data>
+  <data name="Tab.Discovery" xml:space="preserve"><value>Discovery</value></data>
+  <data name="Discovery.Title" xml:space="preserve"><value>Discover service operations</value></data>
+  <data name="Discovery.Help" xml:space="preserve"><value>Discover operations from this saved Connected Service. Follow each discovery Flow Run and review its operations here.</value></data>
+  <data name="Discovery.Start" xml:space="preserve"><value>Start discovery</value></data>
+  <data name="Discovery.Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Discovery.Unsupported" xml:space="preserve"><value>This service type revision does not currently provide a discovery Flow. Historical results remain available.</value></data>
+  <data name="Discovery.Failed" xml:space="preserve"><value>The request could not complete. Check the service revision, access and execution history, then refresh or retry.</value></data>
+  <data name="Discovery.Accepted" xml:space="preserve"><value>Discovery accepted. Open its Flow Run or refresh to follow completion.</value></data>
+  <data name="Discovery.Loading" xml:space="preserve"><value>Loading discoveries and operations…</value></data>
+  <data name="Discovery.Operations" xml:space="preserve"><value>Service operations</value></data>
+  <data name="Discovery.ActivationHelp" xml:space="preserve"><value>Enable or disable operations explicitly here. Activation does not execute an operation or publish a Tool. Existing Data Sources keep their saved operation revisions.</value></data>
+  <data name="Discovery.NoOperations" xml:space="preserve"><value>No operations have been discovered for this service.</value></data>
+  <data name="Discovery.Operation" xml:space="preserve"><value>Operation</value></data>
+  <data name="Discovery.Actions" xml:space="preserve"><value>Actions</value></data>
+  <data name="Discovery.EnableOperation" xml:space="preserve"><value>Enable operation</value></data>
+  <data name="Discovery.DisableOperation" xml:space="preserve"><value>Disable operation</value></data>
+  <data name="Discovery.Availability.Available" xml:space="preserve"><value>Available</value></data>
+  <data name="Discovery.Availability.Stale" xml:space="preserve"><value>Stale revision</value></data>
+  <data name="Discovery.Availability.Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="Discovery.History" xml:space="preserve"><value>Discovery history</value></data>
+  <data name="Discovery.NoHistory" xml:space="preserve"><value>No discoveries in the current execution context.</value></data>
+  <data name="Discovery.Created" xml:space="preserve"><value>Created</value></data>
+  <data name="Discovery.State" xml:space="preserve"><value>State</value></data>
+  <data name="Discovery.FlowRun" xml:space="preserve"><value>Discovery Flow Run</value></data>
+  <data name="Discovery.State.Pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="Discovery.State.Running" xml:space="preserve"><value>Running</value></data>
+  <data name="Discovery.State.WaitingForInput" xml:space="preserve"><value>Waiting for input</value></data>
+  <data name="Discovery.State.WaitingForChild" xml:space="preserve"><value>Waiting for child execution</value></data>
+  <data name="Discovery.State.Succeeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="Discovery.State.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Discovery.State.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="Discovery.State.TimedOut" xml:space="preserve"><value>Timed out</value></data>
 </root>

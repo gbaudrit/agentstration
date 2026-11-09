@@ -236,6 +236,20 @@ internal static class ConnectedServiceEndpoints
             .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
 
         var operations = endpoints.MapGroup("/api/connected-service-operations");
+        operations.MapGet("/", async (ConnectedServiceOperationService service, CancellationToken token) =>
+            Results.Ok(await service.ListAsync(token)))
+            .Produces<ConnectedServiceOperationResource[]>()
+            .WithSummary("List discoverable Connected Service operations")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        operations.MapPut("/{name}/enabled", async (string name, string scopeRef, string? @namespace,
+            SetConnectedServiceOperationEnabledRequest body, HttpRequest request, HttpResponse response,
+            ConnectedServiceOperationService service, CancellationToken token) => await Execute(async () =>
+                Resource(await service.SetEnabledAsync(new(ResourceScopeRef.Parse(scopeRef),
+                    ResourceNamespace.Parse(@namespace), ConnectedServiceResourceKinds.ConnectedServiceOperation, name),
+                    body.Enabled, request.Headers.IfMatch.FirstOrDefault(), token), response, 200)))
+            .Produces<ConnectedServiceOperationResource>()
+            .WithSummary("Explicitly enable or disable an operation without invoking or publishing it")
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         operations.MapGet("/{name}", async (string name, string scopeRef, string? @namespace,
             HttpResponse response, ConnectedServiceOperationDiscoveryService service,
             CancellationToken token) => await Execute(async () =>

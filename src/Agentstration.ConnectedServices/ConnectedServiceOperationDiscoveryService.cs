@@ -18,7 +18,10 @@ public sealed record ConnectedServiceDiscoveryFlowRunRequest(
     string? IdempotencyKey,
     Guid TenantId,
     Guid WorkspaceId,
-    Guid PrincipalId);
+    Guid PrincipalId)
+{
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
+}
 
 public sealed record ConnectedServiceDiscoveryFlowRunSnapshot(
     string RunId,
@@ -59,6 +62,50 @@ public sealed class ConnectedServiceOperationDiscoveryService(
     public const int MaximumIdempotencyKeyLength = 200;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    private async Task<T> InWorkspaceAsync<T>(RequestContext context, Func<Task<T>> action)
+    {
+        using var workspace = requestScopes.Push(context);
+        return await action();
+    }
+
+    public async Task<(ConnectedServiceOperationDiscoveryResource Discovery, ConnectedServiceResource Service,
+        ConnectedServiceTypeResource Type, ConnectedServiceTypeVersionDescriptor Version)> GetExecutionAsync(
+        ResourceNamespace @namespace, string id, string runId, CancellationToken cancellationToken)
+    {
+        var context = RequireContext();
+        var stored = await InWorkspaceAsync(context, () => store.GetExactAsync<ConnectedServiceOperationDiscoveryResource>(new(
+            ResourceScopeRef.Workspace(context.WorkspaceId), @namespace,
+            ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, id), cancellationToken))
+            ?? throw Error("connected_service_discovery_not_found", "The discovery was not found.");
+        var discovery = stored.Value;
+        var consumer = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(context.TenantId),
+            _ => ResourceScopeRef.Workspace(context.WorkspaceId)
+        };
+        if (discovery.FlowRunId != runId || discovery.CreatedBy != context.PrincipalId
+            || discovery.TenantId != context.TenantId || discovery.WorkspaceId != context.WorkspaceId
+            || (discovery.LogicalScopeRef ?? ResourceScopeRef.Workspace(discovery.WorkspaceId)) != consumer
+            || IsTerminal(discovery.State))
+            throw Error("connected_service_discovery_execution_denied", "The discovery execution context does not match.");
+        var reference = discovery.Service;
+        var service = await services.GetExactAsync(reference.Service.ScopeRef, reference.Service.Address.Namespace,
+            reference.Service.Address.Name, cancellationToken)
+            ?? throw Error("connected_service_unavailable", "The Connected Service is unavailable.");
+        if (service.Value.Uid != reference.ServiceUid || service.Value.Generation != reference.Generation
+            || service.Value.Namespace != reference.Service.Address.Namespace)
+            throw Error("connected_service_revision_changed", "The Connected Service revision changed.");
+        EnsureDiscoverable(service.Value);
+        var (type, version) = await ResolveServiceTypeAsync(service.Value, cancellationToken);
+        if (service.Value.Definition.Type != discovery.ServiceType
+            || version.OperationDiscovery?.Flow != discovery.Flow)
+            throw Error("connected_service_discovery_revision_changed", "The discovery dependencies changed.");
+        await ValidateDependenciesAsync(version.OperationDiscovery, service.Value.Namespace,
+            reference.Service.ScopeRef, cancellationToken);
+        return (discovery, service.Value, type, version);
+    }
+
     public async Task<StoredResource<ConnectedServiceOperationDiscoveryResource>> StartAsync(
         ResourceScopeRef serviceScope,
         string serviceName,
@@ -88,8 +135,8 @@ public sealed class ConnectedServiceOperationDiscoveryService(
             descriptor.ProducedTypes
         }, JsonOptions));
         var workspaceScope = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var existing = await store.ListExactAsync<ConnectedServiceOperationDiscoveryResource>(workspaceScope,
-            ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, 0, 1_000, cancellationToken);
+        var existing = await InWorkspaceAsync(context, () => store.ListExactAsync<ConnectedServiceOperationDiscoveryResource>(workspaceScope,
+            ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, 0, 1_000, cancellationToken));
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
             var previous = existing.SingleOrDefault(item => item.Value.Service.ServiceUid == service.Value.Uid
@@ -148,6 +195,12 @@ public sealed class ConnectedServiceOperationDiscoveryService(
             CreatedBy = context.PrincipalId,
             TenantId = context.TenantId,
             WorkspaceId = context.WorkspaceId,
+            LogicalScopeRef = requestContext.AccessMode switch
+            {
+                ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+                ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(context.TenantId),
+                _ => workspaceScope
+            },
             CreatedAt = timeProvider.GetUtcNow()
         };
         using (requestScopes.Push(context))
@@ -160,7 +213,8 @@ public sealed class ConnectedServiceOperationDiscoveryService(
                     {
                         _ = await flowRuns.StartAsync(new(resource.FlowRunId, descriptor.Flow,
                             service.Value.Namespace, input, context.PrincipalId.ToString("D"), effectiveCorrelationId,
-                            resource.IdempotencyKey, context.TenantId, context.WorkspaceId, context.PrincipalId), token);
+                            resource.IdempotencyKey, context.TenantId, context.WorkspaceId, context.PrincipalId)
+                        { LogicalScopeRef = resource.LogicalScopeRef }, token);
                         return stored;
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -187,9 +241,9 @@ public sealed class ConnectedServiceOperationDiscoveryService(
         var context = RequireContext();
         var service = await services.GetExactAsync(serviceScope, serviceName, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(serviceName);
-        var stored = await store.ListExactAsync<ConnectedServiceOperationDiscoveryResource>(
+        var stored = await InWorkspaceAsync(context, () => store.ListExactAsync<ConnectedServiceOperationDiscoveryResource>(
             ResourceScopeRef.Workspace(context.WorkspaceId),
-            ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, 0, 1_000, cancellationToken);
+            ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, 0, 1_000, cancellationToken));
         var result = new List<ConnectedServiceOperationDiscoveryResource>();
         foreach (var item in stored.Where(item => item.Value.Service.ServiceUid == service.Value.Uid)
                      .OrderByDescending(item => item.Value.CreatedAt))
@@ -203,7 +257,7 @@ public sealed class ConnectedServiceOperationDiscoveryService(
         var context = RequireContext();
         var address = ScopedResourceAddress.Create(ResourceScopeRef.Workspace(context.WorkspaceId), @namespace,
             ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, id);
-        var stored = await store.GetExactAsync<ConnectedServiceOperationDiscoveryResource>(address, cancellationToken)
+        var stored = await InWorkspaceAsync(context, () => store.GetExactAsync<ConnectedServiceOperationDiscoveryResource>(address, cancellationToken))
             ?? throw Error("connected_service_discovery_not_found", $"Discovery '{id}' was not found.");
         return await SynchronizeAsync(stored, context, cancellationToken);
     }
@@ -243,7 +297,8 @@ public sealed class ConnectedServiceOperationDiscoveryService(
             {
                 _ = await flowRuns.StartAsync(new(value.FlowRunId, value.Flow,
                     value.Namespace, input, value.CreatedBy.ToString("D"), value.CorrelationId,
-                    value.IdempotencyKey, value.TenantId, value.WorkspaceId, value.CreatedBy), cancellationToken);
+                    value.IdempotencyKey, value.TenantId, value.WorkspaceId, value.CreatedBy)
+                { LogicalScopeRef = value.LogicalScopeRef }, cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -336,12 +391,12 @@ public sealed class ConnectedServiceOperationDiscoveryService(
         };
         try
         {
-            return await store.PutExactAsync(updated.ScopeRef!.Value, updated, stored.ETag, false, cancellationToken);
+            return await InWorkspaceAsync(context, () => store.PutExactAsync(updated.ScopeRef!.Value, updated, stored.ETag, false, cancellationToken));
         }
         catch (ResourceConcurrencyException)
         {
-            return await store.GetExactAsync<ConnectedServiceOperationDiscoveryResource>(new(
-                updated.ScopeRef!.Value, updated.Namespace, updated.Kind, updated.Name), cancellationToken) ?? stored;
+            return await InWorkspaceAsync(context, () => store.GetExactAsync<ConnectedServiceOperationDiscoveryResource>(new(
+                updated.ScopeRef!.Value, updated.Namespace, updated.Kind, updated.Name), cancellationToken)) ?? stored;
         }
     }
 
@@ -384,6 +439,7 @@ public sealed class ConnectedServiceOperationDiscoveryService(
                 ScopeRef = serviceScope,
                 Generation = existing.TryGetValue(candidate.ExternalId, out var previous)
                     ? checked(previous.Value.Generation + 1) : 1,
+                Enabled = previous?.Value.Enabled ?? false,
                 Status = Succeeded(),
                 Definition = new()
                 {

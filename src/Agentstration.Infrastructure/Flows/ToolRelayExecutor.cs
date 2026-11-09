@@ -1,0 +1,170 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Agentstration.Identity.Contracts;
+using Agentstration.Parameters;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
+using Agentstration.Tools;
+using Agentstration.Tools.Mcp;
+
+namespace Agentstration.Infrastructure.Flows;
+
+public sealed class ToolRelayExecutor(
+    ToolDefinitionService definitions,
+    IToolExecutionPipeline pipeline,
+    IParameterResolver parameters,
+    ISecretInputResolver secretInputs,
+    ICurrentRequestContext current)
+{
+    public async Task<ToolDefinitionInvocationResult> ExecuteAsync(ToolDefinitionResource definition,
+        RelayToolDefinitionProperties relay, ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
+        => await ExecuteCoreAsync(definition, relay, invocation, false, cancellationToken);
+
+    public Task<ToolDefinitionInvocationResult> SimulateAsync(ToolDefinitionResource definition,
+        RelayToolDefinitionProperties relay, ToolDefinitionInvocation invocation, CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(definition, relay, invocation, true, cancellationToken);
+
+    private async Task<ToolDefinitionInvocationResult> ExecuteCoreAsync(ToolDefinitionResource definition,
+        RelayToolDefinitionProperties relay, ToolDefinitionInvocation invocation, bool simulate, CancellationToken cancellationToken)
+    {
+        if (current.AccessMode is not (ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration)
+            || current.Current.TenantId == Guid.Empty || current.Current.WorkspaceId == Guid.Empty || current.Current.PrincipalId == Guid.Empty
+            || current.Current.TenantId != invocation.TenantId
+            || current.Current.WorkspaceId != invocation.WorkspaceId.Value || current.Current.PrincipalId != invocation.PrincipalId)
+            throw Error("tool_definition_scope_mismatch", "A relay requires the current trusted invocation scope.");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(relay.InvocationTimeoutSeconds));
+        var token = timeout.Token;
+        try
+        {
+            ToolRelayArguments.ValidateCaller(invocation.Arguments, relay.Bindings);
+            var publication = await definitions.GetPublicationAsync(definition.Name, definition.Namespace,
+                definition.ScopeRef!.Value, token)
+                ?? throw Error("tool_definition_not_found", "The relay publication was not found.");
+            var pinned = publication.Value.Source ?? throw Error("tool_definition_target_invalid", "The relay has no pinned source.");
+            var source = await definitions.ResolveRelaySourceAsync(relay.Target, definition.ScopeRef.Value, token);
+            if (source.Provider.Uid != pinned.Provider.Uid || source.Provider.Generation != pinned.Provider.Generation
+                || source.Tool.Definition.ExternalId != pinned.Tool.Definition.ExternalId)
+                throw Error("tool_definition_target_stale", "The source provider no longer matches its published revision.");
+            var values = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            var inherited = invocation.ExecutionContext?.SecretInputs ?? [];
+            var references = inherited.ToList();
+            foreach (var binding in relay.Bindings)
+            {
+                switch (binding)
+                {
+                    case LiteralToolArgumentBinding literal:
+                        values[binding.Path] = literal.Value.Clone();
+                        break;
+                    case ParameterToolArgumentBinding parameter:
+                        await VerifyIdentityAsync(ScopedResourceAddress.Create(parameter.Parameter.ScopeRef,
+                            parameter.Parameter.Address.Namespace, parameter.Parameter.Address.Kind, parameter.Parameter.Address.Name), binding.Path);
+                        var resolved = await parameters.ResolveAsync(parameter.Parameter,
+                            new(definition.ScopeRef.Value, definition.Address), token)
+                            ?? throw Error("tool_definition_binding_unavailable", "A bound Parameter is unavailable.");
+                        values[binding.Path] = resolved.Value.Clone();
+                        break;
+                    case SecretToolArgumentBinding secret:
+                        if (secret.Secret.ScopeRef is not { } secretScope)
+                            throw Error("tool_definition_binding_invalid", "A Secret binding requires an exact scope.");
+                        await VerifyIdentityAsync(ScopedResourceAddress.Create(secretScope, secret.Secret.Address.Namespace,
+                            secret.Secret.Address.Kind, secret.Secret.Address.Name), binding.Path);
+                        var identity = publication.Value.BindingIdentities.Single(value => value.Path == binding.Path).Uid;
+                        var id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{publication.Value.Uid:D}:{binding.Path}:{identity:D}")));
+                        var reference = new SecretInputReference(id, secret.Secret, identity, new(definition.ScopeRef.Value, definition.Address));
+                        if (!references.Any(value => value.Id == id)) references.Add(reference);
+                        values[binding.Path] = SecretInputs.Marker(id);
+                        break;
+                }
+            }
+            // Public JSON cannot acquire authority merely by matching a newly created binding identifier.
+            var introduced = references.Where(reference => !inherited.Any(value => value.Id == reference.Id)).ToArray();
+            if (SecretInputs.ContainsReference(invocation.Arguments, introduced)
+                || relay.Bindings.OfType<LiteralToolArgumentBinding>().Any(binding => SecretInputs.ContainsReference(binding.Value, references)))
+                throw Error("tool_definition_binding_invalid", "An untrusted value collides with a protected input reference.");
+            var arguments = ToolRelayArguments.Reconstruct(invocation.Arguments, relay.Bindings, values, pinned.Tool.Definition.Schema!.Input, references);
+            using var resolvedInputs = await secretInputs.ResolveAsync(arguments, references, token);
+            ToolInputSchemaValidator.Validate(pinned.Tool.Definition.Schema.Input, resolvedInputs.Value);
+            var execution = invocation.ExecutionContext;
+            var context = new ToolExecutionContext
+            {
+                OwnerKind = invocation.CallerKind == ToolDefinitionCallerKind.Console ? ToolExecutionOwnerKind.Console
+                    : invocation.CallerKind == ToolDefinitionCallerKind.Mcp ? ToolExecutionOwnerKind.Mcp
+                    : invocation.CallerKind == ToolDefinitionCallerKind.Flow ? ToolExecutionOwnerKind.FlowRun : ToolExecutionOwnerKind.RuntimeRun,
+                ToolCallId = $"{invocation.CallId}:relay:{publication.Value.Uid:N}",
+                InvocationId = $"{execution?.InvocationId ?? invocation.CallId}:relay:{publication.Value.Uid:N}",
+                ToolId = pinned.Tool.Name,
+                ToolNamespace = pinned.Tool.Namespace,
+                ToolScopeRef = pinned.Tool.ScopeRef,
+                ToolUid = pinned.Tool.Uid,
+                ToolGeneration = pinned.Tool.Generation,
+                ToolName = pinned.Tool.Definition.ExternalId ?? pinned.Tool.Name,
+                ExternalToolId = pinned.Tool.Definition.ExternalId,
+                ToolProviderId = pinned.Provider.Name,
+                ToolProviderNamespace = pinned.Provider.Namespace,
+                ToolProviderScopeRef = pinned.Provider.ScopeRef,
+                ToolProviderUid = pinned.Provider.Uid,
+                ToolProviderGeneration = pinned.Provider.Generation,
+                TenantId = invocation.TenantId,
+                WorkspaceId = invocation.WorkspaceId,
+                PrincipalId = invocation.PrincipalId,
+                RunId = execution?.RuntimeRunId ?? execution?.FlowRunId,
+                FlowStepId = execution?.FlowStepId,
+                AgentId = execution?.AgentId,
+                AgentRevisionId = execution?.AgentRevisionId,
+                AgentVersion = execution?.AgentVersion,
+                AgentGeneration = execution?.AgentGeneration,
+                CorrelationId = invocation.CorrelationId,
+                PersistArguments = false,
+                SecretInputs = references,
+                HasSensitiveArguments = execution?.HasSensitiveArguments == true || relay.Bindings.Any(binding => binding is SecretToolArgumentBinding),
+                Arguments = arguments
+            };
+            if (simulate)
+            {
+                await pipeline.ValidateAsync(context, token);
+                return new(JsonSerializer.SerializeToElement(new { dryRun = true, inputAccepted = true }),
+                    new(null, null, null, definition.Namespace, null, invocation.CorrelationId ?? invocation.CallId, false));
+            }
+            var result = await pipeline.ExecuteDetailedAsync(context, token);
+            string? workItemId = null, flowRunId = null;
+            result.Receipt?.TryGetValue("workItemId", out workItemId);
+            result.Receipt?.TryGetValue("flowRunId", out flowRunId);
+            return new(result.Output, new(workItemId, flowRunId, null, definition.Namespace, null,
+                invocation.CorrelationId ?? invocation.CallId, false, Relay: new(publication.Value.Uid, relay.Version,
+                    pinned.Tool.Name, pinned.Tool.ScopeRef!.Value, pinned.Tool.Uid, pinned.Tool.Generation, pinned.Tool.Definition.Version)));
+
+            async Task VerifyIdentityAsync(ScopedResourceAddress address, string path)
+            {
+                var expected = publication.Value.BindingIdentities.SingleOrDefault(value => value.Path == path);
+                if (expected is null || await definitions.BindingIdentityAsync(address, token) != expected.Uid)
+                    throw Error("tool_definition_binding_stale", "A bound resource was removed or replaced.");
+            }
+        }
+        catch (ToolDefinitionValidationException exception) { throw Error(exception.Code, exception.Message); }
+        catch (ParameterAccessDeniedException) { throw Error("tool_definition_binding_unavailable", "A bound Parameter is unavailable or unauthorized."); }
+        catch (SecretResolutionException) { throw Error("tool_definition_binding_unavailable", "A bound Secret is unavailable or unauthorized."); }
+        catch (ResourceScopeAccessDeniedException) { throw Error("tool_definition_scope_mismatch", "The source is outside the authorized execution scope."); }
+        catch (ResourceReferenceOutsideScopeException) { throw Error("tool_definition_scope_mismatch", "The source is outside the authorized execution scope."); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { throw Error("tool_definition_timed_out", "The relay exceeded its invocation timeout."); }
+        catch (Exception exception) when (exception is not OperationCanceledException
+            && (invocation.ExecutionContext?.HasSensitiveArguments == true || relay.Bindings.Any(binding => binding is SecretToolArgumentBinding)))
+        {
+            var code = exception switch
+            {
+                ToolDefinitionInvocationException invocationError => invocationError.Code,
+                ToolResolutionException resolutionError => resolutionError.Code,
+                ToolExecutionDeniedException denied => denied.Code,
+                ToolInputValidationException => "tool_definition_binding_invalid",
+                _ => "tool_definition_execution_failed"
+            };
+            throw Error(code, "The Tool invocation with protected inputs could not be completed.");
+        }
+    }
+
+    private static ToolDefinitionInvocationException Error(string code, string message) => new(code, message);
+}

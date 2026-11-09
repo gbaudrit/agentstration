@@ -67,4 +67,12 @@
   <data name="Validation.InvalidJsonValue"><value>Saisissez une valeur JSON valide.</value></data>
   <data name="Validation.Union"><value>Utilisez une valeur correspondant à l’un des types autorisés.</value></data>
   <data name="Validation.ExclusiveUnion"><value>La valeur doit correspondre à une seule variante du schéma.</value></data>
+  <data name="AdvancedEditing"><value>Édition avancée</value></data>
+  <data name="EditField"><value>Revenir à la valeur</value></data>
+  <data name="ChooseValue"><value>Choisissez une valeur</value></data>
+  <data name="TrueValue"><value>Oui</value></data>
+  <data name="FalseValue"><value>Non</value></data>
+  <data name="EnterValue"><value>Saisissez une valeur.</value></data>
+  <data name="UseEmptyString"><value>Utiliser un texte vide</value></data>
+  <data name="UseEmptyStringFor"><value>Utiliser un texte vide pour {0}</value></data>
 </root>

@@ -124,6 +124,7 @@ const sidebars = {
         'reference/overview',
         'reference/versioning',
         'reference/api/overview',
+        'reference/tool-relays',
         'reference/storages',
         'reference/storage-execution',
         'reference/opendal-extension',

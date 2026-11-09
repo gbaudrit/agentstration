@@ -214,10 +214,10 @@ opendal.azblob version 1.0.0. One provider translates ASP operations to the same
 native Operator/Stream methods for every backend. Backend capabilities and typed
 connection requirements stay inside the extension; product modules remain
 provider-neutral. See [the OpenDAL reference](../../reference/opendal-extension.md)
-and [ADR-0201](../../decisions/0201-opendal-runs-in-an-autonomous-asp-extension.md).
+and [ADR-0206](../../decisions/0206-opendal-runs-in-an-autonomous-asp-extension.md).
 
 FR #1085 supplies text/blob sessions and bounded replay receipts in the independent
-ASP SDK (ADR-0202). OpenDAL stores each logical key directly: there is no aggregate
+ASP SDK (ADR-0205). OpenDAL stores each logical key directly: there is no aggregate
 objects.json, custom content engine, persistent protocol receipt ledger, 128-object
 quota or 8 MiB store quota. Optional native conditions/metadata are gated, and native
 stream completion never acquires exact commit metadata by a later stat.

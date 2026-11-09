@@ -4,7 +4,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<JsonSchemaInputStrings> Localizer
 
 <div class="schema-field schema-field-@Schema.Kind.ToString().ToLowerInvariant() @(IsLocked ? "schema-field-locked" : null)" data-schema-path="@Schema.Path">
-    @if (PreservePresence && !IsPresent && Schema.Kind != JsonSchemaInputKind.Union)
+    @if (PreservePresence && !IsPresent && Schema.Kind != JsonSchemaInputKind.Union && !(Compact && IsEditableScalar))
     {
         <button type="button" class="button-secondary" disabled="@FieldDisabled" aria-label="@Localizer["SetValueFor", Label]" @onclick="InitializeValueAsync">@Localizer["SetValue"]</button>
         <span>@Localizer["NotSet"]</span>
@@ -22,7 +22,7 @@
         </label>
         @if (SelectedVariantIndex is >= 0 and var selected)
         {
-            <JsonSchemaField Schema="@(Schema.Variants![selected] with { Required = Schema.Required, Title = Schema.Variants[selected].Title ?? Schema.Title })" Value="Value" ValueChanged="ValueChanged" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="@Issues.Where(issue => issue.Path != Schema.Path).ToArray()" PreservePresence="PreservePresence" IsPresent="IsPresent" />
+            <JsonSchemaField Schema="@(Schema.Variants![selected] with { Required = Schema.Required, Title = Schema.Variants[selected].Title ?? Schema.Title })" Value="Value" ValueChanged="ValueChanged" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="@Issues.Where(issue => issue.Path != Schema.Path).ToArray()" PreservePresence="PreservePresence" IsPresent="IsPresent" Compact="Compact" />
         }
     }
     else if (Schema.Kind == JsonSchemaInputKind.Map)
@@ -47,6 +47,14 @@
     }
     else if (Schema.Kind == JsonSchemaInputKind.Toggle)
     {
+        @if (Compact && ValueRemoved.HasDelegate)
+        {
+            <label><span>@Label @RequiredMark @RulesTooltip</span><select value="@(IsPresent ? BooleanValue.ToString().ToLowerInvariant() : string.Empty)" disabled="@FieldDisabled" @onchange="ChangeBooleanSelectionAsync">
+                <option value="">@Localizer["ChooseValue"]</option><option value="true">@Localizer["TrueValue"]</option><option value="false">@Localizer["FalseValue"]</option>
+            </select></label>
+        }
+        else
+        {
         <label class="schema-toggle">
             <input class="schema-toggle-input" type="checkbox" checked="@BooleanValue" disabled="@FieldDisabled" @onchange="ChangeBooleanAsync" />
             <span class="schema-toggle-switch" aria-hidden="true"></span>
@@ -55,6 +63,7 @@
                 @Help
             </span>
         </label>
+        }
     }
     else if (Schema.AllowedValues.Count > 0)
     {
@@ -65,7 +74,7 @@
         <label><span>@Label @RequiredMark @RulesTooltip</span>
             @if (UsesMultilineText)
             {
-                <textarea class="schema-long-text" rows="6" value="@StringValue" disabled="@FieldDisabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync"></textarea>
+                <textarea class="schema-long-text @(Compact ? "schema-compact-text" : null)" rows="@(Compact ? 3 : 6)" value="@StringValue" disabled="@FieldDisabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync"></textarea>
             }
             else
             {
@@ -81,11 +90,19 @@
     {
         <label><span>@Label @RequiredMark</span><input value="null" readonly /></label>@Help
     }
+    @if (CanSetEmptyString)
+    {
+        <button type="button" class="button-secondary schema-presence-action" disabled="@FieldDisabled" aria-label="@Localizer["UseEmptyStringFor", Label]" @onclick="SetEmptyStringAsync">@Localizer["UseEmptyString"]</button>
+    }
+    @if (Compact && !IsPresent && IsEditableScalar && !CanSetEmptyString)
+    {
+        <small class="schema-value-hint">@Localizer["EnterValue"]</small>
+    }
     @if (PreservePresence && IsPresent && ValueRemoved.HasDelegate)
     {
-        <button type="button" class="button-secondary" disabled="@FieldDisabled" aria-label="@Localizer["ClearValueFor", Label]" @onclick="RemoveValueAsync">@Localizer["ClearValue"]</button>
+        <button type="button" class="button-secondary schema-presence-action" disabled="@FieldDisabled" aria-label="@Localizer["ClearValueFor", Label]" @onclick="RemoveValueAsync">@Localizer["ClearValue"]</button>
     }
-    @foreach (var issue in FieldIssues)
+    @foreach (var issue in FieldIssues.Where(issue => !Compact || IsPresent || issue.Code != "Required"))
     {
         <span class="field-validation-error" role="alert">@IssueText(issue)</span>
     }
@@ -101,6 +118,10 @@
     [Parameter] public bool PreservePresence { get; set; }
     [Parameter] public bool IsPresent { get; set; } = true;
     [Parameter] public EventCallback ValueRemoved { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    private bool IsEditableScalar => Schema.Kind is JsonSchemaInputKind.Text or JsonSchemaInputKind.WholeNumber or JsonSchemaInputKind.DecimalNumber or JsonSchemaInputKind.Toggle;
+    private bool CanSetEmptyString => Compact && PreservePresence && !IsPresent && Schema.Kind == JsonSchemaInputKind.Text
+        && Schema.AllowedValues.Count == 0 && JsonSchemaInputModel.Validate(JsonSerializer.SerializeToElement(string.Empty), Schema).Count == 0;
     private int chosenVariant = -1;
     private IReadOnlyList<JsonSchemaInputNode>? previousVariants;
     protected override void OnParametersSet()
@@ -182,6 +203,9 @@
     private async Task ChangePropertyAsync(JsonSchemaInputNode property, JsonNode? value) { if (FieldDisabled) return; var root = Value is JsonObject current ? (JsonObject)current.DeepClone() : []; if (value is null && !property.Required && !PreservePresence) root.Remove(property.Name); else root[property.Name] = value?.DeepClone(); await ValueChanged.InvokeAsync(root); }
     private async Task RemovePropertyAsync(string name) { if (FieldDisabled) return; var root = Value is JsonObject current ? (JsonObject)current.DeepClone() : []; root.Remove(name); await ValueChanged.InvokeAsync(root); }
     private Task InitializeValueAsync() => FieldDisabled ? Task.CompletedTask : ValueChanged.InvokeAsync(JsonSchemaInputModel.TemplateValue(Schema));
+    private Task SetEmptyStringAsync() => FieldDisabled ? Task.CompletedTask : ValueChanged.InvokeAsync(JsonValue.Create(string.Empty));
+    private Task ChangeBooleanSelectionAsync(ChangeEventArgs args) => FieldDisabled ? Task.CompletedTask
+        : bool.TryParse(args.Value?.ToString(), out var value) ? ValueChanged.InvokeAsync(JsonValue.Create(value)) : ValueRemoved.InvokeAsync();
     private Task RemoveValueAsync() => FieldDisabled ? Task.CompletedTask : ValueRemoved.InvokeAsync();
     private Task ChangeVariantAsync(ChangeEventArgs args)
     {

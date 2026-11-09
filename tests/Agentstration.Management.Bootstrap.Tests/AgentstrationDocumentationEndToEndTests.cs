@@ -122,7 +122,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 new WorkspaceId(workspace.Id),
                 principal.Id,
                 ResourceNamespace.Default,
-                "agentstration-documentation.search",
+                ToolDefinitionService.VersionName("agentstration-documentation.search", "1.0.0"),
                 "documentation-search-call",
                 "documentation-search-correlation",
                 JsonSerializer.SerializeToElement(new { request = new { query = "Workspace", limit = 5 } }),

@@ -1,0 +1,257 @@
+@page "/tools/definitions/new"
+@implements IDisposable
+@inject IToolDefinitionsClient Definitions
+@inject IFlowApiClient Flows
+@inject IConsoleNavigationContext NavigationContext
+@inject ConsoleContextState ContextState
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
+
+<PageTitle>@T("CreationTitle") · Agentstration</PageTitle>
+<PageHeader Title="@T("CreationTitle")" Description="@T("CreationDescription")" TestId="resource-tool-definition-editor" />
+
+<div class="tool-create-shell" data-testid="tool-definition-create" data-interactive="@((interactive && contextLoaded).ToString().ToLowerInvariant())">
+    @if (!contextLoaded) { <LoadingState Message="@T("CreationLoadingContext")" /> }
+    else
+    {
+    <div class="tool-create-form">
+        <nav class="tool-create-progress" aria-label="@T("CreationProgress")">
+            <span class="tool-create-step @(step == 1 ? "is-active" : "is-complete")" aria-current="@(step == 1 ? "step" : null)"><strong>1</strong>@T("CreationDefine")</span>
+            <span class="tool-create-progress-line" aria-hidden="true"></span>
+            <span class="tool-create-step @(step == 2 ? "is-active" : null)" aria-current="@(step == 2 ? "step" : null)"><strong>2</strong>@T("CreationConfigure")</span>
+        </nav>
+
+        @if (step == 1)
+        {
+            <EditForm Model="identity" OnSubmit="ContinueAsync">
+            <section class="panel tool-create-section" data-testid="tool-definition-identity">
+                <div class="panel-header tool-create-section-header"><div><p class="eyebrow">@T("CreationIdentityEyebrow")</p><h2>@T("CreationIdentityTitle")</h2><p>@T("CreationIdentityHelp")</p></div><span class="tool-create-section-number">01</span></div>
+                <div class="form-grid tool-create-identity-grid">
+                    <ResourceIdentityFields @bind-DisplayName="identity.DisplayName" @bind-TechnicalName="identity.Name" IsNew="true" DisplayNameHelp="@T("CreationDisplayNameHelp")" TechnicalNameHelp="@T("CreationTechnicalNameHelp")" DisplayNameTestId="tool-definition-display-name" TechnicalNameTestId="tool-definition-name" />
+                    <label><span>@T("CreationInitialVersion")</span><InputText @bind-Value="identity.Version" data-testid="tool-definition-initial-version" /><small>@T("CreationInitialVersionHelp")</small></label>
+                    <div><ResourceScopeFormField @key="lastContextScope" ResourceKind="@ToolResourceKinds.ToolDefinition" Value="identity.ScopeRef" ValueChanged="ScopeChanged" /><small>@T("CreationScopeHelp")</small></div>
+                    <label><span>@T("Namespace")</span><InputText @bind-Value="identity.Namespace" data-testid="tool-definition-namespace" /></label>
+                    <label class="tool-create-span-all"><span>@T("DefinitionDescription")</span><InputTextArea @bind-Value="identity.Description" rows="3" data-testid="tool-definition-description" /><small>@T("CreationDescriptionHelp")</small></label>
+                </div>
+            </section>
+            <section class="panel tool-create-section">
+                <div class="panel-header tool-create-section-header"><div><p class="eyebrow">@T("CreationKindEyebrow")</p><h2>@T("CreationKindTitle")</h2><p>@T("CreationKindHelp")</p></div><span class="tool-create-section-number">02</span></div>
+                <div class="tool-kind-grid" role="group" aria-label="@T("CreationKindTitle")">
+                <InputRadioGroup @bind-Value="kind">
+                    <label class="tool-kind-card @(kind == "flow" ? "is-selected" : null)" data-testid="tool-definition-kind-flow">
+                        <InputRadio Value="@("flow")" /><span class="tool-kind-icon"><UiIcon Name="workflow" /></span><span class="tool-kind-copy"><strong>@T("CreationKindFlow")</strong><small>@T("CreationKindFlowHelp")</small></span><span class="tool-kind-check"><UiIcon Name="check" /></span>
+                    </label>
+                    <label class="tool-kind-card @(kind == "relay" ? "is-selected" : null)" data-testid="tool-definition-kind-relay">
+                        <InputRadio Value="@("relay")" /><span class="tool-kind-icon"><UiIcon Name="tools" /></span><span class="tool-kind-copy"><strong>@T("CreationKindRelay")</strong><small>@T("CreationKindRelayHelp")</small></span><span class="tool-kind-check"><UiIcon Name="check" /></span>
+                    </label>
+                </InputRadioGroup>
+                </div>
+            </section>
+            </EditForm>
+        }
+
+        <div hidden="@(step != 2 || kind != "relay")">
+            @if (relayVisited)
+            {
+                <ToolRelayEditor CreationIdentity="identity" CreationActive="@(step == 2 && kind == "relay")" Source="@Source" OnBack="Back" OnCreated="Created" />
+            }
+        </div>
+        <div hidden="@(step != 2 || kind != "flow")">
+            @if (flowVisited)
+            {
+                <section class="panel tool-create-section" data-testid="tool-definition-flow-configuration">
+                    <div class="panel-header tool-create-section-header"><div><p class="eyebrow">@T("CreationFlowEyebrow")</p><h2>@T("CreationFlowTitle")</h2><p>@T("CreationFlowHelp")</p></div><span class="tool-create-section-number">02</span></div>
+                    <div class="tool-create-summary"><span><strong>@identity.DisplayName</strong><code>@identity.Name</code><ResourceScopeBadge ScopeRef="identity.ScopeRef" Compact /></span><span>@T("RelayVersion") <strong>@identity.Version</strong></span></div>
+                    @if (loadingFlow) { <LoadingState Message="@T("LoadingFlowContract")" /> }
+                    <div class="form-grid">
+                        <label><span>@T("Flow")</span><select data-testid="tool-definition-flow" @bind="selectedFlow" @bind:after="FlowChangedAsync" disabled="@(loadingFlow || saving)"><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@FlowKey(flow)">@flow.Name · @flow.ScopeRef · @flow.Namespace/@flow.Id</option> }</select></label>
+                        <label><span>@T("CreationFlowVersion")</span><select data-testid="tool-definition-version" @bind="selectedVersion" @bind:after="LoadContractAsync" disabled="@(loadingFlow || saving || versions.Count == 0)"><option value="">@T("CreationSelectVersion")</option>@foreach (var version in versions) { <option value="@version.Version">@version.Version</option> }</select></label>
+                    </div>
+                    @if (contractLoaded)
+                    {
+                        <p class="inline-info">@T("ContractsProvidedByFlow", selectedVersion)</p>
+                        <ContractDirectionTabs Label="@T("Contracts")" InputLabel="@T("InputContract")" OutputLabel="@T("OutputContract")" TestId="tool-definition-contract">
+                            <InputContent><ReusableSchemaBindingEditor Title="@T("InputSchema")" TestId="tool-definition-input-schema" LegacySchema="inputSchema" ReadOnly="true" ShowSourceControls="false" HelpText="@T("FlowContractReadOnlyHelp")" /></InputContent>
+                            <OutputContent><ReusableSchemaBindingEditor Title="@T("OutputSchema")" TestId="tool-definition-output-schema" LegacySchema="outputSchema" ReadOnly="true" ShowSourceControls="false" HelpText="@T("FlowContractReadOnlyHelp")" /></OutputContent>
+                        </ContractDirectionTabs>
+                    }
+                </section>
+            }
+        </div>
+        @if (error is not null) { <p class="error-panel" role="alert">@error</p> }
+        @if (step == 1 || kind == "flow")
+        {
+            <div class="tool-create-actions">
+                <span><strong>@T(step == 1 ? kind == "relay" ? "CreationNextRelay" : "CreationNextFlow" : "CreationReady")</strong><small>@T(step == 1 ? kind == "relay" ? "CreationNextRelayHelp" : "CreationNextFlowHelp" : "CreationDraftHelp")</small></span>
+                <div>
+                    @if (step == 1) { <a class="button-secondary" href="@NavigationContext.AddToUri("/tools/definitions")">@T("Cancel")</a><button type="button" class="button-primary" data-testid="tool-definition-continue" disabled="@(!CanManage)" @onclick="ContinueAsync">@T("CreationContinue")</button> }
+                    else { <button type="button" class="button-secondary" data-testid="tool-definition-back" disabled="@saving" @onclick="Back">@T("CreationBack")</button><button type="button" class="button-primary" data-testid="tool-definition-create-draft" disabled="@(saving || loadingFlow || !contractLoaded || !CanManage)" @onclick="CreateFlowAsync">@T(saving ? "CreationCreating" : "CreationCreateDraft")</button> }
+                </div>
+            </div>
+        }
+    </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "toolKind")] public string? ToolKind { get; set; }
+    [SupplyParameterFromQuery(Name = "source")] public string? Source { get; set; }
+    [SupplyParameterFromQuery(Name = "context")] public string? Context { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ToolDefinitionCreationIdentity identity = new();
+    private IReadOnlyList<FlowSummary> flows = [];
+    private IReadOnlyList<FlowVersionResponse> versions = [];
+    private string kind = "flow", selectedFlow = "", selectedVersion = "";
+    private int step = 1, contractRequest;
+    private bool interactive, contextLoaded, relayVisited, flowVisited, loadingFlow, saving, contractLoaded;
+    private string? error;
+    private JsonElement? inputSchema, outputSchema;
+    private ResourceScopeRef? lastContextScope;
+    private bool contextScopeInitialized;
+    private bool CanManage => identity.ScopeRef is not null;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+
+    protected override async Task OnInitializedAsync()
+    {
+        kind = ToolKind == "relay" || !string.IsNullOrWhiteSpace(Source) ? "relay" : "flow";
+        ContextState.Changed += ContextChanged;
+        await ContextState.EnsureLoadedAsync(cancellation.Token);
+        RefreshContext();
+        if (!CanManage) error = ContextState.Error ?? T("CreationScopeRequired");
+        contextLoaded = true;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (contextLoaded) RefreshContext();
+    }
+
+    private void ContextChanged() => _ = InvokeAsync(() =>
+    {
+        RefreshContext();
+        StateHasChanged();
+    });
+
+    private void RefreshContext()
+    {
+        NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        var scope = ContextState.Current is null ? null : ResourceOwnershipContext.TryGetCurrent(NavigationContext);
+        if (contextScopeInitialized && scope == lastContextScope) return;
+        lastContextScope = scope;
+        contextScopeInitialized = true;
+        ScopeChanged(scope);
+    }
+
+    private void ScopeChanged(ResourceScopeRef? scope)
+    {
+        if (scope == identity.ScopeRef) return;
+        identity.ScopeRef = scope;
+        // Sources and contracts loaded in one workspace must not be reused in another.
+        step = 1;
+        relayVisited = flowVisited = contractLoaded = loadingFlow = false;
+        flows = []; versions = []; selectedFlow = selectedVersion = "";
+        inputSchema = outputSchema = null;
+        contractRequest++;
+        error = CanManage ? null : ContextState.Error ?? T("CreationScopeRequired");
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        interactive = true;
+        StateHasChanged();
+    }
+
+    private bool ValidateIdentity()
+    {
+        if (!CanManage) { error = T("CreationScopeRequired"); return false; }
+        if (!identity.IsComplete) { error = T("CreationIdentityInvalid"); return false; }
+        try { _ = ResourceNamespace.Parse(identity.Namespace); }
+        catch (ArgumentException) { error = T("CreationIdentityInvalid"); return false; }
+        error = null;
+        return true;
+    }
+
+    private async Task ContinueAsync()
+    {
+        if (!ValidateIdentity()) return;
+        step = 2;
+        if (kind == "relay") { relayVisited = true; return; }
+        if (flowVisited) return;
+        flowVisited = true;
+        var request = ++contractRequest;
+        loadingFlow = true;
+        try
+        {
+            var available = await Flows.GetFlowsAsync(identity.ScopeRef!.Value, cancellation.Token);
+            if (request == contractRequest) flows = available;
+        }
+        catch (Exception exception) { if (request == contractRequest) error = exception.Message; }
+        finally { if (request == contractRequest) loadingFlow = false; }
+    }
+
+    private void Back() { error = null; step = 1; }
+    private FlowSummary? SelectedFlow => flows.SingleOrDefault(flow => FlowKey(flow) == selectedFlow);
+    private static string FlowKey(FlowSummary flow) => $"{flow.ScopeRef}|{flow.Namespace}|{flow.Id}";
+
+    private async Task FlowChangedAsync()
+    {
+        var request = ++contractRequest;
+        contractLoaded = false; versions = []; selectedVersion = ""; error = null;
+        if (SelectedFlow is not { } flow) return;
+        loadingFlow = true;
+        try
+        {
+            var available = await Flows.GetFlowVersionsAsync(flow.Namespace, flow.Id, flow.ScopeRef, identity.ScopeRef!.Value, cancellation.Token);
+            if (request != contractRequest) return;
+            versions = available;
+            selectedVersion = available.FirstOrDefault(value => value.Version == flow.ActiveVersion)?.Version ?? available.FirstOrDefault()?.Version ?? "";
+            if (versions.Count == 0) { error = T("CreationNoPublishedVersions"); return; }
+            await LoadContractAsync();
+        }
+        catch (Exception exception) { if (request == contractRequest) error = exception.Message; }
+        finally { if (request == contractRequest || contractLoaded) loadingFlow = false; }
+    }
+
+    private async Task LoadContractAsync()
+    {
+        var request = ++contractRequest;
+        contractLoaded = false; error = null;
+        if (SelectedFlow is not { } flow || string.IsNullOrWhiteSpace(selectedVersion)) { loadingFlow = false; return; }
+        loadingFlow = true;
+        try
+        {
+            var published = await Flows.GetFlowVersionAsync(flow.Namespace, flow.Id, selectedVersion, flow.ScopeRef, identity.ScopeRef!.Value, cancellation.Token);
+            if (request != contractRequest) return;
+            var ambiguous = false;
+            var output = published.Graph?.ResolveSingleSuccessOutputSchema(out ambiguous);
+            if (ambiguous) { error = T("FlowOutputContractAmbiguous"); return; }
+            inputSchema = published.Graph?.ResolveInputSchema()?.Clone() ?? JsonSerializer.SerializeToElement(new { });
+            outputSchema = output?.Clone();
+            contractLoaded = true;
+        }
+        catch (Exception exception) { if (request == contractRequest) error = exception.Message; }
+        finally { if (request == contractRequest) loadingFlow = false; }
+    }
+
+    private async Task CreateFlowAsync()
+    {
+        if (saving || loadingFlow || !contractLoaded || !ValidateIdentity() || SelectedFlow is not { } flow) return;
+        saving = true;
+        try
+        {
+            var created = await Definitions.CreateAsync(new(identity.Name, new FlowToolDefinitionProperties
+            {
+                DisplayName = identity.DisplayName, Description = identity.Description, Version = identity.Version,
+                Publish = false, InputSchema = inputSchema!.Value, OutputSchema = outputSchema,
+                Flow = new() { Name = flow.Id, Namespace = flow.Namespace, ScopeRef = flow.ScopeRef, Version = selectedVersion, UseActiveVersion = false }
+            }, identity.Namespace, identity.ScopeRef), cancellation.Token);
+            Created(created.Value);
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { saving = false; }
+    }
+
+    private void Created(ToolDefinitionResource definition) => Navigation.NavigateTo($"/tools/definitions/{Uri.EscapeDataString(definition.Name)}?namespace={Uri.EscapeDataString(definition.Namespace.Value)}&context={Uri.EscapeDataString(definition.ScopeRef!.Value.Value)}");
+    public void Dispose() { ContextState.Changed -= ContextChanged; cancellation.Cancel(); cancellation.Dispose(); }
+}

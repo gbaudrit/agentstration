@@ -67,4 +67,12 @@
   <data name="Validation.Maximum"><value>Enter a value less than or equal to {0}.</value></data>
   <data name="Validation.ExclusiveMinimum"><value>Enter a value greater than {0}.</value></data>
   <data name="Validation.ExclusiveMaximum"><value>Enter a value less than {0}.</value></data>
+  <data name="AdvancedEditing"><value>Advanced editing</value></data>
+  <data name="EditField"><value>Back to value</value></data>
+  <data name="ChooseValue"><value>Choose a value</value></data>
+  <data name="TrueValue"><value>Yes</value></data>
+  <data name="FalseValue"><value>No</value></data>
+  <data name="EnterValue"><value>Enter a value.</value></data>
+  <data name="UseEmptyString"><value>Use empty text</value></data>
+  <data name="UseEmptyStringFor"><value>Use empty text for {0}</value></data>
 </root>

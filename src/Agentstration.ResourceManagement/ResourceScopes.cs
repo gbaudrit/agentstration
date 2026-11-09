@@ -64,7 +64,7 @@ public static class ResourceScopePolicy
             or "ConnectedServiceOperationType" or "ConnectedServiceOperation"
             or "StorageType" or "Storage" or "Schema" or "SchemaVersion" or "DataSource"
             or "DataSourceProfile" or "DataSourceProfileRevision" or "KnowledgeSource" => InstanceTenantWorkspace,
-        "ToolProvider" or "Tool" or "ToolSet" or "ToolSetVersion" or "ToolDefinition" => InstanceTenantWorkspace,
+        "ToolProvider" or "Tool" or "ToolSet" or "ToolSetVersion" or "ToolDefinition" or "ToolDefinitionVersion" => InstanceTenantWorkspace,
         "ToolCategory" or "ToolExecutionHook" or "ConnectedServiceOperationDiscovery" or "DataSourceAcquisition"
             or "DataSourceDiscovery" or "DataSourceAcquisitionTarget" => WorkspaceOnly,
         "Flow" or "FlowVersion" or "Agent" or "AgentRevision" => InstanceTenantWorkspace,

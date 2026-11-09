@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace Agentstration.Extensions.OpenApi;
 
-public sealed class OpenApiService(
+public sealed partial class OpenApiService(
     HttpClient client,
     OpenApiDestinationPolicy destinations,
     OpenApiContractParser parser,
@@ -60,14 +60,16 @@ public sealed class OpenApiService(
         string? credentialId,
         int? maximumPages,
         string? correlationId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? bearerToken = null, Uri? connectionOrigin = null, bool requireReadOnly = false)
     {
         var id = Correlation(correlationId);
         if (arguments.ValueKind is not (JsonValueKind.Object or JsonValueKind.Null or JsonValueKind.Undefined))
             throw Error("openapi_arguments_invalid", "Invocation arguments must be a JSON object.");
         var contractUri = await destinations.ValidateAsync(selector.ContractUri, cancellationToken);
+        if (connectionOrigin is not null && !OpenApiDestinationPolicy.SameOrigin(connectionOrigin, contractUri))
+            throw Error("openapi_connection_origin_denied", "The selected contract is outside the Connected Service origin.");
         var fetched = await FetchAsync(contractUri, options.MaximumDocumentBytes, options.AllowedContractMediaTypes,
-            "openapi_contract", cancellationToken)
+            "openapi_contract", cancellationToken, bearerToken)
             ?? throw Error("openapi_contract_unavailable", "The selected OpenAPI contract is unavailable.");
         var digest = Convert.ToHexStringLower(SHA256.HashData(fetched.Content));
         if (!CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(digest), Encoding.ASCII.GetBytes(selector.ContractDigest.ToLowerInvariant())))
@@ -79,12 +81,16 @@ public sealed class OpenApiService(
         if (!string.Equals(operation.Method, selector.Method, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(operation.Path, selector.Path, StringComparison.Ordinal))
             throw Error("openapi_selector_mismatch", "The selector method or path does not match its operationId.");
+        if (requireReadOnly && !operation.ReadOnly)
+            throw Error("openapi_acquisition_action_denied", "Only read-only operations can be acquired.");
         if (!options.AllowedMethods.Contains(operation.Method, StringComparer.OrdinalIgnoreCase))
             throw Error("openapi_method_denied", $"HTTP method '{operation.Method}' is not allowed.");
         if (!contract.Descriptor.Servers.Contains(selector.Server, StringComparer.Ordinal))
             throw Error("openapi_server_not_discovered", "The selected server was not present in the discovered contract.");
 
         var server = await destinations.ValidateAsync(selector.Server, cancellationToken);
+        if (connectionOrigin is not null && !OpenApiDestinationPolicy.SameOrigin(connectionOrigin, server))
+            throw Error("openapi_connection_origin_denied", "The selected server is outside the Connected Service origin.");
         var requestUri = BuildUri(server, operation.Path, contract.Document, operation, arguments, fixedBindings, out var headers, out var body);
         var pageLimit = Math.Clamp(maximumPages ?? 1, 1, options.MaximumPages);
         var pages = new List<(int Status, string MediaType, byte[] Content)>();
@@ -94,6 +100,7 @@ public sealed class OpenApiService(
             request.Headers.TryAddWithoutValidation("X-Correlation-ID", id);
             foreach (var header in headers) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             ApplyCredential(request, credentialId);
+            if (bearerToken is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
             if (body is { } content) request.Content = JsonContent.Create(content);
             using var response = await SendAsync(request, cancellationToken);
             await EnsureSuccessAsync(response);
@@ -234,7 +241,7 @@ public sealed class OpenApiService(
 
     private static Dictionary<string, string> Arguments(JsonElement arguments, string name)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, string>(name == "headers" ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         if (arguments.ValueKind != JsonValueKind.Object || !arguments.TryGetProperty(name, out var values)
             || values.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return result;
         if (values.ValueKind != JsonValueKind.Object) throw Error("openapi_arguments_invalid", $"'{name}' arguments must be an object.");
@@ -289,10 +296,11 @@ public sealed class OpenApiService(
     }
 
     private async Task<(string MediaType, byte[] Content)?> FetchAsync(Uri uri, int maximumBytes,
-        IReadOnlyList<string> allowedMediaTypes, string prefix, CancellationToken cancellationToken)
+        IReadOnlyList<string> allowedMediaTypes, string prefix, CancellationToken cancellationToken, string? bearerToken = null)
     {
         _ = await destinations.ValidateAsync(uri.AbsoluteUri, cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        if (bearerToken is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         using var response = await SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         await EnsureSuccessAsync(response);

@@ -196,7 +196,7 @@ shared key read-only. Mount and preserve product control-plane identities too.
 Never expose physical configuration as MCP business arguments. Building for
 linux-arm64 requires an appropriate build environment and separate validation.
 
-See [ADR-0201](../decisions/0201-opendal-runs-in-an-autonomous-asp-extension.md).
+See [ADR-0206](../decisions/0206-opendal-runs-in-an-autonomous-asp-extension.md).
 The dedicated OpenDAL CI publishes and smoke-tests native distributions on Linux
 and Windows; the root Integration lane includes the native provider/MCP tests and
 the actual product-to-extension Storage execution regression.

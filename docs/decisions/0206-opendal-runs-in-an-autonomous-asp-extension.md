@@ -1,4 +1,4 @@
-# ADR-0201: OpenDAL runs in an autonomous ASP extension
+# ADR-0206: OpenDAL runs in an autonomous ASP extension
 
 ## Status
 

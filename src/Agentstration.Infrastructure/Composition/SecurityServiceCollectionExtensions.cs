@@ -1,7 +1,7 @@
-using Agentstration.Identity;
-using Agentstration.Identity.Contracts;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
+using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
@@ -36,6 +36,7 @@ internal static class SecurityServiceCollectionExtensions
         services.AddSingleton<ConnectedServiceTypeManagementService>();
         services.AddSingleton<ConnectedServiceOperationTypeManagementService>();
         services.AddSingleton<ConnectedServiceOperationDiscoveryService>();
+        services.AddSingleton<ConnectedServiceOperationService>();
         services.AddSingleton<IConnectedServiceOperationDiscoveryFlowGateway,
             ConnectedServiceOperationDiscoveryFlowGateway>();
         if (context.Options.EnableHostedServices)
