@@ -7,15 +7,22 @@ namespace Agentstration.Web.Console;
 public interface IConnectedServiceOperationsClient
 {
     Task<IReadOnlyList<ConnectedServiceOperationResource>> GetAsync(CancellationToken token);
+    Task<IReadOnlyList<ConnectedServiceOperationResource>> GetForServiceAsync(ConnectedServiceResource service, CancellationToken token);
+    Task<IReadOnlyList<ConnectedServiceOperationDiscoveryResource>> GetDiscoveriesAsync(ConnectedServiceResource service, CancellationToken token);
     Task<ResourceSnapshot<ConnectedServiceOperationResource>> SetEnabledAsync(ConnectedServiceOperationResource operation, bool enabled, CancellationToken token);
-    Task DiscoverAsync(ConnectedServiceResource service, CancellationToken token);
-    Task RefreshDiscoveryAsync(ConnectedServiceResource service, CancellationToken token);
+    Task<ConnectedServiceOperationDiscoveryResource> DiscoverAsync(ConnectedServiceResource service, CancellationToken token);
 }
 
 public sealed class ConnectedServiceOperationsApiClient(HttpClient http) : IConnectedServiceOperationsClient
 {
     public Task<IReadOnlyList<ConnectedServiceOperationResource>> GetAsync(CancellationToken token) =>
         ApiResponse.ReadAsync<IReadOnlyList<ConnectedServiceOperationResource>>(http, "api/connected-service-operations", token);
+
+    public Task<IReadOnlyList<ConnectedServiceOperationResource>> GetForServiceAsync(ConnectedServiceResource service, CancellationToken token) =>
+        ApiResponse.ReadAsync<IReadOnlyList<ConnectedServiceOperationResource>>(http, ServicePath(service, "operations"), token);
+
+    public Task<IReadOnlyList<ConnectedServiceOperationDiscoveryResource>> GetDiscoveriesAsync(ConnectedServiceResource service, CancellationToken token) =>
+        ApiResponse.ReadAsync<IReadOnlyList<ConnectedServiceOperationDiscoveryResource>>(http, ServicePath(service, "operation-discoveries"), token);
 
     public async Task<ResourceSnapshot<ConnectedServiceOperationResource>> SetEnabledAsync(ConnectedServiceOperationResource operation, bool enabled, CancellationToken token)
     {
@@ -34,16 +41,14 @@ public sealed class ConnectedServiceOperationsApiClient(HttpClient http) : IConn
         return new((await response.Content.ReadFromJsonAsync<ConnectedServiceOperationResource>(token))!, response.Headers.ETag!.ToString());
     }
 
-    public async Task DiscoverAsync(ConnectedServiceResource service, CancellationToken token)
+    public async Task<ConnectedServiceOperationDiscoveryResource> DiscoverAsync(ConnectedServiceResource service, CancellationToken token)
     {
-        using var response = await http.PostAsJsonAsync($"api/connected-services/{Uri.EscapeDataString(service.Name)}/operation-discoveries?scopeRef={Uri.EscapeDataString(service.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(service.Namespace.Value)}",
+        using var response = await http.PostAsJsonAsync(ServicePath(service, "operation-discoveries"),
             new StartConnectedServiceOperationDiscoveryRequest(), token);
         await ApiResponse.EnsureSuccessAsync(response, token);
+        return (await response.Content.ReadFromJsonAsync<ConnectedServiceOperationDiscoveryResource>(token))!;
     }
 
-    public async Task RefreshDiscoveryAsync(ConnectedServiceResource service, CancellationToken token)
-    {
-        using var response = await http.GetAsync($"api/connected-services/{Uri.EscapeDataString(service.Name)}/operation-discoveries?scopeRef={Uri.EscapeDataString(service.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(service.Namespace.Value)}", token);
-        await ApiResponse.EnsureSuccessAsync(response, token);
-    }
+    private static string ServicePath(ConnectedServiceResource service, string action) =>
+        $"api/connected-services/{Uri.EscapeDataString(service.Name)}/{action}?scopeRef={Uri.EscapeDataString(service.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(service.Namespace.Value)}";
 }

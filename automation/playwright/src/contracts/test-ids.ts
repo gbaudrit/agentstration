@@ -143,9 +143,15 @@ export const TestIds = {
     snapshotDetails: 'knowledge-snapshot-details', retrievalText: 'knowledge-retrieval-text',
     retrievalRun: 'knowledge-retrieval-run', retrievalResult: 'knowledge-retrieval-result',
   },
+  connectedServiceDiscovery: {
+    tab: 'connected-service-discovery-tab', panel: 'connected-service-discovery', start: 'connected-service-start-discovery',
+    refresh: 'connected-service-refresh-discovery', operationRow: 'connected-service-operation-row',
+    activation: 'connected-service-operation-enabled', emptyOperations: 'connected-service-no-operations',
+    historyRow: 'connected-service-discovery-row', flowRun: 'connected-service-discovery-flow-link',
+  },
   datasetComposition: {
     editor: 'data-source-dataset-editor', fields: 'dataset-definition-fields', storage: 'dataset-storage', prefix: 'dataset-prefix',
-    operation: 'dataset-operation', activation: 'dataset-operation-enabled', parameters: 'dataset-parameters',
+    service: 'dataset-service', serviceDiscovery: 'dataset-service-discovery-link', operation: 'dataset-operation', parameters: 'dataset-parameters',
     acquisitions: 'dataset-acquisitions', readContent: 'dataset-read-content', content: 'dataset-content',
   },
   schemaDrivenSources: {

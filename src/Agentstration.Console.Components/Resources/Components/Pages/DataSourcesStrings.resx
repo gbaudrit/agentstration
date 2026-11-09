@@ -91,14 +91,9 @@
   <data name="DatasetPrefixHelp" xml:space="preserve"><value>Optional relative directory ending with /. The datasets segment is reserved; a unique dataset partition is always added.</value></data>
   <data name="DatasetOperation" xml:space="preserve"><value>Operation</value></data>
   <data name="DatasetOperationHelp" xml:space="preserve"><value>Select an exact read-only operation revision. Actions require a separate journey.</value></data>
-  <data name="DatasetDisableOperation" xml:space="preserve"><value>Disable operation</value></data>
-  <data name="DatasetEnableOperation" xml:space="preserve"><value>Enable operation</value></data>
-  <data name="DatasetActivationHelp" xml:space="preserve"><value>Activation executes nothing and publishes no Tool. Other Data Sources may also use this operation.</value></data>
   <data name="DatasetNoConfiguration" xml:space="preserve"><value>No configuration</value></data>
   <data name="DatasetParametersHelp" xml:space="preserve"><value>These saved call parameters are validated and fixed for each acquisition. Schema defaults are never filled automatically.</value></data>
   <data name="DatasetLegacyProfile" xml:space="preserve"><value>From a legacy profile</value></data>
-  <data name="DatasetDiscoverOperations" xml:space="preserve"><value>Discover operations</value></data>
-  <data name="DatasetDiscoverHelp" xml:space="preserve"><value>Run discovery on an existing Connected Service, then refresh to review the discovered operations.</value></data>
   <data name="DatasetService" xml:space="preserve"><value>Connected Service</value></data>
   <data name="DatasetFixedCallHelp" xml:space="preserve"><value>Acquisition uses the saved operation, parameters and Storage. Caller overrides are refused.</value></data>
   <data name="DatasetNotReady" xml:space="preserve"><value>The saved composition is unavailable. Review its exact revisions, activation and access before acquiring.</value></data>
@@ -109,7 +104,10 @@
   <data name="DatasetContentTruncated" xml:space="preserve"><value>This preview is limited to the first content segment.</value></data>
   <data name="DatasetCloseContent" xml:space="preserve"><value>Close content</value></data>
   <data name="DatasetLoadFailed" xml:space="preserve"><value>The dataset or its available dependencies could not be loaded.</value></data>
-  <data name="DatasetDiscoveryAccepted" xml:space="preserve"><value>Discovery accepted. Refresh to review its results.</value></data>
   <data name="DatasetActionFailed" xml:space="preserve"><value>The action was refused or could not complete. Review the current revisions, input values and access, then retry explicitly.</value></data>
   <data name="DatasetAcquisitionNotAuthorized" xml:space="preserve"><value>You are not authorized to start acquisitions in the operational Workspace.</value></data>
+  <data name="DatasetServiceHelp" xml:space="preserve"><value>Choose the Connected Service that owns the acquisition operation. Discovery and activation are managed on that service.</value></data>
+  <data name="DatasetManageOperations" xml:space="preserve"><value>Open service discovery and operations</value></data>
+  <data name="DatasetSelectOperationFirst" xml:space="preserve"><value>Choose a Connected Service, then an operation to configure its saved call parameters.</value></data>
+  <data name="DatasetNoServiceOperations" xml:space="preserve"><value>No operations are currently available for this service. Open its Discovery tab to discover and review operations.</value></data>
 </root>

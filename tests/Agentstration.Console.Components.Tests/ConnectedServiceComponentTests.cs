@@ -117,7 +117,7 @@ public sealed class ConnectedServiceComponentTests
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.HasCount(4, rendered.FindAll(".resource-tabs button"));
+            Assert.HasCount(5, rendered.FindAll(".resource-tabs button"));
             Assert.IsEmpty(rendered.FindAll("a[href*='/edit']"));
             Assert.DoesNotContain("Saved configuration and observed availability", rendered.Markup,
                 StringComparison.Ordinal);

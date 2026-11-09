@@ -91,14 +91,9 @@
   <data name="DatasetPrefixHelp" xml:space="preserve"><value>Répertoire relatif facultatif se terminant par /. Le segment datasets est réservé ; une partition unique du dataset est toujours ajoutée.</value></data>
   <data name="DatasetOperation" xml:space="preserve"><value>Opération</value></data>
   <data name="DatasetOperationHelp" xml:space="preserve"><value>Sélectionnez une révision exacte d’une opération en lecture seule. Les actions suivent un parcours distinct.</value></data>
-  <data name="DatasetDisableOperation" xml:space="preserve"><value>Désactiver l’opération</value></data>
-  <data name="DatasetEnableOperation" xml:space="preserve"><value>Activer l’opération</value></data>
-  <data name="DatasetActivationHelp" xml:space="preserve"><value>L’activation n’exécute rien et ne publie aucun Tool. D’autres Data Sources peuvent aussi utiliser cette opération.</value></data>
   <data name="DatasetNoConfiguration" xml:space="preserve"><value>Sans configuration</value></data>
   <data name="DatasetParametersHelp" xml:space="preserve"><value>Ces paramètres sauvegardés sont validés et fixés pour chaque acquisition. Les valeurs par défaut du schéma ne sont jamais remplies automatiquement.</value></data>
   <data name="DatasetLegacyProfile" xml:space="preserve"><value>Depuis un profil historique</value></data>
-  <data name="DatasetDiscoverOperations" xml:space="preserve"><value>Découvrir les opérations</value></data>
-  <data name="DatasetDiscoverHelp" xml:space="preserve"><value>Lancez une découverte sur un Connected Service existant, puis actualisez pour examiner les opérations découvertes.</value></data>
   <data name="DatasetService" xml:space="preserve"><value>Connected Service</value></data>
   <data name="DatasetFixedCallHelp" xml:space="preserve"><value>L’acquisition utilise l’opération, les paramètres et le Storage sauvegardés. Les substitutions par l’appelant sont refusées.</value></data>
   <data name="DatasetNotReady" xml:space="preserve"><value>La composition sauvegardée est indisponible. Vérifiez ses révisions exactes, son activation et ses accès avant une acquisition.</value></data>
@@ -109,7 +104,10 @@
   <data name="DatasetContentTruncated" xml:space="preserve"><value>Cet aperçu est limité au premier segment du contenu.</value></data>
   <data name="DatasetCloseContent" xml:space="preserve"><value>Fermer le contenu</value></data>
   <data name="DatasetLoadFailed" xml:space="preserve"><value>Le dataset ou ses dépendances disponibles n’ont pas pu être chargés.</value></data>
-  <data name="DatasetDiscoveryAccepted" xml:space="preserve"><value>Découverte acceptée. Actualisez pour examiner ses résultats.</value></data>
   <data name="DatasetActionFailed" xml:space="preserve"><value>L’action a été refusée ou n’a pas abouti. Vérifiez les révisions actuelles, les valeurs saisies et les accès, puis réessayez explicitement.</value></data>
   <data name="DatasetAcquisitionNotAuthorized" xml:space="preserve"><value>Vous n’êtes pas autorisé à lancer des acquisitions dans le Workspace opérationnel.</value></data>
+  <data name="DatasetServiceHelp" xml:space="preserve"><value>Choisissez le service connecté propriétaire de l’opération d’acquisition. La découverte et l’activation se gèrent sur ce service.</value></data>
+  <data name="DatasetManageOperations" xml:space="preserve"><value>Ouvrir la découverte et les opérations du service</value></data>
+  <data name="DatasetSelectOperationFirst" xml:space="preserve"><value>Choisissez un service connecté, puis une opération pour configurer ses paramètres d’appel enregistrés.</value></data>
+  <data name="DatasetNoServiceOperations" xml:space="preserve"><value>Aucune opération n’est actuellement disponible pour ce service. Ouvrez son onglet Découverte pour découvrir et examiner ses opérations.</value></data>
 </root>

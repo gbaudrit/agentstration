@@ -10,7 +10,9 @@ FR [#1041](https://github.com/gbaudrit/agentstration/issues/1041), under #1032,
 composes the Connected Service and Storage families delivered by ADR-0195,
 ADR-0198, ADR-0199 and ADR-0200. The ownership and route proposal below was
 reviewed by the maintainer in the implementation chat on 2026-11-08. This is
-architecture approval, not approval of the implemented browser UX.
+architecture approval, not approval of the implemented browser UX. On
+2026-11-09 the maintainer clarified that the Connected Service owns the Discovery
+tab and operation activation, while Data Sources select the service and operation.
 
 ADR-0164 gave Data Sources origin configuration and acquisition Profiles.
 ADR-0182 added discovery and promoted targets. ADR-0190 describes fixed
@@ -33,6 +35,14 @@ capability and separate explicit enablement; Storage owns implementation,
 manual mappings and the authorized envelope. A dataset cannot carry connection
 configuration or replace any of those authorities. The composition mode is
 immutable; migration creates a new dataset explicitly, preserving the old one.
+
+Connected Service owns operation discovery and explicit activation, including the
+Console Discovery tab, its operations and links to durable discovery Flow Runs.
+The Data Source editor first selects a Connected Service, then one of that exact
+service's operations. Changing the service clears the operation and its call
+parameters. Refreshing or reopening a saved dataset never adopts a newer pin.
+The service identity remains carried by the pinned Operation; no independent
+connection configuration is copied into the dataset.
 
 The immutable Operation type version may supply an acquisition descriptor
 referencing an exact published Flow UID/version/hash with contract
@@ -90,6 +100,9 @@ There is no second relay engine. Knowledge Snapshot composition remains #1042.
 - Console routes remain `/data-sources`, `/data-sources/new` and
   `/data-sources/{Name}`. The catalog opens creation with `?composition=dataset`;
   the historical profile journey remains available explicitly.
+- Connected Service discovery uses `/connected-services/{Name}?view=discovery`
+  with explicit owner `scopeRef` and navigation `context`. Discovery run links
+  retain their operational Workspace and original logical context.
 - Existing acquisition API routes are reused; bounded native content is read
   through `/api/datasourceacquisitions/{id}/content`. Saved parameters and
   Storage selection cannot be overridden by acquisition callers.

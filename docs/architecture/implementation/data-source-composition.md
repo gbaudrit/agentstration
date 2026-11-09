@@ -6,14 +6,17 @@ for ownership, the compatibility decision and routes.
 
 ## Configuration and execution
 
-1. Configure a Connected Service and discover its typed Operations using the
-   existing durable discovery lifecycle. Discovery preserves the service UID
-   and generation and never enables an operation automatically.
+1. Configure a Connected Service and open its Discovery tab. Discover its typed
+   Operations, follow the linked Flow Runs, refresh the service's history and
+   review its operation list there. Discovery preserves the service UID and
+   generation and never enables an operation automatically.
 2. Explicitly enable a reviewed Operation revision. `PUT
    /api/connected-service-operations/{name}/enabled` requires its current
    `If-Match`. Activation performs no acquisition and publishes no Tool.
 3. Create a Data Source selecting an exact existing Storage, an allowed relative
-   prefix and one exact Operation with saved JSON parameters. Its type version
+   prefix, a Connected Service and then one of that service's exact Operations
+   with saved JSON parameters. Changing the service clears the operation and
+   parameters; saved revisions are never replaced on refresh. Its type version
    must advertise a published read-only acquisition Flow. Unsupported adapters,
    actions, missing required values and unavailable dependencies are refused.
 4. Start acquisition using the ordinary Data Source acquisition endpoint with
@@ -29,7 +32,8 @@ for ownership, the compatibility decision and routes.
    refuses a changed version. Content is data, never executable markup.
 
 The Console uses the shared schema editor, complete neutral/French resources,
-explicit activation and revision selection. A changed reference is selected
+explicit activation on the Connected Service, and revision selection on the
+Data Source. Discovery is not offered from the Data Source. A changed reference is selected
 explicitly; refresh does not rewrite saved pins. Existing profile resources,
 discoveries, targets, acquisitions, Tools and Knowledge consumers are retained.
 
@@ -85,7 +89,7 @@ Checks completed on 2026-11-09 after integrating `integration/fr-1032` at
 `03ad8f0` (#1079 and #1059):
 
 - Release solution build: zero warnings and errors.
-- Required Fast lane: 1,027 passed, zero failed or skipped.
+- Required Fast lane: 1,032 passed, zero failed or skipped.
 - Required Integration lane: 1,103 passed, zero failed, 12 existing optional
   integrations skipped (two PostgreSQL and ten live-model cases).
 - The five native dataset integration tests passed separately on the merged
@@ -94,13 +98,17 @@ Checks completed on 2026-11-09 after integrating `integration/fr-1032` at
   with real AWP execution and Secret callbacks. Before correction, the Instance
   and Tenant success cases failed at the host guard before the extension call.
   Both required functional lanes passed again after correction.
-- Ten existing schema-driven source, source lifecycle and artifact-content
-  Playwright regressions passed against the local product during the integration
-  refresh, before the subsequent host discovery fix; its UI is unchanged.
-- Temporary implementation smoke checks created, acquired and read a native
-  dataset in en-US/fr-FR at desktop (1,440 px) and mobile (390 px) widths, with
-  no horizontal page overflow or JavaScript errors. These checks are not a new
-  reusable journey.
+- Ten focused Console tests cover the service-owned discovery tab, scoped
+  history links, explicit activation with ETag, read-only controls, service and
+  operation selection, parameter reset and preservation of saved older pins.
+- Twelve existing schema-driven source, source lifecycle, artifact-content and
+  inherited-resource Playwright regressions passed against the local product.
+- Temporary implementation smoke checks launched discovery from the Connected
+  Service, reviewed operations, activated one and opened its Flow Run; then
+  selected that service and operation in a Data Source, acquired and read the
+  content. All passed in en-US/fr-FR at desktop (1,440 px) and mobile (390 px)
+  widths, with no page overflow or JavaScript errors. These checks are not a
+  new reusable journey.
 - Console rendering/locale tests, TypeScript checking, the application-surface
   catalog, ADR/LikeC4 checks and the complete Docusaurus build passed.
 
