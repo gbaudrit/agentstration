@@ -1,5 +1,4 @@
 extern alias openapi;
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -7,8 +6,8 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
-using Agentstration.Extensions.Contracts;
 using Agentstration.Extensions.Aep;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;

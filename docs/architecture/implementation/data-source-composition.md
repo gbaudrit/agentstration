@@ -86,12 +86,17 @@ Checks completed on 2026-11-09 after integrating `integration/fr-1032` at
 
 - Release solution build: zero warnings and errors.
 - Required Fast lane: 1,027 passed, zero failed or skipped.
-- Required Integration lane: 1,097 passed, zero failed, 12 existing optional
+- Required Integration lane: 1,103 passed, zero failed, 12 existing optional
   integrations skipped (two PostgreSQL and ten live-model cases).
 - The five native dataset integration tests passed separately on the merged
   base and are also included in the successful complete Integration lane.
+- Nine protected OpenAPI discovery scenarios passed after the host context fix,
+  with real AWP execution and Secret callbacks. Before correction, the Instance
+  and Tenant success cases failed at the host guard before the extension call.
+  Both required functional lanes passed again after correction.
 - Ten existing schema-driven source, source lifecycle and artifact-content
-  Playwright regressions passed against the local product.
+  Playwright regressions passed against the local product during the integration
+  refresh, before the subsequent host discovery fix; its UI is unchanged.
 - Temporary implementation smoke checks created, acquired and read a native
   dataset in en-US/fr-FR at desktop (1,440 px) and mobile (390 px) widths, with
   no horizontal page overflow or JavaScript errors. These checks are not a new
