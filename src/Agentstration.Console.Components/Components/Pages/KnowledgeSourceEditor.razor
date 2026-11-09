@@ -19,7 +19,8 @@
 else
 {
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
-    <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section">
+    <EditForm Model="this" OnValidSubmit="SaveAsync" FormName="knowledge-source-editor" class="panel form-section">
+        <fieldset class="resource-definition-fields" disabled="@(busy || !interactive)" data-testid="knowledge-source-definition-fields" data-interactive="@(interactive ? "true" : "false")">
         <div class="form-grid">
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
             @if (IsNew)
@@ -48,7 +49,8 @@ else
                 }
             </section>
         </div>
-        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" disabled="@(busy || bindings.Any(value => !value.ConfigurationValid))">@(busy ? T("Saving") : T("Save"))</button></div>
+        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" disabled="@(busy || !interactive || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))">@(busy ? T("Saving") : T("Save"))</button></div>
+        </fieldset>
     </EditForm>
 }
 
@@ -65,11 +67,17 @@ else
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
         description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
-    private bool enabled, busy, loading = true;
+    private bool enabled, busy, interactive, loading = true;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
     private string DetailsUrl => ExistingNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name!)}" : $"/knowledge-sources/{Uri.EscapeDataString(Name!)}?namespace={Uri.EscapeDataString(ExistingNamespace.Value)}";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -109,7 +117,7 @@ else
 
     private async Task SaveAsync()
     {
-        if (busy) return;
+        if (busy || !interactive || bindings.Any(value => value.TargetsLoadFailed)) return;
         busy = true;
         message = null;
         try
@@ -136,6 +144,10 @@ else
                 var ns = saved.Value.Namespace;
                 Navigation.NavigateTo(ns.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(ns.Value)}");
             }
+        }
+        catch (AgentstrationApiException exception) when (exception.ProblemType == "https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported")
+        {
+            message = T("NativeDatasetProjectionUnavailable");
         }
         catch (System.Text.Json.JsonException exception)
         {
@@ -209,13 +221,22 @@ else
         return new(parts[2], ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]));
     }
     private async Task ChangeDataSourceAsync(BindingModel binding, ChangeEventArgs args)
-    { binding.DataSourceKey = args.Value?.ToString() ?? string.Empty; binding.AcquisitionTargetName = string.Empty; await LoadTargetsAsync(binding); }
+    { message = null; binding.DataSourceKey = args.Value?.ToString() ?? string.Empty; binding.AcquisitionTargetName = string.Empty; await LoadTargetsAsync(binding); }
     private async Task LoadTargetsAsync(BindingModel binding)
     {
+        binding.TargetsLoadFailed = false;
         if (string.IsNullOrWhiteSpace(binding.DataSourceKey) || acquisitionTargets.ContainsKey(binding.DataSourceKey)) return;
         var parts = binding.DataSourceKey.Split('|', 3);
-        acquisitionTargets[binding.DataSourceKey] = await DataSources.GetAcquisitionTargetsAsync(
-            ResourceNamespace.Parse(parts[1]), parts[2], ResourceScopeRef.Parse(parts[0]), cancellation.Token);
+        try
+        {
+            acquisitionTargets[binding.DataSourceKey] = await DataSources.GetAcquisitionTargetsAsync(
+                ResourceNamespace.Parse(parts[1]), parts[2], ResourceScopeRef.Parse(parts[0]), cancellation.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            binding.TargetsLoadFailed = true;
+            message = T("AcquisitionTargetsLoadFailed");
+        }
     }
     private IReadOnlyList<DataSourceAcquisitionTargetView> TargetOptions(BindingModel binding) =>
         acquisitionTargets.GetValueOrDefault(binding.DataSourceKey, []);
@@ -253,6 +274,7 @@ else
         public string TransformationFlowKey { get; set; } = string.Empty;
         public JsonElement Configuration { get; set; } = JsonSerializer.SerializeToElement(new { });
         public bool ConfigurationValid { get; set; } = true;
+        public bool TargetsLoadFailed { get; set; }
         public bool Required { get; set; } = true;
         public string MaximumAgeText { get; set; } = string.Empty;
         public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner, string transformationFlowKey) => new()

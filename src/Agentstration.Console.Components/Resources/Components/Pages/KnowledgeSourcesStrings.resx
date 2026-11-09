@@ -67,4 +67,6 @@
   <data name="AcquisitionTarget" xml:space="preserve"><value>Acquisition target</value></data>
   <data name="SelectAcquisitionTarget" xml:space="preserve"><value>Select an acquisition target</value></data>
   <data name="Tab.Access" xml:space="preserve"><value>Access</value></data>
+  <data name="AcquisitionTargetsLoadFailed" xml:space="preserve"><value>Acquisition targets could not be loaded. Check access to the Data Source, then select it again to retry.</value></data>
+  <data name="NativeDatasetProjectionUnavailable" xml:space="preserve"><value>Knowledge projection from this dataset composition is not available yet. The Data Source and its acquired content are preserved.</value></data>
 </root>

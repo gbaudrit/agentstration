@@ -412,6 +412,8 @@ public sealed class DataSourceAcquisitionTargetService(
         var source = await sources.GetAsync(sourceNamespace, sourceName, sourceScope, cancellationToken)
             ?? throw Error("data_source_not_found", $"Data Source '{sourceNamespace}/{sourceName}' was not found.");
         execution.EnsureVisible(source.Value.ScopeRef!.Value);
+        // Native datasets already pin their operation and parameters; promoted targets belong to legacy profiles.
+        if (source.Value.Definition.Dataset is not null) return [];
         var profile = await profiles.ResolveActiveAsync(source.Value.ScopeRef!.Value, source.Value.Namespace,
             source.Value.Definition.Profile!, cancellationToken);
         var discoveries = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceDiscoveryResource>(ResourceScopeRef.Workspace(context.WorkspaceId),

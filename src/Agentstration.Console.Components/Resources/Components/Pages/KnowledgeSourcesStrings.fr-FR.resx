@@ -67,4 +67,6 @@
   <data name="AcquisitionTarget" xml:space="preserve"><value>Cible d’acquisition</value></data>
   <data name="SelectAcquisitionTarget" xml:space="preserve"><value>Sélectionner une cible d’acquisition</value></data>
   <data name="Tab.Access" xml:space="preserve"><value>Accès</value></data>
+  <data name="AcquisitionTargetsLoadFailed" xml:space="preserve"><value>Impossible de charger les cibles d’acquisition. Vérifiez l’accès à la Data Source, puis sélectionnez-la à nouveau pour réessayer.</value></data>
+  <data name="NativeDatasetProjectionUnavailable" xml:space="preserve"><value>La projection Knowledge depuis cette composition de dataset n’est pas encore disponible. La Data Source et son contenu acquis sont conservés.</value></data>
 </root>

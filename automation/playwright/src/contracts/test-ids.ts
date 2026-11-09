@@ -177,6 +177,7 @@ export const TestIds = {
     dataSourceStartAcquisition: 'data-source-start-acquisition',
     dataSourceAcquisitionRow: 'data-source-acquisition-row',
     knowledgeSourceEditor: 'knowledge-source-editor',
+    knowledgeSourceFields: 'knowledge-source-definition-fields',
     knowledgeSourceDisplayName: 'knowledge-source-display-name',
     knowledgeSourceName: 'knowledge-source-name',
     knowledgeSourceProjectionFlow: 'knowledge-source-projection-flow',

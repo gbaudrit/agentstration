@@ -74,6 +74,27 @@ reference or callback. Secured inputs still reject literals, and unsupported
 binding kinds fail explicitly. The OpenAPI regression matrix includes literal
 URLs with and without the optional authentication Secret in all three scopes.
 
+## Knowledge form submission
+
+The Knowledge Source editor names its form and disables fields until the Blazor
+connection is interactive, both on create and embedded edit. A failure to list
+acquisition targets stays in the form as a localized error, preserves the entered
+values, blocks save until an explicit retry succeeds, and does not terminate the
+interactive circuit.
+
+The acquisition-target collection belongs to legacy profiles. For an authorized
+native dataset it returns an empty list, without resolving a nonexistent Profile.
+Before this correction, selecting a native dataset returned HTTP 422 with a null
+`reference` error; the uncaught selection callback could terminate interactivity,
+after which a submit could fall back to an unnamed HTML POST.
+
+Native dataset inputs are not yet supported by the existing Knowledge projection
+pipeline, which still pins Profile/Artifact dependencies. This remains #1042.
+Creating a Knowledge Source with such an input now returns an explicit HTTP 422
+`knowledge_projection_dataset_input_unsupported`, localized by the editor, rather
+than a server error. This correction does not fabricate a Profile, rewrite a
+source or acquired content, or implement native Knowledge Snapshot composition.
+
 ## Lifecycle and limits
 
 - Acceptance is idempotent per Workspace, dataset UID and caller request key.
@@ -107,9 +128,9 @@ URLs with and without the optional authentication Secret in all three scopes.
 Checks completed on 2026-11-09 against integration base `03ad8f0`:
 
 - Release solution build: zero warnings and errors.
-- Required Fast lane: 1,037 passed, zero failures or skips.
-- Required Integration lane: 1,120 passed, zero failures, 12 existing optional
-  integrations skipped (two PostgreSQL and ten live-model cases), 1,132 total.
+- Required Fast lane: 1,043 passed, zero failures or skips.
+- The complete Integration rerun for the Knowledge form correction is in progress.
+  The preceding OpenAPI acquisition baseline passed 1,120 tests with 12 optional skips.
 - Five native dataset integration scenarios and fifteen protected real OpenAPI
   Flow/Secret callback scenarios passed in focused runs. Successful OpenAPI rows
   now save and acquire two datasets with different parameters into one local
@@ -122,6 +143,9 @@ Checks completed on 2026-11-09 against integration base `03ad8f0`:
   reflection, effective/default response schemas and case-sensitive query names.
 - Six standalone registration graph cases passed after adding the acquisition
   Tool; the Infrastructure registration/lifetime contract also passes.
+- Twenty focused Knowledge editor tests pass, including six new prerender,
+  failed-lookup/retry and native-input validation cases. Five native dataset API
+  scenarios pass with target-list and explicit Knowledge refusal assertions.
 - Fifteen focused Console rendering tests cover service-owned discovery and dataset
   editing, locale rendering, ETags, parent filtering, named schema properties,
   missing adapters, stale type digests, parameter reset and preservation of pins.

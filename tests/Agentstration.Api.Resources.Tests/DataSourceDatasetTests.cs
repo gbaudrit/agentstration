@@ -12,6 +12,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Storage;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
@@ -39,6 +40,20 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         Assert.IsTrue((await management.GetReadinessAsync(first.Value.Namespace, first.Value.Name, Owner, default)).CanAcquire);
         using var client = factory.CreateClient();
         SelectConsoleContext(client, Owner);
+        using var targetsResponse = await client.GetAsync("/api/datasources/first/acquisition-targets?scopeRef=/instance");
+        Assert.AreEqual(HttpStatusCode.OK, targetsResponse.StatusCode, await targetsResponse.Content.ReadAsStringAsync());
+        Assert.IsEmpty((await targetsResponse.Content.ReadFromJsonAsync<DataSourceAcquisitionTargetView[]>())!);
+        using var knowledge = await client.PostAsJsonAsync("/api/knowledgesources", new CreateKnowledgeSourceRequest("native-knowledge", new()
+        {
+            DisplayName = "Native Knowledge",
+            Enabled = true,
+            ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner, Version = "1.0.0", UseActiveVersion = false },
+            RetrievalFlow = new() { Name = "knowledge-retrieval-builtin", ScopeRef = Owner, Version = "1.0.0", UseActiveVersion = false },
+            DataSources = [new() { Name = "dataset", DataSource = new(first.Value.Name, Owner) }]
+        }, ScopeRef: Owner));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, knowledge.StatusCode, await knowledge.Content.ReadAsStringAsync());
+        var problem = await knowledge.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.AreEqual("https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported", problem.GetProperty("type").GetString());
         var one = await AcquireAsync(client, first.Value.Name);
         var two = await AcquireAsync(client, second.Value.Name);
         Assert.AreNotEqual(one.Content!.Key, two.Content!.Key);

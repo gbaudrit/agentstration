@@ -408,6 +408,8 @@ export class SourceLifecyclePage {
     await choose(binding.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBindingDataSource), source);
   }
   private async saveKnowledge(): Promise<void> {
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceFields)).toHaveAttribute('data-interactive', 'true');
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave)).toBeEnabled();
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave).click();
     await expect(this.page).toHaveURL(new RegExp(`/knowledge-sources/${this.fixture.knowledge}(?:\\?|$)`));
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.knowledgeDetails)).toBeVisible();
