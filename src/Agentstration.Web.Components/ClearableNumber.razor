@@ -1,0 +1,35 @@
+@typeparam TValue
+@using Microsoft.AspNetCore.Components.Forms
+@inherits InputNumber<TValue>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+
+<span class="clearable-field">
+    @RenderInput
+    @if (CanClear)
+    {
+        <button class="field-clear" type="button" aria-label="@Localizer["ClearValue"]" @onclick="ClearAsync" @onclick:stopPropagation><span aria-hidden="true">×</span></button>
+    }
+</span>
+
+@code {
+    [CascadingParameter] private FormFieldPresentation? Field { get; set; }
+    private RenderFragment RenderInput => builder => base.BuildRenderTree(builder);
+    private bool CanClear => Nullable.GetUnderlyingType(typeof(TValue)) is not null && !string.IsNullOrEmpty(CurrentValueAsString)
+        && !IsLocked("disabled") && !IsLocked("readonly");
+    private bool IsLocked(string name) => AdditionalAttributes?.TryGetValue(name, out var value) == true && value is not false;
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (Field is null) return;
+        var attributes = AdditionalAttributes is null ? new Dictionary<string, object>() : new(AdditionalAttributes);
+        attributes.TryAdd("id", Field.Id);
+        if (Field.DescriptionId is { } descriptionId) attributes.TryAdd("aria-describedby", descriptionId);
+        AdditionalAttributes = attributes;
+    }
+    private async Task ClearAsync()
+    {
+        if (!CanClear) return;
+        CurrentValueAsString = string.Empty;
+        if (Element is { } element) await element.FocusAsync();
+    }
+}
