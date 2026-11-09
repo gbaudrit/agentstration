@@ -18,10 +18,10 @@ namespace Agentstration.Infrastructure.ConnectedServices;
 // A Flow can request only its own persisted discovery. All connection authority is server-derived.
 public sealed class ConnectedServiceDiscoveryExecutor(
     ConnectedServiceOperationDiscoveryService discoveries,
-    IResourceStore store, ConnectedServiceManagementService services, IParameterResolver parameters,
-    ISecretResolver secrets, ISecretCapabilityService capabilities,
+    IResourceStore store, ConnectedServiceManagementService services, ConnectedServiceBoundValues boundValues,
+    ISecretResolver secrets,
     ICurrentRequestContext current,
-    IHttpClientFactory clients, IConfiguration configuration)
+    IHttpClientFactory clients)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -78,57 +78,15 @@ public sealed class ConnectedServiceDiscoveryExecutor(
         var manifest = await client.DiscoverAsync(cancellationToken);
         if (!manifest.Capabilities.TryGetValue(AepConnectedServiceDiscoveryProtocol.Capability, out var capability)
             || capability.Version != AepConnectedServiceDiscoveryProtocol.Version
-            || !manifest.Capabilities.TryGetValue(AepCapabilityNames.BoundValues, out var boundValues)
-            || boundValues.Version != AepProtocol.BoundValuesCapabilityVersion)
+            || !manifest.Capabilities.TryGetValue(AepCapabilityNames.BoundValues, out var boundCapability)
+            || boundCapability.Version != AepProtocol.BoundValuesCapabilityVersion)
             throw Error("connected_service_discovery_provider_unsupported");
         var advertised = manifest.Contributions.ConnectedServiceTypes?.SingleOrDefault(item => item.Id == type.Name)?
             .Versions.SingleOrDefault(item => item.Version == version.Version);
         if (advertised?.SchemaDigest != version.SchemaDigest)
             throw Error("connected_service_discovery_provider_changed");
-        // Issue Secret grants from saved bindings; no Secret bytes enter the AEP request or Flow values.
-        var handles = new List<SecretCapabilityHandle>();
-        var values = new List<AepBoundValue>();
-        try
+        return await boundValues.ExecuteAsync(service, version, registration, manifest, invocation, async values =>
         {
-            var declared = version.Inputs.Select(input => input.Id).ToArray();
-            foreach (var binding in service.Definition.Bindings)
-            {
-                if (binding.Kind == ConnectedServiceBindingKind.Literal)
-                {
-                    if (binding.Literal is not { ValueKind: not JsonValueKind.Undefined } literal
-                        || !version.Inputs.Any(input => input.Id == binding.InputId
-                            && input.Protection == ConnectedServiceValueProtection.Standard))
-                        throw Error("connected_service_literal_binding_invalid");
-                    values.Add(AepBoundValue.Inline(binding.InputId, literal.Clone()));
-                }
-                else if (binding.Kind == ConnectedServiceBindingKind.Parameter)
-                {
-                    var parameter = await parameters.ResolveAsync(binding.Parameter!,
-                        new(service.ScopeRef!.Value, service.Address), cancellationToken)
-                        ?? throw Error("connected_service_parameter_unavailable");
-                    values.Add(AepBoundValue.Inline(binding.InputId, parameter.Value));
-                }
-                else if (binding.Kind == ConnectedServiceBindingKind.Secret)
-                {
-                    if (!manifest.Capabilities.TryGetValue(AepCapabilityNames.SecretAccess, out var access)
-                        || access.Version != AepProtocol.SecretAccessVersion)
-                        throw Error("connected_service_secret_access_unsupported");
-                    if (!Uri.TryCreate(configuration["Agentstration:Aep:SecretAccess:PublicBaseUrl"], UriKind.Absolute, out var baseUri)
-                        || baseUri.Scheme != "https" && !(baseUri.Scheme == "http" && baseUri.IsLoopback))
-                        throw Error("connected_service_secret_callback_unavailable");
-                    var context = new SecretCapabilityContext(
-                        new(registration.ScopeRef!.Value, registration.Namespace, registration.Kind, registration.Name),
-                        manifest.Extension.Id, new(service.ScopeRef!.Value, service.Namespace, service.Kind, service.Name),
-                        binding.InputId, invocation.CallId);
-                    var handle = await capabilities.IssueAsync(context, new(binding.InputId, binding.Secret!),
-                        declared, cancellationToken, cancellationToken);
-                    handles.Add(handle);
-                    values.Add(AepBoundValue.Secured(binding.InputId, new(AepProtocol.SecretAccessVersion,
-                        new Uri(baseUri, AepProtocol.SecretAccessPath), manifest.Extension.Id,
-                        binding.InputId, invocation.CallId, handle.RevealForTransport())));
-                }
-                else throw Error("connected_service_binding_kind_invalid");
-            }
             var result = await client.DiscoverConnectedServiceOperationsAsync(new(type.Name, version.Version,
                 resolved.Definition.Options, values, discovery.CorrelationId), cancellationToken);
             var output = new ConnectedServiceOperationDiscoveryManifest
@@ -149,11 +107,7 @@ public sealed class ConnectedServiceDiscoveryExecutor(
             if (System.Text.Encoding.UTF8.GetByteCount(manifestOutput.GetRawText()) > AepConnectedServiceDiscoveryProtocol.MaximumResponseBytes)
                 throw Error("connected_service_discovery_manifest_too_large");
             return manifestOutput;
-        }
-        finally
-        {
-            foreach (var handle in handles) capabilities.Revoke(handle);
-        }
+        }, cancellationToken);
     }
 
     private static ConnectedServiceOperationDiscoveryException Error(string code) => new(code, "Connected Service provider discovery could not be completed.");

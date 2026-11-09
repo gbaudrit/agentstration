@@ -152,7 +152,7 @@ export const TestIds = {
   datasetComposition: {
     editor: 'data-source-dataset-editor', fields: 'dataset-definition-fields', storage: 'dataset-storage', prefix: 'dataset-prefix',
     service: 'dataset-service', serviceDiscovery: 'dataset-service-discovery-link', operation: 'dataset-operation', parameters: 'dataset-parameters',
-    acquisitions: 'dataset-acquisitions', readContent: 'dataset-read-content', content: 'dataset-content',
+    ineligibleOperation: 'dataset-operation-ineligible', errorCode: 'dataset-error-code', acquisitions: 'dataset-acquisitions', readContent: 'dataset-read-content', content: 'dataset-content',
   },
   schemaDrivenSources: {
     dataSourceEditor: 'data-source-editor',

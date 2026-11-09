@@ -6,6 +6,7 @@ namespace Agentstration.Web.Console;
 
 public interface IConnectedServiceOperationsClient
 {
+    Task<IReadOnlyList<ConnectedServiceOperationTypeResource>> GetTypesAsync(CancellationToken token);
     Task<IReadOnlyList<ConnectedServiceOperationResource>> GetAsync(CancellationToken token);
     Task<IReadOnlyList<ConnectedServiceOperationResource>> GetForServiceAsync(ConnectedServiceResource service, CancellationToken token);
     Task<IReadOnlyList<ConnectedServiceOperationDiscoveryResource>> GetDiscoveriesAsync(ConnectedServiceResource service, CancellationToken token);
@@ -15,6 +16,9 @@ public interface IConnectedServiceOperationsClient
 
 public sealed class ConnectedServiceOperationsApiClient(HttpClient http) : IConnectedServiceOperationsClient
 {
+    public Task<IReadOnlyList<ConnectedServiceOperationTypeResource>> GetTypesAsync(CancellationToken token) =>
+        ApiResponse.ReadAsync<IReadOnlyList<ConnectedServiceOperationTypeResource>>(http, "api/connected-service-operation-types", token);
+
     public Task<IReadOnlyList<ConnectedServiceOperationResource>> GetAsync(CancellationToken token) =>
         ApiResponse.ReadAsync<IReadOnlyList<ConnectedServiceOperationResource>>(http, "api/connected-service-operations", token);
 

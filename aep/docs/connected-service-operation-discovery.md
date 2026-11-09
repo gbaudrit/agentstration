@@ -33,6 +33,7 @@ extension. Cancellation revokes outstanding grants; retries issue fresh grants.
 
 The existing resource-bundle installation lifecycle may install a Flow-only bundle
 when every manifest is a Flow with contract
-`connected-service-operation-discovery/v1`. The wire container retains its historic
+`connected-service-operation-discovery/v1` or
+`connected-service-operation-acquisition/v1`. The wire container retains its historic
 `DataSourceProfileBundles` name; no Data Source Profile is required in this narrow
 case. Normal Data Source bundles retain their validation and governance rules.

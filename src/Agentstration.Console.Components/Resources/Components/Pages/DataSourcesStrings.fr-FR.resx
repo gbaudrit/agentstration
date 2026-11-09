@@ -110,4 +110,12 @@
   <data name="DatasetManageOperations" xml:space="preserve"><value>Ouvrir la découverte et les opérations du service</value></data>
   <data name="DatasetSelectOperationFirst" xml:space="preserve"><value>Choisissez un service connecté, puis une opération pour configurer ses paramètres d’appel enregistrés.</value></data>
   <data name="DatasetNoServiceOperations" xml:space="preserve"><value>Aucune opération n’est actuellement disponible pour ce service. Ouvrez son onglet Découverte pour découvrir et examiner ses opérations.</value></data>
+  <data name="DatasetOperationTypeUnavailable" xml:space="preserve"><value>La version exacte du type d’opération est indisponible. Vérifiez sa référence et les accès.</value></data>
+  <data name="DatasetOperationAdapterUnavailable" xml:space="preserve"><value>Ce type d’opération ne fournit pas de Flow d’acquisition. Il ne peut pas alimenter une Data Source activée.</value></data>
+  <data name="DatasetOperationNotReadOnly" xml:space="preserve"><value>L’acquisition nécessite une opération en lecture seule de type requête-réponse.</value></data>
+  <data name="DatasetOperationSchemaMissing" xml:space="preserve"><value>Le schéma effectif d’entrée ou de sortie est absent ou non pris en charge pour l’acquisition.</value></data>
+  <data name="DatasetParametersUnavailable" xml:space="preserve"><value>Les paramètres sont disponibles lorsque l’opération prend en charge l’acquisition.</value></data>
+  <data name="DatasetParametersInvalid" xml:space="preserve"><value>Les paramètres sauvegardés ne respectent pas le schéma d’entrée de l’opération.</value></data>
+  <data name="DatasetPrefixInvalid" xml:space="preserve"><value>Utilisez un préfixe de répertoire relatif se terminant par /, sans .. ni le segment réservé datasets.</value></data>
+  <data name="DatasetErrorReference" xml:space="preserve"><value>Référence de l’erreur :</value></data>
 </root>

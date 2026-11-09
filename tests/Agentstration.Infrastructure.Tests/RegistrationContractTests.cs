@@ -5,6 +5,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
@@ -41,8 +42,8 @@ public sealed class RegistrationContractTests
             [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(IToolExecutionEventSink)] = (2, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolDefinitionProvider)] = (35, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolHandler)] = (35, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolDefinitionProvider)] = (36, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolHandler)] = (36, ServiceLifetime.Singleton),
             [typeof(IFlowVersionActivationGuard)] = (4, ServiceLifetime.Singleton),
             [typeof(IFlowDeletionGuard)] = (3, ServiceLifetime.Singleton),
             [typeof(IWorkExecutionScopeAccessor)] = (2, ServiceLifetime.Singleton)
@@ -67,6 +68,8 @@ public sealed class RegistrationContractTests
             .ToArray();
         Assert.HasCount(0, accidentalDuplicates, string.Join(Environment.NewLine, accidentalDuplicates));
         AssertSingleton<IRuntimeRunExecutionScope>(services, typeof(WorkspaceRuntimeRunExecutionScope));
+        AssertSingleton<ConnectedServiceAcquisitionExecutor>(services);
+        AssertSingleton<ConnectedServiceBoundValues>(services);
         AssertSingleton<ICurrentRequestContext>(services);
         AssertSingleton<IRequestContextScopeFactory>(services);
         AssertSingleton<TimeProvider>(services);

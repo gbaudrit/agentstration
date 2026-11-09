@@ -40,10 +40,22 @@ discoveries, targets, acquisitions, Tools and Knowledge consumers are retained.
 The integration baseline includes StorageType administration and scoped generic
 grants from #1079, and protected OpenAPI discovery from #1059. Acquisition uses
 the merged `local@1.0.0` contract and current Storage/StorageType Use decisions;
-it creates no grants. OpenAPI discovery alone does not make its Operations
-acquisition-eligible: their exact type version must also declare the compatible
-acquisition adapter. No invocation contract is inferred from a discovered HTTP
-method or from its read-only flag.
+it creates no grants. OpenAPI now contributes the compatible operation acquisition
+adapter, its Flow, and the protected AEP acquisition endpoint. Enrollment publishes
+the bundle before resolving the type's exact Flow UID/version/hash. The extension
+retains protocol-specific HTTP execution; Data Sources remain provider-neutral.
+No invocation contract is inferred from a discovered HTTP method or read-only flag.
+
+The dataset editor resolves the exact operation type UID/version/digest and uses
+its named input schema and read-only flag. An absent adapter or schema is explained
+before saving an enabled source. Server validation preserves the stable Data Source
+error code; the Console localizes known failures and displays the code and correlation
+reference without printing arbitrary server details or saved values.
+
+This is unreleased development state: the maintainer requested reseeding rather
+than new versions or a migration layer. Existing immutable records are not silently
+modified. After reseeding, enroll OpenAPI, create the service and rediscover/enable
+its operations before configuring datasets.
 
 Protected discovery preserves the logical Instance, Tenant administration or
 Workspace context through the AWP Tool call. An administrative context can carry
@@ -92,34 +104,36 @@ URLs with and without the optional authentication Secret in all three scopes.
 
 ## Validation evidence
 
-Checks completed on 2026-11-09 after integrating `integration/fr-1032` at
-`03ad8f0` (#1079 and #1059):
+Checks completed on 2026-11-09 against integration base `03ad8f0`:
 
 - Release solution build: zero warnings and errors.
-- Required Fast lane: 1,032 passed, zero failed or skipped.
-- Required Integration lane: 1,109 passed, zero failed, 12 existing optional
-  integrations skipped (two PostgreSQL and ten live-model cases).
-- The five native dataset integration tests passed separately on the merged
-  base and are also included in the successful complete Integration lane.
-- Fifteen protected OpenAPI discovery scenarios passed after the host context and binding fixes,
-  with real AWP execution and Secret callbacks. Before correction, the Instance
-  and Tenant success cases failed at the host guard before the extension call.
-  The six added literal URL cases reproduced the Secret-capability error before
-  the binding fix; afterwards all fifteen passed, with zero Secret callbacks for
-  literal-only connections. Both functional lanes passed again after correction.
-- Ten focused Console tests cover the service-owned discovery tab, scoped
-  history links, explicit activation with ETag, read-only controls, service and
-  operation selection, parameter reset and preservation of saved older pins.
-- Twelve existing schema-driven source, source lifecycle, artifact-content and
-  inherited-resource Playwright regressions passed against the local product.
-- Temporary implementation smoke checks launched discovery from the Connected
-  Service, reviewed operations, activated one and opened its Flow Run; then
-  selected that service and operation in a Data Source, acquired and read the
-  content. All passed in en-US/fr-FR at desktop (1,440 px) and mobile (390 px)
-  widths, with no page overflow or JavaScript errors. These checks are not a
-  new reusable journey.
-- Console rendering/locale tests, TypeScript checking, the application-surface
-  catalog, ADR/LikeC4 checks and the complete Docusaurus build passed.
+- Required Fast lane: 1,037 passed, zero failures or skips.
+- The final complete Integration rerun is in progress; no final success is claimed yet.
+- Five native dataset integration scenarios and fifteen protected real OpenAPI
+  Flow/Secret callback scenarios passed in focused runs. Successful OpenAPI rows
+  now save and acquire two datasets with different parameters into one local
+  Storage, then read and compare their isolated content in Instance, Tenant and
+  Workspace contexts. Forged identities, runs, completed acquisitions and logical
+  scopes dispatch no provider call; Flow evidence contains no redeemed credential.
+- All 36 extension tests and 59 standalone AEP SDK tests passed. Coverage includes
+  enrollment authentication, request/response bounds, protected bindings, exact
+  contract digest, connection-origin enforcement, action refusal, credential
+  reflection, effective/default response schemas and case-sensitive query names.
+- Six standalone registration graph cases passed after adding the acquisition
+  Tool; the Infrastructure registration/lifetime contract also passes.
+- Fifteen focused Console rendering tests cover service-owned discovery and dataset
+  editing, locale rendering, ETags, parent filtering, named schema properties,
+  missing adapters, stale type digests, parameter reset and preservation of pins.
+- Twelve existing `schema-driven-sources`, `source-lifecycle`, `artifact-content`
+  and `inherited-resource-readonly` Playwright regressions passed.
+- Temporary implementation smoke checks passed in en-US/fr-FR at desktop
+  (1,440 px) and mobile (390 px): service discovery/history, activation, Flow Run
+  navigation, incompatible-adapter feedback, localized HTTP 422 diagnosis,
+  corrected save, acquisition and content read. Screenshots confirm readable
+  stacked error details, with no horizontal overflow or JavaScript errors.
+  These checks are not a new reusable journey.
+- TypeScript checking, changed C#/Razor formatting, ADR registry, LikeC4 checks
+  and the complete Docusaurus build passed.
 
 `DataSourceDatasetTests` uses actual discovery and acquisition Flows, the AWP
 test worker, and the selected builtin local Storage, without a network origin,
@@ -127,6 +141,11 @@ cloud credential or model. Its five scenarios cover two datasets sharing one
 Operation and Storage, fixed parameters, empty-input calls, concurrent admission,
 cancellation, foreign references/Workspaces, reserved-prefix isolation, Storage
 envelope refusal, and pending/completed acquisitions across real host restarts.
+
+The protected OpenAPI acquisition fixture grants builtin StorageType use explicitly
+in Workspace context. Tenant administration deliberately cannot read Instance
+resources; its offline acquisition fixture seeds a Tenant-owned Core local type
+and Storage instead. Production authorization and default provisioning are unchanged.
 
 The architecture and route framing was approved before UI work. Explicit
 maintainer approval of the implemented UX and a merged implementation PR are

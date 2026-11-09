@@ -91,13 +91,37 @@ larger catalogs fail explicitly and are not silently truncated.
 Metadata that reflects the supplied Bearer credential is rejected before it can
 enter durable discovery evidence.
 
-Successful discoveries materialize read-only operations. Rediscovery retains
+Successful discoveries materialize typed operations for review. Rediscovery retains
 stable identities for the same contract location/operationId, updates observed
 definition evidence, and marks disappeared operations unavailable through the
 generic lifecycle. Discovery neither invokes a business operation nor publishes
-an Agent Tool. Invocation dispatch for these materialized resources remains a
-separate delivery; the existing `openapi.operation.invoke` Tool is the retained
-Data Source acquisition path, not that dispatch API.
+an Agent Tool.
+
+The operation type also contributes an acquisition adapter and the published
+`openapi-operation-acquisition` Flow (`connected-service-operation-acquisition/v1`).
+After explicit activation, a native Data Source can pin the operation and its
+validated parameters, then acquire its JSON result into a selected Storage.
+The internal Tool accepts only the accepted acquisition id; it cannot receive a
+caller-selected connection, selector, credential or destination. The host checks
+its exact Flow Run, creator, Workspace, logical context, dependency pins and
+current authorization before protected AEP dispatch. It reuses the same typed
+Literal/Parameter bindings and short-lived Secret capabilities as discovery.
+
+The extension owns HTTP execution. It re-fetches the contract, checks its exact
+digest and operation selector, refuses actions and destinations outside the
+configured Connected Service origin, and uses the protected Bearer for both
+contract and business requests. Reflected credentials, non-JSON responses,
+invalid JSON, pagination beyond one page, and results exceeding the 48 KiB AEP
+envelope fail explicitly.
+Saved parameters cannot override the connection or protected Authorization header.
+
+Effective input schemas preserve path/query/header groups and required values;
+empty-input operations use an empty object and show No configuration / Sans
+configuration. JSON response schemas and local references are projected into
+the bounded native schema profile. Unsupported schemas leave the operation
+visible for discovery with a diagnostic, but without acquisition schemas; the
+Console explains why it cannot feed an enabled Data Source. No required values
+are invented. Generic operation Tool relays remain owned by #1044.
 
 ## Migration inventory
 
@@ -106,11 +130,15 @@ Data Source acquisition path, not that dispatch API.
 | `openapi-governed` bundle and its published versions | Retained unchanged for existing consumers; the Connected Service Flow is installed in a separate bundle. |
 | `openapi-discovery` / `datasource.discovery/v1`, hierarchical choices and promoted selectors | Legacy compatibility path retained until explicit consumer migration in #1041; new service operation discovery uses `openapi-operation-discovery`. |
 | Data Source `origin`, `candidatePaths` and `credentialId` | Retained for legacy consumers. New connections use Connected Service options and Parameter/Secret bindings; no values or references are silently copied. |
-| `openapi-acquisition`, fixed bindings, invocation Tool and Artifact persistence | Retained; operation invocation/acquisition adoption is coordinated with #1041. |
+| `openapi-acquisition`, fixed bindings, invocation Tool and Artifact persistence | Retained; native operation acquisition uses the separate `openapi-operation-acquisition` Flow. |
 | Existing targets, immutable Flow versions, discovery/acquisition histories | Preserved without automatic replacement or repinning. |
 | Parser, destination policy, schema-format contribution and technical Tools | Reused; no direct extension dependency is introduced. |
 
-Operators should enroll/reconcile the extension to add its new contributions,
+This unreleased integration keeps the existing `1.0.0` versions by maintainer
+instruction. Reseed development state before enrolling the changed contracts;
+existing immutable type/Flow/bundle records are not rewritten in place.
+
+Operators should enroll/reconcile the extension to add its contributions,
 create explicit Connected Services and run their discovery. This does not
 authorize deletion of old bundles or migration of their dependent resources.
 ADR-0201 records the protected execution boundary and this transition.

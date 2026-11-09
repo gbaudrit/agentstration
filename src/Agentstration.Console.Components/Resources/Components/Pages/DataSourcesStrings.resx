@@ -110,4 +110,12 @@
   <data name="DatasetManageOperations" xml:space="preserve"><value>Open service discovery and operations</value></data>
   <data name="DatasetSelectOperationFirst" xml:space="preserve"><value>Choose a Connected Service, then an operation to configure its saved call parameters.</value></data>
   <data name="DatasetNoServiceOperations" xml:space="preserve"><value>No operations are currently available for this service. Open its Discovery tab to discover and review operations.</value></data>
+  <data name="DatasetOperationTypeUnavailable" xml:space="preserve"><value>The exact operation type version is unavailable. Review its reference and access.</value></data>
+  <data name="DatasetOperationAdapterUnavailable" xml:space="preserve"><value>This operation type does not provide an acquisition Flow. It cannot feed an enabled Data Source.</value></data>
+  <data name="DatasetOperationNotReadOnly" xml:space="preserve"><value>Acquisition requires a read-only request-response operation.</value></data>
+  <data name="DatasetOperationSchemaMissing" xml:space="preserve"><value>The effective input or output schema is missing or unsupported for acquisition.</value></data>
+  <data name="DatasetParametersUnavailable" xml:space="preserve"><value>Parameters become available when the operation supports acquisition.</value></data>
+  <data name="DatasetParametersInvalid" xml:space="preserve"><value>The saved parameters do not satisfy the operation input schema.</value></data>
+  <data name="DatasetPrefixInvalid" xml:space="preserve"><value>Use a relative directory prefix ending in /, without .. or the reserved datasets segment.</value></data>
+  <data name="DatasetErrorReference" xml:space="preserve"><value>Error reference:</value></data>
 </root>

@@ -27,15 +27,25 @@ public sealed class DataSourceDatasetAcquisitionService(
         if (!input.TryGetProperty("acquisitionId", out var id) || id.ValueKind != JsonValueKind.String
             || !input.TryGetProperty("operation", out var operation) || !input.TryGetProperty("parameters", out var parameters))
             throw Invalid("data_source_invocation_invalid", "An operation Flow requires an accepted acquisition identity.");
-        var records = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceAcquisitionResource>(
-            ResourceScopeRef.Workspace(context.WorkspaceId), DataSourceResourceKinds.DataSourceAcquisition, 0, 1000, cancellationToken));
-        var acquisition = records.SingleOrDefault(item => item.Value.Name == id.GetString() && item.Value.FlowRunId == runId)?.Value;
+        var acquisition = await GetExecutionAsync(id.GetString()!, runId, cancellationToken);
         if (acquisition?.Dataset is null || Terminal(acquisition.State)
             || context.PrincipalId != acquisition.CreatedBy || !JsonElement.DeepEquals(parameters, acquisition.Parameters)
             || !JsonElement.DeepEquals(operation, JsonSerializer.SerializeToElement(acquisition.Dataset.Definition.Acquisition.Operation, JsonSerializerOptions.Web))
             || !JsonElement.DeepEquals(input, InvocationInput(acquisition)))
             throw Invalid("data_source_invocation_invalid", "The Flow input does not match the accepted acquisition.");
+    }
+
+    public async Task<DataSourceAcquisitionResource> GetExecutionAsync(string id, string runId, CancellationToken cancellationToken)
+    {
+        var context = execution.RequireContext("data_source_context_required");
+        var records = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceAcquisitionResource>(
+            ResourceScopeRef.Workspace(context.WorkspaceId), DataSourceResourceKinds.DataSourceAcquisition, 0, 1000, cancellationToken));
+        var acquisition = records.SingleOrDefault(item => item.Value.Name == id && item.Value.FlowRunId == runId)?.Value;
+        if (acquisition?.Dataset is null || Terminal(acquisition.State) || context.PrincipalId != acquisition.CreatedBy
+            || acquisition.LogicalScopeRef != execution.ConsumerScope || context.TenantId != acquisition.TenantId)
+            throw Invalid("data_source_invocation_invalid", "The invocation does not identify an accepted acquisition in this context.");
         await ValidateExecutionAsync(acquisition, cancellationToken);
+        return acquisition;
     }
 
     public async Task<StoredResource<DataSourceAcquisitionResource>> StartAsync(DataSourceResource source,

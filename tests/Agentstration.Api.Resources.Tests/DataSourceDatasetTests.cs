@@ -89,7 +89,8 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         var management = factory.Services.GetRequiredService<DataSourceManagementService>();
         var source = Source("invalid", fixture, Empty);
-        await Assert.ThrowsAsync<DataSourceValidationException>(() => management.CreateAsync(source, default));
+        var invalidParameters = await Assert.ThrowsAsync<DataSourceValidationException>(() => management.CreateAsync(source, default));
+        Assert.AreEqual("data_source_parameters_invalid", invalidParameters.Code);
         var valid = Source("valid", fixture, JsonSerializer.SerializeToElement(new { dataset = "alpha" }));
         foreach (var prefix in new[] { "../", "/", "foreign", "a/../../", "datasets/other/" })
             await Assert.ThrowsAsync<DataSourceValidationException>(() => management.CreateAsync(valid with

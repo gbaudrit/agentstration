@@ -52,6 +52,14 @@ Only request-response, explicitly read-only operations are eligible. Missing
 adapters are reported as unavailable. No HTTP method, schema annotation or
 operation name implicitly authorizes an action for acquisition.
 
+AEP operation type contributions carry an optional acquisition declaration naming
+an extension-owned bundled Flow/version and schema/read-only properties. Enrollment
+publishes the bundle before resolving exact local Flow pins. The protected AEP
+acquisition endpoint reuses Bound Values and enrollment authentication. A host-owned
+internal Tool dispatches only an accepted acquisition in its matching Flow Run and
+logical/operational context. It derives the exact connection and operation server-side;
+this is acquisition execution, not a second generic Tool relay mechanism.
+
 The Flow receives the acquisition identity, exact Operation reference, saved
 parameters and caller identity. It returns the operation's JSON result. The
 type-owned adapter implements the operation; Data Sources never copy resolved
@@ -111,9 +119,11 @@ There is no second relay engine. Knowledge Snapshot composition remains #1042.
 - The initial schema profile reuses the bounded governed Tool validator and
   rejects unsupported validation keywords. Empty-input-valid operations use
   an empty saved object and display No configuration / Sans configuration.
-- OpenAPI #1058/#1059 and OpenDAL #1039 are optional adapters. They must publish
-  compatible executable type versions before their operations become eligible;
-  historical schemas alone do not make an old implementation executable.
+- OpenAPI #1058/#1059 is extended with a compatible acquisition Flow, protected
+  endpoint and effective schemas. OpenDAL #1039 remains optional. Historical
+  schemas alone do not make an old implementation executable.
+- The maintainer requested retaining current versions and reseeding this unreleased
+  integration state. No immutable-record rewrite or migration layer is added.
 - Storage authorization uses the actually merged ADR-0200 generic Use contract.
   No automatic grants, permission bypass, or #1077/#1078 policy engine is added.
 - #1033 retains its explicit implemented-UX approval and merge gates. This

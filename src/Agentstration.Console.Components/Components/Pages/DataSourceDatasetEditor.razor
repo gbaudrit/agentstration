@@ -14,7 +14,13 @@
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else
 {
-    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+    @if (error is not null)
+    {
+        <div class="form-alert form-alert-danger" role="alert">@error
+            @if (errorCode is not null) { <code data-testid="dataset-error-code">@errorCode</code> }
+            @if (errorId is not null) { <small>@T("DatasetErrorReference") <code>@errorId</code></small> }
+        </div>
+    }
     @if (source is not null && scope is { } owner) { <InheritedResourceNotice OwnerScopeRef="owner" /> }
     <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section">
         <fieldset class="resource-definition-fields" disabled="@(busy || !CanManage || !interactive)" data-testid="dataset-definition-fields" data-interactive="@(interactive ? "true" : "false")">
@@ -46,14 +52,17 @@ else
                     @if (HasSavedOperationPin && ServiceOperations.All(value => OperationKey(value) != operationKey)) { <option value="@operationKey">@source!.Definition.Dataset!.Acquisition.Operation.Operation · @T("DatasetPinnedUnavailable")</option> }
                 </select><small>@T("DatasetOperationHelp")</small></label>
                 @if (SelectedService is not null && !ServiceOperations.Any() && !HasSavedOperationPin) { <p class="form-field-wide" role="status">@T("DatasetNoServiceOperations")</p> }
+                @if (SelectedOperation is not null && AcquisitionIssue is { } issue)
+                { <p class="form-field-wide form-alert" role="status" data-testid="dataset-operation-ineligible">@T(issue)</p> }
                 <div class="form-field-wide" data-testid="dataset-parameters"><span>@T("Parameters")</span>
                     @if (string.IsNullOrEmpty(operationKey)) { <p>@T("DatasetSelectOperationFirst")</p> }
+                    else if (AcquisitionIssue is not null && SelectedOperation is not null) { <p>@T("DatasetParametersUnavailable")</p> }
                     else if (NoConfiguration) { <p>@T("DatasetNoConfiguration")</p> }
                     else { <JsonSchemaInputEditor Schema="InputSchema" Value="parameters" ValueChanged="value => parameters = value" ValidationChanged="state => parametersValid = state.IsValid" Disabled="@(busy || !CanManage)" AllowAnyRoot="true" /> }
                     <small>@T("DatasetParametersHelp")</small>
                 </div>
             </div>
-            <div class="form-actions"><button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !HasOperationSelection || string.IsNullOrEmpty(storageKey) || enabled && (!parametersValid || SelectedOperation?.Enabled != true || SelectedOperation.Definition.Service.Generation != SelectedService?.Generation))">@T("Save")</button>
+            <div class="form-actions"><button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !HasOperationSelection || string.IsNullOrEmpty(storageKey) || enabled && (!parametersValid || AcquisitionIssue is not null || SelectedOperation?.Enabled != true || SelectedOperation.Definition.Service.Generation != SelectedService?.Generation))">@T("Save")</button>
                 <button class="button-secondary" type="button" @onclick="RefreshAsync" disabled="@busy">@T("Refresh")</button>
                 @if (IsNew) { <a class="button-secondary" href="/data-sources/new">@T("DatasetLegacyProfile")</a> }
             </div>
@@ -92,7 +101,7 @@ else
     private DataSourceReadiness? readiness;
     private ResourceScopeRef? scope;
     private string technicalName = "", displayName = "", resourceNamespace = "default", description = "", prefix = "", storageKey = "", operationKey = "", serviceKey = "";
-    private string? etag, error, preview;
+    private string? etag, error, preview, errorCode, errorId;
     private string savedServiceKey = "";
     private bool loading = true, busy, enabled = true, parametersValid = true, previewTruncated;
     private bool interactive;
@@ -100,6 +109,7 @@ else
     private IReadOnlyList<StorageResource> storages = [];
     private IReadOnlyList<ConnectedServiceOperationResource> operations = [];
     private IReadOnlyList<ConnectedServiceResource> connectedServices = [];
+    private IReadOnlyList<ConnectedServiceOperationTypeResource> operationTypes = [];
     private IReadOnlyList<DataSourceAcquisitionResource> history = [];
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private bool CanManage => Services.GetService<ConsoleContextState>()?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true
@@ -112,9 +122,31 @@ else
     private bool HasSavedOperationPin => source?.Definition.Dataset?.Acquisition.Operation is { } saved
         && operationKey == $"{saved.OperationUid}:{saved.Generation}:{saved.DefinitionDigest}" && serviceKey == savedServiceKey;
     private bool HasOperationSelection => SelectedOperation is not null || HasSavedOperationPin;
-    private JsonElement? InputSchema => SelectedOperation is { } selected && selected.Definition.Definition.ValueKind == JsonValueKind.Object
-        && selected.Definition.Definition.TryGetProperty("inputSchema", out var schema) ? schema : HasSavedOperationPin ? readiness?.Dataset?.InputSchema : null;
-    private bool NoConfiguration => InputSchema is { } schema && schema.TryGetProperty("additionalProperties", out var additional) && additional.ValueKind == JsonValueKind.False
+    private ConnectedServiceOperationTypeVersionDescriptor? SelectedType
+    {
+        get
+        {
+            if (SelectedOperation is not { } operation) return null;
+            var reference = operation.Definition.Type;
+            return operationTypes.FirstOrDefault(type => type.Uid == reference.TypeUid && type.Definition.Enabled
+                && type.ScopeRef == reference.Type.ScopeRef && type.Name == reference.Type.Name
+                && type.Namespace == (reference.Type.Namespace ?? operation.Namespace))?.Definition.Versions.FirstOrDefault(version =>
+                    version.Version == reference.Version && version.SchemaDigest == reference.SchemaDigest);
+        }
+    }
+    private JsonElement? DefinitionSchema(string property) => SelectedOperation is { } operation
+        && operation.Definition.Definition.ValueKind == JsonValueKind.Object
+        && operation.Definition.Definition.TryGetProperty(property, out var schema) && schema.ValueKind == JsonValueKind.Object ? schema : null;
+    private JsonElement? InputSchema => SelectedType?.Acquisition is { } adapter ? DefinitionSchema(adapter.InputSchemaProperty)
+        : HasSavedOperationPin ? readiness?.Dataset?.InputSchema : null;
+    private string? AcquisitionIssue => SelectedType is not { } type ? "DatasetOperationTypeUnavailable"
+        : type.Acquisition is not { } adapter ? "DatasetOperationAdapterUnavailable"
+        : type.Interaction != ConnectedServiceOperationInteraction.RequestResponse
+            || SelectedOperation!.Definition.Definition.ValueKind != JsonValueKind.Object
+            || !SelectedOperation.Definition.Definition.TryGetProperty(adapter.ReadOnlyProperty, out var readOnly)
+            || readOnly.ValueKind != JsonValueKind.True ? "DatasetOperationNotReadOnly"
+        : InputSchema is null || DefinitionSchema(adapter.OutputSchemaProperty) is null ? "DatasetOperationSchemaMissing" : null;
+    private bool NoConfiguration => InputSchema is { ValueKind: JsonValueKind.Object } schema && schema.TryGetProperty("additionalProperties", out var additional) && additional.ValueKind == JsonValueKind.False
         && (!schema.TryGetProperty("properties", out var properties) || properties.EnumerateObject().Any() == false)
         && (!schema.TryGetProperty("required", out var required) || required.GetArrayLength() == 0);
     private string T(string key) => Localizer[key];
@@ -163,6 +195,7 @@ else
     private async Task RefreshCoreAsync()
     {
         connectedServices = await ConnectedServices.GetConnectedServicesAsync(cancellation.Token);
+        operationTypes = await Operations.GetTypesAsync(cancellation.Token);
         operations = SelectedService is { } selectedService
             ? await Operations.GetForServiceAsync(selectedService, cancellation.Token) : [];
         if (scope is { } owner) storages = await Storages.GetStoragesAsync(owner, cancellation.Token);
@@ -179,7 +212,8 @@ else
     private void ChangeOperation(ChangeEventArgs value) { operationKey = value.Value?.ToString() ?? ""; parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; }
     private async Task SaveAsync() => await RunAsync(async () =>
     {
-        if (!HasOperationSelection) return;
+        if (!HasOperationSelection || enabled && (AcquisitionIssue is not null || !parametersValid
+            || SelectedOperation?.Enabled != true || SelectedOperation.Definition.Service.Generation != SelectedService?.Generation)) return;
         var storage = storages.SingleOrDefault(item => StorageKey(item) == storageKey);
         var operation = SelectedOperation;
         var storageReference = storage is null ? source!.Definition.Dataset!.Storage : new StorageRevisionReference(
@@ -208,8 +242,24 @@ else
     });
     private async Task RunAsync(Func<Task> action)
     {
-        busy = true; error = null;
+        busy = true; error = null; errorCode = null; errorId = null;
         try { await action(); }
+        catch (AgentstrationApiException exception)
+        {
+            const string prefix = "https://agentstration.dev/problems/";
+            var code = exception.ProblemType?.StartsWith(prefix, StringComparison.Ordinal) == true ? exception.ProblemType[prefix.Length..] : null;
+            errorCode = code is { Length: > 0 and <= 96 } && code.All(value => char.IsAsciiLetterOrDigit(value) || value is '_' or '-') ? code : null;
+            errorId = exception.ErrorId;
+            error = T(errorCode switch
+            {
+                "data_source_operation_adapter_unavailable" => "DatasetOperationAdapterUnavailable",
+                "data_source_operation_not_read_only" => "DatasetOperationNotReadOnly",
+                "data_source_operation_schema_missing" or "data_source_schema_unsupported" => "DatasetOperationSchemaMissing",
+                "data_source_parameters_invalid" => "DatasetParametersInvalid",
+                "data_source_rule_invalid" => "DatasetPrefixInvalid",
+                _ => "DatasetActionFailed"
+            });
+        }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = T("DatasetActionFailed"); }
         finally { busy = false; }
     }

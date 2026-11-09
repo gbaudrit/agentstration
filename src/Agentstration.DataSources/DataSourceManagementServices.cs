@@ -575,7 +575,7 @@ public sealed class DataSourceManagementService(
         bool requirePinnedProfile, CancellationToken cancellationToken)
     {
         Validate(resource);
-        var readiness = await ResolveReadinessAsync(resource, requirePinnedProfile, cancellationToken);
+        var readiness = await ResolveReadinessAsync(resource, requirePinnedProfile, cancellationToken, throwDatasetFailures: resource.Definition.Enabled);
         if (resource.Definition.Enabled && !readiness.Ready) throw Error("data_source_not_ready", string.Join(' ', readiness.Issues));
         return readiness;
     }
@@ -584,7 +584,7 @@ public sealed class DataSourceManagementService(
         CancellationToken cancellationToken) => ResolveReadinessAsync(resource, true, cancellationToken);
 
     private async Task<DataSourceReadiness> ResolveReadinessAsync(DataSourceResource resource,
-        bool requirePinnedProfile, CancellationToken cancellationToken)
+        bool requirePinnedProfile, CancellationToken cancellationToken, bool throwDatasetFailures = false)
     {
         if (!resource.Definition.Enabled) return new(false, false, null, ["The Data Source is disabled."]);
         if (resource.Definition.Dataset is not null)
@@ -601,6 +601,7 @@ public sealed class DataSourceManagementService(
                 or Agentstration.ConnectedServices.ConnectedServiceOperationTypeValidationException
                 or Agentstration.ConnectedServices.ConnectedServiceOperationTypeRevisionException)
             {
+                if (throwDatasetFailures && exception is DataSourceValidationException) throw;
                 return new(false, true, null, [exception.Message]);
             }
         }

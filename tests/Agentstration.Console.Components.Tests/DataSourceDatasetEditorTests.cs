@@ -109,6 +109,64 @@ public sealed class DataSourceDatasetEditorTests
         });
     }
 
+    [TestMethod]
+    [DataRow("en-US", "does not provide an acquisition Flow")]
+    [DataRow("fr-FR", "ne fournit pas de Flow d’acquisition")]
+    public async Task MissingAdapterExplainsIneligibilityAndPreventsEnabledSave(string cultureName, string expected)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var handler = new DatasetHandler { MissingAdapter = true };
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(rendered, handler);
+        rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Find("[data-testid='dataset-operation-ineligible']").TextContent));
+        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        await rendered.Find("form").SubmitAsync();
+        Assert.IsNull(handler.Created);
+    }
+
+    [TestMethod]
+    public async Task ChangedTypeDigestCannotSilentlySupplyAnAcquisitionAdapter()
+    {
+        using var handler = new DatasetHandler { StaleType = true };
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(rendered, handler);
+        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        Assert.IsNotNull(rendered.Find("[data-testid='dataset-operation-ineligible']"));
+        Assert.IsNull(handler.Created);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "relative directory prefix")]
+    [DataRow("fr-FR", "préfixe de répertoire relatif")]
+    public async Task SaveFailureShowsLocalizedReasonAndCorrelationWithoutRawValues(string cultureName, string expected)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var handler = new DatasetHandler { FailSave = true };
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(rendered, handler);
+        await rendered.Find("form").SubmitAsync();
+        rendered.WaitForAssertion(() => Assert.AreEqual("data_source_rule_invalid", rendered.Find("[data-testid='dataset-error-code']").TextContent));
+        Assert.Contains(expected, rendered.Find("[role='alert']").TextContent);
+        Assert.Contains("fixture-error-reference", rendered.Find("[role='alert']").TextContent);
+        Assert.DoesNotContain("private-saved-value", rendered.Markup);
+    }
+
+    private static async Task SelectAsync(IRenderedComponent<DataSourceDatasetEditor> rendered, DatasetHandler handler)
+    {
+        rendered.WaitForElement("[data-testid='dataset-storage']");
+        var storage = handler.Storage;
+        await rendered.Find("[data-testid='dataset-storage']").ChangeAsync($"{storage.Uid}:{storage.Generation}:{storage.ObservedState!.BindingDigest}");
+        await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.Service.Uid.ToString());
+        var operation = handler.Operation;
+        await rendered.Find("[data-testid='dataset-operation']").ChangeAsync($"{operation.Uid}:{operation.Generation}:{operation.Definition.DefinitionDigest}");
+    }
+
     private static async Task<BunitContext> SetupAsync(HttpClient http)
     {
         var context = new BunitContext();
@@ -135,13 +193,36 @@ public sealed class DataSourceDatasetEditorTests
                 {
                     Definition = JsonSerializer.SerializeToElement(new
                     {
-                        readOnly = true,
-                        inputSchema = new
+                        isReadOnly = true,
+                        responseShape = new { type = "object" },
+                        requestShape = new
                         { type = "object", properties = new { query = new { type = "string" } }, required = new[] { "query" }, additionalProperties = false }
                     })
                 }
             };
         }
+        public bool MissingAdapter { get; set; }
+        public bool FailSave { get; set; }
+        public bool StaleType { get; set; }
+        public ConnectedServiceOperationTypeResource OperationType => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = "ConnectedServiceOperationType",
+            Uid = Operation.Definition.Type.TypeUid,
+            ScopeRef = ResourceScopeRef.Instance,
+            Metadata = new() { Name = "fixture-operation" },
+            Generation = 1,
+            Definition = new()
+            {
+                DisplayName = "Fixture operation",
+                PreferredVersion = "1.0.0",
+                Versions = [new("1.0.0", StaleType ? "other-digest" : "type-digest", JsonSerializer.SerializeToElement(new { type = "object" }),
+                    ConnectedServiceOperationInteraction.RequestResponse, new("fixture.read", "1.0.0"))
+                { Acquisition = MissingAdapter ? null : new(new()
+                    { Flow = new("fixture-acquire", ResourceScopeRef.Instance), FlowUid = Guid.NewGuid(), Version = "1.0.0", DefinitionHash = "flow-hash", Contract = "connected-service-operation-acquisition/v1" },
+                    InputSchemaProperty: "requestShape", OutputSchemaProperty: "responseShape", ReadOnlyProperty: "isReadOnly") }]
+            }
+        };
         public CreateDataSourceRequest? Created { get; private set; }
         public int Activations { get; private set; }
         public int Discoveries { get; private set; }
@@ -218,10 +299,10 @@ public sealed class DataSourceDatasetEditorTests
             {
                 DisplayName = "Inventory",
                 ExternalId = "inventory",
-                Type = null!,
+                Type = new() { Type = new("fixture-operation", ResourceScopeRef.Instance), TypeUid = Guid.NewGuid(), Version = "1.0.0", SchemaDigest = "type-digest" },
                 DefinitionDigest = "operation-digest",
                 Service = new() { Service = new(new(ResourceNamespace.Default, "ConnectedService", "fixture"), ResourceScopeRef.Instance), ServiceUid = Guid.NewGuid(), Generation = 1 },
-                Definition = JsonSerializer.SerializeToElement(new { inputSchema = new { type = "object", additionalProperties = false }, readOnly = true }),
+                Definition = JsonSerializer.SerializeToElement(new { requestShape = new { type = "object", additionalProperties = false }, responseShape = new { type = "object" }, isReadOnly = true }),
                 Provenance = new() { Discovery = new(ResourceScopeRef.Instance, ResourceNamespace.Default, "ConnectedServiceOperationDiscovery", "discovery"), DiscoveryUid = Guid.NewGuid(), ManifestDigest = "manifest", DiscoveredAt = DateTimeOffset.UtcNow }
             },
             ObservedState = new() { Availability = ConnectedServiceOperationAvailability.Available, ObservedAt = DateTimeOffset.UtcNow }
@@ -233,6 +314,13 @@ public sealed class DataSourceDatasetEditorTests
             object body;
             if (request.Method == HttpMethod.Post && path == "/api/datasources")
             {
+                if (FailSave)
+                {
+                    var failure = new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+                    { Content = JsonContent.Create(new { title = "Invalid Data Source", type = "https://agentstration.dev/problems/data_source_rule_invalid", detail = "private-saved-value" }) };
+                    failure.Headers.Add("X-Correlation-ID", "fixture-error-reference");
+                    return failure;
+                }
                 Created = await request.Content!.ReadFromJsonAsync<CreateDataSourceRequest>(cancellationToken);
                 body = new DataSourceResource
                 {
@@ -245,6 +333,7 @@ public sealed class DataSourceDatasetEditorTests
                     Definition = Created.Properties
                 };
             }
+            else if (path == "/api/connected-service-operation-types") body = new[] { OperationType };
             else if (path == "/api/connected-service-operations") body = new[] { NewerOperation ? Operation with { Generation = Operation.Generation + 1 } : Operation, OtherOperation };
             else if (path == "/api/connected-services/fixture/operations") body = new[] { NewerOperation ? Operation with { Generation = Operation.Generation + 1 } : Operation, OtherOperation };
             else if (path == "/api/connected-services/other/operations") body = new[] { OtherOperation, Operation };

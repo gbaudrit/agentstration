@@ -6,6 +6,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
@@ -13,14 +14,17 @@ using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.ConnectedServices;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.Infrastructure.Tools;
 using Agentstration.Parameters;
 using Agentstration.Parameters.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Contracts;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -255,12 +259,133 @@ public sealed partial class ConnectedServiceApiTests
         Assert.AreEqual(service.Uid, operations[0].Definition.Service.ServiceUid);
         Assert.AreEqual(service.Generation, operations[0].Definition.Service.Generation);
         Assert.AreEqual("getOrders", operations[0].Definition.Definition.GetProperty("operationId").GetString());
+        var selected = operations[0];
+        using var operationGet = await client.GetAsync($"/api/connected-service-operations/{selected.Name}?namespace={selected.Namespace}&scopeRef={Uri.EscapeDataString(owner.Value)}");
+        using var enabledResponse = new HttpRequestMessage(HttpMethod.Put,
+            $"/api/connected-service-operations/{selected.Name}/enabled?namespace={selected.Namespace}&scopeRef={Uri.EscapeDataString(owner.Value)}")
+        { Content = JsonContent.Create(new { enabled = true }) };
+        enabledResponse.Headers.IfMatch.Add(operationGet.Headers.ETag!);
+        using var enabled = await client.SendAsync(enabledResponse);
+        Assert.AreEqual(HttpStatusCode.OK, enabled.StatusCode, await enabled.Content.ReadAsStringAsync());
+        selected = (await enabled.Content.ReadFromJsonAsync<ConnectedServiceOperationResource>())!;
+        StorageResource storage;
+        using (scopes.PushSystem())
+        {
+            storage = (await store.GetExactAsync<StorageResource>(new(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                StorageResourceKinds.Storage, LocalStorageDefaultsProvisioner.DefaultName), default))!.Value;
+            if (owner != ResourceScopeRef.Instance)
+            {
+                // The fixture explicitly grants builtin type use; production grants remain unchanged.
+                var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+                var localType = (await store.GetExactAsync<StorageTypeResource>(new(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                    StorageResourceKinds.StorageType, storage.Definition.Type.Type.Name), default))!.Value;
+                if (ownerKind == "tenant")
+                {
+                    // Tenant administration intentionally cannot read Instance resources. Seed a tenant-owned
+                    // Core local adapter fixture instead of weakening this boundary to reach the Instance type.
+                    using var core = factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.local", "1.0.0"));
+                    var tenantType = (await factory.Services.GetRequiredService<Agentstration.Storage.StorageTypeManagementService>()
+                        .SynchronizeManagedAsync(localType with { Uid = Guid.Empty, ScopeRef = owner, Metadata = new() { Name = "local-fixture" } }, default)).Value;
+                    storage = storage with
+                    {
+                        Definition = storage.Definition with
+                        {
+                            Type = storage.Definition.Type with
+                            { Type = new(tenantType.Name, owner, tenantType.Namespace), TypeUid = tenantType.Uid }
+                        }
+                    };
+                }
+                else
+                    await policies.PutAsync(new(new(localType.Uid, localType.ScopeRef!.Value, localType.Namespace, localType.Kind),
+                        [new(owner, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+            }
+        }
+        if (owner != ResourceScopeRef.Instance)
+        {
+            using var createStorage = await client.PostAsJsonAsync("/api/storages", new CreateStorageRequest("openapi-datasets", storage.Definition, owner));
+            Assert.AreEqual(HttpStatusCode.Created, createStorage.StatusCode, await createStorage.Content.ReadAsStringAsync());
+            storage = (await createStorage.Content.ReadFromJsonAsync<StorageResource>())!;
+        }
+        var storageReference = new StorageRevisionReference(new(storage.ScopeRef!.Value, storage.Namespace, storage.Kind, storage.Name),
+            storage.Uid, storage.Generation, storage.ObservedState!.BindingDigest!);
+        var operationReference = new ConnectedServiceOperationRevisionReference(new(owner, selected.Namespace, selected.Kind, selected.Name),
+            selected.Uid, selected.Generation, selected.Definition.DefinitionDigest);
+        using (var invalidSave = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest("missing-parameters",
+            new() { DisplayName = "Invalid", Dataset = new(storageReference, new(Write: true), new(operationReference, JsonSerializer.SerializeToElement(new { }))) }, ScopeRef: owner)))
+        {
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalidSave.StatusCode);
+            var problem = await invalidSave.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.AreEqual("https://agentstration.dev/problems/data_source_parameters_invalid", problem.GetProperty("type").GetString());
+        }
+        var results = new List<DataSourceAcquisitionResource>();
+        foreach (var dataset in new[] { "alpha", "beta" })
+        {
+            var parameters = JsonSerializer.SerializeToElement(new { query = new { dataset } });
+            using var save = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest(dataset,
+                new() { DisplayName = dataset, Dataset = new(storageReference, new(Write: true), new(operationReference, parameters)) }, ScopeRef: owner));
+            Assert.AreEqual(HttpStatusCode.Created, save.StatusCode, await save.Content.ReadAsStringAsync());
+            using var accepted = await client.PostAsJsonAsync($"/api/datasources/{dataset}/acquisitions?scopeRef={Uri.EscapeDataString(owner.Value)}", new StartDataSourceAcquisitionRequest());
+            Assert.AreEqual(HttpStatusCode.Accepted, accepted.StatusCode, await accepted.Content.ReadAsStringAsync());
+            var acquisition = (await accepted.Content.ReadFromJsonAsync<DataSourceAcquisitionResource>())!;
+            using var acquisitionTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            do
+            {
+                await Task.Delay(25, acquisitionTimeout.Token);
+                acquisition = (await client.GetFromJsonAsync<DataSourceAcquisitionResource>(
+                    $"/api/datasourceacquisitions/{acquisition.Name}", acquisitionTimeout.Token))!;
+            } while (acquisition.CompletedAt is null);
+            Assert.AreEqual(DataSourceAcquisitionState.Succeeded, acquisition.State, $"{acquisition.ErrorCode}: {acquisition.ErrorMessage}");
+            using var read = await client.GetAsync($"/api/datasourceacquisitions/{acquisition.Name}/content");
+            Assert.AreEqual(HttpStatusCode.OK, read.StatusCode, await read.Content.ReadAsStringAsync());
+            var content = (await read.Content.ReadFromJsonAsync<StorageObjectContent>())!;
+            Assert.AreEqual(dataset, JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(content.ContentBase64)).GetProperty("dataset").GetString());
+            results.Add(acquisition);
+        }
+        Assert.AreNotEqual(results[0].Content!.Key, results[1].Content!.Key);
+        Assert.AreEqual(5, calls); // discovery + contract and business request per acquisition
+        Assert.AreEqual(baseBinding == "literal-no-secret" ? 0 : 3, secretCallbacks);
+        using (ownerKind switch
+        {
+            "instance" => scopes.PushInstance(context),
+            "tenant" => scopes.PushTenantAdministration(context),
+            _ => scopes.Push(context)
+        })
+        {
+            var executor = factory.Services.GetRequiredService<ConnectedServiceAcquisitionExecutor>();
+            var invocation = new InternalMcpToolInvocation(context.TenantId, new(context.WorkspaceId), context.PrincipalId,
+                "forged-acquisition-call", "test", JsonSerializer.SerializeToElement(new { acquisitionId = results[0].Name }),
+                ToolDefinitionCallerKind.Flow, RunId: results[0].FlowRunId);
+            foreach (var invalid in new[]
+            {
+                invocation with { WorkspaceId = new(Guid.NewGuid()) }, invocation with { TenantId = Guid.NewGuid() },
+                invocation with { PrincipalId = Guid.NewGuid() }, invocation with { CallerKind = ToolDefinitionCallerKind.Agent },
+                invocation with { RunId = null }
+            })
+            {
+                var denied = await Assert.ThrowsAsync<Agentstration.DataSources.DataSourceAcquisitionException>(() => executor.ExecuteAsync(invalid, default));
+                Assert.AreEqual("connected_service_acquisition_execution_denied", denied.Code);
+            }
+            // An arbitrary run, a completed acquisition, or another logical context cannot dispatch the provider.
+            await Assert.ThrowsAsync<Agentstration.DataSources.DataSourceAcquisitionException>(() => executor.ExecuteAsync(invocation with { RunId = "another-run" }, default));
+            await Assert.ThrowsAsync<Agentstration.DataSources.DataSourceAcquisitionException>(() => executor.ExecuteAsync(invocation, default));
+            using (ownerKind == "workspace" ? scopes.PushInstance(context) : scopes.Push(context))
+                await Assert.ThrowsAsync<Agentstration.DataSources.DataSourceAcquisitionException>(() => executor.ExecuteAsync(invocation, default));
+        }
+        Assert.AreEqual(5, calls);
         var runScope = new FlowRunScope(context.TenantId, new(context.WorkspaceId), context.PrincipalId)
         { LogicalScopeRef = owner };
         var runs = factory.Services.GetRequiredService<FlowRunService>();
         var run = (await runs.GetAsync(discovery.FlowRunId, runScope, default))!.Value;
         var events = await runs.ListEventsAsync(runScope, discovery.FlowRunId, 0, default);
-        var evidence = JsonSerializer.Serialize(new { discovery, operations, run, events });
+        var acquisitionEvidence = new List<object>();
+        foreach (var acquired in results)
+        {
+            var acquisitionRun = (await runs.GetAsync(acquired.FlowRunId, runScope, default))!.Value;
+            var acquisitionEvents = await runs.ListEventsAsync(runScope, acquired.FlowRunId, 0, default);
+            acquisitionEvidence.Add(new { acquisitionRun, acquisitionEvents });
+            Assert.DoesNotContain("https://origin.example.test", acquisitionRun.Input.GetRawText(), StringComparison.Ordinal);
+        }
+        var evidence = JsonSerializer.Serialize(new { discovery, operations, run, events, acquisitions = results, acquisitionEvidence });
         Assert.DoesNotContain(credential, evidence, StringComparison.Ordinal);
         Assert.DoesNotContain("https://origin.example.test", run.Input.GetRawText(), StringComparison.Ordinal);
         Assert.DoesNotContain("secretGrant", evidence, StringComparison.OrdinalIgnoreCase);
@@ -296,11 +421,16 @@ public sealed partial class ConnectedServiceApiTests
         {
             Assert.AreEqual(token is null ? null : "Bearer " + token, request.Headers.Authorization?.ToString());
             called();
+            if (request.RequestUri!.AbsolutePath == "/orders")
+            {
+                var dataset = request.RequestUri.Query.Contains("alpha", StringComparison.Ordinal) ? "alpha" : "beta";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { dataset }) });
+            }
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("""
                     {"openapi":"3.1.0","info":{"title":"Orders","version":"1"},"paths":{
-                      "/orders":{"get":{"operationId":"getOrders","responses":{"200":{"description":"OK"}}}}
+                      "/orders":{"get":{"operationId":"getOrders","parameters":[{"in":"query","name":"dataset","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"OK","content":{"application/json":{"schema":{"type":"object","properties":{"dataset":{"type":"string"}},"required":["dataset"],"additionalProperties":false}}}}}}}
                     }}
                     """, System.Text.Encoding.UTF8, "application/json")
             });

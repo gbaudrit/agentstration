@@ -13,15 +13,19 @@ public static class OpenApiConnectedService
     public const string FlowName = "openapi-operation-discovery";
     public static JsonElement OptionsSchema { get; } = JsonSerializer.SerializeToElement(new
     {
-        type = "object", properties = new
+        type = "object",
+        properties = new
         {
             candidatePaths = new { type = "array", minItems = 1, maxItems = 8, items = new { type = "string", minLength = 1, maxLength = 512 } }
-        }, required = new[] { "candidatePaths" }, additionalProperties = false
+        },
+        required = new[] { "candidatePaths" },
+        additionalProperties = false
     });
 
     public static JsonElement DefinitionSchema { get; } = JsonSerializer.SerializeToElement(new
     {
-        type = "object", properties = new
+        type = "object",
+        properties = new
         {
             contractUri = new { type = "string", maxLength = 2048 },
             contractDigest = new { type = "string", minLength = 64, maxLength = 64 },
@@ -30,8 +34,12 @@ public static class OpenApiConnectedService
             method = new { type = "string", minLength = 1, maxLength = 16 },
             path = new { type = "string", minLength = 1, maxLength = 2048 },
             readOnly = new { type = "boolean" },
-            requestShape = new { type = "object" }, responseShape = new { type = "object" }
-        }, required = new[] { "contractUri", "contractDigest", "server", "operationId", "method", "path", "readOnly" },
+            requestShape = new { type = "object" },
+            responseShape = new { type = "object" },
+            inputSchema = new { type = "object" },
+            outputSchema = new { type = "object" }
+        },
+        required = new[] { "contractUri", "contractDigest", "server", "operationId", "method", "path", "readOnly" },
         additionalProperties = false
     });
 
@@ -39,11 +47,14 @@ public static class OpenApiConnectedService
     {
         options.Capabilities[AepConnectedServiceDiscoveryProtocol.Capability] = new(AepConnectedServiceDiscoveryProtocol.Version,
             AepConnectedServiceDiscoveryProtocol.Path);
+        options.Capabilities[AepConnectedServiceAcquisitionProtocol.Capability] = new(AepConnectedServiceAcquisitionProtocol.Version,
+            AepConnectedServiceAcquisitionProtocol.Path);
         options.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
         options.Capabilities[AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion);
         options.ConnectedServiceOperationTypes.Add(new("openapi-operation", "OpenAPI operation", Version,
             [AepConnectedServiceOperationTypeVersionDescriptor.Create(Version, DefinitionSchema,
-                AepConnectedServiceOperationInteraction.RequestResponse, new("openapi.operation.invoke", "1.0"))]));
+                AepConnectedServiceOperationInteraction.RequestResponse, new("openapi.operation.invoke", "1.0")) with
+            { Acquisition = new("openapi-operation-acquisition", Version) }]));
         options.ConnectedServiceTypes.Add(new("openapi", "OpenAPI service", Version,
             [AepConnectedServiceTypeVersionDescriptor.Create(Version, OptionsSchema,
                 [new("baseUrl", true, Format: "uri"), new("bearerToken", false, Protection: AepValueProtection.Secured)],
@@ -108,6 +119,51 @@ public static class OpenApiConnectedService
           publish: true
           activate: true
         """;
+
+    public const string AcquisitionFlow = """
+        apiVersion: agentstration.io/v1
+        kind: Flow
+        metadata: { name: openapi-operation-acquisition, namespace: Agentstration.Extensions.OpenApi }
+        definition:
+          displayName: Acquire an OpenAPI service operation
+          version: 1.0.0
+          enabled: true
+          metadata: { flow.contract: connected-service-operation-acquisition/v1 }
+          spec:
+            flowKind: workflow
+            entryNodeId: input
+            nodes: [{ id: input, kind: input }]
+            edges: []
+          graph:
+            entryStep: input
+            inputSchema:
+              type: object
+              properties:
+                acquisitionId: { type: string }
+                operation: { type: object }
+                parameters: { type: object }
+                caller: { type: object }
+              required: [acquisitionId, operation, parameters, caller]
+              additionalProperties: false
+            steps:
+              - { type: input, name: input, displayName: Acquisition request }
+              - type: tool
+                name: acquire
+                displayName: Acquire authorized service operation
+                tool: { resourceId: agentstration.connected-service.operations.acquire, namespace: default, scopeRef: /instance }
+                argumentsMapping: { acquisitionId: "${input.acquisitionId}" }
+              - type: output
+                name: output
+                displayName: Acquired JSON
+                outputMapping: "${steps.acquire.output}"
+              - { type: output, name: failure, displayName: Acquisition failed, outcome: error }
+            transitions:
+              - { id: input-acquire, fromStep: input, event: completed, toStep: acquire }
+              - { id: acquire-output, fromStep: acquire, event: success, toStep: output }
+              - { id: acquire-failure, fromStep: acquire, event: error, toStep: failure }
+          publish: true
+          activate: true
+        """;
 }
 
 public sealed class OpenApiConnectedServiceDiscovery(OpenApiService service, IHttpClientFactory clients)
@@ -164,7 +220,8 @@ public sealed partial class OpenApiService
                     "openapi_contract", cancellationToken, bearerToken);
                 if (fetched is null) continue;
                 contractCount++;
-                var contract = parser.Parse(Encoding.UTF8.GetString(fetched.Value.Content), fetched.Value.MediaType, candidate).Descriptor;
+                var parsed = parser.Parse(Encoding.UTF8.GetString(fetched.Value.Content), fetched.Value.MediaType, candidate);
+                var contract = parsed.Descriptor;
                 foreach (var operation in contract.Operations)
                 {
                     if (!operation.Eligible)
@@ -176,12 +233,29 @@ public sealed partial class OpenApiService
                     var externalId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{candidate.AbsoluteUri}\n{operation.OperationId}")));
                     var definition = new Dictionary<string, object?>
                     {
-                        ["contractUri"] = candidate.AbsoluteUri, ["contractDigest"] = contract.Sha256,
-                        ["server"] = contract.Servers[0], ["operationId"] = operation.OperationId,
-                        ["method"] = operation.Method, ["path"] = operation.Path, ["readOnly"] = operation.ReadOnly
+                        ["contractUri"] = candidate.AbsoluteUri,
+                        ["contractDigest"] = contract.Sha256,
+                        ["server"] = contract.Servers[0],
+                        ["operationId"] = operation.OperationId,
+                        ["method"] = operation.Method,
+                        ["path"] = operation.Path,
+                        ["readOnly"] = operation.ReadOnly
                     };
                     if (operation.RequestShape is { } input) definition["requestShape"] = input;
                     if (operation.ResponseShape is { } output) definition["responseShape"] = output;
+                    if (operation.ReadOnly)
+                    {
+                        try
+                        {
+                            var schemas = OpenApiAcquisitionSchemas.Create(parsed, operation);
+                            definition["inputSchema"] = schemas.Input;
+                            definition["outputSchema"] = schemas.Output;
+                        }
+                        catch (OpenApiExtensionException)
+                        {
+                            diagnostics.Add(new("openapi_acquisition_schema_unsupported", "An operation cannot be acquired with the supported schema profile."));
+                        }
+                    }
                     var displayName = string.IsNullOrWhiteSpace(operation.Summary) ? operation.OperationId! : operation.Summary;
                     operations.Add(new(externalId, displayName[..Math.Min(200, displayName.Length)],
                         "openapi-operation", OpenApiConnectedService.Version, JsonSerializer.SerializeToElement(definition)));
@@ -206,7 +280,7 @@ public sealed partial class OpenApiService
         return result;
     }
 
-    private static bool ContainsCredential(JsonElement value, string credential) => value.ValueKind switch
+    internal static bool ContainsCredential(JsonElement value, string credential) => value.ValueKind switch
     {
         JsonValueKind.String => value.GetString()!.Contains(credential, StringComparison.Ordinal),
         JsonValueKind.Object => value.EnumerateObject().Any(property => property.Name.Contains(credential, StringComparison.Ordinal)
