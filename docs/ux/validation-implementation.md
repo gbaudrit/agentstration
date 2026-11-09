@@ -15,7 +15,7 @@ Exécution en Release, fournisseur IA déterministe, sans service LLM distant :
 
 Les cas ignorés correspondent aux intégrations optionnelles, notamment PostgreSQL et les fournisseurs distants, dont les prérequis ne sont pas configurés ici. L’adaptateur PostgreSQL compile ; ce compte rendu ne prétend pas certifier son exécution sur un serveur PostgreSQL réel.
 
-Les tests ajoutés ou réparés couvrent notamment l’effacement avec focus et sans soumission, zéro numérique distinct du vide, énumération obligatoire vide conservée comme saisie invalide, libellés/aides/erreurs associés, absence de compteur inventé, protection des brouillons et navigation après sauvegarde avant le prochain rendu, onglets au clavier et réponses de recherche obsolètes. Les tests API couvrent les recherches au-delà de la première page, les caractères accentués, les curseurs invalides, les homonymes et les droits. Un test de stockage vérifie que la désérialisation reste limitée à la fenêtre demandée.
+Les tests ajoutés ou réparés couvrent notamment l’effacement avec focus et sans soumission, zéro numérique distinct du vide, énumération obligatoire vide conservée comme saisie invalide, libellés/aides/erreurs associés, absence de compteur inventé, protection des brouillons et navigation après sauvegarde avant le prochain rendu, onglets au clavier et réponses de recherche obsolètes et fermeture du sélecteur pendant son chargement. Les tests API couvrent les recherches au-delà de la première page, les caractères accentués, les curseurs invalides, les homonymes et les droits. Un test de stockage vérifie que la désérialisation reste limitée à la fenêtre demandée.
 
 ## Contrôles sur l’application réelle
 
@@ -30,6 +30,7 @@ Les données des captures sont des fixtures locales de revue, sans appel à un m
 - Paramètre : choix obligatoire vidé sans retour au premier choix ;
 - création Agent : nom technique dérivé puis actualisé après passage par Contrats ;
 - filtre du catalogue Outils et effacement ;
+- Workplace : filtre de statut sélectionné puis vidé dans le champ, avec focus conservé ;
 - absence de débordement horizontal à 1 440 et 390 pixels, apparences claire et sombre ;
 - surcharge des variables de thème : rayon de champ à 18 pixels et couleur d’action modifiée sans modifier le composant.
 
@@ -42,6 +43,8 @@ Ces contrôles ponctuels ne constituent pas de nouveaux parcours réutilisables 
 | Agent — vue d’ensemble | [Capture](implementation/agent-light.png) | [Capture](implementation/agent-dark.png) |
 | Agent — édition, bureau | [Capture](implementation/agent-edit-light-1440.png) | [Capture](implementation/agent-edit-dark-1440.png) |
 | Agent — édition, mobile | [Capture](implementation/agent-edit-light-390.png) | [Capture](implementation/agent-edit-dark-390.png) |
+| Workplace — tâches, bureau | [Capture](implementation/workplace-light-1440.png) | [Capture](implementation/workplace-dark-1440.png) |
+| Workplace — tâches, mobile | [Capture](implementation/workplace-light-390.png) | [Capture](implementation/workplace-dark-390.png) |
 
 La [preuve de surcharge de thème](implementation/theme-override.png) illustre le point d’extension ; elle ne livre pas un sélecteur de thèmes nommés. Les captures de la [maquette](maquette-ecran-type.md) restent séparées des captures produit.
 

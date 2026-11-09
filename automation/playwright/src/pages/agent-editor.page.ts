@@ -41,6 +41,7 @@ export class AgentEditorPage {
   }
 
   public async openTools(): Promise<void> {
+    if (!await this.form.isVisible()) await this.openEdit();
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
     await this.page.getByTestId(TestIds.agentEditor.toolsTab).click();
     await this.page.getByTestId(TestIds.agentEditor.toolSetConfiguration).waitFor({ state: 'visible' });

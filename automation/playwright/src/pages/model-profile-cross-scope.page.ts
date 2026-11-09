@@ -203,6 +203,7 @@ export class ModelProfileCrossScopePage {
   }
 
   public async openWorkspaceUsage(fixture: ExecutionScopeFixture): Promise<void> {
+    await this.findUsage(workspaceAgentName);
     await this.usageLink(workspaceAgentName).click();
     await this.expectContext(fixture.scopes.workspace);
     await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
@@ -229,6 +230,7 @@ export class ModelProfileCrossScopePage {
   }
 
   public async assertNewTabIsolation(fixture: ExecutionScopeFixture): Promise<void> {
+    await this.findUsage(workspaceAgentName);
     const context = this.page.context();
     const [destination] = await Promise.all([
       context.waitForEvent('page'),
@@ -238,7 +240,7 @@ export class ModelProfileCrossScopePage {
       await destination.waitForLoadState('domcontentloaded');
       await expect(destination.getByTestId(TestIds.console.shell))
         .toHaveAttribute('data-context-scope', fixture.scopes.workspace);
-      await destination.getByTestId(TestIds.agentEditor.form).waitFor({ state: 'visible' });
+      await destination.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
       await this.expectContext(fixture.scopes.instance);
       await expect(this.usagesPanel).toBeVisible();
     } finally {
@@ -305,6 +307,20 @@ export class ModelProfileCrossScopePage {
 
   public get primaryWorkspaceAgentName(): string { return workspaceAgentName; }
   public get hiddenSiblingAgentName(): string { return siblingAgentName; }
+
+  private async findUsage(name: string): Promise<void> {
+    const pager = this.usagesPanel.locator('.collection-pager');
+    for (let page = 0; page < 100; page++) {
+      await expect(this.usagesPanel.locator('.spinner')).toHaveCount(0);
+      if (await this.usageLink(name).count()) return;
+      const next = pager.locator('button').last();
+      await expect(next).toBeEnabled();
+      const label = await pager.getAttribute('aria-label');
+      await next.click();
+      await expect(pager).not.toHaveAttribute('aria-label', label!);
+    }
+    throw new Error(`Usage '${name}' was not found within the fixture's bounded pages.`);
+  }
 
   private usageLink(name: string): Locator {
     return this.page.getByTestId(TestIds.modelAdministration.profileUsage).filter({ hasText: name }).locator('a');
