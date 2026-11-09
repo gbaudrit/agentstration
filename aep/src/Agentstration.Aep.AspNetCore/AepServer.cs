@@ -43,6 +43,7 @@ public sealed class AepExtensionOptions
     public IList<AepSchemaFormatContribution> SchemaFormats { get; } = [];
     public IList<AepConnectedServiceTypeContribution> ConnectedServiceTypes { get; } = [];
     public IList<AepConnectedServiceOperationTypeContribution> ConnectedServiceOperationTypes { get; } = [];
+    public IList<AepStorageTypeContribution> StorageTypes { get; } = [];
     public IList<AepOptionSetDescriptor> OptionSets { get; } = [];
     public IList<AepValueRequirement> ValueRequirements { get; } = [];
     public AepSourceMaterializationLimits SourceMaterializationLimits { get; set; } = new(
@@ -206,6 +207,8 @@ public static partial class AepServerExtensions
         if (options.SchemaFormats.Count > 0) capabilities[AepCapabilityNames.SchemaFormats] = new("1.0");
         if (options.ConnectedServiceTypes.Count > 0)
             capabilities[AepCapabilityNames.ConnectedServiceTypes] = new(AepProtocol.ConnectedServiceTypesCapabilityVersion);
+        if (options.StorageTypes.Count > 0)
+            capabilities[AepStorageProtocol.Capability] = new(AepStorageProtocol.Version, AepStorageProtocol.BindingPath);
         if (options.ConnectedServiceOperationTypes.Count > 0)
             capabilities[AepCapabilityNames.ConnectedServiceOperationTypes] = new(
                 AepProtocol.ConnectedServiceOperationTypesCapabilityVersion);
@@ -221,7 +224,7 @@ public static partial class AepServerExtensions
             capabilities,
             new AepContributions(modelProviders, options.Tools.ToArray(), sources,
                 options.DataSourceProfileBundles.ToArray(), options.SchemaFormats.ToArray(),
-                options.ConnectedServiceTypes.ToArray(), options.ConnectedServiceOperationTypes.ToArray()),
+                options.ConnectedServiceTypes.ToArray(), options.ConnectedServiceOperationTypes.ToArray(), options.StorageTypes.ToArray()),
             options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()),
             options.ValueRequirements.Count == 0 ? null : options.ValueRequirements.ToArray());
         var errors = AepDescriptorValidator.Validate(descriptor);

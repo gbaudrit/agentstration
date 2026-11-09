@@ -7,17 +7,17 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Contracts;
-using Agentstration.Web.Console;
 using Agentstration.Web.Components.Values;
+using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
 
-using ConnectedServicesPage = Agentstration.Web.Components.Pages.ConnectedServices;
 using ConnectedServiceDetailsPage = Agentstration.Web.Components.Pages.ConnectedServiceDetails;
 using ConnectedServiceEditorPage = Agentstration.Web.Components.Pages.ConnectedServiceEditor;
+using ConnectedServicesPage = Agentstration.Web.Components.Pages.ConnectedServices;
 
 [TestClass]
 public sealed class ConnectedServiceComponentTests
@@ -25,6 +25,7 @@ public sealed class ConnectedServiceComponentTests
     [TestMethod]
     public void CatalogRendersTypeAvailabilityAndExactScope()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -161,23 +162,23 @@ public sealed class ConnectedServiceComponentTests
 
     private static ParameterResource Parameter(string name, string displayName, ResourceScopeRef scope,
         ParameterValueType type, DescendantUsePolicy? usePolicy = null) => new()
-    {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = ParameterResourceKinds.Parameter,
-        Metadata = new() { Name = name },
-        ScopeRef = scope,
-        Definition = new()
         {
-            DisplayName = displayName,
-            ValueType = type,
-            Value = type == ParameterValueType.WholeNumber
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ParameterResourceKinds.Parameter,
+            Metadata = new() { Name = name },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = displayName,
+                ValueType = type,
+                Value = type == ParameterValueType.WholeNumber
                 ? JsonSerializer.SerializeToElement(3)
                 : type == ParameterValueType.Logical
                     ? JsonSerializer.SerializeToElement(true)
                     : JsonSerializer.SerializeToElement("value"),
-            UsePolicy = usePolicy ?? new()
-        }
-    };
+                UsePolicy = usePolicy ?? new()
+            }
+        };
 
     private static SecretResponse Secret(string name, string displayName, ResourceScopeRef scope, bool configured,
         DescendantUsePolicy? usePolicy = null) =>
@@ -198,21 +199,21 @@ public sealed class ConnectedServiceComponentTests
 
     private static ConnectedServiceResource Resource(ResourceScopeRef scope,
         ConnectedServiceTypeResource? type = null) => new()
-    {
-        ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = ConnectedServiceResourceKinds.ConnectedService,
-        Metadata = new() { Name = "redis" },
-        ScopeRef = scope,
-        Definition = new()
         {
-            DisplayName = "Redis",
-            Type = type is null
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ConnectedServiceResourceKinds.ConnectedService,
+            Metadata = new() { Name = "redis" },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = "Redis",
+                Type = type is null
                 ? new() { Type = new ResourceReference("redis", ResourceScopeRef.Instance, new("azure")), TypeUid = Guid.NewGuid(), Version = "1.0.0", SchemaDigest = "sha256:contract" }
                 : new() { Type = new ResourceReference(type.Name, type.ScopeRef, type.Namespace), TypeUid = type.Uid, Version = "1.0.0", SchemaDigest = "sha256:http" },
-            Options = JsonSerializer.SerializeToElement(new { })
-        },
-        ObservedState = new() { Availability = ConnectedServiceAvailability.Ready, ObservedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) }
-    };
+                Options = JsonSerializer.SerializeToElement(new { })
+            },
+            ObservedState = new() { Availability = ConnectedServiceAvailability.Ready, ObservedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) }
+        };
 
     private sealed class StubClient(ConnectedServiceResource resource) : IConnectedServicesClient
     {

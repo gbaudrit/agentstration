@@ -1,4 +1,4 @@
-# ADR-0199: OpenAPI discovery uses protected Connected Service execution
+# ADR-0201: OpenAPI discovery uses protected Connected Service execution
 
 ## Status
 

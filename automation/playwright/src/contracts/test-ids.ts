@@ -31,6 +31,8 @@ export const TestIds = {
     notificationsPanel: 'console-notifications-panel',
   },
   consoleAdministration: {
+    storages: 'storages-page',
+    storageEditor: 'storage-editor',
     settings: 'console-admin-settings',
     profileSettings: 'console-admin-profile-settings',
     organization: 'console-admin-organization',

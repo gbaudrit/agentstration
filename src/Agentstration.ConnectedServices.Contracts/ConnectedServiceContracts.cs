@@ -361,6 +361,21 @@ public interface IConnectedServiceResolver
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>Validated export metadata for management consumers; never resolves Secret values.</summary>
+public sealed record ConnectedServiceExportMetadata(
+    ConnectedServiceTypeReference Type, IReadOnlyList<ConnectedServiceExportDescriptor> Exports);
+
+public sealed class ConnectedServiceExportInspectionException(string code) : Exception(code)
+{
+    public string Code { get; } = code;
+}
+
+public interface IConnectedServiceExportInspector
+{
+    Task<ConnectedServiceExportMetadata> InspectAsync(ConnectedServiceRevisionReference service,
+        ConnectedServiceResolutionContext context, CancellationToken cancellationToken);
+}
+
 public sealed record CreateConnectedServiceRequest(
     string Name,
     ConnectedServiceProperties Properties,

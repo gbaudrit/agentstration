@@ -3,6 +3,7 @@ using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -25,12 +26,18 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     IResourceAccessPolicyService accessPolicies,
     InternalMcpToolProjectionService internalTools,
     ConnectedServicePlatformResourceProvisioner connectedServiceTypes,
+    StoragePlatformResourceProvisioner storageTypes,
+    LocalStorageDefaultsProvisioner localStorage,
     ArtifactPlatformResourceProvisioner artifacts,
     KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
 {
     public async Task EnsureAllAsync(CancellationToken cancellationToken)
     {
-        using (scopes.PushSystem()) await connectedServiceTypes.EnsureAsync(cancellationToken);
+        using (scopes.PushSystem())
+        {
+            await connectedServiceTypes.EnsureAsync(cancellationToken);
+            await storageTypes.EnsureAsync(cancellationToken);
+        }
         var tenants = await identities.ListTenantsAsync(cancellationToken);
         foreach (var tenant in tenants.Where(value => value.Status == TenantStatus.Active))
         {
@@ -44,8 +51,10 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     {
         using var systemScope = scopes.PushSystem();
         await connectedServiceTypes.EnsureAsync(cancellationToken);
+        await storageTypes.EnsureAsync(cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
+        await localStorage.EnsureAsync(workspace, cancellationToken);
         var runtimeProfile = await EnsureStandardRuntimeProfileAsync(cancellationToken);
         if (OperationalTopologyIdentities.IsOperationalWorkspace(workspace))
             await RemoveWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);

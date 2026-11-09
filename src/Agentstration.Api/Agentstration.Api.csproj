@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Storage.Api/Agentstration.Storage.Api.csproj" />
     <ProjectReference Include="../Agentstration.ConnectedServices.Api/Agentstration.ConnectedServices.Api.csproj" />
     <ProjectReference Include="../Agentstration.DataSources.Api/Agentstration.DataSources.Api.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

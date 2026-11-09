@@ -41,6 +41,7 @@ internal static class SecurityServiceCollectionExtensions
         if (context.Options.EnableHostedServices)
             services.AddHostedService<ConnectedServiceOperationDiscoveryRecoveryWorker>();
         services.AddSingleton<IConnectedServiceResolver>(provider => provider.GetRequiredService<ConnectedServiceManagementService>());
+        services.AddSingleton<IConnectedServiceExportInspector>(provider => provider.GetRequiredService<ConnectedServiceManagementService>());
         services.AddSingleton<IParameterUsageProvider, ConnectedServiceParameterUsageProvider>();
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());

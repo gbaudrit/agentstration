@@ -82,7 +82,7 @@ Data Source acquisition path, not that dispatch API.
 Operators should enroll/reconcile the extension to add its new contributions,
 create explicit Connected Services and run their discovery. This does not
 authorize deletion of old bundles or migration of their dependent resources.
-ADR-0199 records the protected execution boundary and this transition.
+ADR-0201 records the protected execution boundary and this transition.
 
 ## Legacy Data Source configuration
 

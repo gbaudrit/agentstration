@@ -35,9 +35,9 @@ public sealed class RegistrationContractTests
         var contributions = new Dictionary<Type, (int Count, ServiceLifetime Lifetime)>
         {
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
-            [typeof(IBootstrapResourceHandler)] = (18, ServiceLifetime.Scoped),
+            [typeof(IBootstrapResourceHandler)] = (20, ServiceLifetime.Scoped),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),
-            [typeof(IAepEnrollmentResourceProvisioner)] = (4, ServiceLifetime.Singleton),
+            [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(IToolExecutionEventSink)] = (2, ServiceLifetime.Singleton),
             [typeof(IInternalMcpToolDefinitionProvider)] = (35, ServiceLifetime.Singleton),
@@ -69,7 +69,9 @@ public sealed class RegistrationContractTests
         AssertSingleton<ICurrentRequestContext>(services);
         AssertSingleton<IRequestContextScopeFactory>(services);
         AssertSingleton<TimeProvider>(services);
-        Assert.HasCount(0, services.Where(descriptor => descriptor.ServiceType == typeof(IHostedService)).ToArray());
+        var frameworkHost = services.Single(descriptor => descriptor.ServiceType == typeof(IHostedService));
+        Assert.AreEqual("Microsoft.AspNetCore.DataProtection.Internal.DataProtectionHostedService", frameworkHost.ImplementationType?.FullName);
+        Assert.AreEqual(ServiceLifetime.Singleton, frameworkHost.Lifetime);
         CollectionAssert.AreEqual(new Type?[]
         {
             typeof(ToolDefinitionFlowDeletionGuard),

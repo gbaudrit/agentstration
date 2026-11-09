@@ -2,6 +2,7 @@
   <Folder Name="/asp/">
     <Project Path="asp/src/Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
     <Project Path="asp/src/Agentstration.Asp.Server/Agentstration.Asp.Server.csproj" />
+    <Project Path="asp/src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
     <Project Path="asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
     <Project Path="asp/samples/LocalStorage/LocalStorage.csproj" />
     <Project Path="asp/tests/Agentstration.Asp.Tests/Agentstration.Asp.Tests.csproj" />
@@ -158,6 +159,11 @@
     <Project Path="src/Agentstration.Sources.Api/Agentstration.Sources.Api.csproj" />
     <Project Path="src/Agentstration.Sources.Contracts/Agentstration.Sources.Contracts.csproj" />
   </Folder>
+  <Folder Name="/src/Storage/">
+    <Project Path="src/Agentstration.Storage.Contracts/Agentstration.Storage.Contracts.csproj" />
+    <Project Path="src/Agentstration.Storage/Agentstration.Storage.csproj" />
+    <Project Path="src/Agentstration.Storage.Api/Agentstration.Storage.Api.csproj" />
+  </Folder>
   <Folder Name="/src/Tools/">
     <Project Path="src/Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <Project Path="src/Agentstration.Tools/Agentstration.Tools.csproj" />
@@ -208,11 +214,15 @@
     <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.OpenApi.Tests/Agentstration.Extensions.OpenApi.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/fixtures/">
+    <Project Path="tests/fixtures/StorageVolumeProbe/StorageVolumeProbe.csproj" />
+  </Folder>
   <Folder Name="/tests/Models/">
     <Project Path="tests/Agentstration.Models.Tests/Agentstration.Models.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Resources/">
+    <Project Path="tests/Agentstration.Storage.Tests/Agentstration.Storage.Tests.csproj" />
     <Project Path="tests/Agentstration.ResourceManagement.Tests/Agentstration.ResourceManagement.Tests.csproj" />
     <Project Path="tests/Agentstration.Schemas.Tests/Agentstration.Schemas.Tests.csproj" />
     <Project Path="tests/Agentstration.Secrets.Tests/Agentstration.Secrets.Tests.csproj" />

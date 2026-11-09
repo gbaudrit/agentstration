@@ -10,9 +10,12 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Storage;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.AI;
@@ -353,6 +356,9 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
         var retry = await writer.ExecuteAsync(invocation, default);
         Assert.IsNotNull(first);
         Assert.AreEqual(first.Value.GetProperty("flowRunArtifactId").GetString(), retry!.Value.GetProperty("flowRunArtifactId").GetString());
+        Assert.IsNull(await factory.Services.GetRequiredService<StorageManagementService>().GetExactAsync(
+            ResourceScopeRef.Workspace(context.WorkspaceId), ResourceNamespace.Default, LocalStorageDefaultsProvisioner.DefaultName, default));
+        Assert.IsFalse(first.Value.GetProperty("receipt").GetProperty("OpaqueReference").GetString()!.StartsWith("storage-v1.", StringComparison.Ordinal));
 
         var reader = factory.Services.GetRequiredService<ArtifactStorageReadMcpTool>();
         var materialized = await reader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
@@ -481,6 +487,105 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
         Assert.AreEqual("true", readFlow?.Value.Metadata[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual(ResourceScopeRef.Instance, writeFlow?.Value.ScopeRef);
         Assert.AreEqual(ResourceScopeRef.Instance, readFlow?.Value.ScopeRef);
+    }
+
+    [TestMethod]
+    public async Task SelectedStorageHonoursArtifactEnvelopeAndCommitsOnlyCompleteImmutableContent()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var services = factory.Services;
+        Workspace operational;
+        using (services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+            operational = await services.GetRequiredService<IOperationalTopologyProvisioner>().GetInstanceOperationsWorkspaceAsync(default);
+        context = context with { TenantId = operational.TenantId, WorkspaceId = operational.Id };
+        using var caller = services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
+        var scope = ResourceScopeRef.Instance;
+        var management = services.GetRequiredService<StorageManagementService>();
+        var resource = (await management.GetExactAsync(scope, ResourceNamespace.Default, LocalStorageDefaultsProvisioner.DefaultName, default))!;
+        using var authority = services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.local-default", "1.0.0"));
+        var changed = await management.ReconcileAsync(scope, resource.Value.Namespace, resource.Value.Name,
+            resource.Value.Definition with
+            {
+                Envelope = JsonSerializer.SerializeToElement(new { prefix = "artifacts/", write = true, maximumWriteBytes = 3, maximumReadBytes = 4 })
+            }, resource.ETag, default);
+        var adapter = services.GetRequiredService<WorkspaceArtifactStorage>();
+        var workspace = new WorkspaceId(context.WorkspaceId);
+        var bytes = Encoding.UTF8.GetBytes("complete-content");
+        var digest = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var reference = await adapter.CreateReferenceAsync(workspace, new string('b', 64), bytes.Length, digest, default);
+        Assert.AreEqual(3, await adapter.MaximumChunkBytesAsync(workspace, reference, true, default));
+        await adapter.ResetAsync(workspace, reference, default);
+        _ = await adapter.WriteAsync(workspace, reference, 0, bytes.AsMemory(0, 3), default);
+        await Assert.ThrowsAsync<ArtifactValidationException>(() => adapter.ReadAsync(workspace, reference, 0, 4, default));
+        var partial = await Assert.ThrowsAsync<StorageException>(() => adapter.StatAsync(workspace, reference, default));
+        Assert.AreEqual("storage_artifact_integrity_failed", partial.Code);
+        await adapter.ResetAsync(workspace, reference, default);
+        for (var offset = 0; offset < bytes.Length; offset += 3)
+            _ = await adapter.WriteAsync(workspace, reference, offset, bytes.AsMemory(offset, Math.Min(3, bytes.Length - offset)), default);
+        Assert.AreEqual(digest, (await adapter.StatAsync(workspace, reference, default)).Sha256);
+        await adapter.ResetAsync(workspace, reference, default);
+        var conflict = await Assert.ThrowsAsync<StorageException>(() => adapter.WriteAsync(workspace, reference, 0, new byte[] { 0 }, default));
+        Assert.AreEqual("storage_artifact_conflict", conflict.Code);
+        CollectionAssert.AreEqual(bytes[..4], (await adapter.ReadAsync(workspace, reference, 0, 4, default)).ToArray());
+        await Assert.ThrowsAsync<StorageException>(() => adapter.ReadAsync(workspace, reference, 0, 5, default));
+        _ = await management.ReconcileAsync(scope, changed.Value.Namespace, changed.Value.Name, changed.Value.Definition with
+        {
+            Envelope = JsonSerializer.SerializeToElement(new { prefix = "artifacts/", write = true, read = false })
+        }, changed.ETag, default);
+        var deniedReference = await adapter.CreateReferenceAsync(workspace, new string('c', 64), bytes.Length, digest, default);
+        var denied = await Assert.ThrowsAsync<StorageException>(() => adapter.ReadAsync(workspace, deniedReference, 0, 4, default));
+        Assert.AreEqual("storage_artifact_access_denied", denied.Code);
+        // Receipt dependencies still protect selected Storage identities.
+        var committedReference = await adapter.CreateReferenceAsync(workspace, new string('d', 64), bytes.Length, digest, default);
+        await adapter.ResetAsync(workspace, committedReference, default);
+        _ = await adapter.WriteAsync(workspace, committedReference, 0, bytes, default);
+        _ = await adapter.StatAsync(workspace, committedReference, default);
+        using (services.GetRequiredService<IRequestContextScopeFactory>().Push(context))
+        {
+            var artifacts = services.GetRequiredService<ArtifactManagementService>();
+            var staged = await artifacts.CreateStagedAsync(new("retained.txt", "text/plain",
+                new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "selected-producer", FlowRunId = "selected-producer", FlowStepId = "write" }), default);
+            _ = await artifacts.WriteAsync(staged.Value.ArtifactId, 0, bytes, default);
+            _ = await artifacts.SealAsync(staged.Value.ArtifactId, default);
+            _ = await artifacts.CompleteFlowRunArtifactAsync(staged.Value.ArtifactId, new("selected-producer", "write", new()
+            {
+                StorageFlowRunId = "selected-storage",
+                OpaqueReference = committedReference,
+                Length = bytes.Length,
+                Sha256 = digest,
+                MediaType = "text/plain"
+            }), default);
+        }
+        var retained = (await management.GetExactAsync(scope, resource.Value.Namespace, resource.Value.Name, default))!;
+        var inUse = await Assert.ThrowsAsync<StorageException>(() => management.DeactivateAsync(scope,
+            retained.Value.Namespace, retained.Value.Name, retained.ETag, default));
+        Assert.AreEqual("storage_in_use", inUse.Code);
+    }
+
+    [TestMethod]
+    public async Task SelectedDefaultDisablementNeverFallsBackToTheIndependentArtifactBackend()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var services = factory.Services;
+        var scopes = services.GetRequiredService<IRequestContextScopeFactory>();
+        Workspace operational;
+        using (scopes.PushSystem())
+            operational = await services.GetRequiredService<IOperationalTopologyProvisioner>().GetInstanceOperationsWorkspaceAsync(default);
+        context = context with { TenantId = operational.TenantId, WorkspaceId = operational.Id };
+        using var caller = scopes.PushInstance(context);
+        var management = services.GetRequiredService<StorageManagementService>();
+        var resource = (await management.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default,
+            LocalStorageDefaultsProvisioner.DefaultName, default))!;
+        using var authority = services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.local-default", "1.0.0"));
+        _ = await management.PutExactAsync(ResourceScopeRef.Instance, resource.Value.Namespace, resource.Value.Name,
+            resource.Value.Definition with { Enabled = false }, resource.ETag, default);
+        var adapter = services.GetRequiredService<WorkspaceArtifactStorage>();
+        var digest = Convert.ToHexStringLower(SHA256.HashData([]));
+        var denied = await Assert.ThrowsAsync<StorageException>(() => adapter.CreateReferenceAsync(new(context.WorkspaceId), new string('e', 64), 0, digest, default));
+        Assert.AreEqual("storage_disabled", denied.Code);
+        await Assert.ThrowsAsync<StorageException>(() => adapter.CreateReferenceAsync(new(Guid.NewGuid()), new string('e', 64), 0, digest, default));
     }
 
     [TestMethod]

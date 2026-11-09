@@ -42,6 +42,8 @@ using Agentstration.Secrets;
 using Agentstration.Security.Contracts;
 using Agentstration.Sources;
 using Agentstration.Sources.Contracts;
+using Agentstration.Storage;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
 using Agentstration.Tools.SourceRegistry;
 using Agentstration.Triggers;
@@ -231,6 +233,8 @@ public sealed class DependencyTests
             "Agentstration.Application",
             "Agentstration.Infrastructure",
             "Agentstration.Management.Core",
+            "Agentstration.Storage",
+            "Agentstration.Storage.Api",
             "Agentstration.ModelProviders",
             "Agentstration.Runtime.MicrosoftAgentFramework",
             "Agentstration.Runtime.Core",
@@ -241,7 +245,8 @@ public sealed class DependencyTests
 
         Assert.IsFalse(references.Any(reference =>
             forbidden.Contains(reference, StringComparer.Ordinal)
-            || reference!.Contains(".Storage.", StringComparison.Ordinal)));
+            || (reference!.Contains(".Storage.", StringComparison.Ordinal)
+                && reference != "Agentstration.Storage.Contracts")));
     }
 
     [TestMethod]
@@ -275,6 +280,8 @@ public sealed class DependencyTests
             "Agentstration.Application",
             "Agentstration.Infrastructure",
             "Agentstration.Management.Core",
+            "Agentstration.Storage",
+            "Agentstration.Storage.Api",
             "Agentstration.ModelProviders",
             "Agentstration.Runtime.MicrosoftAgentFramework",
             "Agentstration.Runtime.Core",
@@ -285,7 +292,8 @@ public sealed class DependencyTests
 
         Assert.IsFalse(references.Any(reference =>
             forbidden.Contains(reference, StringComparer.Ordinal)
-            || reference!.Contains(".Storage.", StringComparison.Ordinal)));
+            || (reference!.Contains(".Storage.", StringComparison.Ordinal)
+                && reference != "Agentstration.Storage.Contracts")));
     }
 
     [TestMethod]
@@ -383,7 +391,7 @@ public sealed class DependencyTests
         var repositoryRoot = FindRepositoryRoot();
         var apiRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Api");
         var hostRoot = Path.Combine(repositoryRoot, "src", "Agentstration.Web");
-        var modules = new[] { "Agents", "Bootstrap", "ConnectedServices", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
+        var modules = new[] { "Agents", "Bootstrap", "ConnectedServices", "Storage", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
 
         foreach (var family in modules)
         {
@@ -422,7 +430,7 @@ public sealed class DependencyTests
         var aggregator = Path.Combine(root, "src", "Agentstration.Api");
         var routeComposition = File.ReadAllText(Path.Combine(aggregator, "ApiTransportEndpointRouteBuilderExtensions.cs"));
         var serviceComposition = File.ReadAllText(Path.Combine(aggregator, "Configuration", "ApiTransportServiceCollectionExtensions.cs"));
-        var families = new[] { "Agents", "Bootstrap", "ConnectedServices", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
+        var families = new[] { "Agents", "Bootstrap", "ConnectedServices", "Storage", "Extensions", "Flows", "Identity", "Models", "Packs", "Resources", "Runtime", "Secrets", "Sources", "Tools", "Triggers", "Work", "Workplace" };
         foreach (var family in families)
         {
             Assert.AreEqual(1, CountOccurrences(routeComposition, $"Map{family}Api("), family);
@@ -855,6 +863,49 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void StorageOwnsResourcesAndDependsOnlyOnNeutralConsumerBoundaries()
+    {
+        var references = typeof(StorageManagementService).Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name!).ToArray();
+        var forbidden = new[]
+        {
+            "Agentstration.ConnectedServices", "Agentstration.DataSources", "Agentstration.Knowledge",
+            "Agentstration.Extensions", "Agentstration.Infrastructure", "Agentstration.Web"
+        };
+        Assert.IsFalse(references.Any(reference => forbidden.Contains(reference, StringComparer.Ordinal)
+            || reference.StartsWith("Agentstration.Asp.", StringComparison.Ordinal)
+            || reference.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)
+            || reference.Contains("EntityFramework", StringComparison.Ordinal)));
+        var projects = new[] { "Agentstration.Storage", "Agentstration.Storage.Contracts", "Agentstration.Storage.Api" };
+        var root = FindRepositoryRoot();
+        var solution = File.ReadAllText(Path.Combine(root, "Agentstration.slnx"));
+        foreach (var project in projects)
+            Assert.Contains($"src/{project}/{project}.csproj", solution, StringComparison.Ordinal);
+        Assert.IsTrue(ResourceScopePolicy.AllowedScopes(StorageResourceKinds.Storage)
+            .SetEquals([ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace]));
+        Assert.IsTrue(ResourceScopePolicy.AllowedScopes(StorageResourceKinds.StorageType)
+            .SetEquals([ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace]));
+    }
+
+    [TestMethod]
+    public void StorageContentPortsRemainNeutralAndAspConfigurationCannotDependOnProductResources()
+    {
+        Assert.AreEqual(typeof(IStorageResolver).Assembly, typeof(IStorageContentGateway).Assembly);
+        var contracts = typeof(IStorageContentGateway).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+        Assert.IsFalse(contracts.Any(name => name.StartsWith("Agentstration.Asp.", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)
+            || name.Contains("EntityFramework", StringComparison.Ordinal)
+            || name is "Agentstration.Infrastructure" or "Agentstration.Web"));
+        var adapter = typeof(Agentstration.Asp.Aep.AspAepBindings).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+        Assert.IsFalse(adapter.Any(name => name.StartsWith("Agentstration.Storage", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.ConnectedServices", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Identity", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Work", StringComparison.Ordinal)
+            || name is "Agentstration.Infrastructure" or "Agentstration.Web" or "Agentstration.Resources"
+            || name.Contains("EntityFramework", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void ResourceFamilyModulesDoNotReferenceHostsOrConcreteStorage()
     {
         var assemblies = new[]
@@ -865,13 +916,15 @@ public sealed class DependencyTests
             typeof(ModelProfileResource).Assembly,
             typeof(ToolResource).Assembly,
             typeof(SecretResource).Assembly,
-            typeof(ConnectedServiceManagementService).Assembly
+            typeof(ConnectedServiceManagementService).Assembly,
+            typeof(StorageManagementService).Assembly
         };
 
         Assert.IsFalse(assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Any(reference =>
             reference.Name!.Contains("Agentstration.Web", StringComparison.Ordinal)
             || reference.Name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
-            || reference.Name.Contains(".Storage.", StringComparison.Ordinal)
+            || (reference.Name.Contains(".Storage.", StringComparison.Ordinal)
+                && reference.Name != "Agentstration.Storage.Contracts")
             || reference.Name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
     }
 
@@ -1033,13 +1086,13 @@ public sealed class DependencyTests
     {
         var expected = new[]
         {
-            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "KnowledgeSourceToolExposure", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter", "ConnectedServiceType", "ConnectedService",
+            "Agent", "AgentRevision", "AgentDeployment", "Flow", "Entry", "KnowledgeSource", "KnowledgeSourceToolExposure", "ModelProvider", "ModelProfile", "RuntimeProfile", "Parameter", "ConnectedServiceType", "ConnectedService", "StorageType", "Storage",
             "Secret", "Vault", "Tool", "ToolDefinition", "ToolProvider", "ToolExecutionHook", "ToolSet", "ToolSetVersion", "Trigger", "Source", "SourceVersion", "SourceProvider"
         };
         var actual = new[]
         {
             AgentResourceKinds.Agent, AgentResourceKinds.AgentRevision, AgentResourceKinds.AgentDeployment, FlowResourceKinds.Flow,
-            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, KnowledgeResourceKinds.KnowledgeSourceToolExposure, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter, ConnectedServiceResourceKinds.ConnectedServiceType, ConnectedServiceResourceKinds.ConnectedService,
+            EntryResourceKinds.Entry, KnowledgeResourceKinds.KnowledgeSource, KnowledgeResourceKinds.KnowledgeSourceToolExposure, ModelResourceKinds.ModelProvider, ModelResourceKinds.ModelProfile, RuntimeProfileResourceKinds.RuntimeProfile, ParameterResourceKinds.Parameter, ConnectedServiceResourceKinds.ConnectedServiceType, ConnectedServiceResourceKinds.ConnectedService, StorageResourceKinds.StorageType, StorageResourceKinds.Storage,
             SecretResourceKinds.Secret, SecretResourceKinds.Vault, ToolResourceKinds.Tool, ToolResourceKinds.ToolDefinition,
             ToolResourceKinds.ToolProvider, ToolResourceKinds.ToolExecutionHook, ToolResourceKinds.ToolSet, ToolResourceKinds.ToolSetVersion, TriggerResourceKinds.Trigger, SourceResourceKinds.Source,
             SourceResourceKinds.SourceVersion, SourceResourceKinds.SourceProvider
@@ -1062,6 +1115,7 @@ public sealed class DependencyTests
             typeof(Agentstration.Models.Contracts.ModelProviderResponse).Assembly,
             typeof(Agentstration.Parameters.Contracts.CreateParameterRequest).Assembly,
             typeof(CreateConnectedServiceRequest).Assembly,
+            typeof(CreateStorageRequest).Assembly,
             typeof(Agentstration.ResourceManagement.Contracts.ResourceDeclaration<>).Assembly,
             typeof(Agentstration.Runtime.Contracts.RuntimeProfileSummaryResponse).Assembly,
             typeof(Agentstration.Secrets.Contracts.SecretResponse).Assembly,
