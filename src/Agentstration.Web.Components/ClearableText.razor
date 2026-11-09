@@ -1,0 +1,45 @@
+@using Microsoft.AspNetCore.Components.Forms
+@inherits InputBase<string?>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+
+<span class="clearable-field @(Multiline ? "clearable-multiline" : null)">
+    @if (Multiline)
+    {
+        <textarea @attributes="AdditionalAttributes" id="@ControlId" aria-describedby="@DescriptionId" class="@CssClass" value="@CurrentValueAsString" @oninput="Input" @onchange="Input" readonly="@ReadOnly" disabled="@Disabled" @ref="control"></textarea>
+    }
+    else
+    {
+        <input @attributes="AdditionalAttributes" id="@ControlId" aria-describedby="@DescriptionId" type="@Type" class="@CssClass" value="@CurrentValueAsString" @oninput="Input" @onchange="Input" readonly="@ReadOnly" disabled="@Disabled" @ref="control" />
+    }
+    @if (CanClear)
+    {
+        <button class="field-clear" type="button" aria-label="@Localizer["ClearValue"]" @onclick="ClearAsync" @onclick:stopPropagation><span aria-hidden="true">×</span></button>
+    }
+</span>
+
+@code {
+    [Parameter] public bool Multiline { get; set; }
+    [Parameter] public string Type { get; set; } = "text";
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [CascadingParameter] private FormFieldPresentation? Field { get; set; }
+    private readonly string generatedId = $"input-{Guid.NewGuid():N}";
+    private ElementReference control;
+    private string ControlId => AdditionalAttributes?.GetValueOrDefault("id")?.ToString() ?? Field?.Id ?? generatedId;
+    private string? DescriptionId => AdditionalAttributes?.GetValueOrDefault("aria-describedby")?.ToString() ?? Field?.DescriptionId;
+    private bool CanClear => !ReadOnly && !Disabled && !string.IsNullOrEmpty(CurrentValueAsString);
+    public ClearableText() { ValueExpression = () => Value; }
+    private void Input(ChangeEventArgs args) => CurrentValueAsString = args.Value?.ToString() ?? string.Empty;
+    private async Task ClearAsync()
+    {
+        if (!CanClear) return;
+        CurrentValueAsString = string.Empty;
+        await control.FocusAsync();
+    }
+    protected override bool TryParseValueFromString(string? value, out string? result, [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] out string? validationErrorMessage)
+    {
+        result = value;
+        validationErrorMessage = null;
+        return true;
+    }
+}

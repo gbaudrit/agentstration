@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="ClearValue" xml:space="preserve">
+    <value>Clear value</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="Filters" xml:space="preserve">
+    <value>Resource filters</value>
+  </data>
+  <data name="Sections" xml:space="preserve">
+    <value>Resource sections</value>
+  </data>
+  <data name="Previous" xml:space="preserve">
+    <value>Previous</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="Results" xml:space="preserve">
+    <value>{0} results</value>
+  </data>
+  <data name="Page" xml:space="preserve">
+    <value>Page {0}</value>
+  </data>
+  <data name="NoMatches" xml:space="preserve">
+    <value>No matching results</value>
+  </data>
+  <data name="NoMatchesHelp" xml:space="preserve">
+    <value>Change or clear the filters.</value>
+  </data>
+  <data name="UnsavedTitle" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="UnsavedMessage" xml:space="preserve">
+    <value>Save your changes before leaving this resource.</value>
+  </data>
+  <data name="LeaveTitle" xml:space="preserve">
+    <value>Discard unsaved changes?</value>
+  </data>
+  <data name="LeaveMessage" xml:space="preserve">
+    <value>Your unsaved changes will be lost.</value>
+  </data>
+  <data name="Discard" xml:space="preserve">
+    <value>Discard</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="ConfirmTitle" xml:space="preserve">
+    <value>Confirm action</value>
+  </data>
+  <data name="ConfirmMessage" xml:space="preserve">
+    <value>This action cannot be undone.</value>
+  </data>
+  <data name="Overview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Access" xml:space="preserve">
+    <value>Access</value>
+  </data>
+  <data name="Yaml" xml:space="preserve">
+    <value>YAML</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Saved configuration</value>
+  </data>
+  <data name="SearchProfiles" xml:space="preserve">
+    <value>Search model profiles</value>
+  </data>
+  <data name="Provider" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="Scope" xml:space="preserve">
+    <value>Owner scope</value>
+  </data>
+  <data name="All" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="Choose" xml:space="preserve">
+    <value>Choose</value>
+  </data>
+  <data name="Change" xml:space="preserve">
+    <value>Change selection</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Unavailable selection</value>
+  </data>
+  <data name="NoSelection" xml:space="preserve">
+    <value>No selection</value>
+  </data>
+  <data name="UsedBy" xml:space="preserve">
+    <value>Used by</value>
+  </data>
+  <data name="SearchUsages" xml:space="preserve">
+    <value>Search usages</value>
+  </data>
+  <data name="YamlConflict" xml:space="preserve">
+    <value>A YAML draft is pending. Apply it or explicitly discard it before changing the form.</value>
+  </data>
+  <data name="DiscardYaml" xml:space="preserve">
+    <value>Discard YAML draft</value>
+  </data>
+</root>

@@ -1,0 +1,17 @@
+<div class="form-field @Class">
+    <div class="form-field-heading"><label for="@ControlId">@Label</label>@if (!string.IsNullOrWhiteSpace(Tooltip)) { <HelpTooltip Text="@Tooltip" /> }</div>
+    <CascadingValue Value="Presentation" IsFixed="false">@ChildContent</CascadingValue>
+    @if (!string.IsNullOrWhiteSpace(Help)) { <small id="@(ControlId + "-help")">@Help</small> }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string? Help { get; set; }
+    [Parameter] public string? Tooltip { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private readonly string generatedId = $"field-{Guid.NewGuid():N}";
+    private string ControlId => Id ?? generatedId;
+    private FormFieldPresentation Presentation => new(ControlId, string.IsNullOrWhiteSpace(Help) ? null : ControlId + "-help");
+}

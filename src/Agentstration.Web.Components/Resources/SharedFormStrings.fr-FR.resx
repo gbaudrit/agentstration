@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="ClearValue" xml:space="preserve">
+    <value>Vider la valeur</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Rechercher</value>
+  </data>
+  <data name="Filters" xml:space="preserve">
+    <value>Filtres des ressources</value>
+  </data>
+  <data name="Sections" xml:space="preserve">
+    <value>Sections de la ressource</value>
+  </data>
+  <data name="Previous" xml:space="preserve">
+    <value>Précédent</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Suivant</value>
+  </data>
+  <data name="Results" xml:space="preserve">
+    <value>{0} résultats</value>
+  </data>
+  <data name="Page" xml:space="preserve">
+    <value>Page {0}</value>
+  </data>
+  <data name="NoMatches" xml:space="preserve">
+    <value>Aucun résultat correspondant</value>
+  </data>
+  <data name="NoMatchesHelp" xml:space="preserve">
+    <value>Modifiez ou videz les filtres.</value>
+  </data>
+  <data name="UnsavedTitle" xml:space="preserve">
+    <value>Modifications non enregistrées</value>
+  </data>
+  <data name="UnsavedMessage" xml:space="preserve">
+    <value>Enregistrez vos modifications avant de quitter cette ressource.</value>
+  </data>
+  <data name="LeaveTitle" xml:space="preserve">
+    <value>Abandonner les modifications ?</value>
+  </data>
+  <data name="LeaveMessage" xml:space="preserve">
+    <value>Vos modifications non enregistrées seront perdues.</value>
+  </data>
+  <data name="Discard" xml:space="preserve">
+    <value>Abandonner</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>Confirmer</value>
+  </data>
+  <data name="ConfirmTitle" xml:space="preserve">
+    <value>Confirmer l’action</value>
+  </data>
+  <data name="ConfirmMessage" xml:space="preserve">
+    <value>Cette action est irréversible.</value>
+  </data>
+  <data name="Overview" xml:space="preserve">
+    <value>Vue d’ensemble</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Édition</value>
+  </data>
+  <data name="Access" xml:space="preserve">
+    <value>Accès</value>
+  </data>
+  <data name="Yaml" xml:space="preserve">
+    <value>YAML</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Configuration enregistrée</value>
+  </data>
+  <data name="SearchProfiles" xml:space="preserve">
+    <value>Rechercher des profils de modèles</value>
+  </data>
+  <data name="Provider" xml:space="preserve">
+    <value>Fournisseur</value>
+  </data>
+  <data name="Scope" xml:space="preserve">
+    <value>Périmètre propriétaire</value>
+  </data>
+  <data name="All" xml:space="preserve">
+    <value>Tous</value>
+  </data>
+  <data name="Choose" xml:space="preserve">
+    <value>Choisir</value>
+  </data>
+  <data name="Change" xml:space="preserve">
+    <value>Changer la sélection</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Sélection indisponible</value>
+  </data>
+  <data name="NoSelection" xml:space="preserve">
+    <value>Aucune sélection</value>
+  </data>
+  <data name="UsedBy" xml:space="preserve">
+    <value>Utilisé par</value>
+  </data>
+  <data name="SearchUsages" xml:space="preserve">
+    <value>Rechercher des utilisations</value>
+  </data>
+  <data name="YamlConflict" xml:space="preserve">
+    <value>Un brouillon YAML est en attente. Appliquez-le ou abandonnez-le explicitement avant de modifier le formulaire.</value>
+  </data>
+  <data name="DiscardYaml" xml:space="preserve">
+    <value>Abandonner le brouillon YAML</value>
+  </data>
+</root>

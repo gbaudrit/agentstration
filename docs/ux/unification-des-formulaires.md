@@ -8,7 +8,7 @@ L’[analyse des listes, fiches, écrans d’administration et du Workplace](ana
 
 La [maquette interactive de fiche ressource](maquette-ecran-type.md) permet de comparer ces propositions sur une liste et un formulaire, dans les thèmes clair et sombre et sur mobile.
 
-Le [plan des FR d’unification](plan-fr-unification.md) transforme ces besoins en neuf brouillons locaux : une FR parent, six FR de réalisation et deux tâches techniques de socle, avec dépendances, critères d’acceptation et scénarios de validation. Aucune issue n’est publiée à ce stade.
+Le [plan des FR d’unification](plan-fr-unification.md) transforme ces besoins en neuf brouillons locaux : une FR parent, six FR de réalisation et deux tâches techniques de socle, avec dépendances, critères d’acceptation et scénarios de validation. Les tickets sont publiés sous [#1089](https://github.com/gbaudrit/agentstration/issues/1089) ; voir le plan pour les numéros.
 
 ## Périmètre de l’état des lieux
 

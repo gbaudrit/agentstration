@@ -1,6 +1,6 @@
 # Plan des FR d’unification de l’IHM
 
-État : **brouillons locaux, aucune issue publiée**. Les identifiants `FR-00` à `FR-06` et `T-01` à `T-02` servent uniquement à ce plan ; ce ne sont pas des numéros GitHub. L’ordre ci-dessous exprime des dépendances de réalisation, sans attribuer de priorité ni d’estimation.
+État : **issues publiées sous le parent [#1089](https://github.com/gbaudrit/agentstration/issues/1089)**. Branche d’intégration publiée : `ux/unification-formulaires`. Les identifiants `FR-00` à `FR-06` et `T-01` à `T-02` servent uniquement à ce plan ; ce ne sont pas des numéros GitHub. L’ordre ci-dessous exprime des dépendances de réalisation, sans attribuer de priorité ni d’estimation.
 
 Le besoin est de rendre les formulaires et collections prévisibles dans toute l’IHM, à partir des composants existants. Agent est un cas complexe de validation, pas le modèle métier imposé aux autres écrans. La référence est le [catalogue des besoins](unification-des-formulaires.md), complété par l’[analyse transverse](analyse-des-ecrans-transverses.md) et la [maquette interactive](maquette-ecran-type.md).
 
@@ -68,7 +68,7 @@ Le plan **ne nécessite pas de bibliothèque UX globale**. T-02 commence par `Da
 
 ## Publication et validation
 
-Les neuf brouillons respectent les formulaires du dépôt, avec titres et corps en anglais. Les liens locaux seront remplacés par les vrais numéros lors d’une éventuelle publication. Les FR utilisent `enhancement`, les tâches de socle `technical-task`, avec `triage:agent` et `triage:pending-review` pour la classification proposée ; aucune priorité n’est attribuée.
+Les neuf descriptions respectent les formulaires du dépôt, avec titres et corps en anglais. Les liens locaux seront remplacés par les vrais numéros lors d’une éventuelle publication. Les FR utilisent `enhancement`, les tâches de socle `technical-task`, avec `triage:agent` et `triage:pending-review` pour la classification proposée ; aucune priorité n’est attribuée.
 
 À la publication, créer d’abord FR-00, puis attacher les huit lots par les **Sub-issues natives GitHub** et enregistrer leurs dépendances séparément. Les liens textuels ne remplacent pas cette relation. FR-00 suit les scénarios des lots, sans imposer un scénario parent qui dupliquerait tous les parcours.
 
@@ -79,3 +79,19 @@ Vérifier le catalogue [application-surfaces.ts](../../automation/playwright/src
 Chaque PR produit inclut la validation ciblée, les smoke tests clavier/desktop/mobile et clair/sombre, les traductions et les deux lanes fonctionnelles hors ligne selon les commandes et seuils du dépôt au moment de la livraison. Aucun service LLM externe ne devient nécessaire. Les changements d’API de pagination ajoutent leurs tests de contrat et d’isolation.
 
 Les défauts ponctuels recensés dans l’audit restent à qualifier avec le formulaire Bug s’ils ne sont pas résolus directement par l’adoption d’un composant ; ce plan ne les présente pas comme de nouvelles capacités. Les écrans non retenus dans les vagues initiales restent explicitement reportés dans FR-06.
+
+## Tickets publiés
+
+| Lot | Issue |
+| --- | --- |
+| FR-00 | [#1089](https://github.com/gbaudrit/agentstration/issues/1089) |
+| FR-01 | [#1090](https://github.com/gbaudrit/agentstration/issues/1090) |
+| FR-02 | [#1091](https://github.com/gbaudrit/agentstration/issues/1091) |
+| FR-03 | [#1092](https://github.com/gbaudrit/agentstration/issues/1092) |
+| FR-04 | [#1093](https://github.com/gbaudrit/agentstration/issues/1093) |
+| FR-05 | [#1094](https://github.com/gbaudrit/agentstration/issues/1094) |
+| FR-06 | [#1095](https://github.com/gbaudrit/agentstration/issues/1095) |
+| T-01 | [#1096](https://github.com/gbaudrit/agentstration/issues/1096) |
+| T-02 | [#1097](https://github.com/gbaudrit/agentstration/issues/1097) |
+
+Les relations natives parent/enfant sont vérifiées. Les scénarios #1098 à #1106 sont rattachés à leurs FR et attendent validation UX et fusion.

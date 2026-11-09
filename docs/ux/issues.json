@@ -1,0 +1,133 @@
+{
+  "integrationBranch": "ux/unification-formulaires",
+  "scenarios": [
+  {
+    "parent": 1090,
+    "local": "FR-01",
+    "number": 1098,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1098",
+    "title": "Cover clear field values in place and keep resource identity easy to understand with a reusable browser journey"
+  },
+  {
+    "parent": 1091,
+    "local": "FR-02",
+    "number": 1099,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1099",
+    "title": "Cover preserve resource drafts and make save outcomes predictable with a reusable browser journey"
+  },
+  {
+    "parent": 1092,
+    "local": "FR-03",
+    "number": 1100,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1100",
+    "title": "Cover give resource details a consistent overview and editing structure with a reusable browser journey"
+  },
+  {
+    "parent": 1093,
+    "local": "FR-04",
+    "number": 1101,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1101",
+    "title": "Cover find and select model profiles in an inline filtered collection with a reusable browser journey"
+  },
+  {
+    "parent": 1094,
+    "local": "FR-05",
+    "number": 1102,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1102",
+    "title": "Cover browse large Model Profile usage lists with bounded filtering and paging with a reusable browser journey"
+  },
+  {
+    "parent": 1095,
+    "local": "FR-06 wave A",
+    "number": 1103,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1103",
+    "title": "Cover adopt shared UX patterns across a bounded set of Console and Workplace screens wave A with a reusable browser journey"
+  },
+  {
+    "parent": 1095,
+    "local": "FR-06 wave B",
+    "number": 1104,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1104",
+    "title": "Cover adopt shared UX patterns across a bounded set of Console and Workplace screens wave B with a reusable browser journey"
+  },
+  {
+    "parent": 1095,
+    "local": "FR-06 wave C",
+    "number": 1105,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1105",
+    "title": "Cover adopt shared UX patterns across a bounded set of Console and Workplace screens wave C with a reusable browser journey"
+  },
+  {
+    "parent": 1095,
+    "local": "FR-06 wave D",
+    "number": 1106,
+    "url": "https://github.com/gbaudrit/agentstration/issues/1106",
+    "title": "Cover adopt shared UX patterns across a bounded set of Console and Workplace screens wave D with a reusable browser journey"
+  }
+],
+  "issues": [
+    {
+      "local": "FR-00",
+      "file": "docs/ux/fr/FR-00-resource-administration.md",
+      "number": 1089,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1089",
+      "title": "Unify resource administration with shared forms and collection patterns"
+    },
+    {
+      "local": "FR-01",
+      "file": "docs/ux/fr/FR-01-clearable-fields.md",
+      "number": 1090,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1090",
+      "title": "Clear field values in place and keep resource identity easy to understand"
+    },
+    {
+      "local": "FR-02",
+      "file": "docs/ux/fr/FR-02-safe-editing.md",
+      "number": 1091,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1091",
+      "title": "Preserve resource drafts and make save outcomes predictable"
+    },
+    {
+      "local": "FR-03",
+      "file": "docs/ux/fr/FR-03-resource-pages.md",
+      "number": 1092,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1092",
+      "title": "Give resource details a consistent overview and editing structure"
+    },
+    {
+      "local": "FR-04",
+      "file": "docs/ux/fr/FR-04-resource-reference.md",
+      "number": 1093,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1093",
+      "title": "Find and select model profiles in an inline filtered collection"
+    },
+    {
+      "local": "FR-05",
+      "file": "docs/ux/fr/FR-05-resource-usages.md",
+      "number": 1094,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1094",
+      "title": "Browse large Model Profile usage lists with bounded filtering and paging"
+    },
+    {
+      "local": "FR-06",
+      "file": "docs/ux/fr/FR-06-phased-adoption.md",
+      "number": 1095,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1095",
+      "title": "Adopt shared UX patterns across a bounded set of Console and Workplace screens"
+    },
+    {
+      "local": "T-01",
+      "file": "docs/ux/fr/T-01-form-foundations.md",
+      "number": 1096,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1096",
+      "title": "Consolidate shared form structure and field presentation"
+    },
+    {
+      "local": "T-02",
+      "file": "docs/ux/fr/T-02-collection-foundations.md",
+      "number": 1097,
+      "url": "https://github.com/gbaudrit/agentstration/issues/1097",
+      "title": "Consolidate collection filtering, paging and result states"
+    }
+  ]
+}

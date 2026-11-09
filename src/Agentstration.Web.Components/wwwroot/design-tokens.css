@@ -316,3 +316,36 @@
 @media (min-width: 621px) and (max-width: 820px) { .brand-lockup { justify-content:center; padding-inline:0; }.side-nav { scrollbar-gutter:auto; scrollbar-width:none; }.side-nav::-webkit-scrollbar { display:none; width:0; }.side-nav a { justify-content:center; gap:0; padding-inline:0; }.navigation-group .nav-icon { color:var(--navigation-group-color); } }
 @media (max-width: 820px) { .brand-lockup-logo { display: none; }.brand-lockup .brand-mark-compact { display: grid; }.topbar { grid-template-columns: 1fr auto; }.command-palette-trigger { display: none; }.resource-toolbar,.resource-header { align-items: flex-start; flex-direction: column; }.resource-toolbar-filters { width: 100%; }.resource-toolbar .search-box { flex: 1 1 100%; }.quick-inspector { top: auto; bottom: 0; width: 100%; height: min(75vh,620px); }.state-comparison-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .sidebar { height:64px; overflow-x:auto; overflow-y:hidden; }.side-nav { overflow:visible; }.navigation-group { display: contents; }.side-nav a { min-width: 50px; justify-content: center; }.resource-header-identity { align-items: flex-start; }.resource-icon { display: none; }.page-actions { flex-wrap: wrap; }.unsaved-changes-bar { align-items: flex-start; flex-direction: column; }.unsaved-changes-actions { width: 100%; }.unsaved-changes-actions > * { flex: 1; } }
+
+/* Component contracts: named themes override semantic tokens on the shell. */
+.app-shell {
+  --form-gap: var(--space-4);
+  --form-section-gap: var(--space-6);
+  --form-radius: var(--radius-md);
+  --form-focus-color: var(--color-action-primary);
+  --form-error-color: var(--color-danger);
+  --form-action-size: var(--field-height);
+  --collection-gap: var(--space-3);
+}
+.form-field { display: grid; align-content: start; min-width: 0; gap: var(--space-2); }
+.form-field-heading { display: flex; align-items: center; gap: var(--space-2); }
+.form-field-heading > label { color: var(--text); font-size: var(--font-size-sm); font-weight: 650; }
+.form-field > small { color: var(--muted); font-size: var(--font-size-xs); }
+.clearable-field { position: relative; display: grid; min-width: 0; width: 100%; }
+.app-shell .clearable-field > :is(input,textarea,select) { width: 100%; min-width: 0; padding-right: calc(var(--form-action-size) + var(--space-3)); }
+.field-clear { position: absolute; right: var(--space-1); top: 50%; transform: translateY(-50%); min-width: 34px; min-height: 34px; display: grid; place-items: center; border: 0; border-radius: var(--form-radius); background: transparent; color: var(--muted); font-size: 1.25rem; cursor: pointer; }
+.clearable-multiline .field-clear { top: var(--space-1); transform: none; }
+.field-clear:hover { color: var(--text); background: var(--surface); }
+.field-clear:focus-visible { outline: 2px solid var(--form-focus-color); outline-offset: -2px; }
+fieldset:disabled .field-clear { display: none; }
+.clearable-field input[type="search"]::-webkit-search-cancel-button { appearance: none; }
+.form-grid { gap: var(--form-gap); }
+.resource-form { gap: var(--form-section-gap); }
+.form-actions { flex-wrap: wrap; }
+.collection-pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--collection-gap); flex-wrap: wrap; margin-block: var(--space-4); }
+.resource-reference-results { display: grid; gap: var(--collection-gap); border: 1px solid var(--border); border-radius: var(--form-radius); padding: var(--space-4); margin-top: var(--space-3); }
+.resource-reference-choice { display: flex; align-items: center; justify-content: space-between; gap: var(--collection-gap); min-width: 0; }
+.resource-reference-choice > div { min-width: 0; overflow-wrap: anywhere; }
+.resource-reference-choice small,.resource-reference-choice code { display: block; color: var(--muted); }
+.resource-reference-summary { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+@media(max-width:620px) { .field-clear { min-width: 38px; min-height: 38px; } .resource-reference-choice { align-items: flex-start; flex-direction: column; } }

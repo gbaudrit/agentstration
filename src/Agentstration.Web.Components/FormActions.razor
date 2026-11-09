@@ -1,0 +1,6 @@
+<div class="form-actions" aria-busy="@Busy.ToString().ToLowerInvariant()">@ChildContent</div>
+
+@code {
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
