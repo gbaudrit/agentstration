@@ -440,6 +440,8 @@ public sealed record AepConnectedServiceOperationTypeVersionDescriptor(
     AepConnectedServiceOperationInvocationDescriptor Invocation,
     bool Deprecated = false)
 {
+    public AepConnectedServiceOperationAcquisitionDescriptor? Acquisition { get; init; }
+
     public static AepConnectedServiceOperationTypeVersionDescriptor Create(
         string version,
         JsonElement definitionSchema,
@@ -448,6 +450,11 @@ public sealed record AepConnectedServiceOperationTypeVersionDescriptor(
         bool deprecated = false) => new(version, AepSchemaDigest.Compute(definitionSchema),
             definitionSchema.Clone(), interaction, invocation, deprecated);
 }
+
+public sealed record AepConnectedServiceOperationAcquisitionDescriptor(
+    string FlowName, string FlowVersion,
+    string InputSchemaProperty = "inputSchema", string OutputSchemaProperty = "outputSchema",
+    string ReadOnlyProperty = "readOnly");
 
 public sealed record AepConnectedServiceOperationTypeContribution(
     string Id,
@@ -811,6 +818,15 @@ public static class AepDescriptorValidator
                     || JsonSerializer.SerializeToUtf8Bytes(version.DefinitionSchema, AepProtocol.JsonOptions).Length > 256 * 1024
                     || !string.Equals(version.SchemaDigest, AepSchemaDigest.Compute(version.DefinitionSchema), StringComparison.Ordinal))
                     errors.Add($"Connected Service operation type '{type.Id}' version '{version.Version}' has an invalid schema contract.");
+                if (version.Acquisition is { } acquisition
+                    && (version.Interaction != AepConnectedServiceOperationInteraction.RequestResponse
+                        || !IsValidValueRequirementId(acquisition.FlowName)
+                        || string.IsNullOrWhiteSpace(acquisition.FlowVersion) || acquisition.FlowVersion.Length > 128
+                        || new[] { acquisition.InputSchemaProperty, acquisition.OutputSchemaProperty, acquisition.ReadOnlyProperty }
+                            .Any(value => string.IsNullOrWhiteSpace(value) || value.Length > 128)
+                        || !descriptor.Capabilities.TryGetValue(AepConnectedServiceAcquisitionProtocol.Capability, out var adapterCapability)
+                        || adapterCapability.Version != AepConnectedServiceAcquisitionProtocol.Version))
+                    errors.Add($"Connected Service operation type '{type.Id}' has an invalid acquisition declaration or capability.");
                 if (version.Invocation is null || string.IsNullOrWhiteSpace(version.Invocation.ProviderOperationId)
                     || string.IsNullOrWhiteSpace(version.Invocation.ContractVersion))
                     errors.Add($"Connected Service operation type '{type.Id}' version '{version.Version}' requires an invocation contract.");

@@ -32,11 +32,22 @@ public sealed class KnowledgeProjectionInputResolver(
             && binding.DataSource.ScopeRef == ResourceScopeRef.Instance
             && ownerScope == ResourceScopeRef.Tenant(current.Current.TenantId)
             ? requestScopes.PushInstance(current.Current) : null;
-        var source = await dataSources.ResolveForUseAsync(ns, binding.DataSource.Name,
-            binding.DataSource.ScopeRef, ownerScope, cancellationToken);
+        StoredResource<DataSourceResource> source;
+        try
+        {
+            source = await dataSources.ResolveForUseAsync(ns, binding.DataSource.Name,
+                binding.DataSource.ScopeRef, ownerScope, cancellationToken);
+        }
+        catch (DataSourceValidationException exception)
+        {
+            throw new KnowledgeSourceValidationException(exception.Code, exception.Message);
+        }
         var sourceScope = source.Value.ScopeRef
             ?? throw Error("knowledge_projection_data_source_scope_missing",
                 $"Data Source '{source.Value.Address}' has no ownership scope.");
+        if (source.Value.Definition.Dataset is not null)
+            throw new KnowledgeSourceValidationException("knowledge_projection_dataset_input_unsupported",
+                "Knowledge projection does not yet support native dataset inputs.");
         var readiness = await dataSources.GetReadinessAsync(source.Value.Namespace, source.Value.Name,
             sourceScope, cancellationToken);
         var profile = readiness.Profile

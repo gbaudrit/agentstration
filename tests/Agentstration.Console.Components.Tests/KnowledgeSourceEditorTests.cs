@@ -9,13 +9,113 @@ using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
 public sealed class KnowledgeSourceEditorTests
 {
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task PrerenderDisablesKnowledgeSourceFormsUntilInteractive(bool embedded)
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new KnowledgeClientStub(ProjectedSource());
+        using var context = CreateContext(client);
+        await using var renderer = new HtmlRenderer(context.Services, context.Services.GetRequiredService<ILoggerFactory>());
+        var markup = await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            var parameters = ParameterView.FromDictionary(new Dictionary<string, object?>
+            { [nameof(KnowledgeSourceEditor.Embedded)] = embedded, [nameof(KnowledgeSourceEditor.Name)] = embedded ? "agentstration-documentation" : null });
+            var component = await renderer.RenderComponentAsync<KnowledgeSourceEditor>(parameters);
+            return component.ToHtmlString();
+        });
+        var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(markup);
+        Assert.IsTrue(document.QuerySelector("[data-testid='knowledge-source-definition-fields']")!.HasAttribute("disabled"));
+        Assert.AreEqual("false", document.QuerySelector("[data-testid='knowledge-source-definition-fields']")!.GetAttribute("data-interactive"));
+        Assert.IsTrue(document.QuerySelector("[data-testid='knowledge-source-save']")!.HasAttribute("disabled"));
+        Assert.IsNull(client.CreatedRequest);
+        Assert.IsNull(client.UpdatedRequest);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Acquisition targets could not be loaded")]
+    [DataRow("fr-FR", "Impossible de charger les cibles d’acquisition")]
+    public void TargetLookupFailureKeepsTheFormInteractiveAndAllowsExplicitRetry(string cultureName, string expected)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var client = new KnowledgeClientStub();
+        var sources = new DataSourcesClientStub { FailTargets = true };
+        using var context = CreateContext(client, sources);
+        var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Find("[role='alert']").TextContent));
+        Assert.DoesNotContain("private-response-detail", rendered.Markup);
+        Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-save']").HasAttribute("disabled"));
+        rendered.Find("[data-testid='knowledge-source-display-name']").Change("After error");
+        Assert.AreEqual("after-error", rendered.Find("[data-testid='knowledge-source-name']").GetAttribute("value"));
+        rendered.Find("form").Submit();
+        Assert.IsNull(client.CreatedRequest);
+        sources.FailTargets = false;
+        rendered.Find("[data-testid='knowledge-source-binding-data-source']").Change($"{DataSourceScope.Value}|default|documentation");
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='knowledge-source-save']").HasAttribute("disabled")));
+        rendered.Find("form").Submit();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.CreatedRequest));
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "not available yet")]
+    [DataRow("fr-FR", "n’est pas encore disponible")]
+    public void UnsupportedNativeProjectionKeepsTheFormInteractiveAndCanBeSavedDisabled(string cultureName, string expected)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var client = new KnowledgeClientStub { RejectNativeDataset = true };
+        using var context = CreateContext(client);
+        var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        rendered.Find("[data-testid='knowledge-source-display-name']").Change("Dataset Knowledge");
+        rendered.Find("[data-testid=knowledge-source-editor-enabled-option] input").Change(true);
+        rendered.Find("form").Submit();
+        rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Find("[role='alert']").TextContent));
+        Assert.DoesNotContain("private-response-detail", rendered.Markup);
+        Assert.IsNull(client.CreatedRequest);
+        rendered.Find("[data-testid='knowledge-source-display-name']").Change("Still interactive");
+        Assert.AreEqual("still-interactive", rendered.Find("[data-testid='knowledge-source-name']").GetAttribute("value"));
+        rendered.Find("[data-testid=knowledge-source-editor-enabled-option] input").Change(false);
+        rendered.Find("form").Submit();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.CreatedRequest));
+        Assert.IsFalse(client.CreatedRequest!.Properties.Enabled);
+        Assert.AreEqual("Still interactive", client.CreatedRequest.Properties.DisplayName);
+        Assert.AreEqual("documentation", client.CreatedRequest.Properties.DataSources.Single().DataSource.Name);
+        Assert.IsEmpty(rendered.FindAll("[role=alert]"));
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Saved as a disabled draft")]
+    [DataRow("fr-FR", "Configuration enregistrée désactivée")]
+    public void DisabledDraftShowsLocalizedReadinessAndCannotStartProjection(string cultureName, string expected)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var source = ProjectedSource();
+        var client = new KnowledgeClientStub(source with { Definition = source.Definition with { Enabled = false }, Composition = null });
+        using var context = CreateContext(client);
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(component => component.Name, source.Name));
+        rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Markup));
+        Assert.DoesNotContain("Non-executable draft", rendered.Markup);
+        Assert.DoesNotContain("ResolvedFlowsHelp", rendered.Markup);
+        rendered.Find("[data-testid=knowledge-source-projections-tab]").Click();
+        Assert.IsTrue(rendered.Find("[data-testid=knowledge-start-projection]").HasAttribute("disabled"));
+        Assert.IsNull(client.StartedProjectionRequest);
+    }
+
     [TestMethod]
     public void CreationDerivesTechnicalNameUntilTheUserOverridesIt()
     {
@@ -26,6 +126,9 @@ public sealed class KnowledgeSourceEditorTests
 
         rendered.WaitForAssertion(() =>
         {
+            Assert.AreEqual("knowledge-source-editor", rendered.FindComponent<EditForm>().Instance.FormName);
+            Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-source-definition-fields']").GetAttribute("data-interactive"));
+            Assert.IsFalse(rendered.Find("[data-testid='knowledge-source-definition-fields']").HasAttribute("disabled"));
             var fields = rendered.FindAll(".form-grid > label");
             Assert.AreEqual("knowledge-source-display-name", fields[0].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.AreEqual("knowledge-source-name", fields[1].QuerySelector("input")?.GetAttribute("data-testid"));
@@ -606,6 +709,7 @@ public sealed class KnowledgeSourceEditorTests
     private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, KnowledgeSourceToolExposureResource? exposure = null, IReadOnlyList<KnowledgeSnapshotView>? snapshots = null, KnowledgeRetrievalResult? retrievalResult = null) : IKnowledgeSourcesClient
     {
         private readonly List<KnowledgeProjectionResource> projections = [];
+        public bool RejectNativeDataset { get; set; }
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
         public StartKnowledgeProjectionRequest? StartedProjectionRequest { get; private set; }
@@ -615,6 +719,8 @@ public sealed class KnowledgeSourceEditorTests
             source is not null ? Task.FromResult(new ResourceSnapshot<KnowledgeSourceResource>(source, "\"etag-1\"")) : throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeSourceResource>> CreateAsync(CreateKnowledgeSourceRequest request, CancellationToken cancellationToken = default)
         {
+            if (RejectNativeDataset && request.Properties.Enabled) throw new AgentstrationApiException("private-response-detail", "test-error", System.Net.HttpStatusCode.UnprocessableEntity)
+            { ProblemType = "https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported" };
             CreatedRequest = request;
             var created = new KnowledgeSourceResource
             {
@@ -636,7 +742,9 @@ public sealed class KnowledgeSourceEditorTests
         public Task<ResourceSnapshot<KnowledgeSourceResource>> SetEnabledAsync(ResourceNamespace @namespace, string name, bool enabled, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<KnowledgeSourceReadiness> GetReadinessAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new KnowledgeSourceReadiness(true, true,
+            source is { Definition.Enabled: false, Composition: null }
+                ? Task.FromResult(new KnowledgeSourceReadiness(false, false, null, ["Non-executable draft"]))
+                : Task.FromResult(new KnowledgeSourceReadiness(true, true,
                 new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
                 [],
                 new ResolvedKnowledgeFlowBinding("knowledge-projection-builtin", ResourceNamespace.Default, "1.0.0", true, ProjectionInputSchema, null, KnowledgeFlowContracts.Projection),
@@ -746,6 +854,7 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class DataSourcesClientStub(bool withTarget = false) : IDataSourcesClient
     {
+        public bool FailTargets { get; set; }
         private static readonly DataSourceResource Source = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -769,7 +878,8 @@ public sealed class KnowledgeSourceEditorTests
         public Task<ResourceSnapshot<DataSourceAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, StartDataSourceAcquisitionRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<DataSourceAcquisitionTargetView>> GetAcquisitionTargetsAsync(ResourceNamespace ns,
             string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>(withTarget
+            FailTargets ? Task.FromException<IReadOnlyList<DataSourceAcquisitionTargetView>>(new AgentstrationApiException("private-response-detail", "test-error"))
+            : Task.FromResult<IReadOnlyList<DataSourceAcquisitionTargetView>>(withTarget
                 ? [new(new DataSourceAcquisitionTargetResource
                 {
                     ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceAcquisitionTarget,

@@ -167,7 +167,7 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
         var tool = (await created.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
         Assert.AreEqual(owner, tool.ScopeRef);
-        Assert.AreEqual(original.Name, tool.Definition.Acquisition!.TemplateId);
+        Assert.AreEqual(original.Name, ((AcquisitionToolDefinitionProperties)tool.Definition).Acquisition.TemplateId);
         StringAssert.Contains(tool.Definition.Description!, "artifact reference, not the acquired data");
         StringAssert.Contains(tool.Definition.Description!, "Do not infer the acquired content");
         var listedDefinitions = await client.GetFromJsonAsync<JsonElement>("/api/tooldefinitions");
@@ -175,14 +175,14 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
             value.GetProperty("metadata").GetProperty("name").GetString() == "catalog"));
         var listedTools = await client.GetFromJsonAsync<JsonElement>("/api/tools");
         Assert.IsTrue(listedTools.GetProperty("value").EnumerateArray().Any(value =>
-            value.GetProperty("metadata").GetProperty("name").GetString() == "agentstration.catalog"));
+            value.GetProperty("metadata").GetProperty("name").GetString() == "agentstration.catalog.v1.0.0"));
 
         using var details = await client.GetAsync(created.Headers.Location);
         Assert.AreEqual(HttpStatusCode.OK, details.StatusCode, await details.Content.ReadAsStringAsync());
         using var projection = await client.GetAsync(
-            $"/api/tools/agentstration.catalog?scopeRef={Uri.EscapeDataString(owner.Value)}");
+            $"/api/tools/agentstration.catalog.v1.0.0?scopeRef={Uri.EscapeDataString(owner.Value)}");
         Assert.AreEqual(HttpStatusCode.OK, projection.StatusCode, await projection.Content.ReadAsStringAsync());
-        var toolPath = $"/api/tools/agentstration.catalog/run?scopeRef={Uri.EscapeDataString(owner.Value)}";
+        var toolPath = $"/api/tools/agentstration.catalog.v1.0.0/run?scopeRef={Uri.EscapeDataString(owner.Value)}";
         using var overrideResponse = await client.PostAsJsonAsync(toolPath,
             new RunToolRequest(JsonSerializer.SerializeToElement(new { limit = 100 }), ToolRunMode.Execute));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, overrideResponse.StatusCode, await overrideResponse.Content.ReadAsStringAsync());
@@ -219,9 +219,39 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         using var replayed = await client.PostAsJsonAsync(toolPath, request);
         Assert.AreEqual(HttpStatusCode.OK, replayed.StatusCode, await replayed.Content.ReadAsStringAsync());
 
+        // A generic relay invokes the existing acquisition Tool; it does not own a second acquisition engine.
+        var acquisitionTool = (await projection.Content.ReadFromJsonAsync<ToolResource>())!;
+        using var relayCreated = await client.PostAsJsonAsync("/api/tooldefinitions", new CreateToolDefinitionRequest(
+            "catalog-relay", new RelayToolDefinitionProperties
+            {
+                DisplayName = "Catalog relay",
+                Version = "5.2.0",
+                Publish = true,
+                Target = new()
+                {
+                    Name = acquisitionTool.Name,
+                    Namespace = acquisitionTool.Namespace,
+                    ScopeRef = acquisitionTool.ScopeRef!.Value,
+                    Uid = acquisitionTool.Uid,
+                    Generation = acquisitionTool.Generation
+                }
+            }, ScopeRef: owner));
+        Assert.AreEqual(HttpStatusCode.Created, relayCreated.StatusCode, await relayCreated.Content.ReadAsStringAsync());
+        var acquisitionsBeforeRelay = gateway.AcquisitionInputs.Count;
+        gateway.ArtifactIds.Enqueue(originalArtifact.ArtifactId);
+        using var relayRun = await client.PostAsJsonAsync(
+            $"/api/tools/agentstration.catalog-relay.v5.2.0/run?scopeRef={Uri.EscapeDataString(owner.Value)}", request);
+        Assert.AreEqual(HttpStatusCode.OK, relayRun.StatusCode, await relayRun.Content.ReadAsStringAsync());
+        var relayResult = await relayRun.Content.ReadFromJsonAsync<RunToolResponse>();
+        Assert.AreEqual("5.2.0", relayResult!.Receipt?.Relay?.RelayVersion);
+        Assert.AreEqual(acquisitionTool.Uid, relayResult.Receipt?.Relay?.SourceToolUid);
+        Assert.AreEqual("1.0.0", relayResult.Receipt?.Relay?.SourceVersion);
+        Assert.AreEqual(acquisitionsBeforeRelay + 1, gateway.AcquisitionInputs.Count);
+        Assert.IsTrue(JsonElement.DeepEquals(OpaquePayload, gateway.AcquisitionInputs.Last().GetProperty("parameters")));
+
         if (instanceContext)
         {
-            var projectedTool = (await projection.Content.ReadFromJsonAsync<ToolResource>())!;
+            var projectedTool = acquisitionTool;
             var runtimeTool = new RuntimeExecutionToolMaterial(projectedTool.Name, projectedTool.Namespace,
                 projectedTool.Definition.DisplayName, null, ToolDefinitionAcquisitionTarget.InputSchema,
                 ToolDefinitionAcquisitionTarget.OutputSchema, false, AgentstrationToolProvider.Name,
@@ -447,7 +477,7 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         var profile = await profiles.CreateAsync(ProfileResource("versioned", workspace, Profile()), default);
         _ = await profiles.PublishAsync(ResourceNamespace.Default, "versioned", workspace, new("1.0.0"), default);
         var source = await sources.CreateAsync(SourceResource("source-a", workspace, new("versioned", workspace)), default);
-        var first = await profiles.ResolveActiveAsync(workspace, source.Value.Namespace, source.Value.Definition.Profile, default);
+        var first = await profiles.ResolveActiveAsync(workspace, source.Value.Namespace, source.Value.Definition.Profile!, default);
         Assert.AreEqual("1.0.0", first.Version);
 
         var draft = profile.Value.Definition with { Description = "Second revision", Version = "2.0.0" };
@@ -456,20 +486,20 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         _ = await profiles.PublishAsync(ResourceNamespace.Default, "versioned", workspace,
             new("2.0.0", Activate: false), default);
         var beforeActivation = await profiles.ResolveActiveAsync(workspace, ResourceNamespace.Default,
-            source.Value.Definition.Profile, default);
+            source.Value.Definition.Profile!, default);
         Assert.AreEqual("1.0.0", beforeActivation.Version);
         var profileBeforeActivation = await profiles.GetAsync(ResourceNamespace.Default, "versioned", workspace, default);
         _ = await profiles.ActivateAsync(ResourceNamespace.Default, "versioned", workspace,
             new("2.0.0"), profileBeforeActivation!.ETag, default);
         var afterActivation = await profiles.ResolveActiveAsync(workspace, ResourceNamespace.Default,
-            source.Value.Definition.Profile, default);
+            source.Value.Definition.Profile!, default);
         Assert.AreEqual("2.0.0", afterActivation.Version);
 
         var profileBeforeRollback = await profiles.GetAsync(ResourceNamespace.Default, "versioned", workspace, default);
         _ = await profiles.ActivateAsync(ResourceNamespace.Default, "versioned", workspace,
             new("1.0.0"), profileBeforeRollback!.ETag, default);
         var afterRollback = await profiles.ResolveActiveAsync(workspace, ResourceNamespace.Default,
-            source.Value.Definition.Profile, default);
+            source.Value.Definition.Profile!, default);
         Assert.AreEqual("1.0.0", afterRollback.Version);
 
         var stale = await Assert.ThrowsAsync<DataSourceValidationException>(() => profiles.ActivateAsync(
@@ -585,7 +615,7 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
             ?? throw new AssertFailedException("The acquisition response must contain a resource.");
         Assert.AreEqual(source.Value.Uid, started.DataSourceUid);
         Assert.AreEqual(workspace, started.DataSourceScopeRef);
-        Assert.AreEqual("1.0.0", started.Composition.Profile.Version);
+        Assert.AreEqual("1.0.0", started.Composition!.Profile.Version);
         Assert.AreEqual("1.0.0", started.Composition.Flow.Version);
         Assert.AreEqual(DataSourceFlowContracts.Acquisition, started.Composition.Flow.Contract);
 

@@ -10,6 +10,7 @@ using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools;
+using Agentstration.Work;
 
 namespace Agentstration.Infrastructure.Flows;
 
@@ -21,12 +22,17 @@ public sealed class ToolDefinitionFlowResolver(FlowService flows) : IToolDefinit
         ToolDefinitionFlowTarget target,
         CancellationToken cancellationToken)
     {
-        if (scopeRef.Kind != ResourceScopeKind.Workspace || scopeRef.TargetId is not { } workspaceId)
-            throw new ToolDefinitionValidationException("tool_definition_scope_invalid", "A ToolDefinition must belong to a Workspace scope.");
         var flowNamespace = target.Namespace ?? ownerNamespace;
         var reference = new FlowReference(new FlowId(target.Name, flowNamespace), target.Version, target.UseActiveVersion, flowNamespace, target.ScopeRef);
-        var resolved = await flows.ResolveAsync(new WorkspaceId(workspaceId), reference, ownerNamespace, cancellationToken);
-        return Contract(resolved);
+        try
+        {
+            var resolved = await flows.ResolveAsync(scopeRef, reference, ownerNamespace, cancellationToken);
+            return Contract(resolved);
+        }
+        catch (FlowReferenceOutsideScopeException)
+        {
+            throw new ResourceReferenceOutsideScopeException(new(target.Name, target.ScopeRef, flowNamespace), scopeRef);
+        }
     }
 
     internal static ResolvedToolDefinitionFlowContract Contract(FlowVersion version)
@@ -53,18 +59,22 @@ public sealed class ToolDefinitionFlowActivationGuard(
     IResourceStore store,
     IRequestContextScopeFactory requestScopes) : IFlowVersionActivationGuard
 {
-    public async Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken)
+    public Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken) =>
+        ValidateActivationAsync(ResourceScopeRef.Workspace(workspaceId.Value), version, cancellationToken);
+
+    public async Task ValidateActivationAsync(ResourceScopeRef ownerScopeRef, FlowVersion version, CancellationToken cancellationToken)
     {
         using var requestScope = requestScopes.PushSystem();
-        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
+        var drafts = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
+        var publications = await store.ListAllAsync<ToolDefinitionVersionResource>(ToolResourceKinds.ToolDefinitionVersion, cancellationToken);
+        var definitions = drafts.Concat(publications.Select(value => new StoredResource<ToolDefinitionResource>(value.Value.ToDefinition(), value.ETag, value.UpdatedAt)));
         var matchingDefinitions = definitions.Where(value =>
-                     value.Value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
-                     && targetId == workspaceId.Value
-                     && value.Value.Definition.Acquisition is null
+                     value.Value.Definition is FlowToolDefinitionProperties
+                     && (((FlowToolDefinitionProperties)value.Value.Definition).Flow.ScopeRef ?? value.Value.ScopeRef) == ownerScopeRef
                      && value.Value.Definition.Enabled
-                     && value.Value.Definition.Flow.UseActiveVersion
-                     && string.Equals(value.Value.Definition.Flow.Name, version.FlowId.Value, StringComparison.Ordinal)
-                     && (value.Value.Definition.Flow.Namespace ?? value.Value.Namespace) == version.FlowId.Namespace)
+                     && ((FlowToolDefinitionProperties)value.Value.Definition).Flow.UseActiveVersion
+                     && string.Equals(((FlowToolDefinitionProperties)value.Value.Definition).Flow.Name, version.FlowId.Value, StringComparison.Ordinal)
+                     && (((FlowToolDefinitionProperties)value.Value.Definition).Flow.Namespace ?? value.Value.Namespace) == version.FlowId.Namespace)
             .ToArray();
         if (matchingDefinitions.Length == 0) return;
 
@@ -91,16 +101,20 @@ public sealed class ToolDefinitionFlowDeletionGuard(
     IResourceStore store,
     IRequestContextScopeFactory requestScopes) : IFlowDeletionGuard
 {
-    public async Task ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken)
+    public Task ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken) =>
+        ValidateDeleteAsync(ResourceScopeRef.Workspace(workspaceId.Value), flowId, cancellationToken);
+
+    public async Task ValidateDeleteAsync(ResourceScopeRef ownerScopeRef, FlowId flowId, CancellationToken cancellationToken)
     {
         using var requestScope = requestScopes.PushSystem();
-        var definitions = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
+        var drafts = await store.ListAllAsync<ToolDefinitionResource>(ToolResourceKinds.ToolDefinition, cancellationToken);
+        var publications = await store.ListAllAsync<ToolDefinitionVersionResource>(ToolResourceKinds.ToolDefinitionVersion, cancellationToken);
+        var definitions = drafts.Concat(publications.Select(value => new StoredResource<ToolDefinitionResource>(value.Value.ToDefinition(), value.ETag, value.UpdatedAt)));
         var usage = definitions.Select(value => value.Value).FirstOrDefault(value =>
-            value.ScopeRef is { Kind: ResourceScopeKind.Workspace, TargetId: { } targetId }
-            && targetId == workspaceId.Value
-            && value.Definition.Acquisition is null
-            && string.Equals(value.Definition.Flow.Name, flowId.Value, StringComparison.Ordinal)
-            && (value.Definition.Flow.Namespace ?? value.Namespace) == flowId.Namespace);
+            value.Definition is FlowToolDefinitionProperties
+            && (((FlowToolDefinitionProperties)value.Definition).Flow.ScopeRef ?? value.ScopeRef) == ownerScopeRef
+            && string.Equals(((FlowToolDefinitionProperties)value.Definition).Flow.Name, flowId.Value, StringComparison.Ordinal)
+            && (((FlowToolDefinitionProperties)value.Definition).Flow.Namespace ?? value.Namespace) == flowId.Namespace);
         if (usage is not null)
             throw new FlowValidationException("flow_in_use_by_tool_definition", $"Flow '{flowId}' is referenced by ToolDefinition '{usage.Address}'.");
     }
@@ -112,13 +126,28 @@ public sealed class ToolDefinitionExecutor(
     RootFlowSubmissionService submissions,
     FlowRunService runs,
     KnowledgeRetrievalService? knowledgeRetrieval = null,
-    ToolDefinitionAcquisitionExecutor? acquisitions = null) : IToolDefinitionExecutor
+    ToolDefinitionAcquisitionExecutor? acquisitions = null,
+    ToolRelayExecutor? relays = null,
+    IEnumerable<IWorkExecutionScopeAccessor>? executionScopeAccessors = null,
+    IResourceReferenceResolver? references = null,
+    Agentstration.Secrets.Abstractions.ISecretInputResolver? secretInputs = null) : IToolDefinitionExecutor
 {
     private static readonly JsonSerializerOptions WebJsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<JsonElement?> SimulateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
         var stored = await ValidateAsync(invocation, cancellationToken);
+        if (stored.Value.Definition is RelayToolDefinitionProperties relay)
+            return (await (relays ?? throw new ToolDefinitionInvocationException("tool_definition_relay_unavailable", "Relay execution is unavailable."))
+                .SimulateAsync(stored.Value, relay, invocation, cancellationToken)).Output;
+        if (stored.Value.Definition is FlowToolDefinitionProperties flow)
+        {
+            var contract = await flowResolver.ResolveAsync(stored.Value.ScopeRef!.Value, stored.Value.Namespace, flow.Flow, cancellationToken);
+            var input = MergeArguments(invocation.Arguments, stored.Value.Definition.FixedArguments);
+            using var resolved = secretInputs is null ? null : await secretInputs.ResolveAsync(input,
+                invocation.ExecutionContext?.SecretInputs ?? [], cancellationToken);
+            ToolInputSchemaValidator.Validate(contract.InputSchema, resolved?.Value ?? input, invocation.ExecutionContext?.SecretInputs);
+        }
         return JsonSerializer.SerializeToElement(new
         {
             dryRun = true,
@@ -131,7 +160,7 @@ public sealed class ToolDefinitionExecutor(
     {
         var stored = await ValidateAsync(invocation, cancellationToken);
 
-        if (stored.Value.Definition.Acquisition is { } acquisition)
+        if (stored.Value.Definition is AcquisitionToolDefinitionProperties { Acquisition: var acquisition })
         {
             if (acquisitions is null)
                 throw new ToolDefinitionInvocationException("tool_definition_acquisition_unavailable",
@@ -139,25 +168,33 @@ public sealed class ToolDefinitionExecutor(
             return await acquisitions.ExecuteAsync(stored.Value, acquisition, invocation, cancellationToken);
         }
 
+        if (stored.Value.Definition is RelayToolDefinitionProperties relay)
+            return await (relays ?? throw new ToolDefinitionInvocationException("tool_definition_relay_unavailable", "Relay execution is unavailable."))
+                .ExecuteAsync(stored.Value, relay, invocation, cancellationToken);
+
         if (knowledgeRetrieval is not null
             && stored.Value.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source", out var sourceName)
             && stored.Value.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-operation", out var operationName)
             && Enum.TryParse<KnowledgeSourceOperation>(operationName, true, out var operation))
             return await ExecuteKnowledgeRetrievalAsync(stored.Value, invocation, sourceName, operation,
-                knowledgeRetrieval, cancellationToken);
+                knowledgeRetrieval, secretInputs, cancellationToken);
 
         var flowInput = MergeArguments(invocation.Arguments, stored.Value.Definition.FixedArguments);
+        var references = invocation.ExecutionContext?.SecretInputs ?? [];
+        if (invocation.ExecutionContext?.HasSensitiveArguments == true && references.Count == 0)
+            throw new ToolDefinitionInvocationException("tool_definition_protected_input_reference_required",
+                "Protected inputs require durable Secret references.");
         var flowContract = await flowResolver.ResolveAsync(stored.Value.ScopeRef!.Value, stored.Value.Namespace,
-            stored.Value.Definition.Flow, cancellationToken);
-        try { FlowRunService.ValidateInput(flowContract.InputSchema, flowInput); }
+            ((FlowToolDefinitionProperties)stored.Value.Definition).Flow, cancellationToken);
+        try { FlowRunService.ValidateInput(flowContract.InputSchema, Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(flowInput, references)); }
         catch (FlowValidationException exception)
         {
             throw new ToolDefinitionInvocationException("tool_definition_fixed_input_invalid", exception.Message, exception);
         }
 
-        var target = stored.Value.Definition.Flow;
+        var target = ((FlowToolDefinitionProperties)stored.Value.Definition).Flow;
         var flowNamespace = target.Namespace ?? stored.Value.Namespace;
-        var scope = new FlowRunScope(invocation.TenantId, invocation.WorkspaceId, invocation.PrincipalId);
+        var scope = ExecutionScope(invocation);
         var origin = invocation.CallerKind switch
         {
             ToolDefinitionCallerKind.Agent => FlowInvocationOrigin.Agent,
@@ -175,7 +212,7 @@ public sealed class ToolDefinitionExecutor(
                 origin,
                 callerId,
                 invocation.CallerKind == ToolDefinitionCallerKind.Flow ? FlowRunTrigger.Flow : FlowRunTrigger.Api,
-                $"tool:{stored.Value.Uid:N}:{invocation.CallId}",
+                $"tool:{stored.Value.Uid:N}:{stored.Value.Definition.Version}:{invocation.CallId}",
                 invocation.CallId,
                 invocation.CorrelationId,
                 Type: "tool-definition",
@@ -186,8 +223,10 @@ public sealed class ToolDefinitionExecutor(
                     ["toolDefinition.uid"] = stored.Value.Uid.ToString("D"),
                     ["toolDefinition.name"] = stored.Value.Name,
                     ["toolDefinition.namespace"] = stored.Value.Namespace.Value,
-                    ["toolDefinition.callId"] = invocation.CallId
-                }), cancellationToken);
+                    ["toolDefinition.callId"] = invocation.CallId,
+                    ["toolDefinition.version"] = stored.Value.Definition.Version
+                })
+            { SecretInputs = references }, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -215,7 +254,7 @@ public sealed class ToolDefinitionExecutor(
             throw new ToolDefinitionInvocationException("tool_definition_output_invalid", "The Flow returned no output for a ToolDefinition with an output schema.");
         if (output is not null)
         {
-            try { FlowRunService.ValidateInput(stored.Value.Definition.OutputSchema, output.Value); }
+            try { FlowRunService.ValidateInput(stored.Value.Definition.OutputSchema, Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(output.Value, references)); }
             catch (FlowValidationException exception)
             {
                 throw new ToolDefinitionInvocationException("tool_definition_output_invalid", exception.Message, exception);
@@ -238,6 +277,7 @@ public sealed class ToolDefinitionExecutor(
         string sourceName,
         KnowledgeSourceOperation operation,
         KnowledgeRetrievalService retrieval,
+        Agentstration.Secrets.Abstractions.ISecretInputResolver? secretInputs,
         CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -248,6 +288,10 @@ public sealed class ToolDefinitionExecutor(
                 || request.ValueKind != JsonValueKind.Object)
                 throw new ToolDefinitionInvocationException("knowledge_retrieval_request_invalid",
                     "A Knowledge retrieval request object is required.");
+            var symbolicRequest = request.Clone();
+            using var resolvedInputs = secretInputs is null ? null : await secretInputs.ResolveAsync(invocation.Arguments,
+                invocation.ExecutionContext?.SecretInputs ?? [], timeout.Token);
+            if (resolvedInputs is not null) request = resolvedInputs.Value.GetProperty("request");
             var origin = invocation.CallerKind switch
             {
                 ToolDefinitionCallerKind.Agent => KnowledgeRetrievalInvocationOrigin.Agent,
@@ -266,7 +310,12 @@ public sealed class ToolDefinitionExecutor(
                 invocation.ExecutionContext?.FlowRunId,
                 invocation.ExecutionContext?.FlowStepId,
                 invocation.CallId,
-                invocation.ExecutionContext?.InvocationId);
+                invocation.ExecutionContext?.InvocationId)
+            {
+                SecretInputs = invocation.ExecutionContext?.SecretInputs ?? [],
+                SymbolicRequest = symbolicRequest,
+                ProtectState = value => resolvedInputs?.Protect(value) ?? value
+            };
             var result = operation switch
             {
                 KnowledgeSourceOperation.Search => await retrieval.SearchAsync(sourceId,
@@ -339,18 +388,34 @@ public sealed class ToolDefinitionExecutor(
 
     private async Task<StoredResource<ToolDefinitionResource>> ValidateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
-        var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken)
+        var scope = ExecutionScope(invocation);
+        if (invocation.ExecutionContext is { HasSensitiveArguments: true, SecretInputs.Count: 0 })
+            throw new ToolDefinitionInvocationException("tool_definition_protected_input_reference_required",
+                "Protected inputs require durable Secret references.");
+        var stored = await definitions.GetInvocationAsync(invocation.ToolName, invocation.Namespace, cancellationToken, invocation.DefinitionScopeRef)
             ?? (acquisitions is null ? null
                 : await acquisitions.FindInOperationalWorkspaceAsync(definitions, invocation, cancellationToken))
             ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", $"ToolDefinition '{invocation.Namespace}/{invocation.ToolName}' was not found.");
         if (!stored.Value.Definition.Enabled)
             throw new ToolDefinitionInvocationException("tool_definition_disabled", $"ToolDefinition '{stored.Value.Address}' is disabled.");
-        if (stored.Value.ScopeRef != ResourceScopeRef.Workspace(invocation.WorkspaceId.Value)
+        if (stored.Value.ScopeRef != scope.AccessScopeRef
             && acquisitions?.OwnsAdministrativeInvocation(stored.Value, invocation) != true)
-            throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is not owned by the invocation Workspace.");
+        {
+            try
+            {
+                if (references is null || await references.ResolveAsync<ToolDefinitionVersionResource>(
+                    new(invocation.ToolName, stored.Value.ScopeRef, invocation.Namespace), invocation.Namespace,
+                    ToolResourceKinds.ToolDefinitionVersion, scope.AccessScopeRef, cancellationToken) is null)
+                    throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is outside the logical invocation scope.");
+            }
+            catch (ResourceReferenceOutsideScopeException exception)
+            {
+                throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "The ToolDefinition is outside the logical invocation scope.", exception);
+            }
+        }
         if (invocation.Arguments.GetRawText().Length > 65_536)
             throw new ToolDefinitionInvocationException("tool_definition_input_too_large", "ToolDefinition input cannot exceed 65536 JSON characters.");
-        if (stored.Value.Definition.Acquisition is not null)
+        if (stored.Value.Definition is AcquisitionToolDefinitionProperties)
         {
             try { ToolInputSchemaValidator.Validate(stored.Value.Definition.InputSchema, invocation.Arguments); }
             catch (ToolInputValidationException exception)
@@ -359,18 +424,37 @@ public sealed class ToolDefinitionExecutor(
             }
             return stored;
         }
+        if (stored.Value.Definition is RelayToolDefinitionProperties relay)
+        {
+            try { ToolRelayArguments.ValidateCaller(invocation.Arguments, relay.Bindings); }
+            catch (ToolDefinitionValidationException exception) { throw new ToolDefinitionInvocationException(exception.Code, exception.Message); }
+            ToolInputSchemaValidator.Validate(relay.InputSchema, invocation.Arguments, invocation.ExecutionContext?.SecretInputs);
+            return stored;
+        }
         if (stored.Value.Definition.FixedArguments is { ValueKind: JsonValueKind.Object } fixedArguments)
             foreach (var property in fixedArguments.EnumerateObject())
                 if (invocation.Arguments.TryGetProperty(property.Name, out _))
                     throw new ToolDefinitionInvocationException("tool_definition_fixed_argument_override",
                         $"ToolDefinition argument '{property.Name}' is fixed and cannot be supplied by the caller.");
-        try { FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, invocation.Arguments); }
+        try
+        {
+            FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(
+                invocation.Arguments, invocation.ExecutionContext?.SecretInputs ?? []));
+        }
         catch (FlowValidationException exception)
         {
             throw new ToolDefinitionInvocationException("tool_definition_input_invalid", exception.Message, exception);
         }
 
         return stored;
+    }
+
+    private FlowRunScope ExecutionScope(ToolDefinitionInvocation invocation)
+    {
+        var candidates = (executionScopeAccessors ?? []).Select(accessor => accessor.Current).OfType<FlowRunScope>()
+            .Where(scope => scope.PrincipalId == invocation.PrincipalId && scope.TenantId == invocation.TenantId && scope.WorkspaceId == invocation.WorkspaceId).ToArray();
+        return candidates.FirstOrDefault(scope => scope.LogicalScopeRef is not null) ?? candidates.FirstOrDefault()
+            ?? throw new ToolDefinitionInvocationException("tool_definition_scope_mismatch", "A ToolDefinition invocation requires its trusted execution scope.");
     }
 
     private async Task<StoredFlowRun> AwaitCompletionAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)

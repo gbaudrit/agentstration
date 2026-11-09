@@ -699,12 +699,11 @@ public sealed class DataSourceEditorTests
                             Kind = ToolResourceKinds.ToolDefinition,
                             Metadata = new ResourceMetadata { Name = "saved-acquisition" },
                             ScopeRef = Scope,
-                            Definition = new ToolDefinitionProperties
+                            Definition = new AcquisitionToolDefinitionProperties
                             {
                                 DisplayName = "Saved acquisition",
                                 Acquisition = new(Acquisition.Name, Acquisition.Namespace, "catalog.json", "staged"),
-                                InputSchema = ToolDefinitionAcquisitionTarget.InputSchema,
-                                Flow = new ToolDefinitionFlowTarget { Name = "acquisition" }
+                                InputSchema = ToolDefinitionAcquisitionTarget.InputSchema
                             }
                         }
                     }
@@ -722,7 +721,7 @@ public sealed class DataSourceEditorTests
                     Kind = ToolResourceKinds.ToolDefinition,
                     Metadata = new ResourceMetadata { Name = Request.Name },
                     ScopeRef = Scope,
-                    Definition = new ToolDefinitionProperties
+                    Definition = new FlowToolDefinitionProperties
                     {
                         DisplayName = Request.DisplayName,
                         InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),

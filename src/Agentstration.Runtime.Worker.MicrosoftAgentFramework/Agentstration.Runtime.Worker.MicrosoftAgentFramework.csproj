@@ -19,6 +19,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Runtime.Tests" />
     <InternalsVisibleTo Include="Agentstration.Management.Bootstrap.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Execution.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Resources.Tests" />
     <InternalsVisibleTo Include="Agentstration.Management.Api.Tests" />

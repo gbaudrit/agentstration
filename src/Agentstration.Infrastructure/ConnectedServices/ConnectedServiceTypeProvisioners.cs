@@ -194,6 +194,7 @@ public sealed class AepEnrollmentConnectedServiceTypeProvisioner(
 
 public sealed class AepEnrollmentConnectedServiceOperationTypeProvisioner(
     ConnectedServiceOperationTypeManagementService types,
+    FlowService flows,
     IResourceGovernanceContext governance) : IAepEnrollmentResourceProvisioner
 {
     public async Task ProvisionAsync(
@@ -223,17 +224,41 @@ public sealed class AepEnrollmentConnectedServiceOperationTypeProvisioner(
                     DisplayName = contribution.DisplayName,
                     Description = contribution.Description,
                     PreferredVersion = contribution.PreferredVersion,
-                    Versions = contribution.Versions.Select(version =>
-                        new ConnectedServiceOperationTypeVersionDescriptor(
-                            version.Version,
-                            version.SchemaDigest,
-                            version.DefinitionSchema.Clone(),
-                            Map(version.Interaction),
-                            new(version.Invocation.ProviderOperationId, version.Invocation.ContractVersion),
-                            version.Deprecated)).ToArray()
+                    Versions = await Task.WhenAll(contribution.Versions.Select(version =>
+                        MapAsync(version, scopeRef, @namespace, cancellationToken)))
                 }
             }, cancellationToken);
         }
+    }
+
+    private async Task<ConnectedServiceOperationTypeVersionDescriptor> MapAsync(
+        AepConnectedServiceOperationTypeVersionDescriptor version, ResourceScopeRef scope,
+        ResourceNamespace extensionNamespace, CancellationToken cancellationToken)
+    {
+        ConnectedServiceOperationAcquisitionDescriptor? acquisition = null;
+        if (version.Acquisition is { } declared)
+        {
+            var id = new FlowId(declared.FlowName, extensionNamespace);
+            var flow = await flows.GetExactAsync(scope, id, cancellationToken)
+                ?? throw new ConnectedServiceOperationTypeValidationException("The acquisition Flow was not provisioned.");
+            var published = await flows.GetVersionExactAsync(scope, id, declared.FlowVersion, cancellationToken)
+                ?? throw new ConnectedServiceOperationTypeValidationException("The acquisition Flow version was not published.");
+            const string contract = "connected-service-operation-acquisition/v1";
+            if (published.Value.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract) != contract
+                || published.Value.DefinitionHash is null)
+                throw new ConnectedServiceOperationTypeValidationException("The acquisition Flow contract or hash is invalid.");
+            acquisition = new(new()
+            {
+                Flow = new(declared.FlowName, scope, extensionNamespace),
+                FlowUid = flow.Value.Uid,
+                Version = published.Value.Version,
+                DefinitionHash = published.Value.DefinitionHash,
+                Contract = contract
+            }, declared.InputSchemaProperty, declared.OutputSchemaProperty, declared.ReadOnlyProperty);
+        }
+        return new(version.Version, version.SchemaDigest, version.DefinitionSchema.Clone(), Map(version.Interaction),
+            new(version.Invocation.ProviderOperationId, version.Invocation.ContractVersion), version.Deprecated)
+        { Acquisition = acquisition };
     }
 
     private static ConnectedServiceOperationInteraction Map(AepConnectedServiceOperationInteraction interaction) =>

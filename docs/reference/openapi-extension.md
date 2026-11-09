@@ -7,15 +7,17 @@
 Configure at least one destination domain and start the extension independently:
 
 ```powershell
-$env:OpenApi__AllowedDomains__0 = "api.example.com"
-dotnet run --project src/Agentstration.Extensions.OpenApi
+dotnet run --project src/Agentstration.Extensions.OpenApi --launch-profile http `
+  -e OpenApi__AllowedDomains__0=api.example.com
 ```
 
 The Development profile listens on `http://localhost:5310`. Enroll that endpoint like any other AEP extension. Its manifest contributes:
 
 - schema format `openapi` with OpenAPI 3.0 and 3.1 JSON/YAML validation;
 - technical Tools `openapi.contract.discover` and `openapi.operation.invoke`;
-- the installable `openapi-governed` Data Source Profile bundle.
+- autonomous `openapi` Connected Service and `openapi-operation` operation types;
+- the `openapi-connected-services` discovery Flow bundle and retained
+  `openapi-governed` Data Source Profile bundle.
 
 Enrollment installs the advertised bundle at the exact Extension Registration scope (Instance, Tenant, or Workspace), resolves and enables only its two required technical Tools, and records a durable governed inventory. Its ToolSet, published Flows, and Data Source Profile remain read-only through ordinary administration, including while the extension is offline. Identical enrollment retries are idempotent; ownership or definition drift produces a conflict. The former `openapi-testing` and `crawl4ai-testing` bootstrap profiles and temporary Tool activation bridge have been removed in favor of this lifecycle.
 
@@ -27,9 +29,123 @@ $env:OpenApi__AllowedDomains__0 = "api.example.test"
 dotnet run --project src/Agentstration.AppHost
 ```
 
-## Data Source configuration
+### Pair with an existing instance
 
-The contributed profile accepts:
+The `existing-instance` launch profile starts only the extension at
+`http://localhost:5311` and announces it to the running Agentstration API at
+`http://localhost:5100`. The target slot is selected by its API URL. The
+profile stores its pairing state under
+`.agentstration/slots/main/aep-pairing/openapi-standalone.json`.
+
+For a different local slot, supply its API URL, a separate pairing state file
+and the allowed domain for your OpenAPI documents:
+
+```powershell
+dotnet run --project src/Agentstration.Extensions.OpenApi --launch-profile existing-instance `
+  -e Aep__PairingCode__AuthorityUrl=http://localhost:5200 `
+  -e Aep__PairingCode__StateFile=../../.agentstration/slots/integration/aep-pairing/openapi-standalone.json `
+  -e OpenApi__AllowedDomains__0=api.example.com
+```
+
+On the target instance, a Platform administrator assigns the candidate under
+**Extensions → Enrollment inbox** and enters the one-time code in the extension
+form. Keep a separate state file for each authority and reuse it on restart.
+For an authority on another host, use HTTPS, set
+`Aep__PairingCode__AllowInsecureHttp=false`, and set
+`Aep__PairingCode__PublicEndpoint` to an HTTPS origin that reaches the extension
+from the authority and the administrator's browser. See the
+[AEP transport configuration](../getting-started/configuration.md#aep-outbound-transport)
+for endpoint allowlists.
+
+To test Connected Service operation discovery, use an authority build that
+includes FR #1058 and its server-side discovery Tool.
+
+## Connected Service operation discovery
+
+The extension also contributes an autonomous `ConnectedServiceType` named
+`openapi`, a `ConnectedServiceOperationType` named `openapi-operation`, and the
+`openapi-connected-services` bundle containing a published discovery Flow.
+These contributions are independent of the builtin HTTP type and of other
+extensions. Enrollment installs operation types, bundle Flows, then service types
+with exact local revision pins.
+
+Create a Connected Service using the exact enrolled `openapi` type revision.
+Bind `baseUrl` to a scoped string Parameter and optionally bind `bearerToken` to
+a Secret. Its options contain `candidatePaths`, an explicit array of one through
+eight same-origin relative paths. Origin and credentials belong to the service,
+not a Data Source or ordinary Flow input. The extension applies its normal
+destination and contract policies. Authenticated contract retrieval uses the
+optional Bearer credential through the existing one-use AEP Secret callback;
+configure `Agentstration:Aep:SecretAccess:PublicBaseUrl` on the authority as for
+other AEP Secret consumers.
+
+Start discovery through the generic Connected Services API, in an authorized
+operational Workspace. The Flow is marked
+`connected-service-operation-discovery/v1` and receives reference-only input.
+Its internal Tool can execute only the matching persisted discovery/Flow Run.
+The server resolves the configured connection immediately before protected AEP
+dispatch and maps provider candidates to exact allowed operation-type revisions.
+Results contain bounded operation metadata, exact contract digests and diagnostics,
+not document content or credentials. The provider manifest limit is 48 KiB;
+larger catalogs fail explicitly and are not silently truncated.
+Metadata that reflects the supplied Bearer credential is rejected before it can
+enter durable discovery evidence.
+
+Successful discoveries materialize typed operations for review. Rediscovery retains
+stable identities for the same contract location/operationId, updates observed
+definition evidence, and marks disappeared operations unavailable through the
+generic lifecycle. Discovery neither invokes a business operation nor publishes
+an Agent Tool.
+
+The operation type also contributes an acquisition adapter and the published
+`openapi-operation-acquisition` Flow (`connected-service-operation-acquisition/v1`).
+After explicit activation, a native Data Source can pin the operation and its
+validated parameters, then acquire its JSON result into a selected Storage.
+The internal Tool accepts only the accepted acquisition id; it cannot receive a
+caller-selected connection, selector, credential or destination. The host checks
+its exact Flow Run, creator, Workspace, logical context, dependency pins and
+current authorization before protected AEP dispatch. It reuses the same typed
+Literal/Parameter bindings and short-lived Secret capabilities as discovery.
+
+The extension owns HTTP execution. It re-fetches the contract, checks its exact
+digest and operation selector, refuses actions and destinations outside the
+configured Connected Service origin, and uses the protected Bearer for both
+contract and business requests. Reflected credentials, non-JSON responses,
+invalid JSON, pagination beyond one page, and results exceeding the 48 KiB AEP
+envelope fail explicitly.
+Saved parameters cannot override the connection or protected Authorization header.
+
+Effective input schemas preserve path/query/header groups and required values;
+empty-input operations use an empty object and show No configuration / Sans
+configuration. JSON response schemas and local references are projected into
+the bounded native schema profile. Unsupported schemas leave the operation
+visible for discovery with a diagnostic, but without acquisition schemas; the
+Console explains why it cannot feed an enabled Data Source. No required values
+are invented. Generic operation Tool relays remain owned by #1044.
+
+## Migration inventory
+
+| Existing element | Treatment in this delivery |
+| --- | --- |
+| `openapi-governed` bundle and its published versions | Retained unchanged for existing consumers; the Connected Service Flow is installed in a separate bundle. |
+| `openapi-discovery` / `datasource.discovery/v1`, hierarchical choices and promoted selectors | Legacy compatibility path retained until explicit consumer migration in #1041; new service operation discovery uses `openapi-operation-discovery`. |
+| Data Source `origin`, `candidatePaths` and `credentialId` | Retained for legacy consumers. New connections use Connected Service options and Parameter/Secret bindings; no values or references are silently copied. |
+| `openapi-acquisition`, fixed bindings, invocation Tool and Artifact persistence | Retained; native operation acquisition uses the separate `openapi-operation-acquisition` Flow. |
+| Existing targets, immutable Flow versions, discovery/acquisition histories | Preserved without automatic replacement or repinning. |
+| Parser, destination policy, schema-format contribution and technical Tools | Reused; no direct extension dependency is introduced. |
+
+This unreleased integration keeps the existing `1.0.0` versions by maintainer
+instruction. Reseed development state before enrolling the changed contracts;
+existing immutable type/Flow/bundle records are not rewritten in place.
+
+Operators should enroll/reconcile the extension to add its contributions,
+create explicit Connected Services and run their discovery. This does not
+authorize deletion of old bundles or migration of their dependent resources.
+ADR-0201 records the protected execution boundary and this transition.
+
+## Legacy Data Source configuration
+
+The retained `openapi-governed` profile accepts:
 
 | Field | Meaning |
 | --- | --- |

@@ -42,6 +42,11 @@ profiles. The profile target supplies the scope when the document omits one.
 
 ## Operation types and discovery
 
+The optional [OpenAPI extension](openapi-extension.md#connected-service-operation-discovery)
+provides an executable provider of this lifecycle, with its own independent types
+and a reference-only discovery Flow. ADR-0201 documents its protected AEP
+connection execution and the explicit transition from legacy Data Source discovery.
+
 `ConnectedServiceOperationType` is a governed resource with immutable additive
 versions. A version defines the JSON schema of one protocol-specific operation,
 its interaction shape and an invocation contract. This keeps an OpenAPI operation,
@@ -131,7 +136,7 @@ The administration Console exposes the same family-owned API through these route
 
 - `/connected-services` lists the permission-aware scoped catalog and filters by type or observed availability;
 - `/connected-services/new` selects an exact `ConnectedServiceType` resource revision, renders its JSON schema and binds every declared input manually to a typed literal, exact Parameter or Secret as allowed by the input contract;
-- `/connected-services/{name}?scopeRef=...` provides Overview, Definition, Access and YAML tabs. Definition updates options and bindings with the resource ETag; YAML exposes the read-only resource manifest.
+- `/connected-services/{name}?scopeRef=...` provides Overview, Definition, Discovery, Access and YAML tabs. Definition updates options and bindings with the resource ETag; YAML exposes the read-only resource manifest. Discovery (`view=discovery`) starts the service's pinned Flow, lists its operations with explicit activation, and retains discovery history with links to each Flow Run in its operational Workspace and logical context. Data Sources select a Connected Service and one of its operations; discovery is managed on the service.
 
 Reconciliation and deactivation always require explicit confirmation. Reconciliation
 refreshes compatibility evidence but never silently changes the pinned type UID,

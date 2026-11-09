@@ -57,3 +57,13 @@ window.agentstrationEnrollment = {
         window.open(window.agentstrationEnrollment.themedUri(uri), "_blank", "noopener,noreferrer");
     }
 };
+
+window.agentstrationDataSources = {
+    focusTab: function (element) {
+        if (!(element instanceof HTMLElement)) {
+            return;
+        }
+        element.focus({ preventScroll: true });
+        element.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+};

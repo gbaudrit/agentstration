@@ -6,6 +6,8 @@ namespace Agentstration.Web.Console;
 
 public interface IDataSourcesClient
 {
+    Task<Agentstration.Storage.Contracts.StorageObjectContent> ReadContentAsync(ResourceNamespace ns, string acquisitionId,
+        CancellationToken cancellationToken = default) => throw new NotSupportedException();
     Task<IReadOnlyList<DataSourceResource>> GetAsync(CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<DataSourceResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope,
         CancellationToken cancellationToken = default);
@@ -61,6 +63,9 @@ public interface IDataSourceProfilesClient
 
 public sealed class DataSourcesApiClient(HttpClient httpClient) : IDataSourcesClient
 {
+    public Task<Agentstration.Storage.Contracts.StorageObjectContent> ReadContentAsync(ResourceNamespace ns, string acquisitionId,
+        CancellationToken cancellationToken = default) => ApiResponse.ReadAsync<Agentstration.Storage.Contracts.StorageObjectContent>(httpClient,
+            $"api/datasourceacquisitions/{Uri.EscapeDataString(acquisitionId)}/content?namespace={Uri.EscapeDataString(ns.Value)}", cancellationToken);
     public Task<IReadOnlyList<DataSourceResource>> GetAsync(CancellationToken cancellationToken = default) =>
         ApiResponse.ReadAsync<IReadOnlyList<DataSourceResource>>(httpClient, "api/datasources", cancellationToken);
     public Task<ResourceSnapshot<DataSourceResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope,

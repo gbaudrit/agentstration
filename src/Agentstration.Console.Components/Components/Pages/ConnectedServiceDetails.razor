@@ -41,6 +41,10 @@ else if (resource is not null)
         <section class="panel form-section"><div class="panel-header"><h2>@T("Diagnostics")</h2></div>@if (resource.ObservedState is null) { <p>@T("NotObserved")</p> } else { <dl class="details-list"><dt>@T("ObservedAt")</dt><dd>@resource.ObservedState.ObservedAt.ToLocalTime().ToString("g")</dd><dt>@T("Code")</dt><dd><code>@(resource.ObservedState.Code ?? "—")</code></dd><dt>@T("Message")</dt><dd>@(resource.ObservedState.Message ?? "—")</dd></dl> }</section>
         <section class="panel form-section"><div class="panel-header"><h2>@T("Dependents")</h2><span>@usages.Count</span></div><p>@T("DependentsExplanation")</p>@if (usages.Count == 0) { <p>@T("NoDependents")</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@(usage.ResourceType == StorageResourceKinds.Storage ? StorageLinks.FromApi(usage.Url) : usage.Url)"><strong>@usage.DisplayName</strong><code>@usage.ResourceType · @usage.Name</code></a></li> }</ul> }</section>
     }
+    else if (activeTab == DetailsTab.Discovery)
+    {
+        <ConnectedServiceDiscoveryPanel Service="resource" Supported="@(TypeVersion?.OperationDiscovery is not null)" />
+    }
     else if (activeTab == DetailsTab.Definition)
     {
         <ConnectedServiceEditor Name="@resource.Name" EmbeddedScopeRef="resource.ScopeRef" Embedded="true" Saved="DefinitionSavedAsync" />
@@ -123,5 +127,5 @@ else if (resource is not null)
         public ResourceScopeRef? ScopeRef { get; init; }
         public required ConnectedServiceProperties Definition { get; init; }
     }
-    private enum DetailsTab { Overview, Definition, Access, YAML }
+    private enum DetailsTab { Overview, Definition, Discovery, Access, YAML }
 }

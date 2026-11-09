@@ -25,6 +25,109 @@ namespace Agentstration.Management.Tests;
 public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    [DataRow("Instance")]
+    [DataRow("Tenant")]
+    public async Task AdministrativeFlowToolsPersistLogicalScopeSeparatelyFromOperationalPlacement(string scopeKind)
+    {
+        await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var business = await GetBootstrapContextAsync(factory);
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var owner = scopeKind == "Instance" ? ResourceScopeRef.Instance : ResourceScopeRef.Tenant(business.TenantId);
+        var operational = scopeKind == "Instance" ? await topology.GetInstanceOperationsWorkspaceAsync(default)
+            : await topology.GetTenantOperationsWorkspaceAsync(business.TenantId, default);
+        var context = new RequestContext(business.PrincipalId, operational.TenantId, operational.Id);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        using var administrativeScope = scopeKind == "Instance" ? scopes.PushInstance(context) : scopes.PushTenantAdministration(context);
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { message = new { type = "string" } }, required = new[] { "message" } });
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        await flows.CreateExactAsync(owner, new("administrative-tool-flow", null, "2.4.0", true,
+            GraphOnlyDefinition(), Graph: Graph(schema, schema)), ResourceNamespace.Default, default);
+        await flows.PublishVersionExactAsync(owner, new("administrative-tool-flow"), "2.4.0", true, default);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", owner.Value);
+        using var outsideLogicalScope = await client.PostAsJsonAsync("/api/tooldefinitions", new CreateToolDefinitionRequest("outside-logical-scope",
+            Properties("Outside logical scope", "administrative-tool-flow", schema, schema) with
+            { Publish = false, Flow = new() { Name = "administrative-tool-flow", ScopeRef = ResourceScopeRef.Workspace(business.WorkspaceId), Version = "2.4.0", UseActiveVersion = false } }, ScopeRef: owner));
+        Assert.AreEqual(HttpStatusCode.Forbidden, outsideLogicalScope.StatusCode, await outsideLogicalScope.Content.ReadAsStringAsync());
+        using var created = await client.PostAsJsonAsync("/api/tooldefinitions", new CreateToolDefinitionRequest("administrative-flow-tool",
+            Properties("Administrative Flow Tool", "administrative-tool-flow", schema, schema) with
+            { Version = "7.0.0", Publish = false, Flow = new() { Name = "administrative-tool-flow", ScopeRef = owner, Version = "2.4.0", UseActiveVersion = false } }, ScopeRef: owner));
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
+        Assert.AreEqual(owner, (await created.Content.ReadFromJsonAsync<ToolDefinitionResource>())?.ScopeRef);
+        using var published = await client.PostAsJsonAsync("/api/tooldefinitions/administrative-flow-tool/versions", new PublishToolDefinitionRequest("7.0.0"));
+        Assert.AreEqual(HttpStatusCode.Created, published.StatusCode, await published.Content.ReadAsStringAsync());
+        using var executed = await client.PostAsJsonAsync($"/api/tools/agentstration.administrative-flow-tool.v7.0.0/run?scopeRef={Uri.EscapeDataString(owner.Value)}",
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "logical-scope" }), ToolRunMode.Execute));
+        Assert.AreEqual(HttpStatusCode.OK, executed.StatusCode, await executed.Content.ReadAsStringAsync());
+        var result = await executed.Content.ReadFromJsonAsync<RunToolResponse>();
+        Assert.AreEqual("logical-scope", result?.Output?.GetProperty("message").GetString());
+        Assert.IsNotNull(result?.Receipt?.FlowRunId);
+        var runScope = new FlowRunScope(context.TenantId, new(context.WorkspaceId), context.PrincipalId) { LogicalScopeRef = owner };
+        var run = await factory.Services.GetRequiredService<FlowRunService>().GetAsync(result.Receipt.FlowRunId, runScope, default);
+        Assert.IsNotNull(run);
+        Assert.AreEqual(owner, run.Value.Scope.LogicalScopeRef);
+        Assert.AreEqual(owner, run.Value.Scope.AccessScopeRef);
+        Assert.AreEqual(owner, run.Value.DefinitionScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Workspace(operational.Id), run.Value.Scope.ScopeRef);
+        Assert.AreNotEqual(business.WorkspaceId, run.Value.Scope.WorkspaceId.Value);
+        var inUse = await Assert.ThrowsAsync<FlowValidationException>(() => flows.DeleteExactAsync(owner, new("administrative-tool-flow"), null, false, default));
+        Assert.AreEqual("flow_in_use_by_tool_definition", inUse.Code);
+    }
+
+    [TestMethod]
+    public async Task PublishedVersionsDoNotShareIdempotentFlowSubmissions()
+    {
+        await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var contract = await CreatePublishedFlowAsync(factory.Services, context, "versioned-flow");
+        var definitions = factory.Services.GetRequiredService<ToolDefinitionService>();
+        var properties = Properties("Versioned Tool", "versioned-flow", contract.Input, contract.Output) with
+        {
+            InputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { dryRun = new { type = "boolean" } } }),
+            FixedArguments = JsonSerializer.SerializeToElement(new { message = "first" })
+        };
+        var draft = await definitions.PutAsync(Resource("versioned", ResourceScopeRef.Workspace(context.WorkspaceId), properties), null, true, default);
+        await definitions.PutAsync(draft.Value with
+        {
+            Definition = properties with
+            { Version = "1.1.0", FixedArguments = JsonSerializer.SerializeToElement(new { message = "second" }) }
+        }, draft.ETag, false, default);
+        var executor = factory.Services.GetRequiredService<IToolDefinitionExecutor>();
+        var invocation = new ToolDefinitionInvocation(context.TenantId, new(context.WorkspaceId), context.PrincipalId,
+            default, "versioned.v1.0.0", "same-call", null, JsonSerializer.SerializeToElement(new { }), ToolDefinitionCallerKind.Mcp);
+        var first = await executor.ExecuteAsync(invocation, default);
+        var second = await executor.ExecuteAsync(invocation with { ToolName = "versioned.v1.1.0" }, default);
+        var replay = await executor.ExecuteAsync(invocation, default);
+        Assert.AreEqual("first", first.Output?.GetProperty("message").GetString());
+        Assert.AreEqual("second", second.Output?.GetProperty("message").GetString());
+        Assert.AreNotEqual(first.Receipt.FlowRunId, second.Receipt.FlowRunId);
+        Assert.AreEqual(first.Receipt.FlowRunId, replay.Receipt.FlowRunId);
+        Assert.IsTrue(replay.Receipt.Recovered);
+    }
+
+    [TestMethod]
+    public async Task ProtectedInputsAreRejectedBeforeDurableFlowSubmission()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var contract = await CreatePublishedFlowAsync(factory.Services, context, "protected-input-flow");
+        await factory.Services.GetRequiredService<ToolDefinitionService>().PutAsync(Resource("protected-input",
+            ResourceScopeRef.Workspace(context.WorkspaceId), Properties("Protected input", "protected-input-flow", contract.Input, contract.Output)), null, true, default);
+        var failure = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => factory.Services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(new(
+            context.TenantId, new(context.WorkspaceId), context.PrincipalId, default, "protected-input.v1.0.0", "protected", null,
+            JsonSerializer.SerializeToElement(new { message = "synthetic-sensitive-value" }), ToolDefinitionCallerKind.Mcp,
+            ExecutionContext: new(HasSensitiveArguments: true)), default));
+        Assert.AreEqual("tool_definition_protected_input_reference_required", failure.Code);
+        var runs = await factory.Services.GetRequiredService<IFlowRepository>().ListRunsAsync(
+            new(context.TenantId, new(context.WorkspaceId), context.PrincipalId), null, null, 0, 100, default);
+        Assert.IsFalse(runs.Items.Any(run => run.Value.FlowId.Value == "protected-input-flow"));
+    }
+
+    [TestMethod]
     public async Task FlowBackedToolDryRunReturnsPreviewWithoutCreatingWorkOrFlowRun()
     {
         await using var factory = Factory();
@@ -43,7 +146,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         var runsBefore = await flowRepository.ListRunsAsync(flowScope, null, null, 0, 100, default);
 
         using var response = await factory.CreateClient().PostAsJsonAsync(
-            "/api/tools/agentstration.dry-run.preview/run",
+            "/api/tools/agentstration.dry-run.preview.v1.0.0/run",
             new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "preview" })));
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
@@ -77,13 +180,13 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.Created, definition.StatusCode);
 
         using var invalid = await client.PostAsJsonAsync(
-            "/api/tools/agentstration.preview.run/run",
+            "/api/tools/agentstration.preview.run.v1.0.0/run",
             new RunToolRequest(JsonSerializer.SerializeToElement(new { })));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
         Assert.AreEqual(0, pipeline.Simulations);
 
         using var response = await client.PostAsJsonAsync(
-            "/api/tools/agentstration.preview.run/run",
+            "/api/tools/agentstration.preview.run.v1.0.0/run",
             new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "check" })));
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
@@ -97,7 +200,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.AreEqual(0, pipeline.Executions);
 
         using var execution = await client.PostAsJsonAsync(
-            "/api/tools/agentstration.preview.run/run",
+            "/api/tools/agentstration.preview.run.v1.0.0/run",
             new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "execute" }), ToolRunMode.Execute));
         Assert.AreEqual(HttpStatusCode.OK, execution.StatusCode);
         var executionResult = await execution.Content.ReadFromJsonAsync<RunToolResponse>();
@@ -131,19 +234,19 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         var providerAddress = ScopedResourceAddress.Create(workspaceScope, ResourceNamespace.Default,
             ToolResourceKinds.ToolProvider, AgentstrationToolProvider.Name);
         var toolAddress = ScopedResourceAddress.Create(workspaceScope, ResourceNamespace.Default,
-            ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("notification.send"));
+            ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName("notification.send", "1.0.0")));
         var provider = await store.GetExactAsync<ToolProviderResource>(providerAddress, default);
         var tool = await store.GetExactAsync<ToolResource>(toolAddress, default);
         Assert.IsNotNull(provider);
         Assert.IsTrue(provider.Value.Definition.Mcp?.Internal);
         Assert.IsNotNull(tool);
-        Assert.AreEqual("notification.send", tool.Value.Definition.ExternalId);
+        Assert.AreEqual("notification.send.v1.0.0", tool.Value.Definition.ExternalId);
         Assert.AreEqual(created.Uid, tool.Value.Definition.Metadata["agentstration.toolDefinitionUid"].GetGuid());
         Assert.IsTrue(tool.Value.Definition.Enabled);
 
         using var update = new HttpRequestMessage(HttpMethod.Put, "/api/tooldefinitions/notification.send?namespace=default")
         {
-            Content = JsonContent.Create(new PutToolDefinitionRequest(Properties("Send an alert", "notification-flow", contract.Input, contract.Output)))
+            Content = JsonContent.Create(new PutToolDefinitionRequest(Properties("Send an alert", "notification-flow", contract.Input, contract.Output) with { Publish = false }))
         };
         update.Headers.IfMatch.Add(createdResponse.Headers.ETag!);
         using var updatedResponse = await client.SendAsync(update);
@@ -161,14 +264,15 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         var disabled = await disabledResponse.Content.ReadFromJsonAsync<ToolDefinitionResource>();
         Assert.IsFalse(disabled!.Definition.Enabled);
         tool = await store.GetExactAsync<ToolResource>(toolAddress, default);
-        Assert.IsFalse(tool!.Value.Definition.Enabled);
+        Assert.IsTrue(tool!.Value.Definition.Enabled);
+        await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => factory.Services.GetRequiredService<ToolDefinitionService>().GetInvocationAsync("notification.send.v1.0.0", default, default));
 
         using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/tooldefinitions/notification.send?namespace=default");
         delete.Headers.IfMatch.Add(disabledResponse.Headers.ETag!);
         using var deleted = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.IsNull(await store.GetAsync<ToolDefinitionResource>(new(ToolResourceKinds.ToolDefinition, "notification.send"), default));
-        Assert.IsNull(await store.GetExactAsync<ToolResource>(toolAddress, default));
+        Assert.IsNotNull(await store.GetExactAsync<ToolResource>(toolAddress, default));
     }
 
     [TestMethod]
@@ -214,7 +318,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.AreEqual(published.Value.DefinitionHash, stored.Value.SchemaBindings["$.inputSchema"].DefinitionHash);
         Assert.AreEqual("1.0.0", stored.Value.SchemaBindings["$.inputSchema"].Source?.Version);
         var materialized = await factory.Services.GetRequiredService<IResourceStore>().GetAsync<ToolResource>(
-            new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName("shared.contract")), default);
+            new(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName("shared.contract", "1.0.0"))), default);
         Assert.IsNotNull(materialized);
         Assert.IsTrue(ToolDefinitionService.SameSchema(contract.Input, materialized.Value.Definition.Schema?.Input));
     }
@@ -267,7 +371,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             Flow = new ToolDefinitionFlowTarget { Name = "analysis-flow", Version = "1.0.0", UseActiveVersion = false }
         };
         var exactStored = await service.PutAsync(Resource("news.analyze.v1", scope, exact), null, true, default);
-        Assert.AreEqual("1.0.0", exactStored.Value.Definition.Flow.Version);
+        Assert.AreEqual("1.0.0", ((FlowToolDefinitionProperties)exactStored.Value.Definition).Flow.Version);
 
         var flows = factory.Services.GetRequiredService<FlowService>();
         var workspaceId = new WorkspaceId(requestContext.WorkspaceId);
@@ -379,7 +483,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
 
         var http = factory.CreateClient();
         using var consoleExecution = await http.PostAsJsonAsync(
-            "/api/tools/agentstration.document.review/run",
+            "/api/tools/agentstration.document.review.v1.0.0/run",
             new RunToolRequest(JsonSerializer.SerializeToElement(new { message = "via console" }), ToolRunMode.Execute));
         Assert.AreEqual(HttpStatusCode.OK, consoleExecution.StatusCode);
         var consoleResult = await consoleExecution.Content.ReadFromJsonAsync<RunToolResponse>();
@@ -396,15 +500,15 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             ownsHttpClient: false);
         await using var mcp = await McpClient.CreateAsync(transport, loggerFactory: NullLoggerFactory.Instance);
         var published = await mcp.ListToolsAsync();
-        var publishedTool = published.Single(value => value.Name == "document.review");
+        var publishedTool = published.Single(value => value.Name == "document.review.v1.0.0");
         Assert.IsFalse(published.Any(value => value.Name is "flow.start" or "management.execute"));
         var mcpResult = await publishedTool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?> { ["message"] = "via mcp" }));
         StringAssert.Contains(JsonSerializer.Serialize(mcpResult), "via mcp");
 
         var assigned = await factory.Services.GetRequiredService<IToolCatalog>()
-            .ResolveAsync([AgentstrationToolProvider.ToolResourceName("document.review")]);
+            .ResolveAsync([AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName("document.review", "1.0.0"))]);
         var assignedTool = assigned.Single();
-        Assert.AreEqual("document.review", assignedTool.Name);
+        Assert.AreEqual("document.review.v1.0.0", assignedTool.Name);
         Assert.AreEqual(AgentstrationToolProvider.Name, assignedTool.ProviderId);
 
         var arguments = JsonSerializer.SerializeToElement(new
@@ -418,7 +522,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
             new WorkspaceId(requestContext.WorkspaceId),
             requestContext.PrincipalId,
             ResourceNamespace.Default,
-            "document.review",
+            "document.review.v1.0.0",
             "logical-call-1",
             "correlation-1",
             arguments,
@@ -437,7 +541,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.IsFalse(first.Receipt.Recovered);
         Assert.IsTrue(replay.Receipt.Recovered);
         var persistedRun = await factory.Services.GetRequiredService<FlowRunService>().GetAsync(
-            first.Receipt.FlowRunId,
+            first.Receipt.FlowRunId ?? throw new AssertFailedException("Expected a Flow-backed receipt."),
             new FlowRunScope(requestContext.TenantId, new WorkspaceId(requestContext.WorkspaceId), requestContext.PrincipalId),
             default);
         Assert.IsNotNull(persistedRun);
@@ -464,7 +568,7 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         await factory.Services.GetRequiredService<ToolDefinitionService>().PutAsync(resource, null, true, default);
 
         var assigned = await factory.Services.GetRequiredService<IToolCatalog>().ResolveAsync([
-            ToolResourceIdentity.CatalogId(ns, AgentstrationToolProvider.ToolResourceName("notification.send"))
+            ToolResourceIdentity.CatalogId(ns, AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName("notification.send", "1.0.0")))
         ]);
 
         Assert.AreEqual(ns, assigned.Single().Namespace);
@@ -480,9 +584,10 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Definition = properties
     };
 
-    private static ToolDefinitionProperties Properties(string displayName, string flowName, JsonElement input, JsonElement output) => new()
+    private static FlowToolDefinitionProperties Properties(string displayName, string flowName, JsonElement input, JsonElement output) => new()
     {
         DisplayName = displayName,
+        Publish = true,
         InputSchema = input.Clone(),
         OutputSchema = output.Clone(),
         Flow = new ToolDefinitionFlowTarget { Name = flowName, UseActiveVersion = true }

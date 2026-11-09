@@ -191,4 +191,4 @@ sequencing, bounded replay receipts and explicit finalization. The product's bou
 content port delegates to these methods without exposing a backend to the Agent.
 Every continuation and status/cleanup call rechecks the current binding and grant.
 See the [ASP protocol](https://github.com/gbaudrit/agentstration/blob/integration/fr-1032/asp/docs/protocol.md) and
-[ADR-0202](../decisions/0202-asp-uses-scoped-progressive-content-sessions.md).
+[ADR-0205](../decisions/0205-asp-uses-scoped-progressive-content-sessions.md).

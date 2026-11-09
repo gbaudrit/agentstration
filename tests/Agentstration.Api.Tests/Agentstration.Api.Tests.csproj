@@ -1,5 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <Compile Include="../TestHostMetrics.cs" Link="TestHostMetrics.cs" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />
     <ProjectReference Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
     <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />

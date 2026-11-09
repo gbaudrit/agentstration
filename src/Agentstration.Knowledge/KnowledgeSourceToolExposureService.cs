@@ -100,8 +100,10 @@ public sealed class KnowledgeSourceToolExposureService(
                     }
                 },
                 ScopeRef = scopeRef,
-                Definition = new ToolDefinitionProperties
+                Definition = new FlowToolDefinitionProperties
                 {
+                    Version = version,
+                    Publish = true,
                     DisplayName = $"{source.Value.Definition.DisplayName} {route}",
                     Description = $"{route} operation for KnowledgeSource '{source.Value.Name}'.",
                     RequiresApproval = requiresApproval,
@@ -129,7 +131,7 @@ public sealed class KnowledgeSourceToolExposureService(
                 }
             }, current?.ETag, current is null, cancellationToken);
 
-            var toolName = AgentstrationToolProvider.ToolResourceName(definitionName);
+            var toolName = AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName(definitionName, version));
             var tool = new ResourceReference(toolName, scopeRef, source.Value.Namespace);
             var capability = $"knowledge.{route}";
             operations.Add(new KnowledgeSourceToolOperationExposure

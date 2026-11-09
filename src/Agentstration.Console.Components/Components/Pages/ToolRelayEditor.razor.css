@@ -1,0 +1,61 @@
+.relay-binding {
+    padding-block: 1rem;
+    border-bottom: 1px solid var(--border-color, #80808040);
+}
+
+.form-grid > .relay-toggle {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.relay-toggle input {
+    width: 18px;
+    min-height: 18px;
+    margin: 0;
+}
+
+.data-table {
+    width: 100%;
+    table-layout: fixed;
+    overflow-wrap: anywhere;
+}
+
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+    .data-table thead {
+        display: none;
+    }
+
+    .data-table tbody,
+    .data-table tr,
+    .data-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .data-table tr {
+        padding-block: 0.75rem;
+        border-bottom: 1px solid var(--border-color, #80808040);
+    }
+
+    .data-table td {
+        padding: 0.4rem 0;
+    }
+
+    .data-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .data-table button {
+        width: 100%;
+    }
+}

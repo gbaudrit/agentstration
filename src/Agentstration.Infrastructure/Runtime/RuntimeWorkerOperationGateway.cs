@@ -197,7 +197,8 @@ public sealed class RuntimeWorkerOperationGateway(
                 run.CorrelationId ?? run.Id,
                 tool,
                 arguments,
-                resolvedRoute), cancellationToken);
+                resolvedRoute)
+            { SecretInputs = run.SecretInputs }, cancellationToken);
         }
         catch (ToolDefinitionInvocationException exception)
         {

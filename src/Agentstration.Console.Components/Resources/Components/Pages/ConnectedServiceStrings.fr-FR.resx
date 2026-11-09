@@ -114,4 +114,36 @@
   <data name="YamlReadOnlyHelp"><value>Ce manifeste reflète la définition enregistrée. Modifiez-la depuis l’onglet Définition.</value></data>
   <data name="ReadOnly"><value>Lecture seule</value></data>
   <data name="YamlDefinition"><value>Définition YAML du service connecté</value></data>
+  <data name="Tab.Discovery" xml:space="preserve"><value>Découverte</value></data>
+  <data name="Discovery.Title" xml:space="preserve"><value>Découvrir les opérations du service</value></data>
+  <data name="Discovery.Help" xml:space="preserve"><value>Découvrez les opérations de ce service connecté enregistré. Suivez chaque exécution du Flow de découverte et examinez ses opérations ici.</value></data>
+  <data name="Discovery.Start" xml:space="preserve"><value>Lancer la découverte</value></data>
+  <data name="Discovery.Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="Discovery.Unsupported" xml:space="preserve"><value>Cette révision du type de service ne fournit pas actuellement de Flow de découverte. Les résultats historiques restent disponibles.</value></data>
+  <data name="Discovery.Failed" xml:space="preserve"><value>La demande n’a pas abouti. Vérifiez la révision du service, les accès et l’historique des exécutions, puis actualisez ou réessayez.</value></data>
+  <data name="Discovery.Accepted" xml:space="preserve"><value>Découverte acceptée. Ouvrez son exécution de Flow ou actualisez pour suivre son achèvement.</value></data>
+  <data name="Discovery.Loading" xml:space="preserve"><value>Chargement des découvertes et des opérations…</value></data>
+  <data name="Discovery.Operations" xml:space="preserve"><value>Opérations du service</value></data>
+  <data name="Discovery.ActivationHelp" xml:space="preserve"><value>Activez ou désactivez explicitement les opérations ici. L’activation n’exécute aucune opération et ne publie aucun Tool. Les Data Sources existantes conservent les révisions enregistrées de leurs opérations.</value></data>
+  <data name="Discovery.NoOperations" xml:space="preserve"><value>Aucune opération n’a été découverte pour ce service.</value></data>
+  <data name="Discovery.Operation" xml:space="preserve"><value>Opération</value></data>
+  <data name="Discovery.Actions" xml:space="preserve"><value>Actions</value></data>
+  <data name="Discovery.EnableOperation" xml:space="preserve"><value>Activer l’opération</value></data>
+  <data name="Discovery.DisableOperation" xml:space="preserve"><value>Désactiver l’opération</value></data>
+  <data name="Discovery.Availability.Available" xml:space="preserve"><value>Disponible</value></data>
+  <data name="Discovery.Availability.Stale" xml:space="preserve"><value>Révision obsolète</value></data>
+  <data name="Discovery.Availability.Unavailable" xml:space="preserve"><value>Indisponible</value></data>
+  <data name="Discovery.History" xml:space="preserve"><value>Historique des découvertes</value></data>
+  <data name="Discovery.NoHistory" xml:space="preserve"><value>Aucune découverte dans le contexte d’exécution courant.</value></data>
+  <data name="Discovery.Created" xml:space="preserve"><value>Créée</value></data>
+  <data name="Discovery.State" xml:space="preserve"><value>État</value></data>
+  <data name="Discovery.FlowRun" xml:space="preserve"><value>Exécution du Flow de découverte</value></data>
+  <data name="Discovery.State.Pending" xml:space="preserve"><value>En attente</value></data>
+  <data name="Discovery.State.Running" xml:space="preserve"><value>En cours</value></data>
+  <data name="Discovery.State.WaitingForInput" xml:space="preserve"><value>En attente d’une entrée</value></data>
+  <data name="Discovery.State.WaitingForChild" xml:space="preserve"><value>En attente d’une exécution enfant</value></data>
+  <data name="Discovery.State.Succeeded" xml:space="preserve"><value>Réussie</value></data>
+  <data name="Discovery.State.Failed" xml:space="preserve"><value>Échouée</value></data>
+  <data name="Discovery.State.Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="Discovery.State.TimedOut" xml:space="preserve"><value>Délai dépassé</value></data>
 </root>

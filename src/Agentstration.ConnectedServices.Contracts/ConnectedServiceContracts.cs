@@ -117,7 +117,17 @@ public sealed record ConnectedServiceOperationTypeVersionDescriptor(
     JsonElement DefinitionSchema,
     ConnectedServiceOperationInteraction Interaction,
     ConnectedServiceOperationInvocationDescriptor Invocation,
-    bool Deprecated = false);
+    bool Deprecated = false)
+{
+    public ConnectedServiceOperationAcquisitionDescriptor? Acquisition { get; init; }
+}
+
+/// <summary>An immutable, type-owned adapter for read-only acquisition. No connection values enter the Flow input.</summary>
+public sealed record ConnectedServiceOperationAcquisitionDescriptor(
+    ConnectedServiceDiscoveryFlowReference Flow,
+    string InputSchemaProperty = "inputSchema",
+    string OutputSchemaProperty = "outputSchema",
+    string ReadOnlyProperty = "readOnly");
 
 public sealed record ConnectedServiceOperationTypeProperties
 {
@@ -252,7 +262,13 @@ public sealed record ConnectedServiceOperationResource : Resource
 {
     public ConnectedServiceOperationProperties Definition { get; init; } = null!;
     public ConnectedServiceOperationObservedState ObservedState { get; init; } = null!;
+    public bool Enabled { get; init; }
 }
+
+public sealed record ConnectedServiceOperationRevisionReference(
+    ScopedResourceAddress Operation, Guid OperationUid, long Generation, string DefinitionDigest);
+
+public sealed record SetConnectedServiceOperationEnabledRequest(bool Enabled);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ConnectedServiceOperationDiscoveryState>))]
 public enum ConnectedServiceOperationDiscoveryState
@@ -310,6 +326,7 @@ public sealed record ConnectedServiceOperationDiscoveryCaller(
 
 public sealed record ConnectedServiceOperationDiscoveryResource : Resource
 {
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
     public required ConnectedServiceRevisionReference Service { get; init; }
     public required ConnectedServiceTypeReference ServiceType { get; init; }
     public required ConnectedServiceDiscoveryFlowReference Flow { get; init; }

@@ -18,6 +18,7 @@ public sealed record StorageWrite(string RequestId, DateTimeOffset NotAfter, str
 /// <summary>Each operation reauthorizes an exact Storage. No session is an authorization cache.</summary>
 public interface IStorageContentGateway
 {
+    Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default);
     Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit,
         string? cursor = null, CancellationToken cancellationToken = default);
     Task<StorageObject> StatAsync(StorageContentRequest target, string reference,

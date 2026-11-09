@@ -49,6 +49,12 @@ public sealed class ConnectedServiceManagementService(
             usages.AddRange(await provider.GetUsagesAsync(Scoped(scopeRef, name), cancellationToken));
         return usages;
     }
+
+    public Task<StoredResource<ConnectedServiceResource>?> GetExactAsync(
+        ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        store.GetExactAsync<ConnectedServiceResource>(new(scopeRef, @namespace,
+            ConnectedServiceResourceKinds.ConnectedService, name), cancellationToken);
+
     public async Task<StoredResource<ConnectedServiceResource>> CreateAsync(
         ConnectedServiceResource resource,
         CancellationToken cancellationToken)
@@ -158,6 +164,34 @@ public sealed class ConnectedServiceManagementService(
         ConnectedServiceResolutionContext context,
         CancellationToken cancellationToken = default)
     {
+        var resource = await AuthorizeAsync(service, context, cancellationToken);
+        if (resource is null) return null;
+        var (_, version) = await ResolveTypeAsync(resource, cancellationToken);
+        var inputs = new List<ResolvedConnectedServiceInput>();
+        try
+        {
+            foreach (var binding in resource.Definition.Bindings)
+                inputs.Add(await ResolveBindingAsync(binding, resource, cancellationToken));
+            return new ResolvedConnectedService
+            {
+                Reference = service,
+                Type = resource.Definition.Type,
+                Options = resource.Definition.Options.Clone(),
+                Exports = version.Exports,
+                Inputs = inputs
+            };
+        }
+        catch
+        {
+            foreach (var input in inputs) input.Dispose();
+            throw;
+        }
+    }
+
+    public async Task<ConnectedServiceResource?> AuthorizeAsync(
+        ConnectedServiceReference service, ConnectedServiceResolutionContext context,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(context);
         if (service.Address.Kind != ConnectedServiceResourceKinds.ConnectedService)
@@ -174,27 +208,8 @@ public sealed class ConnectedServiceManagementService(
                 stored.Value.Definition.UsePolicy, cancellationToken))
             throw new ConnectedServiceAccessDeniedException(service.Address);
 
-        var (_, version) = await ResolveTypeAsync(stored.Value, cancellationToken);
-
-        var inputs = new List<ResolvedConnectedServiceInput>();
-        try
-        {
-            foreach (var binding in stored.Value.Definition.Bindings)
-                inputs.Add(await ResolveBindingAsync(binding, stored.Value, cancellationToken));
-            return new ResolvedConnectedService
-            {
-                Reference = service,
-                Type = stored.Value.Definition.Type,
-                Options = stored.Value.Definition.Options.Clone(),
-                Exports = version.Exports,
-                Inputs = inputs
-            };
-        }
-        catch
-        {
-            foreach (var input in inputs) input.Dispose();
-            throw;
-        }
+        _ = await ResolveTypeAsync(stored.Value, cancellationToken);
+        return stored.Value;
     }
 
     public async Task<ConnectedServiceExportMetadata> InspectAsync(
@@ -516,12 +531,12 @@ public sealed class ConnectedServiceManagementService(
         ConnectedServiceAvailability availability,
         string? code = null,
         string? message = null) => new()
-    {
-        Availability = availability,
-        ObservedAt = timeProvider.GetUtcNow(),
-        Code = code,
-        Message = message
-    };
+        {
+            Availability = availability,
+            ObservedAt = timeProvider.GetUtcNow(),
+            Code = code,
+            Message = message
+        };
 
     private static bool Matches(JsonElement value, ConnectedServiceValueType type) => type switch
     {
