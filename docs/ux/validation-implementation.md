@@ -50,10 +50,10 @@ La [preuve de surcharge de thème](implementation/theme-override.png) illustre l
 
 ## Régressions navigateur et suites
 
-Les parcours existants Agent, administration des modèles, ressources héritées et navigation entre périmètres sont adaptés à la vue d’ensemble par défaut et au choix de modèle inline. Les assertions d’usages parcourent les continuations au lieu de supposer que tous les résultats sont présents dans une page. La compilation TypeScript passe.
+Les parcours existants Agent, administration des modèles, ressources héritées et navigation entre périmètres sont adaptés à la vue d’ensemble par défaut et au choix de modèle inline. Les assertions d’usages parcourent les continuations au lieu de supposer que tous les résultats sont présents dans une page. La compilation TypeScript passe. Le build Docusaurus complet, la validation des ADR et la validation/génération LikeC4 passent également. Les liens vers les instructions du dépôt et le fichier HTML autonome de la maquette sont explicites pour rester accessibles depuis le site de documentation.
 
 Le résultat de la campagne smoke complète est consigné après son exécution.
 
 Le contrôle supplémentaire du catalogue statique comporte deux échecs préexistants : décalage entre quelques routes et leurs entrées, et présence de `trackingIssue: 753` sur une surface marquée couverte. Les déclarations `@page` de tous les fichiers concernés et `application-surfaces.ts` ont été comparées au point de départ `main` (`8a9fafd`) : les entrées de ces deux contrôles sont identiques. Les deux autres contrôles, dont le garde de santé des pages, passent. Ces incohérences du catalogue ne sont pas présentées comme corrigées par cette livraison.
 
-Les nouveaux scénarios réutilisables #1098 à #1106 restent ouverts : [AGENTS.md](../../AGENTS.md#ux-test-scenario-follow-up) exige une validation UX explicite du mainteneur et la fusion de la PR avant leur réalisation. Les FR parentes restent ouvertes jusqu’à ces scénarios ou une dérogation documentée.
+Les nouveaux scénarios réutilisables #1098 à #1106 restent ouverts : [AGENTS.md](https://github.com/gbaudrit/agentstration/blob/ux/unification-formulaires/AGENTS.md#ux-test-scenario-follow-up) exige une validation UX explicite du mainteneur et la fusion de la PR avant leur réalisation. Les FR parentes restent ouvertes jusqu’à ces scénarios ou une dérogation documentée.
