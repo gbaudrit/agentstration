@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 
@@ -12,7 +13,9 @@ public sealed class StorageTypeManagementService(
     DescendantResourceUseAuthorizer useAuthorizer,
     IResourceGovernanceContext governance,
     IStorageTypeAvailabilityProvider availability,
-    IRequestContextScopeFactory requestScopes)
+    IRequestContextScopeFactory requestScopes,
+    IResourceAccessPolicyService accessPolicies,
+    ICurrentRequestContext requestContext)
 {
     public async Task<IReadOnlyList<StoredResource<StorageTypeResource>>> ListAsync(
         ResourceScopeRef scopeRef, int skip, int take, CancellationToken token)
@@ -36,12 +39,25 @@ public sealed class StorageTypeManagementService(
         foreach (var version in resource.Value.Definition.Versions)
             versions.Add(new(version.Version, !resource.Value.Definition.Enabled ? StorageAvailability.Disabled
                 : await availability.IsAvailableAsync(resource.Value, version, token) ? StorageAvailability.Ready : StorageAvailability.Unavailable));
-        return resource with { Value = resource.Value with { ObservedVersions = versions } };
+        var ownerScope = resource.Value.ScopeRef!.Value;
+        var consumerScope = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(requestContext.Current.TenantId),
+            ControlPlaneAccessMode.Workspace => ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId),
+            _ => ownerScope
+        };
+        var decision = await accessPolicies.EvaluateAsync(new(resource.Value.Uid, ownerScope, resource.Value.Namespace,
+            resource.Value.Kind, resource.Value.Generation), consumerScope, ResourceAccessAction.Use, token);
+        return resource with { Value = resource.Value with { ObservedVersions = versions, ObservedUse = new(consumerScope, decision) } };
     }
 
     public Task ValidateForCreateAsync(StorageTypeResource resource, CancellationToken token) =>
-        ValidateAsync(resource with { ScopeRef = resource.ScopeRef
-            ?? scopeOperations.DefaultScopeRef(StorageResourceKinds.StorageType) }, token);
+        ValidateAsync(resource with
+        {
+            ScopeRef = resource.ScopeRef
+            ?? scopeOperations.DefaultScopeRef(StorageResourceKinds.StorageType)
+        }, token);
 
     public async Task<StoredResource<StorageTypeResource>> CreateAsync(StorageTypeResource resource, CancellationToken token)
     {
@@ -52,7 +68,10 @@ public sealed class StorageTypeManagementService(
             await ValidateAsync(scoped, ct);
             return await store.PutExactAsync(scope, scoped with
             {
-                Generation = 1, Status = new() { ProvisioningState = ProvisioningState.Succeeded }
+                Generation = 1,
+                Status = new() { ProvisioningState = ProvisioningState.Succeeded },
+                ObservedVersions = [],
+                ObservedUse = null
             }, null, true, ct);
         }, token);
     }
@@ -67,9 +86,55 @@ public sealed class StorageTypeManagementService(
         var changed = existing.Value with { Definition = merged, Generation = checked(existing.Value.Generation + 1) };
         return await scopeOperations.WriteAsync(existing.Value, scope, AuthorizationPermissions.ResourcesWrite, async ct =>
         {
+            if (existing.Value.Definition.Enabled && !merged.Enabled && await HasUsagesAsync(existing.Value.Uid, ct))
+                throw new StorageException("storage_type_in_use", "The type is referenced by a Storage.", 409);
             await ValidateAsync(changed, ct);
-            return await store.PutExactAsync(scope, changed, etag, false, ct);
+            return await store.PutExactAsync(scope, changed with { ObservedVersions = [], ObservedUse = null }, etag, false, ct);
         }, token);
+    }
+
+    public async Task<StoredResource<StorageTypeResource>> PublishVersionAsync(ResourceScopeRef scope,
+        ResourceNamespace ns, string name, PublishStorageTypeVersionRequest request, string? etag,
+        CancellationToken token)
+    {
+        var existing = await GetExactAsync(scope, ns, name, token)
+            ?? throw new StorageException("storage_type_not_found", "Storage type not found.", 404);
+        StorageValidation.ETag(etag, existing.ETag);
+        if (request.Version is null)
+            throw new StorageException("storage_type_version_invalid", "An immutable version is required.");
+        if (existing.Value.Definition.Versions.Any(version => version.Version == request.Version.Version))
+            throw new StorageException("storage_type_version_exists", "The version is already published.", 409);
+        return await PutExactAsync(scope, ns, name, existing.Value.Definition with
+        {
+            Versions = [.. existing.Value.Definition.Versions, request.Version],
+            PreferredVersion = request.SetPreferred ? request.Version.Version : existing.Value.Definition.PreferredVersion
+        }, etag, token);
+    }
+
+    public async Task<IReadOnlyList<StorageUsage>> GetUsagesAsync(ResourceScopeRef scope,
+        ResourceNamespace ns, string name, CancellationToken token)
+    {
+        var type = await GetExactAsync(scope, ns, name, token)
+            ?? throw new StorageException("storage_type_not_found", "Storage type not found.", 404);
+        IReadOnlyList<StoredResource<StorageResource>> candidates;
+        using (requestScopes.PushSystem())
+            candidates = await store.ListAllAsync<StorageResource>(StorageResourceKinds.Storage, token);
+        var result = new List<StorageUsage>();
+        foreach (var candidate in candidates.Where(value => value.Value.Definition.Type.TypeUid == type.Value.Uid))
+        {
+            var value = candidate.Value;
+            var address = new ScopedResourceAddress(value.ScopeRef!.Value, value.Namespace, value.Kind, value.Name);
+            try
+            {
+                // Re-enter the caller's context before projecting dependency metadata.
+                if (await store.GetExactAsync<StorageResource>(address, token) is null) continue;
+            }
+            catch (ResourceScopeAccessDeniedException) { continue; }
+            result.Add(new(value.Kind, value.Name, value.Definition.DisplayName,
+                $"/storages/{Uri.EscapeDataString(value.Name)}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace={Uri.EscapeDataString(value.Namespace.Value)}"));
+            if (result.Count == 100) break;
+        }
+        return result;
     }
 
     /// <summary>Trusted Core/extension adapters synchronize only their own types.</summary>

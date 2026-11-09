@@ -9,6 +9,7 @@ public sealed record ResourceAccessPolicySnapshot(ResourceAccessPolicy Policy, s
 
 public interface IResourceAccessPolicyClient
 {
+    Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request, CancellationToken cancellationToken);
     Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken);
     Task<ResourceAccessPolicySnapshot> PutAsync(ResourceAccessPolicy policy, string? etag,
         CancellationToken cancellationToken);
@@ -16,6 +17,14 @@ public interface IResourceAccessPolicyClient
 
 public sealed class ResourceAccessPolicyApiClient(HttpClient httpClient) : IResourceAccessPolicyClient
 {
+    public async Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync($"{Path(request.Resource.Uid)}/evaluate", request, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ResourceAccessDecision>(cancellationToken)
+            ?? throw new AgentstrationApiException("The access decision response is empty.", Guid.NewGuid().ToString("N"));
+    }
     public async Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid,
         CancellationToken cancellationToken)
     {

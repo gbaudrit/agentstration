@@ -1,0 +1,30 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+
+<section class="panel form-section">
+    <h2>@T("Type.VersionContract")</h2><p>@T("Type.ImmutableHelp")</p>
+    <div class="form-grid">
+        <label><span>@T("Version")</span><InputText @bind-Value="Draft.Version" maxlength="64" data-testid="storage-type-version" /></label>
+        <label><span>@T("Type.RequiresService")</span><InputCheckbox @bind-Value="Draft.RequiresConnectedService" /></label>
+        <label class="form-span-2"><span>@T("Type.ConfigurationSchema")</span><InputTextArea @bind-Value="Draft.ConfigurationSchema" class="form-code-editor" rows="8" maxlength="262144" data-testid="storage-type-configuration-schema" /></label>
+        <label class="form-span-2"><span>@T("Type.EnvelopeSchema")</span><InputTextArea @bind-Value="Draft.EnvelopeSchema" class="form-code-editor" rows="8" maxlength="262144" /></label>
+        <label class="form-span-2"><span>@T("Type.Requirements")</span><InputTextArea @bind-Value="Draft.Requirements" class="form-code-editor" rows="5" maxlength="65536" /></label>
+    </div>
+    <p>@T("Type.RequirementsHelp")</p><h3>@T("Capabilities")</h3><p>@T("Type.CapabilitiesHelp")</p>
+    <div class="form-grid">
+        <label><InputCheckbox @bind-Value="Draft.List" />@T("Capability.List")</label>
+        <label><InputCheckbox @bind-Value="Draft.Stat" />@T("Capability.Stat")</label>
+        <label><InputCheckbox @bind-Value="Draft.Read" />@T("Capability.Read")</label>
+        <label><InputCheckbox @bind-Value="Draft.Write" />@T("Capability.Write")</label>
+        <label><InputCheckbox @bind-Value="Draft.Delete" />@T("Capability.Delete")</label>
+        <label><InputCheckbox @bind-Value="Draft.StableVersions" />@T("Capability.StableVersions")</label>
+        <label><InputCheckbox @bind-Value="Draft.DurableRetention" />@T("Capability.DurableRetention")</label>
+        <label><InputCheckbox @bind-Value="Draft.Deprecated" />@T("Deprecated")</label>
+        <label><span>@T("Type.MaximumPageSize")</span><InputNumber @bind-Value="Draft.MaximumPageSize" min="1" max="1000" /></label>
+        <label><span>@T("Type.MaximumReadBytes")</span><InputNumber @bind-Value="Draft.MaximumReadBytes" min="1" max="16777216" /></label>
+        <label><span>@T("Type.MaximumWriteBytes")</span><InputNumber @bind-Value="Draft.MaximumWriteBytes" min="1" max="16777216" /></label>
+    </div>
+</section>
+@code {
+    [Parameter, EditorRequired] public StorageTypeVersionDraft Draft { get; set; } = new();
+    private string T(string key) => Localizer[key].Value;
+}

@@ -61,7 +61,8 @@ else
         }
         else if (activeTab == DetailsTab.Access && CanManageAccess)
         {
-            <ResourceAccessPanel OwnerScopeRef="resource.ScopeRef!.Value" Namespace="resource.Namespace" Kind="@StorageResourceKinds.Storage" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
+            <p class="form-alert form-alert-info" role="note">@T("Type.AccessHelp")</p>
+            <ResourceAccessPanel OwnerScopeRef="resource.ScopeRef!.Value" Namespace="resource.Namespace" Kind="@StorageResourceKinds.Storage" Name="@resource.Name" Governance="resource.Governance" EvaluateSavedAccess />
         }
         else if (activeTab == DetailsTab.YAML)
         {

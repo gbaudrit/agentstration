@@ -28,11 +28,10 @@ public sealed class StoragePlatformResourceProvisioner(StorageTypeManagementServ
 {
     public const string LocalTypeName = "local";
     public const string LocalTypeVersion = "1.0.0";
-    public const string ContentTypeVersion = "2.0.0";
 
     public async Task EnsureAsync(CancellationToken cancellationToken)
     {
-        using var authority = governance.Push(ResourceGovernance.Core("storage.local", ContentTypeVersion));
+        using var authority = governance.Push(ResourceGovernance.Core("storage.local", LocalTypeVersion));
         var existing = await types.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, LocalTypeName, cancellationToken);
         var schema = JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = false });
         _ = await types.SynchronizeManagedAsync(new()
@@ -49,20 +48,15 @@ public sealed class StoragePlatformResourceProvisioner(StorageTypeManagementServ
             Definition = new()
             {
                 DisplayName = "Local storage",
-                Description = "A local logical Storage without a remote connection. Version 2 provides bounded filesystem content operations.",
+                Description = "A local logical Storage without a remote connection, with bounded filesystem content operations.",
                 Enabled = existing?.Value.Definition.Enabled ?? true,
                 UsePolicy = existing?.Value.Definition.UsePolicy ?? new(),
-                PreferredVersion = ContentTypeVersion,
+                PreferredVersion = LocalTypeVersion,
                 Versions =
                 [
                     new()
                     {
                         Version = LocalTypeVersion, SchemaDigest = StorageDigests.Schema(schema), ConfigurationSchema = schema,
-                        EnvelopeSchemaDigest = StorageDigests.Schema(schema), EnvelopeSchema = schema
-                    },
-                    new()
-                    {
-                        Version = ContentTypeVersion, SchemaDigest = StorageDigests.Schema(schema), ConfigurationSchema = schema,
                         EnvelopeSchemaDigest = StorageDigests.Schema(LocalEnvelopeSchema), EnvelopeSchema = LocalEnvelopeSchema,
                         Capabilities = new() { List = true, Stat = true, Read = true, Write = true },
                         Limits = new(100, 65536, 65536)

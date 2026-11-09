@@ -19,7 +19,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class ConnectedServiceApiTests : ModelManagementApiTestBase
+public sealed partial class ConnectedServiceApiTests : ModelManagementApiTestBase
 {
     private static readonly JsonElement ObjectStorageSchema = JsonSerializer.SerializeToElement(new
     {

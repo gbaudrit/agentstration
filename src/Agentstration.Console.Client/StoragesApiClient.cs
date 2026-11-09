@@ -20,8 +20,41 @@ public interface IStoragesClient
     Task<ResourceSnapshot<StorageResource>> DeactivateAsync(ScopedResourceAddress address, string etag, CancellationToken token);
 }
 
-public sealed class StoragesApiClient(HttpClient httpClient) : IStoragesClient
+public interface IStorageTypesClient
 {
+    Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token);
+    Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token);
+    Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token);
+    Task<ResourceSnapshot<StorageTypeResource>> CreateTypeAsync(CreateStorageTypeRequest body, CancellationToken token);
+    Task<ResourceSnapshot<StorageTypeResource>> UpdateTypeAsync(ScopedResourceAddress address, PutStorageTypeRequest body, string etag, CancellationToken token);
+    Task<ResourceSnapshot<StorageTypeResource>> PublishTypeVersionAsync(ScopedResourceAddress address, PublishStorageTypeVersionRequest body, string etag, CancellationToken token);
+    Task DeleteTypeAsync(ScopedResourceAddress address, string etag, CancellationToken token);
+}
+
+public sealed class StoragesApiClient(HttpClient httpClient) : IStoragesClient, IStorageTypesClient
+{
+    public Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token) =>
+        ReadSnapshotAsync<StorageTypeResource>(HttpMethod.Get, TypePath(address), null, null, token);
+
+    public async Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token) =>
+        (await ApiResponse.ReadAsync<ValueResponse<StorageUsage>>(httpClient, TypePath(address, "usages"), token)).Value;
+
+    public Task<ResourceSnapshot<StorageTypeResource>> CreateTypeAsync(CreateStorageTypeRequest body, CancellationToken token) =>
+        ReadSnapshotAsync<StorageTypeResource>(HttpMethod.Post, "api/storage-types", JsonContent.Create(body), null, token);
+
+    public Task<ResourceSnapshot<StorageTypeResource>> UpdateTypeAsync(ScopedResourceAddress address, PutStorageTypeRequest body, string etag, CancellationToken token) =>
+        ReadSnapshotAsync<StorageTypeResource>(HttpMethod.Put, TypePath(address), JsonContent.Create(body), etag, token);
+
+    public Task<ResourceSnapshot<StorageTypeResource>> PublishTypeVersionAsync(ScopedResourceAddress address, PublishStorageTypeVersionRequest body, string etag, CancellationToken token) =>
+        ReadSnapshotAsync<StorageTypeResource>(HttpMethod.Post, TypePath(address, "versions"), JsonContent.Create(body), etag, token);
+
+    public async Task DeleteTypeAsync(ScopedResourceAddress address, string etag, CancellationToken token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, TypePath(address));
+        request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(request, token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+    }
     public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) =>
         ReadPagesAsync<StorageTypeResource>("api/storage-types", scope, token);
 
@@ -64,13 +97,17 @@ public sealed class StoragesApiClient(HttpClient httpClient) : IStoragesClient
     }
 
     private async Task<ResourceSnapshot<StorageResource>> ReadSnapshotAsync(HttpMethod method, string path,
+        HttpContent? content, string? etag, CancellationToken token) =>
+        await ReadSnapshotAsync<StorageResource>(method, path, content, etag, token);
+
+    private async Task<ResourceSnapshot<T>> ReadSnapshotAsync<T>(HttpMethod method, string path,
         HttpContent? content, string? etag, CancellationToken token)
     {
         using var request = new HttpRequestMessage(method, path) { Content = content };
         if (etag is not null) request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(request, token);
         await ApiResponse.EnsureSuccessAsync(response, token);
-        var value = await response.Content.ReadFromJsonAsync<StorageResource>(token);
+        var value = await response.Content.ReadFromJsonAsync<T>(token);
         var responseEtag = response.Headers.ETag?.ToString();
         if (value is null || string.IsNullOrWhiteSpace(responseEtag))
             throw new AgentstrationApiException("Storage response is missing its resource or ETag.", Guid.NewGuid().ToString("N"));
@@ -79,4 +116,7 @@ public sealed class StoragesApiClient(HttpClient httpClient) : IStoragesClient
 
     private static string Path(ScopedResourceAddress address, string? action = null) =>
         $"api/storages/{Uri.EscapeDataString(address.Name)}{(action is null ? "" : $"/{action}")}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+
+    private static string TypePath(ScopedResourceAddress address, string? action = null) =>
+        $"api/storage-types/{Uri.EscapeDataString(address.Name)}{(action is null ? "" : $"/{action}")}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace={Uri.EscapeDataString(address.Namespace.Value)}";
 }

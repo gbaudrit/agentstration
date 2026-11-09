@@ -51,7 +51,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
             _ = await policies.PutAsync(new(new(source.Value.Uid, instanceScope, source.Value.Namespace,
-                source.Value.Kind, source.Value.Generation),
+                source.Value.Kind),
                 [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
 
         var knowledge = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();

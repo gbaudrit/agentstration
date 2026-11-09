@@ -174,7 +174,7 @@ public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourc
         var context = await storages.ResolveAsync(storage, new(consumer, storage.Storage.Address), cancellationToken);
         if (context.Type.Type.ScopeRef != ResourceScopeRef.Instance || context.Type.Type.Name != StoragePlatformResourceProvisioner.LocalTypeName
             || context.Type.Type.Namespace is { } ns && ns != ResourceNamespace.Default
-            || context.Type.Version != StoragePlatformResourceProvisioner.ContentTypeVersion
+            || context.Type.Version != StoragePlatformResourceProvisioner.LocalTypeVersion
             || (operation == Operation.Write ? !context.Capabilities.Write : operation == Operation.Read ? !context.Capabilities.Read : !context.Capabilities.Stat))
             throw new StorageException("storage_artifact_incompatible", "The selected Artifact Storage implementation is incompatible.", 409);
         var policy = context.Envelope.Deserialize<StorageContentPolicy>(Json)

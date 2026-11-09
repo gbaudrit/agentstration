@@ -14,8 +14,9 @@ and opaque configuration layers. ADR-0151 preserves Artifact staging, receipts,
 leases and Flow composition; ADR-0185 separates administrative ownership from
 operational Workspace placement. These accepted boundaries remain in effect.
 
-The metadata-only immutable builtin `local@1.0.0` has no content capabilities.
-The maintainer requires a functional local default, separate physical directories
+Storage has not shipped. The maintainer requires one functional initial builtin
+`local@1.0.0`, without retaining an intermediate metadata-only version or adding
+a compatibility version. The local default requires separate physical directories
 and a persistent operator-owned root suitable for Docker mounting. #1064 owns
 StorageType administration and existing generic resource grants, preserving
 deliberate revocations. New user-permission work belongs to #1077; UsePolicy
@@ -55,8 +56,10 @@ delegation must refuse a service identity that does not satisfy that requirement
 Content arguments cannot create or replace configured bindings. The existing
 static ASP binding mode remains available to independently authorized consumers.
 
-Publish `local@2.0.0` on the same Instance-owned type UID. Retain `local@1.0.0`
-unchanged and leave existing Storage pins unchanged. Version 2 implements bounded
+Publish one functional builtin `local@1.0.0` on the Instance-owned type UID.
+This pre-release baseline replaces the intermediate metadata-only draft contract;
+it adds no migration, compatibility version or automatic consumer rebinding.
+Subsequently published versions remain immutable. Version 1 implements bounded
 list, stat, read and conditional/idempotent write. It advertises no deletion,
 stable historical object versions or Snapshot retention. The native Artifact
 receipt/retention contract remains a separate established guarantee.

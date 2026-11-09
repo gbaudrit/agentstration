@@ -1,0 +1,170 @@
+@page "/storage-types/new"
+@page "/storage-types/{Name}/edit"
+@page "/storage-types/{Name}/versions/new"
+@implements IDisposable
+@inject IStorageTypesClient Client
+@inject ConsoleContextState Context
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+
+<PageTitle>@Title · Agentstration</PageTitle>
+<PageHeader Title="@Title" Description="@T("Type.ImmutableHelp")" TestId="storage-type-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
+@if (loading) { <LoadingState Message="@T("Type.Loading")" /> }
+else
+{
+    <StorageError Error="error" />
+    @if (!CanWrite) { <p role="note">@T("ReadOnlyHelp")</p> }
+    else
+    {
+        @if (invalid) { <p role="alert">@T("Type.Validation")</p> }
+        @if (error is not null && original is not null)
+        {
+            <button type="button" class="button-secondary" @onclick="ReviewAsync" disabled="@busy" data-testid="storage-type-review">@T("Type.ReviewCurrent")</button>
+        }
+        @if (reviewed && original is not null)
+        {
+            <section class="panel storage-type-current">
+                <p role="status">@Localizer["Type.CurrentSaved", original.Definition.DisplayName, original.Generation]</p>
+                <dl class="resource-details">
+                    <dt>@T("Description")</dt><dd>@original.Definition.Description</dd>
+                    <dt>@T("Enabled")</dt><dd>@T(original.Definition.Enabled ? "Value.Yes" : "Value.No")</dd>
+                    <dt>@T("Type.PreferredVersion")</dt><dd>@original.Definition.PreferredVersion</dd>
+                </dl>
+            </section>
+        }
+        <EditForm Model="draft" OnSubmit="RequestSaveAsync" FormName="storage-type-editor" class="resource-form">
+            <fieldset disabled="@busy">
+                @if (!IsPublishing)
+                {
+                    <section class="panel form-section"><h2>@T("Identity")</h2><div class="form-grid">
+                        <ResourceIdentityFields @bind-DisplayName="draft.DisplayName" @bind-TechnicalName="draft.Name" Policy="ResourceNamePolicy.Generic" IsNew="IsNew" DisplayNameTestId="storage-type-display-name" TechnicalNameTestId="storage-type-name" />
+                        <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="draft.Description" maxlength="2000" /></label>
+                        <label><span>@T("Namespace")</span>@if (IsNew) { <InputText @bind-Value="draft.Namespace" maxlength="128" /> } else { <code>@draft.Namespace</code> }</label>
+                        <div><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="ownerScope" /></div>
+                        <label><span>@T("Enabled")</span><InputCheckbox @bind-Value="draft.Enabled" /></label>
+                        @if (!IsNew && original is not null)
+                        {
+                            <label><span>@T("Type.PreferredVersion")</span><InputSelect @bind-Value="draft.PreferredVersion">@foreach (var version in original.Definition.Versions) { <option value="@version.Version">@version.Version</option> }</InputSelect></label>
+                        }
+                    </div></section>
+                }
+                @if (IsNew || IsPublishing)
+                {
+                    <StorageTypeVersionFields Draft="draft.Version" />
+                    @if (IsPublishing) { <label><InputCheckbox @bind-Value="draft.SetPreferred" />@T("Type.SetPreferred")</label> }
+                }
+                <div class="form-actions"><button type="submit" class="button-primary" data-testid="storage-type-save">@(busy ? T("Saving") : IsPublishing ? T("Type.Publish") : T("Save"))</button></div>
+            </fieldset>
+        </EditForm>
+    }
+}
+<StorageConfirmation IsOpen="confirmDisable" Title="@T("Deactivate")" Message="@T("Type.DisableConfirm")" ConfirmLabel="@T("Deactivate")" TestId="storage-type-disable-confirmation" OnConfirm="SaveAsync" OnCancel="() => confirmDisable = false" />
+@code {
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private TypeDraft draft = new();
+    private StorageTypeResource? original;
+    private ResourceScopeRef? ownerScope;
+    private string? etag, loadedKey;
+    private bool loading = true, busy, invalid, reviewed, confirmDisable;
+    private Exception? error;
+    private bool IsNew => string.IsNullOrEmpty(Name);
+    private bool IsPublishing => Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath.EndsWith("/versions/new", StringComparison.Ordinal);
+    private string Title => T(IsNew ? "Type.Create" : IsPublishing ? "Type.Publish" : "Type.Edit");
+    private string BackUrl => original is null ? "/storage-types" : StorageTypeLinks.Details(original);
+    private bool CanWrite => Context.HasPermission("resources/write") && ownerScope?.Value == Context.Current?.SelectedScopeRef && (IsNew || original is { Governance.IsManaged: false });
+    private string T(string key) => Localizer[key].Value;
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{ScopeRefValue}|{NamespaceValue}|{IsPublishing}";
+        if (loadedKey == key) return;
+        loadedKey = key;
+        loading = true; original = null; ownerScope = null; draft = new(); error = null; invalid = reviewed = confirmDisable = false;
+        try
+        {
+            await Context.EnsureLoadedAsync(cancellation.Token);
+            if (!Context.HasPermission("resources/read")) return;
+            ownerScope = IsNew ? ResourceScopeRef.Parse(Context.Current!.SelectedScopeRef) : ResourceScopeRef.Parse(ScopeRefValue ?? throw new ArgumentException("scopeRef"));
+            if (IsNew) return;
+            var snapshot = await Client.GetTypeAsync(Address(), cancellation.Token);
+            original = snapshot.Value; etag = snapshot.ETag;
+            draft.Name = original.Name; draft.Namespace = original.Namespace.Value;
+            draft.DisplayName = original.Definition.DisplayName; draft.Description = original.Definition.Description;
+            draft.Enabled = original.Definition.Enabled; draft.PreferredVersion = original.Definition.PreferredVersion;
+            if (IsPublishing) draft.Version.Version = string.Empty;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private ScopedResourceAddress Address() => ScopedResourceAddress.Create(ownerScope!.Value,
+        ResourceNamespace.Parse(NamespaceValue ?? draft.Namespace), StorageResourceKinds.StorageType, Name ?? draft.Name);
+    private async Task RequestSaveAsync(EditContext editContext)
+    {
+        if (!editContext.Validate()) { invalid = true; return; }
+        if (!IsPublishing && original?.Definition.Enabled == true && !draft.Enabled)
+        {
+            confirmDisable = true;
+            return;
+        }
+        await SaveAsync();
+    }
+    private async Task SaveAsync()
+    {
+        confirmDisable = false;
+        if (busy || !CanWrite) return;
+        busy = true; error = null; invalid = false;
+        try
+        {
+            ResourceSnapshot<StorageTypeResource> snapshot;
+            if (IsNew)
+            {
+                var version = draft.Version.Build();
+                snapshot = await Client.CreateTypeAsync(new(draft.Name, new()
+                {
+                    DisplayName = draft.DisplayName.Trim(), Description = draft.Description, Enabled = draft.Enabled,
+                    PreferredVersion = version.Version, Versions = [version]
+                }, ownerScope, ResourceNamespace.Parse(draft.Namespace)), cancellation.Token);
+            }
+            else if (IsPublishing)
+                snapshot = await Client.PublishTypeVersionAsync(Address(), new(draft.Version.Build(), draft.SetPreferred), etag!, cancellation.Token);
+            else
+                snapshot = await Client.UpdateTypeAsync(Address(), new(original!.Definition with
+                {
+                    DisplayName = draft.DisplayName.Trim(), Description = draft.Description,
+                    Enabled = draft.Enabled, PreferredVersion = draft.PreferredVersion
+                }), etag!, cancellation.Token);
+            Navigation.NavigateTo(StorageTypeLinks.Details(snapshot.Value));
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException) { invalid = true; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { busy = false; }
+    }
+    private async Task ReviewAsync()
+    {
+        busy = true;
+        try
+        {
+            var snapshot = await Client.GetTypeAsync(Address(), cancellation.Token);
+            original = snapshot.Value; etag = snapshot.ETag; reviewed = true; error = null;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { busy = false; }
+    }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private sealed class TypeDraft
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
+        public string DisplayName { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool Enabled { get; set; } = true;
+        public string PreferredVersion { get; set; } = string.Empty;
+        public bool SetPreferred { get; set; }
+        public StorageTypeVersionDraft Version { get; } = new();
+    }
+}

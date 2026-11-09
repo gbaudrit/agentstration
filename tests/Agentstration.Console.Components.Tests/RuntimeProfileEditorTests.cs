@@ -99,6 +99,8 @@ public sealed class RuntimeProfileEditorTests
 
     private sealed class AccessPolicyClientStub : IResourceAccessPolicyClient
     {
+        public Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessDecision(false, ResourceAccessDecisionReasons.GrantMissing));
         public ResourceAccessPolicy? Saved { get; private set; }
 
         public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) =>

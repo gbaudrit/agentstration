@@ -1,7 +1,7 @@
 # Data Source operation and Storage composition
 
 This vertical implements [#1041](https://github.com/gbaudrit/agentstration/issues/1041)
-on `integration/fr-1032`. See [ADR-0201](../../decisions/0201-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
+on `integration/fr-1032`. See [ADR-0202](../../decisions/0202-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
 for ownership, the compatibility decision and routes.
 
 ## Configuration and execution
@@ -32,6 +32,14 @@ The Console uses the shared schema editor, complete neutral/French resources,
 explicit activation and revision selection. A changed reference is selected
 explicitly; refresh does not rewrite saved pins. Existing profile resources,
 discoveries, targets, acquisitions, Tools and Knowledge consumers are retained.
+
+The integration baseline includes StorageType administration and scoped generic
+grants from #1079, and protected OpenAPI discovery from #1059. Acquisition uses
+the merged `local@1.0.0` contract and current Storage/StorageType Use decisions;
+it creates no grants. OpenAPI discovery alone does not make its Operations
+acquisition-eligible: their exact type version must also declare the compatible
+acquisition adapter. No invocation contract is inferred from a discovered HTTP
+method or from its read-only flag.
 
 ## Lifecycle and limits
 

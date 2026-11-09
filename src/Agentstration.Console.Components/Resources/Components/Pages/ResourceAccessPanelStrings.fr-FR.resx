@@ -54,4 +54,22 @@
   <data name="ScopeKind.Instance"><value>Instance</value></data>
   <data name="ScopeKind.Tenant"><value>Tenant</value></data>
   <data name="ScopeKind.Workspace"><value>Workspace</value></data>
+  <data name="Evaluation.Title" xml:space="preserve"><value>Décisions d’accès générique enregistrées</value></data>
+  <data name="Evaluation.Help" xml:space="preserve"><value>Évaluez séparément Discover et Use pour un périmètre exact à partir de la politique enregistrée. Ces décisions n’évaluent pas les droits utilisateurs, UsePolicy, la disponibilité du fournisseur ni les capacités de contenu.</value></data>
+  <data name="Evaluation.Action" xml:space="preserve"><value>Évaluer les autorisations enregistrées</value></data>
+  <data name="Evaluation.Unsaved" xml:space="preserve"><value>Vous avez des modifications non enregistrées. L’évaluation utilise toujours les autorisations enregistrées.</value></data>
+  <data name="Evaluation.Failed" xml:space="preserve"><value>Impossible d’évaluer l’accès. Actualisez la ressource et vérifiez son identité et sa politique.</value></data>
+  <data name="Evaluation.Allowed" xml:space="preserve"><value>Autorisé</value></data>
+  <data name="Evaluation.Denied" xml:space="preserve"><value>Refusé</value></data>
+  <data name="Evaluation.SameScope" xml:space="preserve"><value>Même périmètre propriétaire ; l’autorisation contextuelle reste applicable.</value></data>
+  <data name="Evaluation.ExactGrant" xml:space="preserve"><value>Une autorisation ciblant ce périmètre exact permet cette action.</value></data>
+  <data name="Evaluation.PropagatedGrant" xml:space="preserve"><value>Une autorisation d’ancêtre explicitement propagée permet cette action.</value></data>
+  <data name="Evaluation.PolicyMissing" xml:space="preserve"><value>Aucune politique d’accès descendant n’est enregistrée.</value></data>
+  <data name="Evaluation.GrantMissing" xml:space="preserve"><value>Aucune autorisation correspondante ne permet cette action.</value></data>
+  <data name="Evaluation.Stale" xml:space="preserve"><value>La révision de ressource ou de politique est obsolète ; vérifiez l’identité exacte.</value></data>
+  <data name="Evaluation.Unavailable" xml:space="preserve"><value>La décision demandée n’est pas disponible dans ce contexte.</value></data>
+  <data name="ReviewCurrent" xml:space="preserve"><value>Consulter la révision de politique sans perdre mes autorisations</value></data>
+  <data name="ReviewedPolicy" xml:space="preserve"><value>Comparez ces autorisations enregistrées avec votre saisie conservée. Un nouvel enregistrement remplace les autorisations enregistrées par votre saisie.</value></data>
+  <data name="CurrentPolicy" xml:space="preserve"><value>Autorisations actuellement enregistrées</value></data>
+  <data name="ExactTargetOnly" xml:space="preserve"><value>Cible exacte uniquement</value></data>
 </root>

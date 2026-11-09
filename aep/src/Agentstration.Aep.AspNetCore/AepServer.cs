@@ -53,7 +53,7 @@ public sealed class AepExtensionOptions
         TimeoutSeconds: 60);
 }
 
-public static class AepServerExtensions
+public static partial class AepServerExtensions
 {
     public static IServiceCollection AddAep(this IServiceCollection services, Action<AepExtensionOptions>? configure = null) =>
         services.AddAgentstrationAep(configure);
@@ -95,6 +95,7 @@ public static class AepServerExtensions
         protocolEndpoints.Add(endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepOptionMigrator> migrators) =>
             Results.Json(CreateConfigurationCatalog(options.Value.OptionSets, migrators), AepProtocol.JsonOptions)));
         protocolEndpoints.Add(endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync));
+        protocolEndpoints.Add(endpoints.MapPost(AepConnectedServiceDiscoveryProtocol.Path, DiscoverConnectedServiceOperationsAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync));

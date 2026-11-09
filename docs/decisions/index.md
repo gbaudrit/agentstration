@@ -226,4 +226,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 198. [ADR-0198 — Connected Service operations are typed discovered resources](0198-connected-service-operations-are-typed-discovered-resources.md)
 199. [ADR-0199 — Storages own explicit Connected Service export bindings](0199-storages-own-explicit-service-export-bindings.md)
 200. [ADR-0200 — Storage execution pins protected bindings and local Workspace defaults](0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md)
-201. [ADR-0201 — Data Sources compose operation acquisitions with logical datasets](0201-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
+201. [ADR-0201 — OpenAPI discovery uses protected Connected Service execution](0201-openapi-discovery-uses-protected-connected-service-execution.md)
+202. [ADR-0202 — Data Sources compose operation acquisitions with logical datasets](0202-data-sources-compose-operation-acquisitions-with-logical-datasets.md)

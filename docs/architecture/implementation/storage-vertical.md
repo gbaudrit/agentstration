@@ -40,9 +40,10 @@ definition requires an explicit request and ETag; dependencies prevent destructi
 rebinding or deactivation. Missing providers leave stored resources and evidence
 unchanged. Read-time observations do not create writes or change ETags.
 
-The Core `local` type supports management/resolution without a Connected Service.
-Its immutable metadata-only `1.0.0` remains unchanged. #1040 adds functional
-`2.0.0`, guarded default provisioning, separate UID-bound directories and protected
+The Core `local@1.0.0` type supports management/resolution and bounded content
+without a Connected Service. Before release, the maintainer retained a single
+functional initial version rather than intermediate compatibility contracts.
+#1040 supplies guarded default provisioning, separate UID-bound directories and protected
 ASP/AEP/Artifact adapters. [Execution and deployment](../../reference/storage-execution.md)
 and [ADR-0200](../../decisions/0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md)
 describe runtime authority, policy preservation, current capability limits and
@@ -91,6 +92,33 @@ Secret-resolution ports. Architecture checks explicitly permit this family contr
 while continuing to reject Storage services, API modules and concrete persistence
 from Console assemblies. This follows ADR-0199 and the existing Connected Service
 Console architecture; it introduces no new architectural decision or ADR.
+
+## StorageType administration (#1064)
+
+The existing family now exposes explicit immutable-version publication and a
+bounded discoverable-reference projection. Dependency checks cover type deletion
+and disablement even when the consumer cannot be disclosed. Console adds an
+independent catalogue, exact details, metadata editor and version-publication
+form through `IStorageTypesClient`, implemented by the existing HTTP client and
+registered in both Console composition roots. There is no new module or schema.
+
+The shared Access panel reuses the canonical evaluator for saved generic
+Discover/Use decisions. Ordinary Storage overlays bind to exact resource UID,
+scope, namespace and kind rather than automatically pinning mutable generation.
+Explicit revision pins remain supported and fail closed in both store discovery
+and effective evaluation. Existing-overlay writes require the policy's own ETag;
+conflicts retain the Console draft and require explicit review of the current
+revision before retry. SQLite and PostgreSQL implement the same identity and
+concurrency rules. Managed-resource synchronization never writes these overlays.
+
+These changes implement ADR-0172/ADR-0181 and the Storage family contract corrected
+by ADR-0200. Generic ResourceAccessPolicy.Use is the current Storage/StorageType
+usage authority; embedded UsePolicy adds no second gate while #1078 is deferred.
+Existing caller-authorization checks remain in place; new user-permission work is
+tracked by #1077. Accepted ADRs remain unchanged. #1040 owns ASP/AEP/Artifact/local
+execution and provisioning; #1041/#1042 retain consumer rules. #1065 remains
+blocked on explicit implemented-UX approval and implementation merge, independently
+of the required implementation smoke/regression checks.
 
 ## Execution boundary
 
@@ -169,3 +197,11 @@ Storage-specific help text also needs alignment with the current contract. An
 isolated test patch was prepared for that branch; no Console source was changed
 in #1080. Combined-branch/browser validation is not claimed by these backend checks.
 No new reusable UX scenario was added; #1033/#1065 retain their existing gates.
+
+The #1064 integration applies those cross-branch adaptations and the subsequent
+maintainer decision to retain one functional pre-release `local@1.0.0`. The
+Storage-specific help, builtin version selection, authorized creation/revocation
+assertions and request-observation/selector regressions now follow ADR-0200.
+Combined validation and the isolated service-fixture correction are recorded in
+[the Console reference](../../reference/storage-console.md#validation-evidence--combined-10641040-2026-11-08)
+and PR #1079. These checks do not approve the UX or authorize a merge.
