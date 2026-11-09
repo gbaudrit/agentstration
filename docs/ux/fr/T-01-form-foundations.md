@@ -3,6 +3,8 @@
 ## Technical category
 Refactoring
 
+Published issue: [#1096](https://github.com/gbaudrit/agentstration/issues/1096).
+
 ## Area
 Cross-cutting
 

@@ -68,9 +68,9 @@ Le plan **ne nécessite pas de bibliothèque UX globale**. T-02 commence par `Da
 
 ## Publication et validation
 
-Les neuf descriptions respectent les formulaires du dépôt, avec titres et corps en anglais. Les liens locaux seront remplacés par les vrais numéros lors d’une éventuelle publication. Les FR utilisent `enhancement`, les tâches de socle `technical-task`, avec `triage:agent` et `triage:pending-review` pour la classification proposée ; aucune priorité n’est attribuée.
+Les neuf descriptions respectent les formulaires du dépôt, avec titres et corps en anglais. Les numéros publiés et les relations natives vérifiées sont consignés ci-dessous. Les FR utilisent `enhancement`, les tâches de socle `technical-task`, avec `triage:agent` et `triage:pending-review` pour la classification proposée ; aucune priorité n’est attribuée.
 
-À la publication, créer d’abord FR-00, puis attacher les huit lots par les **Sub-issues natives GitHub** et enregistrer leurs dépendances séparément. Les liens textuels ne remplacent pas cette relation. FR-00 suit les scénarios des lots, sans imposer un scénario parent qui dupliquerait tous les parcours.
+La publication a créé FR-00, puis attaché les huit lots par les **Sub-issues natives GitHub** avec leurs dépendances documentées séparément. Les liens textuels ne remplacent pas cette relation. FR-00 suit les scénarios des lots, sans imposer un scénario parent qui dupliquerait tous les parcours.
 
 Pour chaque FR qui change un parcours, créer après son numéro et avant sa PR UX un enfant distinct `technical-task` + `test-scenario-task`. Les sections « UX test scenario follow-up » en donnent déjà les routes, fixtures, actions, succès et échecs attendus. Le nouveau scénario Playwright réutilisable attend la validation UX explicite du mainteneur et la fusion de la PR, conformément à [AGENTS.md](../../AGENTS.md). Cette attente ne concerne pas les tests de comportement, la réparation des régressions existantes ni les smoke tests requis dans la PR UX.
 
@@ -95,3 +95,7 @@ Les défauts ponctuels recensés dans l’audit restent à qualifier avec le for
 | T-02 | [#1097](https://github.com/gbaudrit/agentstration/issues/1097) |
 
 Les relations natives parent/enfant sont vérifiées. Les scénarios #1098 à #1106 sont rattachés à leurs FR et attendent validation UX et fusion.
+
+## Livraison initiale
+
+Le socle et les écrans pilotes sont implémentés sur la branche d’intégration. Consulter la [matrice d’adoption et des reports](adoption-des-composants.md), les [contrats des composants et des thèmes](component-contracts.md) et le [compte rendu de validation avec captures](validation-implementation.md). Les thèmes nommés restent une capacité future, distincte de l’apparence clair/sombre/système déjà disponible. Les FR restent ouvertes pour le suivi des scénarios et de la validation UX.

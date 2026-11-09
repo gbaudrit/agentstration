@@ -1,5 +1,7 @@
 # Unify resource administration with shared forms and collection patterns
 
+Published issue: [#1089](https://github.com/gbaudrit/agentstration/issues/1089).
+
 ## Area
 Cross-cutting
 
@@ -45,7 +47,7 @@ None
 - [ ] All native Sub-issues and required scenario children are complete, or explicit maintainer exceptions are recorded before closure.
 
 ## UX test scenario follow-up
-The parent introduces no separate route or implementation PR. The changed journeys and deterministic scenarios are owned by FR-01 through FR-06. After publication, attach these delivery issues and the foundation tasks as native Sub-issues. Each UX delivery creates its own scenario child before its UX PR; no blanket claim of existing browser coverage is made. Keep this parent open until the delivery and scenario children are closed or explicitly waived.
+The parent introduces no separate route or implementation PR. The changed journeys and deterministic scenarios are owned by FR-01 through FR-06. Delivery issues #1090–#1097 are published and natively attached; scenario children #1098–#1106 are also attached to their FRs. Each UX delivery creates its own scenario child before its UX PR; no blanket claim of existing browser coverage is made. Keep this parent open until the delivery and scenario children are closed or explicitly waived.
 
 ## Additional context
 Local planning ID: FR-00, not a GitHub issue number. Source baseline: main at 8a9fafd7432e28c7aab23109c43593cc90b35c66. Reconcile newer merged/integration work before implementation. Proposed labels on publication: enhancement, triage:agent, triage:pending-review; no priority assigned.

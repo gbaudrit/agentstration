@@ -1,5 +1,7 @@
 # Clear field values in place and keep resource identity easy to understand
 
+Published issue: [#1090](https://github.com/gbaudrit/agentstration/issues/1090); parent [#1089](https://github.com/gbaudrit/agentstration/issues/1089).
+
 ## Area
 Console
 
@@ -47,7 +49,7 @@ None
 - [ ] Light/dark rendering, focus visibility and complete en-US/fr-FR localization pass on both pilots.
 
 ## UX test scenario follow-up
-Create a separate Technical task with technical-task and test-scenario-task labels after this issue has a number; attach it as a native Sub-issue before the UX PR. Local child status: pending parent publication. Start its new reusable journey only after explicit maintainer UX approval and merge; update existing affected tests and run smoke checks in the UX PR.
+Scenario children [#1098](https://github.com/gbaudrit/agentstration/issues/1098) are published and natively attached. Their new reusable journeys wait for explicit maintainer UX validation and merged implementation PR. Existing regression repairs, behavior tests and required smoke checks remain in the UX PR.
 
 Routes: the four pilot routes above. Prerequisites: deterministic writable scope, disposable Parameter and Model Profile, a read-only resource, unique proposed technical names and no remote provider dependency. Actions: create with an accented display name, manually override and clear the proposed technical name, exercise required/optional fields, save/reopen and rename the display name. Success: focus retained, intended empty values persisted where allowed, identity stable after creation, adjacent fields usable on mobile. Expected failures: invalid/duplicate name and missing required value remain visible without losing other input; read-only values cannot be cleared. Compare existing #578 journey before adding coverage; only an evidenced overlap can be marked Not applicable.
 

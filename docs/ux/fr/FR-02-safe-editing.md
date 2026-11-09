@@ -1,5 +1,7 @@
 # Preserve resource drafts and make save outcomes predictable
 
+Published issue: [#1091](https://github.com/gbaudrit/agentstration/issues/1091); parent [#1089](https://github.com/gbaudrit/agentstration/issues/1089).
+
 ## Area
 Console
 
@@ -47,7 +49,7 @@ None
 - [ ] Actions remain reachable without obscuring the last field at desktop/mobile widths and browser zoom, in light/dark themes and en-US/fr-FR.
 
 ## UX test scenario follow-up
-Child: pending parent publication. Create a separate native Technical task child labeled technical-task and test-scenario-task before the UX PR. Its new reusable scenario waits for explicit maintainer UX approval and merge; behavior tests, existing browser regression repairs and smoke checks remain in the UX PR.
+Scenario children [#1099](https://github.com/gbaudrit/agentstration/issues/1099) are published and natively attached. Their new reusable journeys wait for explicit maintainer UX validation and merged implementation PR. Existing regression repairs, behavior tests and required smoke checks remain in the UX PR.
 
 Routes: `/agents/new`, `/agents/{Name}`, `/agents/{Name}/run`, `/agents`. Fixtures: deterministic Agent, valid local Model Profile, controllable delayed/failed save and failed deployment responses, no live LLM. Actions: edit/revert, filter profiles, switch structured/YAML views with invalid YAML, cancel/confirm departure, retry a failed save and exercise a delayed save. Success: drafts retained, UI-only changes stay clean, successful save distinguished from failed deployment. Expected failures: validation/server rejection preserves values; duplicate save is prevented; late responses do not erase subsequent edits. Run desktop/mobile and both themes; do not repurpose the Flow Designer journey as proof of ordinary-form coverage.
 

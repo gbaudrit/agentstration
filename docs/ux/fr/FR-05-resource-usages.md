@@ -1,5 +1,7 @@
 # Browse large Model Profile usage lists with bounded filtering and paging
 
+Published issue: [#1094](https://github.com/gbaudrit/agentstration/issues/1094); parent [#1089](https://github.com/gbaudrit/agentstration/issues/1089).
+
 ## Area
 Console
 
@@ -48,7 +50,7 @@ None
 - [ ] No-data, no-matches and expected error states are distinguishable; both themes, mobile, keyboard and en-US/fr-FR pass.
 
 ## UX test scenario follow-up
-Child: pending parent publication. Create a separate native Technical task child labeled technical-task and test-scenario-task before the UX PR. Its new reusable scenario starts after explicit maintainer UX approval and merge. Preserve existing #898 coverage and include behavior/contract/isolation tests and browser smoke in the UX PR.
+Scenario children [#1102](https://github.com/gbaudrit/agentstration/issues/1102) are published and natively attached. Their new reusable journeys wait for explicit maintainer UX validation and merged implementation PR. Existing regression repairs, behavior tests and required smoke checks remain in the UX PR.
 
 Routes: `/modelprofiles/{Name}` and authorized `/agents/{Name}` detail links, preserving existing usage deep links. Fixtures: deterministic Instance- and Tenant-owned profiles with enough authorized direct consumers for multiple pages (the prototype illustrates 32 usages), repeated names in distinct Workspaces, a restricted user, one unused profile and controllable API failure. Actions: open overview, search for a later-page consumer, clear filters, change page, open a permitted consumer, and return with an unsaved draft where applicable. Success: correct references/count semantics, bounded requests, stable draft behavior and recoverable no-match state. Expected failures: unauthorized consumers/counts are absent, errors retain query context and allow retry, a removed result does not leave an unusable page. No remote LLM is required.
 

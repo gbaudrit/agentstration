@@ -1,5 +1,7 @@
 # Adopt shared UX patterns across a bounded set of Console and Workplace screens
 
+Published issue: [#1095](https://github.com/gbaudrit/agentstration/issues/1095); parent [#1089](https://github.com/gbaudrit/agentstration/issues/1089).
+
 ## Area
 Cross-cutting
 
@@ -52,7 +54,7 @@ None
 - [ ] All other audited families have an explicit disposition; deferred screens are not claimed as migrated. Closure waits for required scenario children or documented maintainer waivers.
 
 ## UX test scenario follow-up
-Children: pending parent publication. Before the first UX PR for a wave, create and natively attach a separate Technical task scenario child for that coherent route group, labeled technical-task and test-scenario-task. Do not create one giant journey that couples all four waves. Each new reusable journey waits for its wave's explicit maintainer UX approval and merged implementation PR. Existing tests, component behavior and browser smoke remain in each UX PR.
+Scenario children [#1103](https://github.com/gbaudrit/agentstration/issues/1103), [#1104](https://github.com/gbaudrit/agentstration/issues/1104), [#1105](https://github.com/gbaudrit/agentstration/issues/1105), [#1106](https://github.com/gbaudrit/agentstration/issues/1106) are published and natively attached. Their new reusable journeys wait for explicit maintainer UX validation and merged implementation PR. Existing regression repairs, behavior tests and required smoke checks remain in the UX PR.
 
 - Wave A routes: listed above. Fixtures: disposable writable and read-only resources using deterministic providers; valid and invalid form inputs. Actions: create, clear required/optional fields, save/reopen, change display name and cancel departure. Assert validation, stable identity, retained drafts and denied editing where applicable.
 - Wave B route: `/tools`. Fixtures: local populated catalog, multiple categories and a no-match query. Actions: filter, clear, inspect details and return. Assert valid result scope/count wording, stable navigation and mobile cards; expected failures show no-match/error without implying an empty catalog.

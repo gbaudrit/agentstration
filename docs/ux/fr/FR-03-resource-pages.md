@@ -1,5 +1,7 @@
 # Give resource details a consistent overview and editing structure
 
+Published issue: [#1092](https://github.com/gbaudrit/agentstration/issues/1092); parent [#1089](https://github.com/gbaudrit/agentstration/issues/1089).
+
 ## Area
 Console
 
@@ -48,7 +50,7 @@ None
 - [ ] Layout and focus remain usable on desktop/mobile in light/dark themes, with complete en-US/fr-FR labels.
 
 ## UX test scenario follow-up
-Child: pending parent publication. Create and attach a separate native Technical task child labeled technical-task and test-scenario-task before the UX PR. New reusable automation starts after explicit maintainer UX approval and merge. Existing regression repairs, behavior tests and browser smoke remain required in that PR.
+Scenario children [#1100](https://github.com/gbaudrit/agentstration/issues/1100) are published and natively attached. Their new reusable journeys wait for explicit maintainer UX validation and merged implementation PR. Existing regression repairs, behavior tests and required smoke checks remain in the UX PR.
 
 Routes: both detail routes above, `/modelprofiles/new`, `/agents/new` and existing family-tab deep links. Fixtures: deterministic saved resources, Instance/Tenant/Workspace ownership cases, one writable and one inherited/read-only case, a restricted user, and differing saved/active Agent generations where supported. Actions: visit overview, edit without saving, switch Access/YAML/family tabs, return, save and reopen via direct link. Success: saved overview and draft are distinct, input survives navigation, rights and extra tabs remain intact. Expected failures: unauthorized edits cannot execute; invalid raw YAML remains available with errors rather than disappearing. Include keyboard tab activation and desktop/mobile/theme smoke.
 
