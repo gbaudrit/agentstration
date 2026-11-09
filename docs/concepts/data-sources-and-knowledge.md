@@ -19,7 +19,7 @@ origin
 
 ## Acquire once, project many times
 
-A Data Source owns the origin identity, configuration, enabled state, and profile reference. Its Data Source Profile owns the reusable configuration schema, acquisition Flow, governed Tool bindings, limits, and policies. Profiles have editable drafts, immutable published revisions, and one active revision.
+A historical Data Source owns the origin identity, configuration, enabled state, and profile reference. Its Data Source Profile owns the reusable configuration schema, acquisition Flow, governed Tool bindings, limits, and policies. Profiles have editable drafts, immutable published revisions, and one active revision. Native datasets instead pin an Operation, saved parameters and Storage; they do not require a historical Profile.
 
 Data Sources and profiles may be owned at instance, tenant, or Workspace scope. References follow ancestor-only visibility and explicit descendant-use grants: a Workspace may consume an authorized Workspace, tenant, or instance resource, while a tenant resource cannot depend on a Workspace resource. Profile publication resolves dependencies from the profile owner scope and pins the exact Flow version and integrity hash plus Tool and provider identities and generations. The acquisition Flow currently has to share the profile's exact scope because #751 has not yet exposed Flow identities to the shared access-policy overlay; ancestor Flows fail closed instead of inheriting visibility as authorization. The consuming Workspace validates those immutable pins without rebinding names, then records the exact source, active profile revision, limits, policies, and returned Artifact manifest in its isolated acquisition state.
 
@@ -41,7 +41,7 @@ The choice button shows **Promote** for a new target, **Already promoted** (disa
 
 ## Project one or more Data Sources
 
-An Instance-, Tenant-, or Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. The definition pins the exact Data Source and active profile identity plus the exact projection, retrieval, and optional transformation Flow versions and integrity hashes from its owner scope. Protected ancestor dependencies require explicit descendant-use authorization; ambiguous or stale references fail closed. Each named binding can use its latest successful Workspace acquisition or an explicitly selected successful acquisition. Omitting the transformation Flow is an identity transformation: the acquired Artifact references pass through unchanged.
+An Instance-, Tenant-, or Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. The definition pins the exact Data Source and its native dataset definition or historical active profile identity plus the exact projection, retrieval, and optional transformation Flow versions and integrity hashes from its owner scope. Protected ancestor dependencies require explicit descendant-use authorization; ambiguous or stale references fail closed. Each named binding can use its latest successful Workspace acquisition or an explicitly selected successful acquisition. Omitting the transformation Flow is an identity transformation: the acquired content passes through unchanged.
 
 The Knowledge Source invokes one `knowledge.projection/v1` Flow with all prepared inputs. The projection decides which durable, publishable Artifacts become the new Snapshot. Inputs remain provenance unless the projection emits them.
 
@@ -100,7 +100,7 @@ activation and completion are distinct steps, with no distributed transaction.
 
 A Knowledge Source also selects a `knowledge.retrieval/v1` Flow. Search, query, and bounded read resolve the active or explicitly selected Snapshot before execution. Every returned item, citation, byte range, and Artifact identifier must belong to that Snapshot.
 
-The built-in `knowledge-retrieval-builtin` Flow provides deterministic local text search, query, and read over filesystem-backed Snapshot Artifacts. Search interleaves bounded matches across the Snapshot artifacts; it is not a model-backed semantic index. Binary interpretation, spreadsheet analysis, semantic search, or answer synthesis requires a different governed retrieval composition and any required Tools.
+The built-in `knowledge-retrieval-builtin` Flow provides deterministic local text search, query, and read over retained Storage publications or historical filesystem-backed Snapshot Artifacts. Search interleaves bounded matches across the Snapshot entries; it is not a model-backed semantic index. Binary interpretation, spreadsheet analysis, semantic search, or answer synthesis requires a different governed retrieval composition and any required Tools.
 
 A Knowledge Source may publish source-specific `search`, `query`, and `read` Tools. Their source identity and operation are fixed by the Tool definition, and the existing Tool pipeline and internal MCP provider retain authorization, assignment, execution, and audit ownership.
 
