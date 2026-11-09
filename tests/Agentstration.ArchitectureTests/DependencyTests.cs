@@ -1006,7 +1006,7 @@ public sealed class DependencyTests
         var references = assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Web", StringComparison.Ordinal)
             || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
-            || name.Contains(".Storage.", StringComparison.Ordinal)
+            || name.Contains(".Storage.", StringComparison.Ordinal) && name != "Agentstration.Storage.Contracts"
             || name.Contains("EntityFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
@@ -1139,8 +1139,8 @@ public sealed class DependencyTests
             .Select(reference => reference.Name)
             .ToArray();
 
-        Assert.IsFalse(references.Any(reference =>
-            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+        Assert.IsFalse(references.Any(reference => reference != "Agentstration.Storage.Contracts"
+            && forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
     }
 
     [TestMethod]

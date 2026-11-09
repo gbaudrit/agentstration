@@ -230,3 +230,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 202. [ADR-0202 — ToolDefinitions publish independent governed relay versions](0202-tool-definitions-publish-independent-governed-relay-versions.md)
 203. [ADR-0203 — Durable Flow inputs retain live Secret references](0203-durable-flow-inputs-retain-live-secret-references.md)
 204. [ADR-0204 — Data Sources compose operation acquisitions with logical datasets](0204-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
+
+- [ADR-0206: Knowledge publishes retained Storage content](0206-knowledge-publishes-retained-storage-content.md)

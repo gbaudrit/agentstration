@@ -30,7 +30,7 @@
   <data name="RequiredInput" xml:space="preserve"><value>Required input</value></data>
   <data name="RequiredInputHelp" xml:space="preserve"><value>Prevent projection when this input has no successful acquisition.</value></data>
   <data name="MaximumAge" xml:space="preserve"><value>Maximum age (hh:mm:ss)</value></data>
-  <data name="MaximumAgeHelp" xml:space="preserve"><value>Optional. Hours may exceed 24. Older acquisitions are reported as stale and cannot be projected.</value></data>
+  <data name="MaximumAgeHelp" xml:space="preserve"><value>Empty or zero means no age limit, or a new acquisition for every projection when refresh is enabled. A positive age requires a recent success.</value></data>
   <data name="MaximumAgeFormat" xml:space="preserve"><value>Maximum age must use the hh:mm:ss format; hours may exceed 24.</value></data>
   <data name="TransformationConfiguration" xml:space="preserve"><value>Transformation configuration (JSON)</value></data>
   <data name="TransformationConfigurationHelp" xml:space="preserve"><value>Provide a bounded JSON object passed only to this binding's transformation Flow.</value></data>
@@ -68,8 +68,19 @@
   <data name="SelectAcquisitionTarget" xml:space="preserve"><value>Select an acquisition target</value></data>
   <data name="Tab.Access" xml:space="preserve"><value>Access</value></data>
   <data name="AcquisitionTargetsLoadFailed" xml:space="preserve"><value>Acquisition targets could not be loaded. Check access to the Data Source, then select it again to retry.</value></data>
-  <data name="NativeDatasetProjectionUnavailable" xml:space="preserve"><value>Knowledge projection from this dataset composition is not available yet. Clear Enabled to save the configuration as a disabled draft.</value></data>
-  <data name="NativeDatasetDraftHelp" xml:space="preserve"><value>Native datasets are not yet supported for projection. You can save this configuration with Enabled cleared.</value></data>
+  <data name="NativeDatasetProjectionUnavailable" xml:space="preserve"><value>Native dataset projection requires a compatible output Storage. Select one or save the configuration disabled.</value></data>
+  <data name="NativeDatasetDraftHelp" xml:space="preserve"><value>Select an output Storage before enabling native dataset projection. You can also save a disabled configuration.</value></data>
   <data name="DisabledDraftNotReady" xml:space="preserve"><value>Saved as a disabled draft. A supported definition is required before activation and projection.</value></data>
   <data name="ResolvedFlowsHelp" xml:space="preserve"><value>Available Flows depend on the validated composition of this source.</value></data>
+  <data name="OutputStorage" xml:space="preserve"><value>Snapshot output Storage</value></data>
+  <data name="ArtifactOutputDefault" xml:space="preserve"><value>Existing Artifact publication</value></data>
+  <data name="PinnedOutputStorage" xml:space="preserve"><value>Saved exact Storage revision</value></data>
+  <data name="OutputStorageHelp" xml:space="preserve"><value>Select an independent output Storage supporting retained publications. The local implementation is supported.</value></data>
+  <data name="OutputPrefix" xml:space="preserve"><value>Output prefix</value></data>
+  <data name="OutputPrefixHelp" xml:space="preserve"><value>A relative prefix within the selected Storage envelope. End directory prefixes with /.</value></data>
+  <data name="RefreshIfNecessary" xml:space="preserve"><value>Refresh acquisitions if necessary</value></data>
+  <data name="ContentVersion" xml:space="preserve"><value>Content version</value></data>
+  <data name="OutputStorageInvalid" xml:space="preserve"><value>The output Storage or destination rule is unavailable, incompatible or unauthorized. Review the selected revision, restrictions and access.</value></data>
+  <data name="RebindDependencies" xml:space="preserve"><value>Resolve current dependency revisions</value></data>
+  <data name="RebindDependenciesHelp" xml:space="preserve"><value>Explicitly adopt current Data Source and Flow revisions when saving. Existing Snapshots keep their original references.</value></data>
 </root>

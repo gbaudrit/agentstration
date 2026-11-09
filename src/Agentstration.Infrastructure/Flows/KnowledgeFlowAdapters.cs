@@ -78,7 +78,7 @@ public sealed class KnowledgeRetrievalFlowGateway(FlowRunService runs) : IKnowle
         KnowledgeRetrievalFlowRequest request,
         CancellationToken cancellationToken)
     {
-        var scope = new FlowRunScope(request.TenantId, new WorkspaceId(request.WorkspaceId), request.PrincipalId);
+        var scope = new FlowRunScope(request.TenantId, new WorkspaceId(request.WorkspaceId), request.PrincipalId) { LogicalScopeRef = request.LogicalScopeRef };
         var origin = request.Origin switch
         {
             KnowledgeRetrievalInvocationOrigin.Tool => FlowInvocationOrigin.Mcp,
@@ -275,6 +275,7 @@ public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store)
             {
                 var exists = reference.Kind switch
                 {
+                    KnowledgeArtifactKind.Inline => reference.ContentBase64 is { Length: <= 87384 },
                     KnowledgeArtifactKind.Staged => await store.GetExactAsync<StagedArtifactResource>(ScopedResourceAddress.Create(
                         ResourceScopeRef.Workspace(workspaceId), ResourceNamespace.Default, ArtifactResourceKinds.StagedArtifact,
                         StagedArtifactId.Parse(reference.ArtifactId).ToString()), cancellationToken) is not null,

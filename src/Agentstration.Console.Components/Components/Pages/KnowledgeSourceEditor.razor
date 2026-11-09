@@ -4,6 +4,8 @@
 @inject IKnowledgeSourcesClient Client
 @inject IDataSourcesClient DataSources
 @inject IFlowApiClient Flows
+@inject IServiceProvider Services
+@using Agentstration.Storage.Contracts
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
 
@@ -29,7 +31,14 @@ else
             }
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
             <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
-            @if (HasNativeDatasetInput) { <p class="form-alert form-alert-info form-span-2" role="status">@T("NativeDatasetDraftHelp")</p> }
+            @if (!IsNew) { <label class="knowledge-choice form-span-2"><input type="checkbox" @bind="rebindDependencies" data-testid="knowledge-rebind-dependencies" /><span><strong>@T("RebindDependencies")</strong><small>@T("RebindDependenciesHelp")</small></span></label> }
+            @if (HasNativeDatasetInput && savedOutput is null && string.IsNullOrEmpty(outputStorageKey)) { <p class="form-alert form-alert-info form-span-2" role="status">@T("NativeDatasetDraftHelp")</p> }
+            <label class="form-field-wide"><span>@T("OutputStorage")</span><select @bind="outputStorageKey" data-testid="knowledge-output-storage">
+                <option value="">@T("ArtifactOutputDefault")</option>
+                @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef</option> }
+                @if (savedOutput is not null && !storages.Any(value => StorageKey(value) == outputStorageKey)) { <option value="@outputStorageKey">@T("PinnedOutputStorage")</option> }
+            </select><small>@T("OutputStorageHelp")</small></label>
+            <label class="form-field-wide"><span>@T("OutputPrefix")</span><input @bind="outputPrefix" data-testid="knowledge-output-prefix" /><small>@T("OutputPrefixHelp")</small></label>
             <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <label><span>@T("RetrievalFlow")</span><select @bind="retrievalFlowKey" required data-testid="knowledge-source-retrieval-flow"><option value="">@T("SelectRetrievalFlow")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
@@ -43,6 +52,7 @@ else
                         @if (TargetOptions(binding).Count > 0) { <label><span>@T("AcquisitionTarget")</span><select @bind="binding.AcquisitionTargetName" required data-testid="knowledge-source-binding-acquisition-target"><option value="">@T("SelectAcquisitionTarget")</option>@foreach (var target in TargetOptions(binding).Where(value => value.Target.Enabled && !value.Stale)) { <option value="@target.Target.Name">@target.Target.DisplayName · @target.Target.ChoiceDisplayName</option> }</select></label> }
                         <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
                         <label class="knowledge-choice"><input type="checkbox" @bind="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
+                        <label class="knowledge-choice"><input type="checkbox" @bind="binding.RefreshIfNecessary" data-testid="knowledge-binding-refresh" /><span>@T("RefreshIfNecessary")</span></label>
                         <label><span>@T("MaximumAge")</span><input type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /><small>@T("MaximumAgeHelp")</small></label>
                         <div class="form-span-2 knowledge-transformation-configuration" data-testid="knowledge-source-transformation-configuration"><span>@T("TransformationConfiguration")</span><JsonSchemaInputEditor Schema="TransformationConfigurationSchema(binding)" Value="binding.Configuration" ValueChanged="value => binding.Configuration = value" ValidationChanged="state => binding.ConfigurationValid = state.IsValid" Disabled="busy" /><small>@T("TransformationConfigurationHelp")</small></div>
                         <div class="form-actions form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></div>
@@ -62,13 +72,26 @@ else
     [Parameter] public EventCallback<KnowledgeSourceResource> Saved { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<DataSourceResource> dataSources = [];
+    private IReadOnlyList<StorageResource> storages = [];
+    private KnowledgeOutputStorage? savedOutput;
+    private string outputStorageKey = string.Empty, outputPrefix = string.Empty;
+    private static string StorageKey(StorageResource value) => $"{value.Uid}:{value.Generation}:{StorageDigests.Binding(value.Definition)}";
+    private KnowledgeOutputStorage? OutputSelection()
+    {
+        if (string.IsNullOrEmpty(outputStorageKey)) return null;
+        if (savedOutput is not null && outputStorageKey == $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}")
+            return savedOutput with { Rule = savedOutput.Rule with { Prefix = outputPrefix } };
+        var selected = storages.Single(value => StorageKey(value) == outputStorageKey);
+        return new(new(new(selected.ScopeRef!.Value, selected.Namespace, selected.Kind, selected.Name), selected.Uid,
+            selected.Generation, StorageDigests.Binding(selected.Definition)), new(Write: true, Prefix: outputPrefix));
+    }
     private readonly Dictionary<string, IReadOnlyList<DataSourceAcquisitionTargetView>> acquisitionTargets = new(StringComparer.Ordinal);
     private IReadOnlyList<FlowOption> projectionFlows = [], retrievalFlows = [], transformationFlows = [];
     private readonly List<BindingModel> bindings = [];
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
         description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
-    private bool enabled, busy, interactive, loading = true;
+    private bool enabled, busy, interactive, rebindDependencies, loading = true;
     private bool HasNativeDatasetInput => bindings.Any(binding => dataSources.Any(source => source.Definition.Dataset is not null && DataSourceKey(source) == binding.DataSourceKey));
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
@@ -91,6 +114,9 @@ else
             var flowsTask = LoadFlowsAsync();
             await Task.WhenAll(dataSourcesTask, flowsTask);
             dataSources = await dataSourcesTask;
+            if (Services.GetService(typeof(IStoragesClient)) is IStoragesClient storageClient
+                && ResourceOwnershipContext.TryGetCurrent(Services) is { } owner)
+                storages = await storageClient.GetStoragesAsync(owner, cancellation.Token);
             if (!IsNew)
             {
                 var snapshot = await Client.GetAsync(ExistingNamespace, Name!, cancellation.Token);
@@ -99,6 +125,9 @@ else
                 displayName = snapshot.Value.Definition.DisplayName;
                 description = snapshot.Value.Definition.Description ?? string.Empty;
                 enabled = snapshot.Value.Definition.Enabled;
+                savedOutput = snapshot.Value.Definition.Output;
+                outputStorageKey = savedOutput is null ? string.Empty : $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}";
+                outputPrefix = savedOutput?.Rule.Prefix ?? string.Empty;
                 projectionFlowKey = TargetKey(snapshot.Value.Definition.ProjectionFlow, snapshot.Value.Namespace);
                 retrievalFlowKey = TargetKey(snapshot.Value.Definition.RetrievalFlow, snapshot.Value.Namespace);
                 bindings.Clear();
@@ -131,14 +160,16 @@ else
                 Enabled = enabled,
                 DataSources = bindings.Select(ToBinding).ToArray(),
                 ProjectionFlow = FlowTarget(projectionFlowKey),
-                RetrievalFlow = FlowTarget(retrievalFlowKey)
+                RetrievalFlow = FlowTarget(retrievalFlowKey),
+                Output = OutputSelection()
             };
             var saved = IsNew
                 ? await Client.CreateAsync(new CreateKnowledgeSourceRequest(technicalName.Trim(), properties, sourceNamespace.Trim()), cancellation.Token)
-                : await Client.UpdateAsync(ExistingNamespace, Name!, new PutKnowledgeSourceRequest(properties), etag!, cancellation.Token);
+                : await Client.UpdateAsync(ExistingNamespace, Name!, new PutKnowledgeSourceRequest(properties, rebindDependencies), etag!, cancellation.Token);
             if (Embedded)
             {
                 etag = saved.ETag;
+                rebindDependencies = false;
                 await Saved.InvokeAsync(saved.Value);
             }
             else
@@ -147,6 +178,9 @@ else
                 Navigation.NavigateTo(ns.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(ns.Value)}");
             }
         }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.Contains("/storage_", StringComparison.Ordinal) == true
+            || exception.ProblemType?.Contains("/knowledge_output_", StringComparison.Ordinal) == true)
+        { message = T("OutputStorageInvalid"); }
         catch (AgentstrationApiException exception) when (exception.ProblemType == "https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported")
         {
             message = T("NativeDatasetProjectionUnavailable");
@@ -187,7 +221,7 @@ else
             AcquisitionTarget = string.IsNullOrWhiteSpace(value.AcquisitionTargetName) ? null
                 : new(value.AcquisitionTargetName, TargetOptions(value).Single(target => target.Target.Name == value.AcquisitionTargetName).Target.ScopeRef, dataSource.Namespace),
             TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = value.Configuration.Clone(), Required = value.Required,
-            MaximumAge = ParseMaximumAge(value.MaximumAgeText) };
+            MaximumAge = ParseMaximumAge(value.MaximumAgeText), RefreshIfNecessary = value.RefreshIfNecessary };
     }
     private TimeSpan? ParseMaximumAge(string value)
     {
@@ -278,6 +312,7 @@ else
         public bool ConfigurationValid { get; set; } = true;
         public bool TargetsLoadFailed { get; set; }
         public bool Required { get; set; } = true;
+        public bool RefreshIfNecessary { get; set; }
         public string MaximumAgeText { get; set; } = string.Empty;
         public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner, string transformationFlowKey) => new()
         {
@@ -288,6 +323,7 @@ else
             TransformationFlowKey = transformationFlowKey,
             Configuration = value.Configuration.Clone(),
             Required = value.Required,
+            RefreshIfNecessary = value.RefreshIfNecessary,
             MaximumAgeText = FormatMaximumAge(value.MaximumAge)
         };
     }

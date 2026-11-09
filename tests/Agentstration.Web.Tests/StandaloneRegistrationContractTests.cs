@@ -119,7 +119,7 @@ public sealed class StandaloneRegistrationContractTests
         {
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 3,
             [typeof(ISecretVaultProvider)] = 2,
-            [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 2,
+            [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 3,
             [typeof(IBootstrapResourceHandler)] = 21,
             [typeof(IPackResourceHandler)] = 11,
             [typeof(IAepEnrollmentResourceProvisioner)] = 5,

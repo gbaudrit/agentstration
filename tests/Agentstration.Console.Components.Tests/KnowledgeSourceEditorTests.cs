@@ -71,8 +71,8 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
-    [DataRow("en-US", "not available yet")]
-    [DataRow("fr-FR", "n’est pas encore disponible")]
+    [DataRow("en-US", "requires a compatible output Storage")]
+    [DataRow("fr-FR", "nécessite un Storage de sortie compatible")]
     public void UnsupportedNativeProjectionKeepsTheFormInteractiveAndCanBeSavedDisabled(string cultureName, string expected)
     {
         using var culture = new TestCultureScope(cultureName);
@@ -169,12 +169,14 @@ public sealed class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-data-source-bindings'] textarea")
             .Input("{\"format\":\"markdown\"}");
         rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").Change("25:30:45");
+        rendered.Find("[data-testid='knowledge-binding-refresh']").Change(true);
         rendered.Find("button[type='submit']").Click();
 
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(client.CreatedRequest);
             Assert.HasCount(1, client.CreatedRequest.Properties.DataSources);
+            Assert.IsTrue(client.CreatedRequest.Properties.DataSources[0].RefreshIfNecessary);
             Assert.AreEqual("documentation", client.CreatedRequest.Properties.DataSources[0].DataSource.Name);
             Assert.AreEqual("markdown", client.CreatedRequest.Properties.DataSources[0].Configuration.GetProperty("format").GetString());
             Assert.AreEqual(TimeSpan.FromHours(25) + TimeSpan.FromMinutes(30) + TimeSpan.FromSeconds(45),
@@ -310,10 +312,12 @@ public sealed class KnowledgeSourceEditorTests
             rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']")));
         Assert.AreEqual("49:02:03",
             rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").GetAttribute("value"));
+        rendered.Find("[data-testid='knowledge-rebind-dependencies']").Change(true);
         rendered.Find("button[type='submit']").Click();
 
         rendered.WaitForAssertion(() => Assert.AreEqual("markdown",
             client.UpdatedRequest?.Properties.DataSources[0].Configuration.GetProperty("format").GetString()));
+        Assert.IsTrue(client.UpdatedRequest!.RebindDependencies);
         Assert.AreEqual(TimeSpan.FromHours(49) + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(3),
             client.UpdatedRequest?.Properties.DataSources[0].MaximumAge);
     }

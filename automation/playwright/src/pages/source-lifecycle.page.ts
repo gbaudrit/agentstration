@@ -233,7 +233,7 @@ export class SourceLifecyclePage {
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).fill(f.knowledge);
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceName)).toHaveValue(f.knowledge);
-    await this.page.getByLabel(text.enabled, { exact: false }).check();
+    await this.page.getByRole('checkbox', { name: text.enabled, exact: false }).check();
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), f.projectionFlow);
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
     await this.configureBinding(0, f.sources[0], 'primary');

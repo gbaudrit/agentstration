@@ -587,3 +587,15 @@ SQLite schema evolution remains reset-only before the first release: existing ge
 - [ADR-0118 — dedicated Workspaces for browser campaign data isolation](../../decisions/0118-browser-campaigns-use-dedicated-workspaces.md)
 - [ADR-0157 — Crawl4AI web acquisition is an AEP Tool Provider](../../decisions/0157-crawl4ai-web-acquisition-is-an-aep-tool-provider.md)
 - [ADR-0161 — Web crawlers produce bounded aggregate content](../../decisions/0161-web-crawlers-produce-bounded-aggregate-content.md)
+
+## Retained Knowledge output
+
+Knowledge composition accepts native Data Source datasets when an exact output
+Storage and narrowing rule are selected. The existing transformation/projection
+Flows execute through Runtime/AWP; Storage preparation and sealing precede
+immutable Snapshot creation and separate activation. The first retained-output
+adapter supports builtin local Storages using a namespace distinct from mutable
+ASP objects. Existing Artifact-only Snapshots remain readable through their
+receipts. Projection request identities and pending evidence support restart
+recovery through the existing worker; current authorization is checked again.
+See [ADR-0206](../../decisions/0206-knowledge-publishes-retained-storage-content.md).

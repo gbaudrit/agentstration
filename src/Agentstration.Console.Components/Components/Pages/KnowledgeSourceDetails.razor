@@ -66,7 +66,7 @@ else if (source is not null && readiness is not null)
                 {
                     <section class="knowledge-projection-provenance" data-testid="knowledge-projection-provenance">
                         <div><p class="eyebrow">@T("Provenance")</p><h3>@selected.Name</h3><p>@T("ProjectionProvenanceHelp")</p></div>
-                        <DataGrid TItem="KnowledgeProjectionInputEvidence" Items="selected.Inputs"><Header><tr><th>@T("BindingName")</th><th>@T("DataSource")</th><th>@T("Acquisition")</th><th>@T("Transformation")</th><th>@T("Artifacts")</th></tr></Header><Row Context="input"><tr><td><strong>@input.BindingName</strong></td><td><a class="text-button" href="@DataSourceUrl(input)">@input.DataSourceName</a><small>@input.DataSourceScopeRef · g@(input.DataSourceGeneration)</small></td><td><code title="@input.AcquisitionId">@ShortIdentifier(input.AcquisitionId)</code><small>@input.AcquiredAt.ToLocalTime().ToString("g")</small></td><td>@if (input.TransformationFlow is { } transformation) { <a class="text-button" href="@FlowUrl(transformation)">@transformation.Name</a><small><a class="text-button" href="@($"/flow-runs/{Uri.EscapeDataString(input.TransformationFlowRunId!)}")">@ShortIdentifier(input.TransformationFlowRunId!)</a></small> } else { <span>@T("IdentityTransformation")</span> }</td><td>@foreach (var artifact in input.PreparedArtifacts) { <a class="text-button" href="@ArtifactUrl(artifact)">@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</a> }</td></tr></Row></DataGrid>
+                        <DataGrid TItem="KnowledgeProjectionInputEvidence" Items="selected.Inputs"><Header><tr><th>@T("BindingName")</th><th>@T("DataSource")</th><th>@T("Acquisition")</th><th>@T("Transformation")</th><th>@T("Artifacts")</th></tr></Header><Row Context="input"><tr><td><strong>@input.BindingName</strong></td><td><a class="text-button" href="@DataSourceUrl(input)">@input.DataSourceName</a><small>@input.DataSourceScopeRef · g@(input.DataSourceGeneration)</small></td><td><code title="@input.AcquisitionId">@ShortIdentifier(input.AcquisitionId)</code><small>@input.AcquiredAt.ToLocalTime().ToString("g")</small></td><td>@if (input.TransformationFlow is { } transformation) { <a class="text-button" href="@FlowUrl(transformation)">@transformation.Name</a><small><a class="text-button" href="@($"/flow-runs/{Uri.EscapeDataString(input.TransformationFlowRunId!)}")">@ShortIdentifier(input.TransformationFlowRunId!)</a></small> } else { <span>@T("IdentityTransformation")</span> }</td><td>@foreach (var artifact in input.PreparedArtifacts) { @if (artifact.Kind == KnowledgeArtifactKind.Inline) { <code>@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</code> } else { <a class="text-button" href="@ArtifactUrl(artifact)">@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</a> } }</td></tr></Row></DataGrid>
                         @foreach (var issue in selected.InputIssues)
                         {
                             <p class="inline-warning"><strong>@issue.BindingName</strong> · @issue.Message <code>@issue.Code</code></p>
@@ -93,8 +93,8 @@ else if (source is not null && readiness is not null)
                         <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId)">@selectedSnapshotView.Snapshot.ProjectionFlowRunId</a></dd>
                     </dl>
                     <DataGrid TItem="KnowledgeSnapshotArtifact" Items="selectedSnapshotView.Snapshot.Artifacts">
-                        <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("StorageFlow")</th></tr></Header>
-                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td><a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a></td></tr></Row>
+                        <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("OutputStorage")</th></tr></Header>
+                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td>@if (artifact.Content is { } content) { <code>@content.Target.Storage.Storage.Name</code><small>@content.Target.Storage.Storage.ScopeRef · g@(content.Target.Storage.Generation)</small><code title="@content.Key">@ShortIdentifier(content.Key)</code><small>@T("ContentVersion"): <code title="@content.Version">@ShortIdentifier(content.Version)</code></small> } else { <a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a> }</td></tr></Row>
                     </DataGrid>
                 </section>
             }
@@ -343,6 +343,9 @@ else if (source is not null && readiness is not null)
         if (busy) return;
         busy = true; failed = false; message = null;
         try { await action(); message = T(success); await ReloadChildrenAsync(); }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.Contains("/storage_", StringComparison.Ordinal) == true
+            || exception.ProblemType?.Contains("/knowledge_output_", StringComparison.Ordinal) == true)
+        { failed = true; message = T("OutputStorageInvalid"); }
         catch (AgentstrationApiException exception) when (exception.ProblemType == "https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported")
         { failed = true; message = T("NativeDatasetProjectionUnavailable"); }
         catch (Exception exception) { failed = true; message = exception.Message; }
@@ -360,7 +363,7 @@ else if (source is not null && readiness is not null)
     private Task StartProjectionAsync() => RunActionAsync(async () =>
     {
         await Client.StartProjectionAsync(SourceNamespace, Name,
-            new StartKnowledgeProjectionRequest { Parameters = projectionParameters.Clone() }, cancellation.Token);
+            new StartKnowledgeProjectionRequest { Parameters = projectionParameters.Clone(), IdempotencyKey = Guid.NewGuid().ToString("N") }, cancellation.Token);
     }, "ProjectionCompleted");
     private Task SelectSnapshotAsync(KnowledgeSnapshotView value) => RunActionAsync(async () => { await Client.SelectActiveSnapshotAsync(SourceNamespace, Name, value.Snapshot.Name, cancellation.Token); }, "SnapshotActivated");
     private void ChangeRetrievalOperation(ChangeEventArgs arguments)
@@ -411,7 +414,9 @@ else if (source is not null && readiness is not null)
             : $"{length / (1024d * 1024d):N1} MiB";
     private static string FlowRunUrl(string flowRunId) => $"/flow-runs/{Uri.EscapeDataString(flowRunId)}";
     private static string SnapshotArtifactUrl(KnowledgeSnapshotArtifact value) =>
-        $"/artifacts/durable/{Uri.EscapeDataString(value.ArtifactId)}";
+        value.Content is { } content
+            ? $"/storages/{Uri.EscapeDataString(content.Target.Storage.Storage.Name)}?scopeRef={Uri.EscapeDataString(content.Target.Storage.Storage.ScopeRef.Value)}&namespace={Uri.EscapeDataString(content.Target.Storage.Storage.Namespace.Value)}"
+            : $"/artifacts/durable/{Uri.EscapeDataString(value.ArtifactId)}";
     private static string ArtifactOptionLabel(KnowledgeSnapshotArtifact value) =>
         $"{ShortIdentifier(value.ArtifactId)} · {value.MediaType} · {FormatSize(value.Length)}";
     private static string FlowIdentity(ResolvedKnowledgeFlowBinding value) => $"{value.Namespace} · {value.Version}";

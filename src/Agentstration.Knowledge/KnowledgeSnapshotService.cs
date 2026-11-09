@@ -5,6 +5,8 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
+using Agentstration.Storage;
 using Agentstration.Security.Contracts;
 
 namespace Agentstration.Knowledge;
@@ -41,7 +43,8 @@ public sealed class KnowledgeSnapshotService(
     IAuthorizationService authorization,
     IKnowledgeSnapshotArtifactResolver artifacts,
     ISecurityAuditWriter audit,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IStoragePublicationGateway publications)
 {
     public const int MaximumSnapshotArtifacts = 256;
 
@@ -89,8 +92,8 @@ public sealed class KnowledgeSnapshotService(
         using var operational = administrative is null ? null : requestScopes.Push(context);
         var observed = await LoadObservedAsync(scopeRef, source.Value, cancellationToken);
         if (observed?.Value.ActiveSnapshotName is null) return null;
-        var snapshot = await store.GetExactAsync<KnowledgeSnapshotResource>(Scoped(scopeRef, sourceId.Namespace,
-            KnowledgeResourceKinds.KnowledgeSnapshot, observed.Value.ActiveSnapshotName), cancellationToken);
+        var snapshot = await InWorkspaceAsync(() => store.GetExactAsync<KnowledgeSnapshotResource>(Scoped(scopeRef, sourceId.Namespace,
+            KnowledgeResourceKinds.KnowledgeSnapshot, observed.Value.ActiveSnapshotName), cancellationToken));
         return snapshot is null
             ? throw Error("knowledge_snapshot_active_unavailable", "The active Knowledge Snapshot record is unavailable.")
             : await ViewAsync(snapshot.Value, scopeRef, cancellationToken);
@@ -104,7 +107,7 @@ public sealed class KnowledgeSnapshotService(
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
         var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var source = await RequireSourceAsync(scopeRef, sourceId, cancellationToken);
+        var source = await RequireSourceAsync(KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef, sourceId, cancellationToken);
         StoredResource<KnowledgeSnapshotResource> snapshot;
         if (string.IsNullOrWhiteSpace(snapshotName))
         {
@@ -124,8 +127,9 @@ public sealed class KnowledgeSnapshotService(
                 && pinnedScope != source.Value.ScopeRef)
             throw Error("knowledge_snapshot_source_mismatch",
                 "The selected Knowledge Snapshot belongs to another KnowledgeSource.");
-        _ = await artifacts.ResolveAsync(context.WorkspaceId,
-            snapshot.Value.Artifacts.Select(value => value.ArtifactId).ToArray(), cancellationToken);
+        _ = await InWorkspaceAsync(() => artifacts.ResolveAsync(context.WorkspaceId,
+            snapshot.Value.Artifacts.Where(value => value.Content is null).Select(value => value.ArtifactId).ToArray(), cancellationToken));
+        await ValidateContentAsync(snapshot.Value, cancellationToken);
         return snapshot.Value;
     }
 
@@ -137,14 +141,15 @@ public sealed class KnowledgeSnapshotService(
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.ResourcesWrite, cancellationToken);
         var scopeRef = ResourceScopeRef.Workspace(context.WorkspaceId);
-        var source = await RequireSourceAsync(scopeRef, sourceId, cancellationToken);
+        var source = await RequireSourceAsync(KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef, sourceId, cancellationToken);
         var snapshot = await RequireSnapshotAsync(scopeRef, snapshotName, sourceId.Namespace, cancellationToken);
         if (snapshot.Value.KnowledgeSourceUid != source.Value.Uid
             || snapshot.Value.KnowledgeSourceScopeRef is { } pinnedScope
                 && pinnedScope != source.Value.ScopeRef)
             throw Error("knowledge_snapshot_source_mismatch", "The Knowledge Snapshot belongs to another KnowledgeSource.");
-        _ = await artifacts.ResolveAsync(context.WorkspaceId,
-            snapshot.Value.Artifacts.Select(value => value.ArtifactId).ToArray(), cancellationToken);
+        _ = await InWorkspaceAsync(() => artifacts.ResolveAsync(context.WorkspaceId,
+            snapshot.Value.Artifacts.Where(value => value.Content is null).Select(value => value.ArtifactId).ToArray(), cancellationToken));
+        await ValidateContentAsync(snapshot.Value, cancellationToken);
         await SaveObservedAsync(scopeRef, source.Value, snapshot.Value, cancellationToken);
         await audit.WriteAsync(new(SecurityAuditActions.KnowledgeSnapshotActivated,
             ActorPrincipalId: context.PrincipalId, TenantId: context.TenantId,
@@ -167,16 +172,28 @@ public sealed class KnowledgeSnapshotService(
         }, cancellationToken);
         try
         {
-            _ = await artifacts.ResolveAsync(scopeRef.TargetId!.Value,
-                snapshot.Artifacts.Select(value => value.ArtifactId).ToArray(), cancellationToken);
+            _ = await InWorkspaceAsync(() => artifacts.ResolveAsync(scopeRef.TargetId!.Value,
+                snapshot.Artifacts.Where(value => value.Content is null).Select(value => value.ArtifactId).ToArray(), cancellationToken));
+            await ValidateContentAsync(snapshot, cancellationToken);
         }
-        catch (KnowledgeSnapshotException)
+        catch (Exception exception) when (exception is KnowledgeSnapshotException or StorageException)
         {
             return new(snapshot, KnowledgeSnapshotLifecycleState.Unavailable);
         }
         return new(snapshot, observed?.Value.ActiveSnapshotUid == snapshot.Uid
             ? KnowledgeSnapshotLifecycleState.Active
             : KnowledgeSnapshotLifecycleState.Superseded);
+    }
+
+    private async Task ValidateContentAsync(KnowledgeSnapshotResource snapshot, CancellationToken cancellationToken)
+    {
+        foreach (var item in snapshot.Artifacts.Where(value => value.Content is not null))
+        {
+            if (item.Content!.Length != item.Length || item.Content.Sha256 != item.Sha256)
+                throw Error("knowledge_snapshot_content_invalid", "Snapshot content evidence is inconsistent.");
+            try { _ = await publications.ReadAsync(item.Content, 0, 1, cancellationToken); }
+            catch (StorageException exception) { throw Error(exception.Code, exception.Message); }
+        }
     }
 
     private async Task SaveObservedAsync(
@@ -208,7 +225,7 @@ public sealed class KnowledgeSnapshotService(
             };
             try
             {
-                _ = await store.PutExactAsync(scopeRef, value, current?.ETag, current is null, cancellationToken);
+                _ = await InWorkspaceAsync(() => store.PutExactAsync(scopeRef, value, current?.ETag, current is null, cancellationToken));
                 return;
             }
             catch (ResourceConcurrencyException) when (attempt < 2) { }
@@ -219,8 +236,8 @@ public sealed class KnowledgeSnapshotService(
     private Task<StoredResource<KnowledgeSnapshotObservedResource>?> LoadObservedAsync(
         ResourceScopeRef scopeRef,
         KnowledgeSourceResource source,
-        CancellationToken cancellationToken) => store.GetExactAsync<KnowledgeSnapshotObservedResource>(Scoped(scopeRef,
-            source.Namespace, KnowledgeResourceKinds.KnowledgeSnapshotObservedState, ObservedName(source.Uid)), cancellationToken);
+        CancellationToken cancellationToken) => InWorkspaceAsync(() => store.GetExactAsync<KnowledgeSnapshotObservedResource>(Scoped(scopeRef,
+            source.Namespace, KnowledgeResourceKinds.KnowledgeSnapshotObservedState, ObservedName(source.Uid)), cancellationToken));
 
     private async Task<StoredResource<KnowledgeSourceResource>> RequireSourceAsync(
         ResourceScopeRef executionScopeRef,
@@ -238,13 +255,20 @@ public sealed class KnowledgeSnapshotService(
         ResourceScopeRef scopeRef,
         string name,
         ResourceNamespace @namespace,
-        CancellationToken cancellationToken) => await store.GetExactAsync<KnowledgeSnapshotResource>(Scoped(scopeRef,
-            @namespace, KnowledgeResourceKinds.KnowledgeSnapshot, name), cancellationToken)
+        CancellationToken cancellationToken) => await InWorkspaceAsync(() => store.GetExactAsync<KnowledgeSnapshotResource>(Scoped(scopeRef,
+            @namespace, KnowledgeResourceKinds.KnowledgeSnapshot, name), cancellationToken))
         ?? throw Error("knowledge_snapshot_not_found", $"Knowledge Snapshot '{@namespace}/{name}' was not found.");
 
-    private RequestContext RequireContext() => requestContext.IsInitialized
+    private async Task<T> InWorkspaceAsync<T>(Func<Task<T>> action)
+    {
+        if (requestContext.AccessMode == ControlPlaneAccessMode.System) return await action();
+        using var workspace = requestScopes.Push(RequireContext());
+        return await action();
+    }
+
+    private RequestContext RequireContext() => KnowledgeOperationalRead.AdministrativeContext(requestContext) ?? (requestContext.IsInitialized
         ? requestContext.Current
-        : throw Error("knowledge_snapshot_context_required", "A Workspace request context is required.");
+        : throw Error("knowledge_snapshot_context_required", "A Workspace request context is required."));
     private static string ObservedName(Guid sourceUid) => $"snapshot-state-{sourceUid:N}";
     private static bool SameDigest(string left, string right) =>
         string.Equals(left.Replace("sha256:", string.Empty, StringComparison.OrdinalIgnoreCase),

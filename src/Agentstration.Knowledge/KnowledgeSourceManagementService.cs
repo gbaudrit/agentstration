@@ -7,6 +7,8 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
+using Agentstration.Storage;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Knowledge;
 
@@ -39,7 +41,8 @@ public sealed class KnowledgeSourceManagementService(
     IRequestContextScopeFactory requestContexts,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
-    IKnowledgeProjectionInputResolver? projectionInputs = null)
+    IKnowledgeProjectionInputResolver? projectionInputs = null,
+    IStoragePublicationGateway? publications = null)
 {
     public const int MaximumDisplayNameLength = 200;
     public const int MaximumDescriptionLength = 2_000;
@@ -109,10 +112,11 @@ public sealed class KnowledgeSourceManagementService(
         KnowledgeSourceId id,
         KnowledgeSourceProperties definition,
         string? etag,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool rebindDependencies = false)
     {
         var existing = await GetAsync(id, cancellationToken) ?? throw new KnowledgeSourceNotFoundException(id);
-        return await PutAsync(existing, definition, etag, SecurityAuditActions.KnowledgeSourceUpdated, cancellationToken);
+        return await PutAsync(existing, definition, etag, SecurityAuditActions.KnowledgeSourceUpdated, cancellationToken, rebindDependencies);
     }
 
     public async Task<StoredResource<KnowledgeSourceResource>> PutExactAsync(
@@ -120,10 +124,11 @@ public sealed class KnowledgeSourceManagementService(
         KnowledgeSourceId id,
         KnowledgeSourceProperties definition,
         string? etag,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool rebindDependencies = false)
     {
         var existing = await GetExactAsync(scopeRef, id, cancellationToken) ?? throw new KnowledgeSourceNotFoundException(id);
-        return await PutAsync(existing, definition, etag, SecurityAuditActions.KnowledgeSourceUpdated, cancellationToken);
+        return await PutAsync(existing, definition, etag, SecurityAuditActions.KnowledgeSourceUpdated, cancellationToken, rebindDependencies);
     }
 
     public async Task<StoredResource<KnowledgeSourceResource>> SetEnabledAsync(
@@ -180,13 +185,28 @@ public sealed class KnowledgeSourceManagementService(
         KnowledgeSourceProperties definition,
         string? etag,
         string auditAction,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool rebindDependencies = false)
     {
         var scopeRef = RequireScope(existing.Value);
         var changed = existing.Value with { Definition = definition };
         var updated = await scopeOperations.WriteAsync(changed, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            var (readiness, composition) = await ValidateAsync(changed, token);
+            KnowledgeSourceReadiness readiness;
+            ResolvedKnowledgeSourceComposition? composition;
+            if (!rebindDependencies && existing.Value.Composition is not null && SameDependencies(existing.Value.Definition, definition))
+            {
+                ValidateStructure(changed);
+                composition = existing.Value.Composition;
+                readiness = await EvaluateReadinessAsync(changed, scopeRef, includeOperationalState: false,
+                    rejectInvalidBindings: true, token);
+            }
+            else
+            {
+                (readiness, composition) = await ValidateAsync(changed, token);
+                if (!rebindDependencies && existing.Value.Composition is not null && composition is not null)
+                    EnsureUnchangedPins(existing.Value, definition, composition);
+            }
             return await store.PutExactAsync(scopeRef, changed with
             {
                 Generation = checked(existing.Value.Generation + 1),
@@ -196,6 +216,41 @@ public sealed class KnowledgeSourceManagementService(
         }, cancellationToken);
         await AuditAsync(auditAction, scopeRef, cancellationToken);
         return updated;
+    }
+
+    private static void EnsureUnchangedPins(KnowledgeSourceResource existing, KnowledgeSourceProperties changed,
+        ResolvedKnowledgeSourceComposition resolved)
+    {
+        static void Same(object? left, object? right)
+        {
+            if (!JsonElement.DeepEquals(JsonSerializer.SerializeToElement(left), JsonSerializer.SerializeToElement(right)))
+                throw new KnowledgeSourceValidationException("knowledge_source_dependency_stale",
+                    "An unchanged dependency has a different revision. Explicitly resolve current dependency revisions to adopt it.");
+        }
+        var previous = existing.Composition!;
+        if (existing.Definition.ProjectionFlow == changed.ProjectionFlow) Same(FlowEvidence(previous.ProjectionFlow), FlowEvidence(resolved.ProjectionFlow));
+        if (existing.Definition.RetrievalFlow == changed.RetrievalFlow) Same(FlowEvidence(previous.RetrievalFlow), FlowEvidence(resolved.RetrievalFlow));
+        foreach (var binding in changed.DataSources)
+        {
+            var old = existing.Definition.DataSources.SingleOrDefault(value => value.Name == binding.Name);
+            if (old?.DataSource == binding.DataSource)
+                Same(previous.DataSources.SingleOrDefault(value => value.BindingName == binding.Name),
+                    resolved.DataSources.SingleOrDefault(value => value.BindingName == binding.Name));
+            if (old is not null && old.TransformationFlow == binding.TransformationFlow)
+                Same(previous.TransformationFlows.GetValueOrDefault(binding.Name), resolved.TransformationFlows.GetValueOrDefault(binding.Name));
+        }
+    }
+
+    private static bool SameDependencies(KnowledgeSourceProperties left, KnowledgeSourceProperties right)
+    {
+        static JsonElement Dependencies(KnowledgeSourceProperties value) => JsonSerializer.SerializeToElement(new
+        {
+            value.ProjectionFlow,
+            value.RetrievalFlow,
+            Inputs = value.DataSources.Select(binding => new
+            { binding.Name, binding.DataSource, binding.AcquisitionTarget, binding.TransformationFlow }).ToArray()
+        });
+        return JsonElement.DeepEquals(Dependencies(left), Dependencies(right));
     }
 
     private async Task DeleteAsync(
@@ -233,6 +288,11 @@ public sealed class KnowledgeSourceManagementService(
         CancellationToken cancellationToken)
     {
         ValidateStructure(resource);
+        if (resource.Definition.Output is { } output && publications is not null)
+        {
+            try { await publications.ValidateAsync(new(output.Storage, new(RequireScope(resource), resource.Address), output.Rule), cancellationToken); }
+            catch (StorageException exception) { throw new KnowledgeSourceValidationException(exception.Code, exception.Message); }
+        }
         var composition = await ResolveCompositionAsync(resource, cancellationToken);
         var readiness = await EvaluateReadinessAsync(resource with { Composition = composition }, RequireScope(resource),
             includeOperationalState: false, rejectInvalidBindings: composition is not null, cancellationToken);
@@ -259,6 +319,11 @@ public sealed class KnowledgeSourceManagementService(
         if (resource.Definition.DataSources.Count is < 1 or > KnowledgeProjectionService.MaximumInputs)
             throw new KnowledgeSourceValidationException("knowledge_source_data_sources_invalid",
                 $"A KnowledgeSource requires 1 to {KnowledgeProjectionService.MaximumInputs} Data Source bindings.");
+        if (resource.Definition.Output is { } output && (output.Rule.Prefix is null
+            || output.Rule.Prefix.Contains("..", StringComparison.Ordinal) || output.Rule.Prefix.Contains('\\')
+            || output.Rule.Prefix.StartsWith('/') || output.Rule.Prefix.Length > 256
+            || output.Rule.Prefix.Length > 0 && !output.Rule.Prefix.EndsWith('/')))
+            throw new KnowledgeSourceValidationException("knowledge_output_rule_invalid", "The output prefix must be a bounded relative directory prefix.");
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var binding in resource.Definition.DataSources)
         {
@@ -274,9 +339,9 @@ public sealed class KnowledgeSourceManagementService(
             if (binding.Configuration.ValueKind != JsonValueKind.Object)
                 throw new KnowledgeSourceValidationException("knowledge_source_transformation_configuration_invalid",
                     $"Binding '{binding.Name}' transformation configuration must be a JSON object.");
-            if (binding.MaximumAge is { } maximumAge && maximumAge <= TimeSpan.Zero)
+            if (binding.MaximumAge is { } maximumAge && maximumAge < TimeSpan.Zero)
                 throw new KnowledgeSourceValidationException("knowledge_source_data_source_maximum_age_invalid",
-                    $"Binding '{binding.Name}' maximum age must be greater than zero.");
+                    $"Binding '{binding.Name}' maximum age cannot be negative.");
             ValidateTarget(binding.TransformationFlow, "transformation");
         }
         if (resource.Definition.Enabled
@@ -293,6 +358,15 @@ public sealed class KnowledgeSourceManagementService(
         CancellationToken cancellationToken)
     {
         var issues = new List<string>();
+        if (resource.Definition.Output is { } output && publications is not null)
+        {
+            try { await publications.ValidateAsync(new(output.Storage, new(executionScope, resource.Address), output.Rule), cancellationToken); }
+            catch (StorageException exception)
+            {
+                if (rejectInvalidBindings) throw new KnowledgeSourceValidationException(exception.Code, exception.Message);
+                issues.Add(exception.Code);
+            }
+        }
         var composition = resource.Composition;
         ResolvedKnowledgeFlowBinding? retrieval = composition?.RetrievalFlow;
         ResolvedKnowledgeFlowBinding? projection = composition?.ProjectionFlow;
@@ -357,7 +431,7 @@ public sealed class KnowledgeSourceManagementService(
             }
         }
         if (!resource.Definition.Enabled) issues.Add("KnowledgeSource is disabled.");
-        return new(resource.Definition.Enabled && projection is not null && retrieval is not null
+        return new(resource.Definition.Enabled && issues.Count == 0 && projection is not null && retrieval is not null
                 && dataSources.Where((_, index) => resource.Definition.DataSources[index].Required).All(value => value.Ready),
             resource.Definition.Enabled, retrieval, issues, projection, dataSources);
 
@@ -394,8 +468,12 @@ public sealed class KnowledgeSourceManagementService(
             {
                 try
                 {
-                    dependencies.Add(await projectionInputs.ResolveDependencyAsync(ownerScope, resource.Namespace,
-                        binding, cancellationToken));
+                    var dependency = await projectionInputs.ResolveDependencyAsync(ownerScope, resource.Namespace,
+                        binding, cancellationToken);
+                    if (dependency.DatasetDependencyHash is not null && resource.Definition.Output is null)
+                        throw new KnowledgeSourceValidationException("knowledge_projection_dataset_input_unsupported",
+                            "Native inputs require a retained output Storage before activation.");
+                    dependencies.Add(dependency);
                 }
                 catch (KnowledgeSourceValidationException exception) when (!resource.Definition.Enabled
                     && exception.Code == "knowledge_projection_dataset_input_unsupported")

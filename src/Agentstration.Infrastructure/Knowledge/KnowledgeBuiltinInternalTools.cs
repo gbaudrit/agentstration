@@ -6,6 +6,7 @@ using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Knowledge;
@@ -81,7 +82,9 @@ public sealed class DataSourceArtifactImportMcpTool(
 public abstract class KnowledgeRetrievalBuiltinMcpTool(
     IResourceStore resources,
     IArtifactDurableStore durable,
-    IAuthorizationService authorization) : IInternalMcpToolHandler
+    IAuthorizationService authorization,
+    IStoragePublicationGateway publications,
+    KnowledgeSourceManagementService sources, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : IInternalMcpToolHandler
 {
     private const int MaximumScannedBytesPerArtifact = 1024 * 1024;
     private const int MaximumTotalScannedBytes = 8 * 1024 * 1024;
@@ -103,6 +106,19 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
             AuthorizationPermissions.ArtifactsReadContent, cancellationToken);
         var input = invocation.Arguments.Deserialize<KnowledgeRetrievalInput>(JsonOptions)
             ?? throw Error("knowledge_builtin_input_invalid", "The retrieval input is invalid.");
+        KnowledgeSnapshotResource? snapshot;
+        using (scopes.Push(current.Current))
+            snapshot = (await resources.GetExactAsync<KnowledgeSnapshotResource>(ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(invocation.WorkspaceId.Value), input.Snapshot.Namespace,
+            KnowledgeResourceKinds.KnowledgeSnapshot, input.Snapshot.Name), cancellationToken))?.Value;
+        if (snapshot is null || snapshot.Uid != input.Snapshot.Uid || snapshot.KnowledgeSourceUid != input.KnowledgeSourceUid
+            || !JsonElement.DeepEquals(JsonSerializer.SerializeToElement(snapshot.Artifacts, JsonOptions),
+                JsonSerializer.SerializeToElement(input.Snapshot.Artifacts, JsonOptions)))
+            throw Error("knowledge_builtin_snapshot_invalid", "Retrieval requires exact evidence from a published Snapshot.");
+        _ = await sources.ResolveForUseAsync(new(snapshot.KnowledgeSourceName, snapshot.KnowledgeSourceNamespace,
+            snapshot.KnowledgeSourceScopeRef), current.AccessMode == ControlPlaneAccessMode.Instance ? ResourceScopeRef.Instance
+                : current.AccessMode == ControlPlaneAccessMode.TenantAdministration ? ResourceScopeRef.Tenant(invocation.TenantId)
+                : ResourceScopeRef.Workspace(invocation.WorkspaceId.Value), cancellationToken);
         if (!string.Equals(input.Operation, Operation, StringComparison.OrdinalIgnoreCase))
             throw Error("knowledge_builtin_operation_mismatch", $"The '{ToolName}' Tool accepts only the '{Operation}' operation.");
         return Operation switch
@@ -141,9 +157,8 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
         var length = RequiredInt32(input.Request, "length", 1, 1024 * 1024);
         var evidence = input.Snapshot.Artifacts.SingleOrDefault(value => string.Equals(value.ArtifactId, artifactId, StringComparison.Ordinal))
             ?? throw Error("knowledge_builtin_artifact_outside_snapshot", $"Artifact '{artifactId}' is not present in the selected Snapshot.");
-        var artifact = await RequireArtifactAsync(invocation.WorkspaceId, evidence, cancellationToken);
-        var bytes = await durable.ReadAsync(invocation.WorkspaceId, artifact.Receipt.OpaqueReference, offset, length, cancellationToken);
-        var content = Decode(bytes.Span, artifact.Receipt.MediaType);
+        var bytes = await ReadContentAsync(invocation.WorkspaceId, evidence, offset, length, cancellationToken);
+        var content = Decode(bytes.Span, evidence.MediaType);
         var excerpt = content.Length <= KnowledgeRetrievalService.MaximumCitationExcerptCharacters
             ? content
             : content[..KnowledgeRetrievalService.MaximumCitationExcerptCharacters];
@@ -157,7 +172,7 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
                     id = $"{artifactId}:{offset}",
                     artifactId,
                     content,
-                    mediaType = artifact.Receipt.MediaType,
+                    mediaType = evidence.MediaType,
                     score = (double?)null,
                     metadata = new Dictionary<string, string>()
                 }
@@ -179,13 +194,12 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
         foreach (var item in evidence)
         {
             if (remaining <= 0) break;
-            var artifact = await RequireArtifactAsync(invocation.WorkspaceId, item, cancellationToken);
-            if (!IsText(artifact.Receipt.MediaType)) continue;
-            var length = checked((int)Math.Min(Math.Min(artifact.Receipt.Length, MaximumScannedBytesPerArtifact), remaining));
+            if (!IsText(item.MediaType)) continue;
+            var length = checked((int)Math.Min(Math.Min(item.Length, MaximumScannedBytesPerArtifact), remaining));
             if (length == 0) continue;
-            var bytes = await durable.ReadAsync(invocation.WorkspaceId, artifact.Receipt.OpaqueReference, 0, length, cancellationToken);
+            var bytes = await ReadContentAsync(invocation.WorkspaceId, item, 0, length, cancellationToken);
             remaining -= bytes.Length;
-            var content = Decode(bytes.Span, artifact.Receipt.MediaType);
+            var content = Decode(bytes.Span, item.MediaType);
             var searchOffset = 0;
             var artifactMatches = new List<Match>();
             while (artifactMatches.Count < limit && searchOffset < content.Length)
@@ -194,7 +208,7 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
                 if (index < 0) break;
                 var start = Math.Max(0, index - ExcerptRadius);
                 var end = Math.Min(content.Length, index + query.Length + ExcerptRadius);
-                artifactMatches.Add(new(item.ArtifactId, artifact.Receipt.MediaType, content[start..end], start, end));
+                artifactMatches.Add(new(item.ArtifactId, item.MediaType, content[start..end], start, end));
                 searchOffset = index + query.Length;
             }
 
@@ -219,13 +233,36 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
         return result;
     }
 
+    private async Task<ReadOnlyMemory<byte>> ReadContentAsync(WorkspaceId workspaceId, KnowledgeSnapshotArtifact evidence,
+        long offset, int length, CancellationToken cancellationToken)
+    {
+        if (evidence.Content is not { } reference)
+        {
+            var artifact = await RequireArtifactAsync(workspaceId, evidence, cancellationToken);
+            return await durable.ReadAsync(workspaceId, artifact.Receipt.OpaqueReference, offset, length, cancellationToken);
+        }
+        using var buffer = new MemoryStream();
+        var remaining = (int)Math.Min(length, reference.Length - offset);
+        while (remaining > 0)
+        {
+            var chunk = await publications.ReadAsync(reference, offset + buffer.Length,
+                Math.Min(remaining, reference.Target.Policy.MaximumReadBytes), cancellationToken);
+            if (chunk.Length == 0) throw Error("knowledge_builtin_content_incomplete", "The published content is incomplete.");
+            await buffer.WriteAsync(chunk, cancellationToken);
+            remaining -= chunk.Length;
+        }
+        return buffer.ToArray();
+    }
+
     private async Task<FlowRunArtifactResource> RequireArtifactAsync(WorkspaceId workspaceId,
         KnowledgeSnapshotArtifact evidence, CancellationToken cancellationToken)
     {
         FlowRunArtifactId id;
         try { id = FlowRunArtifactId.Parse(evidence.ArtifactId); }
         catch (FormatException exception) { throw Error("knowledge_builtin_artifact_id_invalid", exception.Message, exception); }
-        var stored = await resources.GetExactAsync<FlowRunArtifactResource>(ScopedResourceAddress.Create(
+        StoredResource<FlowRunArtifactResource> stored;
+        using (scopes.Push(current.Current))
+            stored = await resources.GetExactAsync<FlowRunArtifactResource>(ScopedResourceAddress.Create(
             ResourceScopeRef.Workspace(workspaceId.Value), ResourceNamespace.Default,
             ArtifactResourceKinds.FlowRunArtifact, id.ToString()), cancellationToken)
             ?? throw Error("knowledge_builtin_artifact_not_found", $"FlowRunArtifact '{id}' was not found in the current Workspace.");
@@ -281,8 +318,9 @@ public abstract class KnowledgeRetrievalBuiltinMcpTool(
     private sealed record Match(string ArtifactId, string MediaType, string Excerpt, int Start, int End);
 }
 
-public sealed class KnowledgeRetrievalSearchMcpTool(IResourceStore resources, IArtifactDurableStore durable, IAuthorizationService authorization)
-    : KnowledgeRetrievalBuiltinMcpTool(resources, durable, authorization)
+public sealed class KnowledgeRetrievalSearchMcpTool(IResourceStore resources, IArtifactDurableStore durable, IAuthorizationService authorization,
+    IStoragePublicationGateway publications, KnowledgeSourceManagementService sources, ICurrentRequestContext current, IRequestContextScopeFactory scopes)
+    : KnowledgeRetrievalBuiltinMcpTool(resources, durable, authorization, publications, sources, current, scopes)
 {
     protected override string Operation => "search";
     protected override string ToolName => KnowledgeBuiltinToolNames.RetrievalSearch;
@@ -290,8 +328,9 @@ public sealed class KnowledgeRetrievalSearchMcpTool(IResourceStore resources, IA
     protected override string Description => "Performs bounded deterministic text search over the selected Knowledge Snapshot.";
 }
 
-public sealed class KnowledgeRetrievalQueryMcpTool(IResourceStore resources, IArtifactDurableStore durable, IAuthorizationService authorization)
-    : KnowledgeRetrievalBuiltinMcpTool(resources, durable, authorization)
+public sealed class KnowledgeRetrievalQueryMcpTool(IResourceStore resources, IArtifactDurableStore durable, IAuthorizationService authorization,
+    IStoragePublicationGateway publications, KnowledgeSourceManagementService sources, ICurrentRequestContext current, IRequestContextScopeFactory scopes)
+    : KnowledgeRetrievalBuiltinMcpTool(resources, durable, authorization, publications, sources, current, scopes)
 {
     protected override string Operation => "query";
     protected override string ToolName => KnowledgeBuiltinToolNames.RetrievalQuery;
@@ -299,8 +338,9 @@ public sealed class KnowledgeRetrievalQueryMcpTool(IResourceStore resources, IAr
     protected override string Description => "Builds a deterministic bounded answer from matching Snapshot excerpts without a remote model.";
 }
 
-public sealed class KnowledgeRetrievalReadMcpTool(IResourceStore resources, IArtifactDurableStore durable, IAuthorizationService authorization)
-    : KnowledgeRetrievalBuiltinMcpTool(resources, durable, authorization)
+public sealed class KnowledgeRetrievalReadMcpTool(IResourceStore resources, IArtifactDurableStore durable, IAuthorizationService authorization,
+    IStoragePublicationGateway publications, KnowledgeSourceManagementService sources, ICurrentRequestContext current, IRequestContextScopeFactory scopes)
+    : KnowledgeRetrievalBuiltinMcpTool(resources, durable, authorization, publications, sources, current, scopes)
 {
     protected override string Operation => "read";
     protected override string ToolName => KnowledgeBuiltinToolNames.RetrievalRead;

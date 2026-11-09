@@ -99,3 +99,26 @@ Agent, Tool, Tool-route, child-Flow, repeat, and Flow-output steps may capture a
 `clean` accepts `auto`, `true`, or `false`. `auto` is the default and removes the local staged copy when the containing Flow reaches any terminal state, whether or not a Storage Flow is configured. `true` fixes the same cleanup behavior explicitly; `false` retains the copy until ordinary retention expires it. A requested capture or storage failure fails the Flow instead of silently discarding the Artifact.
 
 See [ADR-0151](../decisions/0151-artifacts-use-toolset-backed-staging-and-storage-flows.md), [ADR-0165](../decisions/0165-flow-steps-optionally-capture-results-as-artifacts.md), [ADR-0166](../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0167](../decisions/0167-knowledge-sources-project-data-source-artifacts.md).
+
+## Retained Storage publication
+
+Knowledge `output` selects an exact `StorageRevisionReference` and a narrowing
+`StorageContentPolicy` rule. Native inputs require an output. The existing
+`artifacts` manifest array also accepts `kind: inline`, `disposition: publishable`,
+`artifactId`, `mediaType`, optional `digest` and bounded `contentBase64`. `inline`
+is content for projection, not a durable Artifact receipt. Transformations and
+projection retain the existing `artifact.transform/v1` and
+`knowledge.projection/v1` Flow orchestration. The builtin projection aggregates
+prepared entries; a specialized Flow can emit normalized or filtered content.
+
+A published entry's optional `content` contains the retained Storage publication
+reference. Historical entries without it continue to resolve durable Artifacts.
+Retrieval remains `knowledge.retrieval/v1` and returns the existing item/citation
+shape. The builtin routes validate the complete persisted Snapshot before reading
+its exact content. Neither a caller nor a model can substitute another Storage,
+version or content reference.
+
+`StartKnowledgeProjectionRequest.idempotencyKey` is bounded to 200 characters.
+Conflicting reuse is refused. Pending attempts retain exact input evidence and
+resume through the ordinary Flow service. See
+[ADR-0206](../decisions/0206-knowledge-publishes-retained-storage-content.md).

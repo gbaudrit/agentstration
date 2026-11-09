@@ -1,4 +1,5 @@
 using Agentstration.DataSources;
+using Agentstration.Knowledge;
 using Agentstration.Identity.Contracts;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,6 +9,7 @@ namespace Agentstration.Infrastructure.Flows;
 public sealed class DataSourceAcquisitionRecoveryWorker(
     DataSourceAcquisitionService acquisitions,
     DataSourceDiscoveryService discoveries,
+    KnowledgeProjectionService projections,
     IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
     ILogger<DataSourceAcquisitionRecoveryWorker> logger) : BackgroundService
@@ -26,11 +28,12 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
             using var scope = requestScopes.PushSystem();
             await acquisitions.RecoverPendingAsync(cancellationToken);
             await discoveries.RecoverPendingAsync(cancellationToken);
+            await projections.RecoverPendingAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Data Source acquisition and discovery recovery scan failed");
+            logger.LogError(exception, "Data Source and Knowledge recovery scan failed");
         }
     }
 }

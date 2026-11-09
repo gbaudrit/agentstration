@@ -51,6 +51,51 @@ The built-in `knowledge-projection-builtin` Flow performs identity aggregation. 
 
 Every successful projection creates and activates a distinct immutable Snapshot. A failed projection leaves the previous active Snapshot unchanged. Provenance pins the exact Data Source acquisitions, optional transformation Runs, projection Flow and Run, Artifact receipts, storage lineage, and integrity evidence.
 
+## Native datasets and independent Snapshot output
+
+A native dataset binding uses its saved acquisition parameters and exact Storage
+revision. Select an **output Storage** on the Knowledge Source to enable native
+projection. Input and output Storages are independent. The output prefix narrows
+the selected Storage envelope; Knowledge does not configure the connection or
+manual export mapping. A disabled native preparation can still be saved before
+an output Storage is selected.
+
+The initial retained-publication implementation supports builtin local Storages.
+It stores sealed content separately from mutable ASP objects and never overwrites
+a sealed publication. A provider supporting ordinary object reads and writes is
+not automatically compatible. The bounded initial inline Flow profile supports
+64 KiB per content object, subject to lower Storage limits.
+
+Each binding also selects **Refresh acquisitions if necessary**:
+
+| Refresh | Maximum age | Projection input selection |
+| --- | --- | --- |
+| Off | Empty or zero | Latest compatible success, without an age limit. |
+| Off | Positive | Latest compatible success within that age; otherwise fail. |
+| On | Empty or zero | Acquire for each new projection attempt. |
+| On | Positive | Reuse a recent compatible success, otherwise acquire. |
+
+Successful completion determines age; the exact age boundary is accepted.
+Explicit acquisition selection must match the saved configuration and freshness
+policy. Required failures stop publication; optional failures appear in provenance.
+A failed refresh never falls back to an expired success.
+
+Output content retains its exact Storage revision, rule, key, version and digest.
+Changing or revoking a Storage cannot redirect an old Snapshot. Stale revisions
+are explicitly unavailable; retained bytes are preserved. Keep both control-plane
+data and the configured local content root on persistent storage. Existing
+Artifact-only Snapshots retain their original receipts and read path.
+
+Editing a definition preserves unchanged dependency pins. To adopt revised Data
+Sources or active Flow versions, explicitly select **Resolve current dependency
+revisions** when saving. Existing Snapshots retain their original evidence.
+
+Projection requests accept an `idempotencyKey`. Retrying the same configuration
+returns or resumes the same attempt. Cancellation stops the caller's wait; accepted
+work remains resumable. After a restart, recovery uses recorded dependencies and
+authorization, without selecting a newer configuration. Sealing, Snapshot creation,
+activation and completion are distinct steps, with no distributed transaction.
+
 ## Retrieve only from the selected Snapshot
 
 A Knowledge Source also selects a `knowledge.retrieval/v1` Flow. Search, query, and bounded read resolve the active or explicitly selected Snapshot before execution. Every returned item, citation, byte range, and Artifact identifier must belong to that Snapshot.
@@ -75,3 +120,5 @@ Classified Flows use the single Flow-owned `flow.contract` metadata key:
 The contract value is a classification and schema boundary, not a new deployment unit. REST, Console, MCP, and background work delegate to the same family services inside the authoritative Agentstration process.
 
 See [ADR-0164](../decisions/0164-data-sources-own-governed-acquisition.md), [ADR-0166](../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0167](../decisions/0167-knowledge-sources-project-data-source-artifacts.md).
+
+See [ADR-0206](../decisions/0206-knowledge-publishes-retained-storage-content.md) for publication limits and recovery semantics.

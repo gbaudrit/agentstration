@@ -24,6 +24,7 @@ internal static class StorageResourcesServiceCollectionExtensions
         services.AddSingleton<IStorageDefinitionValidator, LocalStorageDefinitionValidator>();
         services.AddSingleton<StorageAspRemoteAdapter>();
         services.AddSingleton<IStorageContentGateway, StorageContentGateway>();
+        services.AddSingleton<IStoragePublicationGateway, LocalStoragePublicationGateway>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepStorageTypeProvisioner>();
         return services;
     }
