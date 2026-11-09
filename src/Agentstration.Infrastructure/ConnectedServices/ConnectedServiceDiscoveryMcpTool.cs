@@ -20,7 +20,7 @@ public sealed class ConnectedServiceDiscoveryExecutor(
     ConnectedServiceOperationDiscoveryService discoveries,
     IResourceStore store, ConnectedServiceManagementService services, IParameterResolver parameters,
     ISecretResolver secrets, ISecretCapabilityService capabilities,
-    ICurrentRequestContext current, IRequestContextScopeFactory scopes,
+    ICurrentRequestContext current,
     IHttpClientFactory clients, IConfiguration configuration)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -35,17 +35,29 @@ public sealed class ConnectedServiceDiscoveryExecutor(
     private async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         if (invocation.CallerKind != ToolDefinitionCallerKind.Flow || string.IsNullOrEmpty(invocation.RunId)
-            || !current.IsInitialized || current.Current.PrincipalId != invocation.PrincipalId
-            || current.Current.WorkspaceId != invocation.WorkspaceId.Value || current.Current.TenantId != invocation.TenantId)
+            || current.AccessMode is not (ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance
+                or ControlPlaneAccessMode.TenantAdministration))
             throw Error("connected_service_discovery_execution_denied");
-        using var scope = scopes.Push(current.Current);
+        RequestContext operational;
+        try { operational = current.Current; }
+        catch (InvalidOperationException) { throw Error("connected_service_discovery_execution_denied"); }
+        if (operational.PrincipalId == Guid.Empty || operational.TenantId == Guid.Empty || operational.WorkspaceId == Guid.Empty
+            || operational.PrincipalId != invocation.PrincipalId || operational.TenantId != invocation.TenantId
+            || operational.WorkspaceId != invocation.WorkspaceId.Value)
+            throw Error("connected_service_discovery_execution_denied");
+        var consumer = current.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(operational.TenantId),
+            _ => ResourceScopeRef.Workspace(operational.WorkspaceId)
+        };
         var id = invocation.Arguments.GetProperty("discoveryId").GetString()
             ?? throw Error("connected_service_discovery_id_required");
         var @namespace = ResourceNamespace.Parse(invocation.Arguments.GetProperty("discoveryNamespace").GetString()!);
         var execution = await discoveries.GetExecutionAsync(@namespace, id, invocation.RunId, cancellationToken);
         var (discovery, service, type, version) = execution;
         var resolved = await services.AuthorizeAsync(discovery.Service.Service,
-            new(ResourceScopeRef.Workspace(invocation.WorkspaceId.Value), discovery.Address), cancellationToken)
+            new(consumer, discovery.Address), cancellationToken)
             ?? throw Error("connected_service_unavailable");
         if (resolved.Uid != discovery.Service.ServiceUid || resolved.Generation != discovery.Service.Generation)
             throw Error("connected_service_revision_changed");
@@ -114,7 +126,9 @@ public sealed class ConnectedServiceDiscoveryExecutor(
             {
                 Operations = result.Operations.Select(operation => new ConnectedServiceOperationCandidate
                 {
-                    ExternalId = operation.ExternalId, DisplayName = operation.DisplayName, Description = operation.Description,
+                    ExternalId = operation.ExternalId,
+                    DisplayName = operation.DisplayName,
+                    Description = operation.Description,
                     Type = version.OperationDiscovery!.ProducedTypes.SingleOrDefault(reference =>
                         reference.Type.Name == operation.TypeId && reference.Version == operation.TypeVersion)
                         ?? throw Error("connected_service_operation_type_not_allowed"),
@@ -142,12 +156,14 @@ public sealed class ConnectedServiceDiscoveryMcpTool(ConnectedServiceDiscoveryEx
     public InternalMcpToolDefinition Definition { get; } = new(Name, Name, null,
         JsonSerializer.SerializeToElement(new
         {
-            type = "object", properties = new
+            type = "object",
+            properties = new
             {
                 discoveryId = new { type = "string", minLength = 1, maxLength = 128 },
                 discoveryNamespace = new { type = "string", minLength = 1, maxLength = 128 }
             },
-            required = new[] { "discoveryId", "discoveryNamespace" }, additionalProperties = false
+            required = new[] { "discoveryId", "discoveryNamespace" },
+            additionalProperties = false
         }), ExposeThroughMcp: false);
 
     public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>

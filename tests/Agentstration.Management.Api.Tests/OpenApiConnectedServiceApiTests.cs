@@ -35,13 +35,20 @@ namespace Agentstration.Management.Tests;
 public sealed partial class ConnectedServiceApiTests
 {
     [TestMethod]
-    [DataRow("success")]
-    [DataRow("changed-generation")]
-    [DataRow("disabled")]
-    public async Task OpenApiPublishedDiscoveryFlowUsesExactServiceAndSecretCallbackAndMaterializesOperations(string scenario)
+    [DataRow("success", "workspace")]
+    [DataRow("changed-generation", "workspace")]
+    [DataRow("disabled", "workspace")]
+    [DataRow("success", "instance")]
+    [DataRow("changed-generation", "instance")]
+    [DataRow("disabled", "instance")]
+    [DataRow("success", "tenant")]
+    [DataRow("changed-generation", "tenant")]
+    [DataRow("disabled", "tenant")]
+    public async Task OpenApiPublishedDiscoveryFlowUsesExactServiceAndSecretCallbackAndMaterializesOperations(string scenario, string ownerKind)
     {
         const string credential = "synthetic-openapi-connection-credential";
         var calls = 0;
+        var providerCalls = 0;
         WebApplicationFactory<Program>? authority = null;
         await using var extension = new WebApplicationFactory<openapi::Program>().WithWebHostBuilder(builder =>
         {
@@ -62,13 +69,19 @@ public sealed partial class ConnectedServiceApiTests
             builder.ConfigureTestServices(services =>
             {
                 foreach (var name in new[] { "agentstration-aep", "agentstration-aep-tools", "agentstration-aep-mcp-tools", "agentstration-mcp-tools" })
-                    services.AddHttpClient(name).ConfigurePrimaryHttpMessageHandler(() => extension.Server.CreateHandler());
+                    services.AddHttpClient(name).ConfigurePrimaryHttpMessageHandler(() =>
+                        new DiscoveryRequestHandler(extension.Server.CreateHandler(), () => Interlocked.Increment(ref providerCalls)));
             });
         });
         authority = factory;
         using var client = factory.CreateClient();
         var context = await GetBootstrapContextAsync(factory);
-        var owner = await WorkspaceScopeAsync(client);
+        var owner = ownerKind switch
+        {
+            "instance" => ResourceScopeRef.Instance,
+            "tenant" => ResourceScopeRef.Tenant(context.TenantId),
+            _ => await WorkspaceScopeAsync(client)
+        };
         SelectConsoleContext(client, owner);
         var manifest = await new AepClient(extension.CreateClient()).DiscoverAsync();
         var store = factory.Services.GetRequiredService<IResourceStore>();
@@ -77,10 +90,16 @@ public sealed partial class ConnectedServiceApiTests
         {
             var registration = (await store.PutExactAsync(owner, new ExtensionRegistrationResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration,
-                Metadata = new() { Name = "openapi-test" }, ScopeRef = owner,
-                Definition = new() { DisplayName = "OpenAPI test", Endpoint = new("https://extension.example.test"),
-                    ExpectedExtensionId = manifest.Extension.Id }
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
+                Metadata = new() { Name = "openapi-test" },
+                ScopeRef = owner,
+                Definition = new()
+                {
+                    DisplayName = "OpenAPI test",
+                    Endpoint = new("https://extension.example.test"),
+                    ExpectedExtensionId = manifest.Extension.Id
+                }
             }, null, true, default)).Value;
             foreach (var provisioner in factory.Services.GetServices<IAepEnrollmentResourceProvisioner>())
                 await provisioner.ProvisionAsync(registration, manifest, default);
@@ -94,8 +113,12 @@ public sealed partial class ConnectedServiceApiTests
             CollectionAssert.AreEquivalent(installed.Select(item => item.ETag).ToArray(), repeated.Select(item => item.ETag).ToArray());
         }
         using var parameter = await client.PostAsJsonAsync("/api/parameters", new CreateParameterRequest("openapi-origin",
-            new() { DisplayName = "OpenAPI origin", ValueType = ParameterValueType.Text,
-                Value = JsonSerializer.SerializeToElement("https://origin.example.test") }, owner));
+            new()
+            {
+                DisplayName = "OpenAPI origin",
+                ValueType = ParameterValueType.Text,
+                Value = JsonSerializer.SerializeToElement("https://origin.example.test")
+            }, owner));
         Assert.AreEqual(HttpStatusCode.Created, parameter.StatusCode);
         using var vault = await client.PostAsJsonAsync("/api/vaults", new CreateVaultRequest("openapi-vault",
             new() { DisplayName = "OpenAPI Vault", ProviderType = "local" }, owner));
@@ -116,8 +139,14 @@ public sealed partial class ConnectedServiceApiTests
         using var created = await client.PostAsJsonAsync("/api/connected-services", new CreateConnectedServiceRequest("orders",
             new()
             {
-                DisplayName = "Orders", Type = new() { Type = new("openapi", owner, type.Namespace), TypeUid = type.Uid,
-                    Version = version.Version, SchemaDigest = version.SchemaDigest },
+                DisplayName = "Orders",
+                Type = new()
+                {
+                    Type = new("openapi", owner, type.Namespace),
+                    TypeUid = type.Uid,
+                    Version = version.Version,
+                    SchemaDigest = version.SchemaDigest
+                },
                 Options = JsonSerializer.SerializeToElement(new { candidatePaths = new[] { "/openapi.json" } }),
                 Bindings =
                 [
@@ -133,15 +162,37 @@ public sealed partial class ConnectedServiceApiTests
         Assert.AreEqual(HttpStatusCode.Accepted, start.StatusCode, await start.Content.ReadAsStringAsync());
         var discovery = (await start.Content.ReadFromJsonAsync<ConnectedServiceOperationDiscoveryResource>())!;
         var service = (await created.Content.ReadFromJsonAsync<ConnectedServiceResource>())!;
-        using (scopes.Push(context))
+        context = new(discovery.CreatedBy, discovery.TenantId, discovery.WorkspaceId);
+        using (ownerKind switch
+        {
+            "instance" => scopes.PushInstance(context),
+            "tenant" => scopes.PushTenantAdministration(context),
+            _ => scopes.Push(context)
+        })
         {
             var executor = factory.Services.GetRequiredService<ConnectedServiceDiscoveryExecutor>();
             var invocation = new InternalMcpToolInvocation(context.TenantId, new(context.WorkspaceId), context.PrincipalId,
                 "forged-call", "test", JsonSerializer.SerializeToElement(new { discoveryId = discovery.Name, discoveryNamespace = discovery.Namespace.Value }),
                 ToolDefinitionCallerKind.Flow, RunId: discovery.FlowRunId);
-            var denied = await Assert.ThrowsAsync<ConnectedServiceOperationDiscoveryException>(() =>
-                executor.ExecuteAsync(invocation with { WorkspaceId = new(Guid.NewGuid()) }, default));
-            Assert.AreEqual("connected_service_discovery_execution_denied", denied.Code);
+            foreach (var invalid in new[]
+            {
+                invocation with { WorkspaceId = new(Guid.NewGuid()) },
+                invocation with { TenantId = Guid.NewGuid() },
+                invocation with { PrincipalId = Guid.NewGuid() },
+                invocation with { CallerKind = ToolDefinitionCallerKind.Agent },
+                invocation with { RunId = null }
+            })
+            {
+                var denied = await Assert.ThrowsAsync<ConnectedServiceOperationDiscoveryException>(() =>
+                    executor.ExecuteAsync(invalid, default));
+                Assert.AreEqual("connected_service_discovery_execution_denied", denied.Code);
+            }
+            using (ownerKind == "workspace" ? scopes.PushInstance(context) : scopes.Push(context))
+            {
+                var wrongScope = await Assert.ThrowsAsync<ConnectedServiceOperationDiscoveryException>(() =>
+                    executor.ExecuteAsync(invocation, default));
+                Assert.AreEqual("connected_service_discovery_execution_denied", wrongScope.Code);
+            }
             var wrongRun = await Assert.ThrowsAsync<ConnectedServiceOperationDiscoveryException>(() =>
                 executor.ExecuteAsync(invocation with { RunId = "another-run" }, default));
             Assert.AreEqual("connected_service_discovery_execution_denied", wrongRun.Code);
@@ -150,6 +201,7 @@ public sealed partial class ConnectedServiceApiTests
                     service.Definition with { Enabled = scenario != "disabled" }, created.Headers.ETag!.Tag, default);
         }
         Assert.AreEqual(0, calls);
+        Assert.AreEqual(0, providerCalls);
         await using var worker = await AwpTestWorker.StartAsync(factory);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         do
@@ -162,10 +214,12 @@ public sealed partial class ConnectedServiceApiTests
         {
             Assert.AreEqual(ConnectedServiceOperationDiscoveryState.Failed, discovery.State);
             Assert.AreEqual(0, calls);
+            Assert.AreEqual(0, providerCalls);
             return;
         }
-        Assert.AreEqual(ConnectedServiceOperationDiscoveryState.Succeeded, discovery.State, discovery.ErrorMessage);
+        Assert.AreEqual(ConnectedServiceOperationDiscoveryState.Succeeded, discovery.State, $"{discovery.ErrorCode}: {discovery.ErrorMessage}");
         Assert.AreEqual(1, calls);
+        Assert.AreEqual(1, providerCalls);
         var operations = (await client.GetFromJsonAsync<ConnectedServiceOperationResource[]>(
             $"/api/connected-services/orders/operations?scopeRef={Uri.EscapeDataString(owner.Value)}"))!;
         Assert.HasCount(1, operations);
@@ -174,7 +228,8 @@ public sealed partial class ConnectedServiceApiTests
         Assert.AreEqual(service.Uid, operations[0].Definition.Service.ServiceUid);
         Assert.AreEqual(service.Generation, operations[0].Definition.Service.Generation);
         Assert.AreEqual("getOrders", operations[0].Definition.Definition.GetProperty("operationId").GetString());
-        var runScope = new FlowRunScope(context.TenantId, new(context.WorkspaceId), context.PrincipalId);
+        var runScope = new FlowRunScope(context.TenantId, new(context.WorkspaceId), context.PrincipalId)
+        { LogicalScopeRef = owner };
         var runs = factory.Services.GetRequiredService<FlowRunService>();
         var run = (await runs.GetAsync(discovery.FlowRunId, runScope, default))!.Value;
         var events = await runs.ListEventsAsync(runScope, discovery.FlowRunId, 0, default);
@@ -182,6 +237,15 @@ public sealed partial class ConnectedServiceApiTests
         Assert.DoesNotContain(credential, evidence, StringComparison.Ordinal);
         Assert.DoesNotContain("https://origin.example.test", run.Input.GetRawText(), StringComparison.Ordinal);
         Assert.DoesNotContain("secretGrant", evidence, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class DiscoveryRequestHandler(HttpMessageHandler inner, Action called) : DelegatingHandler(inner)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri?.AbsolutePath == AepConnectedServiceDiscoveryProtocol.Path) called();
+            return base.SendAsync(request, cancellationToken);
+        }
     }
 
     private sealed class PublicAddressResolver : OpenApi.IOpenApiAddressResolver

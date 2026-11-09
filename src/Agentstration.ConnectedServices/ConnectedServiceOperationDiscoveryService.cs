@@ -78,8 +78,16 @@ public sealed class ConnectedServiceOperationDiscoveryService(
             ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, id), cancellationToken))
             ?? throw Error("connected_service_discovery_not_found", "The discovery was not found.");
         var discovery = stored.Value;
+        var consumer = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(context.TenantId),
+            _ => ResourceScopeRef.Workspace(context.WorkspaceId)
+        };
         if (discovery.FlowRunId != runId || discovery.CreatedBy != context.PrincipalId
-            || discovery.TenantId != context.TenantId || IsTerminal(discovery.State))
+            || discovery.TenantId != context.TenantId || discovery.WorkspaceId != context.WorkspaceId
+            || (discovery.LogicalScopeRef ?? ResourceScopeRef.Workspace(discovery.WorkspaceId)) != consumer
+            || IsTerminal(discovery.State))
             throw Error("connected_service_discovery_execution_denied", "The discovery execution context does not match.");
         var reference = discovery.Service;
         var service = await services.GetExactAsync(reference.Service.ScopeRef, reference.Service.Address.Namespace,

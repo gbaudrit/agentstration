@@ -41,6 +41,16 @@ acquisition-eligible: their exact type version must also declare the compatible
 acquisition adapter. No invocation contract is inferred from a discovered HTTP
 method or from its read-only flag.
 
+Protected discovery preserves the logical Instance, Tenant administration or
+Workspace context through the AWP Tool call. An administrative context can carry
+a valid operational Workspace while `ICurrentRequestContext.IsInitialized` is
+false (that property describes Workspace selection only). The executor checks
+the actual operational identity and accepted discovery's logical scope, and
+authorizes the service in that scope. It never substitutes Workspace authority
+for an administrative call. Nine real OpenAPI/Flow/Secret callback scenarios
+cover success, disabled services and changed revisions in all three contexts;
+forged identities/scopes are refused before the provider discovery request.
+
 ## Lifecycle and limits
 
 - Acceptance is idempotent per Workspace, dataset UID and caller request key.
