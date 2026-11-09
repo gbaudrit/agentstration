@@ -7,8 +7,8 @@
 Configure at least one destination domain and start the extension independently:
 
 ```powershell
-$env:OpenApi__AllowedDomains__0 = "api.example.com"
-dotnet run --project src/Agentstration.Extensions.OpenApi
+dotnet run --project src/Agentstration.Extensions.OpenApi --launch-profile http `
+  -e OpenApi__AllowedDomains__0=api.example.com
 ```
 
 The Development profile listens on `http://localhost:5310`. Enroll that endpoint like any other AEP extension. Its manifest contributes:
@@ -28,6 +28,37 @@ $env:OpenApi__Enabled = "true"
 $env:OpenApi__AllowedDomains__0 = "api.example.test"
 dotnet run --project src/Agentstration.AppHost
 ```
+
+### Pair with an existing instance
+
+The `existing-instance` launch profile starts only the extension at
+`http://localhost:5311` and announces it to the running Agentstration API at
+`http://localhost:5100`. The target slot is selected by its API URL. The
+profile stores its pairing state under
+`.agentstration/slots/main/aep-pairing/openapi-standalone.json`.
+
+For a different local slot, supply its API URL, a separate pairing state file
+and the allowed domain for your OpenAPI documents:
+
+```powershell
+dotnet run --project src/Agentstration.Extensions.OpenApi --launch-profile existing-instance `
+  -e Aep__PairingCode__AuthorityUrl=http://localhost:5200 `
+  -e Aep__PairingCode__StateFile=../../.agentstration/slots/integration/aep-pairing/openapi-standalone.json `
+  -e OpenApi__AllowedDomains__0=api.example.com
+```
+
+On the target instance, a Platform administrator assigns the candidate under
+**Extensions → Enrollment inbox** and enters the one-time code in the extension
+form. Keep a separate state file for each authority and reuse it on restart.
+For an authority on another host, use HTTPS, set
+`Aep__PairingCode__AllowInsecureHttp=false`, and set
+`Aep__PairingCode__PublicEndpoint` to an HTTPS origin that reaches the extension
+from the authority and the administrator's browser. See the
+[AEP transport configuration](../getting-started/configuration.md#aep-outbound-transport)
+for endpoint allowlists.
+
+To test Connected Service operation discovery, use an authority build that
+includes FR #1058 and its server-side discovery Tool.
 
 ## Connected Service operation discovery
 
