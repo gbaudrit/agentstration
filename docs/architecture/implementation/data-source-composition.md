@@ -1,7 +1,7 @@
 # Data Source operation and Storage composition
 
 This vertical implements [#1041](https://github.com/gbaudrit/agentstration/issues/1041)
-on `integration/fr-1032`. See [ADR-0202](../../decisions/0202-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
+on `integration/fr-1032`. See [ADR-0204](../../decisions/0204-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
 for ownership, the compatibility decision and routes.
 
 ## Configuration and execution
@@ -153,9 +153,10 @@ Source or acquired content, or implement native Knowledge Snapshot composition.
 - Historical content remains readable only while its exact Storage revision and
   content version are available and current access allows it. This is not a
   stable Snapshot contract, which belongs to #1042.
-- Generic relay and parameterized Tool exposure remains dependent on unmerged
-  #1044. No dataset-specific replacement relay is introduced. Historical fixed
-  acquisition Tools continue to use their original implementation.
+- The integration base now provides independently versioned ToolDefinitions and
+  relays through #1044 (ADR-0202/0203). This feature adds no automatic native
+  dataset Tool exposure or replacement relay engine. Historical acquisition Tools
+  retain their governed replay path.
 
 ## Disabled Knowledge configuration validation
 

@@ -62,7 +62,7 @@ public sealed class FlowDesignerResourceProviderTests
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolDefinition,
             Metadata = new ResourceMetadata { Name = "notify" },
-            Definition = new ToolDefinitionProperties
+            Definition = new FlowToolDefinitionProperties
             {
                 DisplayName = "Notify",
                 InputSchema = schema,

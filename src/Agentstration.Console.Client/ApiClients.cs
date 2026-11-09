@@ -180,6 +180,10 @@ public interface IFlowApiClient
         @namespace.IsDefault ? GetFlowVersionsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
         GetFlowVersionsAsync(@namespace, flowId, cancellationToken);
+    Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        GetFlowVersionsAsync(@namespace, flowId, scopeRef, cancellationToken);
+    Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, ResourceScopeRef? scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        GetFlowVersionAsync(@namespace, flowId, version, scopeRef, cancellationToken);
     async Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, CancellationToken cancellationToken) =>
         (await GetFlowVersionsAsync(@namespace, flowId, cancellationToken)).Single(value => string.Equals(value.Version, version, StringComparison.Ordinal));
     async Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>

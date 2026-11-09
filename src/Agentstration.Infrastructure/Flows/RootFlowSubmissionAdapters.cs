@@ -6,6 +6,11 @@ namespace Agentstration.Infrastructure.Flows;
 
 public sealed class RootFlowTargetResolver(FlowService flows) : IRootFlowTargetResolver
 {
+    public Task<ResolvedRootFlowTarget> ResolveAsync(FlowRunScope scope, FlowReference target,
+        System.Text.Json.JsonElement input, IReadOnlyList<Agentstration.Secrets.Abstractions.SecretInputReference> secretInputs,
+        CancellationToken cancellationToken) => ResolveAsync(scope, target,
+            Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(input, secretInputs), cancellationToken);
+
     public async Task<ResolvedRootFlowTarget> ResolveAsync(
         FlowRunScope scope,
         FlowReference target,
@@ -42,7 +47,8 @@ public sealed class RootFlowRunGateway(FlowRunService runs) : IRootFlowRunGatewa
             request.TriggerMessageId,
             request.Scope)
         {
-            DefinitionScopeRef = request.Target.ScopeRef
+            DefinitionScopeRef = request.Target.ScopeRef,
+            SecretInputs = request.SecretInputs
         }, cancellationToken);
         return new(stored.Value, stored.ETag);
     }

@@ -1,4 +1,4 @@
-# ADR-0202: Data Sources compose operation acquisitions with logical datasets
+# ADR-0204: Data Sources compose operation acquisitions with logical datasets
 
 ## Status
 

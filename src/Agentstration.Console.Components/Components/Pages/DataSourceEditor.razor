@@ -81,7 +81,7 @@ else
                                             @T("CreateAcquisitionTool")
                                         </button>
                                     }
-                                    @foreach (var linkedTool in acquisitionTools.Where(value => value.Definition.Acquisition is { } binding
+                                    @foreach (var linkedTool in acquisitionTools.Where(value => value.Definition is AcquisitionToolDefinitionProperties { Acquisition: var binding }
                                         && binding.TemplateId == item.Name && binding.TemplateNamespace == item.Namespace))
                                     {
                                         <a class="button-secondary" href="@AcquisitionToolUrl(linkedTool)" data-testid="data-source-linked-tool">@linkedTool.Definition.DisplayName</a>
@@ -339,7 +339,7 @@ else
                         .OrderByDescending(value => value.CreatedAt).ToArray();
                     if (acquisitions.Count > 0 && Services.GetService<IToolDefinitionsClient>() is { } definitions)
                         acquisitionTools = (await definitions.GetAsync(cancellation.Token))
-                            .Where(value => value.Definition.Acquisition is not null).ToArray();
+                            .Where(value => value.Definition is AcquisitionToolDefinitionProperties).ToArray();
                     if (readiness.Discovery is not null)
                     {
                         discoveries = (await Client.GetDiscoveriesAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token))

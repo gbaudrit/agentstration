@@ -40,9 +40,11 @@ public sealed class McpToolCatalogTests
         var recorder = new AuthorizationRecorder(token);
         var secrets = new TestSecretResolver(token);
         var extensionUnavailable = false;
+        var waitForOperationCancellation = false;
         var httpHandlers = new TestHttpMessageHandlerFactory(() =>
             extensionUnavailable
                 ? new AuthenticationFailureHandler()
+                : waitForOperationCancellation ? new WaitForCancellationHandler()
                 : new RecordingAuthorizationHandler(host.Server.CreateHandler(), recorder));
         var transport = new AepMcpTransport(httpHandlers, NullLoggerFactory.Instance);
         var source = new AepSchemaFormatHandlerSource(
@@ -106,6 +108,8 @@ public sealed class McpToolCatalogTests
             SchemaFormatIds.JsonSchema,
             SchemaFormatCapabilities.ValidateDefinition,
             contributed.Provider);
+        // Exercise cancellation deterministically instead of racing a timer against synchronous TestServer responses.
+        waitForOperationCancellation = true;
         var timeout = await Assert.ThrowsAsync<SchemaFormatOperationException>(async () =>
             await timeoutHandler.ValidateDefinitionAsync(
                 JsonSerializer.SerializeToElement(new { type = "object" }),
@@ -574,6 +578,15 @@ public sealed class McpToolCatalogTests
         {
             recorder.Record(request);
             return base.SendAsync(request, cancellationToken);
+        }
+    }
+
+    private sealed class WaitForCancellationHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("The request must be cancelled by its operation timeout.");
         }
     }
 

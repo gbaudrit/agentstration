@@ -67,6 +67,7 @@ public sealed record ToolSchema
 
 public sealed record ToolResourceProperties
 {
+    public string? Version { get; init; }
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public ToolTypeReference? ToolType { get; init; }

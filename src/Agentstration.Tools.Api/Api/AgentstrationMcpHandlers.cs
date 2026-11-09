@@ -25,7 +25,7 @@ internal static class AgentstrationMcpHandlers
         await services.GetRequiredService<InternalMcpToolProjectionService>().EnsureAsync(
             workspaceScope, ResourceNamespace.Default, cancellationToken);
         var definitions = services.GetRequiredService<ToolDefinitionService>();
-        var values = await definitions.ListAsync(cancellationToken);
+        var values = await definitions.ListPublishedAsync(cancellationToken);
         var projected = (await services.GetRequiredService<IResourceStore>()
                 .ListExactAsync<ToolResource>(workspaceScope, ToolResourceKinds.Tool, 0, 1_000, cancellationToken))
             .Select(value => value.Value)
@@ -118,7 +118,7 @@ internal static class AgentstrationMcpHandlers
                     StructuredContent = builtInOutput
                 };
             }
-            var definitions = await services.GetRequiredService<ToolDefinitionService>().ListAsync(cancellationToken);
+            var definitions = await services.GetRequiredService<ToolDefinitionService>().ListPublishedAsync(cancellationToken);
             var definition = definitions.Select(value => value.Value).SingleOrDefault(value =>
                 value.Definition.Enabled && string.Equals(PublicName(value), parameters.Name, StringComparison.Ordinal))
                 ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", $"Tool '{parameters.Name}' is not published by the Agentstration MCP server.");
@@ -134,7 +134,30 @@ internal static class AgentstrationMcpHandlers
                 Correlation(parameters.Meta),
                 arguments,
                 ToolDefinitionCallerKind.Mcp);
-            var result = await services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(invocation, cancellationToken);
+            var tool = (await services.GetRequiredService<IResourceStore>().GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+                workspaceScope, definition.Namespace, ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(definition.Name)), cancellationToken))?.Value
+                ?? throw new ToolDefinitionInvocationException("tool_definition_not_found", "The published Tool projection is unavailable.");
+            var result = await services.GetRequiredService<IToolExecutionPipeline>().ExecuteDetailedAsync(new ToolExecutionContext
+            {
+                OwnerKind = ToolExecutionOwnerKind.Mcp,
+                ToolCallId = invocation.CallId,
+                InvocationId = $"{invocation.CallId}:attempt:1",
+                ToolId = tool.Name,
+                ToolName = definition.Name,
+                ExternalToolId = definition.Name,
+                ToolNamespace = tool.Namespace,
+                ToolScopeRef = workspaceScope,
+                ToolUid = tool.Uid,
+                ToolGeneration = tool.Generation,
+                ToolProviderId = AgentstrationToolProvider.Name,
+                ToolProviderNamespace = tool.Namespace,
+                ToolProviderScopeRef = workspaceScope,
+                TenantId = current.TenantId,
+                WorkspaceId = new(current.WorkspaceId),
+                PrincipalId = current.PrincipalId,
+                CorrelationId = invocation.CorrelationId,
+                Arguments = invocation.Arguments
+            }, cancellationToken);
             var output = result.Output?.Clone();
             return new CallToolResult
             {
@@ -194,7 +217,7 @@ internal static class AgentstrationMcpHandlers
         {
             ["agentstration/namespace"] = definition.Namespace.Value,
             ["agentstration/requiresApproval"] = definition.Definition.RequiresApproval,
-            ["agentstration/implementation"] = "flow"
+            ["agentstration/implementation"] = definition.Definition switch { RelayToolDefinitionProperties => "relay", AcquisitionToolDefinitionProperties => "acquisition", _ => "flow" }
         };
         if (definition.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source", out var source))
             metadata["agentstration/knowledgeSource"] = source;

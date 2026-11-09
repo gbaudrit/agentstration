@@ -139,9 +139,9 @@ export class GovernedKnowledgePage {
     const definition = await (await this.get(consoleUrl, `/api/tooldefinitions/${knowledge}.search`, scope)).json() as { definition: Record<string, unknown> };
     const additionalName = `${knowledge}.additional-search`;
     await this.post(consoleUrl, '/api/tooldefinitions', scope, {
-      name: additionalName, namespace: 'default', properties: { ...definition.definition, displayName: additionalName },
+      name: additionalName, namespace: 'default', properties: { ...definition.definition, displayName: additionalName, publish: true },
     }, 201);
-    const additionalTool = `agentstration.${additionalName}`;
+    const additionalTool = `agentstration.${additionalName}.v${String(definition.definition.version)}`;
     const updated = await this.page.request.put(this.url(consoleUrl, path, scope), {
       headers: { 'X-Agentstration-Context': scope, 'If-Match': current.headers()['etag']! },
       data: { properties: { ...toolSet.definition, version: '2.0.0', publish: true,
@@ -157,8 +157,8 @@ export class GovernedKnowledgePage {
     await this.openToolSet(consoleUrl, evidence.toolSetName, scope);
     const versions = this.page.getByTestId(TestIds.governedKnowledge.toolSetVersion);
     await expect(versions).toHaveCount(2);
-    await expect(versions.filter({ hasText: '2.0.0' })).toContainText(additionalTool);
-    await expect(versions.filter({ hasText: '1.0.0' })).not.toContainText(additionalTool);
+    await expect(versions.filter({ has: this.page.getByRole('heading', { level: 3, name: /\b2\.0\.0$/ }) })).toContainText(additionalTool);
+    await expect(versions.filter({ has: this.page.getByRole('heading', { level: 3, name: /\b1\.0\.0$/ }) })).not.toContainText(additionalTool);
     const beforeDelete = await (await this.get(consoleUrl, path, scope)).json() as unknown;
     await this.publishedTools.getByRole('button', { name: text.deleteToolSet, exact: true }).click();
     await this.page.getByRole('dialog').getByRole('button', { name: text.confirmToolSetDelete, exact: true }).click();
