@@ -83,7 +83,7 @@ public sealed record ModelProfileSummaryPropertiesResponse(
     ModelReasoningOptions Reasoning,
     ModelOutputOptions Output,
     string Status,
-    int UsageCount);
+    int? UsageCount);
 
 public sealed record ModelProfileSummaryResponse(
     string Id,
@@ -143,3 +143,6 @@ public sealed record AgentModelResponse(
     ResolvedAgentModelResponse Resolved,
     string Status,
     IReadOnlyList<string> Warnings);
+
+public sealed record ModelProfileLookupPageResponse(IReadOnlyList<ModelProfileSummaryResponse> Value, string? NextCursor);
+public sealed record ModelProfileUsagePageResponse(IReadOnlyList<ModelProfileUsageResponse> Value, string? NextCursor, int? Count = null);

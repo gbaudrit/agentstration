@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Agents;
+using Agentstration.Models;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
@@ -105,7 +106,7 @@ public sealed class PostgreSqlResourceStore(
     TimeProvider timeProvider,
     ICurrentRequestContext requestContext,
     IResourceGovernanceContext governanceContext,
-    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver
+    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver, IModelProfileLookupQueries, IAgentProfileUsageQueries
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -239,6 +240,78 @@ public sealed class PostgreSqlResourceStore(
             value.Kind,
             value.Name,
             value.UpdatedAt)).ToArray();
+    }
+
+    public async Task<AgentProfileUsageWindow> FindProfileCandidatesAsync(ResourceScopeRef scopeRef, string profileName, string? search, int offset, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var scope = await RequireScopeAsync(context, scopeRef, cancellationToken);
+        await EnsureCanReadAsync(context, scope, cancellationToken);
+        var searchPattern = "%" + (search ?? string.Empty).Replace("!", "!!", StringComparison.Ordinal).Replace("%", "!%", StringComparison.Ordinal).Replace("_", "!_", StringComparison.Ordinal) + "%";
+        FormattableString sql = $"""
+            SELECT * FROM management."ControlPlaneResources"
+            WHERE "Kind" = {AgentResourceKinds.Agent}
+              AND jsonb_extract_path_text("Payload"::jsonb, 'definition', 'modelProfile', 'name') = {profileName}
+              AND ("Name" ILIKE {searchPattern} ESCAPE '!' OR "Namespace" ILIKE {searchPattern} ESCAPE '!'
+                OR jsonb_extract_path_text("Payload"::jsonb, 'definition', 'displayName') ILIKE {searchPattern} ESCAPE '!')
+            """;
+        var candidates = await context.Documents.FromSqlInterpolated(sql).AsNoTracking().Where(value => value.ScopeId == scope.Id)
+            .Include(value => value.Scope).OrderBy(value => value.Namespace).ThenBy(value => value.Name).Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(DeserializeValue<AgentResource>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
+    }
+
+    public async Task<ModelProfileLookupResult> LookupProfilesAsync(string? search, string? provider, string? ownerKind, int offset, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        static string Pattern(string? value) => "%" + (value ?? string.Empty).Replace("!", "!!", StringComparison.Ordinal).Replace("%", "!%", StringComparison.Ordinal).Replace("_", "!_", StringComparison.Ordinal) + "%";
+        var searchPattern = Pattern(search);
+        var providerPattern = Pattern(provider);
+        FormattableString sql = $"""
+            SELECT * FROM management."ControlPlaneResources"
+            WHERE "Kind" = {ModelResourceKinds.ModelProfile}
+              AND ("Name" ILIKE {searchPattern} ESCAPE '!' OR "Namespace" ILIKE {searchPattern} ESCAPE '!'
+                OR jsonb_extract_path_text("Payload"::jsonb, 'definition', 'displayName') ILIKE {searchPattern} ESCAPE '!'
+                OR jsonb_extract_path_text("Payload"::jsonb, 'definition', 'provider', 'name') ILIKE {searchPattern} ESCAPE '!'
+                OR jsonb_extract_path_text("Payload"::jsonb, 'definition', 'model', 'name') ILIKE {searchPattern} ESCAPE '!')
+              AND jsonb_extract_path_text("Payload"::jsonb, 'definition', 'provider', 'name') ILIKE {providerPattern} ESCAPE '!'
+            """;
+        var query = Scoped(context.Documents.FromSqlInterpolated(sql).AsNoTracking());
+        if (!string.IsNullOrEmpty(ownerKind))
+        {
+            var normalizedKind = ownerKind.ToLowerInvariant();
+            query = query.Where(value => value.Scope.Kind == normalizedKind);
+        }
+        var candidates = await query.Include(value => value.Scope).OrderBy(value => value.ScopeId)
+            .ThenBy(value => value.Namespace).ThenBy(value => value.Name).Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(DeserializeValue<ModelProfileResource>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
+    }
+
+    public async Task<ResourceDiscoveryWindow<T>> ListDiscoveryWindowAsync<T>(string kind, ResourceScopeRef? exactScope, int offset, int take, CancellationToken cancellationToken) where T : Resource
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = exactScope is null ? Scoped(context.Documents.AsNoTracking()) : context.Documents.AsNoTracking();
+        if (exactScope is { } scopeRef)
+        {
+            var scope = await RequireScopeAsync(context, scopeRef, cancellationToken);
+            await EnsureCanReadAsync(context, scope, cancellationToken);
+            query = query.Where(value => value.ScopeId == scope.Id);
+        }
+        var candidates = await query.Where(value => value.Kind == kind).Include(value => value.Scope)
+            .OrderBy(value => value.ScopeId).ThenBy(value => value.Namespace).ThenBy(value => value.Name)
+            .Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(Deserialize<T>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
     }
 
     public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
@@ -675,6 +748,8 @@ public static class PostgreSqlResourceManagementServiceCollectionExtensions
         services.AddDbContextFactory<ResourceManagementDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "management").EnableRetryOnFailure()).AddInterceptors(new UtcDateTimeOffsetInterceptor()));
         services.AddSingleton<IResourceStore, PostgreSqlResourceStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (PostgreSqlResourceStore)provider.GetRequiredService<IResourceStore>());
+        services.AddSingleton<IModelProfileLookupQueries>(provider => (PostgreSqlResourceStore)provider.GetRequiredService<IResourceStore>());
+        services.AddSingleton<IAgentProfileUsageQueries>(provider => (PostgreSqlResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceScopeResolver>(provider => (PostgreSqlResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceAccessPolicyStore, PostgreSqlResourceAccessPolicyStore>();
         services.AddSingleton<ITriggerOccurrenceStore, PostgreSqlTriggerOccurrenceStore>();

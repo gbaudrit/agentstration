@@ -27,6 +27,8 @@ public static class ModelsApiModule
 
         var profiles = endpoints.MapGroup("/api/modelprofiles");
         ListModelProfilesEndpoint.Map(profiles);
+        LookupModelProfilesEndpoint.Map(profiles);
+        GetModelProfileUsagePageEndpoint.Map(profiles);
         GetModelProfileUsagesEndpoint.Map(profiles);
         ResolveModelProfileEndpoint.Map(profiles);
         PreviewModelProfileOptionMigrationEndpoint.Map(profiles);

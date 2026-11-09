@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Agents;
+using Agentstration.Models;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
@@ -107,7 +108,7 @@ public sealed class SqliteResourceStore(
     TimeProvider timeProvider,
     ICurrentRequestContext requestContext,
     IResourceGovernanceContext governanceContext,
-    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver
+    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver, IModelProfileLookupQueries, IAgentProfileUsageQueries
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -232,6 +233,85 @@ public sealed class SqliteResourceStore(
             value.Kind,
             value.Name,
             value.UpdatedAt)).ToArray();
+    }
+
+    public async Task<AgentProfileUsageWindow> FindProfileCandidatesAsync(ResourceScopeRef scopeRef, string profileName, string? search, int offset, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var scope = await RequireScopeAsync(context, scopeRef, cancellationToken);
+        await EnsureCanReadAsync(context, scope, cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        var connection = (Microsoft.Data.Sqlite.SqliteConnection)context.Database.GetDbConnection();
+        connection.CreateFunction<string?, string?, bool>("agentstration_contains", static (text, needle) =>
+            string.IsNullOrEmpty(needle) || text?.Contains(needle, StringComparison.OrdinalIgnoreCase) == true, isDeterministic: true);
+        var searchValue = search ?? string.Empty;
+        FormattableString sql = $"""
+            SELECT * FROM ControlPlaneResources
+            WHERE Kind = {AgentResourceKinds.Agent}
+              AND json_extract(Payload, '$.definition.modelProfile.name') = {profileName}
+              AND (agentstration_contains(Name, {searchValue}) OR agentstration_contains(Namespace, {searchValue})
+                OR agentstration_contains(json_extract(Payload, '$.definition.displayName'), {searchValue}))
+            """;
+        var candidates = await context.Documents.FromSqlInterpolated(sql).AsNoTracking().Where(value => value.ScopeId == scope.Id)
+            .Include(value => value.Scope).OrderBy(value => value.Namespace).ThenBy(value => value.Name).Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(DeserializeValue<AgentResource>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
+    }
+
+    public async Task<ModelProfileLookupResult> LookupProfilesAsync(string? search, string? provider, string? ownerKind, int offset, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        var connection = (Microsoft.Data.Sqlite.SqliteConnection)context.Database.GetDbConnection();
+        connection.CreateFunction<string?, string?, bool>("agentstration_contains", static (text, needle) =>
+            string.IsNullOrEmpty(needle) || text?.Contains(needle, StringComparison.OrdinalIgnoreCase) == true, isDeterministic: true);
+        var searchValue = search ?? string.Empty;
+        var providerValue = provider ?? string.Empty;
+        FormattableString sql = $"""
+            SELECT * FROM ControlPlaneResources
+            WHERE Kind = {ModelResourceKinds.ModelProfile}
+              AND (agentstration_contains(Name, {searchValue}) OR agentstration_contains(Namespace, {searchValue})
+                OR agentstration_contains(json_extract(Payload, '$.definition.displayName'), {searchValue})
+                OR agentstration_contains(json_extract(Payload, '$.definition.provider.name'), {searchValue})
+                OR agentstration_contains(json_extract(Payload, '$.definition.model.name'), {searchValue}))
+              AND agentstration_contains(json_extract(Payload, '$.definition.provider.name'), {providerValue})
+            """;
+        var query = Scoped(context.Documents.FromSqlInterpolated(sql).AsNoTracking());
+        if (!string.IsNullOrEmpty(ownerKind))
+        {
+            var normalizedKind = ownerKind.ToLowerInvariant();
+            query = query.Where(value => value.Scope.Kind == normalizedKind);
+        }
+        var candidates = await query.Include(value => value.Scope).OrderBy(value => value.ScopeId)
+            .ThenBy(value => value.Namespace).ThenBy(value => value.Name).Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(DeserializeValue<ModelProfileResource>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
+    }
+
+    public async Task<ResourceDiscoveryWindow<T>> ListDiscoveryWindowAsync<T>(string kind, ResourceScopeRef? exactScope, int offset, int take, CancellationToken cancellationToken) where T : Resource
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = exactScope is null ? Scoped(context.Documents.AsNoTracking()) : context.Documents.AsNoTracking();
+        if (exactScope is { } scopeRef)
+        {
+            var scope = await RequireScopeAsync(context, scopeRef, cancellationToken);
+            await EnsureCanReadAsync(context, scope, cancellationToken);
+            query = query.Where(value => value.ScopeId == scope.Id);
+        }
+        var candidates = await query.Where(value => value.Kind == kind).Include(value => value.Scope)
+            .OrderBy(value => value.ScopeId).ThenBy(value => value.Namespace).ThenBy(value => value.Name)
+            .Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(Deserialize<T>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
     }
 
     public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
@@ -752,6 +832,8 @@ public static class SqliteResourceManagementServiceCollectionExtensions
         services.AddDbContextFactory<ResourceManagementDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IResourceStore, SqliteResourceStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
+        services.AddSingleton<IModelProfileLookupQueries>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
+        services.AddSingleton<IAgentProfileUsageQueries>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceScopeResolver>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceAccessPolicyStore, SqliteResourceAccessPolicyStore>();
         services.AddSingleton<ITriggerOccurrenceStore, SqliteTriggerOccurrenceStore>();
