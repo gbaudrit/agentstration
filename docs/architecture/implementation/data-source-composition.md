@@ -108,7 +108,8 @@ Checks completed on 2026-11-09 against integration base `03ad8f0`:
 
 - Release solution build: zero warnings and errors.
 - Required Fast lane: 1,037 passed, zero failures or skips.
-- The final complete Integration rerun is in progress; no final success is claimed yet.
+- Required Integration lane: 1,120 passed, zero failures, 12 existing optional
+  integrations skipped (two PostgreSQL and ten live-model cases), 1,132 total.
 - Five native dataset integration scenarios and fifteen protected real OpenAPI
   Flow/Secret callback scenarios passed in focused runs. Successful OpenAPI rows
   now save and acquire two datasets with different parameters into one local
