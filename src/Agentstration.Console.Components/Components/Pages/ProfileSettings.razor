@@ -53,8 +53,8 @@
 
         <div class="profile-language">
             <label for="profile-language"><strong>@Localizer["Language"]</strong></label>
-            <p>@Localizer["LanguageDescription"]</p>
-            <ClearableSelect AllowClear="false" TValue="string" id="profile-language" data-testid="profile-language" Value="@Convert.ToString(Preferences.Language ?? "auto", System.Globalization.CultureInfo.InvariantCulture)" disabled="@Preferences.IsSaving" ValueChanged="changed => SelectLanguageAsync(new ChangeEventArgs { Value = changed })">
+            <p id="profile-language-help">@Localizer["LanguageDescription"]</p>
+            <ClearableSelect AllowClear="false" TValue="string" id="profile-language" aria-describedby="profile-language-help" data-testid="profile-language" Value="@Convert.ToString(Preferences.Language ?? "auto", System.Globalization.CultureInfo.InvariantCulture)" disabled="@Preferences.IsSaving" ValueChanged="changed => SelectLanguageAsync(new ChangeEventArgs { Value = changed })">
                 <option value="auto">@Localizer["LanguageAutomatic"]</option>
                 <option value="en-US">English</option>
                 <option value="fr-FR">Français</option>

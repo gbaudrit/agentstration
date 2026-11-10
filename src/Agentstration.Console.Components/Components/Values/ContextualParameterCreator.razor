@@ -5,8 +5,8 @@
 
 @if (IsOpen && Context is { } creationContext)
 {
-    <div class="dialog-backdrop" role="presentation" @onclick="CancelAsync">
-        <section class="dialog contextual-value-dialog" role="dialog" aria-modal="true" aria-labelledby="contextual-parameter-title" @onclick:stopPropagation data-testid="contextual-parameter-creator">
+    <ModalFrame IsOpen="true" TitleId="contextual-parameter-title" Class="contextual-value-dialog" Busy="@busy" OnClose="CancelAsync">
+        <div data-testid="contextual-parameter-creator">
             <h2 id="contextual-parameter-title">@T("Parameter.Title")</h2>
             <p>@T("Parameter.Help")</p>
             @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
@@ -31,10 +31,10 @@
                         }
                     </FormField>
                 </FormGrid>
-                <FormActions Class="dialog-actions"><button type="button" class="button-secondary" @onclick="CancelAsync">@T("Cancel")</button><button type="submit" class="button-primary" disabled="@busy" data-testid="contextual-parameter-create">@(busy ? T("Creating") : T("CreateAndUse"))</button></FormActions>
+                <FormActions Class="dialog-actions"><button type="button" class="button-secondary" disabled="@busy" @onclick="CancelAsync">@T("Cancel")</button><button type="submit" class="button-primary" disabled="@busy" data-testid="contextual-parameter-create">@(busy ? T("Creating") : T("CreateAndUse"))</button></FormActions>
             </EditForm>
-        </section>
-    </div>
+        </div>
+    </ModalFrame>
 }
 
 @code {

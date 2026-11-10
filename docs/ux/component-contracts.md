@@ -98,3 +98,6 @@ The Agent overview omits duplicate Identity and Execution panels. `StateComparis
 Les pages Razor utilisent `ClearableControlTagHelper` (`clear-label`, `validation-id`), `native-form-controls.js` et `account-form-theme.css`. L’adaptateur conserve leurs champs et POST natifs, ajoute un bouton non soumettant masqué sans JavaScript et partage les variables sémantiques. Une option vide explicite préserve la validation serveur d’une sélection effacée. Les pages anonymes suivent le système et les pages de compte peuvent lire la préférence enregistrée.
 
 Voir l’[inventaire des formulaires](formulaires-tous-ecrans/README.md), qui sépare les routes, composants imbriqués et filtres de collections.
+
+
+Les créateurs contextuels Paramètre/Secret utilisent également `ModalFrame`. Son ouverture reste unique pendant l’import et l’enregistrement asynchrones ; un rendu supplémentaire du contenu ne doit pas perdre la poignée qui restitue le focus au déclencheur. Les dialogues fermés/détruits pendant cette opération libèrent les références créées tardivement.

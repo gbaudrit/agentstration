@@ -5,6 +5,7 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Values;
 using Agentstration.Web.Console;
 using Bunit;
@@ -16,10 +17,31 @@ namespace Agentstration.Web.Tests;
 public sealed class ContextualValueCreatorTests
 {
     [TestMethod]
+    public async Task ContextualParameterUsesTheSharedModalCloseWithoutCreatingAResource()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var client = new ParameterClient(scope);
+        var cancelled = false;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IParametersClient>(client);
+        var rendered = context.Render<ContextualParameterCreator>(parameters => parameters
+            .Add(component => component.IsOpen, true)
+            .Add(component => component.Context, new(scope, "draft", "Draft"))
+            .Add(component => component.OnCancel, () => cancelled = true));
+        Assert.AreEqual("contextual-parameter-title", rendered.FindComponent<ModalFrame>().Instance.TitleId);
+        await rendered.Find("button[data-modal-close]").ClickAsync(new());
+        Assert.IsTrue(cancelled);
+        Assert.IsNull(client.Request);
+    }
+
+    [TestMethod]
     public void ParameterCreatorWorksWithoutAModelProviderConsumer()
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new ParameterClient(scope);
         ScopedResourceAddress? created = null;
@@ -47,6 +69,7 @@ public sealed class ContextualValueCreatorTests
     public void ParameterCreatorSubmitsDerivedNameAndDisplayNameThroughExistingContract()
     {
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new ParameterClient(scope);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -81,6 +104,7 @@ public sealed class ContextualValueCreatorTests
         {
             using var culture = new TestCultureScope("fr-FR");
             using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
             var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
             var client = new ParameterClient(scope);
             context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -118,6 +142,7 @@ public sealed class ContextualValueCreatorTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new SecretClient(scope);
         ScopedResourceAddress? created = null;

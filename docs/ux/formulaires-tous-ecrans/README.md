@@ -130,7 +130,7 @@ Les écrans de listes qui hébergent aussi de vrais formulaires (Sources, Packs,
 
 ## Validation
 
-Le build Release de la solution passe sans avertissement ni erreur. Les 959 tests rapides passent, dont 15 contrôles supplémentaires sur les primitives, les formulaires serveur, les métadonnées de Pack et la prévention du retour des contrôles ordinaires non partagés.
+Le build Release de la solution passe sans avertissement ni erreur. Les 961 tests rapides passent, dont 17 contrôles supplémentaires sur les primitives, les formulaires serveur, les métadonnées de Pack et la prévention du retour des contrôles ordinaires non partagés.
 
 Les vérifications navigateur des parcours existants couvrent création/publication, administration, organisation et droits, Sources/registres, composition de Packs, contrats et transitions du Designer, schémas dynamiques et Workplace. Les tests de Sources ont été adaptés au nouvel arrêt clavier sur le bouton d’effacement ; le parcours vérifie le bouton, l’aide, puis la sélection, sans supprimer l’assertion de focus. Les 15 cas de la campagne ciblée Sources/distribution/organisation/champs Flow passent après cette correction. La lane Integration passe : 1 011 tests réussis et 12 intégrations optionnelles ignorées. Les contrôles complémentaires couvrent aussi les créateurs contextuels Paramètre/Secret, le modèle, les dialogues de schéma et le Designer mobile. Un lien de modèle rendu côté serveur porte désormais explicitement le contexte propriétaire, afin de conserver ce contexte même si le clic précède l’attachement de la navigation interactive. Les résultats CI définitifs restent liés depuis la PR en brouillon.
 
@@ -153,3 +153,6 @@ Les captures montrent les vrais écrans locaux, après effacement d’un champ. 
 | Initialisation du compte | [Capture](captures/bootstrap-dark-1440.png) | [Capture](captures/bootstrap-light-390.png) |
 
 Le contrôle visuel a également conduit à faire suivre l’apparence sélectionnée aux champs mobiles du Workplace, à son logo mobile et aux titres voisins du formulaire.
+
+
+Les créateurs contextuels Paramètre et Secret réutilisent aussi `ModalFrame` pour le focus, Échap et le retour au déclencheur. L’ouverture de la modale est sérialisée pendant son chargement asynchrone : un nouveau rendu du contenu ne remplace pas son enregistrement de restauration du focus. Un test avec un enregistrement JavaScript volontairement retardé couvre ce cas.

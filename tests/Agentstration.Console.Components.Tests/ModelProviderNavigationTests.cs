@@ -567,6 +567,7 @@ public sealed partial class ModelProviderNavigationTests
         IReadOnlyList<ExtensionResponse>? extensions = null)
     {
         var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         providers = new StubModelProvidersClient();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProvidersClient>(providers);
