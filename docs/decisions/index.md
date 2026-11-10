@@ -230,3 +230,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 202. [ADR-0202 — ToolDefinitions publish independent governed relay versions](0202-tool-definitions-publish-independent-governed-relay-versions.md)
 203. [ADR-0203 — Durable Flow inputs retain live Secret references](0203-durable-flow-inputs-retain-live-secret-references.md)
 204. [ADR-0204 — Data Sources compose operation acquisitions with logical datasets](0204-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
+205. [ADR-0205 — ASP uses scoped progressive content sessions](0205-asp-uses-scoped-progressive-content-sessions.md)

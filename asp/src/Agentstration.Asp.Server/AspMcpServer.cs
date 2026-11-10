@@ -6,17 +6,19 @@ using ModelContextProtocol.Server;
 
 namespace Agentstration.Asp.Server;
 
-public sealed class AspMcpServer
+public sealed class AspMcpServer : IAsyncDisposable
 {
     private readonly Dictionary<AspStoreRef, AspStoreBinding> bindings;
     private readonly string toolPrefix;
     private readonly TimeProvider clock;
     private readonly AspReferences references;
+    private readonly AspTransfers transfers;
+    private readonly AspSessionLimits limits;
     private readonly Func<RequestContext<CallToolRequestParams>, AspStoreRef, CancellationToken, ValueTask<AspStoreBinding>>? resolveBinding;
 
     /// <summary>The host resolves only previously configured bindings, from trusted transport context on every call.</summary>
     public AspMcpServer(Func<RequestContext<CallToolRequestParams>, AspStoreRef, CancellationToken, ValueTask<AspStoreBinding>> resolveBinding,
-        TimeProvider? clock = null, string toolPrefix = "asp")
+        TimeProvider? clock = null, string toolPrefix = "asp", AspSessionLimits? sessionLimits = null)
     {
         ArgumentNullException.ThrowIfNull(resolveBinding);
         AspValidation.Require(toolPrefix.Length is > 0 and <= 64 && toolPrefix.All(c => char.IsAsciiLetterOrDigit(c) || c == '_'),
@@ -26,9 +28,11 @@ public sealed class AspMcpServer
         this.toolPrefix = toolPrefix;
         this.clock = clock ?? TimeProvider.System;
         references = new(this.clock);
+        limits = sessionLimits ?? new();
+        transfers = new(this.clock, references, limits);
     }
 
-    public AspMcpServer(IEnumerable<AspStoreBinding> bindings, TimeProvider? clock = null, string toolPrefix = "asp")
+    public AspMcpServer(IEnumerable<AspStoreBinding> bindings, TimeProvider? clock = null, string toolPrefix = "asp", AspSessionLimits? sessionLimits = null)
     {
         ArgumentNullException.ThrowIfNull(bindings);
         this.bindings = bindings.ToDictionary(value => value.Store);
@@ -44,6 +48,8 @@ public sealed class AspMcpServer
         }
         this.clock = clock ?? TimeProvider.System;
         references = new(this.clock);
+        limits = sessionLimits ?? new();
+        transfers = new(this.clock, references, limits);
     }
 
     public ValueTask<ListToolsResult> ListToolsAsync(RequestContext<ListToolsRequestParams> request, CancellationToken cancellationToken)
@@ -91,7 +97,7 @@ public sealed class AspMcpServer
             return Reply(new AspReply<object>(AspProtocol.Version, requestId, data, null), false);
         }
         catch (AspException exception)
-        { return Reply(new AspReply<object>(AspProtocol.Version, requestId, null, new(exception.Code, exception.Message)), true); }
+        { return Reply(new AspReply<object>(AspProtocol.Version, requestId, null, new(exception.Code, exception.Message, exception.SessionRef)), true); }
         catch (OperationCanceledException)
         { return Reply(new AspReply<object>(AspProtocol.Version, requestId, null, new("cancelled", "Outcome may be unknown; retry writes with the exact original request.")), true); }
     }
@@ -110,7 +116,7 @@ public sealed class AspMcpServer
                     && provider.ConfigurationSchema.GetRawText().Length <= 16_384, "invalid_result", "Invalid configuration schema.");
                 return new AspDescription(AspProtocol.Version, AspProtocol.Profile, provider.ProviderId, provider.ProviderVersion,
                     context.Store, new(context.Policy.CanList, context.Policy.CanStat, context.Policy.CanRead,
-                        context.Policy.CanWrite && provider is IAspObjectWriter, false, false, false), context.Policy, provider.ConfigurationSchema);
+                        context.Policy.CanWrite && provider is IAspObjectWriter, false, false, false), context.Policy, provider.ConfigurationSchema, provider.Transfers, limits);
             case "list":
                 AspValidation.Require(context.Policy.CanList, "forbidden", "List is not authorized.");
                 var list = AspValidation.Parse<AspListRequest>(args);
@@ -137,35 +143,18 @@ public sealed class AspMcpServer
                 AspValidation.Require(context.Policy.CanStat, "forbidden", "Stat is not authorized.");
                 var stat = AspValidation.Parse<AspReferenceRequest>(args);
                 var statRef = references.Open(stat.Reference, "object", context);
-                var metadata = await provider.StatAsync(context, statRef.Key, statRef.Version!, ct);
-                ValidateIdentity(context, metadata, statRef.Key, statRef.Version!);
+                var metadata = await provider.StatAsync(context, statRef.Key, statRef.Version, statRef.ETag, ct);
+                ValidateIdentity(context, metadata, statRef.Key, statRef.Version);
+                AspValidation.Require(statRef.ETag is null || metadata.ETag == statRef.ETag, "version_unavailable", "The selected ETag changed.");
                 return PublicObject(context, metadata);
-            case "read":
-                AspValidation.Require(context.Policy.CanRead, "forbidden", "Read is not authorized.");
-                var read = AspValidation.Parse<AspReadRequest>(args);
-                AspValidation.Require(read.Offset >= 0 && read.MaxBytes > 0 && read.MaxBytes <= context.Policy.MaxReadBytes,
-                    "limit_exceeded", "Invalid read range.");
-                var readRef = references.Open(read.Reference, "object", context);
-                var content = await provider.ReadAsync(context, readRef.Key, readRef.Version!, read.Offset, read.MaxBytes, ct);
-                AspValidation.Require(content is not null && content.Content is not null, "invalid_result", "Missing provider content.");
-                ValidateIdentity(context, content.Item, readRef.Key, readRef.Version!);
-                AspValidation.Require(read.Offset <= content.Item.Length && content.Content.Length <= read.MaxBytes
-                    && content.Content.Length == Math.Min(read.MaxBytes, content.Item.Length - read.Offset)
-                    && content.EndOfObject == (read.Offset + content.Content.Length == content.Item.Length), "invalid_result", "Invalid read result.");
-                if (read.Offset == 0 && content.EndOfObject)
-                    AspValidation.Require(AspValidation.Digest(content.Content) == content.Item.Sha256, "invalid_result", "Content digest mismatch.");
-                return new AspReadResult(PublicObject(context, content.Item), read.Offset, Convert.ToBase64String(content.Content), content.EndOfObject);
-            case "write":
-                AspValidation.Require(context.Policy.CanWrite && provider is IAspObjectWriter, "forbidden", "Write is not authorized.");
-                var write = AspValidation.Parse<AspWriteRequest>(args);
-                AspValidation.Write(write, context, clock);
-                var bytes = AspValidation.Content(write.ContentBase64, context.Policy.MaxWriteBytes);
-                var written = await ((IAspObjectWriter)provider).WriteAsync(context,
-                    new(write.RequestId, write.NotAfter, write.Key, bytes, write.ExpectedVersion), ct);
-                ValidateObject(context, written);
-                AspValidation.Require(written.Key == write.Key && written.Length == bytes.Length && written.Sha256 == AspValidation.Digest(bytes),
-                    "invalid_result", "Provider returned an invalid write receipt.");
-                return new AspWriteResult(PublicObject(context, written));
+            case "read_text":
+            case "read_blob":
+            case "write_text":
+            case "write_blob":
+            case "close_read":
+            case "abort_write":
+            case "write_status":
+                return await transfers.ExecuteAsync(binding, context, operation, args, value => PublicObject(context, value), ct);
             default: throw new AspException("unsupported_operation", "Unknown ASP operation.");
         }
     }
@@ -194,19 +183,19 @@ public sealed class AspMcpServer
     private static string? MinKey(string? left, string? right) => left is null ? right : right is null ? left : string.CompareOrdinal(left, right) <= 0 ? left : right;
     private IEnumerable<string> Operations() => resolveBinding is null
         ? bindings.Values.SelectMany(Operations).Distinct(StringComparer.Ordinal)
-        : ["describe", "list", "stat", "read", "write"];
+        : ["describe", "list", "stat", "read_text", "read_blob", "write_text", "write_blob", "close_read", "abort_write", "write_status"];
     private static IEnumerable<string> Operations(AspStoreBinding binding)
     {
         yield return "describe";
         if (binding.Policy.CanList) yield return "list";
         if (binding.Policy.CanStat) yield return "stat";
-        if (binding.Policy.CanRead) yield return "read";
-        if (binding.Policy.CanWrite && binding.Provider is IAspObjectWriter) yield return "write";
+        if (binding.Policy.CanRead) { yield return "read_text"; yield return "read_blob"; yield return "close_read"; }
+        if (binding.Policy.CanWrite && binding.Provider is IAspObjectWriter) { yield return "write_text"; yield return "write_blob"; yield return "abort_write"; yield return "write_status"; }
     }
-    private static void ValidateIdentity(AspAccessContext context, AspProviderObject value, string key, string version)
+    private static void ValidateIdentity(AspAccessContext context, AspProviderObject value, string key, string? version)
     {
         ValidateObject(context, value);
-        AspValidation.Require(value.Key == key && value.Version == version, "invalid_result", "Provider changed the requested object identity.");
+        AspValidation.Require(value.Key == key && (version is null || value.Version == version), "invalid_result", "Provider changed the requested object identity.");
     }
     private static void ValidateObject(AspAccessContext context, AspProviderObject value)
     {
@@ -214,7 +203,9 @@ public sealed class AspMcpServer
         AspValidation.DemandKey(context, value.Key);
     }
     private AspObject PublicObject(AspAccessContext context, AspProviderObject value) =>
-        new(value.Key, value.Version, value.Length, value.Sha256, references.Seal("object", context, value.Key, value.Version));
+        new(value.Key, value.Version, value.Length, value.Sha256, references.Seal("object", context, value.Key, value.Version, etag: value.ETag), value.ETag, value.Metadata);
+    public ValueTask DisposeAsync() => transfers.DisposeAsync();
+
     private static CallToolResult Reply(AspReply<object> value, bool error)
     {
         var json = JsonSerializer.SerializeToElement(value, AspProtocol.JsonOptions);

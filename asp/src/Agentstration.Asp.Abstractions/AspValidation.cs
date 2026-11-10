@@ -84,8 +84,8 @@ public static class AspValidation
     {
         Require(value is not null, "invalid_result", "Missing object metadata.");
         Key(value.Key);
-        RequestId(value.Version);
-        Require(value.Length >= 0 && value.Sha256 is { Length: 64 } && value.Sha256.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'),
+        if (value.Version is not null) RequestId(value.Version);
+        Require(value.Length >= 0 && (value.Sha256 is null || value.Sha256 is { Length: 64 } && value.Sha256.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f')),
             "invalid_result", "Invalid object metadata.");
     }
 
@@ -101,13 +101,21 @@ public static class AspValidation
         catch (FormatException) { throw new AspException("invalid_request", "Content must use canonical base64."); }
     }
 
-    public static void Write(AspWriteRequest request, AspAccessContext context, TimeProvider clock)
+    public static byte[] Text(string text, int limit)
     {
-        RequestId(request.RequestId);
-        DemandKey(context, request.Key);
+        var encoding = new System.Text.UTF8Encoding(false, true);
+        try
+        {
+            Require(encoding.GetByteCount(text) <= limit, "limit_exceeded", "Text exceeds the byte limit.");
+            return encoding.GetBytes(text);
+        }
+        catch (System.Text.EncoderFallbackException) { throw new AspException("invalid_text", "Text contains invalid Unicode."); }
+    }
+
+    public static void Deadline(DateTimeOffset deadline, TimeProvider clock)
+    {
         var now = clock.GetUtcNow();
-        Require(request.NotAfter > now && request.NotAfter <= now.AddMinutes(5), "request_expired", "Write validity must be within the next five minutes.");
-        if (request.ExpectedVersion is not null) RequestId(request.ExpectedVersion);
+        Require(deadline > now && deadline <= now.AddMinutes(5), "request_expired", "Validity must be within the next five minutes.");
     }
 
     public static string Digest(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
