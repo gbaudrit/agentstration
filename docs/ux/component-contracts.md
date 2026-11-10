@@ -82,3 +82,8 @@ The Agent YAML view uses the saved definition while the form has invalid values 
 `ResourceHeader.TechnicalName` is rendered after the caller's metadata; the full value remains copyable while the visible code may ellipsize. Description is a single line with a full native tooltip. Header flex items are width-constrained so long identifiers/descriptions cannot widen the mobile document.
 
 The Agent overview omits duplicate Identity and Execution panels. `StateComparison.RuntimeUrl` can link the runtime name when the active revision provides an exact name/namespace; absent an authoritative destination, keep plain text. The declared/resolved Model Profile cards and selected-profile summary link resource names directly instead of adding separate Open/View actions. Definition retains execution configuration. See [review captures](references-directes/README.md).
+
+
+## Additional editor field adoption
+
+[#1124](https://github.com/gbaudrit/agentstration/issues/1124) reuses the field components in nine additional Console editors. Secret/Vault forms subscribe to their current EditContext field changes, so in-control clearing activates the existing dirty feedback; replacing the saved/restored model also recreates its form inputs and validation state. Secret replacement input clearing has no persistence or delete side effect. Other family commands, specialized editors and non-nullable enum semantics are preserved. See the [bounded adoption and verification](formulaires-complementaires/README.md). Collection adoption remains owned by #1121.

@@ -31,13 +31,13 @@ else
         <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)">
             <div class="form-grid">
                 <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" />
-                <label><span>@T("Namespace")</span><input @bind="profileNamespace" disabled="@(!IsNew)" /></label>
+                <FormField Label="@T("Namespace")"><ClearableText @bind-Value="profileNamespace" Disabled="@(!IsNew)" /></FormField>
                 @if (IsNew) { <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSourceProfile" @bind-Value="selectedScope" /> }
                 else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
-                <label class="form-field-wide"><span>@T("Description")</span><textarea @bind="description" maxlength="2000"></textarea></label>
-                <label><span>@T("Version")</span><input @bind="version" required /></label>
-                <label><span>@T("Flow")</span><select @bind="flowKey" required><option value="">@T("Select")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.ActiveVersion ?? flow.Version ?? "—")</option> }</select></label>
-                <label><span>@T("DiscoveryFlow")</span><select @bind="discoveryFlowKey"><option value="">@T("None")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.ActiveVersion ?? flow.Version ?? "—")</option> }</select></label>
+                <FormField Label="@T("Description")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" maxlength="2000"></ClearableText></FormField>
+                <FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="version" required /></FormField>
+                <FormField Label="@T("Flow")" Required="true"><ClearableSelect TValue="string" @bind-Value="flowKey" required><option value="">@T("Select")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.ActiveVersion ?? flow.Version ?? "—")</option> }</ClearableSelect></FormField>
+                <FormField Label="@T("DiscoveryFlow")"><ClearableSelect TValue="string" @bind-Value="discoveryFlowKey"><option value="">@T("None")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.ActiveVersion ?? flow.Version ?? "—")</option> }</ClearableSelect></FormField>
                 <label class="form-field-wide"><span>@T("Schema")</span><textarea class="form-code-editor runner-json" rows="14" @bind="schemaJson"></textarea></label>
                 <label class="form-field-wide"><span>@T("ToolBindings")</span><textarea class="form-code-editor runner-json" rows="10" @bind="toolBindingsJson"></textarea></label>
                 <label class="form-field-wide"><span>@T("DiscoveryToolBindings")</span><textarea class="form-code-editor runner-json" rows="10" @bind="discoveryToolBindingsJson"></textarea></label>
@@ -50,7 +50,7 @@ else
     }
     else if (tab == Tab.Revisions)
     {
-        <section class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)"><div class="form-grid"><label><span>@T("Version")</span><input @bind="publishVersion" /></label></div>@if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="PublishAsync">@T("Publish")</button></div> }
+        <section class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)"><div class="form-grid"><FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="publishVersion" /></FormField></div>@if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="PublishAsync">@T("Publish")</button></div> }
         @if (revisions.Count == 0) { <p class="muted">@T("NoRevisions")</p> } else { <DataGrid TItem="DataSourceProfileRevisionResource" Items="revisions"><Header><tr><th>@T("Version")</th><th>@T("Created")</th><th>@T("State")</th><th></th></tr></Header><Row Context="revision"><tr><td><code>@revision.Version</code></td><td>@revision.PublishedAt.ToLocalTime().ToString("g")</td><td>@(revision.Version == profile!.ActiveVersion ? T("Activate") : "-")</td><td>@if (CanManage && revision.Version != profile.ActiveVersion) { <button class="text-button" type="button" @onclick="() => ActivateAsync(revision.Version)">@T("Activate")</button> }</td></tr></Row></DataGrid> }</fieldset></section>
     }
     else if (tab == Tab.Access && CanManageAccess)

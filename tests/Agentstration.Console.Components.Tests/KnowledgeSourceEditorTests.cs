@@ -469,6 +469,29 @@ public sealed class KnowledgeSourceEditorTests
         });
     }
 
+    [TestMethod]
+    public void ClearingDataSourceSelectionAlsoClearsItsDependentAcquisitionTarget()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(new KnowledgeClientStub(), new DataSourcesClientStub(withTarget: true));
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var editor = context.Render<KnowledgeSourceEditor>();
+        editor.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        var target = editor.WaitForElement("[data-testid='knowledge-source-binding-acquisition-target']");
+        var option = target.QuerySelectorAll("option").First(value => !string.IsNullOrEmpty(value.GetAttribute("value")));
+        target.Change(option.GetAttribute("value"));
+        var source = editor.Find("[data-testid='knowledge-source-binding-data-source']");
+        Assert.AreEqual(source.Id, source.Closest(".form-field")!.QuerySelector("label")!.GetAttribute("for"));
+        source.Closest(".form-field")!.QuerySelector(".field-clear")!.Click();
+
+        Assert.AreEqual(string.Empty, editor.Find("[data-testid='knowledge-source-binding-data-source']").GetAttribute("value"));
+        Assert.IsEmpty(editor.FindAll("[data-testid='knowledge-source-binding-acquisition-target']"));
+        editor.Find("[data-testid='knowledge-source-binding-data-source']")
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        Assert.AreEqual(string.Empty, editor.WaitForElement("[data-testid='knowledge-source-binding-acquisition-target']").GetAttribute("value"));
+    }
+
     private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null)
     {
         var context = new BunitContext();

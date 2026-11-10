@@ -313,6 +313,34 @@ public sealed class SchemaConsoleTests
             .GetProperty("type").GetString());
     }
 
+    [TestMethod]
+    public void ClearingDescriptionPreservesSchemaContentAndUsesTheExistingSave()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var resource = Schema(SchemaFormatIds.JsonSchema) with
+        {
+            Definition = Schema(SchemaFormatIds.JsonSchema).Definition with { Description = "Saved description" }
+        };
+        var client = new SchemaClientStub([resource]);
+        using var context = Context(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}");
+        var editor = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+        editor.WaitForElement("[data-testid='schema-tab-definition']").Click();
+        var field = editor.Find(".schema-definition-description");
+        field.QuerySelector(".field-clear")!.Click();
+        Assert.IsNull(client.UpdatedProperties);
+        editor.Find("[data-testid='schema-save']").Click();
+
+        editor.WaitForAssertion(() => Assert.IsNotNull(client.UpdatedProperties));
+        var saved = client.UpdatedProperties;
+        Assert.IsNotNull(saved);
+        Assert.IsNull(saved.Description);
+        Assert.AreEqual("object", saved.Content.GetProperty("type").GetString());
+        Assert.AreEqual(resource.Definition.Format, saved.Format);
+        Assert.AreEqual(resource.Definition.Dialect, saved.Dialect);
+    }
+
     private static BunitContext Context(ISchemasClient client)
     {
         var context = new BunitContext();

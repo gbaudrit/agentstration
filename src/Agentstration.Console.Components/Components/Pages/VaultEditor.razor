@@ -19,10 +19,10 @@
 }
 else
 {
-<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirtyFromForm" @onchange="MarkDirtyFromForm"><DataAnnotationsValidator /><ValidationSummary />
+<EditForm @key="model" EditContext="FormContext" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirtyFromForm" @onchange="MarkDirtyFromForm"><DataAnnotationsValidator /><ValidationSummary />
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("VaultResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusText(status)" Status="@(status == "available" ? UiStatus.Success : UiStatus.Danger)" /> }</div>
-        <div class="form-grid"><ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="vault-display-name" TechnicalNameTestId="vault-name" /><label><span>@T("Provider")</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></InputSelect></label>@if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }</div>
+        <div class="form-grid"><ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="vault-display-name" TechnicalNameTestId="vault-name" /><FormField Label="@T("Provider")" Required="true"><ClearableSelect TValue="string" @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></ClearableSelect></FormField>@if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }</div>
     </section>
     <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" OnChanged="MarkDirty" />
     <section class="panel form-section">
@@ -59,6 +59,21 @@ else
     private bool busy, confirmDelete, confirmInitialize, saveError, dirty, interactive, accessMode;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private EditContext? editContext;
+    private EditContext FormContext
+    {
+        get
+        {
+            if (!ReferenceEquals(editContext?.Model, model))
+            {
+                if (editContext is not null) editContext.OnFieldChanged -= FieldChanged;
+                editContext = new(model);
+                editContext.OnFieldChanged += FieldChanged;
+            }
+            return editContext;
+        }
+    }
+    private void FieldChanged(object? sender, FieldChangedEventArgs args) => MarkDirty();
     private void MarkDirty() => dirty = true;
     private void MarkDirtyFromForm(EventArgs _) => MarkDirty();
     private string StatusText(string value) => value.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T($"Status.{value}") };
@@ -96,5 +111,5 @@ else
     private async Task DeleteAsync() { confirmDelete = false; try { await Client.DeleteVaultAsync(model.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/vaults"); } catch (Exception ex) { error = ex; } }
     private ResourceScopeRef? ParseScope() => string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
     private static string ResourceUrl(VaultResource resource) => $"/vaults/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { if (editContext is not null) editContext.OnFieldChanged -= FieldChanged; cancellation.Cancel(); cancellation.Dispose(); }
 }

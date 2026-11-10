@@ -336,11 +336,11 @@ export class SourceLifecyclePage {
     const f = this.fixture;
     await this.open(consoleUrl, `/data-source-profiles/${f.profile}`, TestIds.sourceLifecycle.profileEditor);
     await this.page.getByRole('tab', { name: text.definition, exact: true }).click();
-    await this.page.getByLabel(text.version, { exact: true }).fill('1.1.0');
+    await this.page.getByRole('textbox', { name: text.version, exact: true }).fill('1.1.0');
     await this.page.getByRole('button', { name: text.save, exact: true }).click();
     await expect.poll(async () => (await this.read<ResourceWire>(consoleUrl, `/api/datasourceprofiles/${f.profile}`)).definition.version).toBe('1.1.0');
     await this.page.getByRole('tab', { name: text.revisions, exact: true }).click();
-    await this.page.getByLabel(text.version, { exact: true }).fill('1.1.0');
+    await this.page.getByRole('textbox', { name: text.version, exact: true }).fill('1.1.0');
     await this.page.getByRole('button', { name: text.publish, exact: true }).click();
     await expect(this.page.getByRole('row').filter({ hasText: '1.1.0' })).toBeVisible();
     // Explicit activation and rollback exercise the revision controls as well.
