@@ -12,6 +12,70 @@ namespace Agentstration.Web.Tests;
 public sealed class ModelProfilePickerTests
 {
     [TestMethod]
+    public async Task SelectedProfileUsesOneSummaryAndChoosingAnotherRestoresTheDisclosureFocus()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var original = Summary("original", "Original profile", ResourceScopeRef.Instance);
+        var alternative = Summary("alternative", "Alternative profile", ResourceScopeRef.Instance);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient([original, alternative]));
+        var changes = new List<string>();
+        var rendered = context.Render<ModelProfilePicker>(parameters => parameters
+            .Add(value => value.Value, original.Name)
+            .Add(value => value.ScopeRef, ResourceScopeRef.Instance)
+            .Add(value => value.ValueChanged, value => changes.Add(value)));
+        Assert.HasCount(1, rendered.FindAll(".model-summary-card"));
+        Assert.HasCount(1, rendered.FindAll(".model-profile-name strong"));
+        Assert.AreEqual("Model profile", rendered.Find("h3").TextContent);
+        await rendered.Find("[data-testid='model-profile-toggle']").ClickAsync(new());
+        var currentChoice = rendered.Find("[data-profile='/instance|default|original']");
+        Assert.IsTrue(currentChoice.HasAttribute("disabled"));
+        var description = currentChoice.GetAttribute("aria-describedby");
+        Assert.IsFalse(string.IsNullOrEmpty(description));
+        var describedRow = rendered.FindAll("[id]").Single(element => element.Id == description);
+        StringAssert.Contains(describedRow.TextContent, "Original profile");
+        StringAssert.Contains(describedRow.TextContent, "/instance");
+        StringAssert.Contains(currentChoice.TextContent, "Selected");
+        Assert.IsEmpty(rendered.FindAll(".collection-pager"));
+        Assert.IsEmpty(changes);
+        var focusRequests = context.JSInterop.Invocations.Count(call => call.Identifier == "Blazor._internal.domWrapper.focus");
+        await rendered.Find("[data-profile='/instance|default|alternative']").ClickAsync(new());
+        Assert.AreEqual(focusRequests + 1, context.JSInterop.Invocations.Count(call => call.Identifier == "Blazor._internal.domWrapper.focus"));
+        CollectionAssert.AreEqual(new[] { "alternative" }, changes);
+        Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-catalog']"));
+        Assert.AreEqual("false", rendered.Find("[data-testid='model-profile-toggle']").GetAttribute("aria-expanded"));
+    }
+
+    [TestMethod]
+    public async Task PagingAndFilteringRetainTheSelectedProfileOutsideTheVisiblePage()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var profiles = Enumerable.Range(0, 25).Select(index => Summary($"profile-{index:D2}", $"Profile {index:D2}", ResourceScopeRef.Instance)).ToArray();
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient(profiles));
+        var changes = 0;
+        var rendered = context.Render<ModelProfilePicker>(parameters => parameters
+            .Add(value => value.Value, profiles[24].Name)
+            .Add(value => value.ScopeRef, ResourceScopeRef.Instance)
+            .Add(value => value.ValueChanged, _ => changes++));
+        await rendered.Find("[data-testid='model-profile-toggle']").ClickAsync(new());
+        Assert.HasCount(20, rendered.FindAll("[data-testid='model-profile-choice']"));
+        await rendered.FindAll(".collection-pager button")[1].ClickAsync(new());
+        Assert.HasCount(5, rendered.FindAll("[data-testid='model-profile-choice']"));
+        Assert.IsTrue(rendered.Find("[data-profile='/instance|default|profile-24']").HasAttribute("disabled"));
+        rendered.Find("[data-testid='model-profile-search']").Input("No matching profile");
+        Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-choice']"));
+        Assert.IsEmpty(rendered.FindAll(".collection-pager"));
+        StringAssert.Contains(rendered.Find(".model-summary-card").TextContent, "Profile 24");
+        await rendered.Find("[data-testid='model-profile-search']").ParentElement!.QuerySelector("button")!.ClickAsync(new());
+        Assert.HasCount(20, rendered.FindAll("[data-testid='model-profile-choice']"));
+        StringAssert.Contains(rendered.Find(".model-summary-card").TextContent, "Profile 24");
+        Assert.AreEqual(0, changes);
+    }
+
+    [TestMethod]
     public async Task DisposingDuringInitialLookupStopsTheSelectionContinuation()
     {
         using var context = new BunitContext();

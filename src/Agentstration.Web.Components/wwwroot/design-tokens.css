@@ -330,6 +330,7 @@
   --form-focus-color: var(--color-action-primary);
   --form-error-color: var(--color-danger);
   --form-action-size: var(--field-height);
+  --field-clear-size: 2.125rem;
   --collection-gap: var(--space-3);
 }
 .form-field { display: grid; align-content: start; min-width: 0; gap: var(--space-2); }
@@ -338,7 +339,8 @@
 .form-field > small { color: var(--muted); font-size: var(--font-size-xs); }
 .clearable-field { position: relative; display: grid; min-width: 0; width: 100%; }
 .app-shell .clearable-field > :is(input,textarea,select) { width: 100%; min-width: 0; padding-right: calc(var(--form-action-size) + var(--space-3)); }
-.field-clear { position: absolute; right: var(--space-1); top: 50%; transform: translateY(-50%); min-width: 34px; min-height: 34px; display: grid; place-items: center; border: 0; border-radius: var(--form-radius); background: transparent; color: var(--muted); font-size: 1.25rem; cursor: pointer; }
+.field-clear { position: absolute; right: var(--space-1); top: 50%; transform: translateY(-50%); box-sizing: border-box; width: var(--field-clear-size); height: var(--field-clear-size); padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; line-height: 1; border: 0; border-radius: var(--form-radius); background: transparent; color: var(--muted); cursor: pointer; }
+.field-clear > svg { display: block; width: 1rem; height: 1rem; pointer-events: none; }
 .clearable-multiline .field-clear { top: var(--space-1); transform: none; }
 .app-shell .clearable-field > :is(select,input[type="number"]) { padding-right: calc(var(--form-action-size) + var(--space-8)); }
 .clearable-field > :is(select,input[type="number"]) + .field-clear { right: var(--space-6); }
@@ -355,7 +357,7 @@ fieldset:disabled .field-clear { display: none; }
 .resource-reference-choice > div { min-width: 0; overflow-wrap: anywhere; }
 .resource-reference-choice small,.resource-reference-choice code { display: block; color: var(--muted); }
 .resource-reference-summary { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-@media(max-width:620px) { .field-clear { min-width: 38px; min-height: 38px; } .resource-reference-choice { align-items: flex-start; flex-direction: column; } }
+@media(max-width:620px) { .app-shell { --field-clear-size: 2.375rem; } .resource-reference-choice { align-items: flex-start; flex-direction: column; } }
 
 .dialog:modal { max-width: calc(100vw - var(--space-8)); max-height: calc(100dvh - var(--space-8)); margin: auto; overflow: auto; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
 .dialog::backdrop { background: var(--color-backdrop); }
@@ -372,6 +374,7 @@ fieldset:disabled .field-clear { display: none; }
 .field-required { color: var(--form-error-color); }
 .field-requirement { margin-inline-start: .35rem; font-weight: 400; color: var(--muted); font-size: var(--font-size-xs); }
 
+.resource-editor-view { display: grid; min-width: 0; gap: var(--form-section-gap); }
 .resource-editor-view[hidden] { display: none; }
 
 .app-shell .button-primary { background: var(--primary); color: var(--color-action-on-primary); }
