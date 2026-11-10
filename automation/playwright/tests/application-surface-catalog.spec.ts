@@ -6,14 +6,14 @@ import { applicationSurfaces } from '../src/coverage/application-surfaces.js';
 import { discoverProductRoutes } from '../src/coverage/discover-routes.js';
 import { automationRoot, repositoryRoot } from '../src/fixtures/repository.js';
 
-test('every product route is represented exactly once in the coverage catalog', async () => {
+test('every product route is represented exactly once in the coverage catalog @smoke', async () => {
   const discovered = await discoverProductRoutes();
   const catalog = applicationSurfaces.flatMap(surface => surface.routes.map(route => ({ source: surface.source, route }))).sort(compareRoute);
   expect(catalog).toEqual(discovered);
   expect(new Set(catalog.map(route => `${route.source}\n${route.route}`)).size).toBe(catalog.length);
 });
 
-test('surface identities and fixture keys are explicit and unique', () => {
+test('surface identities and fixture keys are explicit and unique @smoke', () => {
   expect(new Set(applicationSurfaces.map(surface => surface.id)).size).toBe(applicationSurfaces.length);
   for (const surface of applicationSurfaces) {
     expect(surface.id).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -28,7 +28,7 @@ test('surface identities and fixture keys are explicit and unique', () => {
   }
 });
 
-test('coverage ownership points to implemented files or a tracking issue', () => {
+test('coverage ownership points to implemented files or a tracking issue @smoke', () => {
   for (const surface of applicationSurfaces) {
     expect(fs.existsSync(path.join(repositoryRoot, surface.source))).toBe(true);
     if (surface.coverage !== 'covered') {
@@ -51,7 +51,7 @@ function compareRoute(left: { source: string; route: string }, right: { source: 
 
 // Inventory belongs to the implementation; coverage declarations are independent so
 // adding a product form cannot silently claim a browser case that does not exist.
-test('all-form inventory has explicit field or family regression ownership', () => {
+test('all-form inventory has explicit field or family regression ownership @smoke', () => {
   const inventory = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'docs/ux/formulaires-tous-ecrans/inventory.json'), 'utf8')) as { screens: { path: string }[] };
   expect(formAdoptionCoverage.map(value => value.source).sort()).toEqual(inventory.screens.map(value => value.path).sort());
   for (const form of formAdoptionCoverage) {
