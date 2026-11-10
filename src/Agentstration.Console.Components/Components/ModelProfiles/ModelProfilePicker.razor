@@ -12,7 +12,7 @@
                 <div class="model-profile-copy">
                     @if (selected is not null)
                     {
-                        <div class="model-profile-name"><strong>@selected.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@selected.ScopeRef" Compact /></div>
+                        <div class="model-profile-name"><strong><a class="resource-name-link" href="@ProfileUrl(selected)">@selected.Properties.DisplayName</a></strong><ResourceScopeBadge ScopeRef="@selected.ScopeRef" Compact /></div>
                         <code>@selected.ScopeRef · @selected.Namespace/@selected.Name</code>
                     }
                     else
@@ -34,10 +34,10 @@
         {
             <div class="model-profile-summary-details">
                 <dl class="model-profile-facts">
-                    <div><dt>@T("Provider")</dt><dd>@(selected.Properties.Provider.DisplayName ?? selected.Properties.Provider.Name)</dd></div>
+                    <div><dt>@T("Provider")</dt><dd><a class="resource-name-link" href="@ProviderUrl(selected)">@(selected.Properties.Provider.DisplayName ?? selected.Properties.Provider.Name)</a></dd></div>
                     <div><dt>@T("Model")</dt><dd><code>@selected.Properties.Model.Name</code></dd></div>
                 </dl>
-                <div class="model-profile-summary-footer"><StatusBadge Text="@StatusLabel(selected.Properties.Status)" Status="@ModelManagementUi.Status(selected.Properties.Status)" /><a class="text-button" href="@ProfileUrl(selected)">@T("ViewModelProfile") →</a></div>
+                <div class="model-profile-summary-footer"><StatusBadge Text="@StatusLabel(selected.Properties.Status)" Status="@ModelManagementUi.Status(selected.Properties.Status)" /></div>
             </div>
         }
     </section>
@@ -187,6 +187,8 @@
     private static string ProfileValue(ModelProfileSummaryResponse item) =>
         $"{item.ScopeRef?.Value ?? string.Empty}|{item.Namespace}|{item.Name}";
 
+    private static string ProviderUrl(ModelProfileSummaryResponse item) =>
+        $"/modelproviders/{Uri.EscapeDataString(item.Properties.Provider.ResourceId)}?namespace={Uri.EscapeDataString(item.Properties.Provider.Namespace)}";
     private static string ProfileUrl(ModelProfileSummaryResponse item) =>
         ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(item.Namespace), ModelResourceKinds.ModelProfile, item.Name), item.ScopeRef);
 

@@ -32,8 +32,8 @@ else
 {
     @if (!IsNew)
     {
-        <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@(savedResource?.Definition.DisplayName ?? model.DisplayName)" Description="@(savedResource?.Definition.Description ?? model.Description)" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
-            <Metadata><CopyableValue Value="@model.Name" /><ResourceScopeBadge ScopeRef="selectedScope" Compact /><span>@T("Generation", generation)</span></Metadata>
+        <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" TechnicalName="@model.Name" Name="@(savedResource?.Definition.DisplayName ?? model.DisplayName)" Description="@(savedResource?.Definition.Description ?? model.Description)" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
+            <Metadata><ResourceScopeBadge ScopeRef="selectedScope" Compact /><span>@T("Generation", generation)</span>@if (savedResource is not null) { <code title="@Shared["Namespace"]">@savedResource.Namespace.Value</code> }</Metadata>
             <PrimaryActions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }</PrimaryActions>
             <Actions>@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)" title="@(isDirty ? T("SaveBeforeApply") : null)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
         </ResourceHeader>
@@ -65,7 +65,7 @@ else
     @if (!IsNew && overviewMode && savedResource is not null)
     {
         <div class="resource-overview" data-testid="agent-overview">
-        <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
+        <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" RuntimeUrl="@ActiveRuntimeUrl" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
                 <Actions>@if (CanManage && !IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
         @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
@@ -80,9 +80,6 @@ else
                 </tbody></table></div>
             </section>
         }
-        <ResourceIdentitySummary DisplayName="@savedResource.Definition.DisplayName" TechnicalName="@savedResource.Name" Description="@savedResource.Definition.Description" Namespace="@savedResource.Namespace.Value">
-            <Scope><ResourceScopeBadge ScopeRef="savedResource.ScopeRef" /></Scope>
-        </ResourceIdentitySummary>
         <FormSection Title="@T("Behavior")"><dl class="resource-details">
             <dt>@T("Handler")</dt><dd>@savedResource.Definition.Handler</dd>
             <dt>@T("Instructions")</dt><dd class="resource-text">@savedResource.Definition.Instructions</dd>
@@ -90,12 +87,12 @@ else
             <section class="panel form-section">
                 <div class="panel-header"><div><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
                 <div class="declaration-resolution-grid">
-                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? savedResource.Definition.ModelProfile.Name)</dd><dt>@T("Name")</dt><dd><code>@savedResource.Definition.ModelProfile.Name</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">@T("OpenModelProfile") →</a> }</article>
-                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">@T("OpenProvider") →</a> }}</article>
+                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@if (agentModel is not null) { <a class="resource-name-link" href="@ProfileUrl(agentModel)">@(agentModel.Declared.ModelProfile.DisplayName ?? savedResource.Definition.ModelProfile.Name)</a> } else { @savedResource.Definition.ModelProfile.Name }</dd><dt>@T("Name")</dt><dd><code>@savedResource.Definition.ModelProfile.Name</code></dd></dl></article>
+                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@if (agentModel.Resolved.Provider is { } provider) { <a class="resource-name-link" href="@ProviderUrl(agentModel)">@(provider.DisplayName ?? provider.Name)</a> } else { @T("NotResolved") }</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>}</article>
                 </div>
             </section>
 
-        <FormSection Title="@T("Execution")"><dl class="resource-details"><dt>@T("RuntimeProfile")</dt><dd><code>@savedResource.Definition.RuntimeProfile.ScopeRef · @(savedResource.Definition.RuntimeProfile.Namespace ?? savedResource.Namespace)/@savedResource.Definition.RuntimeProfile.Name</code></dd></dl></FormSection>
+
         <FormSection Title="@T("Tags")"><LabelsSummary Values="@savedResource.Metadata.Tags" /></FormSection>
         </div>
     }
@@ -283,6 +280,9 @@ else
         _ => T("NotDeployed")
     };
     private string? ActiveRuntime => readiness?.RuntimeProfileId is null ? readiness?.DeploymentId : ResourceName(readiness.RuntimeProfileId);
+    private string? ActiveRuntimeUrl => activeRevision is null ? null : ConsoleResourceUrls.RuntimeProfile(ResourceAddress.Create(
+        activeRevision.Definition.RuntimeProfileNamespace,
+        RuntimeProfileResourceKinds.RuntimeProfile, activeRevision.Definition.RuntimeProfileName));
     private string StateSummary => IsStateSynchronized ? T("GenerationReady", generation) : isDirty ? T("SaveOrApplyModified") : T("CurrentGenerationNotActive");
     private string HeaderStatus => readiness?.Ready == true ? T("Ready") : StatusPresentation.Label(provisioningStatus);
     private string RuntimeProfileValue => model is null || string.IsNullOrWhiteSpace(model.RuntimeProfileName) ? string.Empty :

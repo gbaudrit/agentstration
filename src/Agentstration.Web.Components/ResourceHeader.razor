@@ -7,8 +7,13 @@
                 <h1>@Name</h1>
                 @if (!string.IsNullOrWhiteSpace(StatusText)) { <StatusIndicator Text="@StatusText" Status="@Status" /> }
             </div>
-            @if (!string.IsNullOrWhiteSpace(Description)) { <p class="resource-description">@Description</p> }
-            @if (Metadata is not null) { <div class="resource-metadata">@Metadata</div> }
+            @if (!string.IsNullOrWhiteSpace(Description)) { <p class="resource-description" title="@Description" tabindex="0">@Description</p> }
+            @if (Metadata is not null || !string.IsNullOrWhiteSpace(TechnicalName))
+            {
+                <div class="resource-metadata">@Metadata
+                    @if (!string.IsNullOrWhiteSpace(TechnicalName)) { <span class="resource-header-technical" title="@TechnicalName"><CopyableValue Value="@TechnicalName" /></span> }
+                </div>
+            }
         </div>
     </div>
     @if (Actions is not null || PrimaryActions is not null || MoreActions is not null) { <div class="page-actions"><ResourceActionBar Primary="@PrimaryActions" MoreActions="@MoreActions">@Actions</ResourceActionBar></div> }
@@ -25,6 +30,7 @@
     [Parameter] public RenderFragment? PrimaryActions { get; set; }
     [Parameter] public RenderFragment? MoreActions { get; set; }
     [Parameter] public string? IconName { get; set; }
+    [Parameter] public string? TechnicalName { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string? StatusText { get; set; }
     [Parameter] public UiStatus Status { get; set; }

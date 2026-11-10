@@ -55,7 +55,7 @@ The inline Model Profile picker presents one summary with its actions and opens 
 
 ## Resource composition
 
-`ResourceIdentitySummary` presents the common read-only identity, explicit empty description, optional owner scope/namespace and short badges. Family-specific configuration stays in adjacent `FormSection` panels. Agent and Model Profile overviews demonstrate the same summary. `CopyableValue` copies only its supplied value through the clipboard module and reports success/failure accessibly.
+`ResourceIdentitySummary` presents the common read-only identity, explicit empty description, optional owner scope/namespace and short badges. Family-specific configuration stays in adjacent `FormSection` panels. Model Profile demonstrates this summary. Agent exposes identity and description in its header and omits a duplicate overview identity panel. `CopyableValue` copies only its supplied value through the clipboard module and reports success/failure accessibly.
 
 `ResourceHeader` composes `ResourceIcon` and `ResourceActionBar`. Icons accept an image URL (SVG/PNG/WebP through an image element), an optional dark-theme variant, a catalog name or trusted caller content. Images keep their proportions and fall back to the family icon on failure; no arbitrary SVG markup is injected. This is the rendering contract only: persisted icon metadata, Bootstrap asset lifecycle and automatic type inheritance remain owned by [#1110](https://github.com/gbaudrit/agentstration/issues/1110). Header actions support primary, secondary and optional overflow content; each screen retains permissions and commands.
 
@@ -70,3 +70,9 @@ The existing `ResourceAccessPanel` puts permissions ahead of collapsible identit
 `LabelsEditor` ignores entirely empty placeholder rows. Partial/duplicate entries remain local and mark the EditContext invalid without publishing an unserializable map into the resource binding. Publishing resumes only for a valid set of non-empty rows. Keep the inline row feedback; do not add a second field-level ValidationMessage beneath this editor.
 
 The Agent YAML view uses the saved definition while the form has invalid values and remains read-only until the form is corrected. The incomplete form stays mounted, and Apply/Save handlers also enforce that guard. The shared header places type/name/state on one line and compact metadata below it. The default section gap is 12 px; theme overrides remain supported. See the [graphical correction report](corrections-affichage/README.md).
+
+## Header references and direct navigation
+
+`ResourceHeader.TechnicalName` is rendered after the caller's metadata; the full value remains copyable while the visible code may ellipsize. Description is a single line with a full native tooltip. Header flex items are width-constrained so long identifiers/descriptions cannot widen the mobile document.
+
+The Agent overview omits duplicate Identity and Execution panels. `StateComparison.RuntimeUrl` can link the runtime name when the active revision provides an exact name/namespace; absent an authoritative destination, keep plain text. The declared/resolved Model Profile cards and selected-profile summary link resource names directly instead of adding separate Open/View actions. Definition retains execution configuration. See [review captures](references-directes/README.md).

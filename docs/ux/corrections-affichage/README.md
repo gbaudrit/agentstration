@@ -2,6 +2,8 @@
 
 Correctif de [PR #1114](https://github.com/gbaudrit/agentstration/pull/1114), toujours en brouillon vers `ux/unification-formulaires`. Ce rapport complète le [lot précédent](../structure-ressources/README.md).
 
+L’ajustement suivant de l’en-tête et des liens de ressources est décrit dans le [rapport des références directes](../references-directes/README.md).
+
 ## Corrections
 
 - Une nouvelle ligne d’étiquette entièrement vide est un emplacement de saisie : elle ne produit ni erreur immédiate, ni modification de la ressource, ni paire `=`.

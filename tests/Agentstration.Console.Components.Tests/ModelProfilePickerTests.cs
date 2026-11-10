@@ -28,6 +28,9 @@ public sealed class ModelProfilePickerTests
         Assert.HasCount(1, rendered.FindAll(".model-summary-card"));
         Assert.HasCount(1, rendered.FindAll(".model-profile-name strong"));
         Assert.AreEqual("Model profile", rendered.Find("h3").TextContent);
+        StringAssert.Contains(rendered.Find(".model-profile-summary .model-profile-name a").GetAttribute("href")!, "/modelprofiles/original");
+        Assert.IsEmpty(rendered.FindAll(".model-profile-summary-footer a"));
+        StringAssert.Contains(rendered.Find(".model-profile-facts a").GetAttribute("href")!, "/modelproviders/");
         await rendered.Find("[data-testid='model-profile-toggle']").ClickAsync(new());
         var currentChoice = rendered.Find("[data-profile='/instance|default|original']");
         Assert.IsTrue(currentChoice.HasAttribute("disabled"));
