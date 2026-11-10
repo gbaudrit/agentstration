@@ -22,6 +22,8 @@ Light and Dark are the first two shipped themes. The existing Light/Dark/System 
 
 Override semantic variables on the shell after the base styles. Shared components resolve surface/text/border colors, `--form-focus-color`, `--form-error-color`, `--form-gap`, `--form-section-gap`, `--form-radius`, `--form-action-size` and `--collection-gap` from the active shell. Existing `--field-*`, `--space-*` and `--radius-*` tokens remain supported. Avoid fixed palette values in new component rules.
 
+`SchemaBindingEditor`, shared by Agent, Flow and ToolDefinition contracts, uses `--surface-2`, `--surface`, `--border`, `--text` and `--muted` for its container and empty state. Its active source-mode button pairs `--primary` with `--color-action-on-primary`. These colors follow theme changes without light-only fallback values. See the [contract theme verification](contrats-themes/README.md).
+
 For example, an application-owned stylesheet can override these values without changing a field or collection:
 
 ```css
