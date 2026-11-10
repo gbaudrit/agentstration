@@ -239,12 +239,36 @@ public sealed class DataSourceDatasetAcquisitionService(
         if (acquisition.Content is not { } item || acquisition.State != DataSourceAcquisitionState.Succeeded)
             throw Invalid("data_source_content_unavailable", "The acquisition has no published content.");
         var target = DataSourceDatasetCompositionService.Target(acquisition, execution.ConsumerScope);
-        // References are short-lived and subject-bound. Renew from the pinned key/version after authorization.
+        // References are short-lived and subject-bound. Renew from the recorded key after authorization.
         var page = await content.ListAsync(target, item.Key, 1, cancellationToken: cancellationToken);
-        var currentItem = page.Objects.SingleOrDefault(value => value.Key == item.Key && value.Version == item.Version && value.Sha256 == item.Sha256)
-            ?? throw Invalid("data_source_content_version_unavailable", "The exact historical content version is unavailable.");
-        return await content.ReadAsync(target, currentItem.Reference, offset, maximumBytes, cancellationToken);
+        var currentItem = page.Objects.SingleOrDefault(value => value.Key == item.Key);
+        if (currentItem is null || currentItem.Length != item.Length
+            || (item.Version is not null && currentItem.Version != item.Version)
+            || (item.Sha256 is not null && currentItem.Sha256 is not null && currentItem.Sha256 != item.Sha256))
+            throw ContentVersionUnavailable();
+        if (item.Version is not null && currentItem.Sha256 == item.Sha256)
+            return await content.ReadAsync(target, currentItem.Reference, offset, maximumBytes, cancellationToken);
+
+        // A streaming write can attest its bytes even when the provider returns no version or listing checksum.
+        if (item.Sha256 is null || item.Length is < 0 or > DataSourceDatasetCompositionService.MaximumValueBytes)
+            throw ContentVersionUnavailable();
+        if (offset < 0 || offset > item.Length || maximumBytes <= 0)
+            throw new Agentstration.Storage.StorageException("storage_content_limit_exceeded", "Invalid read range.");
+        var verified = await content.ReadAsync(target, currentItem.Reference, 0,
+            Math.Max(maximumBytes, (int)item.Length), cancellationToken);
+        var bytes = Convert.FromBase64String(verified.ContentBase64);
+        if (!verified.EndOfObject || verified.Offset != 0 || verified.Item.Key != item.Key
+            || verified.Item.Version != currentItem.Version || verified.Item.Length != item.Length
+            || bytes.Length != item.Length || Digest(bytes) != item.Sha256)
+            throw ContentVersionUnavailable();
+
+        var length = (int)Math.Min(maximumBytes, item.Length - offset);
+        return new(verified.Item with { Sha256 = item.Sha256 }, offset,
+            Convert.ToBase64String(bytes.AsSpan((int)offset, length)), offset + length == item.Length);
     }
+
+    private static DataSourceAcquisitionException ContentVersionUnavailable() =>
+        Invalid("data_source_content_version_unavailable", "The exact historical content version is unavailable.");
 
     private static string Digest(byte[] value) => Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant();
     private static JsonElement InvocationInput(DataSourceAcquisitionResource acquisition) => JsonSerializer.SerializeToElement(new

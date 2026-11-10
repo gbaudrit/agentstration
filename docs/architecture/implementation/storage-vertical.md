@@ -205,3 +205,29 @@ assertions and request-observation/selector regressions now follow ADR-0200.
 Combined validation and the isolated service-fixture correction are recorded in
 [the Console reference](../../reference/storage-console.md#validation-evidence--combined-10641040-2026-11-08)
 and PR #1079. These checks do not approve the UX or authorize a merge.
+
+## OpenDAL extension — FR #1039
+
+The autonomous Agentstration.Extensions.OpenDal host consumes Apache.OpenDAL 0.3.1
+through ASP.Server/ASP.Aep. It contributes executable opendal.fs, opendal.s3 and
+opendal.azblob version 1.0.0. One provider translates ASP operations to the same
+native Operator/Stream methods for every backend. Backend capabilities and typed
+connection requirements stay inside the extension; product modules remain
+provider-neutral. See [the OpenDAL reference](../../reference/opendal-extension.md)
+and [ADR-0206](../../decisions/0206-opendal-runs-in-an-autonomous-asp-extension.md).
+
+FR #1085 supplies text/blob sessions and bounded replay receipts in the independent
+ASP SDK (ADR-0205). OpenDAL stores each logical key directly: there is no aggregate
+objects.json, custom content engine, persistent protocol receipt ledger, 128-object
+quota or 8 MiB store quota. Optional native conditions/metadata are gated, and native
+stream completion never acquires exact commit metadata by a later stat.
+
+The required Integration lane and coverage shard B include the native extension
+suite. Offline tests execute real MCP and native filesystem calls, a 9 MiB stream,
+concurrent conditional creates, isolation and restart. S3/Azure tests use real native
+operators against synthetic local HTTP protocol peers and protected Secret grants;
+they do not claim a live cloud/emulator certification. Product integration tests
+exercise contributed types, manual exports, protected configuration, revocation
+and disablement. Native Linux/Windows distribution and restart checks run in the
+dedicated packaging workflow. These backend checks do not approve the deferred
+Console/Workplace UX gates owned by #1033/#1065.

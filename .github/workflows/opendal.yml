@@ -1,0 +1,54 @@
+name: OpenDAL native packaging
+on:
+  pull_request:
+    paths:
+      - 'src/Agentstration.Extensions.OpenDal/**'
+      - 'tests/Agentstration.Extensions.OpenDal.Tests/**'
+      - 'samples/OpenDalSmoke/**'
+      - 'scripts/opendal/**'
+      - 'deploy/opendal/**'
+      - 'asp/**'
+      - 'aep/**'
+      - 'Directory.*.props'
+      - 'global.json'
+      - '.github/workflows/opendal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: opendal-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Verify native backend MCP and provider contracts
+        run: dotnet test --project tests/Agentstration.Extensions.OpenDal.Tests --configuration Release --minimum-expected-tests 18
+      - name: Publish the standalone extension
+        run: dotnet publish src/Agentstration.Extensions.OpenDal --configuration Release --runtime ${{ matrix.rid }} --self-contained false --output artifacts/opendal/${{ matrix.rid }}
+      - name: Build the independent MCP consumer
+        run: dotnet build samples/OpenDalSmoke --configuration Release
+      - name: Verify the published process before and after restart
+        run: python scripts/opendal/smoke.py --publish-dir artifacts/opendal/${{ matrix.rid }}
+      - name: Build the glibc container
+        if: runner.os == 'Linux'
+        run: docker build --file deploy/opendal/Dockerfile --build-arg RUNTIME_ID=linux-x64 --tag agentstration-opendal:ci .
+      - name: Preserve the tested distribution
+        uses: actions/upload-artifact@v7
+        with:
+          name: opendal-${{ matrix.rid }}
+          path: artifacts/opendal/${{ matrix.rid }}
+          if-no-files-found: error

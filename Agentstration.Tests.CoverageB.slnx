@@ -15,5 +15,6 @@
     <Project Path="tests/Agentstration.ResourcePlanning.Tests/Agentstration.ResourcePlanning.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.OpenApi.Tests/Agentstration.Extensions.OpenApi.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.OpenDal.Tests/Agentstration.Extensions.OpenDal.Tests.csproj" />
   </Folder>
 </Solution>
