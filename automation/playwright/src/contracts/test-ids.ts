@@ -268,6 +268,7 @@ export const TestIds = {
   resourceAccess: {
     panel: 'resource-access-panel',
     grant: 'resource-access-grant',
+    openAdd: 'resource-access-open-add',
     target: 'resource-access-target',
     add: 'resource-access-add',
     remove: 'resource-access-remove',
@@ -339,7 +340,7 @@ export const TestIds = {
     contextReturn: 'agent-context-return',
     accessTab: 'agent-access-tab',
     form: 'agent-editor-form',
-    overview: 'agent-overview',
+    overview: 'agent-overview', overviewTab: 'agent-overview-tab',
     editTab: 'agent-edit-tab',
     identitySection: 'agent-identity-section',
     behaviorSection: 'agent-behavior-section',

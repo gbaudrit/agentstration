@@ -33,9 +33,9 @@
   <data name="Origin.Extension"><value>Extension</value></data>
   <data name="Visibility"><value>Visibility</value></data>
   <data name="DescendantAccess"><value>Descendant access</value></data>
-  <data name="DefaultDenyHelp"><value>Higher-scope resources are unavailable to descendants by default. Add an exact grant or explicitly propagate it to lower descendants.</value></data>
+  <data name="DefaultDenyHelp"><value>Descendant scopes need an explicit permission to access this resource.</value></data>
   <data name="NoGrants"><value>No descendant grants</value></data>
-  <data name="NoGrantsMessage"><value>This resource can currently be used only from its owner scope.</value></data>
+  <data name="NoGrantsMessage"><value>No descendant scope is authorized by this policy.</value></data>
   <data name="AllowedActions"><value>Allowed actions</value></data>
   <data name="Discover"><value>Discover</value></data>
   <data name="Use"><value>Use</value></data>
@@ -50,8 +50,15 @@
   <data name="SaveFailed"><value>The access policy could not be saved. Refresh it and verify your authorization before trying again.</value></data>
   <data name="Saved"><value>Access policy saved.</value></data>
   <data name="Saving"><value>Saving…</value></data>
-  <data name="Save"><value>Save access policy</value></data>
+  <data name="Save"><value>Save access</value></data>
   <data name="ScopeKind.Instance"><value>Instance</value></data>
   <data name="ScopeKind.Tenant"><value>Tenant</value></data>
   <data name="ScopeKind.Workspace"><value>Workspace</value></data>
+<data name="Permissions"><value>Permissions</value></data>
+<data name="PermissionHelp"><value>Choose which descendant scopes may discover or use this resource.</value></data>
+<data name="ResourceDetails"><value>Resource details</value></data>
+<data name="SearchTargets"><value>Search scopes</value></data>
+<data name="TargetResults"><value>Results: {0} of {1}. Refine the search if needed.</value></data>
+<data name="CloseAdd"><value>Close addition</value></data>
+<data name="Discard"><value>Discard changes</value></data>
 </root>

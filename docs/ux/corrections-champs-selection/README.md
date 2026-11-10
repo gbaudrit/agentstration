@@ -2,6 +2,8 @@
 
 Cette passe part de `ux/unification-formulaires`, après la PR [#1108](https://github.com/gbaudrit/agentstration/pull/1108), et corrige les points signalés sur la fiche Agent. Elle reste proposée dans une nouvelle PR en brouillon, à relire avant validation et fusion. Suivi : [FR champs #1090](https://github.com/gbaudrit/agentstration/issues/1090) et [FR sélection de modèle #1093](https://github.com/gbaudrit/agentstration/issues/1093).
 
+La suite de ce travail est présentée dans le [lot de structure des ressources et actions communes](../structure-ressources/README.md). Les résultats ci-dessous décrivent la première passe.
+
 ## Changements proposés
 
 - `FieldClearButton` réunit le bouton d’effacement des textes, nombres, choix et références de modèle. Une icône SVG centrée remplace le caractère typographique. Le bouton garde une cible de taille fixe et un libellé accessible ; l’effacement et le retour du focus restent gérés par le contrôle.

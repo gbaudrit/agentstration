@@ -112,6 +112,7 @@ export class ResourceAccessPage {
   }
 
   public async addGrant(scopeRef: string): Promise<void> {
+    await this.openAddition();
     await this.page.getByTestId(TestIds.resourceAccess.target).selectOption(scopeRef);
     await this.page.getByTestId(TestIds.resourceAccess.add).click();
     await this.grant(scopeRef).waitFor({ state: 'visible' });
@@ -149,6 +150,7 @@ export class ResourceAccessPage {
   }
 
   public async rejectInjectedTarget(scopeRef: string, expectedMessage: string): Promise<void> {
+    await this.openAddition();
     const target = this.page.getByTestId(TestIds.resourceAccess.target);
     await target.evaluate((element, value) => {
       const option = document.createElement('option');
@@ -178,6 +180,12 @@ export class ResourceAccessPage {
 
   public async assertIdentity(expected: ResourceAccessIdentity): Promise<void> {
     expect(await this.identity()).toEqual(expected);
+  }
+
+  private async openAddition(): Promise<void> {
+    const toggle = this.page.getByTestId(TestIds.resourceAccess.openAdd);
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    await this.page.getByTestId(TestIds.resourceAccess.target).waitFor({ state: 'visible' });
   }
 
   private async save(): Promise<void> {

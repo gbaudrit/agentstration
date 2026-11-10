@@ -105,6 +105,33 @@ public sealed class ResourceAccessPanelTests
         Assert.AreEqual(0, rendered.FindAll("[data-testid='resource-access-grant']").Count);
     }
 
+    [TestMethod]
+    public void CancellingAccessChangesRestoresTheLastSavedGrants()
+    {
+        var uid = Guid.NewGuid();
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var policies = new FakePolicies();
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeScopes(uid, tenant));
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
+        var cut = context.Render<ResourceAccessPanel>(parameters => parameters
+            .Add(value => value.OwnerScopeRef, ResourceScopeRef.Instance)
+            .Add(value => value.Namespace, ResourceNamespace.Default)
+            .Add(value => value.Kind, "Agent").Add(value => value.Name, "managed-agent"));
+        cut.Find("[data-testid='resource-access-open-add']").Click();
+        cut.Find("[data-testid='resource-access-target']").Change(tenant.Value);
+        cut.Find("[data-testid='resource-access-add']").Click();
+        Assert.HasCount(1, cut.FindAll("[data-testid='resource-access-grant']"));
+        cut.Find("[data-testid='resource-access-discard']").Click();
+        Assert.IsEmpty(cut.FindAll("[data-testid='resource-access-grant']"));
+        Assert.IsTrue(cut.Find("[data-testid='resource-access-save']").HasAttribute("disabled"));
+        Assert.IsNull(policies.Saved);
+        cut.Find("[data-testid='resource-access-open-add']").Click();
+        cut.Find("[data-testid='resource-access-search']").Input("missing-scope");
+        Assert.HasCount(1, cut.FindAll("[data-testid='resource-access-target'] option"));
+    }
+
     private sealed class FakePolicies : IResourceAccessPolicyClient
     {
         public ResourceAccessPolicySnapshot? Existing { get; init; }

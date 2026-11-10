@@ -1,0 +1,30 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+<span class="copyable-value">
+    <code>@Value</code>
+    @if (!string.IsNullOrWhiteSpace(Value))
+    {
+        <button type="button" class="icon-button copy-value" aria-label="@Shared["CopyValue", Value]" title="@Shared["Copy"]" @onclick="CopyAsync"><UiIcon Name="copy" /></button>
+    }
+    @if (feedback is not null) { <span class="copy-feedback" role="status">@feedback</span> }
+</span>
+@code {
+    [Parameter] public string? Value { get; set; }
+    private IJSObjectReference? module;
+    private string? feedback;
+    private async Task CopyAsync()
+    {
+        try
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/resource-ui.js");
+            await module.InvokeVoidAsync("copyText", Value);
+            feedback = Shared["Copied"];
+        }
+        catch (JSException) { feedback = Shared["CopyFailed"]; }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null) { try { await module.DisposeAsync(); } catch (JSDisconnectedException) { } }
+    }
+}

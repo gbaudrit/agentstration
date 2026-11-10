@@ -61,7 +61,7 @@
     <value>Vue d’ensemble</value>
   </data>
   <data name="Edit" xml:space="preserve">
-    <value>Édition</value>
+    <value>Définition</value>
   </data>
   <data name="Access" xml:space="preserve">
     <value>Accès</value>
@@ -156,4 +156,23 @@
   <data name="Optional" xml:space="preserve">
     <value>facultatif</value>
   </data>
+  <data name="Identity" xml:space="preserve"><value>Identité</value></data>
+  <data name="Description" xml:space="preserve"><value>Description</value></data>
+  <data name="NotProvided" xml:space="preserve"><value>Non renseignée</value></data>
+  <data name="Namespace" xml:space="preserve"><value>Espace de noms</value></data>
+  <data name="Copy" xml:space="preserve"><value>Copier</value></data>
+  <data name="CopyValue" xml:space="preserve"><value>Copier {0}</value></data>
+  <data name="Copied" xml:space="preserve"><value>Copié</value></data>
+  <data name="CopyFailed" xml:space="preserve"><value>Copie indisponible. Sélectionnez la valeur pour la copier.</value></data>
+  <data name="ResourceActions" xml:space="preserve"><value>Actions de la ressource</value></data>
+  <data name="MoreActions" xml:space="preserve"><value>Plus d’actions</value></data>
+  <data name="DismissNotification" xml:space="preserve"><value>Fermer la notification</value></data>
+  <data name="LabelKey" xml:space="preserve"><value>Clé</value></data>
+  <data name="LabelValue" xml:space="preserve"><value>Valeur</value></data>
+  <data name="AddLabel" xml:space="preserve"><value>Ajouter une étiquette</value></data>
+  <data name="RemoveLabel" xml:space="preserve"><value>Supprimer l’étiquette {0}</value></data>
+  <data name="NoLabels" xml:space="preserve"><value>Aucune étiquette</value></data>
+  <data name="LabelInvalid" xml:space="preserve"><value>Saisissez une clé sans = ni saut de ligne et une valeur non vide.</value></data>
+  <data name="LabelDuplicate" xml:space="preserve"><value>Cette clé est déjà utilisée.</value></data>
+  <data name="LabelRow" xml:space="preserve"><value>Étiquette {0}</value></data>
 </root>

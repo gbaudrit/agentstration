@@ -91,6 +91,7 @@ export class GovernedKnowledgePage {
     for (const member of excluded) await card.getByRole('checkbox', { name: member, exact: false }).uncheck();
     await expect(card.getByRole('checkbox', { name: selected, exact: false })).toBeChecked();
     await editor.createAndDeploy(agentName);
+    await editor.openOverview();
     const pinned = this.pinnedAssignment;
     await expect(pinned).toContainText(text.activeHelp);
     await expect(pinned).toContainText(exposure.toolSet.name);

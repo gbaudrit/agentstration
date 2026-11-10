@@ -16,16 +16,16 @@ The integration branch is `ux/unification-formulaires`; delivery is tracked by [
 
 Reuse ResourceToolbar/SearchBox/FilterBar and DataGrid or the existing mobile card presentation. Family adapters own eligibility, scope, authorization and query transport; the shared UI never invents a generic resource query service.
 
-## Future named themes
+## Light and dark themes
 
-Appearance remains the existing Light/Dark/System user preference. A future named theme is a separate visual identity. Do not extend the appearance enum with brand names or change its API in a component refactor.
+Light and Dark are the first two shipped themes. The existing Light/Dark/System preference chooses one; System resolves the operating-system preference and is not a third palette. The shell exposes the resolved theme through `data-theme="light|dark"` and its existing theme class. Future brand themes can define corresponding palettes without changing component behavior or adding a parallel preference store.
 
 Override semantic variables on the shell after the base styles. Shared components resolve surface/text/border colors, `--form-focus-color`, `--form-error-color`, `--form-gap`, `--form-section-gap`, `--form-radius`, `--form-action-size` and `--collection-gap` from the active shell. Existing `--field-*`, `--space-*` and `--radius-*` tokens remain supported. Avoid fixed palette values in new component rules.
 
 For example, an application-owned stylesheet can override these values without changing a field or collection:
 
 ```css
-.app-shell[data-theme="example"] {
+.app-shell[data-brand="example"] {
   --color-action-primary: #6d28d9;
   --color-action-primary-soft: #ede9fe;
   --color-action-on-primary: #fff;
@@ -34,7 +34,7 @@ For example, an application-owned stylesheet can override these values without c
   --form-gap: 1.25rem;
   --collection-gap: 1rem;
 }
-.app-shell.theme-dark[data-theme="example"] {
+.app-shell.theme-dark[data-brand="example"] {
   --color-action-primary: #c4b5fd;
   --color-action-primary-soft: #2e1065;
   --color-action-on-primary: #08111f;
@@ -52,3 +52,15 @@ Models owns IModelProfileLookupQueries; Agents owns IAgentProfileUsageQueries. E
 Each lookup materializes at most 20 candidates; usage requests inspect at most eight authorized scopes with 20 candidates each and return at most one result page. Empty scopes are skipped within that bound. Unknown totals stay unknown. These bounds limit materialization, resolution and payload, not the cost of a database search scan; no new search-index or latency guarantee is claimed. New providers can retain the bounded enumeration fallback until they implement the family ports.
 
 The inline Model Profile picker presents one summary with its actions and opens a filtered collection below it. A current choice is identified and disabled as a redundant action. Each choice button describes its exact profile identity. Opening focuses search, choosing returns focus to the disclosure, and a single-page result omits inactive pagination. The [correction report](corrections-champs-selection/README.md) includes visual evidence and validation.
+
+## Resource composition
+
+`ResourceIdentitySummary` presents the common read-only identity, explicit empty description, optional owner scope/namespace and short badges. Family-specific configuration stays in adjacent `FormSection` panels. Agent and Model Profile overviews demonstrate the same summary. `CopyableValue` copies only its supplied value through the clipboard module and reports success/failure accessibly.
+
+`ResourceHeader` composes `ResourceIcon` and `ResourceActionBar`. Icons accept an image URL (SVG/PNG/WebP through an image element), an optional dark-theme variant, a catalog name or trusted caller content. Images keep their proportions and fall back to the family icon on failure; no arbitrary SVG markup is injected. This is the rendering contract only: persisted icon metadata, Bootstrap asset lifecycle and automatic type inheritance remain owned by [#1110](https://github.com/gbaudrit/agentstration/issues/1110). Header actions support primary, secondary and optional overflow content; each screen retains permissions and commands.
+
+`LabelsEditor` edits the existing newline-separated key=value binding as explicit rows. It keeps invalid drafts, reports missing/invalid/duplicate keys in the EditContext, and never replaces duplicate values silently. `LabelsSummary` renders saved maps as wrapping badges. Agent is the first adopter; the transport schema is unchanged.
+
+The Agent Definition tab groups Identity, Behavior, Model, Execution and Labels. Overview owns saved configuration and desired/active comparison. Discard restores the last saved resource snapshot, replaces the EditContext and child input state, clears validation/YAML drafts and retains the selected tab. `UnsavedChangesBar` is a neutral sticky action surface that clears the mobile navigation height through `--mobile-navigation-height`; it does not own the restoration operation. `PageNotification` presents dismissible, eight-second action feedback, separate from persisted state; the notification center retains session history.
+
+The existing `ResourceAccessPanel` puts permissions ahead of collapsible identity/governance details. It searches the authorized target inventory, renders at most 50 matching options with an honest count, and keeps exact scope coordinates. This bounds the selector rendering, not the existing inventory API. Discover/use/propagation remain independent rights with existing domain validation. Cancel restores the last loaded/saved policy without calling the API; saves preserve the ETag contract and read-only permissions.

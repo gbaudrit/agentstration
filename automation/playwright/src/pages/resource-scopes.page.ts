@@ -14,8 +14,15 @@ export class ResourceScopesPage {
 
   public async open(consoleUrl: string, scopeRef?: string): Promise<void> {
     const shell = this.page.getByTestId(TestIds.console.shell);
-    if (!scopeRef) await expect(shell).toHaveAttribute('data-context-scope', /^\/(instance|tenants\/|workspaces\/)/);
-    const scope = scopeRef ?? (await shell.getAttribute('data-context-scope'))!;
+    let scope = scopeRef;
+    if (!scope) {
+      await expect(async () => {
+        const current = await shell.getAttribute('data-context-scope');
+        expect(current).toMatch(/^\/(instance|tenants\/|workspaces\/)/);
+        scope = current!;
+      }).toPass();
+    }
+    if (!scope) throw new Error("The Console did not expose an active resource scope.");
     await this.page.goto(`${consoleUrl}/settings/resource-scopes?context=${encodeURIComponent(scope)}`);
     await expect(shell).toHaveAttribute('data-context-scope', scope);
     await expect(shell).toHaveAttribute('data-preferences-ready', 'true');

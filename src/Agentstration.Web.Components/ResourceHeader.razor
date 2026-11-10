@@ -1,6 +1,6 @@
 <header class="resource-header resource-domain-@Domain" data-testid="@TestId">
     <div class="resource-header-identity">
-        <div class="resource-icon" aria-hidden="true">@if (!string.IsNullOrWhiteSpace(IconName)) { <UiIcon Name="@IconName" /> } else { @Icon }</div>
+        <ResourceIcon Source="@ImageSource" DarkSource="@DarkImageSource" IconName="@IconName" Fallback="@Icon" Domain="@Domain" ChildContent="@IconContent" />
         <div>
             <p class="eyebrow">@ResourceType</p>
             <div class="resource-title-row">
@@ -11,7 +11,7 @@
             @if (Metadata is not null) { <div class="resource-metadata">@Metadata</div> }
         </div>
     </div>
-    @if (Actions is not null) { <div class="page-actions">@Actions</div> }
+    @if (Actions is not null || PrimaryActions is not null || MoreActions is not null) { <div class="page-actions"><ResourceActionBar Primary="@PrimaryActions" MoreActions="@MoreActions">@Actions</ResourceActionBar></div> }
 </header>
 
 @code {
@@ -19,6 +19,11 @@
     [Parameter, EditorRequired] public string ResourceType { get; set; } = string.Empty;
     [Parameter] public string Domain { get; set; } = "neutral";
     [Parameter] public string Icon { get; set; } = "◇";
+    [Parameter] public string? ImageSource { get; set; }
+    [Parameter] public string? DarkImageSource { get; set; }
+    [Parameter] public RenderFragment? IconContent { get; set; }
+    [Parameter] public RenderFragment? PrimaryActions { get; set; }
+    [Parameter] public RenderFragment? MoreActions { get; set; }
     [Parameter] public string? IconName { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string? StatusText { get; set; }

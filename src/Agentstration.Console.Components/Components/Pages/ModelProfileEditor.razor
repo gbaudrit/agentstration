@@ -42,15 +42,13 @@ else
     <div id="model-profile-page-panel" role="@(!IsNew ? "tabpanel" : null)" aria-labelledby="@(!IsNew ? "model-profile-page-" + PageKey : null)">
     @if (!IsNew && activeTab == ModelProfileTab.Overview && resource is not null)
     {
-        <FormSection Title="@Shared["Saved"]" Eyebrow="@Shared["Overview"]">
-            <dl class="resource-details" data-testid="model-profile-overview">
-                <dt>@T("DisplayName")</dt><dd>@resource.Definition.DisplayName</dd>
-                <dt>@T("Name")</dt><dd><code>@resource.Namespace/@resource.Name</code></dd>
-                <dt>@T("DescriptionLabel")</dt><dd>@resource.Definition.Description</dd>
-                <dt>@T("Provider")</dt><dd><code>@resource.Definition.Provider.Namespace/@resource.Definition.Provider.Name</code></dd>
-                <dt>@T("Model")</dt><dd>@resource.Definition.Model.Name</dd>
-            </dl>
-        </FormSection>
+        <ResourceIdentitySummary DisplayName="@resource.Definition.DisplayName" TechnicalName="@resource.Name" Description="@resource.Definition.Description" Namespace="@resource.Namespace.Value" TestId="model-profile-overview">
+            <Scope><ResourceScopeBadge ScopeRef="resource.ScopeRef" /></Scope>
+        </ResourceIdentitySummary>
+        <FormSection Title="@T("Model")"><dl class="resource-details">
+            <dt>@T("Provider")</dt><dd><code>@resource.Definition.Provider.Namespace/@resource.Definition.Provider.Name</code></dd>
+            <dt>@T("Model")</dt><dd>@resource.Definition.Model.Name</dd>
+        </dl></FormSection>
     }
     @if (!IsNew && activeTab == ModelProfileTab.Yaml && resource is not null)
     {

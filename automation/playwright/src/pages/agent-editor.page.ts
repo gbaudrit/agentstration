@@ -72,6 +72,15 @@ export class AgentEditorPage {
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
   }
 
+  public async openOverview(): Promise<void> {
+    const tab = this.page.getByTestId(TestIds.agentEditor.overviewTab);
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await expect(this.page.getByTestId(TestIds.agentEditor.overview)).toBeVisible();
+    }).toPass();
+  }
+
   public async openEdit(): Promise<void> {
     const tab = this.page.getByTestId(TestIds.agentEditor.editTab);
     await expect(tab).toBeVisible();

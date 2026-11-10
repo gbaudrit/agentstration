@@ -33,12 +33,38 @@ else
     @if (!IsNew)
     {
         <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@(savedResource?.Definition.DisplayName ?? model.DisplayName)" Description="@(savedResource?.Definition.Description ?? model.Description)" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
-            <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
-            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
+            <Metadata><CopyableValue Value="@model.Name" /><ResourceScopeBadge ScopeRef="selectedScope" Compact /><span>@T("Generation", generation)</span></Metadata>
+            <PrimaryActions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }</PrimaryActions>
+            <Actions>@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)" title="@(isDirty ? T("SaveBeforeApply") : null)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
         </ResourceHeader>
         @if (selectedScope is { } inheritedOwner) { <InheritedResourceNotice OwnerScopeRef="inheritedOwner" /> }
         <ResourcePageTabs Items="PageTabs" Value="@CurrentPage" ValueChanged="SelectPage" PanelId="agent-page-panel" IdPrefix="agent-page" Label="@T("AgentSections")" />
 
+
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="form-alert form-alert-danger" role="alert"><strong>@T("UnableToApply")</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
+    }
+    <PageNotification Message="@successMessage" OnDismiss="() => successMessage = null" />
+    @if (!IsNew && !overviewMode && !accessMode && !IsStateSynchronized && !isDirty)
+    {
+        <div class="form-alert form-alert-warning" role="status">@T("CurrentGenerationNotActive")</div>
+    }
+    @if (HasRawDraft && !sourceMode)
+    {
+        <div class="form-alert form-alert-warning" role="status"><span>@Shared["YamlConflict"]</span><button class="text-button" type="button" @onclick="ShowSource">@T("Yaml")</button><button class="text-button" type="button" @onclick="DiscardRawDraft">@Shared["DiscardYaml"]</button></div>
+    }
+    @if (IsNew)
+    {
+        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+    }
+
+    <div id="agent-page-panel" role="@(!IsNew ? "tabpanel" : null)" aria-labelledby="@(!IsNew ? "agent-page-" + CurrentPage : null)">
+    @if (!IsNew && overviewMode && savedResource is not null)
+    {
+        <div class="resource-overview" data-testid="agent-overview">
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
                 <Actions>@if (CanManage && !IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
@@ -54,38 +80,24 @@ else
                 </tbody></table></div>
             </section>
         }
-    }
+        <ResourceIdentitySummary DisplayName="@savedResource.Definition.DisplayName" TechnicalName="@savedResource.Name" Description="@savedResource.Definition.Description" Namespace="@savedResource.Namespace.Value">
+            <Scope><ResourceScopeBadge ScopeRef="savedResource.ScopeRef" /></Scope>
+        </ResourceIdentitySummary>
+        <FormSection Title="@T("Behavior")"><dl class="resource-details">
+            <dt>@T("Handler")</dt><dd>@savedResource.Definition.Handler</dd>
+            <dt>@T("Instructions")</dt><dd class="resource-text">@savedResource.Definition.Instructions</dd>
+        </dl></FormSection>
+            <section class="panel form-section">
+                <div class="panel-header"><div><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
+                <div class="declaration-resolution-grid">
+                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? savedResource.Definition.ModelProfile.Name)</dd><dt>@T("Name")</dt><dd><code>@savedResource.Definition.ModelProfile.Name</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">@T("OpenModelProfile") →</a> }</article>
+                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">@T("OpenProvider") →</a> }}</article>
+                </div>
+            </section>
 
-    @if (!string.IsNullOrWhiteSpace(errorMessage))
-    {
-        <div class="form-alert form-alert-danger" role="alert"><strong>@T("UnableToApply")</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
-    }
-    @if (!string.IsNullOrWhiteSpace(successMessage))
-    {
-        <div class="form-alert form-alert-success" role="status">@successMessage</div>
-    }
-    @if (HasRawDraft && !sourceMode)
-    {
-        <div class="form-alert form-alert-warning" role="status"><span>@Shared["YamlConflict"]</span><button class="text-button" type="button" @onclick="ShowSource">@T("Yaml")</button><button class="text-button" type="button" @onclick="DiscardRawDraft">@Shared["DiscardYaml"]</button></div>
-    }
-    @if (IsNew)
-    {
-        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
-    }
-
-    <div id="agent-page-panel" role="@(!IsNew ? "tabpanel" : null)" aria-labelledby="@(!IsNew ? "agent-page-" + CurrentPage : null)">
-    @if (!IsNew && overviewMode && savedResource is not null)
-    {
-        <FormSection Title="@Shared["Saved"]" Eyebrow="@Shared["Overview"]">
-            <dl class="resource-details" data-testid="agent-overview">
-                <dt>@T("DisplayName")</dt><dd>@savedResource.Definition.DisplayName</dd>
-                <dt>@T("Name")</dt><dd><code>@savedResource.Name</code></dd>
-                <dt>@T("Description")</dt><dd>@savedResource.Definition.Description</dd>
-                <dt>@T("Handler")</dt><dd>@savedResource.Definition.Handler</dd>
-                <dt>@T("ModelProfile")</dt><dd><code>@savedResource.Definition.ModelProfile.Namespace/@savedResource.Definition.ModelProfile.Name</code></dd>
-                <dt>@T("Instructions")</dt><dd class="resource-text">@savedResource.Definition.Instructions</dd>
-            </dl>
-        </FormSection>
+        <FormSection Title="@T("Execution")"><dl class="resource-details"><dt>@T("RuntimeProfile")</dt><dd><code>@savedResource.Definition.RuntimeProfile.ScopeRef · @(savedResource.Definition.RuntimeProfile.Namespace ?? savedResource.Namespace)/@savedResource.Definition.RuntimeProfile.Name</code></dd></dl></FormSection>
+        <FormSection Title="@T("Tags")"><LabelsSummary Values="@savedResource.Metadata.Tags" /></FormSection>
+        </div>
     }
     else if (CanManage && accessMode && selectedScope is { } ownerScope)
     {
@@ -104,7 +116,7 @@ else
     @if (definitionVisited || toolsVisited || contractsVisited)
     {
     <div class="resource-editor-view" hidden="@(overviewMode || sourceMode || accessMode)">
-    <EditForm Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
+    <EditForm @key="model" Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
         <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
         <ValidationSummary />
         <fieldset class="resource-definition-fields" disabled="@(!CanManage || saving || HasRawDraft)" data-testid="agent-definition-fields">
@@ -139,42 +151,34 @@ else
         {
         <div class="resource-editor-view" hidden="@(toolsMode || contractsMode)">
         <section class="panel form-section" id="definition" data-testid="agent-identity-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ResourceCoordinates")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("Generation", generation)" Status="UiStatus.Info" /> }</div>
+            <div class="panel-header"><h2>@T("Identity")</h2></div>
             <FormGrid>
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="agent-display-name" TechnicalNameTestId="agent-name" />
-                <FormField Required="true" Label="@T("Handler")"><ChildContent><ClearableText @bind-Value="model.Handler" data-testid="agent-handler" /></ChildContent><Validation><ValidationMessage For="() => model.Handler" /></Validation></FormField>
                 <ResourceScopeFormField ResourceKind="@AgentResourceKinds.Agent" Value="@selectedScope" ValueChanged="ScopeChanged" Disabled="@(!IsNew)" />
+                <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" data-testid="agent-description" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
             </FormGrid>
             @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }
         </section>
 
         <section class="panel form-section" data-testid="agent-behavior-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("BehaviorAndModel")</h2></div></div>
+            <div class="panel-header"><h2>@T("Behavior")</h2></div>
             <FormGrid>
-                <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" data-testid="agent-description" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
-                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" @key="selectedScope" /><ValidationMessage For="() => model.ModelProfileName" /></div>
-                <FormField Required="true" Label="@T("RuntimeProfile")" Class="form-span-2"><ChildContent><ClearableSelect TValue="string" Value="@RuntimeProfileValue" ValueChanged="value => RuntimeProfileChanged(new ChangeEventArgs { Value = value })" ValueExpression="() => model.RuntimeProfileName" data-testid="agent-runtime-profile"><option value="">@Shared["NoSelection"]</option>@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</ClearableSelect><small>@T("RuntimeProfileHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeProfileName" /></Validation></FormField>
+                <FormField Required="true" Label="@T("Handler")"><ChildContent><ClearableText @bind-Value="model.Handler" data-testid="agent-handler" /></ChildContent><Validation><ValidationMessage For="() => model.Handler" /></Validation></FormField>
                 <FormField Required="true" Label="@T("Instructions")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /></ChildContent><Validation><ValidationMessage For="() => model.Instructions" /></Validation></FormField>
             </FormGrid>
         </section>
 
-        @if (!IsNew)
-        {
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("ModelConfiguration")</p><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
-                <div class="declaration-resolution-grid">
-                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? model.ModelProfileName)</dd><dt>@T("Name")</dt><dd><code>@model.ModelProfileName</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">@T("OpenModelProfile") →</a> }</article>
-                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">@T("OpenProvider") →</a> }}</article>
-                </div>
-            </section>
-        }
 
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("References")</p><h2>@T("Tags")</h2></div></div>
-            <FormGrid>
-                <FormField Label="@T("Tags")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Tags" rows="7" /><small>@T("TagsHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.Tags" /></Validation></FormField>
-            </FormGrid>
-        </section>
+        <FormSection Title="@T("ModelConfiguration")" TestId="agent-model-section">
+                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" @key="selectedScope" /><ValidationMessage For="() => model.ModelProfileName" /></div>
+        </FormSection>
+        <FormSection Title="@T("Execution")" TestId="agent-runtime-section">
+                <FormField Required="true" Label="@T("RuntimeProfile")" Class="form-span-2"><ChildContent><ClearableSelect TValue="string" Value="@RuntimeProfileValue" ValueChanged="value => RuntimeProfileChanged(new ChangeEventArgs { Value = value })" ValueExpression="() => model.RuntimeProfileName" data-testid="agent-runtime-profile"><option value="">@Shared["NoSelection"]</option>@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</ClearableSelect><small>@T("RuntimeProfileHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeProfileName" /></Validation></FormField>
+        </FormSection>
+
+        <FormSection Title="@T("Tags")" TestId="agent-labels-section">
+            <LabelsEditor @bind-Value="model.Tags" /><ValidationMessage For="() => model.Tags" />
+        </FormSection>
         </div>
         }
 
@@ -186,7 +190,7 @@ else
         else if (CanManage)
         {
             <UnsavedChangesBar IsVisible="@isDirty">
-                <Actions><button class="button-secondary" type="button" @onclick="DiscardAsync" disabled="@saving">@T("Discard")</button><button class="button-secondary" type="submit" data-testid="agent-save-draft" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">@T("SaveDraft")</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Applying") : T("SaveAndApply"))</button></Actions>
+                <Actions><button class="text-button" type="button" data-testid="agent-discard" @onclick="DiscardAsync" disabled="@saving">@T("Discard")</button><button class="button-secondary" type="submit" data-testid="agent-save-draft" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">@T("SaveDraft")</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Applying") : T("SaveAndApply"))</button></Actions>
             </UnsavedChangesBar>
         }
     </EditForm>
@@ -530,7 +534,14 @@ else
         await Task.WhenAll(tasks);
         return tasks.SelectMany(task => task.Result).ToArray();
     }
-    private Task DiscardAsync() => OnParametersSetAsync();
+    private void DiscardAsync()
+    {
+        if (saving || savedResource is null) return;
+        model = AgentEditorModel.FromResource(savedResource);
+        selectedScope = savedResource.ScopeRef;
+        rawInitialized = false; rawYaml = string.Empty; rawError = errorMessage = errorId = successMessage = null;
+        invalidInput = false; savedFingerprint = Fingerprint;
+    }
     private void DiscardRawDraft() { rawInitialized = false; ShowSource(); }
 
     private static string ResourceName(string name) => name;

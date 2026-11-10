@@ -23,51 +23,33 @@
     }
     else
     {
-        <article class="panel access-identity">
-            <div class="panel-header">
-                <div><p class="eyebrow">@T("Ownership")</p><h2>@T("ResourceIdentity")</h2><p>@T("ResourceIdentityHelp")</p></div>
-                <ResourceScopeBadge ScopeRef="OwnerScopeRef" />
-            </div>
-            <dl class="resource-details access-identity-grid">
-                <dt>@T("Scope")</dt><dd><code>@OwnerScopeRef.Value</code></dd>
-                <dt>@T("Namespace")</dt><dd><code>@Namespace.Value</code></dd>
-                <dt>@T("Uid")</dt><dd><code>@identity.Uid</code></dd>
-                @if (Generation is not null) { <dt>@T("Generation")</dt><dd>@Generation</dd> }
-                @if (!string.IsNullOrWhiteSpace(Version)) { <dt>@T("Version")</dt><dd><code>@Version</code></dd> }
-            </dl>
-        </article>
-
-        <article class="panel access-governance">
-            <div class="panel-header"><div><p class="eyebrow">@T("Governance")</p><h2>@GovernanceTitle</h2><p>@GovernanceHelp</p></div><StatusBadge Text="@GovernanceBadge" Status="@(Governance.IsManaged ? UiStatus.Info : UiStatus.Neutral)" /></div>
-            <dl class="resource-details access-governance-grid">
-                <dt>@T("Origin")</dt><dd>@OriginLabel</dd>
-                @if (!string.IsNullOrWhiteSpace(Governance.Origin.Reference)) { <dt>@T("OriginReference")</dt><dd><code>@Governance.Origin.Reference</code></dd> }
-                @if (!string.IsNullOrWhiteSpace(Governance.Origin.Version)) { <dt>@T("SuppliedVersion")</dt><dd><code>@Governance.Origin.Version</code></dd> }
-                @if (Governance.ManagedBy is { } manager) { <dt>@T("ManagedBy")</dt><dd><code>@manager.Reference</code></dd> }
-            </dl>
-        </article>
-
+        <section class="panel access-context">
+            <div><span class="muted">@T("Scope")</span><ResourceScopeBadge ScopeRef="OwnerScopeRef" /><StatusBadge Text="@GovernanceBadge" Status="@(Governance.IsManaged ? UiStatus.Info : UiStatus.Neutral)" /></div>
+            <p>@T("DefaultDenyHelp")</p>
+            @if (Governance.IsManaged) { <p>@T("ManagedResourceHelp")</p> }
+        </section>
         <article class="panel access-grants">
             <div class="panel-header">
-                <div><p class="eyebrow">@T("Visibility")</p><h2>@T("DescendantAccess")</h2><p>@T("DefaultDenyHelp")</p></div>
+                <div><h2>@T("Permissions")</h2><p>@T("PermissionHelp")</p></div>
             </div>
             @if (grants.Count == 0)
             {
-                <EmptyState Title="@T("NoGrants")" Message="@T("NoGrantsMessage")" />
+                <p class="access-empty">@T("NoGrantsMessage")</p>
             }
             else
             {
+                <div class="access-grant-heading" aria-hidden="true"><span>@T("TargetScope")</span><span>@T("AllowedActions")</span><span></span></div>
                 <div class="access-grant-list">
                     @foreach (var grant in grants)
                     {
                         <div class="access-grant" data-testid="resource-access-grant" data-scope-ref="@grant.TargetScopeRef.Value">
                             <div class="access-target"><ResourceScopeBadge ScopeRef="grant.TargetScopeRef" /><strong>@TargetName(grant.TargetScopeRef)</strong><code>@grant.TargetScopeRef.Value</code></div>
                             <div class="access-actions" aria-label="@T("AllowedActions")">
-                                <label><input type="checkbox" checked="@grant.Discover" disabled="@(!canManage)" @onchange="args => SetAction(grant, ResourceAccessAction.Discover, (bool)(args.Value ?? false))" />@T("Discover")</label>
-                                <label><input type="checkbox" checked="@grant.Use" disabled="@(!canManage)" @onchange="args => SetAction(grant, ResourceAccessAction.Use, (bool)(args.Value ?? false))" />@T("Use")</label>
-                                <label><input type="checkbox" checked="@grant.IncludeDescendants" disabled="@(!canManage || grant.TargetScopeRef.Kind == ResourceScopeKind.Workspace)" @onchange="args => SetPropagation(grant, (bool)(args.Value ?? false))" />@T("IncludeDescendants")</label>
+                                <label><input type="checkbox" checked="@grant.Discover" disabled="@(!canManage || saving)" @onchange="args => SetAction(grant, ResourceAccessAction.Discover, (bool)(args.Value ?? false))" />@T("Discover")</label>
+                                <label><input type="checkbox" checked="@grant.Use" disabled="@(!canManage || saving)" @onchange="args => SetAction(grant, ResourceAccessAction.Use, (bool)(args.Value ?? false))" />@T("Use")</label>
+                                <label><input type="checkbox" checked="@grant.IncludeDescendants" disabled="@(!canManage || saving || grant.TargetScopeRef.Kind == ResourceScopeKind.Workspace)" @onchange="args => SetPropagation(grant, (bool)(args.Value ?? false))" />@T("IncludeDescendants")</label>
                             </div>
-                            @if (canManage) { <button class="button-secondary" type="button" data-testid="resource-access-remove" @onclick="() => Remove(grant)">@T("Remove")</button> }
+                            @if (canManage) { <button class="button-secondary" type="button" disabled="@saving" data-testid="resource-access-remove" @onclick="() => Remove(grant)">@T("Remove")</button> }
                         </div>
                     }
                 </div>
@@ -75,9 +57,17 @@
 
             @if (canManage && AvailableTargets.Count > 0)
             {
-                <div class="access-add">
-                    <label><span>@T("TargetScope")</span><select data-testid="resource-access-target" @bind="selectedTarget"><option value="">@T("SelectTarget")</option>@foreach (var target in AvailableTargets) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</select></label>
-                    <button class="button-secondary" type="button" data-testid="resource-access-add" disabled="@string.IsNullOrWhiteSpace(selectedTarget)" @onclick="Add">@T("Add")</button>
+                <button class="button-secondary" type="button" disabled="@saving" @onclick="() => adding = !adding" aria-expanded="@adding.ToString().ToLowerInvariant()" aria-controls="@addId" data-testid="resource-access-open-add">@(adding ? T("CloseAdd") : T("Add"))</button>
+                <div class="access-add" id="@addId" hidden="@(!adding)">
+                    <FormField Label="@T("SearchTargets")"><ClearableText Value="@targetSearch" ValueChanged="value => { targetSearch = value; selectedTarget = string.Empty; }" Type="search" Disabled="@saving" data-testid="resource-access-search" /></FormField>
+                    <FormField Label="@T("TargetScope")"><ClearableSelect TValue="string" Disabled="@saving" @bind-Value="selectedTarget" data-testid="resource-access-target"><option value="">@T("SelectTarget")</option>@foreach (var target in FilteredTargets.Take(50)) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</ClearableSelect></FormField>
+                    <small>@T("TargetResults", Math.Min(50, FilteredTargets.Count), FilteredTargets.Count)</small>
+                    <div class="access-actions">
+                        <label><input type="checkbox" @bind="addDiscover" disabled="@saving" />@T("Discover")</label>
+                        <label><input type="checkbox" @bind="addUse" disabled="@saving" />@T("Use")</label>
+                        <label><input type="checkbox" @bind="addDescendants" disabled="@(saving || ResourceScopeRef.TryParse(selectedTarget, out var targetScope) && targetScope.Kind == ResourceScopeKind.Workspace)" />@T("IncludeDescendants")</label>
+                    </div>
+                    <button class="button-secondary" type="button" data-testid="resource-access-add" disabled="@(saving || string.IsNullOrWhiteSpace(selectedTarget) || (!addDiscover && !addUse))" @onclick="Add">@T("Add")</button>
                 </div>
             }
             else if (!canManage)
@@ -91,9 +81,35 @@
             @if (saved) { <p class="access-success" role="status" data-testid="resource-access-saved">@T("Saved")</p> }
             @if (canManage)
             {
-                <div class="form-actions"><button class="button-primary" type="button" data-testid="resource-access-save" disabled="@(saving || invalidGrant || !dirty)" @onclick="SaveAsync">@(saving ? T("Saving") : T("Save"))</button></div>
+                <div class="form-actions"><button class="text-button" type="button" @onclick="Discard" disabled="@(saving || !dirty)" data-testid="resource-access-discard">@T("Discard")</button><button class="button-primary" type="button" data-testid="resource-access-save" disabled="@(saving || invalidGrant || !dirty)" @onclick="SaveAsync">@(saving ? T("Saving") : T("Save"))</button></div>
             }
         </article>
+        <details class="panel access-details"><summary>@T("ResourceDetails")</summary>
+        <article class="access-identity">
+            <div class="panel-header">
+                <div><h2>@T("ResourceIdentity")</h2><p>@T("ResourceIdentityHelp")</p></div>
+                <ResourceScopeBadge ScopeRef="OwnerScopeRef" />
+            </div>
+            <dl class="resource-details access-identity-grid">
+                <dt>@T("Scope")</dt><dd><code>@OwnerScopeRef.Value</code></dd>
+                <dt>@T("Namespace")</dt><dd><code>@Namespace.Value</code></dd>
+                <dt>@T("Uid")</dt><dd><code>@identity.Uid</code></dd>
+                @if (Generation is not null) { <dt>@T("Generation")</dt><dd>@Generation</dd> }
+                @if (!string.IsNullOrWhiteSpace(Version)) { <dt>@T("Version")</dt><dd><code>@Version</code></dd> }
+            </dl>
+        </article>
+
+        <article class="access-governance">
+            <div class="panel-header"><div><h2>@GovernanceTitle</h2><p>@GovernanceHelp</p></div><StatusBadge Text="@GovernanceBadge" Status="@(Governance.IsManaged ? UiStatus.Info : UiStatus.Neutral)" /></div>
+            <dl class="resource-details access-governance-grid">
+                <dt>@T("Origin")</dt><dd>@OriginLabel</dd>
+                @if (!string.IsNullOrWhiteSpace(Governance.Origin.Reference)) { <dt>@T("OriginReference")</dt><dd><code>@Governance.Origin.Reference</code></dd> }
+                @if (!string.IsNullOrWhiteSpace(Governance.Origin.Version)) { <dt>@T("SuppliedVersion")</dt><dd><code>@Governance.Origin.Version</code></dd> }
+                @if (Governance.ManagedBy is { } manager) { <dt>@T("ManagedBy")</dt><dd><code>@manager.Reference</code></dd> }
+            </dl>
+        </article>
+
+        </details>
     }
 </section>
 
@@ -113,7 +129,12 @@
     private IReadOnlyList<ResourceScopeTargetResponse> targets = [];
     private string? etag;
     private string? loadedKey;
+    private readonly string addId = $"access-add-{Guid.NewGuid():N}";
+    private ResourceAccessGrant[] savedGrants = [];
+    private string targetSearch = string.Empty;
+    private bool adding, addDiscover = true, addUse = true, addDescendants;
     private string selectedTarget = string.Empty;
+    private IReadOnlyList<ResourceScopeTargetResponse> FilteredTargets => AvailableTargets.Where(target => $"{target.DisplayName} {target.ScopeRef.Value}".Contains(targetSearch, StringComparison.CurrentCultureIgnoreCase)).ToArray();
     private bool loading = true, loadError, canManage, dirty, saving, saveError, saved, invalidTarget;
     private bool invalidGrant => grants.Any(value => !value.Discover && !value.Use);
     private IReadOnlyList<ResourceScopeTargetResponse> AvailableTargets => targets
@@ -152,6 +173,7 @@
             var snapshot = await Policies.GetAsync(resource.Uid, cancellation.Token);
             etag = snapshot?.ETag;
             grants.AddRange(snapshot?.Policy.Grants.Select(GrantModel.From) ?? []);
+            savedGrants = grants.Select(grant => grant.ToGrant()).ToArray();
         }
         catch (AgentstrationApiException) { loadError = true; identity = null; }
         finally { loading = false; }
@@ -159,14 +181,25 @@
 
     private void Add()
     {
+        if (!canManage || saving) return;
         if (!ResourceScopeRef.TryParse(selectedTarget, out var scopeRef) || !IsDescendant(scopeRef, OwnerScopeRef))
         {
             invalidTarget = true;
             saved = false;
             return;
         }
+        if (!addDiscover && !addUse) return;
+        if (grants.Any(grant => grant.TargetScopeRef == scopeRef)) { invalidTarget = true; return; }
         invalidTarget = false;
-        grants.Add(new(scopeRef, true, true, false)); selectedTarget = string.Empty; MarkDirty();
+        grants.Add(new(scopeRef, addDiscover, addUse, addDescendants && scopeRef.Kind != ResourceScopeKind.Workspace));
+        selectedTarget = targetSearch = string.Empty; adding = false; addDiscover = addUse = true; addDescendants = false; MarkDirty();
+    }
+    private void Discard()
+    {
+        if (saving) return;
+        grants.Clear(); grants.AddRange(savedGrants.Select(GrantModel.From));
+        selectedTarget = targetSearch = string.Empty; adding = false; addDiscover = addUse = true; addDescendants = false;
+        dirty = saveError = saved = invalidTarget = false;
     }
     private void Remove(GrantModel grant) { grants.Remove(grant); MarkDirty(); }
     private void SetAction(GrantModel grant, ResourceAccessAction action, bool enabled)
@@ -185,7 +218,7 @@
         {
             var policy = new ResourceAccessPolicy(identity, grants.Select(value => value.ToGrant()).ToArray());
             var snapshot = await Policies.PutAsync(policy, etag, cancellation.Token);
-            etag = snapshot.ETag; dirty = false; saved = true;
+            etag = snapshot.ETag; savedGrants = snapshot.Policy.Grants.ToArray(); dirty = false; saved = true;
         }
         catch (AgentstrationApiException) { saveError = true; }
         finally { saving = false; }
@@ -204,13 +237,13 @@
     }
 
     private string TargetName(ResourceScopeRef scopeRef) => targets.SingleOrDefault(value => value.ScopeRef == scopeRef)?.DisplayName ?? scopeRef.Value;
-    private string TargetLabel(ResourceScopeTargetResponse target) => $"{T($"ScopeKind.{target.Kind}")} · {target.DisplayName}";
+    private string TargetLabel(ResourceScopeTargetResponse target) => $"{T($"ScopeKind.{target.Kind}")} · {target.DisplayName} · {target.ScopeRef.Value}";
     private string OriginLabel => T($"Origin.{Governance.Origin.Kind}");
     private string GovernanceTitle => Governance.IsManaged ? T("ManagedResource") : T("EditableResource");
     private string GovernanceHelp => Governance.IsManaged ? T("ManagedResourceHelp") : T("EditableResourceHelp");
     private string GovernanceBadge => Governance.IsManaged ? T("Managed") : T("Local");
     private static int ScopeRank(ResourceScopeKind kind) => kind switch { ResourceScopeKind.Instance => 0, ResourceScopeKind.Tenant => 1, _ => 2 };
-    private string T(string key) => Localizer[key].Value;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 
     private sealed class GrantModel(ResourceScopeRef targetScopeRef, bool discover, bool use, bool includeDescendants)
