@@ -314,7 +314,7 @@ else
         ModelFeatureSupport.Native or ModelFeatureSupport.Emulated or ModelFeatureSupport.Partial;
     private static string ProfileUrl(ModelProviderUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.Name)}";
     private string ModelDetailsUrl(AvailableModelResponse item) => ConsoleResourceUrls.Model(
-        ResourceAddress.Create(ResourceNamespace.Parse(model?.Namespace), ModelResourceKinds.Model, item.ResourceName!));
+        ResourceAddress.Create(ResourceNamespace.Parse(model?.Namespace), ModelResourceKinds.Model, item.ResourceName!), resource?.ScopeRef ?? selectedScope);
     private string CreateModelProfileUrl(string? modelName = null)
     {
         var providerNamespace = ResourceNamespace.Parse(model?.Namespace ?? Namespace).Value;

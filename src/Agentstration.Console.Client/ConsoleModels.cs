@@ -98,12 +98,15 @@ public static class ConsoleResourceUrls
         return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
     }
 
-    public static string Model(ResourceAddress address)
+    public static string Model(ResourceAddress address, ResourceScopeRef? contextScopeRef = null)
     {
         var path = $"/models/{Uri.EscapeDataString(address.Name)}";
-        return address.Namespace.IsDefault
-            ? path
-            : $"{path}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+        var query = new List<string>();
+        if (!address.Namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(address.Namespace.Value)}");
+        // A static/prerendered link must not depend on the shell's location
+        // handler being attached before the user follows it.
+        if (contextScopeRef is not null) query.Add($"context={Uri.EscapeDataString(contextScopeRef.Value.Value)}");
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
     }
 
     public static string RuntimeProfile(ResourceAddress address)

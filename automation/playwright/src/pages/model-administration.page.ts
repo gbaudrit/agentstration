@@ -59,7 +59,10 @@ export class ModelAdministrationPage {
 
   public async overrideFirstModelContextLimit(consoleUrl: string, providerName: string, contextTokens: number): Promise<void> {
     await this.open(consoleUrl, `/modelproviders/${encodeURIComponent(providerName)}`, TestIds.resourceAdministration.modelProviderEditor);
-    await this.page.getByTestId(TestIds.modelAdministration.openModelDetails).first().click();
+    const modelLink = this.page.getByTestId(TestIds.modelAdministration.openModelDetails).first();
+    // This context must exist in the rendered URL before Blazor intercepts clicks.
+    await expect(modelLink).toHaveAttribute('href', /[?&]context=%2Finstance/);
+    await modelLink.click();
     await this.page.getByTestId(TestIds.resourceAdministration.modelDetails).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.modelAdministration.editModelOverride).click();
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.modelOverrideContextTokens), contextTokens.toString());
