@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { formAdoptionCoverage } from '../src/coverage/form-adoption-coverage.js';
 import { applicationSurfaces } from '../src/coverage/application-surfaces.js';
 import { discoverProductRoutes } from '../src/coverage/discover-routes.js';
 import { automationRoot, repositoryRoot } from '../src/fixtures/repository.js';
@@ -47,3 +48,21 @@ test('coverage ownership points to implemented files or a tracking issue', () =>
 function compareRoute(left: { source: string; route: string }, right: { source: string; route: string }): number {
   return left.source.localeCompare(right.source) || left.route.localeCompare(right.route);
 }
+
+// Inventory belongs to the implementation; coverage declarations are independent so
+// adding a product form cannot silently claim a browser case that does not exist.
+test('all-form inventory has explicit field or family regression ownership', () => {
+  const inventory = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'docs/ux/formulaires-tous-ecrans/inventory.json'), 'utf8')) as { screens: { path: string }[] };
+  expect(formAdoptionCoverage.map(value => value.source).sort()).toEqual(inventory.screens.map(value => value.path).sort());
+  for (const form of formAdoptionCoverage) {
+    expect(form.specifications.length).toBeGreaterThan(0);
+    for (const specification of form.specifications) expect(fs.existsSync(path.join(automationRoot, specification))).toBe(true);
+    const surfaces = applicationSurfaces.filter(surface => surface.source === form.source);
+    if (form.kind === 'server-adapter') {
+      expect(form.source).toBe('src/Agentstration.Console.Web/Pages/Login.cshtml');
+      continue;
+    }
+    expect(surfaces.length, form.source).toBeGreaterThan(0);
+    for (const surface of surfaces) expect(surface.formContract).toEqual(form);
+  }
+});

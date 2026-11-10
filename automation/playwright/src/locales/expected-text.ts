@@ -299,3 +299,9 @@ export const OrganizationStructureTextByLocale = {
     openWorkspace: (name: string) => `Ouvrir l’espace de travail ${name}`,
   },
 } as const;
+
+/** Independent field expectations; do not import product resource files. */
+export const SharedFormTextByLocale = {
+  'en-US': { clear: 'Clear', selectionRequired: 'Select a value' },
+  'fr-FR': { clear: 'Vider', selectionRequired: 'Sélectionnez une valeur' },
+} as const;

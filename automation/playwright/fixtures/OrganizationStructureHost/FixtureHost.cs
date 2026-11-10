@@ -1,3 +1,9 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Agentstration.Resources;
+using Agentstration.Work;
+using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Security.AspNetCoreIdentity;
 using Microsoft.AspNetCore.Hosting;
@@ -41,11 +47,60 @@ internal static class FixtureHost
         }
         var readyFile = Environment.GetEnvironmentVariable("ORGANIZATION_STRUCTURE_READY_FILE")
             ?? throw new InvalidOperationException("The browser fixture requires a readiness file.");
-        await File.WriteAllTextAsync(readyFile, "ready", lifetime.ApplicationStopping);
+        var ready = "ready";
+        if (string.Equals(Environment.GetEnvironmentVariable("SHARED_FORM_PENDING_FIXTURE"), "true", StringComparison.Ordinal))
+        {
+            var interactionId = await SeedPendingInputAsync(provider, workspace.Id, admin.Id, lifetime.ApplicationStopping);
+            ready = JsonSerializer.Serialize(new { interactionId });
+        }
+        await File.WriteAllTextAsync(readyFile, ready, lifetime.ApplicationStopping);
         var shutdown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = lifetime.ApplicationStopping.Register(() => shutdown.TrySetResult());
         await shutdown.Task;
     }
+
+    private static async Task<Guid> SeedPendingInputAsync(IServiceProvider provider, Guid workspaceId, Guid principalId, CancellationToken token)
+    {
+        var repository = provider.GetRequiredService<IWorkplaceRepository>();
+        var workspace = new WorkspaceId(workspaceId);
+        var now = DateTimeOffset.UtcNow;
+        var entry = await repository.GetEntryAsync(workspace, new EntryId("quick-answer"), token)
+            ?? new EntryResource
+            {
+                WorkspaceId = workspace, Id = new EntryId("forms-pending-input"), Name = "forms-pending-input",
+                DisplayName = "Pending input fixture", Presentation = new EntryPresentation
+                {
+                    Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Label = "Request", Role = EntryFieldRole.PrimaryInput }]
+                },
+                ResolvedTarget = new EntryResolvedTarget("system-direct-agent-dotnet-expert", "1.0.0"), PublishedAt = now
+            };
+        await repository.UpsertEntryAsync(entry, token);
+        if (await repository.GetDashboardAsync(workspace, new DashboardId("home"), token) is null)
+            await repository.UpsertDashboardAsync(new WorkplaceDashboard
+            {
+                Id = new DashboardId("home"), WorkspaceId = workspace, Name = "home", DisplayName = "Home", IsDefault = true, PublishedAt = now
+            }, token);
+        var id = InteractionId.New();
+        var actionId = PendingActionId.New();
+        var fields = new[] { new EntryFieldDefinition { Name = "focus", Type = EntryFieldType.Textarea, Label = "Report focus", Required = true } };
+        const string resumeToken = "browser-fixture-pending-input-token";
+        await repository.CreateInteractionAsync(new WorkplaceInteraction
+        {
+            Id = id, WorkspaceId = workspace, OwnerPrincipalId = principalId, EntryId = entry.Id, EntrySnapshot = entry,
+            Status = InteractionStatus.WaitingForUser, StartedAt = now, LastActivityAt = now, PendingActionId = actionId,
+            ImmediateResult = new RequestInputAction("What should the report focus on?", "A short answer is enough.", fields, actionId, resumeToken)
+        }, token);
+        await repository.CreatePendingActionAsync(new PendingAction
+        {
+            Id = actionId, WorkspaceId = workspace, InteractionId = id, Kind = PendingActionKind.InputRequired,
+            Title = "What should the report focus on?", Fields = fields, CreatedAt = now, ExpiresAt = now.AddDays(1),
+            ResumeTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(resumeToken))), ResumeStep = 1
+        }, token);
+        await repository.AddMessageAsync(new ConversationMessage(Guid.NewGuid(), workspace, id, null,
+            ConversationRole.User, "Prepare a report.", now), token);
+        return id.Value;
+    }
+
 }
 
 internal sealed class StructureFactory : WebApplicationFactory<Program>

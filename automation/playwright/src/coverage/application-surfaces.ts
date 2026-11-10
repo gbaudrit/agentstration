@@ -1,3 +1,5 @@
+import { formAdoptionCoverage, type FormAdoptionCoverage } from './form-adoption-coverage.js';
+
 export type ProductHost = 'console' | 'workplace';
 export type SurfaceCoverageState = 'covered' | 'partial' | 'planned';
 
@@ -12,6 +14,8 @@ export interface ApplicationSurface {
   specification: string;
   coverage: SurfaceCoverageState;
   trackingIssue?: number;
+  /** Independent field-contract evidence; does not upgrade business journey coverage. */
+  formContract?: FormAdoptionCoverage;
 }
 
 const consolePages = 'src/Agentstration.Console.Components/Components/Pages';
@@ -141,7 +145,38 @@ function lifecycleSurface(id: string, component: string, routes: readonly string
   };
 }
 
-export const applicationSurfaces: readonly ApplicationSurface[] = [
+const baseApplicationSurfaces: readonly ApplicationSurface[] = [
+  {
+    id: 'console-conversations', host: 'console', source: `${consolePages}/ConsoleConversations.razor`,
+    routes: ['/conversations'], fixtureKeys: [], pageObject: 'src/pages/console-entry-interaction.page.ts',
+    specification: 'tests/console-entry-interaction.spec.ts', coverage: 'covered',
+  },
+  {
+    id: 'console-entry-interaction', host: 'console', source: `${consolePages}/ConsoleEntryInteraction.razor`,
+    routes: ['/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}'], fixtureKeys: ['workspaceId', 'entryNamespace', 'entryName'],
+    pageObject: 'src/pages/console-entry-interaction.page.ts', specification: 'tests/console-entry-interaction.spec.ts', coverage: 'covered',
+  },
+  coveredModelAdministration('model-details', `${consolePages}/ModelDetails.razor`, ['/models/{Name}'], ['name']),
+  {
+    id: 'parameter-editor', host: 'console', source: `${consolePages}/ParameterEditor.razor`,
+    routes: ['/parameters/new', '/parameters/{Name}'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/shared-forms.page.ts', specification: 'tests/shared-forms.spec.ts', coverage: 'partial', trackingIssue: 1128,
+  },
+  {
+    id: 'parameters', host: 'console', source: `${consolePages}/Parameters.razor`, routes: ['/parameters'], fixtureKeys: [],
+    pageObject: 'src/pages/resource-administration.page.ts', specification: 'tests/resource-administration.spec.ts', coverage: 'partial', trackingIssue: 1121,
+  },
+  {
+    id: 'tool-category-editor', host: 'console', source: `${consolePages}/ToolCategoryEditor.razor`,
+    routes: ['/tools/categories/new', '/tools/categories/{Name}'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/shared-forms.page.ts', specification: 'tests/shared-forms.spec.ts', coverage: 'partial', trackingIssue: 1128,
+  },
+  {
+    id: 'tool-categories', host: 'console', source: `${consolePages}/ToolCategories.razor`, routes: ['/tools/categories'], fixtureKeys: [],
+    pageObject: 'src/pages/resource-administration.page.ts', specification: 'tests/resource-administration.spec.ts', coverage: 'partial', trackingIssue: 1121,
+  },
+  coveredDistribution('resource-plans', `${consolePages}/ResourcePlans.razor`, ['/resource-plans']),
+  coveredDistribution('resource-plan-details', `${consolePages}/ResourcePlanDetails.razor`, ['/resource-plans/{Id:guid}'], ['id']),
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
     pageObject: 'src/pages/product.pages.ts', journey: 'authenticate-console',
@@ -200,7 +235,7 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     specification: 'tests/bootstrap-provenance.spec.ts', coverage: 'covered',
   },
   {
-    id: 'agent-instances', host: 'console', source: `${consolePages}/Deployments.razor`, routes: ['/agent-instances'], fixtureKeys: [],
+    id: 'agent-instances', host: 'console', source: `${consolePages}/Deployments.razor`, routes: ['/agent-instances', '/deployments'], fixtureKeys: [],
     pageObject: 'src/pages/agent-instance-observability.page.ts', journey: 'inspect-agent-instance-observability',
     specification: 'tests/agent-instance-observability.spec.ts', coverage: 'covered',
   },
@@ -288,7 +323,7 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     routes: ['/extensions/{RegistrationName}', '/extensions/enrollment/{EnrollmentInstanceId:guid}'],
     fixtureKeys: ['registrationName', 'enrollmentInstanceId'],
     pageObject: 'src/pages/governed-extension-inventory.page.ts', journey: 'inspect-governed-extension-inventory',
-    specification: 'tests/governed-extension-inventory.spec.ts', coverage: 'covered', trackingIssue: 753,
+    specification: 'tests/governed-extension-inventory.spec.ts', coverage: 'covered',
   },
   coveredDistribution('source-providers', `${consolePages}/SourceProviders.razor`, ['/sourceproviders']),
   coveredDistribution('source-provider-details', `${consolePages}/SourceProviderDetails.razor`, ['/sourceproviders/new', '/sourceproviders/{Name}'], ['name']),
@@ -380,6 +415,11 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     specification: 'tests/workplace.spec.ts', coverage: 'covered',
   },
 ] as const;
+
+export const applicationSurfaces: readonly ApplicationSurface[] = baseApplicationSurfaces.map(surface => {
+  const formContract = formAdoptionCoverage.find(form => form.source === surface.source);
+  return formContract ? { ...surface, formContract } : surface;
+});
 
 export interface CoverageSummary {
   surfaces: number;
