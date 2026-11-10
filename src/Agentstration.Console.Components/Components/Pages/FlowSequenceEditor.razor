@@ -9,7 +9,7 @@
     @for (var index = 0; index < Value.Count; index++)
     {
         var position = index; var call = Value[index]; var selected = options.FirstOrDefault(option => Key(option.Reference) == Key(call.Flow));
-        <fieldset class="form-section" disabled="@ReadOnly" data-testid="flow-sequence-call">
+        <fieldset class="form-section" disabled="@ReadOnly" data-testid="flow-sequence-call" data-flow-reference="@Key(call.Flow)">
             <legend>@Localizer["SequencePosition", index + 1]</legend>
             <label><span>@T("SequenceFlow")</span><select value="@Key(call.Flow)" @onchange="args => SelectAsync(position, args.Value?.ToString())" data-testid="flow-sequence-target">
                 @if (selected is null) { <option value="@Key(call.Flow)">@call.Flow.ResourceId · @call.Flow.Version · @T("SequenceUnavailable")</option> }
