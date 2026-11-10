@@ -1,3 +1,4 @@
+using Agentstration.Infrastructure.Artifacts;
 using Agentstration.DataSources;
 using Agentstration.Knowledge;
 using Agentstration.Identity.Contracts;
@@ -10,6 +11,7 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
     DataSourceAcquisitionService acquisitions,
     DataSourceDiscoveryService discoveries,
     KnowledgeProjectionService projections,
+    StoredArtifactReconciliationService artifactReconciliation,
     IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
     ILogger<DataSourceAcquisitionRecoveryWorker> logger) : BackgroundService
@@ -29,6 +31,7 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
             await acquisitions.RecoverPendingAsync(cancellationToken);
             await discoveries.RecoverPendingAsync(cancellationToken);
             await projections.RecoverPendingAsync(cancellationToken);
+            await artifactReconciliation.ReconcileAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)

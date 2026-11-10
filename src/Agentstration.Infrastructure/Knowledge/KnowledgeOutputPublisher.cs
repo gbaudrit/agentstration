@@ -10,7 +10,8 @@ using Agentstration.Storage.Contracts;
 namespace Agentstration.Infrastructure.Knowledge;
 
 public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publications, IResourceStore resources,
-    IArtifactDurableStore durable, IAuthorizationService authorization, ICurrentRequestContext current, IRequestContextScopeFactory scopes) : IKnowledgeOutputPublisher
+    IArtifactDurableStore durable, IAuthorizationService authorization, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
+    IStoredArtifactRegistrar artifacts) : IKnowledgeOutputPublisher
 {
     public async Task<IReadOnlyList<KnowledgeSnapshotArtifact>> PublishAsync(KnowledgeSourceResource source,
         KnowledgeProjectionResource projection, KnowledgeProjectionManifest manifest, CancellationToken cancellationToken)
@@ -79,6 +80,28 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
             throw new KnowledgeProjectionException("knowledge_projection_publication_pending",
                 "The prepared output will resume sealing with its original publication identity.", exception);
         }
-        return result;
+        var catalogued = new List<KnowledgeSnapshotArtifact>(result.Count);
+        try
+        {
+            foreach (var item in result)
+            {
+                var reference = item.Content!;
+                FlowRunArtifactResource artifact;
+                using (scopes.Push(current.Current))
+                    artifact = await artifacts.RegisterStoredAsync(new(ArtifactStorageReferences.PublicationIdentity(reference),
+                        projection.ProjectionFlowRunId, new(source.ScopeRef!.Value, source.Namespace, source.Kind, source.Name),
+                        projection.Name, item.MediaType, new(new(projection.WorkspaceId), reference.Target,
+                            reference.Key, reference.Version, reference.Length, reference.Sha256, reference),
+                        ProducerUid: source.Uid, ProducerGeneration: source.Generation), cancellationToken);
+                catalogued.Add(item with { ArtifactId = artifact.ArtifactId.ToString() });
+            }
+        }
+        catch (Exception exception) when (exception is ArtifactValidationException or Agentstration.Storage.StorageException
+            or ResourceConcurrencyException)
+        {
+            throw new KnowledgeProjectionException("knowledge_projection_publication_pending",
+                "Sealed output will resume Artifact registration with its original publication identities.", exception);
+        }
+        return catalogued;
     }
 }

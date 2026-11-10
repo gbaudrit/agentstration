@@ -233,3 +233,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 205. [ADR-0205 — ASP uses scoped progressive content sessions](0205-asp-uses-scoped-progressive-content-sessions.md)
 206. [ADR-0206 — OpenDAL runs in an autonomous ASP extension](0206-opendal-runs-in-an-autonomous-asp-extension.md)
 207. [ADR-0207 — Knowledge publishes retained Storage content](0207-knowledge-publishes-retained-storage-content.md)
+
+208. [ADR-0208 — Produced content remains an Artifact materialized in Storage](0208-produced-content-remains-an-artifact-materialized-in-storage.md)

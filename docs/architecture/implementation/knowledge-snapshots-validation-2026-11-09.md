@@ -2,6 +2,12 @@
 
 ## Scope
 
+This dated report records the initial 2026-11-09 implementation. The subsequent
+Artifact identity correction is described by
+[ADR-0208](../../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md)
+and the current concepts/implementation documentation. Native stored results now
+also have Artifact catalogue entries with producer and Storage evidence.
+
 This report covers [#1042](https://github.com/gbaudrit/agentstration/issues/1042)
 and [PR #1088](https://github.com/gbaudrit/agentstration/pull/1088), compared with
 `integration/fr-1032` at `f27857701517e0ac2fa2561ae180d7eb2c680585`.

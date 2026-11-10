@@ -268,8 +268,11 @@ public sealed class KnowledgeProjectionInputResolver(
         while (buffer.Length < item.Length)
         {
             Agentstration.Storage.Contracts.StorageObjectContent chunk;
-            try { chunk = await datasets.ReadAsync(acquisition, buffer.Length,
-                (int)Math.Min(chunkSize, item.Length - buffer.Length), cancellationToken); }
+            try
+            {
+                chunk = await datasets.ReadAsync(acquisition, buffer.Length,
+                (int)Math.Min(chunkSize, item.Length - buffer.Length), cancellationToken);
+            }
             catch (StorageException exception) when (exception.Code == "storage_content_limit_exceeded" && chunkSize > 1)
             {
                 // The Storage owns its effective envelope. Discover a compatible bounded chunk
@@ -281,7 +284,7 @@ public sealed class KnowledgeProjectionInputResolver(
             if (bytes.Length == 0) throw Error("knowledge_projection_input_incomplete", "The acquired content is incomplete.");
             await buffer.WriteAsync(bytes, cancellationToken);
         }
-        return [new() { ArtifactId = acquisition.Name, Kind = KnowledgeArtifactKind.Inline,
+        return [new() { ArtifactId = acquisition.Manifest?.Artifacts.SingleOrDefault()?.ArtifactId ?? acquisition.Name, Kind = KnowledgeArtifactKind.Inline,
             Disposition = KnowledgeArtifactDisposition.Publishable, MediaType = "application/json",
             Digest = item.Sha256, ContentBase64 = Convert.ToBase64String(buffer.ToArray()) }];
     }

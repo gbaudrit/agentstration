@@ -119,3 +119,13 @@ an error. A failed refresh is never replaced by an out-of-policy stale result.
 - #1033 remains the deferred reusable integrated browser journey, blocked by
   explicit implemented-UX validation and required implementation merges. This
   change supplies implementation tests and smoke checks, not that reusable journey.
+
+## Artifact identity clarification
+
+[ADR-0208](0208-produced-content-remains-an-artifact-materialized-in-storage.md)
+clarifies that each produced stored result remains an Artifact. Native acquisitions
+register their materialized Artifacts; sealed Knowledge outputs register Artifact
+metadata before Snapshot creation. Inline bytes are Flow transport, not a separate
+catalogue. Exact Storage publication evidence remains in the receipt and is retained
+on historical Snapshots for compatibility. The existing Artifact content Flow and
+catalogue provide preview and download for both historical and native results.

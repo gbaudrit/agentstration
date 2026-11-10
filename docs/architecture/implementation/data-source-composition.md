@@ -278,3 +278,13 @@ The architecture and route framing was approved before UI work. Explicit
 maintainer approval of the implemented UX and a merged implementation PR are
 still required before the reusable integrated scenario in
 [#1033](https://github.com/gbaudrit/agentstration/issues/1033) starts.
+
+## Native Artifacts materialized in Storage
+
+Following ADR-0208, native acquisitions register their confirmed content as
+`FlowRunArtifact` resources and populate the ordinary acquisition manifest. The
+Artifact pins its actual producer resource revision, acquisition/Flow Run and
+Storage revision/key/version/digest. History links to the Artifact catalogue and
+its governed preview/download path. Content stays in the selected Storage.
+Previously produced native content receives missing metadata through bounded,
+authorized reconciliation; origins and stored content are not rewritten.

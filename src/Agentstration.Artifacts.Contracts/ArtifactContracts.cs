@@ -143,6 +143,7 @@ public sealed record StagedArtifactResource : Resource
 
 public sealed record ArtifactStorageReceipt
 {
+    public ArtifactStorageMaterialization? Materialization { get; init; }
     public required string StorageFlowRunId { get; init; }
     public required string OpaqueReference { get; init; }
     public required string MediaType { get; init; }
@@ -155,7 +156,11 @@ public sealed record FlowRunArtifactResource : Resource, IImmutableResource
 {
     public required WorkspaceId WorkspaceId { get; init; }
     public required FlowRunArtifactId ArtifactId { get; init; }
-    public required StagedArtifactId SourceArtifactId { get; init; }
+    public StagedArtifactId? SourceArtifactId { get; init; }
+    public ScopedResourceAddress? ProducerResource { get; init; }
+    public Guid? ProducerResourceUid { get; init; }
+    public long? ProducerResourceGeneration { get; init; }
+    public string? ProducerExecutionId { get; init; }
     public required string ProducerFlowRunId { get; init; }
     public required string ProducerFlowStepId { get; init; }
     public required ArtifactStorageReceipt Receipt { get; init; }

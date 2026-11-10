@@ -122,3 +122,26 @@ The contract value is a classification and schema boundary, not a new deployment
 See [ADR-0164](../decisions/0164-data-sources-own-governed-acquisition.md), [ADR-0166](../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0167](../decisions/0167-knowledge-sources-project-data-source-artifacts.md).
 
 See [ADR-0207](../decisions/0207-knowledge-publishes-retained-storage-content.md) for publication limits and recovery semantics.
+
+## Artifact identity and Storage materialization
+
+Every successfully produced native acquisition and retained Knowledge output is
+registered as an Artifact. Its materialization identifies the exact Storage
+revision, content key, available version, length and integrity digest; its producer
+identifies the Data Source or Knowledge Source revision, acquisition/projection
+and actual Flow Run. Selecting a Storage does not remove Artifact identity.
+
+Open **Artifacts** to follow the producer and Storage links, then use the existing
+**Content** tab to create a governed local copy for preview or download. Acquisition
+history and Snapshot details also link to these Artifacts. A direct Storage write
+does not invent a source local copy or a Storage Flow Run.
+
+Existing native histories are reconciled in bounded background batches under the
+original caller's current permissions. This only restores missing Artifact metadata
+and acquisition manifests: content, origin executions and immutable Snapshots are
+preserved. Revoked or changed dependencies remain explicitly unavailable.
+
+Artifact identity does not add retention guarantees to a provider. Retained
+Snapshot output still supports the builtin local implementation; Azure/OpenDAL
+requires its own qualified publication adapter. See
+[ADR-0208](../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md).

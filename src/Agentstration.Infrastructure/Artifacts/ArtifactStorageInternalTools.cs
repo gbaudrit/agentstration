@@ -51,6 +51,7 @@ public sealed class ArtifactStorageWriteMcpTool(
         {
             StorageFlowRunId = storageFlowRunId,
             OpaqueReference = opaqueReference,
+            Materialization = selectableStorage is null ? null : await selectableStorage.DescribeReferenceAsync(invocation.WorkspaceId, opaqueReference, cancellationToken),
             MediaType = source.Value.MediaType,
             Length = stat.Length,
             Sha256 = stat.Sha256,

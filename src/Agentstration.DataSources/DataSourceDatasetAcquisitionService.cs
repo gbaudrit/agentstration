@@ -1,3 +1,4 @@
+using Agentstration.Artifacts.Contracts;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Agentstration.DataSources.Contracts;
@@ -17,7 +18,8 @@ public sealed class DataSourceDatasetAcquisitionService(
     DataSourceDatasetCompositionService compositions,
     IDataSourceAcquisitionFlowGateway flows,
     IStorageContentGateway content,
-    TimeProvider clock)
+    TimeProvider clock,
+    IStoredArtifactRegistrar artifacts)
 {
     private readonly DataSourceExecutionContext execution = new(current, scopes);
 
@@ -135,7 +137,16 @@ public sealed class DataSourceDatasetAcquisitionService(
     public async Task<StoredResource<DataSourceAcquisitionResource>> SynchronizeAsync(
         StoredResource<DataSourceAcquisitionResource> stored, CancellationToken cancellationToken)
     {
-        if (Terminal(stored.Value.State)) return stored;
+        if (Terminal(stored.Value.State))
+        {
+            if (stored.Value.State == DataSourceAcquisitionState.Succeeded && stored.Value.Manifest is null
+                && execution.RequireContext("data_source_context_required").PrincipalId == stored.Value.CreatedBy)
+            {
+                try { return await ReconcileArtifactAsync(stored, cancellationToken); }
+                catch (AuthorizationDeniedException) { return stored; }
+            }
+            return stored;
+        }
         var acquisition = stored.Value;
         if (execution.RequireContext("data_source_context_required").PrincipalId != acquisition.CreatedBy) return stored;
         var run = await flows.GetAsync(acquisition.WorkspaceId, acquisition.FlowRunId,
@@ -144,6 +155,7 @@ public sealed class DataSourceDatasetAcquisitionService(
         var state = run.State;
         var code = run.ErrorCode;
         StorageObject? result = null;
+        DataSourceAcquisitionManifest? manifest = acquisition.Manifest;
         if (state == DataSourceAcquisitionState.Succeeded)
         {
             try
@@ -184,8 +196,21 @@ public sealed class DataSourceDatasetAcquisitionService(
                     result = await content.WriteAsync(target, new(acquisition.Name, acquisition.WriteNotAfter!.Value,
                         key, Convert.ToBase64String(bytes)), cancellationToken);
                 }
+                var materialization = new ArtifactStorageMaterialization(new(acquisition.WorkspaceId), target,
+                    result.Key, result.Version, bytes.Length, digest);
+                var artifact = await execution.InWorkspaceAsync(() => artifacts.RegisterStoredAsync(new(
+                    "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
+                    new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
+                    acquisition.Name, "application/json", materialization, ProducerUid: acquisition.DataSourceUid,
+                    ProducerGeneration: acquisition.DataSourceGeneration), cancellationToken));
+                manifest = new()
+                {
+                    Artifacts = [new() { ArtifactId = artifact.ArtifactId.ToString(),
+                    Kind = DataSourceArtifactKind.Durable, Disposition = DataSourceArtifactDisposition.Publishable,
+                    Name = acquisition.Name, MediaType = artifact.Receipt.MediaType, Digest = artifact.Receipt.Sha256 }]
+                };
             }
-            catch (Exception exception) when (exception is DataSourceValidationException or DataSourceAcquisitionException
+            catch (Exception exception) when (exception is ArtifactValidationException or DataSourceValidationException or DataSourceAcquisitionException
                 or Agentstration.Storage.StorageException or Agentstration.ConnectedServices.ConnectedServiceOperationDiscoveryException
                 or Agentstration.ConnectedServices.Contracts.ConnectedServiceExportInspectionException
                 or Agentstration.ConnectedServices.ConnectedServiceOperationTypeValidationException
@@ -195,6 +220,7 @@ public sealed class DataSourceDatasetAcquisitionService(
                 result = null;
                 code = exception switch
                 {
+                    ArtifactValidationException invalid => invalid.Code,
                     DataSourceValidationException invalid => invalid.Code,
                     DataSourceAcquisitionException invalid => invalid.Code,
                     Agentstration.Storage.StorageException unavailable => unavailable.Code,
@@ -209,6 +235,7 @@ public sealed class DataSourceDatasetAcquisitionService(
             Generation = checked(acquisition.Generation + 1),
             State = state,
             Content = result,
+            Manifest = state == DataSourceAcquisitionState.Succeeded ? manifest : null,
             CompletedAt = Terminal(state) ? clock.GetUtcNow() : null,
             ErrorCode = code,
             ErrorMessage = code is null ? null : "The operation or dataset publication could not complete.",
@@ -265,6 +292,35 @@ public sealed class DataSourceDatasetAcquisitionService(
         var length = (int)Math.Min(maximumBytes, item.Length - offset);
         return new(verified.Item with { Sha256 = item.Sha256 }, offset,
             Convert.ToBase64String(bytes.AsSpan((int)offset, length)), offset + length == item.Length);
+    }
+
+    public async Task<StoredResource<DataSourceAcquisitionResource>> ReconcileArtifactAsync(
+        StoredResource<DataSourceAcquisitionResource> stored, CancellationToken cancellationToken)
+    {
+        var acquisition = stored.Value;
+        if (acquisition.State != DataSourceAcquisitionState.Succeeded || acquisition.Manifest is not null
+            || acquisition.Dataset is null || acquisition.Content is not { Sha256: { } digest } item) return stored;
+        if (execution.RequireContext("data_source_context_required").PrincipalId != acquisition.CreatedBy)
+            throw Invalid("data_source_access_denied", "Artifact reconciliation requires the original acquisition caller.");
+        _ = await ReadAsync(acquisition, 0, 1, cancellationToken);
+        var materialization = new ArtifactStorageMaterialization(new(acquisition.WorkspaceId),
+            DataSourceDatasetCompositionService.Target(acquisition, execution.ConsumerScope), item.Key, item.Version, item.Length, digest);
+        var artifact = await execution.InWorkspaceAsync(() => artifacts.RegisterStoredAsync(new(
+            "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
+            new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
+            acquisition.Name, "application/json", materialization, ProducerUid: acquisition.DataSourceUid,
+            ProducerGeneration: acquisition.DataSourceGeneration), cancellationToken));
+        var updated = acquisition with
+        {
+            Generation = checked(acquisition.Generation + 1),
+            Manifest = new()
+            {
+                Artifacts = [new() { ArtifactId = artifact.ArtifactId.ToString(), Kind = DataSourceArtifactKind.Durable,
+                Disposition = DataSourceArtifactDisposition.Publishable, Name = acquisition.Name,
+                MediaType = artifact.Receipt.MediaType, Digest = artifact.Receipt.Sha256 }]
+            }
+        };
+        return await execution.InWorkspaceAsync(() => store.PutExactAsync(updated.ScopeRef!.Value, updated, stored.ETag, false, cancellationToken));
     }
 
     private static DataSourceAcquisitionException ContentVersionUnavailable() =>

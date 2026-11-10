@@ -601,3 +601,14 @@ recovery through the existing worker; current authorization is checked again.
 See [ADR-0207](../../decisions/0207-knowledge-publishes-retained-storage-content.md).
 The [implementation validation report](knowledge-snapshots-validation-2026-11-09.md)
 records the executed chain, required suite results and remaining UX gates.
+
+
+## Produced Artifacts and their Storage materializations
+
+Native acquisitions and retained Knowledge publications register immutable Artifact
+metadata for their physically stored content. Artifacts retain producer revision,
+execution/Flow Run and exact Storage location/integrity evidence. The existing
+catalogue and content materialization Flow serve previews/downloads. The recovery
+worker reconciles missing metadata from earlier native histories under the original
+caller's current permissions, without rewriting immutable Snapshots or origin data.
+See [ADR-0208](../../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md).

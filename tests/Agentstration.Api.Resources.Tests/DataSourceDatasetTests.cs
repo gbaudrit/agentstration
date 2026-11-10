@@ -1,3 +1,6 @@
+using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Artifacts;
+using Agentstration.Artifacts.Contracts;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -42,10 +45,15 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         var original = (await factory.Services.GetRequiredService<IResourceStore>().GetExactAsync<StorageResource>(fixture.Storage.Storage, default))!.Value;
         var bounded = await factory.Services.GetRequiredService<StorageManagementService>().CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = StorageResourceKinds.Storage,
-            Metadata = new() { Name = "small-read-bound" }, ScopeRef = Owner,
-            Definition = original.Definition with { Envelope = JsonSerializer.SerializeToElement(new
-            { list = true, stat = true, read = true, write = true, maximumReadBytes = 4 }) }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = StorageResourceKinds.Storage,
+            Metadata = new() { Name = "small-read-bound" },
+            ScopeRef = Owner,
+            Definition = original.Definition with
+            {
+                Envelope = JsonSerializer.SerializeToElement(new
+                { list = true, stat = true, read = true, write = true, maximumReadBytes = 4 })
+            }
         }, default);
         var reference = new StorageRevisionReference(new(Owner, bounded.Value.Namespace, bounded.Value.Kind, bounded.Value.Name),
             bounded.Value.Uid, bounded.Value.Generation, StorageDigests.Binding(bounded.Value.Definition));
@@ -57,12 +65,18 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         _ = await AcquireAsync(client, input.Value.Name);
         var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource,
-            Metadata = new() { Name = "bounded-knowledge" }, ScopeRef = Owner,
-            Definition = new() { DisplayName = "Bounded Knowledge", Output = new(reference, new(Write: true)),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            Metadata = new() { Name = "bounded-knowledge" },
+            ScopeRef = Owner,
+            Definition = new()
+            {
+                DisplayName = "Bounded Knowledge",
+                Output = new(reference, new(Write: true)),
                 DataSources = [new() { Name = "bounded", DataSource = new(input.Value.Name, Owner) }],
                 ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
-                RetrievalFlow = new() { Name = "knowledge-retrieval-builtin", ScopeRef = Owner } }
+                RetrievalFlow = new() { Name = "knowledge-retrieval-builtin", ScopeRef = Owner }
+            }
         }, default);
         _ = await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(new(knowledge.Value.Name, ScopeRef: Owner), new(), default);
         var snapshot = (await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(new(knowledge.Value.Name, ScopeRef: Owner), default))!.Snapshot;
@@ -127,6 +141,23 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         SelectConsoleContext(client, Owner);
         var initialAcquisition = await AcquireAsync(client, first.Value.Name);
         _ = await AcquireAsync(client, second.Value.Name);
+        Assert.IsNotNull(initialAcquisition.Manifest);
+        var acquiredId = initialAcquisition.Manifest.Artifacts.Single().ArtifactId;
+        var acquiredArtifact = await client.GetFromJsonAsync<FlowRunArtifactResource>($"/api/artifacts/flow-run-artifacts/{acquiredId}");
+        Assert.IsNotNull(acquiredArtifact);
+        Assert.AreEqual(first.Value.Name, acquiredArtifact.ProducerResource!.Value.Name);
+        Assert.AreEqual(initialAcquisition.FlowRunId, acquiredArtifact.ProducerFlowRunId);
+        Assert.AreEqual(initialAcquisition.Name, acquiredArtifact.ProducerExecutionId);
+        Assert.IsNull(acquiredArtifact.SourceArtifactId);
+        Assert.AreEqual(fixture.Storage.StorageUid, acquiredArtifact.Receipt.Materialization!.Target.Storage.StorageUid);
+        Assert.AreEqual(initialAcquisition.Content!.Key, acquiredArtifact.Receipt.Materialization.Key);
+        var durableStore = factory.Services.GetRequiredService<IArtifactDurableStore>();
+        await Assert.ThrowsAsync<ArtifactValidationException>(() => durableStore.ReadAsync(new(Guid.NewGuid()),
+            acquiredArtifact.Receipt.OpaqueReference, 0, 4, default));
+        await Assert.ThrowsAsync<ArtifactValidationException>(() => durableStore.ResetAsync(new(fixture.Context.WorkspaceId),
+            acquiredArtifact.Receipt.OpaqueReference, default));
+        var substituted = ArtifactStorageReferences.Encode(acquiredArtifact.Receipt.Materialization with { Sha256 = new string('0', 64) });
+        await Assert.ThrowsAsync<ArtifactValidationException>(() => durableStore.ReadAsync(new(fixture.Context.WorkspaceId), substituted, 0, 4, default));
         var projections = factory.Services.GetRequiredService<KnowledgeProjectionService>();
         var request = new StartKnowledgeProjectionRequest { IdempotencyKey = "native-integration" };
         var overlapping = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => projections.StartAsync(new(created.Value.Name, ScopeRef: Owner), request, default)));
@@ -146,6 +177,23 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         Assert.IsNotNull(published.Artifacts[0].Content!.Binding);
         Assert.AreEqual(original.Definition.Type.TypeUid, published.Artifacts[0].Content!.Binding!.Type.TypeUid);
         Assert.AreEqual("storage.local.retained-publication/v1", published.Artifacts[0].Content!.Binding!.PublicationContract);
+        var catalog = await client.GetFromJsonAsync<FlowRunArtifactResource[]>("/api/artifacts/flow-run-artifacts");
+        Assert.IsNotNull(catalog);
+        foreach (var entry in published.Artifacts)
+        {
+            var record = catalog.Single(item => item.ArtifactId.ToString() == entry.ArtifactId);
+            Assert.AreEqual(created.Value.Name, record.ProducerResource!.Value.Name);
+            Assert.AreEqual(completed.Value.ProjectionFlowRunId, record.ProducerFlowRunId);
+            Assert.AreEqual(completed.Value.Name, record.ProducerExecutionId);
+            Assert.AreEqual(output.Value.Uid, record.Receipt.Materialization!.Target.Storage.StorageUid);
+            Assert.AreEqual(entry.Content, record.Receipt.Materialization.Publication);
+        }
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context))
+        {
+            var preview = await factory.Services.GetRequiredService<DurableArtifactContentReader>().ReadAsync(
+                FlowRunArtifactId.Parse(published.Artifacts[0].ArtifactId), null, 0, 65536, "snapshot-artifact-preview", default);
+            Assert.Contains("normalized-alpha", preview.Text);
+        }
         var publications = factory.Services.GetRequiredService<IStoragePublicationGateway>();
         var bytes = await publications.ReadAsync(published.Artifacts[0].Content!, 0, 65536, default);
         Assert.AreEqual(Encoding.UTF8.GetString(transformedBytes), Encoding.UTF8.GetString(bytes.Span));
@@ -568,7 +616,9 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         try
         {
             await using (var first = Factory().WithWebHostBuilder(builder => builder.UseEnvironment("Development").UseSetting("Agentstration:Authentication:Mode", "Development")
-                .UseSetting("Data:Directory", directory).UseSetting("Data:ControlPlanePath", Path.Combine(directory, "control-plane.db"))
+                .UseSetting("Data:Directory", directory).UseSetting("ConnectionStrings:Identity", "Data Source=" + Path.Combine(directory, "identity.db"))
+                .UseSetting("Agentstration:Authentication:DataProtectionKeysPath", Path.Combine(directory, "keys"))
+                .UseSetting("Data:ControlPlanePath", Path.Combine(directory, "control-plane.db"))
                 .UseSetting("Data:WorkPlanePath", Path.Combine(directory, "work-plane.db")).UseSetting("Data:FlowPath", Path.Combine(directory, "flow-plane.db"))
                 .UseSetting("Data:RuntimePath", Path.Combine(directory, "runtime-plane.db"))))
             {
@@ -581,7 +631,9 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
                 Assert.AreEqual(DataSourceAcquisitionState.Pending, accepted.State);
             }
             await using (var second = Factory().WithWebHostBuilder(builder => builder.UseEnvironment("Development").UseSetting("Agentstration:Authentication:Mode", "Development")
-                .UseSetting("Data:Directory", directory).UseSetting("Data:ControlPlanePath", Path.Combine(directory, "control-plane.db"))
+                .UseSetting("Data:Directory", directory).UseSetting("ConnectionStrings:Identity", "Data Source=" + Path.Combine(directory, "identity.db"))
+                .UseSetting("Agentstration:Authentication:DataProtectionKeysPath", Path.Combine(directory, "keys"))
+                .UseSetting("Data:ControlPlanePath", Path.Combine(directory, "control-plane.db"))
                 .UseSetting("Data:WorkPlanePath", Path.Combine(directory, "work-plane.db")).UseSetting("Data:FlowPath", Path.Combine(directory, "flow-plane.db"))
                 .UseSetting("Data:RuntimePath", Path.Combine(directory, "runtime-plane.db"))).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
                 {
@@ -650,7 +702,9 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
             }
             // A second restart recovers publication, then retrieves without another origin execution.
             await using (var third = Factory().WithWebHostBuilder(builder => builder.UseEnvironment("Development").UseSetting("Agentstration:Authentication:Mode", "Development")
-                .UseSetting("Data:Directory", directory).UseSetting("Data:ControlPlanePath", Path.Combine(directory, "control-plane.db"))
+                .UseSetting("Data:Directory", directory).UseSetting("ConnectionStrings:Identity", "Data Source=" + Path.Combine(directory, "identity.db"))
+                .UseSetting("Agentstration:Authentication:DataProtectionKeysPath", Path.Combine(directory, "keys"))
+                .UseSetting("Data:ControlPlanePath", Path.Combine(directory, "control-plane.db"))
                 .UseSetting("Data:WorkPlanePath", Path.Combine(directory, "work-plane.db")).UseSetting("Data:FlowPath", Path.Combine(directory, "flow-plane.db"))
                 .UseSetting("Data:RuntimePath", Path.Combine(directory, "runtime-plane.db"))))
             {
@@ -673,6 +727,37 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
                 Assert.AreEqual(accepted.Uid, history[0].Uid);
                 var content = await third.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(history[0], 0, 65536, default);
                 Assert.Contains("retained", Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)));
+                // Simulate pre-upgrade native history: bytes and Snapshot exist, Artifact metadata is absent.
+                var resourceStore = third.Services.GetRequiredService<IResourceStore>();
+                var snapshotBefore = JsonSerializer.Serialize(active);
+                var contentBefore = history[0].Content;
+                var acquisitionArtifactId = history[0].Manifest!.Artifacts.Single().ArtifactId;
+                using (scopes.Push(fixture.Context))
+                {
+                    var acquisitionRecord = (await resourceStore.GetExactAsync<DataSourceAcquisitionResource>(new(history[0].ScopeRef!.Value,
+                        history[0].Namespace, history[0].Kind, history[0].Name), default))!;
+                    _ = await resourceStore.PutExactAsync(acquisitionRecord.Value.ScopeRef!.Value, acquisitionRecord.Value with
+                    { Generation = acquisitionRecord.Value.Generation + 1, Manifest = null }, acquisitionRecord.ETag, false, default);
+                    foreach (var id in new[] { acquisitionArtifactId, active.Artifacts[0].ArtifactId })
+                        await resourceStore.DeleteExactAsync(new(history[0].ScopeRef!.Value, ResourceNamespace.Default,
+                            ArtifactResourceKinds.FlowRunArtifact, id), null, default);
+                }
+                await third.Services.GetRequiredService<StoredArtifactReconciliationService>().ReconcileAsync(default);
+                await third.Services.GetRequiredService<StoredArtifactReconciliationService>().ReconcileAsync(default);
+                var reconciled = await acquisitions.ListAsync(source.Namespace, source.Name, Owner, default);
+                Assert.HasCount(1, reconciled);
+                Assert.AreEqual(contentBefore, reconciled[0].Content);
+                Assert.AreEqual(acquisitionArtifactId, reconciled[0].Manifest!.Artifacts.Single().ArtifactId);
+                Assert.AreEqual(history[0].CompletedAt, reconciled[0].CompletedAt);
+                var after = (await third.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(
+                    new(retainedKnowledge.Name, ScopeRef: Owner), default))!.Snapshot;
+                Assert.AreEqual(snapshotBefore, JsonSerializer.Serialize(after));
+                using (scopes.Push(fixture.Context))
+                {
+                    var catalog = await third.Services.GetRequiredService<ArtifactManagementService>().ListFlowRunArtifactsAsync(default);
+                    Assert.AreEqual(1, catalog.Count(item => item.Value.ArtifactId.ToString() == acquisitionArtifactId));
+                    Assert.AreEqual(1, catalog.Count(item => item.Value.ArtifactId.ToString() == active.Artifacts[0].ArtifactId));
+                }
 
             }
         }
