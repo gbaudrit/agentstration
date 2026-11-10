@@ -5,7 +5,7 @@
     <code>@Value</code>
     @if (!string.IsNullOrWhiteSpace(Value))
     {
-        <button type="button" class="icon-button copy-value" aria-label="@Shared["CopyValue", Value]" title="@Shared["Copy"]" @onclick="CopyAsync"><UiIcon Name="copy" /></button>
+        <button type="button" class="icon-button copy-value" aria-label="@Shared["CopyValue", Value]" title="@Shared["CopyValue", Value]" @onclick="CopyAsync"><UiIcon Name="copy" /></button>
     }
     @if (feedback is not null) { <span class="copy-feedback" role="status">@feedback</span> }
 </span>

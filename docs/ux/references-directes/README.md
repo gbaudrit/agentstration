@@ -2,6 +2,8 @@
 
 Suite de [PR #1114](https://github.com/gbaudrit/agentstration/pull/1114), toujours en brouillon vers `ux/unification-formulaires`.
 
+Les captures et contrôles ci-dessous décrivent cette première passe. Le regroupement actuel du namespace et de l’identifiant, ainsi que la copie qualifiée, sont présentés dans le [complément sur l’identité de l’en-tête](../entete-identite-qualifiee/README.md).
+
 ## Changements
 
 - L’en-tête Agent présente le périmètre, la génération et le namespace avant l’identifiant technique. Le composant partagé `ResourceHeader` possède un paramètre `TechnicalName` dédié : il rend cet identifiant en dernier, le tronque lorsque nécessaire et conserve sa copie complète.

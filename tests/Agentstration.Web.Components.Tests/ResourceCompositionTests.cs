@@ -11,6 +11,30 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class ResourceCompositionTests
 {
     [TestMethod]
+    public async Task HeaderCopiesTheQualifiedIdentityAndKeepsUnqualifiedCallersCompatible()
+    {
+        using var context = Context();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-ui.js");
+        var copy = module.SetupVoid("copyText", "support/welcome-agent");
+        copy.SetVoidResult();
+        var cut = context.Render<ResourceHeader>(parameters => parameters
+            .Add(value => value.Name, "Welcome agent")
+            .Add(value => value.ResourceType, "Agent")
+            .Add(value => value.TechnicalName, "welcome-agent")
+            .Add(value => value.Namespace, "support"));
+        Assert.AreEqual("support/welcome-agent", cut.Find(".resource-header-technical code").TextContent);
+        StringAssert.Contains(cut.Find(".copy-value").GetAttribute("title")!, "support/welcome-agent");
+        await cut.Find(".copy-value").ClickAsync(new());
+        Assert.HasCount(1, copy.Invocations);
+        cut.Render(parameters => parameters.Add(value => value.Namespace, (string?)null));
+        Assert.AreEqual("welcome-agent", cut.Find(".resource-header-technical code").TextContent);
+        var unqualifiedCopy = module.SetupVoid("copyText", "welcome-agent");
+        unqualifiedCopy.SetVoidResult();
+        await cut.Find(".copy-value").ClickAsync(new());
+        Assert.HasCount(1, unqualifiedCopy.Invocations);
+    }
+
+    [TestMethod]
     public async Task LabelRowsValidateDuplicatesAndIncompleteValuesWithoutLosingTheDraft()
     {
         using var context = Context();

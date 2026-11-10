@@ -32,8 +32,8 @@ else
 {
     @if (!IsNew)
     {
-        <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" TechnicalName="@model.Name" Name="@(savedResource?.Definition.DisplayName ?? model.DisplayName)" Description="@(savedResource?.Definition.Description ?? model.Description)" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
-            <Metadata><ResourceScopeBadge ScopeRef="selectedScope" Compact /><span>@T("Generation", generation)</span>@if (savedResource is not null) { <code title="@Shared["Namespace"]">@savedResource.Namespace.Value</code> }</Metadata>
+        <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" TechnicalName="@model.Name" Namespace="@AgentResourceNamespace.Value" Name="@(savedResource?.Definition.DisplayName ?? model.DisplayName)" Description="@(savedResource?.Definition.Description ?? model.Description)" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
+            <Metadata><ResourceScopeBadge ScopeRef="selectedScope" Compact /><span>@T("Generation", generation)</span></Metadata>
             <PrimaryActions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }</PrimaryActions>
             <Actions>@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)" title="@(isDirty ? T("SaveBeforeApply") : null)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
         </ResourceHeader>
