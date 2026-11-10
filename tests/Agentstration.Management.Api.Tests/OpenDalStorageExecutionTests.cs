@@ -136,6 +136,20 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
             Assert.AreEqual(written.Version, (await gateway.WriteAsync(target, write)).Version);
             Assert.AreEqual("real OpenDAL through product", Encoding.UTF8.GetString(Convert.FromBase64String(
                 (await gateway.ReadAsync(target, written.Reference, 0, 100)).ContentBase64)));
+            // Native Data Source keys span several physical filesystem path segments and
+            // acquired values can exceed the default ASP transfer chunk (16 KiB).
+            var acquisitionKey = "notes/datasets/" + new string('a', 32) + "/" + new string('b', 32)
+                + "/acquisition-" + new string('c', 32) + ".json";
+            var acquisitionBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { value = new string('x', 18146) }));
+            var acquisitionReceipt = await gateway.WriteAsync(target, new("acquisition-write", DateTimeOffset.UtcNow.AddMinutes(2),
+                acquisitionKey, Convert.ToBase64String(acquisitionBytes)));
+            var listed = (await gateway.ListAsync(target, acquisitionKey, 1)).Objects.Single();
+            Assert.AreEqual(acquisitionBytes.Length, listed.Length);
+            var read = await gateway.ReadAsync(target, listed.Reference, 0, 65536);
+            Assert.IsTrue(read.EndOfObject);
+            CollectionAssert.AreEqual(acquisitionBytes, Convert.FromBase64String(read.ContentBase64));
+            Assert.AreEqual(acquisitionReceipt.Sha256,
+                Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Convert.FromBase64String(read.ContentBase64))));
             Assert.IsEmpty((await gateway.ListAsync(Target(second, scope), "notes/", 10)).Objects);
             var cross = await Assert.ThrowsAsync<StorageException>(() => gateway.ReadAsync(Target(second, scope), written.Reference, 0, 100));
             Assert.AreEqual("storage_content_invalid_reference", cross.Code);
@@ -145,12 +159,12 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
             await Assert.ThrowsAsync<StorageException>(() => gateway.ListAsync(target, "notes/", 1));
             builder.Configuration["OpenDal:Enabled"] = "true";
             ((IConfigurationRoot)builder.Configuration).Reload();
-            Assert.HasCount(1, (await gateway.ListAsync(target, "notes/", 10)).Objects);
+            Assert.HasCount(2, (await gateway.ListAsync(target, "notes/", 10)).Objects);
             _ = await resources.PutExactAsync(scope, registration.Value with
             { Definition = registration.Value.Definition with { Enabled = false } }, registration.ETag, false, default);
             await Assert.ThrowsAsync<StorageException>(() => gateway.ReadAsync(target, written.Reference, 0, 100));
             Assert.IsEmpty(Directory.GetFiles(root, "objects.json", SearchOption.AllDirectories));
-            Assert.HasCount(1, Directory.GetFiles(root, "*.blob", SearchOption.AllDirectories));
+            Assert.HasCount(2, Directory.GetFiles(root, "*.blob", SearchOption.AllDirectories));
         }
         finally
         {

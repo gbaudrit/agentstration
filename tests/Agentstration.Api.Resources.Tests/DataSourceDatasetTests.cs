@@ -481,6 +481,11 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         Assert.AreEqual(acquisition.Content.Sha256, response.Item.Sha256);
         CollectionAssert.AreEqual(gateway.Bytes[2..6], Convert.FromBase64String(response.ContentBase64));
 
+        // Existing exact version receipts remain readable when the provider exposes no checksum.
+        var versionOnly = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(
+            acquisition with { Content = acquisition.Content with { Version = "current-version", Sha256 = null } }, 0, 4, default);
+        CollectionAssert.AreEqual(gateway.Bytes[..3], Convert.FromBase64String(versionOnly.ContentBase64));
+
         gateway.Bytes[^2] ^= 1; // Alter a byte outside the requested range without changing the length or metadata.
         using var refused = await client.GetAsync(path);
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
@@ -506,7 +511,8 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
             CancellationToken cancellationToken = default)
         {
             Assert.AreEqual(Listed.Reference, reference);
-            var length = Math.Min(maximumBytes, Bytes.Length - (int)offset);
+            if (maximumBytes > 4) throw new Agentstration.Storage.StorageException("storage_content_limit_exceeded", "Fixture read bound.");
+            var length = Math.Min(3, Math.Min(maximumBytes, Bytes.Length - (int)offset));
             return Task.FromResult(new StorageObjectContent(Listed, offset,
                 Convert.ToBase64String(Bytes.AsSpan((int)offset, length)), offset + length == Bytes.Length));
         }
@@ -516,6 +522,45 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
             Bytes = Convert.FromBase64String(request.ContentBase64);
             written = new(request.Key, null, Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(Bytes)), "write-reference");
             return Task.FromResult(written);
+        }
+    }
+
+    [TestMethod]
+    public async Task UnavailableHistoricalContentDoesNotBlockHistoryOrANewAcquisition()
+    {
+        await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var fixture = await PrepareAsync(factory.Services);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
+        var source = await factory.Services.GetRequiredService<DataSourceManagementService>()
+            .CreateAsync(Source("repair-history", fixture, JsonSerializer.SerializeToElement(new { dataset = "new-content" })), default);
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, Owner);
+        var acquisition = await AcquireAsync(client, source.Value.Name);
+        var resources = factory.Services.GetRequiredService<IResourceStore>();
+        DataSourceAcquisitionResource historical;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context))
+        {
+            var stored = (await resources.GetExactAsync<DataSourceAcquisitionResource>(new(acquisition.ScopeRef!.Value,
+                acquisition.Namespace, acquisition.Kind, acquisition.Name), default))!;
+            // A pre-upgrade history still has its Artifact, but this exact native content
+            // version is unavailable. Repair is metadata upkeep, not a prerequisite to use.
+            historical = stored.Value with { Manifest = null, Content = stored.Value.Content! with { Version = "unavailable" } };
+            historical = (await resources.PutExactAsync(historical.ScopeRef!.Value, historical, stored.ETag, false, default)).Value;
+        }
+        using var history = await client.GetAsync($"/api/datasources/{source.Value.Name}/acquisitions?scopeRef=/instance");
+        Assert.AreEqual(HttpStatusCode.OK, history.StatusCode, await history.Content.ReadAsStringAsync());
+        using var missing = await client.GetAsync($"/api/datasourceacquisitions/{acquisition.Name}/content");
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, missing.StatusCode);
+        Assert.Contains("data_source_content_version_unavailable", await missing.Content.ReadAsStringAsync());
+        var fresh = await AcquireAsync(client, source.Value.Name);
+        Assert.AreNotEqual(acquisition.Name, fresh.Name);
+        Assert.AreEqual("new-content", await ReadDatasetAsync(client, fresh.Name));
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context))
+        {
+            var preserved = (await resources.GetExactAsync<DataSourceAcquisitionResource>(new(historical.ScopeRef!.Value,
+                historical.Namespace, historical.Kind, historical.Name), default))!.Value;
+            Assert.AreEqual(JsonSerializer.Serialize(historical), JsonSerializer.Serialize(preserved));
         }
     }
 

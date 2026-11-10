@@ -83,4 +83,5 @@
   <data name="OutputStorageInvalid" xml:space="preserve"><value>Le Storage de sortie ou la règle de destination est indisponible, incompatible ou non autorisé. Vérifiez la révision sélectionnée, les restrictions et les accès.</value></data>
   <data name="RebindDependencies" xml:space="preserve"><value>Résoudre les révisions actuelles des dépendances</value></data>
   <data name="RebindDependenciesHelp" xml:space="preserve"><value>Adopter explicitement les révisions actuelles des Data Sources et des Flows lors de l’enregistrement. Les Snapshots existants conservent leurs références d’origine.</value></data>
+  <data name="ProjectionFlowNotStarted" xml:space="preserve"><value>Flow non démarré</value></data>
 </root>

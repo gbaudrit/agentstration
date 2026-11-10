@@ -6,6 +6,7 @@ using Agentstration.Flows.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
@@ -387,6 +388,61 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
+    [DataRow("/instance", "en-US", "Flow not started")]
+    [DataRow("/tenants/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "fr-FR", "Flow non démarré")]
+    public async Task KnowledgeHistoryLinksKeepTheExecutionWorkspaceAndDoNotInventAnUnstartedRun(
+        string logicalScope, string cultureName, string notStarted)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var source = ProjectedSource() with { ScopeRef = ResourceScopeRef.Parse(logicalScope) };
+        var client = new KnowledgeClientStub(source);
+        var completed = (await client.StartProjectionAsync(source.Namespace, source.Name, new())).Value with
+        {
+            ScopeRef = DataSourceScope,
+            WorkspaceId = DataSourceScope.TargetId!.Value,
+            LogicalScopeRef = source.ScopeRef
+        };
+        client.Projections.Clear();
+        client.Projections.Add(completed);
+        client.Projections.Add(completed with
+        {
+            Metadata = completed.Metadata with { Name = "projection-unstarted" },
+            State = KnowledgeProjectionState.Failed,
+            ProjectionFlowRunId = "flowrun-never-created",
+            ErrorCode = "data_source_content_version_unavailable"
+        });
+        var snapshot = ExistingSnapshot() with { Snapshot = ExistingSnapshot().Snapshot with { ScopeRef = DataSourceScope } };
+        client.Snapshots = [snapshot];
+        using var context = CreateContext(client);
+        context.Services.AddSingleton<IConsoleNavigationContext>(new KnowledgeNavigationContext(logicalScope));
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(component => component.Name, source.Name));
+        rendered.Find("[data-testid=knowledge-source-projections-tab]").Click();
+        var expectedQuery = "?scopeRef=" + Uri.EscapeDataString(DataSourceScope.Value) + "&context=" + Uri.EscapeDataString(logicalScope);
+        rendered.WaitForAssertion(() =>
+        {
+            var rows = rendered.FindAll("[data-testid=knowledge-projection-row]");
+            Assert.HasCount(2, rows);
+            Assert.AreEqual("/flow-runs/" + completed.ProjectionFlowRunId + expectedQuery, rows[0].QuerySelector("a")?.GetAttribute("href"));
+            Assert.IsNull(rows[1].QuerySelector("a"));
+            Assert.Contains(notStarted, rows[1].TextContent);
+        });
+        rendered.Find("[data-testid=knowledge-source-snapshots-tab]").Click();
+        rendered.Find(".knowledge-snapshot-link").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            var links = rendered.FindAll("[data-testid=knowledge-snapshot-details] a[href^='/flow-runs/']");
+            Assert.IsNotEmpty(links);
+            foreach (var link in links) Assert.EndsWith(expectedQuery, link.GetAttribute("href")!);
+        });
+    }
+
+    private sealed class KnowledgeNavigationContext(string scopeRef) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scopeRef;
+        public string AddToUri(string uri) => uri;
+    }
+
+    [TestMethod]
     public void DetailsExposesSnapshotArtifactsForConsultation()
     {
         using var culture = new TestCultureScope("en-US");
@@ -712,7 +768,8 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, KnowledgeSourceToolExposureResource? exposure = null, IReadOnlyList<KnowledgeSnapshotView>? snapshots = null, KnowledgeRetrievalResult? retrievalResult = null) : IKnowledgeSourcesClient
     {
-        private readonly List<KnowledgeProjectionResource> projections = [];
+        public List<KnowledgeProjectionResource> Projections { get; } = [];
+        public IReadOnlyList<KnowledgeSnapshotView> Snapshots { get; set; } = snapshots ?? [];
         public bool RejectNativeDataset { get; set; }
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
@@ -756,7 +813,7 @@ public sealed class KnowledgeSourceEditorTests
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(exposure);
         public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>(projections);
+            Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>(Projections);
         public Task<ResourceSnapshot<KnowledgeProjectionResource>> StartProjectionAsync(ResourceNamespace @namespace, string name, StartKnowledgeProjectionRequest request, CancellationToken cancellationToken = default)
         {
             StartedProjectionRequest = request;
@@ -782,10 +839,10 @@ public sealed class KnowledgeSourceEditorTests
                 CompletedAt = DateTimeOffset.UtcNow,
                 SnapshotName = "snapshot-0123456789abcdef"
             };
-            projections.Add(projection);
+            Projections.Add(projection);
             return Task.FromResult(new ResourceSnapshot<KnowledgeProjectionResource>(projection, "\"projection-etag\""));
         }
-        public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(snapshots ?? []);
+        public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(Snapshots);
         public Task<KnowledgeSnapshotView> SelectActiveSnapshotAsync(ResourceNamespace @namespace, string name, string snapshotName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<KnowledgeRetrievalResult> SearchAsync(ResourceNamespace @namespace, string name, SearchKnowledgeRequest request, CancellationToken cancellationToken = default) =>
             retrievalResult is null ? throw new NotSupportedException() : Task.FromResult(retrievalResult);

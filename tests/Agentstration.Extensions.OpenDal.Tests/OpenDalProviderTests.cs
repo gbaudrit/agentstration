@@ -15,6 +15,28 @@ public sealed class OpenDalProviderTests
     [TestCleanup]
     public void Cleanup() { execution.Dispose(); if (Directory.Exists(root)) Directory.Delete(root, true); }
     [TestMethod]
+    public async Task NativeAcquisitionLengthKeysRemainListableAndReadableWithoutAVersion()
+    {
+        var provider = Provider;
+        var key = "notes/datasets/" + new string('a', 32) + "/" + new string('b', 32)
+            + "/acquisition-" + new string('c', 32) + ".json";
+        var bytes = System.Text.Encoding.UTF8.GetBytes("{\"value\":\"acquired\"}");
+        await using (var writer = await provider.OpenWriteAsync(Context, new(key), default))
+        {
+            await writer.Content.WriteAsync(bytes);
+            var receipt = await writer.CompleteAsync(default);
+            Assert.AreEqual(bytes.Length, receipt.Length);
+        }
+        var page = await provider.ListAsync(Context, key, null, 1, default);
+        Assert.HasCount(1, page.Objects, "The confirmed acquisition must be visible at its exact logical key.");
+        Assert.AreEqual(key, page.Objects[0].Key);
+        await using var input = await provider.OpenReadAsync(Context, key, null, null, null, default);
+        using var output = new MemoryStream();
+        await input.Content.CopyToAsync(output);
+        CollectionAssert.AreEqual(bytes, output.ToArray());
+    }
+
+    [TestMethod]
     public void NativeDependencyStaysInsideTheAutonomousExtension()
     {
         var dependencies = typeof(OpenDalBindingFactory).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
@@ -92,7 +114,7 @@ public sealed class OpenDalProviderTests
     public async Task FilesystemAliasesCannotCrossOrdinalKeyPolicyBoundaries()
     {
         var provider = Provider;
-        foreach (var key in new[] { "notes/Private/a", "notes/private/a", "notes/name.", "notes/name", "notes/CON", "notes/é😀", "notes/" + new string('x',250) })
+        foreach (var key in new[] { "notes/Private/a", "notes/private/a", "notes/name.", "notes/name", "notes/CON", "notes/é😀", "notes/" + new string('x', 250) })
         {
             await using var writer = await provider.OpenWriteAsync(Context, new(key), default);
             await writer.Content.WriteAsync(System.Text.Encoding.UTF8.GetBytes(key)); await writer.CompleteAsync(default);

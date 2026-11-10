@@ -143,7 +143,13 @@ public sealed class DataSourceDatasetAcquisitionService(
                 && execution.RequireContext("data_source_context_required").PrincipalId == stored.Value.CreatedBy)
             {
                 try { return await ReconcileArtifactAsync(stored, cancellationToken); }
-                catch (AuthorizationDeniedException) { return stored; }
+                // Catalogue repair must not make a successful history unreadable or prevent
+                // an explicit new acquisition when older Storage content is unavailable.
+                catch (Exception exception) when (exception is AuthorizationDeniedException
+                    or DataSourceAcquisitionException or DataSourceValidationException
+                    or ArtifactValidationException or Agentstration.Storage.StorageException
+                    or ResourceConcurrencyException)
+                { return stored; }
             }
             return stored;
         }
@@ -271,9 +277,9 @@ public sealed class DataSourceDatasetAcquisitionService(
         var currentItem = page.Objects.SingleOrDefault(value => value.Key == item.Key);
         if (currentItem is null || currentItem.Length != item.Length
             || (item.Version is not null && currentItem.Version != item.Version)
-            || (item.Sha256 is not null && currentItem.Sha256 is not null && currentItem.Sha256 != item.Sha256))
+            || (item.Sha256 is not null && currentItem.Sha256 is not null && !SameDigest(currentItem.Sha256, item.Sha256)))
             throw ContentVersionUnavailable();
-        if (item.Version is not null && currentItem.Sha256 == item.Sha256)
+        if (item.Version is not null && SameDigest(currentItem.Sha256, item.Sha256))
             return await content.ReadAsync(target, currentItem.Reference, offset, maximumBytes, cancellationToken);
 
         // A streaming write can attest its bytes even when the provider returns no version or listing checksum.
@@ -281,17 +287,37 @@ public sealed class DataSourceDatasetAcquisitionService(
             throw ContentVersionUnavailable();
         if (offset < 0 || offset > item.Length || maximumBytes <= 0)
             throw new Agentstration.Storage.StorageException("storage_content_limit_exceeded", "Invalid read range.");
-        var verified = await content.ReadAsync(target, currentItem.Reference, 0,
-            Math.Max(maximumBytes, (int)item.Length), cancellationToken);
-        var bytes = Convert.FromBase64String(verified.ContentBase64);
-        if (!verified.EndOfObject || verified.Offset != 0 || verified.Item.Key != item.Key
-            || verified.Item.Version != currentItem.Version || verified.Item.Length != item.Length
-            || bytes.Length != item.Length || Digest(bytes) != item.Sha256)
-            throw ContentVersionUnavailable();
-
+        // A bounded read may return only part of an object. Verify the whole historical
+        // value in bounded chunks before exposing any requested range, as Artifact reads do.
+        using var verified = new MemoryStream();
+        var chunkSize = Math.Min(DataSourceDatasetCompositionService.MaximumValueBytes, target.Policy.MaximumReadBytes);
+        do
+        {
+            var count = (int)Math.Min(chunkSize, item.Length - verified.Length);
+            StorageObjectContent chunk;
+            try
+            {
+                chunk = await content.ReadAsync(target, currentItem.Reference, verified.Length,
+                    Math.Max(1, count), cancellationToken);
+            }
+            catch (Agentstration.Storage.StorageException exception) when (exception.Code == "storage_content_limit_exceeded" && chunkSize > 1)
+            {
+                chunkSize = Math.Max(1, chunkSize / 2);
+                continue;
+            }
+            var bytes = Convert.FromBase64String(chunk.ContentBase64);
+            if (chunk.Offset != verified.Length || chunk.Item.Key != item.Key
+                || chunk.Item.Version != currentItem.Version || chunk.Item.Length != item.Length
+                || bytes.Length > count || bytes.Length == 0 && verified.Length < item.Length
+                || chunk.EndOfObject != (verified.Length + bytes.Length == item.Length))
+                throw ContentVersionUnavailable();
+            await verified.WriteAsync(bytes, cancellationToken);
+        } while (verified.Length < item.Length);
+        var all = verified.ToArray();
+        if (!SameDigest(Digest(all), item.Sha256)) throw ContentVersionUnavailable();
         var length = (int)Math.Min(maximumBytes, item.Length - offset);
-        return new(verified.Item with { Sha256 = item.Sha256 }, offset,
-            Convert.ToBase64String(bytes.AsSpan((int)offset, length)), offset + length == item.Length);
+        return new(currentItem with { Sha256 = item.Sha256 }, offset,
+            Convert.ToBase64String(all.AsSpan((int)offset, length)), offset + length == item.Length);
     }
 
     public async Task<StoredResource<DataSourceAcquisitionResource>> ReconcileArtifactAsync(
@@ -325,6 +351,8 @@ public sealed class DataSourceDatasetAcquisitionService(
 
     private static DataSourceAcquisitionException ContentVersionUnavailable() =>
         Invalid("data_source_content_version_unavailable", "The exact historical content version is unavailable.");
+
+    private static bool SameDigest(string? left, string? right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
     private static string Digest(byte[] value) => Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant();
     private static JsonElement InvocationInput(DataSourceAcquisitionResource acquisition) => JsonSerializer.SerializeToElement(new

@@ -54,7 +54,11 @@ acquisitions and retained publications created before this correction. It runs a
 the recorded producer caller with current authorization. It creates missing
 Artifact metadata, attaches missing acquisition manifests and never re-executes an
 origin, rewrites stored bytes or modifies an immutable Snapshot. Unavailable or
-revoked content remains unavailable; no reference is silently rebound.
+revoked content remains unavailable; no reference is silently rebound. Metadata
+repair is best effort: a refused historical read cannot prevent listing its
+history or explicitly starting a new acquisition. Unversioned Data Source reads
+verify the complete digest through bounded chunks before exposing a range; a
+short read does not by itself mean the historical object has disappeared.
 
 ## Consequences
 
