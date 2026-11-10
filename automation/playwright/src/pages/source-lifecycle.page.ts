@@ -345,11 +345,11 @@ export class SourceLifecyclePage {
     await this.page.getByRole('button', { name: text.publish, exact: true }).click();
     await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' })).toBeVisible();
     // Explicit activation and rollback exercise the revision controls as well.
-    await revealCollectionAction(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true }));
-    await this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true }).click();
-    await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true })).toBeAttached();
-    await revealCollectionAction(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true }));
-    await this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true }).click();
+    await revealCollectionAction(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
+    await this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
+    await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true })).toBeAttached();
+    await revealCollectionAction(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
+    await this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
     await expect.poll(async () => (await this.read<ResourceWire & { activeVersion: string }>(consoleUrl, `/api/datasourceprofiles/${f.profile}`)).activeVersion).toBe('1.1.0');
   }
 

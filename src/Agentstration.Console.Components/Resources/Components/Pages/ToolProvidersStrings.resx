@@ -26,4 +26,5 @@
   <data name="Status.notDiscovered"><value>Not discovered</value></data>
   <data name="Categories" xml:space="preserve"><value>Categories</value></data>
   <data name="ToolSets" xml:space="preserve"><value>ToolSets</value></data>
+  <data name="Status.unknown"><value>Unknown</value></data>
 </root>
