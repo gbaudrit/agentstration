@@ -274,6 +274,7 @@ public sealed class KnowledgeSourceEditorTests
             .Add(component => component.Name, "agentstration-documentation"));
 
         rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
+        Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-projections']").GetAttribute("data-interactive"));
         rendered.WaitForElement("[data-schema-path='$.locale'] input").Input("fr-FR");
         rendered.Find("[data-testid='knowledge-start-projection']").Click();
 

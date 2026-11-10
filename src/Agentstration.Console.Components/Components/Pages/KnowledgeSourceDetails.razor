@@ -55,7 +55,7 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Projections)
     {
-        <section class="panel form-section" data-testid="knowledge-projections">
+        <section class="panel form-section" data-testid="knowledge-projections" data-interactive="@(interactive ? "true" : "false")">
             <div class="panel-header"><div><p class="eyebrow">@T("Projection")</p><h2>@T("ProjectionHistory")</h2><p>@T("ProjectionHelp")</p></div><button class="button-primary" type="button" disabled="@(!CanStartProjection)" data-testid="knowledge-start-projection" @onclick="StartProjectionAsync">@T("StartProjection")</button></div>
             <div class="knowledge-projection-parameters"><span>@T("ProjectionParameters")</span><div data-testid="knowledge-projection-parameters"><JsonSchemaInputEditor Schema="ProjectionParametersSchema" Value="projectionParameters" ValueChanged="value => projectionParameters = value" ValidationChanged="state => projectionParametersValid = state.IsValid" Disabled="busy" /></div><small>@T("JsonObjectHelp")</small></div>
             @if (projections.Count == 0) { <p class="muted">@T("NoProjections")</p> }
@@ -155,7 +155,7 @@ else if (source is not null && readiness is not null)
     private KnowledgeProjectionResource? selectedProjection;
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
     private KnowledgeSnapshotView? selectedSnapshot;
-    private bool loading = true, busy, failed, requiresApproval, confirmDelete, projectionParametersValid = true;
+    private bool loading = true, busy, failed, requiresApproval, confirmDelete, interactive, projectionParametersValid = true;
     private DetailsTab activeTab;
     private string version = "1.0.0",
         rawYaml = string.Empty;
@@ -169,7 +169,7 @@ else if (source is not null && readiness is not null)
             ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
             : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}", exposure.ToolSet.ScopeRef);
     private bool IsUnresolvedDraft => source is { Definition.Enabled: false, Composition: null };
-    private bool CanStartProjection => readiness?.Ready == true && projectionParametersValid && !busy;
+    private bool CanStartProjection => interactive && readiness?.Ready == true && projectionParametersValid && !busy;
     private JsonElement? ProjectionParametersSchema => JsonSchemaInputSchema.ObjectProperty(
         readiness?.Projection?.InputSchema, "parameters");
     private KnowledgeSnapshotView? ActiveSnapshot => snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active);
@@ -177,6 +177,11 @@ else if (source is not null && readiness is not null)
         ? $"/knowledge-sources/{Uri.EscapeDataString(Name)}?view=snapshots"
         : $"/knowledge-sources/{Uri.EscapeDataString(Name)}?namespace={Uri.EscapeDataString(SourceNamespace.Value)}&view=snapshots";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
     protected override async Task OnParametersSetAsync()
     {
         loading = true;
