@@ -1,8 +1,7 @@
 .tool-category-members-header { align-items: end; gap: 24px; margin-bottom: 20px; }
 .tool-category-members-header p:last-child { max-width: 680px; margin: 6px 0 0; color: var(--muted); line-height: 1.55; }
 .tool-category-search { position: relative; display: flex; align-items: center; width: min(22rem, 100%); }
-.tool-category-search > span:first-child { position: absolute; left: 13px; z-index: 1; display: inline-flex; color: var(--muted); pointer-events: none; }
-.tool-category-search input { width: 100%; padding-left: 38px; }
+.tool-category-search ::deep .search-box { width: 100%; }
 .tool-category-provider-list { display: grid; gap: 14px; }
 .tool-category-provider { overflow: hidden; border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); }
 .tool-category-provider-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 15px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--primary-soft) 28%, var(--surface)); }

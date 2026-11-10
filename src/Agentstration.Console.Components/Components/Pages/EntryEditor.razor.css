@@ -110,11 +110,11 @@
     gap: 12px;
 }
 
-.entry-suggestion-form > label {
+.entry-suggestion-form ::deep .form-field {
     min-width: 0;
 }
 
-.entry-suggestion-label {
+.entry-suggestion-form ::deep .entry-suggestion-label {
     grid-column: 1 / -1;
 }
 
@@ -123,7 +123,7 @@
     justify-content: flex-end;
 }
 
-.entry-suggestion-value textarea {
+.entry-suggestion-form ::deep .entry-suggestion-value textarea {
     min-height: 84px;
     resize: vertical;
 }

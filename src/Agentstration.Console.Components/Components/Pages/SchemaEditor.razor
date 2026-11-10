@@ -87,7 +87,7 @@ else
                         <div><h3 id="schema-publish-title">@T("PublishDraft")</h3><p>@T("PublishDraftHelp", schema.Generation)</p></div>
                     </div>
                     <div class="schema-publish-controls">
-                        <label><span>@T("Version")</span><input @bind="publishVersion" disabled="@busy" aria-describedby="schema-version-help" data-testid="schema-publish-version" /></label>
+                        <FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="publishVersion" Disabled="@busy" aria-describedby="schema-version-help" data-testid="schema-publish-version" /></FormField>
                         <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy" data-testid="schema-publish">@(busy ? T("Publishing") : T("Publish"))</button>
                     </div>
                     <p id="schema-version-help" class="muted schema-version-help">@T("VersionHelp")</p>
@@ -151,20 +151,20 @@ else
                     <div class="panel-header"><div><h3>@T("IdentityAndDescription")</h3><p>@T("DefinitionDraftHelp")</p></div>@if (!IsNew) { <StatusBadge Text="@T("Draft")" Status="UiStatus.Neutral" /> }</div>
                     <div class="schema-definition-fields">
                         <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="schema-display-name" TechnicalNameTestId="schema-name" />
-                        <label><span>@T("Namespace")</span><input @bind="resourceNamespace" disabled="@(!IsNew || busy)" /></label>
+                        <FormField Label="@T("Namespace")"><ClearableText @bind-Value="resourceNamespace" Disabled="@(!IsNew || busy)" /></FormField>
                         @if (IsNew) { <ResourceScopeFormField ResourceKind="@SchemaResourceKinds.Schema" @bind-Value="selectedScope" Disabled="@busy" /> }
                         else { <label><span>@T("Scope")</span><span class="schema-scope-field"><ResourceScopeBadge ScopeRef="selectedScope" /></span></label> }
                     @if (FormatAvailable)
                     {
-                        <label><span>@T("Format")</span><select value="@format" disabled="@(!IsNew || busy)" @onchange="ChangeFormat">@foreach (var descriptor in AvailableFormats) { <option value="@descriptor.Format">@descriptor.DisplayName (@descriptor.Format)</option> }</select></label>
-                        <label><span>@T("Dialect")</span><select value="@dialect" disabled="@(!IsNew || busy)" @onchange="ChangeDialect">@foreach (var value in SelectedFormatDescriptor?.Dialects ?? []) { <option value="@value">@value</option> }</select></label>
+                        <FormField Label="@T("Format")"><ClearableSelect TValue="string" Value="@format" ValueExpression="@(() => format)" disabled="@(!IsNew || busy)" ValueChanged="value => ChangeFormat(new ChangeEventArgs { Value = value })">@foreach (var descriptor in AvailableFormats) { <option value="@descriptor.Format">@descriptor.DisplayName (@descriptor.Format)</option> }</ClearableSelect></FormField>
+                        <FormField Label="@T("Dialect")"><ClearableSelect TValue="string" Value="@dialect" ValueExpression="@(() => dialect)" disabled="@(!IsNew || busy)" ValueChanged="value => ChangeDialect(new ChangeEventArgs { Value = value })">@foreach (var value in SelectedFormatDescriptor?.Dialects ?? []) { <option value="@value">@value</option> }</ClearableSelect></FormField>
                     }
                     else
                     {
-                        <label><span>@T("Format")</span><input value="@format" disabled /></label>
-                        <label><span>@T("Dialect")</span><input value="@dialect" disabled /></label>
+                        <FormField Label="@T("Format")"><ClearableText Value="@format" Disabled="true" /></FormField>
+                        <FormField Label="@T("Dialect")"><ClearableText Value="@dialect" Disabled="true" /></FormField>
                     }
-                        <label class="schema-definition-description"><span>@T("DescriptionLabel")</span><textarea rows="4" @bind="description" disabled="@busy"></textarea></label>
+                        <FormField Label="@T("DescriptionLabel")" Optional="true" Class="schema-definition-description"><ClearableText Multiline="true" rows="4" @bind-Value="description" Disabled="@busy"></ClearableText></FormField>
                     </div>
                     @if (!IsNew)
                     {

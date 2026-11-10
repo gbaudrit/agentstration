@@ -42,6 +42,29 @@ public sealed class ToolProviderEditorTests
         Assert.HasCount(1, rendered.FindAll("[data-testid='provider-connection-panel']"));
     }
 
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void ClearingConnectionCommandDoesNotChangeItsTransportOrInvokeProviderCommands(string locale)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IToolsClient>(new ProviderClient());
+        var editor = context.Render<ToolProviderEditor>();
+        var transport = editor.WaitForElement("#connection select").GetAttribute("value");
+        editor.Find("input[placeholder='npx']").Input("my-command");
+        var command = editor.Find("input[placeholder='npx']");
+        var field = command.Closest(".form-field")!;
+        Assert.AreEqual(command.Id, field.QuerySelector("label")!.GetAttribute("for"));
+        field.QuerySelector(".field-clear")!.Click();
+
+        Assert.AreEqual(string.Empty, editor.Find("input[placeholder='npx']").GetAttribute("value"));
+        Assert.AreEqual(transport, editor.Find("#connection select").GetAttribute("value"));
+        Assert.IsEmpty(editor.FindAll(".form-alert-danger"));
+    }
+
     private sealed class ProviderClient : IToolsClient
     {
         private static readonly ToolProviderResource Provider = new()
