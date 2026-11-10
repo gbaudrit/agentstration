@@ -281,7 +281,7 @@ export class ExecutionScopesPage {
 
   public async recoverFlowRunThroughWorkspaceList(consoleUrl: string, evidence: ScopedExecutionEvidence): Promise<void> {
     await this.open(`${consoleUrl}/flow-runs`, TestIds.flowObservability.runs);
-    const link = this.page.locator(`a[href^="/flow-runs/${evidence.flowRunId}?"]`);
+    const link = this.page.locator(`a.resource-name-link[href^="/flow-runs/${evidence.flowRunId}?"]`);
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute(
       'href',

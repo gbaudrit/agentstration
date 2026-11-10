@@ -46,7 +46,7 @@
                 <article class="agent-tool-group" data-provider="@group.ProviderName" data-scope="@group.ProviderScopeRef?.Value">
                     <header>
                         <div class="agent-tool-provider-identity">
-                            <div><CollectionIdentity DisplayName="@group.DisplayName" Namespace="@group.ProviderNamespace.Value" Name="@group.ProviderName" Href="@(group.HasProvider ? ProviderUrl(group) : null)" IconName="server" /><ResourceScopeBadge ScopeRef="group.ProviderScopeRef" /><small>@T("McpProvider")</small></div>
+                            <div><CollectionIdentity DisplayName="@group.DisplayName" HeadingLevel="3" Namespace="@group.ProviderNamespace.Value" Name="@group.ProviderName" Href="@(group.HasProvider ? ProviderUrl(group) : null)" IconName="server" /><ResourceScopeBadge ScopeRef="group.ProviderScopeRef" /><small>@T("McpProvider")</small></div>
                         </div>
                         <div class="agent-tool-group-actions">
                             <div class="agent-tool-group-summary">

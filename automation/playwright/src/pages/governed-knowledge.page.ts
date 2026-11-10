@@ -53,7 +53,7 @@ export class GovernedKnowledgePage {
     await expect(this.page.getByText(`agentstration.io/knowledge-source=${knowledge}`, { exact: false })).toBeVisible();
     await this.page.goto(`${consoleUrl}/tools/sets?context=${encodeURIComponent(scope)}`);
     await expect(this.page.getByTestId(TestIds.resourceAdministration.toolSets)).toBeVisible();
-    await this.page.getByTestId(TestIds.governedKnowledge.toolSetRow).filter({ hasText: exposure.toolSet.name }).getByRole('link').click();
+    await this.page.getByTestId(TestIds.governedKnowledge.toolSetRow).filter({ hasText: exposure.toolSet.name }).locator('.resource-name-link').click();
     await expect(this.publishedTools).toBeVisible();
   }
 
