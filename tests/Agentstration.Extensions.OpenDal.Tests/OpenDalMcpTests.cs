@@ -8,6 +8,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Asp.Abstractions;
 using Agentstration.Asp.Client;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -36,6 +37,48 @@ public sealed class OpenDalMcpTests
     {
         await factory.DisposeAsync();
         if (Directory.Exists(root)) Directory.Delete(root, true);
+    }
+
+    [TestMethod]
+    public async Task AppHostPairingAuthorizesTheCurrentAepClientWithoutAnExplicitAllowlist()
+    {
+        Directory.CreateDirectory(root);
+        var stateFile = Path.Combine(root, "pairing.json");
+        await File.WriteAllTextAsync(stateFile, JsonSerializer.Serialize(new
+        {
+            InstanceId = Guid.NewGuid(),
+            Status = "paired",
+            ClientId = "agentstration:/instance:opendal-test",
+            TokenDigest = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(Credential)))
+        }));
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Aep:EnrollmentMode"] = "PairingCode",
+            ["Aep:PairingCode:AuthorityUrl"] = "https://localhost:5100",
+            ["Aep:PairingCode:PublicEndpoint"] = "https://localhost:5189",
+            ["Aep:PairingCode:StateFile"] = stateFile,
+            ["OpenDal:RootDirectory"] = root,
+            ["OpenDal:AllowPairedClient"] = "true"
+        });
+        builder.Services.AddOpenDalStorage(builder.Configuration);
+        await using var app = builder.Build();
+        app.Urls.Add("http://127.0.0.1:0");
+        app.MapOpenDalStorage();
+        await app.StartAsync();
+        using var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", OtherCredential);
+        using var unauthorized = await http.PostAsJsonAsync(AepStorageProtocol.BindingPath, Binding(First), AepProtocol.JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Credential);
+        using var configured = await http.PostAsJsonAsync(AepStorageProtocol.BindingPath, Binding(First), AepProtocol.JsonOptions);
+        Assert.AreEqual(HttpStatusCode.OK, configured.StatusCode);
+
+        using var revoked = await http.PostAsync(AepEnrollmentProtocol.CredentialRevocationPath, null);
+        Assert.AreEqual(HttpStatusCode.OK, revoked.StatusCode);
+        using var afterRevocation = await http.PostAsJsonAsync(AepStorageProtocol.BindingPath, Binding(First), AepProtocol.JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, afterRevocation.StatusCode);
     }
 
     [TestMethod]

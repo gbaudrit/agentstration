@@ -46,6 +46,29 @@ Omitted envelope write permission defaults to false. Optional ordinal `keyFrom`
 and `keyBefore` further restrict keys. Dataset policies may narrow these values;
 they cannot change physical placement or widen the envelope.
 
+## Run with Aspire in Development
+
+From the repository root, start the AppHost with OpenDAL enabled.
+
+```powershell
+$env:OpenDal__Enabled = "true"
+dotnet run --project src/Agentstration.AppHost
+```
+
+OpenDAL is off by default. When enabled, Aspire starts `opendal-extension` and
+stores filesystem content under `opendal-data` in the selected slot directory.
+The extension uses HTTP port 5189 unless dynamic application ports are enabled.
+
+In the Console, assign **OpenDAL Storage** to your test Workspace from
+**Extensions → Enrollment inbox**. With the standard Aspire profiles, enter the
+one-time pairing code. The extension authorizes the paired AEP client immediately.
+With SharedKeyFile enrollment, Aspire provisions the dedicated key and the allowed
+client identity, and the administrator confirms enrollment in the same inbox.
+
+Then create a Storage using `opendal.fs@1.0.0` with configuration `{}`. Enable
+`write` in the envelope if you want to test writing. This filesystem path needs
+no Connected Service.
+
 ## Build and offline demonstration
 
 Use the repository SDK from global.json. No Rust compiler, cloud service, model
