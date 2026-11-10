@@ -36,7 +36,7 @@ Les données des captures sont des fixtures locales de revue, sans appel à un m
 - filtre du catalogue Outils et effacement ;
 - Workplace : filtre de statut sélectionné puis vidé dans le champ, avec focus conservé ;
 - absence de débordement horizontal à 1 440 et 390 pixels, apparences claire et sombre ;
-- surcharge des variables de thème : rayon de champ à 18 pixels et couleur d’action modifiée sans modifier le composant.
+- surcharge des variables de thème : rayons du champ et de la collection à 18 pixels, espacement de collection et de pagination à 24 pixels, couleur d’action modifiée sans modifier les composants.
 
 Ces contrôles ponctuels ne constituent pas de nouveaux parcours réutilisables du catalogue Playwright.
 
