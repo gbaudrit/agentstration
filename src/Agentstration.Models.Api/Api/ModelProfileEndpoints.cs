@@ -42,7 +42,7 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
                         resolution.Status,
                         usagesByProfile[profile.Value.Uid].Count),
                     profile.Value.Namespace.Value,
-                    profile.Value.ScopeRef));
+                    profile.Value.ScopeRef) { IsManaged = profile.Value.Governance.IsManaged });
             }
             return Results.Ok(new ValueResponse<ModelProfileSummaryResponse>(responses));
         });

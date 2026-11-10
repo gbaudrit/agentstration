@@ -126,7 +126,7 @@ export class GovernedExtensionInventoryPage {
     await this.navigate(`${consoleUrl}/data-source-profiles/qa-managed?${query}`);
     await expect(this.managed).toBeVisible();
     await this.navigate(`${consoleUrl}/data-source-profiles?context=%2Finstance`);
-    const profileRow = this.page.locator('tr').filter({ has: this.page.locator("a[href^='/data-source-profiles/qa-managed?']") });
+    const profileRow = this.page.locator('tbody tr, .collection-card').filter({ has: this.page.locator("a.resource-name-link[href^='/data-source-profiles/qa-managed?']") });
     await expect(profileRow).toContainText('Governed inventory fixture');
     await expect(profileRow).toContainText('9.0.0');
     await expect(profileRow).toContainText('2.4.0');

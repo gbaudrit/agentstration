@@ -1,5 +1,6 @@
 @page "/modelprofiles"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IModelProfilesClient Client
 @inject IModelProvidersClient ProvidersClient
 @inject NotificationState Notifications
@@ -31,16 +32,20 @@ else if (profiles?.Count == 0)
 }
 else
 {
-    <DataGrid TItem="ModelProfileSummaryResponse" Items="profiles ?? []">
-        <Header><tr><th>@T("Profile")</th><th>@T("Namespace")</th><th>@T("Provider")</th><th>@T("Model")</th><th>@T("Usage")</th><th>@T("Status")</th><th>@T("Actions")</th></tr></Header>
-        <Row Context="profile"><tr>
-            <td><span class="resource-name-with-scope"><strong>@profile.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@profile.ScopeRef" Compact /></span><code>@profile.Name</code></td>
-            <td><code>@profile.Namespace</code></td>
-            <td>@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</td><td><code>@profile.Properties.Model.Name</code></td>
-            <td>@(profile.Properties.UsageCount is { } count ? AgentCount(count) : "—")</td><td><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@ModelManagementUi.Status(profile.Properties.Status)" /></td>
-            <td><div class="table-actions"><a class="text-button" href="@DetailsUrl(profile)">@T("Open")</a><button class="text-button danger-text" @onclick="() => RequestDeleteAsync(profile)">@T("Delete")</button></div></td>
-        </tr></Row>
-    </DataGrid>
+    <CollectionView TItem="ModelProfileSummaryResponse" Items="profiles ?? []" InformationLabels="@(new[] { T("Provider"), T("Model"), T("Usage") })">
+        <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@DetailsUrl(profile)" IconName="layers" Domain="model"><Badges><ManagedResourceBadge IsManaged="@profile.IsManaged" /></Badges></CollectionIdentity></Identity>
+        <Scope Context="profile"><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Workspace" /></Scope>
+        <State Context="profile"><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@ModelManagementUi.Status(profile.Properties.Status)" /></State>
+        <Information Context="profile">
+            <CollectionValue Label="@T("Provider")">@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</CollectionValue>
+            <CollectionValue Label="@T("Model")"><code>@profile.Properties.Model.Name</code></CollectionValue>
+            <CollectionValue Label="@T("Usage")">@(profile.Properties.UsageCount is { } count ? AgentCount(count) : "—")</CollectionValue>
+        </Information>
+        <Actions Context="profile"><CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name})")">
+            <a href="@DetailsUrl(profile)">@T("Open")</a>
+            @if (!profile.IsManaged && ResourceOwnershipContext.CanManage(profile.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" @onclick="() => RequestDeleteAsync(profile)">@T("Delete")</button></PermissionGate> }
+        </CollectionActions></Actions>
+    </CollectionView>
 }
 
 @if (deleteConflictUsages.Count > 0)
@@ -115,8 +120,8 @@ else
             }
         }
     }
-    private static string DetailsUrl(ModelProfileSummaryResponse profile) =>
-        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(profile.Namespace), ModelResourceKinds.ModelProfile, profile.Name), profile.ScopeRef);
+    private string DetailsUrl(ModelProfileSummaryResponse profile) =>
+        ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(profile.Namespace), ModelResourceKinds.ModelProfile, profile.Name), profile.ScopeRef), Services);
     private static string AgentUrl(ModelProfileUsageResponse usage) =>
         ConsoleResourceUrls.Agent(ResourceNamespace.Parse(usage.Namespace), usage.Name, usage.ScopeRef, usage.ScopeRef);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

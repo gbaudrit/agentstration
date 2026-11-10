@@ -1,0 +1,17 @@
+<div class="collection-identity">
+    <ResourceIcon IconName="@IconName" Domain="@Domain" />
+    <div class="collection-identity-text">
+        <a class="resource-name-link" href="@Href" title="@DisplayName">@DisplayName</a>
+        <div class="collection-qualified-name"><UiIcon Name="folder" /><CopyableValue Value="@($"{Namespace}/{Name}")" /></div>
+        @Badges
+    </div>
+</div>
+@code {
+    [Parameter, EditorRequired] public string DisplayName { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Namespace { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Href { get; set; } = string.Empty;
+    [Parameter] public string IconName { get; set; } = "layers";
+    [Parameter] public string Domain { get; set; } = "neutral";
+    [Parameter] public RenderFragment? Badges { get; set; }
+}

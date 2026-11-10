@@ -1,0 +1,27 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+<details class="collection-actions-menu" @ref="root" @onclick:stopPropagation="true">
+    <summary class="button-secondary" aria-label="@Shared["ActionsFor", ResourceName]">@Shared["CollectionActions"] <UiIcon Name="chevron-down" /></summary>
+    <div class="collection-actions-panel" popover="manual">@ChildContent</div>
+</details>
+@code {
+    [Parameter, EditorRequired] public string ResourceName { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private ElementReference root;
+    private IJSObjectReference? module;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
+        await module.InvokeVoidAsync("attachActions", root);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try { await module.InvokeVoidAsync("releaseActions", root); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+    }
+}

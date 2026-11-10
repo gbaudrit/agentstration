@@ -1,14 +1,45 @@
 @namespace Agentstration.Web.Components
+@implements IDisposable
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
 
 @if (EffectiveKind is { } kind)
 {
-    <span class="resource-scope-badge @(Compact ? "resource-scope-badge-compact" : null)" title="@ScopeRef?.Value">@Localizer[$"ResourceScope.{kind}"].Value</span>
+    <span class="resource-owner-scope">
+        <span class="resource-scope-badge @(Compact ? "resource-scope-badge-compact" : null)" title="@ScopeRef?.Value">@Localizer[$"ResourceScope.{kind}"].Value</span>
+        @if (ShowName && ReadableName is { } name)
+        {
+            <ValueDisclosure Value="@name" />
+        }
+    </span>
 }
 
 @code {
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     [Parameter] public ResourceScopeKind? Kind { get; set; }
     [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool ShowName { get; set; }
+    private ConsoleContextState? context;
     private ResourceScopeKind? EffectiveKind => ScopeRef?.Kind ?? Kind;
+    // Only names already authorized in the shared context snapshot may be disclosed.
+    private string? ReadableName
+    {
+        get
+        {
+            var current = context?.Current;
+            if (current is null || ScopeRef is not { } scope || scope.Kind == ResourceScopeKind.Instance) return null;
+            var option = current.Contexts.FirstOrDefault(value => value.ScopeRef == scope.Value);
+            if (option is not null) return option.DisplayName;
+            if (scope.Value == current.SelectedScopeRef)
+                return scope.Kind == ResourceScopeKind.Tenant ? current.TenantDisplayName : current.WorkspaceDisplayName;
+            return null;
+        }
+    }
+    protected override void OnInitialized()
+    {
+        context = Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState;
+        if (context is not null) context.Changed += ContextChanged;
+    }
+    private void ContextChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() { if (context is not null) context.Changed -= ContextChanged; }
 }

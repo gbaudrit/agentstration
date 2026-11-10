@@ -5,6 +5,11 @@ namespace Agentstration.Web.Components;
 
 internal static class ResourceOwnershipContext
 {
+    public static string PreserveNavigation(string uri, IServiceProvider services) =>
+        services.GetService(typeof(IConsoleNavigationContext)) is IConsoleNavigationContext navigation
+            ? navigation.AddToUri(uri)
+            : uri;
+
     public static bool CanManage(ResourceScopeRef? ownerScope, IServiceProvider services)
     {
         var navigationContext = services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext;

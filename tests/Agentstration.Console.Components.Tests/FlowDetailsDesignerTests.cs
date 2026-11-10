@@ -235,6 +235,7 @@ public sealed class FlowDetailsDesignerTests
     public void FlowListUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
     {
         using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub
         {
@@ -252,7 +253,7 @@ public sealed class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings>>();
 
         var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
-        Assert.AreEqual(strings["Status"].Value, headers[2]);
+        Assert.AreEqual(context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings>>()["CollectionState"].Value, headers[2]);
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("Multi-agent review", link.TextContent.Trim());
         Assert.AreEqual("/namespaces/samples/flows/review", link.GetAttribute("href"));

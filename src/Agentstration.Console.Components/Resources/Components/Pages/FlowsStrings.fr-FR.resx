@@ -26,4 +26,6 @@
   <data name="Status.Draft" xml:space="preserve"><value>Brouillon</value></data>
   <data name="Status.Published" xml:space="preserve"><value>Publié</value></data>
   <data name="Status.Failed" xml:space="preserve"><value>Échec</value></data>
+<data name="Status.Disabled" xml:space="preserve"><value>Désactivé</value></data>
+<data name="Status.Unknown" xml:space="preserve"><value>Inconnu</value></data>
 </root>

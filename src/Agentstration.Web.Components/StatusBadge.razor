@@ -1,7 +1,8 @@
-<span class="status-badge status-@Status.ToString().ToLowerInvariant()"><span aria-hidden="true" class="status-dot"></span>@Text</span>
+<span class="status-badge status-@Status.ToString().ToLowerInvariant()"><UiIcon Name="@Icon" />@Text</span>
 
 @code {
     [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
     [Parameter] public UiStatus Status { get; set; }
+    private string Icon => Status switch { UiStatus.Success => "circle-check", UiStatus.Warning => "alert-triangle", UiStatus.Danger => "circle-x", UiStatus.Info => "info-circle", _ => "circle-minus" };
 }
 

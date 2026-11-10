@@ -111,12 +111,13 @@ public sealed class ExtensionManagedResourcePresentationTests
     }
 
     [TestMethod]
-    [DataRow("en-US", "Managed · read-only")]
-    [DataRow("fr-FR", "Géré · lecture seule")]
+    [DataRow("en-US", "Managed / read-only")]
+    [DataRow("fr-FR", "Géré / lecture seule")]
     public void ProfileListShowsExtensionAndDistinctBundleVersion(string cultureName, string managedLabel)
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfilesClientStub());
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());

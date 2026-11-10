@@ -1,5 +1,6 @@
 @page "/runtimeprofiles"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IRuntimeProfilesClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeProfilesStrings> Localizer
 
@@ -13,10 +14,17 @@ else if (profiles is null) { <LoadingState Message="@T("Loading")" /> }
 else if (profiles.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/runtimeprofiles/new">@T("CreateProfile")</a></EmptyState> }
 else
 {
-    <DataGrid TItem="RuntimeProfileSummaryResponse" Items="profiles">
-        <Header><tr><th>@T("Profile")</th><th>@T("Namespace")</th><th>@T("Runtime")</th><th>@T("Session")</th><th>@T("Streaming")</th><th>@T("Usage")</th><th></th></tr></Header>
-        <Row Context="profile"><tr><td><span class="resource-name-with-scope"><strong>@profile.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@profile.ScopeRef" Compact /></span><code>@profile.Name</code></td><td><code>@profile.Namespace</code></td><td><code>@profile.Properties.RuntimeType</code></td><td>@SessionLabel(profile.Properties.Execution.SessionMode)</td><td>@StreamingLabel(profile.Properties.Execution.Streaming)</td><td>@DeploymentCount(profile.UsageCount)</td><td><a class="text-button" href="@Url(profile)">@T("Open")</a></td></tr></Row>
-    </DataGrid>
+    <CollectionView TItem="RuntimeProfileSummaryResponse" Items="profiles" InformationLabels="@(new[] { T("Runtime"), T("Session"), T("Streaming"), T("Usage") })">
+        <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@Url(profile)" IconName="server" Domain="runtime"><Badges><ManagedResourceBadge IsManaged="@profile.IsManaged" /></Badges></CollectionIdentity></Identity>
+        <Scope Context="profile"><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Instance" /></Scope>
+        <Information Context="profile">
+            <CollectionValue Label="@T("Runtime")"><code>@profile.Properties.RuntimeType</code></CollectionValue>
+            <CollectionValue Label="@T("Session")">@SessionLabel(profile.Properties.Execution.SessionMode)</CollectionValue>
+            <CollectionValue Label="@T("Streaming")">@StreamingLabel(profile.Properties.Execution.Streaming)</CollectionValue>
+            <CollectionValue Label="@T("Usage")">@DeploymentCount(profile.UsageCount)</CollectionValue>
+        </Information>
+        <Actions Context="profile"><CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name})")"><a href="@Url(profile)">@T("Open")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {
@@ -29,6 +37,6 @@ else
     private string StreamingLabel(StreamingMode value) => Localizer[$"Streaming.{value}"];
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync() { error = null; try { profiles = await Client.GetRuntimeProfilesAsync(cancellation.Token); } catch (AgentstrationApiException exception) { error = exception; } }
-    private static string Url(RuntimeProfileSummaryResponse profile) => $"/runtimeprofiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(profile.Namespace)}";
+    private string Url(RuntimeProfileSummaryResponse profile) => ResourceOwnershipContext.PreserveNavigation($"/runtimeprofiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(profile.Namespace)}", Services);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

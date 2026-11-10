@@ -1,0 +1,78 @@
+@typeparam TItem
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+<div class="resource-collection" @ref="root">
+    <div class="collection-view-switch" role="group" aria-label="@Shared["CollectionView"]">
+        <button type="button" class="button-secondary" aria-pressed="@((!cards).ToString().ToLowerInvariant())" @onclick="() => SelectView(false)"><UiIcon Name="table" /> @Shared["TableView"]</button>
+        <button type="button" class="button-secondary" aria-pressed="@(cards.ToString().ToLowerInvariant())" @onclick="() => SelectView(true)"><UiIcon Name="list" /> @Shared["CardView"]</button>
+    </div>
+    @if (cards)
+    {
+        <CascadingValue Name="CollectionCard" Value="true" IsFixed>
+            <ul class="collection-cards">
+                @foreach (var item in Items)
+                {
+                    <li class="collection-card">
+                        @Identity(item)
+                        <dl>
+                            <CollectionValue Label="@Shared["Scope"]">@Scope(item)</CollectionValue>
+                            @if (State is not null) { <CollectionValue Label="@Shared["CollectionState"]">@State(item)</CollectionValue> }
+                            @Information(item)
+                        </dl>
+                        <div class="collection-actions">@Actions(item)</div>
+                    </li>
+                }
+            </ul>
+        </CascadingValue>
+    }
+    else
+    {
+        <DataGrid TItem="TItem" Items="Items">
+            <Header><tr><th scope="col">@Shared["CollectionResource"]</th><th scope="col">@Shared["Scope"]</th>@if (State is not null) { <th scope="col">@Shared["CollectionState"]</th> }@foreach (var heading in InformationLabels) { <th scope="col">@heading</th> }<th scope="col">@Shared["CollectionActions"]</th></tr></Header>
+            <Row Context="item"><tr>
+                <td class="collection-identity-cell">@Identity(item)</td>
+                <td>@Scope(item)</td>
+                @if (State is not null) { <td>@State(item)</td> }
+                @Information(item)
+                <td class="collection-actions">@Actions(item)</td>
+            </tr></Row>
+        </DataGrid>
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TItem> Items { get; set; } = [];
+    [Parameter, EditorRequired] public RenderFragment<TItem> Identity { get; set; } = null!;
+    [Parameter, EditorRequired] public RenderFragment<TItem> Scope { get; set; } = null!;
+    [Parameter] public RenderFragment<TItem>? State { get; set; }
+    [Parameter, EditorRequired] public string[] InformationLabels { get; set; } = [];
+    [Parameter, EditorRequired] public RenderFragment<TItem> Information { get; set; } = null!;
+    [Parameter, EditorRequired] public RenderFragment<TItem> Actions { get; set; } = null!;
+    private ElementReference root;
+    private bool cards;
+    private bool selectedView;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<CollectionView<TItem>>? reference;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
+        reference = DotNetObjectReference.Create(this);
+        await module.InvokeVoidAsync("observeCollection", root, reference);
+    }
+    private void SelectView(bool value) { selectedView = true; cards = value; }
+    [JSInvokable] public Task SetNarrow(bool narrow)
+    {
+        if (!selectedView) { cards = narrow; return InvokeAsync(StateHasChanged); }
+        return Task.CompletedTask;
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try { await module.InvokeVoidAsync("releaseCollection", root); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+        reference?.Dispose();
+    }
+}

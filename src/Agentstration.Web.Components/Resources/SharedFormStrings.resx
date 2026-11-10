@@ -175,4 +175,12 @@
   <data name="LabelInvalid" xml:space="preserve"><value>Enter a key without = or line breaks and a non-empty value.</value></data>
   <data name="LabelDuplicate" xml:space="preserve"><value>This key is already used.</value></data>
   <data name="LabelRow" xml:space="preserve"><value>Label {0}</value></data>
+  <data name="CollectionView" xml:space="preserve"><value>Collection view</value></data>
+  <data name="TableView" xml:space="preserve"><value>Table</value></data>
+  <data name="CardView" xml:space="preserve"><value>List / cards</value></data>
+  <data name="CollectionResource" xml:space="preserve"><value>Resource</value></data>
+  <data name="CollectionState" xml:space="preserve"><value>State</value></data>
+  <data name="CollectionActions" xml:space="preserve"><value>Actions</value></data>
+  <data name="ActionsFor" xml:space="preserve"><value>Actions for {0}</value></data>
+  <data name="ManagedReadOnly" xml:space="preserve"><value>Managed / read-only</value></data>
 </root>

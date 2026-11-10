@@ -90,7 +90,10 @@ public sealed record ModelProfileSummaryResponse(
     string Name,
     ModelProfileSummaryPropertiesResponse Properties,
     string Namespace = "default",
-    ResourceScopeRef? ScopeRef = null);
+    ResourceScopeRef? ScopeRef = null)
+{
+    public bool IsManaged { get; init; }
+}
 
 public sealed record ModelProfileUsageResponse(
     string ResourceType,

@@ -1,8 +1,8 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
-<span class="copyable-value">
-    <code>@Value</code>
+<span class="copyable-value" @onclick:stopPropagation="true">
+    <code title="@Value" tabindex="0">@Value</code>
     @if (!string.IsNullOrWhiteSpace(Value))
     {
         <button type="button" class="icon-button copy-value" aria-label="@Shared["CopyValue", Value]" title="@Shared["CopyValue", Value]" @onclick="CopyAsync"><UiIcon Name="copy" /></button>

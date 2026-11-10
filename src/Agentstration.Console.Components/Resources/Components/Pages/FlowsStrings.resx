@@ -26,4 +26,6 @@
   <data name="Status.Draft" xml:space="preserve"><value>Draft</value></data>
   <data name="Status.Published" xml:space="preserve"><value>Published</value></data>
   <data name="Status.Failed" xml:space="preserve"><value>Failed</value></data>
+<data name="Status.Disabled" xml:space="preserve"><value>Disabled</value></data>
+<data name="Status.Unknown" xml:space="preserve"><value>Unknown</value></data>
 </root>

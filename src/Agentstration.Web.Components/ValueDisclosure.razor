@@ -1,0 +1,26 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<span class="value-disclosure" @ref="root" @onclick:stopPropagation="true">
+    <button type="button" class="disclosure-trigger" title="@Value" aria-expanded="false" aria-controls="@panelId">@Value</button>
+    <span id="@panelId" class="full-value-panel" popover="manual" role="tooltip">@Value</span>
+</span>
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    private readonly string panelId = $"full-value-{Guid.NewGuid():N}";
+    private ElementReference root;
+    private IJSObjectReference? module;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
+        await module.InvokeVoidAsync("attachDisclosure", root);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try { await module.InvokeVoidAsync("releaseDisclosure", root); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+    }
+}

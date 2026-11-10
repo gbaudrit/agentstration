@@ -11,6 +11,9 @@
     white-space: nowrap;
 }
 
+.resource-owner-scope { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; max-width: 18rem; }
+.resource-scope-badge { flex: 0 0 auto; }
+
 .resource-scope-badge-compact {
     padding: .1rem .38rem;
     border-color: color-mix(in srgb, var(--primary) 18%, var(--border));

@@ -1,5 +1,6 @@
 @page "/flows"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IFlowApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings> Localizer
 <PageTitle>@T("PageTitle")</PageTitle>
@@ -12,16 +13,24 @@
 else if (items.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
 else
 {
-    <DataGrid TItem="FlowSummary" Items="items">
-        <Header><tr><th>@T("Flow")</th><th>@T("Scope")</th><th>@T("Status")</th><th>@T("Namespace")</th><th>@T("Kind")</th><th>@T("Version")</th><th>@T("Updated")</th></tr></Header>
-        <Row Context="item"><tr><td><strong><a class="resource-name-link" href="@item.DetailsUrl">@item.Name</a></strong><code>@item.Id</code></td><td><ResourceScopeBadge Kind="@(item.ScopeRef?.Kind ?? ResourceScopeKind.Workspace)" Compact /></td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
-    </DataGrid>
+    <CollectionView TItem="FlowSummary" Items="items" InformationLabels="@(new[] { T("Kind"), T("Version"), T("Updated") })">
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@DetailsUrl(item)" IconName="workflow" Domain="flow"><Badges><ManagedResourceBadge IsManaged="@item.IsManaged" /></Badges></CollectionIdentity></Identity>
+        <Scope Context="item"><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" /></Scope>
+        <State Context="item"><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Kind")">@item.Kind</CollectionValue>
+            <CollectionValue Label="@T("Version")">@item.Version</CollectionValue>
+            <CollectionValue Label="@T("Updated")">@item.UpdatedAt.LocalDateTime.ToString("g")</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id})")"><a href="@DetailsUrl(item)">@T("Open")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 </div>
 @code {
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<FlowSummary>? items;
     protected override async Task OnInitializedAsync() => items = await Client.GetFlowsAsync(cancellation.Token);
+    private string DetailsUrl(FlowSummary item) => ResourceOwnershipContext.PreserveNavigation(item.DetailsUrl, Services);
     private string T(string key) => Localizer[key];
     private string StatusLabel(string value) { var localized = Localizer[$"Status.{value}"]; return localized.ResourceNotFound ? value : localized.Value; }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
