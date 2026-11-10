@@ -11,6 +11,33 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class SharedFormTests
 {
     [TestMethod]
+    public async Task RequiredNumberAndEnumClearToInvalidInputWithoutSubstitutingDefaults()
+    {
+        using var context = Context();
+        var model = new RequiredChoices { Number = 7, Choice = DayOfWeek.Friday };
+        var editContext = new EditContext(model);
+        var invalid = false;
+        var cut = context.Render<CascadingValue<EditContext>>(parameters => parameters
+            .Add(value => value.Value, editContext)
+            .AddChildContent<FormGrid>(grid => grid
+                .AddChildContent<FormDraftMonitor>(monitor => monitor.Add(value => value.InvalidInputChanged, value => invalid = value))
+                .AddChildContent<ClearableNumber<int>>(number => number.Add(value => value.Value, model.Number)
+                    .Add(value => value.ValueChanged, value => model.Number = value).Add(value => value.ValueExpression, () => model.Number))
+                .AddChildContent<ClearableSelect<DayOfWeek>>(choice => choice.Add(value => value.Value, model.Choice)
+                    .Add(value => value.ValueChanged, value => model.Choice = value).Add(value => value.ValueExpression, () => model.Choice)
+                    .AddChildContent("<option value='Sunday'>Sunday</option><option value='Friday'>Friday</option>"))));
+        var buttons = cut.FindAll("button");
+        await buttons[0].ClickAsync(new());
+        await buttons[1].ClickAsync(new());
+        Assert.AreEqual(7, model.Number, "Invalid input must not silently become zero.");
+        Assert.AreEqual(DayOfWeek.Friday, model.Choice, "Invalid input must not select the first enum option.");
+        Assert.AreEqual(string.Empty, cut.Find("input").GetAttribute("value"));
+        Assert.AreEqual(string.Empty, cut.Find("select").GetAttribute("value"));
+        Assert.HasCount(2, editContext.GetValidationMessages().ToArray());
+        Assert.IsTrue(invalid, "An invalid draft must stay protected even while the typed model retains its last valid value.");
+    }
+
+    [TestMethod]
     public async Task ClearingRequiredTextNotifiesValidationAndReturnsFocusWithoutSubmitting()
     {
         using var context = Context();
@@ -111,11 +138,88 @@ public sealed class SharedFormTests
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         return context;
+    }
+
+    [TestMethod]
+    public async Task DirtyNavigationRequiresAnExplicitDiscardAndCancelKeepsTheDraft()
+    {
+        using var context = Context();
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        var initial = navigation.Uri;
+        var cut = context.Render<UnsavedNavigationGuard>(parameters => parameters.Add(value => value.IsDirty, true));
+        await cut.InvokeAsync(() => navigation.NavigateTo("/agents"));
+        cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll("[role='alertdialog']")));
+        Assert.AreEqual(initial, navigation.Uri);
+        await cut.Find(".button-secondary").ClickAsync(new());
+        Assert.AreEqual(initial, navigation.Uri);
+        Assert.IsEmpty(cut.FindAll("[role='alertdialog']"));
+        await cut.InvokeAsync(() => navigation.NavigateTo("/agents"));
+        await cut.Find(".button-danger").ClickAsync(new());
+        Assert.IsTrue(navigation.Uri.EndsWith("/agents", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task ResourceTabsExposeOneTabStopAndKeyboardSelection()
+    {
+        using var context = Context();
+        string? selected = null;
+        var cut = context.Render<ResourcePageTabs>(parameters => parameters
+            .Add(value => value.Items, new[] { new ResourcePageTab("overview", "Overview"), new ResourcePageTab("edit", "Edit") })
+            .Add(value => value.Value, "overview")
+            .Add(value => value.ValueChanged, value => selected = value)
+            .Add(value => value.Label, "Resource")
+            .Add(value => value.PanelId, "panel")
+            .Add(value => value.IdPrefix, "tabs"));
+        Assert.HasCount(1, cut.FindAll("[role='tab'][tabindex='0']"));
+        Assert.AreEqual("panel", cut.Find("[aria-selected='true']").GetAttribute("aria-controls"));
+        await cut.Find("#tabs-overview").KeyDownAsync(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "End" });
+        Assert.AreEqual("edit", selected);
+        Assert.IsTrue(context.JSInterop.Invocations.Any(call => call.Identifier == "Blazor._internal.domWrapper.focus"));
+    }
+
+    [TestMethod]
+    public async Task ViewQueryChangesPreserveTheDraftWhileOwnershipChangesRequireConfirmation()
+    {
+        using var context = Context();
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/modelprofiles/shared?scopeRef=%2Finstance&tab=edit");
+        var cut = context.Render<UnsavedNavigationGuard>(parameters => parameters
+            .Add(value => value.IsDirty, true).Add(value => value.ViewQueryParameters, new[] { "tab" }));
+        await cut.InvokeAsync(() => navigation.NavigateTo("/modelprofiles/shared?scopeRef=%2Finstance&tab=usages"));
+        Assert.IsTrue(navigation.Uri.EndsWith("tab=usages", StringComparison.Ordinal));
+        Assert.IsEmpty(cut.FindAll("[role='alertdialog']"));
+        await cut.InvokeAsync(() => navigation.NavigateTo("/modelprofiles/shared?scopeRef=%2Ftenants%2Fother&tab=edit"));
+        cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll("[role='alertdialog']")));
+        Assert.IsTrue(navigation.Uri.EndsWith("tab=usages", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task CompletedSaveCanNavigateBeforeTheNextParentRender()
+    {
+        using var context = Context();
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/agents/new");
+        var dirty = true;
+        var cut = context.Render<UnsavedNavigationGuard>(parameters => parameters
+            .Add(value => value.IsDirty, true).Add(value => value.HasUnsavedChanges, () => dirty));
+        await cut.InvokeAsync(() =>
+        {
+            dirty = false;
+            navigation.NavigateTo("/agents/saved?scopeRef=%2Finstance");
+        });
+        Assert.IsTrue(navigation.Uri.Contains("/agents/saved?", StringComparison.Ordinal));
+        Assert.IsEmpty(cut.FindAll("[role='alertdialog']"));
     }
 
     private sealed class TextModel
     {
         [Required] public string Name { get; set; } = string.Empty;
+    }
+    private sealed class RequiredChoices
+    {
+        public int Number { get; set; }
+        public DayOfWeek Choice { get; set; }
     }
 }

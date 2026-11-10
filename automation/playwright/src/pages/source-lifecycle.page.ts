@@ -292,8 +292,8 @@ export class SourceLifecyclePage {
   private async createProfileInConsole(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
     const f = this.fixture;
     await this.open(consoleUrl, '/data-source-profiles/new', TestIds.sourceLifecycle.profileEditor);
-    await this.page.getByLabel(text.displayName, { exact: true }).fill(f.profile);
-    await this.page.getByLabel(text.displayName, { exact: true }).blur();
+    await this.page.getByRole('textbox', { name: text.displayName, exact: true }).fill(f.profile);
+    await this.page.getByRole('textbox', { name: text.displayName, exact: true }).blur();
     await expect(this.page.getByRole('textbox', { name: text.technicalName, exact: false })).toHaveValue(f.profile);
     await choose(this.page.getByRole('combobox', { name: text.acquisitionFlow, exact: true }), f.acquisitionFlow);
     await this.page.getByLabel(text.configurationSchema, { exact: true }).fill(JSON.stringify(sourceSchema));
@@ -313,8 +313,8 @@ export class SourceLifecyclePage {
 
   private async createSourceInConsole(consoleUrl: string, name: string, index: number, text: ExpectedText['sourceLifecycle']): Promise<void> {
     await this.open(consoleUrl, '/data-sources/new', TestIds.schemaDrivenSources.dataSourceEditor);
-    await this.page.getByLabel(text.displayName, { exact: true }).fill(name);
-    await this.page.getByLabel(text.displayName, { exact: true }).blur();
+    await this.page.getByRole('textbox', { name: text.displayName, exact: true }).fill(name);
+    await this.page.getByRole('textbox', { name: text.displayName, exact: true }).blur();
     await expect(this.page.getByRole('textbox', { name: text.technicalName, exact: false })).toHaveValue(name);
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceProfile), this.fixture.profile);
     const editor = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceConfiguration);

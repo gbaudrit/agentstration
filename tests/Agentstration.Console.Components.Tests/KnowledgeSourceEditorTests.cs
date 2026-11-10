@@ -26,7 +26,7 @@ public sealed class KnowledgeSourceEditorTests
 
         rendered.WaitForAssertion(() =>
         {
-            var fields = rendered.FindAll(".form-grid > label");
+            var fields = rendered.FindAll(".form-grid > .form-field");
             Assert.AreEqual("knowledge-source-display-name", fields[0].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.AreEqual("knowledge-source-name", fields[1].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-display-name']").HasAttribute("autofocus"));
@@ -472,6 +472,7 @@ public sealed class KnowledgeSourceEditorTests
     private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null)
     {
         var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(knowledge);
         context.Services.AddSingleton(dataSourcesClient ?? new DataSourcesClientStub());

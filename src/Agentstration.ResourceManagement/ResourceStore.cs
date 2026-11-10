@@ -89,9 +89,21 @@ public sealed class ResourceIdentityCatalog(
     }
 }
 
+public sealed record ResourceDiscoveryWindow<T>(IReadOnlyList<StoredResource<T>> Value, int? NextOffset) where T : Resource;
+
 public interface IResourceStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);
+    async Task<ResourceDiscoveryWindow<T>> ListDiscoveryWindowAsync<T>(string kind, ResourceScopeRef? exactScope, int offset, int take, CancellationToken cancellationToken) where T : Resource
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        var values = exactScope is { } scope
+            ? await ListExactAsync<T>(scope, kind, offset, take, cancellationToken)
+            : await ListAsync<T>(kind, offset, take, cancellationToken);
+        return new(values, values.Count == take ? checked(offset + values.Count) : null);
+    }
+
     Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource;
     Task<StoredResource<T>?> GetByUidAsync<T>(Guid uid, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException("This store does not support UID lookup.");
     Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(Guid uid, CancellationToken cancellationToken) => throw new NotSupportedException("This store does not support resource identity lookup.");

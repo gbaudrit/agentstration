@@ -7,22 +7,25 @@
     @RenderInput
     @if (CanClear)
     {
-        <button class="field-clear" type="button" aria-label="@Localizer["ClearValue"]" @onclick="ClearAsync" @onclick:stopPropagation><span aria-hidden="true">×</span></button>
+        <button class="field-clear" type="button" aria-label="@(Field?.Label is { } label ? Localizer["ClearField", label] : Localizer["ClearValue"])" @onclick="ClearAsync" @onclick:stopPropagation><span aria-hidden="true">×</span></button>
     }
 </span>
 
 @code {
     [CascadingParameter] private FormFieldPresentation? Field { get; set; }
     private RenderFragment RenderInput => builder => base.BuildRenderTree(builder);
-    private bool CanClear => Nullable.GetUnderlyingType(typeof(TValue)) is not null && !string.IsNullOrEmpty(CurrentValueAsString)
+    private bool CanClear => (EditContext is not null || Nullable.GetUnderlyingType(typeof(TValue)) is not null) && !string.IsNullOrEmpty(CurrentValueAsString)
         && !IsLocked("disabled") && !IsLocked("readonly");
     private bool IsLocked(string name) => AdditionalAttributes?.TryGetValue(name, out var value) == true && value is not false;
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
+        DisplayName = Field?.Label ?? DisplayName;
+        ParsingErrorMessage = Localizer["NumberRequired"];
         if (Field is null) return;
         var attributes = AdditionalAttributes is null ? new Dictionary<string, object>() : new(AdditionalAttributes);
         attributes.TryAdd("id", Field.Id);
+        if (Field.Required) attributes.TryAdd("aria-required", "true");
         if (Field.DescriptionId is { } descriptionId) attributes.TryAdd("aria-describedby", descriptionId);
         AdditionalAttributes = attributes;
     }

@@ -184,6 +184,7 @@ public sealed class PacksComponentTests
     private static BunitContext CreateContext()
     {
         var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }

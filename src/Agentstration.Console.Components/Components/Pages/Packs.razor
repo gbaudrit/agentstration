@@ -138,8 +138,7 @@ else
 
 @if (installOpen)
 {
-    <div class="dialog-backdrop" role="presentation" @onclick="CloseInstall">
-        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-install-title" @onclick:stopPropagation="true">
+    <ModalFrame IsOpen="true" Class="pack-dialog" TitleId="pack-install-title" Busy="@(installing || previewing)" OnClose="CloseInstall">
             <div class="panel-header"><div><p class="eyebrow">@T("LocalArchive")</p><h2 id="pack-install-title">@T("InstallPack")</h2></div><button class="icon-button" @onclick="CloseInstall" aria-label="@T("Close")">×</button></div>
             <p class="pack-muted">@T("ChoosePackArchive")</p>
             <label class="pack-file-picker">
@@ -242,8 +241,7 @@ else
                 </section>
             }
             <div class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">@T("Cancel")</button><button class="button-primary" disabled="@(!CanInstall || installing)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallPack"))</button></div>
-        </section>
-    </div>
+    </ModalFrame>
 }
 
 @if (forkOpen && selected is not null)

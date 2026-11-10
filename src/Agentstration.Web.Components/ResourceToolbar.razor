@@ -1,10 +1,11 @@
-<div class="resource-toolbar" role="search" aria-label="@Label">
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+<div class="resource-toolbar" role="search" aria-label="@(Label ?? Localizer["Filters"])">
     <div class="resource-toolbar-filters">@ChildContent</div>
     @if (Actions is not null) { <div class="resource-toolbar-actions">@Actions</div> }
 </div>
 
 @code {
-    [Parameter] public string Label { get; set; } = "Resource filters";
+    [Parameter] public string? Label { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
 }

@@ -4,7 +4,7 @@ Cette proposition illustre le socle commun décrit dans le [catalogue des formul
 
 ## Ouvrir la maquette
 
-Le fichier [maquette-ecran-type.html](maquette-ecran-type.html) est autonome : styles, icônes, données et interactions sont inclus. Il peut être ouvert directement dans un navigateur. Il n’installe aucune bibliothèque et ne modifie pas les composants de l’application.
+Le fichier [maquette-ecran-type.html](https://github.com/gbaudrit/agentstration/blob/ux/unification-formulaires/docs/ux/maquette-ecran-type.html) est autonome : styles, icônes, données et interactions sont inclus. Télécharger ce fichier, puis l’ouvrir directement dans un navigateur. Il n’installe aucune bibliothèque et ne modifie pas les composants de l’application.
 
 Pour un aperçu HTTP local, depuis la racine du dépôt :
 

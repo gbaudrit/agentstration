@@ -1,5 +1,6 @@
 @page "/tools"
 @inject IToolsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
 
@@ -14,7 +15,13 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (tools.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
 else
 {
-    <div class="tool-catalog-grid"><DataGrid TItem="ToolResource" Items="tools">
+    <ResourceToolbar Label="@Shared["Filters"]">
+        <SearchBox Value="@search" ValueChanged="SearchChanged" />
+        <FormField Label="@T("Availability")"><ClearableSelect TValue="string" Value="@availability" ValueChanged="AvailabilityChanged" ValueExpression="() => availability"><option value="">@Shared["All"]</option><option value="available">@T("Available")</option><option value="unavailable">@T("Unavailable")</option></ClearableSelect></FormField>
+        <span role="status">@Shared["LoadedResults", tools.Count]</span>
+    </ResourceToolbar>
+    @if (FilteredTools.Count == 0) { <EmptyState Title="@Shared["NoMatches"]" Message="@Shared["NoMatchesHelp"]" /> }
+    <div class="tool-catalog-grid"><DataGrid TItem="ToolResource" Items="PageTools">
         <Header><tr><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
         <Row Context="tool"><tr><td data-label="@T("Tool")"><div class="tool-catalog-identity"><span class="tool-catalog-icon" aria-hidden="true"><UiIcon Name="wrench" /></span><div><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></div></div></td><td data-label="@T("Provider")">
             @if (ManagingExtension(tool) is { } extension)
@@ -24,15 +31,24 @@ else
             else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }
             </td><td data-label="@T("Availability")"><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td data-label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>
     </DataGrid></div>
+    <CollectionPager Page="@(page)" Total="@FilteredTools.Count" HasMore="@(page * 20 < FilteredTools.Count)" PageChanged="value => page = value" />
 }
 
 @code {
+    private string search = string.Empty, availability = string.Empty;
+    private int page = 1;
+    private IReadOnlyList<ToolResource> FilteredTools => tools.Where(tool =>
+        (string.IsNullOrWhiteSpace(search) || new[] { tool.Name, tool.Namespace.Value, tool.Definition.DisplayName, tool.Definition.ExternalId, ProviderDisplayName(tool) }.Any(value => value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true))
+        && (string.IsNullOrEmpty(availability) || (tool.Definition.Discovery?.Available == true) == (availability == "available"))).ToArray();
+    private IReadOnlyList<ToolResource> PageTools => FilteredTools.Skip((page - 1) * 20).Take(20).ToArray();
+    private void SearchChanged(string value) { search = value; page = 1; }
+    private void AvailabilityChanged(string value) { availability = value; page = 1; }
     private IReadOnlyList<ToolResource> tools = []; private IReadOnlyList<ToolProviderResource> providers = []; private IReadOnlyList<ExtensionInventoryItemResponse> extensions = []; private bool loading = true; private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { var toolsTask = Client.GetToolsAsync(); var providersTask = Client.GetProvidersAsync(default); await Task.WhenAll(toolsTask, providersTask); tools = toolsTask.Result; providers = providersTask.Result; if (Services.GetService<IExtensionsClient>() is { } client) extensions = await client.GetExtensionInventoryAsync(default); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
+    private async Task LoadAsync() { loading = true; error = null; try { var toolsTask = Client.GetToolsAsync(); var providersTask = Client.GetProvidersAsync(default); await Task.WhenAll(toolsTask, providersTask); tools = toolsTask.Result; providers = providersTask.Result; if (Services.GetService<IExtensionsClient>() is { } client) extensions = await client.GetExtensionInventoryAsync(default); page = Math.Clamp(page, 1, Math.Max(1, (FilteredTools.Count + 19) / 20)); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
     private string ProviderDisplayName(ToolResource tool)
     {
         return ManagingExtension(tool)?.DisplayName ?? providers.FirstOrDefault(value =>

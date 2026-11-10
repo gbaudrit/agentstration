@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { fillAndCommit } from './controls.js';
 import { TestIds } from '../contracts/test-ids.js';
 import { GovernedInventoryTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 
@@ -158,7 +159,10 @@ export class GovernedExtensionInventoryPage {
     await this.page.locator("a[href^='/extensions/qa-managed?']").click();
     await this.navigate(`${consoleUrl}/tools?context=%2Finstance`);
     const owners = this.page.locator("a[href^='/extensions/qa-managed?']");
-    await expect(owners).toHaveCount(4);
+    await expect(async () => {
+      await fillAndCommit(this.page.getByRole('search').getByRole('searchbox'), 'qa-managed');
+      await expect(owners).toHaveCount(4);
+    }).toPass();
     for (const owner of await owners.all()) {
       await expect(owner).toHaveText('Governed inventory fixture');
       this.assertScopedLink(await owner.getAttribute('href'));

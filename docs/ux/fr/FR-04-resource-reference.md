@@ -1,5 +1,7 @@
 # Find and select model profiles in an inline filtered collection
 
+Published issue: [#1093](https://github.com/gbaudrit/agentstration/issues/1093); parent [#1089](https://github.com/gbaudrit/agentstration/issues/1089).
+
 ## Area
 Console
 
@@ -49,7 +51,7 @@ None
 - [ ] The two themes, en-US/fr-FR, mobile layout and focus behavior pass; no external UI library is required.
 
 ## UX test scenario follow-up
-Child: pending parent publication. Create a native Technical task child labeled technical-task and test-scenario-task before the UX PR. Start the new reusable journey after explicit maintainer UX approval and merge. The UX PR still owns component/API behavior tests, existing regression updates and desktop/mobile smoke.
+Scenario children [#1101](https://github.com/gbaudrit/agentstration/issues/1101) are published and natively attached. Their new reusable journeys wait for explicit maintainer UX validation and merged implementation PR. Existing regression repairs, behavior tests and required smoke checks remain in the UX PR.
 
 Routes: `/agents/new`, `/agents/{Name}`. Fixtures: a deterministic authorized catalog spanning several result pages (the prototype uses 72 profiles), repeated display/technical names in distinct scopes/namespaces, several providers/models, inaccessible profiles, a selected profile outside the filtered page and an unavailable current profile. Actions: expand inline, search by each field, narrow filters, page, select, clear, save/reopen and simulate late/failed lookup responses. Success: exact selection persists, search leaves the draft clean and bounded queries are observed. Expected failures: no matches can be cleared; unavailable selection is retained and explained; inaccessible results/counts are absent; a late response cannot replace the newest results. No live provider calls are needed.
 

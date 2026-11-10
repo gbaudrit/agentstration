@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { fillAndCommit } from './controls.js';
 import { TestIds } from '../contracts/test-ids.js';
 import type { ExpectedText } from '../locales/expected-text.js';
 import type { ExecutionScopeFixture } from './execution-scopes.page.js';
@@ -129,6 +130,7 @@ export class InheritedResourceReadOnlyPage {
   public async assertAgentManageable(ownerScope: string): Promise<void> {
     await this.expectContext(ownerScope);
     await expect(this.notice).toHaveCount(0);
+    await this.page.getByTestId(TestIds.agentEditor.editTab).or(this.page.getByTestId(TestIds.modelAdministration.profileEditTab)).click();
     await expect(this.page.getByTestId(TestIds.agentEditor.identitySection).locator('input').first()).toBeEnabled();
     await expect(this.page.getByTestId(TestIds.agentEditor.accessTab)).toBeVisible();
   }
@@ -136,6 +138,7 @@ export class InheritedResourceReadOnlyPage {
   public async assertModelProfileManageable(): Promise<void> {
     await this.expectContext('/instance');
     await expect(this.notice).toHaveCount(0);
+    await this.page.getByTestId(TestIds.agentEditor.editTab).or(this.page.getByTestId(TestIds.modelAdministration.profileEditTab)).click();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName)).toBeEnabled();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileSave)).toBeVisible();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDelete)).toBeVisible();
@@ -157,8 +160,9 @@ export class InheritedResourceReadOnlyPage {
     expect(response?.status()).toBe(200);
     await this.page.locator(`[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`)
       .waitFor({ state: 'visible' });
-    await expect(this.page.getByTestId(TestIds.agentEditor.modelProfile)
-      .locator('option').filter({ hasText: profileName })).toHaveCount(1);
+    await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.modelProfileSearch), profileName);
+    await expect(this.page.getByTestId(TestIds.agentEditor.modelProfileChoice)
+      .and(this.page.locator(`[data-profile$="|${profileName}"]`))).toHaveCount(1);
   }
 
   public async assertDescendantMutationRejected(
@@ -224,6 +228,12 @@ export class InheritedResourceReadOnlyPage {
     target.searchParams.set('context', contextScope);
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     expect(response?.status(), target.toString()).toBe(200);
+    const editId = marker === TestIds.agentEditor.form
+      ? TestIds.agentEditor.editTab : TestIds.modelAdministration.profileEditTab;
+    await expect(async () => {
+      await this.page.getByTestId(editId).click();
+      await expect(this.page.getByTestId(editId)).toHaveAttribute('aria-selected', 'true');
+    }).toPass();
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
     await this.expectContext(contextScope);
   }
