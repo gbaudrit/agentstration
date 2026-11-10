@@ -2,6 +2,8 @@
 
 Ce lot de [PR #1114](https://github.com/gbaudrit/agentstration/pull/1114) prolonge les corrections des champs et de la sélection de modèle. La cible reste `ux/unification-formulaires` ; la PR reste en brouillon, sans validation UX ni fusion. Suivi : [#1090](https://github.com/gbaudrit/agentstration/issues/1090), [#1091](https://github.com/gbaudrit/agentstration/issues/1091), [#1092](https://github.com/gbaudrit/agentstration/issues/1092), [#1093](https://github.com/gbaudrit/agentstration/issues/1093) et [#1095](https://github.com/gbaudrit/agentstration/issues/1095).
 
+Les ajustements suivants de densité et de YAML sont décrits dans le [rapport de correction d’affichage](../corrections-affichage/README.md). Les mesures et résultats ci-dessous décrivent la passe précédente.
+
 ## Organisation
 
 L’onglet **Définition** remplace Édition. Sur l’Agent, les panneaux sont **Identité**, **Comportement**, **Configuration du modèle**, **Exécution** et **Étiquettes**. La description rejoint l’identité ; le gestionnaire reste avec les instructions. Le choix de modèle et ses informations restent ensemble, avant le profil d’exécution.

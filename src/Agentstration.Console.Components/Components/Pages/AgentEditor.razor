@@ -108,8 +108,12 @@ else
         <section class="panel form-section" data-testid="agent-yaml-editor">
             <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("AgentYaml")</h2><p>@T("AgentYamlHelp")</p></div></div>
             @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-            <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanManage)" disabled="@saving"></textarea></label>
-            @if (CanManage) { <FormActions Busy="@saving"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></FormActions> }
+            @if (invalidInput || rawUsesSavedDefinition)
+            {
+                <div class="form-alert form-alert-info" role="status" data-testid="agent-yaml-form-warning"><span>@T("YamlFormInvalid")</span><button type="button" class="text-button" @onclick="ShowDefinition">@Shared["Edit"]</button></div>
+            }
+            <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanEditRaw)" disabled="@saving"></textarea></label>
+            @if (CanManage) { <FormActions Busy="@saving"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@(saving || !CanEditRaw)">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@(saving || !CanEditRaw)">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></FormActions> }
         </section>
 
     }
@@ -177,7 +181,7 @@ else
         </FormSection>
 
         <FormSection Title="@T("Tags")" TestId="agent-labels-section">
-            <LabelsEditor @bind-Value="model.Tags" /><ValidationMessage For="() => model.Tags" />
+            <LabelsEditor @bind-Value="model.Tags" />
         </FormSection>
         </div>
         }
@@ -240,6 +244,8 @@ else
     private string rawBaseline = string.Empty;
     private string rawModelFingerprint = string.Empty;
     private bool rawInitialized;
+    private bool rawUsesSavedDefinition;
+    private bool CanEditRaw => CanManage && !invalidInput && !rawUsesSavedDefinition;
     private bool HasRawDraft => rawInitialized && rawYaml != rawBaseline;
     private void ScopeChanged(ResourceScopeRef? value)
     {
@@ -386,6 +392,19 @@ else
     private void ShowContracts() { contractsVisited = true; overviewMode = false; (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, true, false); }
     private void ShowTools() { toolsVisited = true; overviewMode = false; (sourceMode, toolsMode, contractsMode, accessMode) = (false, true, false, false); }
     private void ShowAccess() { overviewMode = false; (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, false, true); }
+    private AgentResourceRequest SavedRequest() => new()
+    {
+        ApiVersion = savedResource!.ApiVersion, Kind = savedResource.Kind,
+        Metadata = savedResource.Metadata, Definition = savedResource.Definition, ScopeRef = savedResource.ScopeRef
+    };
+    private void InitializeRawYaml(AgentResourceRequest request, bool savedDefinition)
+    {
+        rawYaml = ResourceManifestSerializer.ToYaml(request);
+        rawBaseline = rawYaml;
+        rawModelFingerprint = Fingerprint;
+        rawInitialized = true;
+        rawUsesSavedDefinition = savedDefinition;
+    }
     private void ShowSource()
     {
         overviewMode = false;
@@ -393,21 +412,23 @@ else
         rawError = null;
         try
         {
-            if (!rawInitialized || !HasRawDraft && rawModelFingerprint != Fingerprint)
+            if (!rawInitialized || !HasRawDraft && (rawModelFingerprint != Fingerprint || rawUsesSavedDefinition != invalidInput))
             {
-                rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest());
-                rawBaseline = rawYaml;
-                rawModelFingerprint = Fingerprint;
-                rawInitialized = true;
+                if (invalidInput && savedResource is not null) InitializeRawYaml(SavedRequest(), true);
+                else InitializeRawYaml(model.ToRequest(), false);
             }
         }
-        catch (Exception exception) { rawError = exception.Message; }
+        catch (ArgumentException)
+        {
+            if (savedResource is not null) InitializeRawYaml(SavedRequest(), true);
+            else rawError = T("YamlNeedsValidForm");
+        }
         (sourceMode, toolsMode, contractsMode, accessMode) = (true, false, false, false);
     }
 
     private bool ApplyRawYaml()
     {
-        if (!CanManage || model is null) return false;
+        if (!CanEditRaw || model is null) return false;
         rawError = null;
         try
         {
@@ -539,7 +560,7 @@ else
         if (saving || savedResource is null) return;
         model = AgentEditorModel.FromResource(savedResource);
         selectedScope = savedResource.ScopeRef;
-        rawInitialized = false; rawYaml = string.Empty; rawError = errorMessage = errorId = successMessage = null;
+        rawInitialized = rawUsesSavedDefinition = false; rawYaml = string.Empty; rawError = errorMessage = errorId = successMessage = null;
         invalidInput = false; savedFingerprint = Fingerprint;
     }
     private void DiscardRawDraft() { rawInitialized = false; ShowSource(); }

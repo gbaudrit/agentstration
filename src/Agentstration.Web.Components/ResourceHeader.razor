@@ -1,9 +1,9 @@
 <header class="resource-header resource-domain-@Domain" data-testid="@TestId">
     <div class="resource-header-identity">
         <ResourceIcon Source="@ImageSource" DarkSource="@DarkImageSource" IconName="@IconName" Fallback="@Icon" Domain="@Domain" ChildContent="@IconContent" />
-        <div>
-            <p class="eyebrow">@ResourceType</p>
+        <div class="resource-header-copy">
             <div class="resource-title-row">
+                <span class="eyebrow resource-type">@ResourceType</span>
                 <h1>@Name</h1>
                 @if (!string.IsNullOrWhiteSpace(StatusText)) { <StatusIndicator Text="@StatusText" Status="@Status" /> }
             </div>

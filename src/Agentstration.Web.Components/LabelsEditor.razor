@@ -40,8 +40,10 @@
         }
         UpdateValidation();
     }
+    private static bool IsBlank(LabelRow row) => string.IsNullOrWhiteSpace(row.Key) && string.IsNullOrWhiteSpace(row.Value);
     private string? ErrorFor(LabelRow row)
     {
+        if (IsBlank(row)) return null;
         if (string.IsNullOrWhiteSpace(row.Key) || string.IsNullOrWhiteSpace(row.Value) || row.Key.Contains('=') || row.Key.IndexOfAny(['\r', '\n']) >= 0 || row.Value.IndexOfAny(['\r', '\n']) >= 0) return Shared["LabelInvalid"];
         return rows.Count(candidate => candidate.Key.Trim() == row.Key.Trim()) > 1 ? Shared["LabelDuplicate"].Value : null;
     }
@@ -55,9 +57,12 @@
     }
     private void Publish()
     {
-        observed = string.Join(Environment.NewLine, rows.Select(row => $"{row.Key}={row.Value}"));
-        CurrentValue = observed;
-        EditContext?.NotifyFieldChanged(FieldIdentifier);
+        if (rows.All(row => ErrorFor(row) is null))
+        {
+            observed = string.Join(Environment.NewLine, rows.Where(row => !IsBlank(row)).Select(row => $"{row.Key}={row.Value}"));
+            CurrentValue = observed;
+        }
+        else { EditContext?.NotifyFieldChanged(FieldIdentifier); }
         UpdateValidation();
     }
     private void Validate(object? sender, ValidationRequestedEventArgs args) => UpdateValidation();

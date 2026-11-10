@@ -23,13 +23,17 @@ public sealed class ResourceCompositionTests
                 .Add(value => value.ValueChanged, value => model.Labels = value)
                 .Add(value => value.ValueExpression, () => model.Labels)));
         await cut.Find("[data-testid='label-add']").ClickAsync(new());
-        Assert.IsFalse(await cut.InvokeAsync(edit.Validate));
-        StringAssert.Contains(model.Labels, "environment=production");
+        Assert.IsTrue(await cut.InvokeAsync(edit.Validate));
+        Assert.AreEqual("environment=production", model.Labels);
+        Assert.IsFalse(edit.IsModified());
         var keys = cut.FindAll("[data-testid='label-key']");
         keys[1].Input("environment");
+        Assert.IsFalse(await cut.InvokeAsync(edit.Validate));
+        Assert.AreEqual("environment=production", model.Labels, "An incomplete row must not corrupt the resource binding.");
         cut.FindAll("[data-testid='label-value']")[1].Input("staging");
         Assert.IsFalse(await cut.InvokeAsync(edit.Validate));
         Assert.HasCount(2, cut.FindAll(".label-row-error"));
+        Assert.AreEqual("environment=production", model.Labels, "Duplicate keys must remain a local draft.");
         keys[1].Input("team");
         Assert.IsTrue(await cut.InvokeAsync(edit.Validate));
         StringAssert.Contains(model.Labels, "team=staging");
