@@ -1,0 +1,21 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> Identity
+<section class="panel form-section resource-identity-summary" data-testid="@TestId">
+    <div class="panel-header"><h2>@Shared["Identity"]</h2>@Badges</div>
+    <dl class="resource-details">
+        <dt>@Identity["DisplayName"]</dt><dd>@DisplayName</dd>
+        <dt>@Identity["TechnicalName"]</dt><dd><CopyableValue Value="@TechnicalName" /></dd>
+        <dt>@Shared["Description"]</dt><dd class="resource-text">@(string.IsNullOrWhiteSpace(Description) ? Shared["NotProvided"] : Description)</dd>
+        @if (Scope is not null) { <dt>@Shared["Scope"]</dt><dd>@Scope</dd> }
+        @if (!string.IsNullOrWhiteSpace(Namespace)) { <dt>@Shared["Namespace"]</dt><dd><code>@Namespace</code></dd> }
+    </dl>
+</section>
+@code {
+    [Parameter, EditorRequired] public string DisplayName { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string TechnicalName { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? Namespace { get; set; }
+    [Parameter] public RenderFragment? Scope { get; set; }
+    [Parameter] public RenderFragment? Badges { get; set; }
+    [Parameter] public string? TestId { get; set; }
+}

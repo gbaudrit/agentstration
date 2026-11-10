@@ -1,0 +1,88 @@
+@using Microsoft.AspNetCore.Components.Forms
+@inherits InputBase<string>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<div class="labels-editor" data-testid="labels-editor">
+    @if (rows.Count == 0) { <p class="labels-empty">@Shared["NoLabels"]</p> }
+    @foreach (var row in rows)
+    {
+        var error = ErrorFor(row);
+        <div class="label-editor-row" role="group" aria-label="@Shared["LabelRow", rows.IndexOf(row) + 1]" @key="row">
+            <FormField Label="@Shared["LabelKey"]"><ClearableText Value="@row.Key" ValueChanged="value => Update(row, value, true)" Disabled="@ReadOnly" aria-invalid="@(error is not null ? "true" : null)" aria-describedby="@(error is not null ? row.Id : null)" data-testid="label-key" /></FormField>
+            <FormField Label="@Shared["LabelValue"]"><ClearableText Value="@row.Value" ValueChanged="value => Update(row, value, false)" Disabled="@ReadOnly" aria-invalid="@(error is not null ? "true" : null)" aria-describedby="@(error is not null ? row.Id : null)" data-testid="label-value" /></FormField>
+            @if (!ReadOnly) { <button type="button" class="icon-button label-remove" aria-label="@Shared["RemoveLabel", row.Key]" @onclick="() => Remove(row)"><UiIcon Name="trash" /></button> }
+            @if (error is not null) { <p class="validation-message label-row-error" id="@row.Id">@error</p> }
+        </div>
+    }
+    @if (!ReadOnly) { <button type="button" class="button-secondary labels-add" @onclick="Add" data-testid="label-add"><UiIcon Name="plus" />@Shared["AddLabel"]</button> }
+</div>
+
+@code {
+    [Parameter] public bool ReadOnly { get; set; }
+    private readonly List<LabelRow> rows = [];
+    private string? observed;
+    private bool initialized;
+    private ValidationMessageStore? messages;
+    protected override void OnParametersSet()
+    {
+        if (!initialized)
+        {
+            initialized = true;
+            if (EditContext is not null) { messages = new(EditContext); EditContext.OnValidationRequested += Validate; }
+        }
+        if (observed == Value) return;
+        observed = Value;
+        rows.Clear();
+        foreach (var line in (Value ?? string.Empty).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var separator = line.IndexOf('=', StringComparison.Ordinal);
+            rows.Add(new() { Key = separator < 0 ? line : line[..separator], Value = separator < 0 ? string.Empty : line[(separator + 1)..] });
+        }
+        UpdateValidation();
+    }
+    private static bool IsBlank(LabelRow row) => string.IsNullOrWhiteSpace(row.Key) && string.IsNullOrWhiteSpace(row.Value);
+    private string? ErrorFor(LabelRow row)
+    {
+        if (IsBlank(row)) return null;
+        if (string.IsNullOrWhiteSpace(row.Key) || string.IsNullOrWhiteSpace(row.Value) || row.Key.Contains('=') || row.Key.IndexOfAny(['\r', '\n']) >= 0 || row.Value.IndexOfAny(['\r', '\n']) >= 0) return Shared["LabelInvalid"];
+        return rows.Count(candidate => candidate.Key.Trim() == row.Key.Trim()) > 1 ? Shared["LabelDuplicate"].Value : null;
+    }
+    private void Add() { if (ReadOnly) return; rows.Add(new()); Publish(); }
+    private void Remove(LabelRow row) { if (ReadOnly) return; rows.Remove(row); Publish(); }
+    private void Update(LabelRow row, string value, bool key)
+    {
+        if (ReadOnly) return;
+        if (key) row.Key = value; else row.Value = value;
+        Publish();
+    }
+    private void Publish()
+    {
+        if (rows.All(row => ErrorFor(row) is null))
+        {
+            observed = string.Join(Environment.NewLine, rows.Where(row => !IsBlank(row)).Select(row => $"{row.Key}={row.Value}"));
+            CurrentValue = observed;
+        }
+        else { EditContext?.NotifyFieldChanged(FieldIdentifier); }
+        UpdateValidation();
+    }
+    private void Validate(object? sender, ValidationRequestedEventArgs args) => UpdateValidation();
+    private void UpdateValidation()
+    {
+        if (messages is null) return;
+        messages.Clear();
+        foreach (var error in rows.Select(ErrorFor).OfType<string>().Distinct(StringComparer.Ordinal)) messages.Add(FieldIdentifier, error);
+        EditContext?.NotifyValidationStateChanged();
+    }
+    protected override bool TryParseValueFromString(string? value, out string result, [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] out string? validationErrorMessage) { result = value ?? string.Empty; validationErrorMessage = null; return true; }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && EditContext is not null) { EditContext.OnValidationRequested -= Validate; messages?.Clear(); }
+        base.Dispose(disposing);
+    }
+    private sealed class LabelRow
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+        public string Id { get; } = $"label-error-{Guid.NewGuid():N}";
+    }
+}

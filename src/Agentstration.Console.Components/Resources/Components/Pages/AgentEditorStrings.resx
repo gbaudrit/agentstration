@@ -10,7 +10,7 @@
   <data name="Loading"><value>Loading agent resource…</value></data>
   <data name="Generation"><value>Generation {0}</value></data>
   <data name="Run"><value>Run</value></data>
-  <data name="ReconcileDeployment"><value>Reconcile deployment</value></data>
+  <data name="ReconcileDeployment"><value>Apply configuration</value></data>
   <data name="AgentSections"><value>Agent sections</value></data>
   <data name="Overview"><value>Overview</value></data>
   <data name="Definition"><value>Definition</value></data>
@@ -74,7 +74,7 @@
   <data name="Creating"><value>Creating…</value></data>
   <data name="CreateAndDeploy"><value>Create and deploy</value></data>
   <data name="Discard"><value>Discard</value></data>
-  <data name="SaveDraft"><value>Save draft</value></data>
+  <data name="SaveDraft"><value>Save</value></data>
   <data name="Applying"><value>Applying…</value></data>
   <data name="SaveAndApply"><value>Save and apply</value></data>
   <data name="NotDeployed"><value>Not deployed</value></data>
@@ -108,4 +108,9 @@
   <data name="InvocationContractsHelp"><value>Describe the structured value accepted by this Agent and the value it returns. Runtime execution remains text-based.</value></data>
   <data name="InputContract"><value>Input contract</value></data>
   <data name="OutputContract"><value>Output contract</value></data>
+<data name="Behavior"><value>Behavior</value></data>
+<data name="Execution"><value>Execution</value></data>
+<data name="SaveBeforeApply"><value>Save your changes before applying the configuration.</value></data>
+<data name="YamlFormInvalid"><value>The form contains incomplete or invalid values. This YAML view is read-only and retains the last valid definition. Correct the fields in Definition to edit or save it.</value></data>
+<data name="YamlNeedsValidForm"><value>Complete the invalid fields in Definition before opening the YAML.</value></data>
 </root>

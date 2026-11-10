@@ -1,18 +1,29 @@
-.resource-access-panel { display: grid; gap: 1rem; }
-.access-identity-grid, .access-governance-grid { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: .65rem 1rem; }
+.resource-access-panel { display: grid; gap: var(--form-section-gap); }
+.access-context { padding: var(--space-4); }
+.access-context > div { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.access-context p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--font-size-sm); }
+.access-context .muted { color: var(--muted); font-size: var(--font-size-sm); }
+.access-identity-grid, .access-governance-grid { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: var(--space-2) var(--space-4); }
 .access-identity-grid dd, .access-governance-grid dd { min-width: 0; overflow-wrap: anywhere; }
-.access-grant-list { display: grid; gap: .75rem; margin-top: 1rem; }
-.access-grant { display: grid; grid-template-columns: minmax(14rem, 1fr) auto auto; align-items: center; gap: 1rem; padding: .9rem; border: 1px solid var(--color-border, #d7dfeb); border-radius: .75rem; }
-.access-target { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .25rem .6rem; min-width: 0; }
-.access-target code { grid-column: 2; overflow-wrap: anywhere; }
-.access-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
-.access-actions label { display: inline-flex; align-items: center; gap: .35rem; }
-.access-add { display: flex; align-items: end; gap: .75rem; margin-top: 1rem; }
-.access-add label { flex: 1; display: grid; gap: .35rem; }
-.access-readonly { margin-top: 1rem; color: var(--color-text-muted, #5f6f85); }
-.access-success { color: var(--color-success, #087f5b); }
-@media (max-width: 760px) {
-    .access-identity-grid, .access-governance-grid { grid-template-columns: 1fr; }
-    .access-grant { grid-template-columns: 1fr; align-items: stretch; }
-    .access-add { align-items: stretch; flex-direction: column; }
-}
+.access-grant-list { display: grid; gap: var(--space-2); margin-block: var(--space-3); }
+.access-grant-heading, .access-grant { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(16rem, 1fr) auto; align-items: center; gap: var(--space-4); }
+.access-grant-heading { padding-inline: var(--space-3); color: var(--muted); font-size: var(--font-size-xs); }
+.access-grant { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--form-radius); background: var(--surface-2); }
+.access-target { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.access-target code { width: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: var(--font-size-xs); }
+.access-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.access-actions label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); }
+.access-add { display: grid; gap: var(--space-3); margin-top: var(--space-3); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--form-radius); background: var(--surface-2); }
+.access-add[hidden] { display: none; }
+.access-add > label { display: grid; gap: var(--space-2); }
+.access-add > small { color: var(--muted); }
+.access-add > button { justify-self: start; }
+.access-empty { margin: 0 0 var(--space-4); padding: var(--space-3); border-radius: var(--form-radius); color: var(--muted); background: var(--surface-2); }
+.access-readonly { margin-top: var(--space-4); color: var(--muted); }
+.access-success { color: var(--color-success); }
+.access-details > summary { cursor: pointer; color: var(--text); font-weight: 600; }
+.access-details > article { padding-top: var(--space-4); }
+.access-details h2 { font-size: var(--font-size-md); }
+.access-details p { color: var(--muted); font-size: var(--font-size-sm); }
+@media (max-width: 960px) { .access-grant-heading { display: none; } .access-grant { grid-template-columns: 1fr; align-items: stretch; } .access-grant > button { justify-self: start; } }
+@media (max-width: 620px) { .access-identity-grid, .access-governance-grid { grid-template-columns: 1fr; } }

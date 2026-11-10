@@ -5,6 +5,7 @@ This workspace owns the Playwright page objects and journeys used by product UX 
 ```powershell
 npm ci
 npm run install:browsers
+npm run test:fixtures
 npm run test:smoke
 ```
 
@@ -35,6 +36,8 @@ npx playwright test --ui
 ```
 
 When `AGENTSTRATION_CONSOLE_URL` is present, the test fixture does not start or stop product hosts and requires the username/password pair. Journey input can explicitly override both values. Without an external URL, tests keep using dynamically allocated local ports, isolated SQLite data, and the public Development fixture `admin / admin`. An omitted Workplace URL falls back to the Console URL so Console-only journeys remain usable; set it explicitly before running a Workplace journey. External tests mutate the selected instance, so use a disposable instance or dedicated campaign Workspace.
+
+Managed host ports remain reserved while proxy and fake-provider endpoints start. Each reservation is released immediately before its host starts; unused reservations and partial startup processes are cleaned up on failure. Because socket handoff to another process cannot be atomic, address-in-use startup failures retry with a fresh isolated host set, up to three attempts. Other startup failures and browser assertions are not retried. `npm run test:fixtures` covers reservations, handoff, collision retries and cleanup, and runs in the Browser UX workflow.
 
 To exercise the capture contract:
 

@@ -9,6 +9,7 @@
   "scripts": {
     "install:browsers": "playwright install chromium",
     "test": "playwright test",
+    "test:fixtures": "node --import tsx --test src/fixtures/reserved-ports.test.ts",
     "test:smoke": "playwright test --grep @smoke",
     "capture": "tsx cli/capture.ts",
     "coverage:report": "node --import tsx cli/coverage.ts"

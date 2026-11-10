@@ -1,0 +1,29 @@
+@implements IDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="page-notification" role="status" data-testid="page-notification">
+        <UiIcon Name="check" /><span>@Message</span><button class="icon-button" type="button" @onclick="DismissAsync" aria-label="@Shared["DismissNotification"]"><UiIcon Name="close" /></button>
+    </div>
+}
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback OnDismiss { get; set; }
+    [Parameter] public TimeProvider Clock { get; set; } = TimeProvider.System;
+    private string? previous;
+    private CancellationTokenSource? pending;
+    protected override void OnParametersSet()
+    {
+        if (Message == previous) return;
+        previous = Message;
+        pending?.Cancel(); pending?.Dispose(); pending = null;
+        if (!string.IsNullOrWhiteSpace(Message)) { pending = new(); _ = ExpireAsync(pending.Token); }
+    }
+    private async Task ExpireAsync(CancellationToken token)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(8), Clock, token); await InvokeAsync(DismissAsync); }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+    private Task DismissAsync() => OnDismiss.InvokeAsync();
+    public void Dispose() { pending?.Cancel(); pending?.Dispose(); }
+}

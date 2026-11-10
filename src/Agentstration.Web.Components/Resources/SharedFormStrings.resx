@@ -61,7 +61,7 @@
     <value>Overview</value>
   </data>
   <data name="Edit" xml:space="preserve">
-    <value>Edit</value>
+    <value>Definition</value>
   </data>
   <data name="Access" xml:space="preserve">
     <value>Access</value>
@@ -156,4 +156,23 @@
   <data name="Optional" xml:space="preserve">
     <value>optional</value>
   </data>
+  <data name="Identity" xml:space="preserve"><value>Identity</value></data>
+  <data name="Description" xml:space="preserve"><value>Description</value></data>
+  <data name="NotProvided" xml:space="preserve"><value>Not provided</value></data>
+  <data name="Namespace" xml:space="preserve"><value>Namespace</value></data>
+  <data name="Copy" xml:space="preserve"><value>Copy</value></data>
+  <data name="CopyValue" xml:space="preserve"><value>Copy {0}</value></data>
+  <data name="Copied" xml:space="preserve"><value>Copied</value></data>
+  <data name="CopyFailed" xml:space="preserve"><value>Copy unavailable. Select the value to copy it.</value></data>
+  <data name="ResourceActions" xml:space="preserve"><value>Resource actions</value></data>
+  <data name="MoreActions" xml:space="preserve"><value>More actions</value></data>
+  <data name="DismissNotification" xml:space="preserve"><value>Dismiss notification</value></data>
+  <data name="LabelKey" xml:space="preserve"><value>Key</value></data>
+  <data name="LabelValue" xml:space="preserve"><value>Value</value></data>
+  <data name="AddLabel" xml:space="preserve"><value>Add a label</value></data>
+  <data name="RemoveLabel" xml:space="preserve"><value>Remove label {0}</value></data>
+  <data name="NoLabels" xml:space="preserve"><value>No labels</value></data>
+  <data name="LabelInvalid" xml:space="preserve"><value>Enter a key without = or line breaks and a non-empty value.</value></data>
+  <data name="LabelDuplicate" xml:space="preserve"><value>This key is already used.</value></data>
+  <data name="LabelRow" xml:space="preserve"><value>Label {0}</value></data>
 </root>

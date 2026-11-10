@@ -13,7 +13,7 @@
     }
     @if (CanClear)
     {
-        <button class="field-clear" type="button" aria-label="@(Field?.Label is { } label ? Localizer["ClearField", label] : Localizer["ClearValue"])" @onclick="ClearAsync" @onclick:stopPropagation><span aria-hidden="true">×</span></button>
+        <FieldClearButton Label="@(Field?.Label is { } label ? Localizer["ClearField", label] : Localizer["ClearValue"])" OnClear="ClearAsync" />
     }
 </span>
 

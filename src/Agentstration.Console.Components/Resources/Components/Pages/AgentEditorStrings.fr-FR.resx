@@ -10,7 +10,7 @@
   <data name="Loading"><value>Chargement de la ressource d’agent…</value></data>
   <data name="Generation"><value>Génération {0}</value></data>
   <data name="Run"><value>Exécuter</value></data>
-  <data name="ReconcileDeployment"><value>Réconcilier le déploiement</value></data>
+  <data name="ReconcileDeployment"><value>Appliquer la configuration</value></data>
   <data name="AgentSections"><value>Sections de l’agent</value></data>
   <data name="Overview"><value>Vue d’ensemble</value></data>
   <data name="Definition"><value>Définition</value></data>
@@ -74,7 +74,7 @@
   <data name="Creating"><value>Création…</value></data>
   <data name="CreateAndDeploy"><value>Créer et déployer</value></data>
   <data name="Discard"><value>Annuler les modifications</value></data>
-  <data name="SaveDraft"><value>Enregistrer le brouillon</value></data>
+  <data name="SaveDraft"><value>Enregistrer</value></data>
   <data name="Applying"><value>Application…</value></data>
   <data name="SaveAndApply"><value>Enregistrer et appliquer</value></data>
   <data name="NotDeployed"><value>Non déployée</value></data>
@@ -108,4 +108,9 @@
   <data name="InvocationContractsHelp"><value>Décrivez la valeur structurée acceptée par cet Agent et celle qu’il retourne. L’exécution reste textuelle.</value></data>
   <data name="InputContract"><value>Contrat d’entrée</value></data>
   <data name="OutputContract"><value>Contrat de sortie</value></data>
+<data name="Behavior"><value>Comportement</value></data>
+<data name="Execution"><value>Exécution</value></data>
+<data name="SaveBeforeApply"><value>Enregistrez vos modifications avant d’appliquer la configuration.</value></data>
+<data name="YamlFormInvalid"><value>Le formulaire contient des valeurs incomplètes ou invalides. Ce YAML reste en lecture seule et conserve la dernière définition valide. Corrigez les champs dans Définition pour le modifier ou l’enregistrer.</value></data>
+<data name="YamlNeedsValidForm"><value>Complétez les champs invalides dans Définition avant d’ouvrir le YAML.</value></data>
 </root>

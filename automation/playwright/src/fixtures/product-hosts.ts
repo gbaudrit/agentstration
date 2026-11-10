@@ -3,10 +3,10 @@ import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import { createServer, request as createRequest, type Server } from 'node:http';
-import net from 'node:net';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 import { automationRoot, repositoryRoot } from './repository.js';
+import { withReservedLoopbackPorts, type LoopbackPortReservation } from './reserved-ports.js';
 
 export interface ProductAddresses {
   consoleUrl: string;
@@ -72,20 +72,33 @@ export async function startProductHosts(
   organizationStructureFixture = false,
 ): Promise<ProductHosts> {
   if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
+  return await withReservedLoopbackPorts(7, ports => startProductHostsOnPorts(
+    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, ports,
+  ));
+}
+
+async function startProductHostsOnPorts(
+  authenticationMode: 'Development' | 'Local',
+  aiProvider: 'Deterministic' | 'Managed',
+  acquisitionFailureFixture: boolean,
+  governedInventoryFixture: boolean,
+  organizationStructureFixture: boolean,
+  ports: readonly LoopbackPortReservation[],
+): Promise<ProductHosts> {
   const runId = `${Date.now()}-${process.pid}`;
   const workDirectory = path.join(automationRoot, '.work', runId);
   const dataDirectory = path.join(workDirectory, 'data');
   await fs.mkdir(dataDirectory, { recursive: true });
 
-  const [consolePort, workplacePort, workerPort, extensionPort, gitExtensionPort, foundryExtensionPort, utilitiesExtensionPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), freePort()]);
-  const consoleUrl = `http://127.0.0.1:${consolePort}`;
+  const [consolePort, workplacePort, workerPort, extensionPort, gitExtensionPort, foundryExtensionPort, utilitiesExtensionPort] = ports;
+  const consoleUrl = `http://127.0.0.1:${consolePort.port}`;
   const fixtureReadyFile = path.join(workDirectory, 'browser-fixture.ready');
-  const workplaceUrl = `http://127.0.0.1:${workplacePort}`;
-  const workerUrl = `http://127.0.0.1:${workerPort}`;
-  const extensionUrl = `http://127.0.0.1:${extensionPort}`;
-  const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort}`;
-  const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort}`;
-  const utilitiesExtensionUrl = `http://127.0.0.1:${utilitiesExtensionPort}`;
+  const workplaceUrl = `http://127.0.0.1:${workplacePort.port}`;
+  const workerUrl = `http://127.0.0.1:${workerPort.port}`;
+  const extensionUrl = `http://127.0.0.1:${extensionPort.port}`;
+  const gitExtensionUrl = `http://127.0.0.1:${gitExtensionPort.port}`;
+  const foundryExtensionUrl = `http://127.0.0.1:${foundryExtensionPort.port}`;
+  const utilitiesExtensionUrl = `http://127.0.0.1:${utilitiesExtensionPort.port}`;
   const bootstrapPath = path.join(workDirectory, 'bootstrap-profiles');
   await fs.cp(path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles'), bootstrapPath, { recursive: true });
   await fs.cp(path.join(automationRoot, 'fixtures', 'bootstrap-profiles'), bootstrapPath, { recursive: true });
@@ -98,23 +111,27 @@ export async function startProductHosts(
   await fs.writeFile(workerKeyFile, `${randomBytes(48).toString('base64')}\n`, { mode: 0o600 });
 
   const fakeOllama = await startFakeOllama();
+  await extensionPort.release();
   const modelExtension = runDotnet('src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj', path.join(workDirectory, 'model-extension.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: extensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',
     Ollama__Endpoint: fakeOllama.url,
   });
+  await gitExtensionPort.release();
   const gitExtension = runDotnet('src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj', path.join(workDirectory, 'git-extension.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: gitExtensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',
     GitSourceProvider__AllowLocalRepositories: 'true',
   });
+  await foundryExtensionPort.release();
   const foundryExtension = runDotnet('src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj', path.join(workDirectory, 'foundry-extension.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: foundryExtensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',
   });
+  await utilitiesExtensionPort.release();
   const utilitiesExtension = runDotnet('src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj', path.join(workDirectory, 'utilities-extension.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: utilitiesExtensionUrl,
@@ -140,6 +157,7 @@ export async function startProductHosts(
     await stopProcess(utilitiesExtension);
     await fakeOllama.stop();
     await runtimeProxy.stop();
+    await workerAuthorityProxy.stop();
     throw error;
   }
 
@@ -150,6 +168,7 @@ export async function startProductHosts(
     : acquisitionFailureFixture
     ? 'automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj'
     : 'src/Agentstration.Web/Agentstration.Web.csproj';
+  await consolePort.release();
   const consoleHost = runDotnet(consoleProject, path.join(workDirectory, 'console.log'), {
     ...(organizationStructureFixture ? { ORGANIZATION_STRUCTURE_READY_FILE: fixtureReadyFile } : {}),
     ...(governedInventoryFixture ? { GOVERNED_INVENTORY_READY_FILE: fixtureReadyFile } : {}),
@@ -194,6 +213,7 @@ export async function startProductHosts(
   let workerHost: ManagedProcess | undefined;
   const startRuntimeWorker = async (): Promise<void> => {
     if (workerHost?.child.exitCode === null) return;
+    await workerPort.release();
     workerHost = runDotnet('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj', path.join(workDirectory, 'runtime-worker.log'), {
       ASPNETCORE_ENVIRONMENT: 'Development',
       ASPNETCORE_URLS: workerUrl,
@@ -222,6 +242,7 @@ export async function startProductHosts(
       }
     }
     await startRuntimeWorker();
+    await workplacePort.release();
     workplaceHost = runDotnet('src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj', path.join(workDirectory, 'workplace.log'), {
       ASPNETCORE_ENVIRONMENT: 'Development',
       ASPNETCORE_URLS: workplaceUrl,
@@ -595,22 +616,4 @@ async function crashProcess(managedProcess: ManagedProcess | undefined): Promise
     managedProcess.child.kill('SIGKILL');
   }
   await exited;
-}
-
-async function freePort(): Promise<number> {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.unref();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      if (!address || typeof address === 'string') {
-        server.close();
-        reject(new Error('Could not allocate a local port.'));
-        return;
-      }
-      const { port } = address;
-      server.close(error => error ? reject(error) : resolve(port));
-    });
-  });
 }
