@@ -236,3 +236,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 208. [ADR-0208 — Produced content remains an Artifact materialized in Storage](0208-produced-content-remains-an-artifact-materialized-in-storage.md)
 209. [ADR-0209 — Knowledge Tools follow the publishing Console scope](0209-knowledge-tools-follow-the-publishing-console-scope.md)
+
+210. [ADR-0210 — Knowledge exposes native Snapshot access Tools](0210-knowledge-exposes-native-snapshot-access-tools.md)

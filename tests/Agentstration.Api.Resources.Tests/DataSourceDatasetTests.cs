@@ -31,7 +31,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
+public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBase
 {
     private static readonly ResourceScopeRef Owner = ResourceScopeRef.Instance;
     private static readonly JsonElement Empty = JsonSerializer.SerializeToElement(new { });
@@ -75,13 +75,22 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         Assert.IsTrue(exposure.Operations.All(value => value.Tool.ScopeRef == Owner));
         using var reloaded = await client.GetAsync($"/api/knowledgesources/{knowledge.Value.Name}/tool-exposure?scopeRef=/instance");
         Assert.AreEqual(HttpStatusCode.OK, reloaded.StatusCode);
-        var search = exposure.Operations.Single(value => value.Operation == KnowledgeSourceOperation.Search).Tool;
-        using var executed = await client.PostAsJsonAsync($"/api/tools/{search.Name}/run?scopeRef=/instance",
-            new RunToolRequest(JsonSerializer.SerializeToElement(new { request = new { query = "instance-tool-content" } }), ToolRunMode.Execute));
-        Assert.AreEqual(HttpStatusCode.OK, executed.StatusCode, await executed.Content.ReadAsStringAsync());
-        var result = (await executed.Content.ReadFromJsonAsync<RunToolResponse>())!;
-        Assert.AreEqual("completed", result.Status, JsonSerializer.Serialize(result));
-        Assert.Contains("instance-tool-content", result.Output!.Value.GetRawText());
+        foreach (var operation in exposure.Operations)
+        {
+            var request = operation.Operation == KnowledgeSourceOperation.SearchRegex
+                ? JsonSerializer.SerializeToElement(new { pattern = "instance-tool-content" }) : Empty;
+            using var executed = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
+                new RunToolRequest(JsonSerializer.SerializeToElement(new { request }), ToolRunMode.Execute));
+            Assert.AreEqual(HttpStatusCode.OK, executed.StatusCode, await executed.Content.ReadAsStringAsync());
+            var result = (await executed.Content.ReadFromJsonAsync<RunToolResponse>())!;
+            Assert.AreEqual("completed", result.Status, JsonSerializer.Serialize(result));
+            Assert.Contains(operation.Operation == KnowledgeSourceOperation.GetStatus ? "activeSnapshotId" : "instance-tool-content",
+                result.Output!.Value.GetRawText());
+            using var overrideSource = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
+                new RunToolRequest(JsonSerializer.SerializeToElement(new { request, source = new { name = "substituted" } }), ToolRunMode.Execute));
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, overrideSource.StatusCode);
+        }
+
     }
 
     [TestMethod]
@@ -130,6 +139,10 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         _ = await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(new(knowledge.Value.Name, ScopeRef: Owner), new(), default);
         var snapshot = (await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(new(knowledge.Value.Name, ScopeRef: Owner), default))!.Snapshot;
         Assert.AreEqual(4, snapshot.Artifacts[0].Content!.Target.Policy.MaximumReadBytes);
+        var native = await factory.Services.GetRequiredService<KnowledgeAccessService>().ReadAsync(new(knowledge.Value.Name, ScopeRef: Owner),
+            new() { SnapshotId = snapshot.Name }, default);
+        Assert.AreEqual("ready", native.State);
+        Assert.Contains("bounded-reading", native.Chunks.Single().Content);
         var retrieved = await factory.Services.GetRequiredService<KnowledgeRetrievalService>().SearchAsync(new(knowledge.Value.Name, ScopeRef: Owner), new() { Query = "bounded-reading" }, default);
         Assert.IsNotEmpty(retrieved.Items);
     }

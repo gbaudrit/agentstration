@@ -139,7 +139,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             Assert.IsNotNull(stored.Value.Composition);
             Assert.IsFalse(string.IsNullOrWhiteSpace(stored.Value.Composition.DependencyHash));
             Assert.AreEqual(instanceScope, stored.Value.Composition.ProjectionFlow.ScopeRef);
-            Assert.AreEqual(instanceScope, stored.Value.Composition.RetrievalFlow.ScopeRef);
+            Assert.AreEqual(instanceScope, stored.Value.Composition.RetrievalFlow!.ScopeRef);
             var dependency = stored.Value.Composition.DataSources.Single();
             Assert.AreEqual(instanceScope, dependency.DataSourceScopeRef);
             Assert.AreEqual(source.Value.Uid, dependency.DataSourceUid);

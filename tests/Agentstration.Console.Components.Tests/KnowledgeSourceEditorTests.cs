@@ -22,6 +22,22 @@ namespace Agentstration.Web.Tests;
 public sealed class KnowledgeSourceEditorTests
 {
     [TestMethod]
+    public async Task PrerenderDisablesNativeContentSelectionUntilInteractive()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(new KnowledgeClientStub());
+        await using var renderer = new HtmlRenderer(context.Services, context.Services.GetRequiredService<ILoggerFactory>());
+        var markup = await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync<KnowledgeContentAccess>(ParameterView.FromDictionary(new Dictionary<string, object?>
+            { [nameof(KnowledgeContentAccess.SourceName)] = "agentstration-documentation" }))).ToHtmlString());
+        var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(markup);
+        var fields = document.QuerySelector("[data-testid='knowledge-native-access-fields']")!;
+        Assert.IsTrue(fields.HasAttribute("disabled"));
+        Assert.AreEqual("false", fields.GetAttribute("data-interactive"));
+        Assert.IsTrue(document.QuerySelector("[data-testid='knowledge-retrieval-run']")!.HasAttribute("disabled"));
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task PrerenderDisablesKnowledgeSourceFormsUntilInteractive(bool embedded)
@@ -135,7 +151,7 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual("knowledge-source-name", fields[1].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-display-name']").HasAttribute("autofocus"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-projection-flow']").HasAttribute("required"));
-            Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-retrieval-flow']").HasAttribute("required"));
+            Assert.IsFalse(rendered.Find("[data-testid='knowledge-source-retrieval-flow']").HasAttribute("required"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-editor-enabled-option'].knowledge-choice"));
             Assert.IsTrue(
@@ -488,15 +504,8 @@ public sealed class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-retrieval-tab']").Click();
         rendered.Find("[data-testid='knowledge-retrieval-operation']").Change("read");
         rendered.WaitForAssertion(() =>
-        {
-            var artifactOption = rendered.Find(
-                "[data-testid='knowledge-retrieval-artifact'] option[value='artifact-0123456789abcdef']");
-            StringAssert.Contains(artifactOption.TextContent, "application/json");
-            Assert.IsTrue(rendered.Find("[data-testid='knowledge-retrieval-run']").HasAttribute("disabled"));
-        });
-        rendered.Find("[data-testid='knowledge-retrieval-artifact']").Change("artifact-0123456789abcdef");
-        rendered.WaitForAssertion(() =>
             Assert.IsFalse(rendered.Find("[data-testid='knowledge-retrieval-run']").HasAttribute("disabled")));
+
     }
 
     [TestMethod]
@@ -504,8 +513,9 @@ public sealed class KnowledgeSourceEditorTests
     {
         using var culture = new TestCultureScope("fr-FR");
         var snapshot = ExistingSnapshot();
-        using var context = CreateContext(new KnowledgeClientStub(ProjectedSource(), snapshots: [snapshot],
-            retrievalResult: ExistingRetrievalResult(snapshot)));
+        var client = new KnowledgeClientStub(ProjectedSource(), snapshots: [snapshot],
+            retrievalResult: ExistingRetrievalResult(snapshot));
+        using var context = CreateContext(client);
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo("/knowledge-sources/agentstration-documentation?view=retrieval");
 
@@ -516,21 +526,21 @@ public sealed class KnowledgeSourceEditorTests
         {
             Assert.AreEqual("Consultation",
                 rendered.Find("[data-testid='knowledge-source-retrieval-tab']").TextContent);
-            Assert.AreEqual("Rechercher",
-                rendered.Find("[data-testid='knowledge-retrieval-operation'] option[value='search']").TextContent);
+            Assert.AreEqual("Recherche regex",
+                rendered.Find("[data-testid='knowledge-retrieval-operation'] option[value='search_regex']").TextContent);
         });
-        rendered.Find("[data-testid='knowledge-retrieval-text']").Change("documentation");
+        rendered.Find("[data-testid='knowledge-retrieval-operation']").Change("search_regex");
+        rendered.Find("[data-testid='knowledge-retrieval-text']").Input("documentation");
         rendered.Find("[data-testid='knowledge-retrieval-run']").Click();
 
         rendered.WaitForAssertion(() =>
         {
             var result = rendered.Find("[data-testid='knowledge-retrieval-result']");
-            StringAssert.Contains(result.TextContent, "Rechercher · 1 résultat(s)");
-            Assert.AreEqual("/artifacts/durable/artifact-0123456789abcdef",
-                result.QuerySelector(".knowledge-retrieval-item a")?.GetAttribute("href"));
-            Assert.AreEqual("artifact-0123456789abcdef",
-                result.QuerySelector(".knowledge-retrieval-item a")?.TextContent);
-            Assert.HasCount(1, result.QuerySelectorAll(".knowledge-retrieval-item pre"));
+            Assert.AreEqual("agentstration-documentation", client.NativeSourceName);
+            StringAssert.Contains(result.TextContent, "Contenu prêt");
+            StringAssert.Contains(result.TextContent, "artifact-0123456789abcdef");
+            Assert.HasCount(1, result.QuerySelectorAll("pre"));
+            Assert.HasCount(1, result.QuerySelectorAll("[data-testid='knowledge-read-match']"));
         });
     }
 
@@ -863,6 +873,20 @@ public sealed class KnowledgeSourceEditorTests
         }
         public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(Snapshots);
         public Task<KnowledgeSnapshotView> SelectActiveSnapshotAsync(ResourceNamespace @namespace, string name, string snapshotName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public string? NativeSourceName { get; private set; }
+        public Task<KnowledgeAccessResult> SearchRegexAsync(ResourceNamespace @namespace, string name, KnowledgeRegexRequest request, CancellationToken cancellationToken = default)
+        {
+            NativeSourceName = name;
+            return retrievalResult is null ? throw new NotSupportedException() : Task.FromResult(new KnowledgeAccessResult
+            {
+                State = "ready",
+                SourceUid = retrievalResult.KnowledgeSourceUid,
+                SnapshotId = retrievalResult.SnapshotName,
+                Matches = retrievalResult.Items.Select(item => new KnowledgeRegexMatch(item.ArtifactId,
+                    new(0, 10), new(0, 10), item.Content ?? string.Empty)).ToArray(),
+                EndOfSelection = true
+            });
+        }
         public Task<KnowledgeRetrievalResult> SearchAsync(ResourceNamespace @namespace, string name, SearchKnowledgeRequest request, CancellationToken cancellationToken = default) =>
             retrievalResult is null ? throw new NotSupportedException() : Task.FromResult(retrievalResult);
         public Task<KnowledgeRetrievalResult> QueryAsync(ResourceNamespace @namespace, string name, QueryKnowledgeRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();

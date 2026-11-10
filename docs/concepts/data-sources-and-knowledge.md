@@ -14,7 +14,7 @@ origin
   -> optional per-binding transformation
   -> Knowledge projection
   -> immutable Snapshot
-  -> search, query, or bounded read
+  -> read, search_regex, or get_status
 ```
 
 ## Acquire once, project many times
@@ -41,7 +41,7 @@ The choice button shows **Promote** for a new target, **Already promoted** (disa
 
 ## Project one or more Data Sources
 
-An Instance-, Tenant-, or Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. The definition pins the exact Data Source and its native dataset definition or historical active profile identity plus the exact projection, retrieval, and optional transformation Flow versions and integrity hashes from its owner scope. Protected ancestor dependencies require explicit descendant-use authorization; ambiguous or stale references fail closed. Each named binding can use its latest successful Workspace acquisition or an explicitly selected successful acquisition. Omitting the transformation Flow is an identity transformation: the acquired content passes through unchanged.
+An Instance-, Tenant-, or Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. The definition pins the exact Data Source and its native dataset definition or historical active profile identity plus the exact projection and optional custom retrieval and transformation Flow versions and integrity hashes from its owner scope. Protected ancestor dependencies require explicit descendant-use authorization; ambiguous or stale references fail closed. Each named binding can use its latest successful Workspace acquisition or an explicitly selected successful acquisition. Omitting the transformation Flow is an identity transformation: the acquired content passes through unchanged.
 
 The Knowledge Source invokes one `knowledge.projection/v1` Flow with all prepared inputs. The projection decides which durable, publishable Artifacts become the new Snapshot. Inputs remain provenance unless the projection emits them.
 
@@ -87,8 +87,7 @@ data and the configured local content root on persistent storage. Existing
 Artifact-only Snapshots retain their original receipts and read path.
 
 Editing a definition preserves unchanged dependency pins. To adopt revised Data
-Sources or active Flow versions, explicitly select **Resolve current dependency
-revisions** when saving. Existing Snapshots retain their original evidence.
+Sources or active Flow versions, use **Update dependencies**, review the confirmation, then save. Existing Snapshots retain their original evidence.
 
 Projection requests accept an `idempotencyKey`. Retrying the same configuration
 returns or resumes the same attempt. Cancellation stops the caller's wait; accepted
@@ -96,13 +95,63 @@ work remains resumable. After a restart, recovery uses recorded dependencies and
 authorization, without selecting a newer configuration. Sealing, Snapshot creation,
 activation and completion are distinct steps, with no distributed transaction.
 
-## Retrieve only from the selected Snapshot
+## Native Snapshot access for Agents
 
-A Knowledge Source also selects a `knowledge.retrieval/v1` Flow. Search, query, and bounded read resolve the active or explicitly selected Snapshot before execution. Every returned item, citation, byte range, and Artifact identifier must belong to that Snapshot.
+Publish the source-specific `read`, `search_regex` and `get_status` relay Tools.
+The source identity is fixed in each immutable ToolDefinition. The ordinary Tool
+pipeline retains assignment, approval, hook, authorization and audit ownership.
+Publication creates a `<source>.access` ToolSet in the selected logical Instance,
+Tenant or Workspace scope; content and read sessions stay in the corresponding
+operational Workspace.
 
-The built-in `knowledge-retrieval-builtin` Flow provides deterministic local text search, query, and read over retained Storage publications or historical filesystem-backed Snapshot Artifacts. Search interleaves bounded matches across the Snapshot entries; it is not a model-backed semantic index. Binary interpretation, spreadsheet analysis, semantic search, or answer synthesis requires a different governed retrieval composition and any required Tools.
+Both reading and regex search may come first. Without `snapshotId` or `cursor`,
+they select the active usable Snapshot or prepare one through the existing
+projection and acquisition pipeline. Refresh restrictions in the table above
+still apply: a binding with refresh disabled cannot silently reacquire. Save
+**Automatic projection parameters** on the Source for implicit preparation.
+A pending result has `state: preparing`, `preparationId` and
+`retryAfterMilliseconds`; retry with that ID and the original request to continue
+the same attempt. Failure preserves the previous active Snapshot.
 
-A Knowledge Source may publish source-specific `search`, `query`, and `read` Tools. Their source identity and operation are fixed by the Tool definition, and the existing Tool pipeline and internal MCP provider retain authorization, assignment, execution, and audit ownership. Publication follows the selected logical Instance, Tenant or Workspace scope for the Tools and ToolSet; the exposure receipt and execution content remain in the corresponding operational Workspace ([ADR-0209](../decisions/0209-knowledge-tools-follow-the-publishing-console-scope.md)). The editor’s **Update dependencies** action explicitly saves the current configuration and updates dependency pins after confirmation; ordinary saving preserves the existing pins.
+| Tool | Request | Result |
+| --- | --- | --- |
+| `read` | Optional `snapshotId`, `documentId`, `range`, `maxCharacters`; or `cursor` only with an optional page size | Bounded chunks, exact Snapshot/document identities and `nextCursor` |
+| `search_regex` | `pattern`, optional `ignoreCase`, `snapshotId`, `limit`, `contextCharacters`; or `cursor` with optional limit | Matches with `matchRange`, `readRange`, excerpts and `nextCursor` |
+| `get_status` | Optional `snapshotId` to compare | Active versus latest published Snapshot, comparison flags, recorded input freshness, processing/failure evidence and document formats/sizes |
+
+To read a search hit, pass its result `snapshotId`, match `documentId` and
+`readRange` as the `range` of `read`. Offsets count Unicode scalar characters,
+start inclusive and end exclusive. This is independent of UTF-8 byte offsets and
+UTF-16 string positions. A read or regex cursor pins its original Snapshot, even
+if a new Snapshot becomes active. Continue using only the cursor and page size;
+combining it with a new selection is rejected. An expired or unavailable historical
+selection fails explicitly without switching to another Snapshot.
+
+Cursors are opaque, authenticated, caller/source/scope-bound and valid for one
+hour. Every call rechecks authorization. Durable leases protect in-progress
+Snapshot selections, with 256 conditional slots per Workspace. Reusing a lease
+does not extend expiry. Text reads are limited to 32,768 Unicode characters per
+page and 1 MiB per document. Regex scans are limited to 8 MiB, a 512-character
+pattern, 100 matches per page, a 100 ms engine timeout and 32,768 excerpt characters.
+Regex uses .NET non-backtracking syntax: lookarounds and backreferences are
+unsupported; scalar-splitting matches fail explicitly. Binary formats need an
+explicit transformation into supported UTF-8 text during preparation.
+
+`get_status` never triggers acquisition or projection. Its freshness evidence
+comes from the active Snapshot's recorded acquisitions; it does not verify remote
+origin changes. The active Snapshot can be older than the latest published one
+when a user intentionally reselects an older publication.
+
+The Console **Consultation** tab uses the same three operations. The editor's
+**Update dependencies** action saves the configuration and adopts changed
+Data Source and Flow dependencies after confirmation. Ordinary saving preserves
+unchanged pins.
+
+An optional custom `knowledge.retrieval/v1` Flow can still serve the historical
+`/search`, `/query` and `/read` REST endpoints. Native endpoints under
+`/api/knowledgesources/{name}/content/` are `read`, `search-regex` and `status`
+(all POST; preparation returns HTTP 202). Native access invokes no retrieval Flow
+and creates no synthetic Flow Run. See [ADR-0210](../decisions/0210-knowledge-exposes-native-snapshot-access-tools.md).
 
 ## Flow contract catalog
 
@@ -145,3 +194,5 @@ Artifact identity does not add retention guarantees to a provider. Retained
 Snapshot output still supports the builtin local implementation; Azure/OpenDAL
 requires its own qualified publication adapter. See
 [ADR-0208](../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md).
+
+Implementation evidence: [native Knowledge access validation](../architecture/implementation/knowledge-native-access-validation-2026-11-10.md).

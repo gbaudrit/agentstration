@@ -33,7 +33,7 @@ public static class KnowledgeFlowContracts
     };
 }
 
-public enum KnowledgeSourceOperation { Search, Query, Read }
+public enum KnowledgeSourceOperation { Search, Query, Read, SearchRegex, GetStatus }
 
 public readonly record struct KnowledgeSourceId(
     string Value,
@@ -67,6 +67,7 @@ public sealed record KnowledgeSourceProperties
     public string? Description { get; init; }
     public bool Enabled { get; init; } = true;
     public KnowledgeFlowTarget? RetrievalFlow { get; init; }
+    public JsonElement ProjectionParameters { get; init; } = JsonSerializer.SerializeToElement(new { });
     public IReadOnlyList<KnowledgeDataSourceBinding> DataSources { get; init; } = [];
     public KnowledgeFlowTarget? ProjectionFlow { get; init; }
     public KnowledgeOutputStorage? Output { get; init; }
@@ -134,7 +135,7 @@ public sealed record ResolvedKnowledgeDataSourceBinding
 public sealed record ResolvedKnowledgeSourceComposition
 {
     public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
-    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public IReadOnlyList<ResolvedKnowledgeDataSourceBinding> DataSources { get; init; } = [];
     public IReadOnlyDictionary<string, ResolvedKnowledgeFlowBinding> TransformationFlows { get; init; }
         = new Dictionary<string, ResolvedKnowledgeFlowBinding>(StringComparer.Ordinal);
@@ -171,7 +172,7 @@ public sealed record KnowledgeSourceToolExposureResource : Resource
     public ResourceScopeRef? KnowledgeSourceScopeRef { get; init; }
     public required string KnowledgeSourceName { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }
-    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public required ResourceReference ToolSet { get; init; }
     public required string ToolSetVersion { get; init; }
     public IReadOnlyList<KnowledgeSourceToolOperationExposure> Operations { get; init; } = [];
@@ -224,6 +225,8 @@ public sealed record KnowledgeProjectionManifest
 
 public sealed record StartKnowledgeProjectionRequest
 {
+    public Guid? ExpectedSourceUid { get; init; }
+    public long? ExpectedSourceGeneration { get; init; }
     public string? IdempotencyKey { get; init; }
     public IReadOnlyDictionary<string, string> AcquisitionIds { get; init; }
         = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -271,7 +274,7 @@ public sealed record KnowledgeProjectionResource : Resource
     public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }
     public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
-    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public IReadOnlyList<KnowledgeProjectionInputEvidence> Inputs { get; init; } = [];
     public IReadOnlyList<KnowledgeProjectionInputIssue> InputIssues { get; init; } = [];
     public required string ProjectionFlowRunId { get; init; }
@@ -366,7 +369,7 @@ public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
     public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
     public required string ProjectionFlowRunId { get; init; }
     public IReadOnlyList<KnowledgeProjectionInputEvidence> ProjectionInputs { get; init; } = [];
-    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public IReadOnlyList<KnowledgeSnapshotArtifact> Artifacts { get; init; } = [];
 }
 

@@ -23,7 +23,7 @@ else
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
     <EditForm Model="this" OnValidSubmit="RequestSaveAsync" FormName="knowledge-source-editor" class="panel form-section">
         <fieldset class="resource-definition-fields" disabled="@(busy || !interactive)" data-testid="knowledge-source-definition-fields" data-interactive="@(interactive ? "true" : "false")">
-        @if (!IsNew) { <div class="form-actions"><button class="button-secondary" type="submit" disabled="@(bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></div> }
+        @if (!IsNew) { <div class="form-actions"><button class="button-secondary" type="submit" disabled="@((enabled && !automaticParametersValid) || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></div> }
         <div class="form-grid">
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
             @if (IsNew)
@@ -40,7 +40,8 @@ else
             </select><small>@T("OutputStorageHelp")</small></label>
             <label class="form-field-wide"><span>@T("OutputPrefix")</span><input @bind="outputPrefix" data-testid="knowledge-output-prefix" /><small>@T("OutputPrefixHelp")</small></label>
             <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
-            <label><span>@T("RetrievalFlow")</span><select @bind="retrievalFlowKey" required data-testid="knowledge-source-retrieval-flow"><option value="">@T("SelectRetrievalFlow")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
+            <label><span>@T("NativeLegacyRetrieval")</span><select @bind="retrievalFlowKey" data-testid="knowledge-source-retrieval-flow"><option value="">@T("NativeNoRetrieval")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select><small>@T("NativeLegacyRetrievalHelp")</small></label>
+            <div class="form-span-2" data-testid="knowledge-automatic-parameters"><span>@T("NativeAutomaticParameters")</span><JsonSchemaInputEditor Schema="AutomaticParametersSchema" Value="automaticParameters" ValueChanged="value => automaticParameters = value" ValidationChanged="state => automaticParametersValid = state.IsValid" Disabled="busy" /><small>@T("NativeAutomaticParametersHelp")</small></div>
             <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
                 <div class="panel-header"><div><p class="eyebrow">@T("ProjectionInputs")</p><h2>@T("DataSourceBindings")</h2><p>@T("DataSourceBindingsHelp")</p></div><button class="button-secondary" type="button" @onclick="AddBinding">@T("AddDataSource")</button></div>
                 @if (bindings.Count == 0) { <p class="muted">@T("NoDataSourceBindings")</p> }
@@ -60,7 +61,7 @@ else
                 }
             </section>
         </div>
-        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))">@(busy ? T("Saving") : T("Save"))</button></div>
+        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || (enabled && !automaticParametersValid) || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))">@(busy ? T("Saving") : T("Save"))</button></div>
         </fieldset>
     </EditForm>
 }
@@ -93,6 +94,9 @@ else
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
         description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
+    private JsonElement automaticParameters = JsonSerializer.SerializeToElement(new { });
+    private bool automaticParametersValid = true;
+    private JsonElement? AutomaticParametersSchema => JsonSchemaInputSchema.ObjectProperty(projectionFlows.FirstOrDefault(value => value.Key == projectionFlowKey)?.InputSchema, "parameters");
     private bool enabled, busy, interactive, rebindDependencies, rebindRequested, confirmRebind, loading = true;
     private bool HasNativeDatasetInput => bindings.Any(binding => dataSources.Any(source => source.Definition.Dataset is not null && DataSourceKey(source) == binding.DataSourceKey));
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
@@ -127,6 +131,7 @@ else
                 displayName = snapshot.Value.Definition.DisplayName;
                 description = snapshot.Value.Definition.Description ?? string.Empty;
                 enabled = snapshot.Value.Definition.Enabled;
+                automaticParameters = snapshot.Value.Definition.ProjectionParameters.Clone();
                 savedOutput = snapshot.Value.Definition.Output;
                 outputStorageKey = savedOutput is null ? string.Empty : $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}";
                 outputPrefix = savedOutput?.Rule.Prefix ?? string.Empty;
@@ -140,7 +145,7 @@ else
             else
             {
                 projectionFlowKey = projectionFlows.FirstOrDefault(value => value.Name == "knowledge-projection-builtin")?.Key ?? string.Empty;
-                retrievalFlowKey = retrievalFlows.FirstOrDefault(value => value.Name == "knowledge-retrieval-builtin")?.Key ?? string.Empty;
+                retrievalFlowKey = string.Empty;
                 AddBinding();
             }
         }
@@ -152,7 +157,8 @@ else
     {
         if (!rebindRequested) return SaveAsync();
         rebindRequested = false;
-        if (!busy && interactive && !bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed)) confirmRebind = true;
+        if (!busy && interactive && (!enabled || automaticParametersValid)
+            && !bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed)) confirmRebind = true;
         return Task.CompletedTask;
     }
 
@@ -166,7 +172,7 @@ else
 
     private async Task SaveAsync()
     {
-        if (busy || !interactive || bindings.Any(value => value.TargetsLoadFailed)) return;
+        if (busy || !interactive || (enabled && !automaticParametersValid) || bindings.Any(value => value.TargetsLoadFailed)) return;
         busy = true;
         message = null;
         try
@@ -178,6 +184,7 @@ else
                 Enabled = enabled,
                 DataSources = bindings.Select(ToBinding).ToArray(),
                 ProjectionFlow = FlowTarget(projectionFlowKey),
+                ProjectionParameters = automaticParameters.Clone(),
                 RetrievalFlow = FlowTarget(retrievalFlowKey),
                 Output = OutputSelection()
             };

@@ -186,3 +186,32 @@ sequenceDiagram
 ```
 
 Structural anchors: **Runtime execution**, **Tool execution pipeline**, the external **AEP extensions** system, and optional provider services. Decisions: [ADR-0026](../../decisions/0026-out-of-process-aep-model-provider-extensions.md), [ADR-0027](../../decisions/0027-aep-tool-contributions-resolve-to-mcp.md), [ADR-0028](../../decisions/0028-tool-providers-governed-catalog.md), [ADR-0065](../../decisions/0065-model-providers-bind-extension-contributions.md), and [ADR-0094](../../decisions/0094-aep-extensions-initiate-enrollment.md).
+
+## Native Knowledge content access
+
+```mermaid
+sequenceDiagram
+    actor Agent
+    participant Tools as Governed Tool pipeline
+    participant Knowledge as Knowledge access service
+    participant Preparation as Acquisition and projection services
+    participant Storage as Storage publication gateway
+    Agent->>Tools: read or search_regex (either may be first)
+    Tools->>Knowledge: Fixed source identity + public request
+    Knowledge->>Knowledge: Authorize and select exact Snapshot
+    opt Missing or stale active Snapshot
+        Knowledge->>Preparation: Share idempotent preparation using saved parameters
+        Preparation-->>Knowledge: Snapshot, pending identity, or failure
+    end
+    Knowledge->>Storage: Reauthorize and read exact retained content
+    Storage-->>Knowledge: Bounded content with verified integrity
+    Knowledge-->>Agent: Chunks or matches + exact ranges + pinned cursor
+    Agent->>Tools: get_status(snapshotId)
+    Tools->>Knowledge: Inspect recorded state only
+    Knowledge-->>Agent: Active versus latest published + input freshness evidence
+```
+
+Preparation retains real governed Flow Runs. Reading and status inspection do not
+create retrieval Runs. Protected cursors and durable expiring read leases preserve
+an exact historical selection across later publication. See
+[ADR-0210](../../decisions/0210-knowledge-exposes-native-snapshot-access-tools.md).

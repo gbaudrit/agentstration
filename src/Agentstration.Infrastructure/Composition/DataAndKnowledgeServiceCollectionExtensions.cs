@@ -26,6 +26,12 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
         services.AddSingleton<IKnowledgeOutputPublisher, KnowledgeOutputPublisher>();
         services.AddSingleton<Agentstration.Storage.Contracts.IStorageUsageProvider, KnowledgeStorageUsageProvider>();
         services.AddSingleton<KnowledgeRetrievalService>();
+        services.AddSingleton<KnowledgeAccessService>();
+        services.AddSingleton<KnowledgeAccessTokenProtector>();
+        services.AddSingleton<IKnowledgeAccessTokenProtector>(provider => provider.GetRequiredService<KnowledgeAccessTokenProtector>());
+        services.AddSingleton<IKnowledgeAccessLifetime>(provider => provider.GetRequiredService<KnowledgeAccessTokenProtector>());
+        services.AddSingleton<IKnowledgeSnapshotContentReader, KnowledgeSnapshotContentReader>();
+        services.AddSingleton<IKnowledgeAccessToolResolver, KnowledgeAccessToolResolver>();
         services.AddHttpClient<IHttpContentFetcher, SafeHttpContentFetcher>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;

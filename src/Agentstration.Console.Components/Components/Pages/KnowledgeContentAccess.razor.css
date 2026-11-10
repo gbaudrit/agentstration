@@ -1,0 +1,10 @@
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+code {
+    overflow-wrap: anywhere;
+}
+article {
+    margin-block: 1rem;
+}

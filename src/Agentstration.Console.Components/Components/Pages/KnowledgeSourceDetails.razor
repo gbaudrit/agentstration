@@ -103,44 +103,7 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Retrieval)
     {
-        <section class="panel form-section knowledge-retrieval" data-testid="knowledge-retrieval-verification">
-        <div class="panel-header knowledge-retrieval-header"><div><p class="eyebrow">@T("Verification")</p><h2>@T("VerifyRetrieval")</h2><p>@T("RetrievalHelp")</p></div><span class="knowledge-retrieval-icon"><UiIcon Name="search" /></span></div>
-        <div class="knowledge-retrieval-form">
-            <label><span>@T("Operation")</span><select value="@retrievalOperation" data-testid="knowledge-retrieval-operation" @onchange="ChangeRetrievalOperation"><option value="search">@T("Operation.Search")</option><option value="query">@T("Operation.Query")</option><option value="read">@T("Operation.Read")</option></select></label>
-            <label><span>@T(retrievalOperation == "query" ? "Question" : retrievalOperation == "read" ? "ArtifactId" : "SearchText")</span>
-                @if (retrievalOperation == "read")
-                {
-                    <select value="@retrievalText" data-testid="knowledge-retrieval-artifact" @onchange="ChangeRetrievalArtifact"><option value="">@T("SelectArtifact")</option>@foreach (var artifact in RetrievalArtifacts) { <option value="@artifact.ArtifactId">@ArtifactOptionLabel(artifact)</option> }</select>
-                }
-                else
-                {
-                    <input @bind="retrievalText" data-testid="knowledge-retrieval-text" />
-                }
-            </label>
-            <label><span>@T("SnapshotOptional")</span><select value="@retrievalSnapshot" data-testid="knowledge-retrieval-snapshot" @onchange="ChangeRetrievalSnapshot"><option value="">@T("ActiveSnapshot")</option>@foreach (var snapshot in snapshots) { <option value="@snapshot.Snapshot.Name">@snapshot.Snapshot.Name</option> }</select></label>
-            <div class="knowledge-retrieval-actions"><button class="button-primary" type="button" disabled="@(!CanRunRetrieval)" data-testid="knowledge-retrieval-run" @onclick="VerifyRetrievalAsync"><UiIcon Name="play-circle" /><span>@T("RunVerification")</span></button></div>
-        </div>
-        @if (retrievalResult is not null)
-        {
-            <section class="knowledge-retrieval-result" role="status" data-testid="knowledge-retrieval-result">
-                <header><div><p class="eyebrow">@T("Results")</p><h3>@T("VerificationResult", OperationLabel(retrievalResult.Operation), retrievalResult.Items.Count)</h3></div><StatusBadge Text="@T("Completed")" Status="UiStatus.Success" /></header>
-                @if (!string.IsNullOrWhiteSpace(retrievalResult.Answer))
-                {
-                    <div class="knowledge-retrieval-answer"><strong>@T("SynthesizedAnswer")</strong><p>@retrievalResult.Answer</p></div>
-                }
-                <div class="knowledge-retrieval-items">
-                    @foreach (var item in retrievalResult.Items)
-                    {
-                        <article class="knowledge-retrieval-item">
-                            <header><a class="text-button knowledge-artifact-id-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(item.ArtifactId)}")" title="@item.ArtifactId"><code>@item.ArtifactId</code></a><small>@(item.MediaType ?? T("UnknownMediaType"))</small></header>
-                            @if (!string.IsNullOrWhiteSpace(item.Content)) { <pre>@item.Content</pre> }
-                        </article>
-                    }
-                </div>
-                <footer><span>@T("Snapshot") <a href="@SnapshotsUrl">@retrievalResult.SnapshotName</a></span><span>@T("FlowRun") <a href="@FlowRunUrl(retrievalResult.FlowRunId, EffectiveRetrievalSnapshot?.Snapshot.ScopeRef)">@retrievalResult.FlowRunId</a></span></footer>
-            </section>
-        }
-        </section>
+        <KnowledgeContentAccess SourceName="@Name" SourceNamespace="SourceNamespace" Snapshots="snapshots" />
     }
     else if (activeTab == DetailsTab.Tools)
     {
@@ -156,7 +119,7 @@ else if (source is not null && readiness is not null)
         {
             <DataGrid TItem="KnowledgeSourceToolOperationExposure" Items="exposure.Operations">
                 <Header><tr><th>@T("Operation")</th><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th></tr></Header>
-                <Row Context="operation"><tr><td>@operation.Operation</td><td><code>@operation.Capability</code></td><td><code>@operation.Route</code></td><td><a class="resource-name-link knowledge-tool-link" href="@ToolUrl(operation.Tool)" data-testid="knowledge-tool-link"><strong>@operation.Tool.Name</strong><span>@ToolNamespace(operation.Tool)</span></a></td></tr></Row>
+                <Row Context="operation"><tr><td>@OperationLabel(operation.Operation)</td><td><code>@operation.Capability</code></td><td><code>@operation.Route</code></td><td><a class="resource-name-link knowledge-tool-link" href="@ToolUrl(operation.Tool)" data-testid="knowledge-tool-link"><strong>@operation.Tool.Name</strong><span>@ToolNamespace(operation.Tool)</span></a></td></tr></Row>
             </DataGrid>
             <p class="resource-hint">@T("PinnedSourceHelp")</p>
         }
@@ -192,10 +155,9 @@ else if (source is not null && readiness is not null)
     private KnowledgeProjectionResource? selectedProjection;
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
     private KnowledgeSnapshotView? selectedSnapshot;
-    private KnowledgeRetrievalResult? retrievalResult;
     private bool loading = true, busy, failed, requiresApproval, confirmDelete, projectionParametersValid = true;
     private DetailsTab activeTab;
-    private string version = "1.0.0", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty,
+    private string version = "1.0.0",
         rawYaml = string.Empty;
     private JsonElement projectionParameters = JsonSerializer.SerializeToElement(new { });
     private string? etag, error, message, rawError;
@@ -211,12 +173,6 @@ else if (source is not null && readiness is not null)
     private JsonElement? ProjectionParametersSchema => JsonSchemaInputSchema.ObjectProperty(
         readiness?.Projection?.InputSchema, "parameters");
     private KnowledgeSnapshotView? ActiveSnapshot => snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active);
-    private KnowledgeSnapshotView? EffectiveRetrievalSnapshot => string.IsNullOrWhiteSpace(retrievalSnapshot)
-        ? snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active)
-        : snapshots.FirstOrDefault(value => value.Snapshot.Name == retrievalSnapshot);
-    private IReadOnlyList<KnowledgeSnapshotArtifact> RetrievalArtifacts => EffectiveRetrievalSnapshot?.Snapshot.Artifacts ?? [];
-    private bool CanRunRetrieval => !busy && !string.IsNullOrWhiteSpace(retrievalText)
-        && (retrievalOperation != "read" || RetrievalArtifacts.Any(value => value.ArtifactId == retrievalText));
     private string SnapshotsUrl => SourceNamespace.IsDefault
         ? $"/knowledge-sources/{Uri.EscapeDataString(Name)}?view=snapshots"
         : $"/knowledge-sources/{Uri.EscapeDataString(Name)}?namespace={Uri.EscapeDataString(SourceNamespace.Value)}&view=snapshots";
@@ -367,35 +323,12 @@ else if (source is not null && readiness is not null)
             new StartKnowledgeProjectionRequest { Parameters = projectionParameters.Clone(), IdempotencyKey = Guid.NewGuid().ToString("N") }, cancellation.Token);
     }, "ProjectionCompleted");
     private Task SelectSnapshotAsync(KnowledgeSnapshotView value) => RunActionAsync(async () => { await Client.SelectActiveSnapshotAsync(SourceNamespace, Name, value.Snapshot.Name, cancellation.Token); }, "SnapshotActivated");
-    private void ChangeRetrievalOperation(ChangeEventArgs arguments)
-    {
-        retrievalOperation = arguments.Value?.ToString() ?? "search";
-        retrievalText = string.Empty;
-        retrievalResult = null;
-    }
-    private void ChangeRetrievalSnapshot(ChangeEventArgs arguments)
-    {
-        retrievalSnapshot = arguments.Value?.ToString() ?? string.Empty;
-        if (retrievalOperation == "read") retrievalText = string.Empty;
-        retrievalResult = null;
-    }
-    private void ChangeRetrievalArtifact(ChangeEventArgs arguments)
-    {
-        retrievalText = arguments.Value?.ToString() ?? string.Empty;
-        retrievalResult = null;
-    }
     private Task ToggleEnabledAsync() => RunActionAsync(async () =>
     {
         var wasEnabled = source!.Definition.Enabled;
         var saved = await Client.SetEnabledAsync(SourceNamespace, Name, !wasEnabled, etag!, cancellation.Token);
         source = saved.Value; etag = saved.ETag; readiness = await Client.GetReadinessAsync(SourceNamespace, Name, cancellation.Token);
     }, source!.Definition.Enabled ? "SourceDisabled" : "SourceEnabled");
-    private Task VerifyRetrievalAsync() => RunActionAsync(async () => retrievalResult = retrievalOperation switch
-    {
-        "query" => await Client.QueryAsync(SourceNamespace, Name, new QueryKnowledgeRequest { Question = retrievalText.Trim(), SnapshotName = EmptyToNull(retrievalSnapshot) }, cancellation.Token),
-        "read" => await Client.ReadAsync(SourceNamespace, Name, new ReadKnowledgeRequest { ArtifactId = retrievalText.Trim(), SnapshotName = EmptyToNull(retrievalSnapshot) }, cancellation.Token),
-        _ => await Client.SearchAsync(SourceNamespace, Name, new SearchKnowledgeRequest { Query = retrievalText.Trim(), SnapshotName = EmptyToNull(retrievalSnapshot) }, cancellation.Token)
-    }, "VerificationCompleted");
     private async Task DeleteAsync()
     {
         if (busy) return;

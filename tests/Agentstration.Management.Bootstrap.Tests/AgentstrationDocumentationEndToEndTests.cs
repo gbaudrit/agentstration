@@ -112,9 +112,9 @@ public sealed class AgentstrationDocumentationEndToEndTests
         _ = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
             new("agentstration-documentation"), "1.0.0", false, default);
         var resourceStore = services.GetRequiredService<IResourceStore>();
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.search", "query");
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.query", "question");
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.read", "artifactId");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.search-regex", "pattern");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.get-status", "snapshotId");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.read", "maxCharacters");
 
         var toolExecution = services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
             new ToolDefinitionInvocation(
@@ -122,12 +122,12 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 new WorkspaceId(workspace.Id),
                 principal.Id,
                 ResourceNamespace.Default,
-                ToolDefinitionService.VersionName("agentstration-documentation.search", "1.0.0"),
+                ToolDefinitionService.VersionName("agentstration-documentation.access.search-regex", "1.0.0"),
                 "documentation-search-call",
                 "documentation-search-correlation",
-                JsonSerializer.SerializeToElement(new { request = new { query = "Workspace", limit = 5 } }),
-                ToolDefinitionCallerKind.Agent,
-                "agentstration-documentation-assistant"), default);
+                JsonSerializer.SerializeToElement(new { request = new { pattern = "Workspace", limit = 5 } }),
+                ToolDefinitionCallerKind.Console,
+                "documentation-administrator"), default);
         var toolResult = await worker.AwaitAsync(toolExecution);
         StringAssert.Contains(toolResult.Output!.Value.GetRawText(), "governed ownership");
 
@@ -157,9 +157,8 @@ public sealed class AgentstrationDocumentationEndToEndTests
         var schema = stored.Value.Definition.InputSchema;
         var request = schema.GetProperty("properties").GetProperty("request");
         Assert.IsTrue(request.GetProperty("properties").TryGetProperty(requiredRequestProperty, out _));
-        CollectionAssert.Contains(
-            request.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray(),
-            requiredRequestProperty);
+        Assert.IsInstanceOfType<RelayToolDefinitionProperties>(stored.Value.Definition);
+        Assert.IsFalse(schema.GetProperty("properties").TryGetProperty("source", out _));
         Assert.IsFalse(request.GetProperty("additionalProperties").GetBoolean());
     }
 

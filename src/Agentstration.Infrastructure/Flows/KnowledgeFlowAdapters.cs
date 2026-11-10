@@ -371,8 +371,8 @@ public sealed class KnowledgeFlowDeletionGuard(
         && string.Equals(target.Name, flowId.Value, StringComparison.Ordinal)
         && (target.Namespace ?? source.Namespace) == flowId.Namespace;
 
-    private static bool References(ResolvedKnowledgeFlowBinding binding, FlowId flowId) =>
-        string.Equals(binding.Name, flowId.Value, StringComparison.Ordinal)
+    private static bool References(ResolvedKnowledgeFlowBinding? binding, FlowId flowId) =>
+        binding is not null && string.Equals(binding.Name, flowId.Value, StringComparison.Ordinal)
         && binding.Namespace == flowId.Namespace;
 }
 

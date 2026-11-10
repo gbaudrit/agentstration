@@ -128,8 +128,9 @@ public sealed class KnowledgeProjectionService(
             throw Error("knowledge_projection_inputs_invalid", $"A KnowledgeSource requires 1 to {MaximumInputs} Data Source bindings.");
         if (source.Value.Definition.ProjectionFlow is null)
             throw Error("knowledge_projection_flow_required", "A KnowledgeSource projection Flow is required.");
-        if (source.Value.Definition.RetrievalFlow is null)
-            throw Error("knowledge_retrieval_flow_required", "A KnowledgeSource retrieval Flow is required.");
+        if (request.ExpectedSourceUid is { } expectedUid && source.Value.Uid != expectedUid
+            || request.ExpectedSourceGeneration is { } expectedGeneration && source.Value.Generation != expectedGeneration)
+            throw Error("knowledge_projection_configuration_changed", "The accepted Source configuration changed.");
 
         if (gates.Count >= 1024 && !gates.ContainsKey((context.WorkspaceId, source.Value.Uid)))
             throw Error("knowledge_projection_capacity", "The projection admission capacity has been reached.");
@@ -146,8 +147,8 @@ public sealed class KnowledgeProjectionService(
                     "The KnowledgeSource does not retain an exact dependency composition and must be recreated.");
             var projectionFlow = await ResolveFlowAsync(composition.ProjectionFlow,
                 KnowledgeFlowContracts.Projection, "projection", cancellationToken);
-            var retrievalFlow = await ResolveFlowAsync(composition.RetrievalFlow,
-                KnowledgeFlowContracts.Retrieval, "retrieval", cancellationToken);
+            // Preserve optional historical retrieval provenance without executing it during preparation.
+            var retrievalFlow = composition.RetrievalFlow;
             if (request.IdempotencyKey is { Length: > 200 })
                 throw Error("knowledge_projection_idempotency_invalid", "The idempotency key exceeds 200 characters.");
             var requestHash = Hash(JsonSerializer.SerializeToElement(new

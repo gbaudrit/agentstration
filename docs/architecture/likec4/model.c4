@@ -48,7 +48,7 @@ model {
           }
 
           knowledgeApi = component 'Knowledge.Api' {
-            description 'Knowledge Source projections, immutable Snapshots, retrieval, and source-specific Tool exposure transport'
+            description 'Knowledge Source projections, immutable Snapshots, native content reading, regex search, status, optional custom retrieval, and source-specific relay Tool exposure transport'
           }
 
           modelsApi = component 'Models.Api' {

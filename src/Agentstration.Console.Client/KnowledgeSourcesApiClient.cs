@@ -28,6 +28,10 @@ public interface IKnowledgeSourcesClient
     Task<KnowledgeRetrievalResult> SearchAsync(ResourceNamespace @namespace, string name, SearchKnowledgeRequest request, CancellationToken cancellationToken = default);
     Task<KnowledgeRetrievalResult> QueryAsync(ResourceNamespace @namespace, string name, QueryKnowledgeRequest request, CancellationToken cancellationToken = default);
     Task<KnowledgeRetrievalResult> ReadAsync(ResourceNamespace @namespace, string name, ReadKnowledgeRequest request, CancellationToken cancellationToken = default);
+    Task<KnowledgeAccessResult> ReadContentAsync(ResourceNamespace @namespace, string name, KnowledgeReadRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<KnowledgeAccessResult> SearchRegexAsync(ResourceNamespace @namespace, string name, KnowledgeRegexRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<KnowledgeAccessStatus> GetContentStatusAsync(ResourceNamespace @namespace, string name, KnowledgeStatusRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
 }
 
 public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledgeSourcesClient
@@ -147,6 +151,15 @@ public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledg
     public Task<KnowledgeRetrievalResult> ReadAsync(ResourceNamespace @namespace, string name,
         ReadKnowledgeRequest request, CancellationToken cancellationToken = default) =>
         PostAsync<KnowledgeRetrievalResult>(ChildPath(@namespace, name, "read"), request, cancellationToken);
+
+    public Task<KnowledgeAccessResult> ReadContentAsync(ResourceNamespace @namespace, string name, KnowledgeReadRequest request, CancellationToken cancellationToken = default) =>
+        PostAsync<KnowledgeAccessResult>(ChildPath(@namespace, name, "content/read"), request, cancellationToken);
+
+    public Task<KnowledgeAccessResult> SearchRegexAsync(ResourceNamespace @namespace, string name, KnowledgeRegexRequest request, CancellationToken cancellationToken = default) =>
+        PostAsync<KnowledgeAccessResult>(ChildPath(@namespace, name, "content/search-regex"), request, cancellationToken);
+
+    public Task<KnowledgeAccessStatus> GetContentStatusAsync(ResourceNamespace @namespace, string name, KnowledgeStatusRequest request, CancellationToken cancellationToken = default) =>
+        PostAsync<KnowledgeAccessStatus>(ChildPath(@namespace, name, "content/status"), request, cancellationToken);
 
     private async Task<ResourceSnapshot<T>> SendResourceAsync<T>(HttpMethod method, string path, object? body,
         string? etag, string? idempotencyKey, CancellationToken cancellationToken)

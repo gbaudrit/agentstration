@@ -59,6 +59,9 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<KnowledgeRetrievalSearchMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalQueryMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalReadMcpTool>(services);
+        AddInternalTool<KnowledgeContentReadMcpTool>(services);
+        AddInternalTool<KnowledgeContentRegexMcpTool>(services);
+        AddInternalTool<KnowledgeContentStatusMcpTool>(services);
         services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
         services.AddSingleton<InternalMcpToolProjectionService>();
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(

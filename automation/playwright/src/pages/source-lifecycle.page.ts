@@ -237,6 +237,7 @@ export class SourceLifecyclePage {
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), f.projectionFlow);
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
     await this.configureBinding(0, f.sources[0], 'primary');
+    await this.fillParameters(TestIds.sourceLifecycle.automaticParameters, { audience: 'operators', includeMetadata: true });
     await this.saveKnowledge();
     await this.updateKnowledgeDependencies(consoleUrl, text);
     const simple = await this.runProjection(consoleUrl);
@@ -490,6 +491,9 @@ export class SourceLifecyclePage {
 
   private async retrieve(consoleUrl: string, projection: Projection): Promise<void> {
     await this.openKnowledge(consoleUrl, 'retrieval');
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.nativeFields)).toHaveAttribute('data-interactive', 'true');
+    await this.page.getByTestId(TestIds.sourceLifecycle.retrievalOperation).selectOption('search_regex');
+    await this.page.getByTestId(TestIds.sourceLifecycle.retrievalSnapshot).selectOption(projection.snapshotName!);
     await this.page.getByTestId(TestIds.sourceLifecycle.retrievalText).fill('Schema-driven');
     await this.page.getByTestId(TestIds.sourceLifecycle.retrievalText).blur();
     await this.page.getByTestId(TestIds.sourceLifecycle.retrievalRun).click();
