@@ -6,7 +6,6 @@ metadata:
     category: documents
     vendor: microsoft
     product: microsoft-365
-    authentication: bearer-token
 definition:
   displayName: "SharePoint Online connection type"
   description: "Installs the SharePoint Online connection contract only. Configure service instances and credentials separately."

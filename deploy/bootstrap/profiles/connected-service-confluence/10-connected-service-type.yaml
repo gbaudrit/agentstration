@@ -7,9 +7,8 @@ metadata:
     category: documents
     vendor: atlassian
     product: confluence
-    authentication: api-token
 definition:
-  displayName: "Confluence Cloud (api-token)"
+  displayName: "Confluence Cloud"
   description: "One Confluence Cloud site and an account authenticated with email and API token. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

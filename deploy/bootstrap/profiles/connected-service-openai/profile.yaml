@@ -6,7 +6,6 @@ metadata:
     category: ai
     vendor: openai
     product: openai
-    authentication: api-key
 definition:
   displayName: "OpenAI connection type"
   description: "Installs the OpenAI connection contract only. Configure service instances and credentials separately."

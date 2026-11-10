@@ -7,9 +7,8 @@ metadata:
     category: development
     vendor: gitlab
     product: gitlab
-    authentication: access-token
 definition:
-  displayName: "GitLab (access-token)"
+  displayName: "GitLab"
   description: "One GitLab instance and an access-token principal. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

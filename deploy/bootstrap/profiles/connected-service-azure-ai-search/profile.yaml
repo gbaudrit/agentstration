@@ -6,7 +6,6 @@ metadata:
     category: search
     vendor: microsoft
     product: azure
-    authentication: api-key
 definition:
   displayName: "Azure AI Search connection type"
   description: "Installs the Azure AI Search connection contract only. Configure service instances and credentials separately."

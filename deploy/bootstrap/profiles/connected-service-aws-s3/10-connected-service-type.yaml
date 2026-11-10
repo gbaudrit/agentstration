@@ -7,9 +7,8 @@ metadata:
     category: storage
     vendor: aws
     product: aws
-    authentication: access-key
 definition:
-  displayName: "Amazon S3 (access-key)"
+  displayName: "Amazon S3"
   description: "One AWS principal and S3 endpoint/region context using access-key credentials. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

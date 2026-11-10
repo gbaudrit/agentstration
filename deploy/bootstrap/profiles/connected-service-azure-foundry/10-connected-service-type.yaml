@@ -7,9 +7,8 @@ metadata:
     category: ai
     vendor: microsoft
     product: azure
-    authentication: api-key
 definition:
-  displayName: "Microsoft Foundry (api-key)"
+  displayName: "Microsoft Foundry"
   description: "One Foundry project and inference endpoint authenticated with an API key. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

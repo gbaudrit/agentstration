@@ -6,7 +6,6 @@ metadata:
     category: database
     vendor: redis
     product: redis
-    authentication: username-password
 definition:
   displayName: "Redis connection type"
   description: "Installs the Redis connection contract only. Configure service instances and credentials separately."

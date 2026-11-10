@@ -7,9 +7,8 @@ metadata:
     category: documents
     vendor: google
     product: google-workspace
-    authentication: bearer-token
 definition:
-  displayName: "Google Drive (bearer-token)"
+  displayName: "Google Drive"
   description: "One Google identity and its explicitly authorized Drive content. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

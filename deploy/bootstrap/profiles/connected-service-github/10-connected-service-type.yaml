@@ -7,9 +7,8 @@ metadata:
     category: development
     vendor: github
     product: github
-    authentication: personal-access-token
 definition:
-  displayName: "GitHub (personal-access-token)"
+  displayName: "GitHub"
   description: "One GitHub API host and the permissions of a fine-grained personal access token. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

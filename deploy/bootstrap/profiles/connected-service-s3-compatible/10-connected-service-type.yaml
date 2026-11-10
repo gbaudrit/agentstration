@@ -7,9 +7,8 @@ metadata:
     category: storage
     vendor: generic
     product: s3
-    authentication: access-key
 definition:
-  displayName: "S3-compatible storage (access-key)"
+  displayName: "S3-compatible storage"
   description: "One explicitly selected S3-compatible service and principal. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

@@ -6,7 +6,6 @@ metadata:
     category: database
     vendor: postgresql
     product: postgresql
-    authentication: username-password
 definition:
   displayName: "PostgreSQL connection type"
   description: "Installs the PostgreSQL connection contract only. Configure service instances and credentials separately."

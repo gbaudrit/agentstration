@@ -6,7 +6,6 @@ metadata:
     category: database
     vendor: microsoft
     product: sql-server
-    authentication: username-password
 definition:
   displayName: "SQL Server / Azure SQL connection type"
   description: "Installs the SQL Server / Azure SQL connection contract only. Configure service instances and credentials separately."

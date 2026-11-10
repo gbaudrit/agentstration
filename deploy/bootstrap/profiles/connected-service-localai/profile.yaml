@@ -6,7 +6,6 @@ metadata:
     category: ai
     vendor: localai
     product: localai
-    authentication: bearer-token
 definition:
   displayName: "LocalAI connection type"
   description: "Installs the LocalAI connection contract only. Configure service instances and credentials separately."

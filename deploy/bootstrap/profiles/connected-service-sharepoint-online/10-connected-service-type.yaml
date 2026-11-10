@@ -7,9 +7,8 @@ metadata:
     category: documents
     vendor: microsoft
     product: microsoft-365
-    authentication: bearer-token
 definition:
-  displayName: "SharePoint Online (bearer-token)"
+  displayName: "SharePoint Online"
   description: "One SharePoint Online tenant reached through Microsoft Graph with an externally issued access token. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

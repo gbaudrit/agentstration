@@ -7,9 +7,8 @@ metadata:
     category: database
     vendor: postgresql
     product: postgresql
-    authentication: username-password
 definition:
-  displayName: "PostgreSQL (username-password)"
+  displayName: "PostgreSQL"
   description: "One PostgreSQL database and login role. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

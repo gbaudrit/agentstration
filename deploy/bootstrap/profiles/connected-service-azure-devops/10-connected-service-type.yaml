@@ -7,9 +7,8 @@ metadata:
     category: development
     vendor: microsoft
     product: azure-devops
-    authentication: personal-access-token
 definition:
-  displayName: "Azure DevOps (personal-access-token)"
+  displayName: "Azure DevOps"
   description: "One Azure DevOps organization and the permissions of a personal access token. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

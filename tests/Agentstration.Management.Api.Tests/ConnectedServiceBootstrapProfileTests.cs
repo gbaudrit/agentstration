@@ -68,7 +68,7 @@ public sealed class ConnectedServiceBootstrapProfileTests : ModelManagementApiTe
             Assert.AreEqual("1.0.0", version.Version);
             Assert.IsNull(version.OperationDiscovery);
             Assert.IsTrue(version.Exports.All(export => export.SourceInputId is not null));
-            foreach (var tag in new[] { "category", "vendor", "product", "authentication" })
+            foreach (var tag in new[] { "category", "vendor", "product" })
                 Assert.IsTrue(stored.Value.Metadata.Tags.ContainsKey(tag), $"{name}/{tag}");
         }
         var connectionsAfter = await store.ListAllAsync<ConnectedServiceResource>(ConnectedServiceResourceKinds.ConnectedService, default);

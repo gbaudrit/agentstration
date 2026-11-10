@@ -7,9 +7,8 @@ metadata:
     category: communication
     vendor: slack
     product: slack
-    authentication: bot-token
 definition:
-  displayName: "Slack (bot-token)"
+  displayName: "Slack"
   description: "One Slack app installation in one workspace. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

@@ -6,7 +6,6 @@ metadata:
     category: ai
     vendor: microsoft
     product: azure
-    authentication: api-key
 definition:
   displayName: "Azure OpenAI connection type"
   description: "Installs the Azure OpenAI connection contract only. Configure service instances and credentials separately."

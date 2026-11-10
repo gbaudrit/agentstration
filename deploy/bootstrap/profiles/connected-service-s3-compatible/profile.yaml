@@ -6,7 +6,6 @@ metadata:
     category: storage
     vendor: generic
     product: s3
-    authentication: access-key
 definition:
   displayName: "S3-compatible storage connection type"
   description: "Installs the S3-compatible storage connection contract only. Configure service instances and credentials separately."

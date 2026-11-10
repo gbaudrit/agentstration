@@ -7,9 +7,8 @@ metadata:
     category: database
     vendor: redis
     product: redis
-    authentication: username-password
 definition:
-  displayName: "Redis (username-password)"
+  displayName: "Redis"
   description: "One Redis deployment and ACL principal. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

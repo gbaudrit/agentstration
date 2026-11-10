@@ -7,9 +7,8 @@ metadata:
     category: ai
     vendor: localai
     product: localai
-    authentication: bearer-token
 definition:
-  displayName: "LocalAI (bearer-token)"
+  displayName: "LocalAI"
   description: "One LocalAI server protected by an API key. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

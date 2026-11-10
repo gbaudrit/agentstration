@@ -50,9 +50,15 @@ are not included in the default Development startup selection.
 
 Each profile creates one Instance-scoped `ConnectedServiceType` in namespace
 `agentstration.connected-services`, at version `1.0.0`. Its ordinary resource
-metadata carries `category`, `vendor`, `product` and `authentication` tags. These tags
+metadata carries `category`, `vendor` and `product` tags. These tags
 do not add new catalog filters or dependency resolution. Profiles remain independently
 selectable and use the existing composition order, preview digest and handlers.
+
+Type names and labels identify the external service, independently of authentication:
+there is one `GitHub` type, not a separate type per credential mechanism. The table
+below documents the bindings of the current immutable `1.0.0` versions. Support for
+multiple authentication modes through conditional requirements is tracked separately
+in [#1112](https://github.com/gbaudrit/agentstration/issues/1112).
 
 | Profile suffix / type name | Service | Authentication described by version 1.0.0 |
 |---|---|---|

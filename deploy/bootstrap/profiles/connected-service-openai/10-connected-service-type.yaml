@@ -7,9 +7,8 @@ metadata:
     category: ai
     vendor: openai
     product: openai
-    authentication: api-key
 definition:
-  displayName: "OpenAI (api-key)"
+  displayName: "OpenAI"
   description: "One OpenAI project and its configured API key. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

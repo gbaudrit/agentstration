@@ -6,7 +6,6 @@ metadata:
     category: storage
     vendor: microsoft
     product: azure
-    authentication: account-key
 definition:
   displayName: "Azure Storage connection type"
   description: "Installs the Azure Storage connection contract only. Configure service instances and credentials separately."

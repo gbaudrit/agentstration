@@ -7,9 +7,8 @@ metadata:
     category: ai
     vendor: microsoft
     product: azure
-    authentication: api-key
 definition:
-  displayName: "Azure OpenAI (api-key)"
+  displayName: "Azure OpenAI"
   description: "One Azure OpenAI resource authenticated with an API key. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

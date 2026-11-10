@@ -7,9 +7,8 @@ metadata:
     category: database
     vendor: microsoft
     product: sql-server
-    authentication: username-password
 definition:
-  displayName: "SQL Server / Azure SQL (username-password)"
+  displayName: "SQL Server / Azure SQL"
   description: "One SQL Server or Azure SQL database and SQL-authenticated login. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

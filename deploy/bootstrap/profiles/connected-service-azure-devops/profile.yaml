@@ -6,7 +6,6 @@ metadata:
     category: development
     vendor: microsoft
     product: azure-devops
-    authentication: personal-access-token
 definition:
   displayName: "Azure DevOps connection type"
   description: "Installs the Azure DevOps connection contract only. Configure service instances and credentials separately."

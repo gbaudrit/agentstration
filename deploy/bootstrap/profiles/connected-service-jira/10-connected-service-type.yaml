@@ -7,9 +7,8 @@ metadata:
     category: development
     vendor: atlassian
     product: jira
-    authentication: api-token
 definition:
-  displayName: "Jira Cloud (api-token)"
+  displayName: "Jira Cloud"
   description: "One Jira Cloud site and an account authenticated with email and API token. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

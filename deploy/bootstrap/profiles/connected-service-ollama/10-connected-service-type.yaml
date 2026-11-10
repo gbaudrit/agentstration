@@ -7,9 +7,8 @@ metadata:
     category: ai
     vendor: ollama
     product: ollama
-    authentication: none
 definition:
-  displayName: "Ollama (none)"
+  displayName: "Ollama"
   description: "One Ollama server reached without application authentication. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0

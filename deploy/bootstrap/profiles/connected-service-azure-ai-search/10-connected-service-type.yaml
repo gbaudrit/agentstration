@@ -7,9 +7,8 @@ metadata:
     category: search
     vendor: microsoft
     product: azure
-    authentication: api-key
 definition:
-  displayName: "Azure AI Search (api-key)"
+  displayName: "Azure AI Search"
   description: "One Azure AI Search service authenticated with an API key. Connection metadata only; execution requires an authorized compatible consumer."
   enabled: true
   preferredVersion: 1.0.0
