@@ -117,6 +117,9 @@ jobs:
       - name: Install Chromium
         working-directory: automation/playwright
         run: npx playwright install --with-deps chromium
+      - name: Test browser host port reservations
+        working-directory: automation/playwright
+        run: npm run test:fixtures
       - name: Run browser UX smoke tests
         working-directory: automation/playwright
         env:
