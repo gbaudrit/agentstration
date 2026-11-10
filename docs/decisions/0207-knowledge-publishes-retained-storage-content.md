@@ -1,4 +1,4 @@
-# ADR-0206: Knowledge publishes retained Storage content
+# ADR-0207: Knowledge publishes retained Storage content
 
 ## Status
 

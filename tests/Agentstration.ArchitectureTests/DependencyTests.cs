@@ -64,6 +64,18 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
+    public void OnlyAppHostReferencesTheAutonomousOpenDalExtension()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
+        var referencingProjects = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.OpenDal.csproj", StringComparison.Ordinal))
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { appHostProject }, referencingProjects);
+    }
+
+    [TestMethod]
     public void OpenApiDependenciesStayInsideTheAutonomousExtension()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");

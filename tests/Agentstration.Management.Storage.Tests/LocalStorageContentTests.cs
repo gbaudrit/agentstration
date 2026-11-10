@@ -19,7 +19,7 @@ public sealed class LocalStorageContentTests
         uid ?? Guid.NewGuid(), 1, "sha256:binding");
     private static AspAccessContext Access(StorageRevisionReference store) => new(
         new(store.StorageUid.ToString("N"), "builtin-local", store.BindingDigest), "caller", "access-v1", Policy);
-    private AspProviderWrite Write(string id, string key = "notes/item", string value = "hello", string? version = null) =>
+    private LocalContentWrite Write(string id, string key = "notes/item", string value = "hello", string? version = null) =>
         new(id, clock.GetUtcNow().AddMinutes(1), key, Encoding.UTF8.GetBytes(value), version);
 
     [TestCleanup]

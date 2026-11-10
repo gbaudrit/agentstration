@@ -8,7 +8,7 @@ and [PR #1088](https://github.com/gbaudrit/agentstration/pull/1088), compared wi
 The baseline includes the merged Data Source composition in #1084. Parallel ASP
 Sessions (#1086) and OpenDAL (#1082) are not prerequisites or qualified Snapshot
 providers. The implemented publication decision is
-[ADR-0206](../../decisions/0206-knowledge-publishes-retained-storage-content.md);
+[ADR-0207](../../decisions/0207-knowledge-publishes-retained-storage-content.md);
 accepted ADRs are preserved.
 
 ## Delivered verticals

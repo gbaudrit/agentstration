@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
@@ -403,6 +404,71 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         SelectConsoleContext(client, ResourceScopeRef.Workspace(bootstrap.WorkspaceId));
         using var foreign = await client.GetAsync($"/api/datasourceacquisitions/{one.Name}/content");
         Assert.AreEqual(HttpStatusCode.NotFound, foreign.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ContentWithAnUnversionedWriteReceiptIsVerifiedBeforeReturningTheRequestedRange()
+    {
+        var gateway = new UnversionedWriteStorage();
+        await using var baseFactory = Factory();
+        await using var factory = baseFactory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services => services.AddSingleton<IStorageContentGateway>(gateway)));
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var fixture = await PrepareAsync(factory.Services);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
+        var source = await factory.Services.GetRequiredService<DataSourceManagementService>()
+            .CreateAsync(Source("receipt-test", fixture, JsonSerializer.SerializeToElement(new { dataset = "alpha" })), default);
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, Owner);
+        var acquisition = await AcquireAsync(client, source.Value.Name);
+        Assert.IsNotNull(acquisition.Content);
+        Assert.IsNull(acquisition.Content.Version);
+        Assert.IsNotNull(acquisition.Content.Sha256);
+
+        var path = $"/api/datasourceacquisitions/{acquisition.Name}/content?offset=2&maximumBytes=4";
+        var response = await client.GetFromJsonAsync<StorageObjectContent>(path);
+        Assert.IsNotNull(response);
+        Assert.AreEqual(2L, response.Offset);
+        Assert.IsFalse(response.EndOfObject);
+        Assert.AreEqual(acquisition.Content.Sha256, response.Item.Sha256);
+        CollectionAssert.AreEqual(gateway.Bytes[2..6], Convert.FromBase64String(response.ContentBase64));
+
+        gateway.Bytes[^2] ^= 1; // Alter a byte outside the requested range without changing the length or metadata.
+        using var refused = await client.GetAsync(path);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        Assert.Contains("data_source_content_version_unavailable", await refused.Content.ReadAsStringAsync());
+    }
+
+    private sealed class UnversionedWriteStorage : IStorageContentGateway
+    {
+        private StorageObject? written;
+        public byte[] Bytes { get; private set; } = [];
+
+        private StorageObject Listed => written! with { Version = "current-version", Sha256 = null, Reference = "fresh-reference" };
+
+        public Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit, string? cursor = null,
+            CancellationToken cancellationToken = default) => Task.FromResult(new StorageObjectPage(written is null ? [] : [Listed], null));
+
+        public Task<StorageObject> StatAsync(StorageContentRequest target, string reference, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StorageObjectContent> ReadAsync(StorageContentRequest target, string reference, long offset, int maximumBytes,
+            CancellationToken cancellationToken = default)
+        {
+            Assert.AreEqual(Listed.Reference, reference);
+            var length = Math.Min(maximumBytes, Bytes.Length - (int)offset);
+            return Task.FromResult(new StorageObjectContent(Listed, offset,
+                Convert.ToBase64String(Bytes.AsSpan((int)offset, length)), offset + length == Bytes.Length));
+        }
+
+        public Task<StorageObject> WriteAsync(StorageContentRequest target, StorageWrite request, CancellationToken cancellationToken = default)
+        {
+            Bytes = Convert.FromBase64String(request.ContentBase64);
+            written = new(request.Key, null, Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(Bytes)), "write-reference");
+            return Task.FromResult(written);
+        }
     }
 
     [TestMethod]

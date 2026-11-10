@@ -232,7 +232,7 @@ public sealed record StartKnowledgeProjectionRequest
 }
 
 public sealed record KnowledgeStorageInput(StorageRevisionReference Storage, string Key,
-    string Version, long Length, string Sha256);
+    string? Version, long Length, string? Sha256);
 
 public sealed record KnowledgeProjectionInputEvidence
 {

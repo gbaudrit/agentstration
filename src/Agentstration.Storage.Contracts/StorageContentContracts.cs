@@ -9,7 +9,7 @@ public sealed record StorageContentPolicy(
 public sealed record StorageContentRequest(
     StorageRevisionReference Storage, StorageResolutionContext Consumer, StorageContentPolicy Policy);
 
-public sealed record StorageObject(string Key, string Version, long Length, string Sha256, string Reference);
+public sealed record StorageObject(string Key, string? Version, long Length, string? Sha256, string Reference);
 public sealed record StorageObjectPage(IReadOnlyList<StorageObject> Objects, string? Cursor);
 public sealed record StorageObjectContent(StorageObject Item, long Offset, string ContentBase64, bool EndOfObject);
 public sealed record StorageWrite(string RequestId, DateTimeOffset NotAfter, string Key,

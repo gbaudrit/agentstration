@@ -121,4 +121,4 @@ version or content reference.
 `StartKnowledgeProjectionRequest.idempotencyKey` is bounded to 200 characters.
 Conflicting reuse is refused. Pending attempts retain exact input evidence and
 resume through the ordinary Flow service. See
-[ADR-0206](../decisions/0206-knowledge-publishes-retained-storage-content.md).
+[ADR-0207](../decisions/0207-knowledge-publishes-retained-storage-content.md).

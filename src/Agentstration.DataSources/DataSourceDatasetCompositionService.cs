@@ -14,6 +14,7 @@ public sealed class DataSourceDatasetCompositionService(
     IDataSourceAcquisitionCompositionResolver flows)
 {
     public const string FlowContract = "connected-service-operation-acquisition/v1";
+    internal const int MaximumValueBytes = 64 * 1024;
 
     public async Task<ResolvedDataSourceDataset> ResolveAsync(DataSourceResource source,
         ResourceScopeRef consumer, CancellationToken cancellationToken)
@@ -64,7 +65,7 @@ public sealed class DataSourceDatasetCompositionService(
     public static void ValidateValue(JsonElement schema, JsonElement value)
     {
         ValidateSchema(schema);
-        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > 64 * 1024)
+        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > MaximumValueBytes)
             throw Invalid("data_source_parameters_invalid", "Operation values must be bounded JSON.");
         try { ToolInputSchemaValidator.Validate(schema, value); }
         catch (ToolInputValidationException)

@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
     <ProjectReference Include="../../asp/src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
     <ProjectReference Include="../../asp/samples/LocalStorage/LocalStorage.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" Aliases="openapi" />

@@ -598,6 +598,6 @@ adapter supports builtin local Storages using a namespace distinct from mutable
 ASP objects. Existing Artifact-only Snapshots remain readable through their
 receipts. Projection request identities and pending evidence support restart
 recovery through the existing worker; current authorization is checked again.
-See [ADR-0206](../../decisions/0206-knowledge-publishes-retained-storage-content.md).
+See [ADR-0207](../../decisions/0207-knowledge-publishes-retained-storage-content.md).
 The [implementation validation report](knowledge-snapshots-validation-2026-11-09.md)
 records the executed chain, required suite results and remaining UX gates.

@@ -76,7 +76,10 @@ public sealed class StorageContentGateway(
         CancellationToken cancellationToken = default) => await ExecuteAsync(target, async (context, policy, type, token) =>
     {
         AspValidation.Require(policy.Policy.CanWrite, "forbidden", "Write is not authorized.");
-        AspValidation.Write(new(request.RequestId, request.NotAfter, request.Key, request.ContentBase64, request.ExpectedVersion), policy, clock);
+        AspValidation.RequestId(request.RequestId);
+        AspValidation.DemandKey(policy, request.Key);
+        AspValidation.Deadline(request.NotAfter, clock);
+        if (request.ExpectedVersion is not null) AspValidation.RequestId(request.ExpectedVersion);
         var bytes = AspValidation.Content(request.ContentBase64, policy.Policy.MaxWriteBytes);
         if (!IsLocal(type)) return await remote.WriteAsync(context, target, type, policy, request, token);
         return Public(await local.WriteAsync(context.Reference, policy,

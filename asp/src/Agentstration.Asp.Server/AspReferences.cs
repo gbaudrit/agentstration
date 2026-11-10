@@ -8,16 +8,16 @@ namespace Agentstration.Asp.Server;
 internal sealed class AspReferences(TimeProvider clock)
 {
     private readonly byte[] secret = RandomNumberGenerator.GetBytes(32);
-    private sealed record Token(string Kind, string Scope, string Key, long Expires, string? Version = null);
+    private sealed record Token(string Kind, string Scope, string Key, long Expires, string? Version = null, string? ETag = null);
 
-    public string Seal(string kind, AspAccessContext context, string key, string? version = null, string? query = null)
+    public string Seal(string kind, AspAccessContext context, string key, string? version = null, string? query = null, string? etag = null)
     {
         var body = JsonSerializer.SerializeToUtf8Bytes(new Token(kind, Scope(context, query), key,
-            clock.GetUtcNow().AddMinutes(15).ToUnixTimeSeconds(), version), AspProtocol.JsonOptions);
+            clock.GetUtcNow().AddMinutes(15).ToUnixTimeSeconds(), version, etag), AspProtocol.JsonOptions);
         return Convert.ToBase64String(body) + "." + Convert.ToBase64String(HMACSHA256.HashData(secret, body));
     }
 
-    public (string Key, string? Version) Open(string token, string kind, AspAccessContext context, string? query = null)
+    public (string Key, string? Version, string? ETag) Open(string token, string kind, AspAccessContext context, string? query = null)
     {
         try
         {
@@ -32,7 +32,7 @@ internal sealed class AspReferences(TimeProvider clock)
             AspValidation.Require(value.Kind == kind && value.Scope == Scope(context, query)
                 && value.Expires > clock.GetUtcNow().ToUnixTimeSeconds(), "invalid_reference", "Reference scope or lifetime does not match.");
             AspValidation.DemandKey(context, value.Key);
-            return (value.Key, value.Version);
+            return (value.Key, value.Version, value.ETag);
         }
         catch (Exception exception) when (exception is FormatException or JsonException or NullReferenceException)
         { throw new AspException("invalid_reference", "Invalid reference."); }

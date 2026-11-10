@@ -16,7 +16,7 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
     private sealed record State(Dictionary<string, Entry> Objects, Dictionary<string, Receipt> Receipts);
 
     public async Task<AspProviderObject> WriteAsync(StorageRevisionReference storage, AspAccessContext context,
-        AspProviderWrite request, CancellationToken cancellationToken)
+        LocalContentWrite request, CancellationToken cancellationToken)
     {
         Validate(store: storage, context);
         AspValidation.Require(context.Policy.CanWrite, "forbidden", "Write is not authorized.");
@@ -25,7 +25,10 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
         var directory = paths.EnsureDirectoryFor(storage);
         await using var lease = await LockAsync(directory, cancellationToken);
         // Validate again after waiting for another process, at the commit boundary.
-        AspValidation.Write(new(request.RequestId, request.NotAfter, request.Key, "", request.ExpectedVersion), context, clock);
+        AspValidation.RequestId(request.RequestId);
+        AspValidation.DemandKey(context, request.Key);
+        AspValidation.Deadline(request.NotAfter, clock);
+        if (request.ExpectedVersion is not null) AspValidation.RequestId(request.ExpectedVersion);
         var state = await ReadStateAsync(directory, cancellationToken);
         var identity = AspValidation.Digest(JsonSerializer.SerializeToUtf8Bytes(new
         { context.Store, context.Subject, context.AuthorizationRevision, request.RequestId }, Json));
@@ -69,14 +72,14 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
     }
 
     public async Task<AspProviderObject> StatAsync(StorageRevisionReference storage, AspAccessContext context,
-        string key, string version, CancellationToken cancellationToken)
+        string key, string? version, CancellationToken cancellationToken)
     {
         AspValidation.Require(context.Policy.CanStat, "forbidden", "Stat is not authorized.");
         return (await FindAsync(storage, context, key, version, cancellationToken)).Item;
     }
 
-    public async Task<AspProviderRead> ReadAsync(StorageRevisionReference storage, AspAccessContext context,
-        string key, string version, long offset, int maximumBytes, CancellationToken cancellationToken)
+    public async Task<LocalContentRead> ReadAsync(StorageRevisionReference storage, AspAccessContext context,
+        string key, string? version, long offset, int maximumBytes, CancellationToken cancellationToken)
     {
         AspValidation.Require(context.Policy.CanRead, "forbidden", "Read is not authorized.");
         AspValidation.Require(offset >= 0 && maximumBytes > 0 && maximumBytes <= context.Policy.MaxReadBytes,
@@ -141,7 +144,7 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
     }
 
     private async Task<Entry> FindAsync(StorageRevisionReference storage, AspAccessContext context,
-        string key, string version, CancellationToken cancellationToken)
+        string key, string? version, CancellationToken cancellationToken)
     {
         Validate(store: storage, context);
         AspValidation.DemandKey(context, key);
@@ -159,3 +162,6 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
             "forbidden", "The provider context does not match the exact logical Storage.");
     }
 }
+
+public sealed record LocalContentWrite(string RequestId, DateTimeOffset NotAfter, string Key, byte[] Content, string? ExpectedVersion);
+public sealed record LocalContentRead(AspProviderObject Item, byte[] Content, bool EndOfObject);

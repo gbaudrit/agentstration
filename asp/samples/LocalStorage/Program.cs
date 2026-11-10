@@ -47,7 +47,7 @@ public sealed class Program
         if (args.Length == 2 && args[0] == "--schemas")
         {
             Directory.CreateDirectory(args[1]);
-            foreach (var operation in new[] { "describe", "list", "stat", "read", "write" })
+            foreach (var operation in new[] { "describe", "list", "stat", "read_text", "read_blob", "write_text", "write_blob", "close_read", "abort_write", "write_status" })
             {
                 await File.WriteAllTextAsync(Path.Combine(args[1], operation + ".input.json"), AspSchemas.Input(operation).GetRawText() + "\n");
                 await File.WriteAllTextAsync(Path.Combine(args[1], operation + ".output.json"), AspSchemas.Output(operation).GetRawText() + "\n");
@@ -86,16 +86,39 @@ public sealed class Program
             using var http = new HttpClient();
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", app.Services.GetRequiredService<SampleAccess>().Token);
             await using var mcp = await McpClient.CreateAsync(new HttpClientTransport(new()
-                { Endpoint = new Uri(app.Urls.Single() + "/mcp") }, http));
+            { Endpoint = new Uri(app.Urls.Single() + "/mcp") }, http));
             var client = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.FirstStore);
             var bytes = Encoding.UTF8.GetBytes("{\"Opaque_KEY\":{\"Value\":42}}");
-            var written = await client.WriteAsync(new("demo-write", DateTimeOffset.UtcNow.AddMinutes(2), "notes/example.json", Convert.ToBase64String(bytes)));
+            var written = await client.WriteBlobAsync(new("demo-write", 0, true, Convert.ToBase64String(bytes), Options: new("notes/example.json"), NotAfter: DateTimeOffset.UtcNow.AddMinutes(2)));
             var page = await client.ListAsync(new("demo-list", "notes/", 1));
-            var metadata = await client.StatAsync(new("demo-stat", written.Item.Reference));
-            var content = await client.ReadAsync(new("demo-read", page.Objects.Single().Reference, 0, 4096));
+            var metadata = await client.StatAsync(new("demo-stat", written.Receipt!.Item.Reference));
+            // A small complete text call and a complete binary call use the same session API.
+            var deadline = DateTimeOffset.UtcNow.AddMinutes(2);
+            var text = await client.WriteTextAsync(new("text-write", 0, true, "é🌍\r\n", Options: new("notes/text"), NotAfter: deadline));
+            var completeText = await client.ReadTextAsync(new("text-read", Selection: new(text.Receipt!.Item.Reference, PreferredChunkSizeBytes: 100), NotAfter: deadline));
+            var completeBlob = await client.ReadBlobAsync(new("blob-read", Selection: new(written.Receipt.Item.Reference, PreferredChunkSizeBytes: 100), NotAfter: deadline));
+            // Progressive text preserves exact characters; only the first call supplies options/deadline.
+            var firstText = await client.WriteTextAsync(new("text-first", 0, false, "é", Options: new("notes/progressive-text"), NotAfter: deadline));
+            var lastText = await client.WriteTextAsync(new("text-last", 1, true, "🌍", SessionRef: firstText.SessionRef));
+            var firstRead = await client.ReadTextAsync(new("text-progressive-read", Selection: new(lastText.Receipt!.Item.Reference, PreferredChunkSizeBytes: 1), NotAfter: deadline));
+            var collected = new StringBuilder(firstRead.Content);
+            for (var current = firstRead; !current.Final;)
+            {
+                current = await client.ReadTextAsync(new("text-read-" + (current.Sequence + 1), current.Sequence + 1, current.SessionRef));
+                collected.Append(current.Content);
+            }
+            // Stream adapters use progressive binary sessions and bounded buffers.
+            await using var output = client.OpenWriteStream(new("notes/progressive-blob"), "stream-write", deadline);
+            await output.WriteAsync(bytes);
+            var receipt = await output.CompleteAsync();
+            await using var input = client.OpenReadStream(new(receipt.Item.Reference), "stream-read", deadline);
+            using var content = new MemoryStream();
+            await input.CopyToAsync(content);
+            var range = await client.ReadBlobAsync(new("range-read", Selection: new(receipt.Item.Reference, new(2, 4), 100), NotAfter: deadline));
             var readonlyClient = await AspClient.ConnectAsync(mcp, "asp", SampleAccess.ReadOnlyStore);
             Console.WriteLine($"ASP {client.Description.AspVersion}: {metadata.Length} bytes, write={client.Description.Capabilities.Write}, readonly.write={readonlyClient.Description.Capabilities.Write}");
-            Console.WriteLine(Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)));
+            Console.WriteLine(Encoding.UTF8.GetString(content.ToArray()));
+            Console.WriteLine($"Complete text/blob: {completeText.ByteLength}/{completeBlob.ByteLength} bytes; progressive text: {collected}; range: {range.Offset}+{range.ByteLength}");
         }
         finally { await app.StopAsync(); await app.DisposeAsync(); }
     }

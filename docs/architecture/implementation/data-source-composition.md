@@ -29,7 +29,10 @@ for ownership, the compatibility decision and routes.
    separate composition evidence, not resolved connection credentials.
 6. Read bounded content through the acquisition content endpoint. It checks
    the dataset, Workspace and Storage again, renews the opaque reference and
-   refuses a changed version. Content is data, never executable markup.
+   refuses a changed pinned version. If the write receipt has no provider
+   version or the listing omits its checksum, the reader verifies the complete
+   bounded object against the saved SHA-256 before returning the requested range.
+   The Storage read limit still applies. Content is data, never executable markup.
 
 The Console uses the shared schema editor, complete neutral/French resources,
 explicit activation on the Connected Service, and revision selection on the

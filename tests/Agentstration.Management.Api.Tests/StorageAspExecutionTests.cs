@@ -303,13 +303,14 @@ public sealed class StorageAspExecutionTests : ModelManagementApiTestBase
 
     private sealed class FixtureObjects : IAspObjectReader, IAspObjectWriter
     {
-        private readonly MemoryObjectProvider inner = new(TimeProvider.System);
+        private readonly MemoryObjectProvider inner = new();
         public string ProviderId => inner.ProviderId;
         public string ProviderVersion => inner.ProviderVersion;
         public JsonElement ConfigurationSchema => Schema;
+        public AspTransferCapabilities Transfers => inner.Transfers;
         public ValueTask<AspProviderPage> ListAsync(AspAccessContext context, string prefix, string? afterKey, int limit, CancellationToken cancellationToken) => inner.ListAsync(context, prefix, afterKey, limit, cancellationToken);
-        public ValueTask<AspProviderObject> StatAsync(AspAccessContext context, string key, string version, CancellationToken cancellationToken) => inner.StatAsync(context, key, version, cancellationToken);
-        public ValueTask<AspProviderRead> ReadAsync(AspAccessContext context, string key, string version, long offset, int maxBytes, CancellationToken cancellationToken) => inner.ReadAsync(context, key, version, offset, maxBytes, cancellationToken);
-        public ValueTask<AspProviderObject> WriteAsync(AspAccessContext context, AspProviderWrite request, CancellationToken cancellationToken) => inner.WriteAsync(context, request, cancellationToken);
+        public ValueTask<AspProviderObject> StatAsync(AspAccessContext context, string key, string? version, string? etag, CancellationToken cancellationToken) => inner.StatAsync(context, key, version, etag, cancellationToken);
+        public ValueTask<AspReadHandle> OpenReadAsync(AspAccessContext context, string key, string? version, string? etag, AspByteRange? range, CancellationToken cancellationToken) => inner.OpenReadAsync(context, key, version, etag, range, cancellationToken);
+        public ValueTask<IAspWriteHandle> OpenWriteAsync(AspAccessContext context, AspWriteOptions options, CancellationToken cancellationToken) => inner.OpenWriteAsync(context, options, cancellationToken);
     }
 }

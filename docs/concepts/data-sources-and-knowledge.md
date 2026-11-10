@@ -121,4 +121,4 @@ The contract value is a classification and schema boundary, not a new deployment
 
 See [ADR-0164](../decisions/0164-data-sources-own-governed-acquisition.md), [ADR-0166](../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0167](../decisions/0167-knowledge-sources-project-data-source-artifacts.md).
 
-See [ADR-0206](../decisions/0206-knowledge-publishes-retained-storage-content.md) for publication limits and recovery semantics.
+See [ADR-0207](../decisions/0207-knowledge-publishes-retained-storage-content.md) for publication limits and recovery semantics.

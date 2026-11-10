@@ -96,7 +96,7 @@ if (args[0] == "write")
     await historical.ResetAsync(workspace, "historical-proof", default);
     _ = await historical.WriteAsync(workspace, "historical-proof", 0, bytes, default);
     await File.WriteAllTextAsync(statePath, JsonSerializer.Serialize(new Proof(resource.Uid, context.WorkspaceId,
-        written.Reference, written.Sha256, completed.Value.ArtifactId.ToString(), opaque), json));
+        written.Reference, written.Sha256 ?? throw new InvalidOperationException("The selected backend supplied no digest."), completed.Value.ArtifactId.ToString(), opaque), json));
     Console.WriteLine($"write: Storage={resource.Uid:N}; content and Artifact receipt committed");
 }
 else
