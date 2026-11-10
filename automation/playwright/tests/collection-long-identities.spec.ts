@@ -14,7 +14,7 @@ for (const variant of [
 ] as const) {
   test.describe(variant.name, () => {
     test.use({ viewport: { width: variant.width, height: variant.height }, colorScheme: variant.theme, locale: variant.locale });
-    test(`long owners and homonymous identities ${variant.tag} @collections @smoke`, async ({ page, product }) => {
+    test(`long owners and homonymous identities ${variant.tag} @collections @smoke`, async ({ page, product }, testInfo) => {
       const pages = new ProductPages(page);
       await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
       await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);
@@ -23,6 +23,8 @@ for (const variant of [
       const fixture = await collections.prepareLongOwnerHomonyms(product.consoleUrl);
       await collections.inspectLongOwnerHomonyms(product.consoleUrl, fixture, variant.width < 761);
       await collections.inspect(variant.locale);
+      await collections.showOwnerDisclosure(fixture.owner, variant.width < 761);
+      await testInfo.attach('long-owner-disclosure', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     });
   });
 }

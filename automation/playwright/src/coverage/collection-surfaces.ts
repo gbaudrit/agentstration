@@ -29,9 +29,13 @@ export const collectionSurfaces = [...collectionManifest.frames, ...collectionMa
   populatedSpecification: 'tests/collection-workflows.spec.ts',
   identitySpecification: 'tests/collection-long-identities.spec.ts',
   domainSpecifications: [...new Set(applicationSurfaces.filter(routeSurface =>
-    routeSurface.host === surface.host && (routeSurface.source === surface.source
+    routeSurface.coverage !== 'planned' && routeSurface.host === surface.host && (routeSurface.source === surface.source
       || routeSurface.routes.some(route => surface.routes.includes(route))),
   ).map(routeSurface => routeSurface.specification))],
+  preexistingTrackingIssues: [...new Set(applicationSurfaces.filter(routeSurface =>
+    routeSurface.host === surface.host && routeSurface.trackingIssue !== undefined
+      && (routeSurface.source === surface.source || routeSurface.routes.some(route => surface.routes.includes(route))),
+  ).map(routeSurface => routeSurface.trackingIssue!))],
   // Shared shell widgets/timelines do not have their own route declaration.
   sharedHostSpecifications: surface.routes.length ? [] : [surface.host === 'workplace'
     ? 'tests/workplace.spec.ts' : 'tests/console-administration.spec.ts'],

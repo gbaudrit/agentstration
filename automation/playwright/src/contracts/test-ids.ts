@@ -1,5 +1,5 @@
 export const TestIds = {
-  toolCategories: { editor: 'resource-tool-category-editor', displayName: 'category-display-name' },
+  collections: { modelProfileOverview: 'model-profile-overview' },
   common: {
     iconPicker: 'icon-picker',
     schemaInputEditor: 'schema-input-editor',

@@ -1,3 +1,4 @@
+import { ExecutionScopesPage } from './execution-scopes.page.js';
 import { randomUUID } from 'node:crypto';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
@@ -18,7 +19,7 @@ export class CollectionContractPage {
 
   public async open(consoleUrl: string, route: string): Promise<void> {
     const url = new URL(route, consoleUrl);
-    if (['/resource-plans', '/workspaces'].includes(url.pathname)) {
+    if (['/resource-plans', '/workspaces', '/account/pat'].includes(url.pathname)) {
       const response = await this.page.request.get(`${consoleUrl}/api/identity/context`);
       expect(response.ok()).toBeTruthy();
       const identity = await response.json() as { availableWorkspaces: Array<{ id: string; name: string }> };
@@ -99,7 +100,7 @@ export class CollectionContractPage {
 
   public async prepareLongOwnerHomonyms(consoleUrl: string): Promise<{ scope: string; owner: string; namespaces: string[] }> {
     const suffix = randomUUID().slice(0, 8);
-    const owner = 'International research, development and operations — ' + 'long-tenant-name-'.repeat(6);
+    const owner = ('International research, development and operations — ' + 'long-tenant-name-'.repeat(6)).slice(0, 120);
     const tenant = await this.page.request.post(`${consoleUrl}/api/identity/tenants`, {
       headers: { 'X-Agentstration-Context': '/instance' },
       data: { name: `collection-${suffix}`, displayName: owner },
@@ -107,24 +108,36 @@ export class CollectionContractPage {
     expect(tenant.status(), await tenant.text()).toBe(201);
     const scope = `/tenants/${(await tenant.json()).id}`;
     const namespaces = [`collection-${suffix}-long-qualified-resource-identity`, `collection-${suffix}-other`];
+    const execution = new ExecutionScopesPage(this.page);
+    await execution.ensureFixture(consoleUrl);
+    const provider = await this.page.request.get(`${consoleUrl}/api/modelproviders/execution-scope-ollama?scopeRef=%2Finstance`, {
+      headers: { 'X-Agentstration-Context': '/instance' },
+    });
+    expect(provider.ok(), await provider.text()).toBeTruthy();
+    await execution.grantDescendantUse(consoleUrl, await provider.json(), scope);
     for (const namespace of namespaces) {
-      const category = await this.page.request.post(`${consoleUrl}/api/toolcategories`, {
+      const profile = await this.page.request.post(`${consoleUrl}/api/modelprofiles`, {
         headers: { 'X-Agentstration-Context': scope },
-        data: { name: 'same-category', namespace, scopeRef: scope, properties: { displayName: 'Shared category', tools: [] } },
+        data: { name: 'same-profile', namespace, scopeRef: scope, properties: {
+          displayName: 'Shared profile', provider: { name: 'execution-scope-ollama', namespace: 'default', scopeRef: '/instance' },
+          model: { name: 'qwen3:1.7b' }, generation: { temperature: 0 }, reasoning: { mode: 0 },
+          output: { format: 0, strict: false }, providerOptions: {}, secretBindings: [],
+        } },
       });
-      expect(category.status(), await category.text()).toBe(201);
+      expect(profile.status(), await profile.text()).toBe(201);
     }
     return { scope, owner, namespaces };
   }
 
   public async inspectLongOwnerHomonyms(consoleUrl: string, fixture: { scope: string; owner: string; namespaces: string[] }, touch: boolean): Promise<void> {
     const open = async () => {
-      expect((await this.page.goto(`${consoleUrl}/tools/categories?context=${encodeURIComponent(fixture.scope)}`))?.ok()).toBeTruthy();
-      await expect(this.page.locator('.collection-identity')).toHaveCount(2);
+      expect((await this.page.goto(`${consoleUrl}/modelprofiles?context=${encodeURIComponent(fixture.scope)}`))?.ok()).toBeTruthy();
+      await expect(this.page.locator('.collection-identity').filter({ hasText: 'same-profile' })).toHaveCount(2);
     };
     await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await open();
-    const scope = this.page.locator('.resource-owner-scope').first();
+    const row = this.page.locator('.resource-collection tbody > tr, .collection-card').filter({ hasText: `${fixture.namespaces[0]}/same-profile` });
+    const scope = row.locator('.resource-owner-scope');
     const disclosure = scope.locator('.disclosure-trigger');
     await expect(scope.locator('.resource-scope-badge')).toBeVisible();
     await expect(disclosure).toHaveAccessibleName(fixture.owner);
@@ -150,7 +163,7 @@ export class CollectionContractPage {
     this.page.on('request', track);
     try {
       for (const namespace of fixture.namespaces) {
-        const identity = this.page.locator('.collection-identity').filter({ hasText: `${namespace}/same-category` });
+        const identity = this.page.locator('.collection-identity').filter({ hasText: `${namespace}/same-profile` });
         const link = identity.locator('.resource-name-link');
         const url = new URL((await link.getAttribute('href'))!, consoleUrl);
         expect(url.searchParams.get('namespace')).toBe(namespace);
@@ -158,21 +171,29 @@ export class CollectionContractPage {
         expect(url.searchParams.get('context')).toBe(fixture.scope);
         const before = this.page.url();
         await identity.locator('.copy-value').click();
-        await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(`${namespace}/same-category`);
+        await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(`${namespace}/same-profile`);
         expect(this.page.url()).toBe(before);
       }
-      await this.inspectMenu(this.page.locator('.collection-actions-menu').first());
+      await this.inspectMenu(row.locator('.collection-actions-menu'));
       await disclosure.focus();
       await this.page.keyboard.press('Escape');
       expect(requests).toEqual([]);
     } finally { this.page.off('request', track); }
     for (const namespace of fixture.namespaces) {
-      await this.page.locator('.collection-identity').filter({ hasText: `${namespace}/same-category` }).locator('.resource-name-link').click();
-      await expect(this.page.getByTestId(TestIds.toolCategories.editor)).toBeVisible();
+      await this.page.locator('.collection-identity').filter({ hasText: `${namespace}/same-profile` }).locator('.resource-name-link').click();
+      await expect(this.page.getByTestId(TestIds.resourceAdministration.modelProfileEditor)).toBeVisible();
       expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(namespace);
-      await expect(this.page.getByTestId(TestIds.toolCategories.displayName)).toHaveValue('Shared category');
+      const overview = this.page.getByTestId(TestIds.collections.modelProfileOverview);
+      await expect(overview).toContainText('Shared profile');
+      await expect(overview.getByText(namespace, { exact: true })).toBeVisible();
       await open();
     }
+  }
+
+  public async showOwnerDisclosure(owner: string, touch: boolean): Promise<void> {
+    const trigger = this.page.getByRole('button', { name: owner, exact: true }).first();
+    if (touch) await trigger.tap(); else await trigger.focus();
+    await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(owner);
   }
 
   public async inspectMenu(menu: Locator): Promise<void> {

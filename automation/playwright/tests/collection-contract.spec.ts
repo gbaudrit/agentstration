@@ -20,12 +20,22 @@ const routes = [
   '/settings/organization/security-audit', '/settings/organization/structure', '/settings', '/account/pat',
 ] as const;
 
-for (const route of routes) {
-  test(`collection contract ${route} @collections @smoke`, async ({ page, product, context }) => {
-    const pages = new ProductPages(page);
-    const journeyContext = { ...product, pages, checkpoint: ignoreCheckpoints };
-    await authenticateConsole(journeyContext, {});
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await inspectCollections(journeyContext, { route });
+for (const variant of [
+  { name: 'desktop English dark', locale: 'en-US', theme: 'dark', width: 1440, height: 1000, tag: '' },
+  { name: 'mobile French light', locale: 'fr-FR', theme: 'light', width: 390, height: 844, tag: '@responsive' },
+] as const) {
+  test.describe(variant.name, () => {
+    test.use({ locale: variant.locale, colorScheme: variant.theme, viewport: { width: variant.width, height: variant.height } });
+    for (const route of routes) {
+      test(`collection contract ${route} ${variant.tag} @collections @smoke`, async ({ page, product, context }) => {
+        const pages = new ProductPages(page);
+        const journeyContext = { ...product, pages, checkpoint: ignoreCheckpoints };
+        await authenticateConsole(journeyContext, {});
+        await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);
+        await pages.ensureTheme(variant.theme);
+        await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+        await inspectCollections(journeyContext, { route, locale: variant.locale });
+      });
+    }
   });
 }
