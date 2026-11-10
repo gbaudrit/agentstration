@@ -1,0 +1,54 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: azure-storage
+  namespace: agentstration.connected-services
+  tags:
+    category: storage
+    vendor: microsoft
+    product: azure
+    authentication: account-key
+definition:
+  displayName: "Azure Storage (account-key)"
+  description: "One Azure Storage account authenticated with an account key. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: endpoint
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact Blob service endpoint for the selected account."
+        - id: accountName
+          required: true
+          type: string
+          protection: standard
+          description: "Azure Storage account name."
+        - id: accountKey
+          required: true
+          type: string
+          protection: secured
+          description: "Azure Storage account key; keep it in a Secret. This version does not implement Entra or SAS authentication."
+      exports:
+        - id: endpoint
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: endpoint
+        - id: accountName
+          type: string
+          protection: standard
+          sourceInputId: accountName
+        - id: accountKey
+          type: string
+          protection: secured
+          sourceInputId: accountKey

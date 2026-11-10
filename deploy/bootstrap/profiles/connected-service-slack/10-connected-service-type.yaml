@@ -1,0 +1,54 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: slack
+  namespace: agentstration.connected-services
+  tags:
+    category: communication
+    vendor: slack
+    product: slack
+    authentication: bot-token
+definition:
+  displayName: "Slack (bot-token)"
+  description: "One Slack app installation in one workspace. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: baseUrl
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Slack Web API base URL."
+        - id: workspaceId
+          required: true
+          type: string
+          protection: standard
+          description: "Exact Slack workspace identifier."
+        - id: botToken
+          required: true
+          type: string
+          protection: secured
+          description: "Slack bot access token; its scopes and channel membership bound access. Bind an existing Secret; token acquisition and renewal are performed outside this type."
+      exports:
+        - id: baseUrl
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: baseUrl
+        - id: workspaceId
+          type: string
+          protection: standard
+          sourceInputId: workspaceId
+        - id: botToken
+          type: string
+          protection: secured
+          sourceInputId: botToken

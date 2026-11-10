@@ -1,0 +1,45 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: localai
+  namespace: agentstration.connected-services
+  tags:
+    category: ai
+    vendor: localai
+    product: localai
+    authentication: bearer-token
+definition:
+  displayName: "LocalAI (bearer-token)"
+  description: "One LocalAI server protected by an API key. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: endpoint
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact LocalAI server endpoint."
+        - id: apiKey
+          required: true
+          type: string
+          protection: secured
+          description: "LocalAI API key used as a Bearer credential. This version requires authentication."
+      exports:
+        - id: endpoint
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: endpoint
+        - id: apiKey
+          type: string
+          protection: secured
+          sourceInputId: apiKey

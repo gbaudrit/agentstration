@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-aws-s3
+  tags:
+    category: storage
+    vendor: aws
+    product: aws
+    authentication: access-key
+definition:
+  displayName: "Amazon S3 connection type"
+  description: "Installs the Amazon S3 connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

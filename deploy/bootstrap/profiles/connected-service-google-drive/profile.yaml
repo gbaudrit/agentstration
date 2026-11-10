@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-google-drive
+  tags:
+    category: documents
+    vendor: google
+    product: google-workspace
+    authentication: bearer-token
+definition:
+  displayName: "Google Drive connection type"
+  description: "Installs the Google Drive connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

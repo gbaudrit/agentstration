@@ -40,6 +40,81 @@ validation then use the local resources; they do not call the extension live.
 Types can also be included as `ConnectedServiceType` documents in Bootstrap
 profiles. The profile target supplies the scope when the document omits one.
 
+## Optional connection-type Bootstrap profiles
+
+The local Bootstrap catalog includes optional `connected-service-<name>` profiles
+for common external services. Select profiles under **System > Bootstrap profiles**
+(`/settings/bootstrap`), review the preview, then apply them. A composition accepts
+up to 16 local profiles; apply larger selections in separate batches. These profiles
+are not included in the default Development startup selection.
+
+Each profile creates one Instance-scoped `ConnectedServiceType` in namespace
+`agentstration.connected-services`, at version `1.0.0`. Its ordinary resource
+metadata carries `category`, `vendor`, `product` and `authentication` tags. These tags
+do not add new catalog filters or dependency resolution. Profiles remain independently
+selectable and use the existing composition order, preview digest and handlers.
+
+| Profile suffix / type name | Service | Authentication described by version 1.0.0 |
+|---|---|---|
+| `github` | GitHub | personal-access-token |
+| `gitlab` | GitLab | access-token |
+| `azure-devops` | Azure DevOps | personal-access-token |
+| `jira` | Jira Cloud | api-token |
+| `confluence` | Confluence Cloud | api-token |
+| `sharepoint-online` | SharePoint Online | bearer-token |
+| `google-drive` | Google Drive | bearer-token |
+| `slack` | Slack | bot-token |
+| `azure-storage` | Azure Storage | account-key |
+| `azure-foundry` | Microsoft Foundry | api-key |
+| `azure-openai` | Azure OpenAI | api-key |
+| `azure-ai-search` | Azure AI Search | api-key |
+| `aws-s3` | Amazon S3 | access-key |
+| `s3-compatible` | S3-compatible storage | access-key |
+| `openai` | OpenAI | api-key |
+| `ollama` | Ollama | none |
+| `localai` | LocalAI | bearer-token |
+| `postgresql` | PostgreSQL | username-password |
+| `sql-server` | SQL Server / Azure SQL | username-password |
+| `redis` | Redis | username-password |
+
+For example, select `connected-service-github` and `connected-service-azure-storage`
+together to install the two independent contracts. No configured `ConnectedService`,
+Parameter, Secret, Storage, operation, Flow or Tool is created by these profiles.
+The default `http-endpoint` and the extension-owned `openapi` types retain their
+existing owners and are not copied into this catalog.
+
+After installing a type:
+
+1. Configure explicit descendant-use grants on the type if Tenant or Workspace
+   services must use it. The profiles grant no descendant access automatically.
+2. Create a Connected Service at an authorized scope, selecting the exact type UID,
+   version and schema digest.
+3. Bind ordinary inputs to literals or Parameters, and secured inputs to existing
+   Secrets. The options object is empty (`{}`); connection values belong to bindings,
+   and unknown options are rejected.
+4. A compatible authorized consumer explicitly maps its requirements to the named
+   exports. Each export preserves the type and protection of its source input;
+   optional unbound inputs do not supply a usable export. Consumer-specific
+   validation, TLS, endpoint policy and remote authorization still apply.
+
+Version 1.0.0 describes the authentication mode listed above only. In particular,
+SharePoint, Drive and Slack accept already-issued access tokens; token acquisition,
+OAuth consent and token renewal are external responsibilities. Temporary S3
+credentials also require their session token. The catalog supplies no signing,
+network client, health check or automatic operation discovery. Foundry and the local
+model-provider integrations keep their existing configuration and lifecycle.
+
+Installed definitions are ordinary operator-owned resources. Reapplying a profile
+skips an existing type at the same scope, namespace and name, preserving its UID,
+versions, enablement, policy and operator edits. Bootstrap does not compare or
+upgrade an existing definition. Apply future immutable versions explicitly through
+the type API after reviewing the contract; a changed profile is not an automatic
+migration.
+
+These are local catalog profiles. Publishing them through a Source requires explicit
+BootstrapCatalog entries and localized profile variants under the existing Source
+publication contract; installing these files does not register or publish a Source.
+
 ## Operation types and discovery
 
 The optional [OpenAPI extension](openapi-extension.md#connected-service-operation-discovery)

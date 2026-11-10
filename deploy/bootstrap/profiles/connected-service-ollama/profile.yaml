@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-ollama
+  tags:
+    category: ai
+    vendor: ollama
+    product: ollama
+    authentication: none
+definition:
+  displayName: "Ollama connection type"
+  description: "Installs the Ollama connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

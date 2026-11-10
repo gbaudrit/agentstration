@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-jira
+  tags:
+    category: development
+    vendor: atlassian
+    product: jira
+    authentication: api-token
+definition:
+  displayName: "Jira Cloud connection type"
+  description: "Installs the Jira Cloud connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

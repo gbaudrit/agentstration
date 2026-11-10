@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-azure-openai
+  tags:
+    category: ai
+    vendor: microsoft
+    product: azure
+    authentication: api-key
+definition:
+  displayName: "Azure OpenAI connection type"
+  description: "Installs the Azure OpenAI connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

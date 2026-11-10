@@ -1,0 +1,45 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: google-drive
+  namespace: agentstration.connected-services
+  tags:
+    category: documents
+    vendor: google
+    product: google-workspace
+    authentication: bearer-token
+definition:
+  displayName: "Google Drive (bearer-token)"
+  description: "One Google identity and its explicitly authorized Drive content. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: baseUrl
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Google Drive API base URL."
+        - id: bearerToken
+          required: true
+          type: string
+          protection: secured
+          description: "Google OAuth access token with the required Drive scopes. Bind an existing Secret; token acquisition and renewal are performed outside this type."
+      exports:
+        - id: baseUrl
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: baseUrl
+        - id: bearerToken
+          type: string
+          protection: secured
+          sourceInputId: bearerToken

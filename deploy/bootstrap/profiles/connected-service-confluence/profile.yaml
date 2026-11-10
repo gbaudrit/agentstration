@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-confluence
+  tags:
+    category: documents
+    vendor: atlassian
+    product: confluence
+    authentication: api-token
+definition:
+  displayName: "Confluence Cloud connection type"
+  description: "Installs the Confluence Cloud connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

@@ -1,0 +1,65 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: sharepoint-online
+  namespace: agentstration.connected-services
+  tags:
+    category: documents
+    vendor: microsoft
+    product: microsoft-365
+    authentication: bearer-token
+definition:
+  displayName: "SharePoint Online (bearer-token)"
+  description: "One SharePoint Online tenant reached through Microsoft Graph with an externally issued access token. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: tenantId
+          required: true
+          type: string
+          protection: standard
+          description: "Microsoft Entra tenant identifier."
+        - id: baseUrl
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Microsoft Graph API base URL for the intended cloud."
+        - id: siteOrigin
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact SharePoint tenant origin; individual site permissions remain enforced by the provider."
+        - id: bearerToken
+          required: true
+          type: string
+          protection: secured
+          description: "Microsoft Graph access token with the required SharePoint grants. Bind an existing Secret; token acquisition and renewal are performed outside this type."
+      exports:
+        - id: tenantId
+          type: string
+          protection: standard
+          sourceInputId: tenantId
+        - id: baseUrl
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: baseUrl
+        - id: siteOrigin
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: siteOrigin
+        - id: bearerToken
+          type: string
+          protection: secured
+          sourceInputId: bearerToken

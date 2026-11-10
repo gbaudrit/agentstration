@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-github
+  tags:
+    category: development
+    vendor: github
+    product: github
+    authentication: personal-access-token
+definition:
+  displayName: "GitHub connection type"
+  description: "Installs the GitHub connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

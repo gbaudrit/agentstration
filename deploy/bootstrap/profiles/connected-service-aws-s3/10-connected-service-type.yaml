@@ -1,0 +1,72 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: aws-s3
+  namespace: agentstration.connected-services
+  tags:
+    category: storage
+    vendor: aws
+    product: aws
+    authentication: access-key
+definition:
+  displayName: "Amazon S3 (access-key)"
+  description: "One AWS principal and S3 endpoint/region context using access-key credentials. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: endpoint
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact S3 service endpoint."
+        - id: region
+          required: true
+          type: string
+          protection: standard
+          description: "AWS region used to sign requests."
+        - id: accessKeyId
+          required: true
+          type: string
+          protection: secured
+          description: "AWS access key identifier."
+        - id: secretAccessKey
+          required: true
+          type: string
+          protection: secured
+          description: "AWS secret access key."
+        - id: sessionToken
+          required: false
+          type: string
+          protection: secured
+          description: "Session token required when using temporary credentials; renewal remains external."
+      exports:
+        - id: endpoint
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: endpoint
+        - id: region
+          type: string
+          protection: standard
+          sourceInputId: region
+        - id: accessKeyId
+          type: string
+          protection: secured
+          sourceInputId: accessKeyId
+        - id: secretAccessKey
+          type: string
+          protection: secured
+          sourceInputId: secretAccessKey
+        - id: sessionToken
+          type: string
+          protection: secured
+          sourceInputId: sessionToken

@@ -1,0 +1,79 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: postgresql
+  namespace: agentstration.connected-services
+  tags:
+    category: database
+    vendor: postgresql
+    product: postgresql
+    authentication: username-password
+definition:
+  displayName: "PostgreSQL (username-password)"
+  description: "One PostgreSQL database and login role. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: host
+          required: true
+          type: string
+          protection: standard
+          description: "Database server DNS name."
+        - id: port
+          required: true
+          type: integer
+          protection: standard
+          description: "Database server TCP port."
+        - id: database
+          required: true
+          type: string
+          protection: standard
+          description: "Exact PostgreSQL database name."
+        - id: userName
+          required: true
+          type: string
+          protection: standard
+          description: "Database login role."
+        - id: tlsMode
+          required: true
+          type: string
+          protection: standard
+          description: "TLS mode supported by the consumer/driver; use verified TLS for remote servers."
+        - id: password
+          required: true
+          type: string
+          protection: secured
+          description: "Password for the selected database role."
+      exports:
+        - id: host
+          type: string
+          protection: standard
+          sourceInputId: host
+        - id: port
+          type: integer
+          protection: standard
+          sourceInputId: port
+        - id: database
+          type: string
+          protection: standard
+          sourceInputId: database
+        - id: userName
+          type: string
+          protection: standard
+          sourceInputId: userName
+        - id: tlsMode
+          type: string
+          protection: standard
+          sourceInputId: tlsMode
+        - id: password
+          type: string
+          protection: secured
+          sourceInputId: password

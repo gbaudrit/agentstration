@@ -1,0 +1,45 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: azure-devops
+  namespace: agentstration.connected-services
+  tags:
+    category: development
+    vendor: microsoft
+    product: azure-devops
+    authentication: personal-access-token
+definition:
+  displayName: "Azure DevOps (personal-access-token)"
+  description: "One Azure DevOps organization and the permissions of a personal access token. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: organizationUrl
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact Azure DevOps organization URL."
+        - id: personalAccessToken
+          required: true
+          type: string
+          protection: secured
+          description: "Personal access token for this organization; the consumer implements the required HTTP authentication."
+      exports:
+        - id: organizationUrl
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: organizationUrl
+        - id: personalAccessToken
+          type: string
+          protection: secured
+          sourceInputId: personalAccessToken

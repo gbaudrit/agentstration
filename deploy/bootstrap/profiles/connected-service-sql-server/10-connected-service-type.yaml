@@ -1,0 +1,79 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: sql-server
+  namespace: agentstration.connected-services
+  tags:
+    category: database
+    vendor: microsoft
+    product: sql-server
+    authentication: username-password
+definition:
+  displayName: "SQL Server / Azure SQL (username-password)"
+  description: "One SQL Server or Azure SQL database and SQL-authenticated login. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: host
+          required: true
+          type: string
+          protection: standard
+          description: "Database server DNS name."
+        - id: port
+          required: true
+          type: integer
+          protection: standard
+          description: "Database server TCP port."
+        - id: database
+          required: true
+          type: string
+          protection: standard
+          description: "Exact database name."
+        - id: userName
+          required: true
+          type: string
+          protection: standard
+          description: "SQL-authenticated login name."
+        - id: encrypt
+          required: true
+          type: boolean
+          protection: standard
+          description: "Whether the consumer must enable encrypted transport; remote deployments should require it."
+        - id: password
+          required: true
+          type: string
+          protection: secured
+          description: "Password for the selected SQL login. Entra authentication is outside this type version."
+      exports:
+        - id: host
+          type: string
+          protection: standard
+          sourceInputId: host
+        - id: port
+          type: integer
+          protection: standard
+          sourceInputId: port
+        - id: database
+          type: string
+          protection: standard
+          sourceInputId: database
+        - id: userName
+          type: string
+          protection: standard
+          sourceInputId: userName
+        - id: encrypt
+          type: boolean
+          protection: standard
+          sourceInputId: encrypt
+        - id: password
+          type: string
+          protection: secured
+          sourceInputId: password

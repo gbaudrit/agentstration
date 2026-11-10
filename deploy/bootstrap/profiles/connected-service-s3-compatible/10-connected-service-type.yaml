@@ -1,0 +1,72 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: s3-compatible
+  namespace: agentstration.connected-services
+  tags:
+    category: storage
+    vendor: generic
+    product: s3
+    authentication: access-key
+definition:
+  displayName: "S3-compatible storage (access-key)"
+  description: "One explicitly selected S3-compatible service and principal. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: endpoint
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact S3-compatible service endpoint."
+        - id: region
+          required: true
+          type: string
+          protection: standard
+          description: "Signing region expected by this service."
+        - id: usePathStyle
+          required: true
+          type: boolean
+          protection: standard
+          description: "Whether the consumer must use path-style bucket addressing."
+        - id: accessKeyId
+          required: true
+          type: string
+          protection: secured
+          description: "Access key identifier for this service."
+        - id: secretAccessKey
+          required: true
+          type: string
+          protection: secured
+          description: "Secret access key for this service."
+      exports:
+        - id: endpoint
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: endpoint
+        - id: region
+          type: string
+          protection: standard
+          sourceInputId: region
+        - id: usePathStyle
+          type: boolean
+          protection: standard
+          sourceInputId: usePathStyle
+        - id: accessKeyId
+          type: string
+          protection: secured
+          sourceInputId: accessKeyId
+        - id: secretAccessKey
+          type: string
+          protection: secured
+          sourceInputId: secretAccessKey

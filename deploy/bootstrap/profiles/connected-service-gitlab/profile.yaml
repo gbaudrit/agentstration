@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-gitlab
+  tags:
+    category: development
+    vendor: gitlab
+    product: gitlab
+    authentication: access-token
+definition:
+  displayName: "GitLab connection type"
+  description: "Installs the GitLab connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

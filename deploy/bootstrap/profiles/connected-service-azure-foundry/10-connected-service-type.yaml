@@ -1,0 +1,56 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: azure-foundry
+  namespace: agentstration.connected-services
+  tags:
+    category: ai
+    vendor: microsoft
+    product: azure
+    authentication: api-key
+definition:
+  displayName: "Microsoft Foundry (api-key)"
+  description: "One Foundry project and inference endpoint authenticated with an API key. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: projectEndpoint
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact Foundry project endpoint ending in /api/projects/{project-name}."
+        - id: inferenceEndpoint
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact inference endpoint for the selected project or account."
+        - id: credential
+          required: true
+          type: string
+          protection: secured
+          description: "Foundry API key. This version describes API-key authentication only."
+      exports:
+        - id: projectEndpoint
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: projectEndpoint
+        - id: inferenceEndpoint
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: inferenceEndpoint
+        - id: credential
+          type: string
+          protection: secured
+          sourceInputId: credential
