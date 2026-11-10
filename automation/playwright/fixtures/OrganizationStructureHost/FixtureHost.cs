@@ -63,7 +63,7 @@ internal static class FixtureHost
     {
         var repository = provider.GetRequiredService<IWorkplaceRepository>();
         var workspace = new WorkspaceId(workspaceId);
-        var now = DateTimeOffset.UtcNow;
+        var now = provider.GetRequiredService<TimeProvider>().GetUtcNow();
         var entry = await repository.GetEntryAsync(workspace, new EntryId("quick-answer"), token)
             ?? new EntryResource
             {
