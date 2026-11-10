@@ -56,7 +56,7 @@ export class GovernedExtensionInventoryPage {
       await expect(row.locator('.collection-qualified-name code')).toHaveText(`${namespace}/qa-managed`);
       await expect(row.locator('.resource-scope-badge')).toHaveText(text.scope);
       await expect(row).toContainText('2.4.0');
-      await expect(row.locator('.managed-resource-badge')).toHaveText(text.managed);
+      await expect(row.locator('.managed-resource-badge')).toHaveText(text.managedBadge);
     }
     for (const href of await grid.locator('a').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))) this.assertScopedLink(href);
     await expect(grid).toContainText(`${namespace}/qa-managed`);

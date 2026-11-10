@@ -4,7 +4,7 @@ export type SupportedTestLocale = typeof SupportedTestLocales[number];
 export const GovernedInventoryTextByLocale = {
   'en-US': {
     resources: 'Managed resources', contributions: 'Contributions', installed: 'Installed', degraded: 'Degraded',
-    managed: 'Managed · read-only', technical: 'Technical details', publications: 'Published versions',
+    managed: 'Managed · read-only', managedBadge: 'Managed / read-only', technical: 'Technical details', publications: 'Published versions',
     available: 'Available', unavailable: 'Unavailable', missing: 'Not materialized', conflict: 'Conflict',
     definition: 'Definition', revisions: 'Revisions', yaml: 'YAML', deployments: 'Deployments',
     kinds: ['ToolSet', 'Flow', 'Data Source Profile'], scope: 'Instance',
@@ -15,7 +15,7 @@ export const GovernedInventoryTextByLocale = {
   },
   'fr-FR': {
     resources: 'Ressources gérées', contributions: 'Contributions', installed: 'Installée', degraded: 'Dégradée',
-    managed: 'Gérée · lecture seule', technical: 'Détails techniques', publications: 'Versions publiées',
+    managed: 'Gérée · lecture seule', managedBadge: 'Géré / lecture seule', technical: 'Détails techniques', publications: 'Versions publiées',
     available: 'Disponible', unavailable: 'Indisponible', missing: 'Non matérialisée', conflict: 'En conflit',
     definition: 'Définition', revisions: 'Révisions', yaml: 'YAML', deployments: 'Déploiements',
     kinds: ['ToolSet', 'Flow', 'Profil de source de données'], scope: 'Instance',

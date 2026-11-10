@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/triggers/new"
 @page "/triggers/{Name}/edit"
 @rendermode InteractiveServer
@@ -211,7 +212,7 @@ else
             var saved = await Client.SaveAsync(resource, IsNew ? null : existing!.ETag, CancellationToken.None);
             Notifications.Add(new(Guid.NewGuid(), IsNew ? T("Notification.Created") : T("Notification.Updated"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
             savedFingerprint = Fingerprint;
-            Navigation.NavigateTo(ConsoleResourceUrls.Resource("/triggers", saved.Value.Name, saved.Value.Namespace, TriggerUi.DefinitionScope(saved.Value)));
+            Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/triggers", saved.Value.Name, saved.Value.Namespace, TriggerUi.DefinitionScope(saved.Value)));
         }
         catch (Exception exception) { error = TriggerUi.ErrorMessage(exception, Localizer); }
         finally { saving = false; }

@@ -73,10 +73,10 @@ else
             <section class="panel form-section" data-testid="agent-active-toolsets">
                 <div class="panel-header"><div><p class="eyebrow">@T("ActiveRevision")</p><h2>@T("PinnedToolSetAssignments")</h2><p>@T("PinnedToolSetAssignmentsHelp")</p></div><code>@activeRevision.Metadata.Name</code></div>
                 <CollectionView TItem="ResolvedAgentToolSetAssignment" Items="activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal).ToArray()" InformationLabels="@(new[] { T("Version"), T("DefinitionHash"), T("EffectiveMembers") })">
-                    <Identity Context="assignment"><CollectionIdentity DisplayName="@assignment.ToolSetName" Namespace="@assignment.ToolSetNamespace.Value" Name="@assignment.ToolSetName" Href="@ConsoleResourceUrls.Resource("/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)" IconName="layers" /></Identity>
+                    <Identity Context="assignment"><CollectionIdentity DisplayName="@assignment.ToolSetName" Namespace="@assignment.ToolSetNamespace.Value" Name="@assignment.ToolSetName" Href="@ResourceOwnershipContext.Resource(Services, "/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)" IconName="layers" /></Identity>
                     <Scope Context="assignment"><ResourceScopeBadge ScopeRef="assignment.ToolSetScopeRef" /></Scope>
                     <Information Context="assignment"><CollectionValue Label="@T("Version")"><code>@assignment.Version</code></CollectionValue><CollectionValue Label="@T("DefinitionHash")"><code>@assignment.DefinitionHash</code></CollectionValue><CollectionValue Label="@T("EffectiveMembers")">@string.Join(", ", assignment.Members)</CollectionValue></Information>
-                    <Actions Context="assignment"><CollectionActions ResourceName="@assignment.ToolSetName"><a href="@ConsoleResourceUrls.Resource("/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)">@T("InspectToolSet")</a></CollectionActions></Actions>
+                    <Actions Context="assignment"><CollectionActions ResourceName="@assignment.ToolSetName"><a href="@ResourceOwnershipContext.Resource(Services, "/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)">@T("InspectToolSet")</a></CollectionActions></Actions>
                 </CollectionView>
             </section>
         }

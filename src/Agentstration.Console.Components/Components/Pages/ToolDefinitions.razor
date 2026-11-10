@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/tools/definitions"
 @inject IToolDefinitionsClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
@@ -38,5 +39,5 @@ else
     private async Task LoadAsync() { loading=true;error=null;try{definitions=await Client.GetAsync(default);}catch(Exception ex){error=ex.Message;}finally{loading=false;} }
     private static string PublicName(ToolDefinitionResource value) => value.Namespace.IsDefault ? value.Name : $"{value.Namespace.Value}.{value.Name}";
     private static string Flow(ToolDefinitionResource value) => $"{value.Definition.Flow.Namespace ?? value.Namespace}/{value.Definition.Flow.Name}:{(value.Definition.Flow.UseActiveVersion ? "active" : value.Definition.Flow.Version)}";
-    private static string EditUrl(ToolDefinitionResource value) => ConsoleResourceUrls.Resource("/tools/definitions", value.Name, value.Namespace, value.ScopeRef);
+    private string EditUrl(ToolDefinitionResource value) => ResourceOwnershipContext.Resource(Services, "/tools/definitions", value.Name, value.Namespace, value.ScopeRef);
 }

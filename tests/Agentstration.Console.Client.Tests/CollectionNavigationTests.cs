@@ -19,6 +19,17 @@ public sealed class CollectionNavigationTests
         Assert.AreEqual(owner.Value, query["context"].ToString());
     }
     [TestMethod]
+    public void InheritedResourceLinkKeepsTheExactOwnerAndTheSourceNavigationContext()
+    {
+        var source = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        var uri = new Uri("https://console.test" + ConsoleResourceUrls.Resource("/tools", "same", ResourceNamespace.Parse("team-a"), ResourceScopeRef.Instance, source));
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        Assert.AreEqual("/instance", query["scopeRef"].ToString());
+        Assert.AreEqual(source.Value, query["context"].ToString());
+        Assert.AreEqual("team-a", query["namespace"].ToString());
+    }
+
+    [TestMethod]
     public void OwnerScopeContextIsAddedBeforeFragmentsWithoutDuplicatingAnExistingOwner()
     {
         var link = ConsoleResourceUrls.WithOwnerScope("/tools/same?namespace=team-a&scopeRef=%2Finstance#usage", ResourceScopeRef.Instance);

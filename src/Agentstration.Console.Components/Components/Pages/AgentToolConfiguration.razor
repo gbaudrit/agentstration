@@ -46,12 +46,7 @@
                 <article class="agent-tool-group" data-provider="@group.ProviderName" data-scope="@group.ProviderScopeRef?.Value">
                     <header>
                         <div class="agent-tool-provider-identity">
-                            <span class="agent-tool-provider-icon" aria-hidden="true"><TablerIcon Name="server" /></span>
-                            <div>
-                                <span class="agent-tool-provider-type">@T("McpProvider")</span>
-                                <h3>@group.DisplayName</h3>
-                                <code>@group.ProviderName</code>
-                            </div>
+                            <div><CollectionIdentity DisplayName="@group.DisplayName" Namespace="@group.ProviderNamespace.Value" Name="@group.ProviderName" Href="@(group.HasProvider ? ProviderUrl(group) : null)" IconName="server" /><ResourceScopeBadge ScopeRef="group.ProviderScopeRef" /><small>@T("McpProvider")</small></div>
                         </div>
                         <div class="agent-tool-group-actions">
                             <div class="agent-tool-group-summary">
@@ -60,7 +55,7 @@
                             </div>
                             @if (group.HasProvider)
                             {
-                                <a class="text-button" href="@ProviderUrl(group)">@T("OpenMcp") →</a>
+                                <CollectionActions ResourceName="@($"{group.ProviderNamespace}/{group.ProviderName}, {group.ProviderScopeRef}")"><a href="@ProviderUrl(group)">@T("OpenMcp")</a></CollectionActions>
                             }
                         </div>
                     </header>

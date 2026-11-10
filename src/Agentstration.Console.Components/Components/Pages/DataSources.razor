@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/data-sources"
 @implements IDisposable
 @inject IDataSourcesClient Client
@@ -35,6 +36,6 @@ else
     private string T(string key) => Localizer[key];
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync() { loading = true; error = null; try { items = await Client.GetAsync(cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
-    private static string Url(DataSourceResource item) => ConsoleResourceUrls.Resource("/data-sources", item.Name, item.Namespace, item.ScopeRef);
+    private string Url(DataSourceResource item) => ResourceOwnershipContext.Resource(Services, "/data-sources", item.Name, item.Namespace, item.ScopeRef);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

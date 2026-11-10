@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/knowledge-sources"
 @inject IKnowledgeSourcesClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
@@ -44,7 +45,7 @@ else
         finally { loading = false; }
     }
     private static string Flow(KnowledgeFlowTarget? value) => value is null ? "—" : $"{value.Namespace ?? ResourceNamespace.Default}/{value.Name}:{value.Version ?? "active"}";
-    private static string DetailsUrl(KnowledgeSourceResource value) => ConsoleResourceUrls.Resource("/knowledge-sources", value.Name, value.Namespace, value.ScopeRef);
+    private string DetailsUrl(KnowledgeSourceResource value) => ResourceOwnershipContext.Resource(Services, "/knowledge-sources", value.Name, value.Namespace, value.ScopeRef);
     private static string DataSourceUrl(KnowledgeSourceResource source, ResourceReference value)
     {
         var ns = value.Namespace ?? source.Namespace;

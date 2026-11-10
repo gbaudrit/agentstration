@@ -1022,6 +1022,7 @@
       "actions": true,
       "informationKeys": [
         "Created",
+        "FlowRun",
         "Version",
         "AcquiredArtifacts"
       ],
@@ -2350,6 +2351,1497 @@
       "renderer": "native-specialized",
       "adaptation": "Static Razor Pages preserve antiforgery and token privacy; ResourceIcon/scope/status and native final Actions reuse shared CSS/JS without adding a Blazor circuit.",
       "validation": "pending-final-campaign"
+    },
+    {
+      "id": "namespaced-agent-details-model-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "host": "console",
+      "routes": [
+        "/namespaces/{AgentNamespace}/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Read-only Pack bindings retain logical requirement and effective scoped target; no invented mutation or lifecycle.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "namespaced-agent-details-runtime-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "host": "console",
+      "routes": [
+        "/namespaces/{AgentNamespace}/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Read-only Pack bindings retain logical requirement and effective scoped target; no invented mutation or lifecycle.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "home-attention-items",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Home.razor",
+      "host": "console",
+      "routes": [
+        "/"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Health/attention items retain common HealthIndicator/StatusBadge and existing permitted destination.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-workspaces",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Organization.razor",
+      "host": "console",
+      "routes": [
+        "/settings/organization"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Use meaningful organization identity, actual authorized scope and membership state; preserve read-only summary and role grouping.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-members",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Organization.razor",
+      "host": "console",
+      "routes": [
+        "/settings/organization"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Use meaningful organization identity, actual authorized scope and membership state; preserve read-only summary and role grouping.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-member-roles",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Organization.razor",
+      "host": "console",
+      "routes": [
+        "/settings/organization"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Use meaningful organization identity, actual authorized scope and membership state; preserve read-only summary and role grouping.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-editor-data-source-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native binding forms and resource selects preserve exact scoped keys, validation and composition; no separate commands or lifecycle are invented for options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-editor-projection-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native binding forms and resource selects preserve exact scoped keys, validation and composition; no separate commands or lifecycle are invented for options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-editor-retrieval-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native binding forms and resource selects preserve exact scoped keys, validation and composition; no separate commands or lifecycle are invented for options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-editor-data-source-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native binding forms and resource selects preserve exact scoped keys, validation and composition; no separate commands or lifecycle are invented for options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-editor-acquisition-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native binding forms and resource selects preserve exact scoped keys, validation and composition; no separate commands or lifecycle are invented for options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-editor-transformation-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native binding forms and resource selects preserve exact scoped keys, validation and composition; no separate commands or lifecycle are invented for options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "pack-composer-resource-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve dependency inclusion/pinning and native selection; shared identity/qualified copy and availability badge. Composition proposals do not gain fabricated installed-resource scope/routes.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "pack-composer-explicit-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve dependency inclusion/pinning and native selection; shared identity/qualified copy and availability badge. Composition proposals do not gain fabricated installed-resource scope/routes.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "pack-composer-automatic-dependencies",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve dependency inclusion/pinning and native selection; shared identity/qualified copy and availability badge. Composition proposals do not gain fabricated installed-resource scope/routes.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "pack-composer-external-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve dependency inclusion/pinning and native selection; shared identity/qualified copy and availability badge. Composition proposals do not gain fabricated installed-resource scope/routes.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "pack-composer-composition-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve dependency inclusion/pinning and native selection; shared identity/qualified copy and availability badge. Composition proposals do not gain fabricated installed-resource scope/routes.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "entry-editor-execution-dependencies",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep form editing and binding semantics; usage/dependency cards share identity and complete identifier copy without inventing a destination not supplied by the API.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "entry-editor-published-dashboard-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep form editing and binding semantics; usage/dependency cards share identity and complete identifier copy without inventing a destination not supplied by the API.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "entry-editor-authored-suggestions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep form editing and binding semantics; usage/dependency cards share identity and complete identifier copy without inventing a destination not supplied by the API.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "entry-editor-binding-resource-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep form editing and binding semantics; usage/dependency cards share identity and complete identifier copy without inventing a destination not supplied by the API.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "new-flow-template-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor",
+      "host": "console",
+      "routes": [
+        "/flows/new"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native template selection preserves the existing template icon/title/description and creation behavior; no resource owner or state exists before creation.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-provider-details-option-contracts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "host": "console",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Option contracts keep immutable versions. Source usages share identity, actual scope and final Open menu. Native selects retain their exact authorized values.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-provider-details-source-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "host": "console",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Option contracts keep immutable versions. Source usages share identity, actual scope and final Open menu. Native selects retain their exact authorized values.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-provider-details-extension-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "host": "console",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Option contracts keep immutable versions. Source usages share identity, actual scope and final Open menu. Native selects retain their exact authorized values.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-provider-details-contribution-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "host": "console",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Option contracts keep immutable versions. Source usages share identity, actual scope and final Open menu. Native selects retain their exact authorized values.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "runtime-profile-editor-deployment-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
+      "host": "console",
+      "routes": [
+        "/runtimeprofiles/new",
+        "/runtimeprofiles/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Shared identity/full identifier copy with existing environment information; API supplies no separate permitted detail route or owner for this legacy usage DTO.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "model-details-override-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelDetails.razor",
+      "host": "console",
+      "routes": [
+        "/models/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve actionable diagnostics next to the specialized model override editor; no resource identity or lifecycle is fabricated.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-source-acquisition-tool-editor-publishable-artifact-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionToolEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native artifact selection preserves actual artifact identity, availability restrictions and publication validation.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-run-artifact-details-provenance",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
+      "host": "console",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Chronological provenance retains actual producer/correlation evidence and permitted existing links.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "parameter-editor-resource-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor",
+      "host": "console",
+      "routes": [
+        "/parameters/new",
+        "/parameters/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Usage links retain the API-provided exact destination; shared identity/copy and final Open menu. Missing namespace/owner fields are not guessed.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "workspaces-workspace-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "host": "console",
+      "routes": [
+        "/workspaces"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Dashboard composition preserves role grouping, checkbox selection, move guards and publishing. Resource rows already share identity, actual Workspace scope and final order menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "workspaces-dashboard-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "host": "console",
+      "routes": [
+        "/workspaces"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Dashboard composition preserves role grouping, checkbox selection, move guards and publishing. Resource rows already share identity, actual Workspace scope and final order menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "workspaces-included-entry-composition",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "host": "console",
+      "routes": [
+        "/workspaces"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Dashboard composition preserves role grouping, checkbox selection, move guards and publishing. Resource rows already share identity, actual Workspace scope and final order menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "workspaces-excluded-entry-composition",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "host": "console",
+      "routes": [
+        "/workspaces"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Dashboard composition preserves role grouping, checkbox selection, move guards and publishing. Resource rows already share identity, actual Workspace scope and final order menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "secret-editor-resource-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "host": "console",
+      "routes": [
+        "/secrets/new",
+        "/secrets/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Authorized usage identity/copy and final Open menu; native vault selection retains exact scoped values and never exposes a secret value.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "secret-editor-vault-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "host": "console",
+      "routes": [
+        "/secrets/new",
+        "/secrets/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Authorized usage identity/copy and final Open menu; native vault selection retains exact scoped values and never exposes a secret value.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-details-execution-checks",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
+      "host": "console",
+      "routes": [
+        "/tools/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Existing diagnostic ordering, localized checks and severity retain native execution semantics.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "trigger-editor-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerEditor.razor",
+      "host": "console",
+      "routes": [
+        "/triggers/new",
+        "/triggers/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native exact scoped Flow selection and chronological schedule preview retain current validation and time-zone behavior.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "trigger-editor-occurrence-preview",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerEditor.razor",
+      "host": "console",
+      "routes": [
+        "/triggers/new",
+        "/triggers/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native exact scoped Flow selection and chronological schedule preview retain current validation and time-zone behavior.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "orchestration-definition-editor-agent-choices",
+      "source": "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor",
+      "host": "console",
+      "routes": [
+        "/flows/new",
+        "/flows/{FlowId}/orchestration",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve native orchestration selection, participant ordering and manager restrictions; resource choices retain current exact identifiers.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "orchestration-definition-editor-selected-participants",
+      "source": "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor",
+      "host": "console",
+      "routes": [
+        "/flows/new",
+        "/flows/{FlowId}/orchestration",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve native orchestration selection, participant ordering and manager restrictions; resource choices retain current exact identifiers.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "orchestration-definition-editor-manager-choices",
+      "source": "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor",
+      "host": "console",
+      "routes": [
+        "/flows/new",
+        "/flows/{FlowId}/orchestration",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve native orchestration selection, participant ordering and manager restrictions; resource choices retain current exact identifiers.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-scope-picker-scope-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Shared/ResourceScopePicker.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/data-source-profiles/new",
+        "/data-source-profiles/{Name}",
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/entries/{Name}",
+        "/extensions",
+        "/flows/new",
+        "/flows/{FlowId}/orchestration",
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}",
+        "/modelproviders/new",
+        "/modelproviders/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration",
+        "/pack-projects/new",
+        "/packs",
+        "/parameters/new",
+        "/parameters/{Name}",
+        "/runtimeprofiles/new",
+        "/runtimeprofiles/{Name}",
+        "/schemas/new",
+        "/schemas/{Name}",
+        "/secrets/new",
+        "/secrets/{Name}",
+        "/settings/source-registries/discovery",
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}",
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}",
+        "/tools/categories/new",
+        "/tools/categories/{Name}",
+        "/tools/providers/new",
+        "/tools/providers/{Name}",
+        "/vaults/new",
+        "/vaults/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native scope selection preserves authorized targets and exact invariant values; state/actions do not apply to an option.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-overview-view-outcomes",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep functional proposal grouping and descriptions; these are proposed business elements without installed resource owners, lifecycle or arbitrary actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-overview-view-roles",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep functional proposal grouping and descriptions; these are proposed business elements without installed resource owners, lifecycle or arbitrary actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-overview-view-workflows",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep functional proposal grouping and descriptions; these are proposed business elements without installed resource owners, lifecycle or arbitrary actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-overview-view-integrations",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep functional proposal grouping and descriptions; these are proposed business elements without installed resource owners, lifecycle or arbitrary actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-overview-view-experiences",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep functional proposal grouping and descriptions; these are proposed business elements without installed resource owners, lifecycle or arbitrary actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-overview-view-retirements",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep functional proposal grouping and descriptions; these are proposed business elements without installed resource owners, lifecycle or arbitrary actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-graph-view-ordered-changes",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanGraphView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve topological dependency order and staged proposal identities; graph semantics remain domain-owned.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "value-binding-requirement-editor-authorized-resource-choices",
+      "source": "src/Agentstration.Console.Components/Components/Values/ValueBindingRequirementEditor.razor",
+      "host": "console",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native parameter/secret resource options retain exact scoped address, authorized labels, validation and selection behavior.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "contextual-secret-creator-eligible-vault-choices",
+      "source": "src/Agentstration.Console.Components/Components/Values/ContextualSecretCreator.razor",
+      "host": "console",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native authorized Vault options preserve exact owner identity and capability restrictions; no per-option lookup.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "execution-timeline-execution-history",
+      "source": "src/Agentstration.Web.Components/ExecutionTimeline.razor",
+      "host": "console",
+      "routes": [],
+      "renderer": "native-specialized",
+      "adaptation": "Keep chronological history, accessible title/time/detail and domain tonal marker; no invented resource route, owner, state label or command.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "labels-summary-metadata-labels",
+      "source": "src/Agentstration.Web.Components/LabelsSummary.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Metadata key/value pairs retain their existing native grouping; not resource identities or lifecycle states.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "labels-editor-metadata-rows",
+      "source": "src/Agentstration.Web.Components/LabelsEditor.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep key/value form editing, validation and row removal; form fields and label values are not resource names or owners.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "icon-picker-icon-search-results",
+      "source": "src/Agentstration.Web.Components/IconPicker.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}",
+        "/workspaces"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bounded native icon-result buttons retain accessible names, keyboard focus and current search/clear behavior; icon storage remains #1110.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "schema-document-editor-schema-properties",
+      "source": "src/Agentstration.Web.Components/Schemas/SchemaDocumentEditor.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer",
+        "/schemas/new",
+        "/schemas/{Name}",
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Specialized property editor retains native nesting, types, validation and permitted field editing.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "schema-property-tree-node-property-tree",
+      "source": "src/Agentstration.Web.Components/Schemas/SchemaPropertyTreeNode.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer",
+        "/schemas/new",
+        "/schemas/{Name}",
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native schema tree preserves recursive property order and selection; graph/tree fields do not gain fabricated resource actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-call-inspector-flow-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep exact scoped Flow/version selection and immutable named output inspection inside the specialized designer.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-call-inspector-version-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep exact scoped Flow/version selection and immutable named output inspection inside the specialized designer.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-call-inspector-named-outputs",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep exact scoped Flow/version selection and immutable named output inspection inside the specialized designer.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-step-palette-step-templates",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowStepPalette.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native step-template buttons retain accessible selection and domain semantics; these are creation choices, not installed resources.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-router-inspector-agent-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowRouterInspector.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native exact owner/namespace/name selection preserves designer routing and disabled choices.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-agent-inspector-agent-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowAgentInspector.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native exact owner/namespace/name selection preserves designer configuration and disabled choices.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-tool-inspector-tool-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowToolInspector.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native exact scoped tool choices retain capabilities and designer configuration.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "schema-binding-editor-schema-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/SchemaBindingEditor.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer",
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native exact Schema/version selection preserves binding direction, validation and immutable version semantics.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "schema-binding-editor-version-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/SchemaBindingEditor.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer",
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native exact Schema/version selection preserves binding direction, validation and immutable version semantics.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-designer-transitions",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native transition selection and diagnostic controls preserve graph/canvas semantics and selection/focus.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-designer-validation-issues",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native transition selection and diagnostic controls preserve graph/canvas semantics and selection/focus.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "prompt-entry-suggestion-choices",
+      "source": "src/Agentstration.Workplace.Components/PromptEntry.razor",
+      "host": "workplace",
+      "routes": [
+        "/",
+        "/entries/{Name}",
+        "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}",
+        "/namespaces/{EntryNamespace}/entries/{Name}",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}",
+        "/w/{WorkspaceName}/d/{DashboardName}/start/{EntryNamespace}/{EntryName}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native authored suggestion buttons retain their existing prompt action and full accessible text; no resource scope/state applies.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "workplace-layout-recent-conversation-navigation",
+      "source": "src/Agentstration.Workplace.Components/WorkplaceLayout.razor",
+      "host": "workplace",
+      "routes": [],
+      "renderer": "native-specialized",
+      "adaptation": "Dynamic recent history retains exact workspace/dashboard/conversation URLs and accessible native navigation semantics.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "workplace-task-details-task-results",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/TaskDetails.razor",
+      "host": "workplace",
+      "routes": [
+        "/w/{WorkspaceName}/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native immutable results/messages retain chronological grouping and meaningful identifiers; child artifact/progress components are separately mapped. No invented resource lifecycle or commands.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "workplace-task-details-conversation-messages",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/TaskDetails.razor",
+      "host": "workplace",
+      "routes": [
+        "/w/{WorkspaceName}/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native immutable results/messages retain chronological grouping and meaningful identifiers; child artifact/progress components are separately mapped. No invented resource lifecycle or commands.",
+      "validation": "pending-final-campaign"
+    }
+  ],
+  "sourceAudit": [
+    {
+      "source": "src/Agentstration.Workplace.Components/InteractionView.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/PromptEntry.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/PendingActionPanel.razor",
+      "classification": "non-collection-control",
+      "reason": "Pending-action answer options are fields in the action form; pending-action collections inventoried at their owning task."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/FormEntry.razor",
+      "classification": "non-collection-control",
+      "reason": "Schema-defined form fields; parent Entry collection and submission semantics separately inventoried."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/EntryFieldRenderer.razor",
+      "classification": "non-collection-control",
+      "reason": "Native allowed field values; static/form option choices are not list screens."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/WorkplaceLayout.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/NotificationCenter.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/TaskProgressTimeline.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/ArtifactList.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/TaskTimeline.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Components/ConversationPanel.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/SecretReferencePicker.razor",
+      "classification": "non-collection-control",
+      "reason": "Legacy component has no active call site; active Secret/Vault selections are inventoried at their actual consumers."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/ExecutionTimeline.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/LabelsSummary.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/MainLayout.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/IconPicker.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/DataGrid.razor",
+      "classification": "non-collection-control",
+      "reason": "Internal rendering primitive; each functional CollectionView instance is counted at its adapter."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/CollectionView.razor",
+      "classification": "non-collection-control",
+      "reason": "Shared internal frame; counted at every domain adapter instance."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/EventList.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/LabelsEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/TaskDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Tasks.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowStepPalette.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowRouterInspector.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowAgentInspector.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowToolInspector.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/SchemaBindingEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowTopologyViewer.razor",
+      "classification": "non-collection-control",
+      "reason": "Canvas nodes/edges retain graph semantics; not a list of resource rows or independent list screen."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/FlowRunTimeline.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ModelProfiles/ModelProfilePicker.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/WorkOperations/TaskOperationsSummary.razor",
+      "classification": "non-collection-control",
+      "reason": "Fixed five status counters; summary metrics, not a collection of domain records."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimePlacementSummary.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkerDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DescendantUseGrantEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceAccessPanel.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Home.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Tasks.razor",
+      "classification": "non-collection-control",
+      "reason": "Workspace/status filter options; task records use TaskOperationsTable."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Organization.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConsoleConversations.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ProfileSettings.razor",
+      "classification": "non-collection-control",
+      "reason": "Fixed theme choices; no functional list exists on this route."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationWorkspaces.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolSetConfiguration.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "classification": "non-collection-control",
+      "reason": "Native implementation Flow reference field; fixed form field, preserves scoped option labels."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionToolEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRuns.razor",
+      "classification": "non-collection-control",
+      "reason": "Fixed status/trigger filters; actual run records use RunGrid."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceScopes.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolConfiguration.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Schemas.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolGovernanceAudit.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Entries.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Shared/ResourceScopePicker.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanValidationView.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanChangesView.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanApplicationView.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanActivityView.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanGraphView.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Values/ContextualParameterCreator.razor",
+      "classification": "non-collection-control",
+      "reason": "Parameter type and schema allowed values are form choices, not domain list records."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Values/ValueBindingRequirementEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Values/ContextualSecretCreator.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/JsonSchema/JsonSchemaInputEditor.razor",
+      "classification": "non-collection-control",
+      "reason": "Validation and generated form fields in a specialized schema editor."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/JsonSchema/JsonSchemaField.razor",
+      "classification": "non-collection-control",
+      "reason": "Schema fields, array input values and allowed-value options; specialized form semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/Schemas/SchemaDocumentEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/Schemas/SchemaPropertyTreeNode.razor",
+      "classification": "inventoried",
+      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/Schemas/SchemaPropertyNode.razor",
+      "classification": "non-collection-control",
+      "reason": "Fixed type options inside the separately inventoried schema property editor."
     }
   ]
 }

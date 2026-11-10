@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/sourceproviders"
 @implements IDisposable
 @inject ISourceProvidersClient Client
@@ -56,6 +57,6 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
     }
-    private static string DetailsUrl(SourceProviderSummaryResponse provider) => ConsoleResourceUrls.Resource("/sourceproviders", provider.Name, ResourceNamespace.Parse(provider.Namespace), provider.ScopeRef);
+    private string DetailsUrl(SourceProviderSummaryResponse provider) => ResourceOwnershipContext.Resource(Services, "/sourceproviders", provider.Name, ResourceNamespace.Parse(provider.Namespace), provider.ScopeRef);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

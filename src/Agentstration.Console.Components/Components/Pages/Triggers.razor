@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/triggers"
 @rendermode InteractiveServer
 @using Agentstration.Resources
@@ -75,7 +76,7 @@ else
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
     private async Task LoadAsync() { loading = true; error = null; try { items = await Client.ListAsync(CancellationToken.None); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
-    private static string DetailsUrl(TriggerResource value) => ConsoleResourceUrls.Resource("/triggers", value.Name, value.Namespace, TriggerUi.DefinitionScope(value));
+    private string DetailsUrl(TriggerResource value) => ResourceOwnershipContext.Resource(Services, "/triggers", value.Name, value.Namespace, TriggerUi.DefinitionScope(value));
     private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace), flow.ScopeRef); }
     private static UiStatus OutcomeStatus(TriggerLastOutcome outcome) => outcome switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
 }
