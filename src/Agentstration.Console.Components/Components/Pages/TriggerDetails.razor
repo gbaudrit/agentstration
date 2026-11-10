@@ -75,48 +75,42 @@ else
         {
             <div class="trigger-detail-grid">
                 <div class="trigger-detail-stack">
-                    <section class="panel">
-                        <div class="panel-header"><div><p class="eyebrow">@T("When")</p><h2>@T("Schedule")</h2></div><StatusBadge Text="@T($"ScheduleType.{trigger.Definition.Source.Schedule!.Type}")" Status="UiStatus.Info" /></div>
+                    <FormSection Title="@T("Schedule")" Eyebrow="@T("When")"><Actions><StatusBadge Text="@T($"ScheduleType.{trigger.Definition.Source.Schedule!.Type}")" Status="UiStatus.Info" /></Actions><ChildContent>
                         <dl class="resource-details"><dt>@T("Definition")</dt><dd>@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)</dd><dt>@T("NextOccurrence")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)</dd><dt>@T("LastScheduled")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastScheduledAt)</dd><dt>@T("LastFired")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)</dd><dt>@T("Misfire")</dt><dd>@MisfireLabel(trigger.Definition.MisfirePolicy)</dd><dt>@T("Concurrency")</dt><dd>@ConcurrencyLabel(trigger.Definition.ConcurrencyPolicy)</dd></dl>
-                    </section>
-                    <section class="panel">
-                        <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("WorkSubmission")</h2></div></div>
+                    </ChildContent></FormSection>
+                    <FormSection Title="@T("WorkSubmission")" Eyebrow="@T("What")"><ChildContent>
                         <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>@T("Flow")</dd><dt>@T("Flow")</dt><dd><a class="text-button" href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("DefinitionScope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
-                    </section>
+                    </ChildContent></FormSection>
                 </div>
                 <aside class="trigger-detail-stack">
-                    <section class="panel">
-                        <div class="panel-header"><div><p class="eyebrow">@T("Security")</p><h2>@T("ExecutionIdentity")</h2></div></div>
+                    <FormSection Title="@T("ExecutionIdentity")" Eyebrow="@T("Security")"><ChildContent>
                         @if (trigger.Definition.ExecutionScope is { } scope)
                         {
                             <dl class="resource-details"><dt>@T("Principal")</dt><dd><code>@Short(scope.PrincipalId)</code></dd><dt>@T("ExecutionScope")</dt><dd><ResourceScopeBadge ScopeRef="scope.AccessScopeRef" Compact /></dd><dt>@T("Authorization")</dt><dd>@T("AuthorizationReevaluated")</dd><dt>@T("Revocation")</dt><dd>@T("FailsClosed")</dd></dl>
                         }
                         else { <p>@T("NoExecutionIdentity")</p> }
-                    </section>
-                    <section class="panel">
-                        <div class="panel-header"><div><p class="eyebrow">@T("Observed")</p><h2>@T("CurrentStatus")</h2></div><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" /></div>
+                    </ChildContent></FormSection>
+                    <FormSection Title="@T("CurrentStatus")" Eyebrow="@T("Observed")"><Actions><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" /></Actions><ChildContent>
                         <dl class="resource-details"><dt>@T("Enabled")</dt><dd>@T(trigger.Definition.Enabled ? "Yes" : "No")</dd><dt>@T("LastOutcome")</dt><dd>@T($"Outcome.{trigger.Observed.LastOutcome}")</dd><dt>@T("ErrorCode")</dt><dd><code>@(trigger.Observed.LastErrorCode ?? "—")</code></dd><dt>@T("Uid")</dt><dd><code>@Short(trigger.Uid)</code></dd></dl>
-                    </section>
+                    </ChildContent></FormSection>
                 </aside>
             </div>
         }
         else if (activeTab == "Access")
         {
-            <section class="panel form-section" data-testid="trigger-access-panel">
-                <div class="panel-header"><div><p class="eyebrow">@T("Access")</p><h2>@T("TriggerAccessModel")</h2><p>@T("TriggerAccessModelHelp")</p></div></div>
+            <FormSection Title="@T("TriggerAccessModel")" Eyebrow="@T("Access")" Description="@T("TriggerAccessModelHelp")" TestId="trigger-access-panel"><ChildContent>
                 <dl class="resource-details">
                     <dt>@T("Flow")</dt><dd><a class="text-button" href="@FlowAccessUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd>
                     <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd>
                 </dl>
-                <div class="form-actions"><a class="button-primary" href="@FlowAccessUrl(trigger)">@T("ManageFlowAccess")</a></div>
-            </section>
+                <FormActions><a class="button-primary" href="@FlowAccessUrl(trigger)">@T("ManageFlowAccess")</a></FormActions>
+            </ChildContent></FormSection>
         }
         else
         {
-            <section class="panel form-section" data-testid="trigger-yaml-viewer">
-                <div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("TriggerYaml")</h2><p>@T("TriggerYamlHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div>
-                <textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("TriggerYaml")">@TriggerYaml</textarea>
-            </section>
+            <FormSection Title="@T("TriggerYaml")" Eyebrow="@T("RawDefinition")" Description="@T("TriggerYamlHelp")" TestId="trigger-yaml-viewer"><Actions><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></Actions><ChildContent>
+                <ClearableText Multiline="true" class="form-code-editor runner-json" rows="30" ReadOnly="true" aria-label="@T("TriggerYaml")" Value="@TriggerYaml"></ClearableText>
+            </ChildContent></FormSection>
         }
     </main>
 }

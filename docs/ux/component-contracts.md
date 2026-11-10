@@ -87,3 +87,14 @@ The Agent overview omits duplicate Identity and Execution panels. `StateComparis
 ## Additional editor field adoption
 
 [#1124](https://github.com/gbaudrit/agentstration/issues/1124) reuses the field components in nine additional Console editors. Secret/Vault forms subscribe to their current EditContext field changes, so in-control clearing activates the existing dirty feedback; replacing the saved/restored model also recreates its form inputs and validation state. Secret replacement input clearing has no persistence or delete side effect. Other family commands, specialized editors and non-nullable enum semantics are preserved. See the [bounded adoption and verification](formulaires-complementaires/README.md). Collection adoption remains owned by #1121.
+
+
+## Adoption transverse des champs (#1127)
+
+`FormField` expose `LabelContent` et `HelpContent` pour les libellés et aides riches, ainsi que les attributs de contexte. Un `FormCheckbox` réutilise `InputCheckbox` avec les associations du champ et les notifications du `EditContext` lorsqu’il existe. `FormGrid`, `FormSection` et `FormActions` acceptent une classe complémentaire et les attributs non reconnus.
+
+`ClearableText.UpdateOnInput=false` conserve une saisie locale jusqu’au changement, sans modifier la fréquence des mutations métier. Un effacement du brouillon conserve le focus et n’effectue pas une première validation par perte de focus. `AllowClear=false` permet de conserver les choix obligatoires fixes (contexte courant, langue). Ces options n’ajoutent pas de validation métier.
+
+Les pages Razor utilisent `ClearableControlTagHelper` (`clear-label`, `validation-id`), `native-form-controls.js` et `account-form-theme.css`. L’adaptateur conserve leurs champs et POST natifs, ajoute un bouton non soumettant masqué sans JavaScript et partage les variables sémantiques. Une option vide explicite préserve la validation serveur d’une sélection effacée. Les pages anonymes suivent le système et les pages de compte peuvent lire la préférence enregistrée.
+
+Voir l’[inventaire des formulaires](formulaires-tous-ecrans/README.md), qui sépare les routes, composants imbriqués et filtres de collections.

@@ -12,13 +12,13 @@
 <ResourceToolbar Label="@T("Filters")">
     <ChildContent>
         <label for="resource-plan-status">@T("Status")</label>
-        <select id="resource-plan-status" @bind="statusFilter" @bind:after="ApplyFilterAsync">
+        <ClearableSelect id="resource-plan-status" @bind-Value="statusFilter" @bind-Value:after="ApplyFilterAsync">
             <option value="">@T("AllStatuses")</option>
             @foreach (var status in Enum.GetValues<ResourcePlanStatus>())
             {
                 <option value="@status">@T($"Status.{status}")</option>
             }
-        </select>
+        </ClearableSelect>
     </ChildContent>
     <Actions>
         <span class="resource-plan-workspace">@T("CurrentWorkspace", ContextState.Current?.WorkspaceDisplayName ?? "—")</span>

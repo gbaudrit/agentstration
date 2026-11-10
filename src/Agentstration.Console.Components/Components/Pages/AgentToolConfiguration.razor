@@ -73,7 +73,7 @@
                             var usable = tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
                             var inputId = ToolInputId(tool);
                             <div class="agent-tool-option @(inherited ? "inherited" : null)">
-                                <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@effective" disabled="@(inherited || (!usable && !assigned))" @onchange="args => ToggleAsync(tool.Metadata.Name, (bool)args.Value!)" />
+                                <FormCheckbox id="@inputId" aria-label="@tool.Definition.DisplayName" Value="@effective" disabled="@(inherited || (!usable && !assigned))" ValueChanged="changed => ToggleAsync(tool.Metadata.Name, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />
                                 <label class="agent-tool-card-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
                                 <span class="agent-tool-copy">
                                     <strong><a class="agent-tool-name" href="@ToolUrl(tool)">@tool.Definition.DisplayName</a>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }</strong>

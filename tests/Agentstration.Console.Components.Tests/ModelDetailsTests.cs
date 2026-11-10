@@ -48,12 +48,12 @@ public sealed class ModelDetailsTests
 
         var yaml = rendered.Find("[data-testid='model-yaml'] textarea");
         Assert.IsTrue(yaml.HasAttribute("readonly"));
-        Assert.IsTrue(yaml.TextContent.Contains($"name: {FakeModelsClient.ResourceName}", StringComparison.Ordinal));
-        Assert.IsTrue(yaml.TextContent.Contains("externalId: gpt-5", StringComparison.Ordinal));
-        Assert.IsTrue(yaml.TextContent.Contains("support: unknown", StringComparison.Ordinal));
-        Assert.IsTrue(yaml.TextContent.Contains("maxOutputTokens: 16000", StringComparison.Ordinal));
-        Assert.IsFalse(yaml.TextContent.Contains("maxOutputTokens: 8000", StringComparison.Ordinal));
-        Assert.IsFalse(yaml.TextContent.Contains("specificationOverride", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains($"name: {FakeModelsClient.ResourceName}", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("externalId: gpt-5", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("support: unknown", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("maxOutputTokens: 16000", StringComparison.Ordinal));
+        Assert.IsFalse((yaml.GetAttribute("value") ?? string.Empty).Contains("maxOutputTokens: 8000", StringComparison.Ordinal));
+        Assert.IsFalse((yaml.GetAttribute("value") ?? string.Empty).Contains("specificationOverride", StringComparison.Ordinal));
 
         await rendered.Find("[data-testid='copy-model-yaml']").ClickAsync(new());
 

@@ -57,17 +57,17 @@ else
                             <StatusBadge Text="@T(IsEditable ? "Status.Draft" : "ReadOnly")" Status="UiStatus.Neutral" />
                         </div>
                         <div class="flow-definition-fields">
-                            <label><span>@T("DisplayName")</span><input value="@definitionDisplayName" @oninput="args => definitionDisplayName = args.Value?.ToString() ?? string.Empty" disabled="@(!CanEditDefinition)" maxlength="200" data-testid="flow-definition-display-name" /></label>
-                            <label><span>@T("TechnicalName")</span><input value="@flow.Id" readonly data-testid="flow-definition-name" /><small>@T("DefinitionIdentityFixedHelp")</small></label>
-                            <label><span>@T("Namespace")</span><input value="@FlowResourceNamespace.Value" readonly data-testid="flow-definition-namespace" /><small>@T("DefinitionIdentityFixedHelp")</small></label>
-                            <label><span>@T("Kind")</span><input value="@flow.Definition.Kind" readonly /></label>
-                            <label class="flow-definition-description"><span>@T("Description")</span><textarea rows="4" @bind="definitionDescription" @bind:event="oninput" disabled="@(!CanEditDefinition)" data-testid="flow-definition-description"></textarea></label>
+                            <FormField Label="@T("DisplayName")"><ChildContent><ClearableText Value="@definitionDisplayName" Disabled="@(!CanEditDefinition)" maxlength="200" data-testid="flow-definition-display-name" ValueChanged="changed => definitionDisplayName = (new ChangeEventArgs { Value = changed }).Value?.ToString() ?? string.Empty" /></ChildContent></FormField>
+                            <FormField Label="@T("TechnicalName")"><HelpContent>@T("DefinitionIdentityFixedHelp")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Value="@flow.Id" ReadOnly="true" data-testid="flow-definition-name" /></ChildContent></FormField>
+                            <FormField Label="@T("Namespace")"><HelpContent>@T("DefinitionIdentityFixedHelp")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Value="@FlowResourceNamespace.Value" ReadOnly="true" data-testid="flow-definition-namespace" /></ChildContent></FormField>
+                            <FormField Label="@T("Kind")"><ChildContent><ClearableText Value="@flow.Definition.Kind.ToString()" ReadOnly="true" /></ChildContent></FormField>
+                            <FormField Label="@T("Description")" Class="flow-definition-description"><ChildContent><ClearableText Multiline="true" rows="4" @bind-Value="definitionDescription" Disabled="@(!CanEditDefinition)" data-testid="flow-definition-description"></ClearableText></ChildContent></FormField>
                         </div>
                         @if (definitionError is not null) { <p class="error-panel" role="alert">@definitionError</p> }
                         @if (definitionSaved && !DefinitionDirty) { <p class="flow-definition-success" role="status">@T("DefinitionSaved")</p> }
                         @if (IsEditable)
                         {
-                            <div class="form-actions"><button class="button-primary" type="submit" disabled="@(!CanEditDefinition || definitionSaving || !DefinitionDirty)">@(definitionSaving ? T("Saving") : T("SaveDefinition"))</button></div>
+                            <FormActions><button class="button-primary" type="submit" disabled="@(!CanEditDefinition || definitionSaving || !DefinitionDirty)">@(definitionSaving ? T("Saving") : T("SaveDefinition"))</button></FormActions>
                         }
                     </form>
                 }
@@ -89,15 +89,14 @@ else
     }
     else
     {
-        <section class="panel form-section" data-testid="flow-yaml-viewer">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("FlowYaml")</h2><p>@T(IsEditable ? "FlowYamlEditableHelp" : "FlowYamlReadOnlyHelp")</p></div><StatusBadge Text="@T(IsEditable ? "Source" : "ReadOnly")" Status="UiStatus.Neutral" /></div>
-            <textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("FlowYamlDefinition")">@FlowYaml</textarea>
-            @if (IsEditable) { <div class="form-actions"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenYamlEditor")</a></div> }
-        </section>
+        <FormSection Title="@T("FlowYaml")" Eyebrow="@T("RawDefinition")" Description="@T(IsEditable ? "FlowYamlEditableHelp" : "FlowYamlReadOnlyHelp")" TestId="flow-yaml-viewer"><Actions><StatusBadge Text="@T(IsEditable ? "Source" : "ReadOnly")" Status="UiStatus.Neutral" /></Actions><ChildContent>
+            <ClearableText Multiline="true" class="form-code-editor runner-json" rows="30" ReadOnly="true" aria-label="@T("FlowYamlDefinition")" Value="@FlowYaml"></ClearableText>
+            @if (IsEditable) { <FormActions><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenYamlEditor")</a></FormActions> }
+        </ChildContent></FormSection>
     }
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-flow-title" data-testid="flow-run-dialog"><h2 id="run-flow-title">@T("RunFlow")</h2><label>@T("PublishedVersion")<select value="@runVersion" @onchange="ChangeRunVersion">@foreach(var version in versions){<option value="@version.Version">@version.Version</option>}</select></label><div class="flow-run-input"><h3>@T("FlowInput")</h3><p class="muted">@T("FlowInputHelp")</p><JsonSchemaInputEditor Schema="SelectedRunVersion?.Graph?.InputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="submitting" /></div>@if(error is not null){<p class="error-panel" role="alert">@error</p>}<div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun=false">@T("Cancel")</button><button class="button-primary" disabled="@(submitting || !runInputValid)" data-testid="flow-run-submit" @onclick="SubmitRunAsync">@(submitting ? T("Starting") : T("RunFlow"))</button></div></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-flow-title" data-testid="flow-run-dialog"><h2 id="run-flow-title">@T("RunFlow")</h2><FormField Label="@T("PublishedVersion")"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(runVersion, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => ChangeRunVersion(new ChangeEventArgs { Value = changed })">@foreach(var version in versions){<option value="@version.Version">@version.Version</option>}</ClearableSelect></ChildContent></FormField><div class="flow-run-input"><h3>@T("FlowInput")</h3><p class="muted">@T("FlowInputHelp")</p><JsonSchemaInputEditor Schema="SelectedRunVersion?.Graph?.InputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="submitting" /></div>@if(error is not null){<p class="error-panel" role="alert">@error</p>}<FormActions Class="dialog-actions"><button class="button-secondary" @onclick="() => showRun=false">@T("Cancel")</button><button class="button-primary" disabled="@(submitting || !runInputValid)" data-testid="flow-run-submit" @onclick="SubmitRunAsync">@(submitting ? T("Starting") : T("RunFlow"))</button></FormActions></section></div>
     }
 }
 </div>

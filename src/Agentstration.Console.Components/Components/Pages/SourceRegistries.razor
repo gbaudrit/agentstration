@@ -82,41 +82,38 @@ else
     var official = !IsNew && string.Equals(Name, SourceRegistryWellKnown.OfficialName, StringComparison.Ordinal);
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="source-registry-editor" class="resource-form">
         <DataAnnotationsValidator /><ValidationSummary />
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Registration")</h2><p>@T(official ? "OfficialRegistrationHelp" : "RegistrationHelp")</p></div>@if (view is not null) { <StatusBadge Text="@ObservedStatus(view.Observed.Definition.Status)" Status="@ObservedTone(view.Observed.Definition.Status)" /> }</div>
-            <div class="form-grid">
+        <FormSection Title="@T("Registration")" Eyebrow="@T("Identity")" Description="@T(official ? "OfficialRegistrationHelp" : "RegistrationHelp")"><Actions>@if (view is not null) { <StatusBadge Text="@ObservedStatus(view.Observed.Definition.Status)" Status="@ObservedTone(view.Observed.Definition.Status)" /> }</Actions><ChildContent>
+            <FormGrid>
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.SourceRegistry" IsNew="@IsNew" />
-                <label class="form-wide"><span>@T("IndexUrl")</span><InputText @bind-Value="model.IndexUrl" type="url" /><ValidationMessage For="() => model.IndexUrl" /></label>
-                <label class="switch-field"><InputCheckbox @bind-Value="model.Enabled" /><span>@T("Enabled")</span></label>
-                <label><span>@T("TrustPolicy")</span><InputSelect @bind-Value="model.TrustPolicy"><option value="@SourceRegistryTrustPolicy.Untrusted">@TrustPolicy(SourceRegistryTrustPolicy.Untrusted)</option><option value="@SourceRegistryTrustPolicy.Trusted">@TrustPolicy(SourceRegistryTrustPolicy.Trusted)</option><option value="@SourceRegistryTrustPolicy.Authoritative">@TrustPolicy(SourceRegistryTrustPolicy.Authoritative)</option></InputSelect></label>
-            </div>
-        </section>
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Connection")</p><h2>@T("EndpointAndCredential")</h2><p>@T("CredentialHelp")</p></div></div>
-            <div class="form-grid">
-                <label><span>@T("Authentication")</span><InputSelect @bind-Value="model.AuthenticationMode"><option value="@SourceRegistryAuthenticationMode.None">@T("Authentication.None")</option><option value="@SourceRegistryAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></InputSelect></label>
+                <FormField Label="@T("IndexUrl")" Class="form-wide form-span-2"><Validation><ValidationMessage For="() => model.IndexUrl" /></Validation><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="model.IndexUrl" Type="url" /></ChildContent></FormField>
+                <label class="switch-field"><FormCheckbox @bind-Value="model.Enabled" /><span>@T("Enabled")</span></label>
+                <FormField Label="@T("TrustPolicy")"><ChildContent><ClearableSelect @bind-Value="model.TrustPolicy"><option value="@SourceRegistryTrustPolicy.Untrusted">@TrustPolicy(SourceRegistryTrustPolicy.Untrusted)</option><option value="@SourceRegistryTrustPolicy.Trusted">@TrustPolicy(SourceRegistryTrustPolicy.Trusted)</option><option value="@SourceRegistryTrustPolicy.Authoritative">@TrustPolicy(SourceRegistryTrustPolicy.Authoritative)</option></ClearableSelect></ChildContent></FormField>
+            </FormGrid>
+        </ChildContent></FormSection>
+        <FormSection Title="@T("EndpointAndCredential")" Eyebrow="@T("Connection")" Description="@T("CredentialHelp")"><ChildContent>
+            <FormGrid>
+                <FormField Label="@T("Authentication")"><ChildContent><ClearableSelect @bind-Value="model.AuthenticationMode"><option value="@SourceRegistryAuthenticationMode.None">@T("Authentication.None")</option><option value="@SourceRegistryAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></ClearableSelect></ChildContent></FormField>
                 @if (model.AuthenticationMode == SourceRegistryAuthenticationMode.StaticBearer)
                 {
-                    <label><span>@T("CredentialReference")</span><InputSelect @bind-Value="model.CredentialName"><option value="">@T("SelectCredential")</option>@foreach (var secret in instanceSecrets) { <option value="@secret.Resource.Name">@secret.Resource.Definition.DisplayName — @secret.Resource.Name</option> }</InputSelect><small>@T("CredentialValueHidden")</small></label>
+                    <FormField Label="@T("CredentialReference")"><HelpContent>@T("CredentialValueHidden")</HelpContent><ChildContent><ClearableSelect @bind-Value="model.CredentialName"><option value="">@T("SelectCredential")</option>@foreach (var secret in instanceSecrets) { <option value="@secret.Resource.Name">@secret.Resource.Definition.DisplayName — @secret.Resource.Name</option> }</ClearableSelect></ChildContent></FormField>
                 }
-                <label class="switch-field"><InputCheckbox @bind-Value="model.AllowHttp" /><span>@T("AllowHttp")</span></label>
-                <label class="switch-field"><InputCheckbox @bind-Value="model.AllowPrivateNetwork" /><span>@T("AllowPrivateNetwork")</span></label>
-            </div>
-        </section>
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Automation")</p><h2>@T("RefreshPolicy")</h2><p>@T("RefreshPolicyHelp")</p></div><label class="switch-field"><InputCheckbox @bind-Value="model.PeriodicEnabled" /><span>@T("PeriodicRefresh")</span></label></div>
+                <label class="switch-field"><FormCheckbox @bind-Value="model.AllowHttp" /><span>@T("AllowHttp")</span></label>
+                <label class="switch-field"><FormCheckbox @bind-Value="model.AllowPrivateNetwork" /><span>@T("AllowPrivateNetwork")</span></label>
+            </FormGrid>
+        </ChildContent></FormSection>
+        <FormSection Title="@T("RefreshPolicy")" Eyebrow="@T("Automation")" Description="@T("RefreshPolicyHelp")"><Actions><label class="switch-field"><FormCheckbox @bind-Value="model.PeriodicEnabled" /><span>@T("PeriodicRefresh")</span></label></Actions><ChildContent>
             <div class="refresh-policy-fields">
-                <label><span>@T("IntervalMinutes")</span><InputNumber @bind-Value="model.IntervalMinutes" /></label>
-                <label><span>@T("TimeoutSeconds")</span><InputNumber @bind-Value="model.TimeoutSeconds" /></label>
-                <label><span>@T("MaximumAttempts")</span><InputNumber @bind-Value="model.MaximumAttempts" /></label>
-                <label><span>@T("InitialBackoffSeconds")</span><InputNumber @bind-Value="model.InitialBackoffSeconds" /></label>
-                <label><span>@T("MaximumBackoffSeconds")</span><InputNumber @bind-Value="model.MaximumBackoffSeconds" /></label>
-                <label><span>@T("JitterSeconds")</span><InputNumber @bind-Value="model.JitterSeconds" /></label>
-                <label><span>@T("StaleAfterMinutes")</span><InputNumber @bind-Value="model.StaleAfterMinutes" /></label>
-                <label><span>@T("RetainedObservations")</span><InputNumber @bind-Value="model.RetainedObservations" /></label>
+                <FormField Label="@T("IntervalMinutes")"><ChildContent><ClearableNumber @bind-Value="model.IntervalMinutes" /></ChildContent></FormField>
+                <FormField Label="@T("TimeoutSeconds")"><ChildContent><ClearableNumber @bind-Value="model.TimeoutSeconds" /></ChildContent></FormField>
+                <FormField Label="@T("MaximumAttempts")"><ChildContent><ClearableNumber @bind-Value="model.MaximumAttempts" /></ChildContent></FormField>
+                <FormField Label="@T("InitialBackoffSeconds")"><ChildContent><ClearableNumber @bind-Value="model.InitialBackoffSeconds" /></ChildContent></FormField>
+                <FormField Label="@T("MaximumBackoffSeconds")"><ChildContent><ClearableNumber @bind-Value="model.MaximumBackoffSeconds" /></ChildContent></FormField>
+                <FormField Label="@T("JitterSeconds")"><ChildContent><ClearableNumber @bind-Value="model.JitterSeconds" /></ChildContent></FormField>
+                <FormField Label="@T("StaleAfterMinutes")"><ChildContent><ClearableNumber @bind-Value="model.StaleAfterMinutes" /></ChildContent></FormField>
+                <FormField Label="@T("RetainedObservations")"><ChildContent><ClearableNumber @bind-Value="model.RetainedObservations" /></ChildContent></FormField>
             </div>
-        </section>
-        <div class="form-actions"><a class="button-secondary" href="/settings/source-registries">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@(busy || !CanSave)">@(busy ? T("Saving") : IsNew ? T("CreateRegistry") : T("SaveChanges"))</button></div>
+        </ChildContent></FormSection>
+        <FormActions><a class="button-secondary" href="/settings/source-registries">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@(busy || !CanSave)">@(busy ? T("Saving") : IsNew ? T("CreateRegistry") : T("SaveChanges"))</button></FormActions>
     </EditForm>
 
     @if (!IsNew && view is not null)
@@ -132,11 +129,10 @@ else
                 <dl class="resource-details"><dt>@T("Freshness")</dt><dd>@ObservedStatus(view.Observed.Definition.Status)</dd><dt>@T("LastSuccessfulRefresh")</dt><dd>@FormatDate(view.Observed.Definition.LastSuccessfulRefreshAt)</dd><dt>@T("IndexDigest")</dt><dd><code>@Short(view.Observed.Definition.Current?.IndexDigest)</code></dd><dt>@T("CachedShards")</dt><dd>@(view.Observed.Definition.Current?.Catalogs.Count ?? 0)</dd></dl>
             </article>
         </section>
-        <section class="panel">
-            <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("RefreshHistory")</h2><p>@T("RefreshHistoryHelp")</p></div></div>
+        <FormSection Title="@T("RefreshHistory")" Eyebrow="@T("History")" Description="@T("RefreshHistoryHelp")"><ChildContent>
             @if (refreshes.Count == 0) { <EmptyState Title="@T("NoRefreshHistory")" Message="@T("NoRefreshHistoryMessage")" /> }
             else { <div class="registry-history">@foreach (var refresh in refreshes) { <article><span><strong>@RefreshOutcome(refresh.Definition.Outcome)</strong><small>@FormatDate(refresh.Definition.CompletedAt) · @RefreshTrigger(refresh.Definition.Trigger) · @F("RetryCount", refresh.Definition.RetryCount)</small></span><span><code>@Short(refresh.Definition.IndexDigest)</code>@if (!string.IsNullOrWhiteSpace(refresh.Definition.ErrorMessage)) { <small class="registry-error">@refresh.Definition.ErrorMessage</small> }</span></article> }</div> }
-        </section>
+        </ChildContent></FormSection>
         <div class="form-actions registry-destructive-actions">
             @if (!official) { <button class="button-danger" disabled="@busy" @onclick="() => confirmDelete = true">@T("DeleteRegistry")</button> }
         </div>

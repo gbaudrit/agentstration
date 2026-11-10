@@ -101,24 +101,24 @@ else
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form" data-testid="model-profile-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
         <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><ValidationSummary />
         <fieldset class="model-profile-definition-fields" disabled="@(!CanManage || saving)" data-testid="model-profile-definition-fields">
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
+        <FormSection Title="@T("ProfileResource")" Eyebrow="@T("Identity")"><Actions>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</Actions><ChildContent>
             <FormGrid>
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="model-profile-display-name" TechnicalNameTestId="model-profile-name" />
                 <FormField Label="@T("Namespace")"><ChildContent><ClearableText @bind-Value="model.Namespace" disabled="@(!IsNew)" /></ChildContent><Validation><ValidationMessage For="() => model.Namespace" /></Validation></FormField>
                 <ResourceScopeFormField ResourceKind="@ModelResourceKinds.ModelProfile" Value="@selectedScope" ValueChanged="ScopeChanged" Disabled="@(!IsNew)" />
                 <FormField Optional="true" Label="@T("DescriptionLabel")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
             </FormGrid>
-        </section>
+        </ChildContent></FormSection>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("ModelSelection")</p><h2>@T("ProviderAndModel")</h2></div></div>
+        <FormSection Title="@T("ProviderAndModel")" Eyebrow="@T("ModelSelection")"><ChildContent>
             <FormGrid>
                 <FormField Required="true" Label="@T("Provider")"><ChildContent><ClearableSelect TValue="string" Value="@SelectedProvider" ValueChanged="value => ProviderChangedAsync(new ChangeEventArgs { Value = value })" ValueExpression="() => model.ProviderName" data-testid="model-profile-provider"><option value="">@T("SelectProvider")</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ProviderName" /></Validation></FormField>
                 <FormField Required="true" Label="@T("Model")"><ChildContent><ClearableSelect @bind-Value="model.ModelName" disabled="@loadingModels" data-testid="model-profile-model"><option value="">@(loadingModels ? T("LoadingModels") : T("SelectModel"))</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — @T("NotCurrentlyDiscovered")</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @StatusLabel(available.Status)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ModelName" /></Validation></FormField>
             </FormGrid>
             @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">@T("NoModelsReported")</p> }
-        </section>
+        </ChildContent></FormSection>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Defaults")</p><h2>@T("Generation")</h2></div><span>@T("Canonical")</span></div>
+        <FormSection Title="@T("Generation")" Eyebrow="@T("Defaults")"><Actions><span>@T("Canonical")</span></Actions><ChildContent>
             <FormGrid>
                 <FormField Label="@T("Temperature")" Tooltip="@T("TemperatureHelp")"><ChildContent><ClearableNumber @bind-Value="model.Temperature" step="0.1" /></ChildContent><Validation><ValidationMessage For="() => model.Temperature" /></Validation></FormField>
                 <FormField Label="@T("TopP")" Tooltip="@T("TopPHelp")"><ChildContent><ClearableNumber @bind-Value="model.TopP" step="0.05" /></ChildContent><Validation><ValidationMessage For="() => model.TopP" /></Validation></FormField>
@@ -127,45 +127,45 @@ else
                 <FormField Label="@T("Seed")" Tooltip="@T("SeedHelp")"><ChildContent><ClearableNumber @bind-Value="model.Seed" /></ChildContent><Validation><ValidationMessage For="() => model.Seed" /></Validation></FormField>
                 <FormField Label="@T("StopSequences")" Class="form-span-2" Tooltip="@T("StopSequencesHelp")"><ChildContent><ClearableText Multiline @bind-Value="model.StopSequences" rows="3" /></ChildContent><Validation><ValidationMessage For="() => model.StopSequences" /></Validation></FormField>
             </FormGrid>
-        </section>
+        </ChildContent></FormSection>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Inference")</p><h2>@T("ReasoningAndOutput")</h2></div></div>
+        <FormSection Title="@T("ReasoningAndOutput")" Eyebrow="@T("Inference")"><ChildContent>
             <FormGrid>
                 <FormField Required="true" Label="@T("ReasoningMode")"><ChildContent><ClearableSelect @bind-Value="model.ReasoningMode">@foreach (var value in Enum.GetValues<ReasoningMode>()) { <option value="@value">@value</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ReasoningMode" /></Validation></FormField>
                 <FormField Label="@T("ReasoningEffort")"><ChildContent><ClearableSelect @bind-Value="model.ReasoningEffort"><option value="">@T("ProviderDefault")</option>@foreach (var value in Enum.GetValues<ReasoningEffort>()) { <option value="@value">@value</option> }</ClearableSelect><small>@T("ReasoningEffortHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.ReasoningEffort" /></Validation></FormField>
                 <FormField Required="true" Label="@T("OutputFormat")"><ChildContent><ClearableSelect @bind-Value="model.OutputFormat">@foreach (var value in Enum.GetValues<ModelOutputFormat>()) { <option value="@value">@value</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.OutputFormat" /></Validation></FormField>
-                <label class="checkbox-field"><InputCheckbox @bind-Value="model.StrictOutput" /><span>@T("StrictStructuredOutput")</span></label>
+                <label class="checkbox-field"><FormCheckbox @bind-Value="model.StrictOutput" /><span>@T("StrictStructuredOutput")</span></label>
                 @if (model.OutputFormat == ModelOutputFormat.JsonSchema)
                 {
                     <FormField Label="@T("JsonSchema")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.JsonSchema" rows="10" class="runner-json" /><small>@T("JsonSchemaRequired")</small></ChildContent><Validation><ValidationMessage For="() => model.JsonSchema" /></Validation></FormField>
                 }
             </FormGrid>
-        </section>
+        </ChildContent></FormSection>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Adapter")</p><h2>@T("ProviderOptions")</h2></div><span>@(optionEditor is null ? T("Advanced") : $"{optionEditor.Contract.Id}@{optionEditor.Version.Version}")</span></div>
+        <FormSection Title="@T("ProviderOptions")" Eyebrow="@T("Adapter")"><Actions><span>@(optionEditor is null ? T("Advanced") : $"{optionEditor.Contract.Id}@{optionEditor.Version.Version}")</span></Actions><ChildContent>
             @if (optionEditor is { CanGuide: true } && !rawOptions)
             {
                 <FormGrid>
-                    <label class="checkbox-field form-span-2"><input type="checkbox" checked="@optionEditor.Enabled" @onchange="SetProviderOptionsEnabled" /><span>@T("ConfigureProviderOptions")</span></label>
+                    <label class="checkbox-field form-span-2"><FormCheckbox Value="@optionEditor.Enabled" ValueChanged="changed => SetProviderOptionsEnabled(new ChangeEventArgs { Value = changed })" /><span>@T("ConfigureProviderOptions")</span></label>
                     @if (optionEditor.Enabled)
                     {
                         @foreach (var field in optionEditor.Fields)
                         {
                             @if (field.Kind == ExtensionOptionFieldKind.Toggle)
                             {
-                                <label class="checkbox-field"><input type="checkbox" checked="@BooleanValue(field)" @onchange="args => SetBooleanOption(field, args)" /><span>@FieldLabel(field)</span></label>
+                                <label class="checkbox-field"><FormCheckbox Value="@BooleanValue(field)" ValueChanged="changed => SetBooleanOption(field, new ChangeEventArgs { Value = changed })" /><span>@FieldLabel(field)</span></label>
                             }
                             else if (field.AllowedValues.Count > 0)
                             {
-                                <label><span>@FieldLabel(field)</span><select value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"><option value="">@T("ProviderDefault")</option>@foreach (var value in field.AllowedValues) { <option value="@value">@value</option> }</select>@FieldHelp(field)</label>
+                                <FormField Label="@FieldLabel(field)"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(field.Value, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => SetOption(field, (new ChangeEventArgs { Value = changed }).Value?.ToString())"><option value="">@T("ProviderDefault")</option>@foreach (var value in field.AllowedValues) { <option value="@value">@value</option> }</ClearableSelect>@FieldHelp(field)</ChildContent></FormField>
                             }
                             else if (field.Kind is ExtensionOptionFieldKind.JsonObject or ExtensionOptionFieldKind.JsonValue)
                             {
-                                <label class="form-span-2"><span>@FieldLabel(field)</span><textarea rows="5" class="runner-json form-code-editor" value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"></textarea>@FieldHelp(field)</label>
+                                <FormField Label="@FieldLabel(field)" Class="form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="5" class="runner-json form-code-editor" Value="@field.Value" ValueChanged="changed => SetOption(field, (new ChangeEventArgs { Value = changed }).Value?.ToString())"></ClearableText>@FieldHelp(field)</ChildContent></FormField>
                             }
                             else
                             {
-                                <label><span>@FieldLabel(field)</span><input type="@(field.Kind is ExtensionOptionFieldKind.WholeNumber or ExtensionOptionFieldKind.DecimalNumber ? "number" : "text")" value="@field.Value" min="@field.Minimum" max="@field.Maximum" step="@(field.Kind == ExtensionOptionFieldKind.WholeNumber ? "1" : "any")" @onchange="args => SetOption(field, args.Value?.ToString())" />@FieldHelp(field)</label>
+                                <FormField Label="@FieldLabel(field)"><ChildContent><ClearableText UpdateOnInput="false" Type="@(field.Kind is ExtensionOptionFieldKind.WholeNumber or ExtensionOptionFieldKind.DecimalNumber ? "number" : "text")" Value="@field.Value" min="@field.Minimum" max="@field.Maximum" step="@(field.Kind == ExtensionOptionFieldKind.WholeNumber ? "1" : "any")" ValueChanged="changed => SetOption(field, (new ChangeEventArgs { Value = changed }).Value?.ToString())" />@FieldHelp(field)</ChildContent></FormField>
                             }
                         }
                     }
@@ -178,7 +178,7 @@ else
                 <FormGrid><FormField Label="@T("ProviderSpecificJson")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("ProviderJsonHelpPrefix") <code>optionSet</code>, <code>version</code>, <code>schemaDigest</code> @T("And") <code>values</code>.</small></ChildContent><Validation><ValidationMessage For="() => model.ProviderOptionsJson" /></Validation></FormField></FormGrid>
                 @if (optionEditor?.CanGuide == true) { <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseGuidedOptions">@T("ReturnToGuidedEditor")</button></div> }
             }
-        </section>
+        </ChildContent></FormSection>
         </fieldset>
 
         @if (CanManage)

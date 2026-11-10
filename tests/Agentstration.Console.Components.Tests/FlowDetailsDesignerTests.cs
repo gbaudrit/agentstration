@@ -321,7 +321,7 @@ public sealed class FlowDetailsDesignerTests
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.YAML"].Value).Click();
         var yaml = rendered.Find("[data-testid='flow-yaml-viewer'] textarea");
         Assert.IsTrue(yaml.HasAttribute("readonly"));
-        Assert.IsTrue(yaml.TextContent.Contains("entryStep: input", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("entryStep: input", StringComparison.Ordinal));
     }
 
     [TestMethod]

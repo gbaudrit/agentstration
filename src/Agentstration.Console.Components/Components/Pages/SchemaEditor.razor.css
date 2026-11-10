@@ -4,7 +4,7 @@
     width: 100%;
 }
 
-.schema-yaml-field textarea {
+.schema-yaml-field ::deep textarea {
     box-sizing: border-box;
     min-height: 32rem;
     width: 100%;

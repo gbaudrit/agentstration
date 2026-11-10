@@ -65,3 +65,8 @@ Voir les [contrats techniques](component-contracts.md), le [plan et les tickets]
 La livraison complémentaire [#1124](https://github.com/gbaudrit/agentstration/issues/1124) étend les champs communs à neuf éditeurs : Secrets, Coffres, fournisseurs d’outils, catégories d’outils, Sources de données, Profils de source de données, Sources de connaissances, Entrées et Schémas. Elle porte sur les champs ordinaires et leurs associations label/aide/validation ; elle conserve les commandes et éditeurs spécialisés de chaque famille.
 
 La [matrice détaillée et les captures](formulaires-complementaires/README.md) distinguent cette adoption des champs d’une refonte complète des fiches. Les listes restent suivies séparément dans #1121 ; les écrans d’administration, les formulaires de registres de Sources et les autres surfaces reportées ci-dessus conservent leur disposition. Le nouveau scénario réutilisable #1125 attend la validation UX explicite et la fusion de la PR d’implémentation.
+
+
+## Extension à tous les formulaires — #1127
+
+La [matrice complète](formulaires-tous-ecrans/README.md) remplace les reports de familles ci-dessus pour les **champs de formulaire** : administration, Sources/registres, Packs, créateurs contextuels, formulaires dynamiques Workplace, inspecteurs Flow et pages Razor de compte. Les comportements métier et les éditeurs spécialisés sont conservés. Les dispositions propres à chaque famille restent adaptées à son usage ; les listes #1121 restent séparées. La couverture associée #1128 sera une PR empilée en brouillon, conformément à la demande du mainteneur.

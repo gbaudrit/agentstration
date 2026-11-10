@@ -106,18 +106,18 @@ else if (source is not null && readiness is not null)
         <section class="panel form-section knowledge-retrieval" data-testid="knowledge-retrieval-verification">
         <div class="panel-header knowledge-retrieval-header"><div><p class="eyebrow">@T("Verification")</p><h2>@T("VerifyRetrieval")</h2><p>@T("RetrievalHelp")</p></div><span class="knowledge-retrieval-icon"><UiIcon Name="search" /></span></div>
         <div class="knowledge-retrieval-form">
-            <label><span>@T("Operation")</span><select value="@retrievalOperation" data-testid="knowledge-retrieval-operation" @onchange="ChangeRetrievalOperation"><option value="search">@T("Operation.Search")</option><option value="query">@T("Operation.Query")</option><option value="read">@T("Operation.Read")</option></select></label>
-            <label><span>@T(retrievalOperation == "query" ? "Question" : retrievalOperation == "read" ? "ArtifactId" : "SearchText")</span>
+            <FormField Label="@T("Operation")"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(retrievalOperation, System.Globalization.CultureInfo.InvariantCulture)" data-testid="knowledge-retrieval-operation" ValueChanged="changed => ChangeRetrievalOperation(new ChangeEventArgs { Value = changed })"><option value="search">@T("Operation.Search")</option><option value="query">@T("Operation.Query")</option><option value="read">@T("Operation.Read")</option></ClearableSelect></ChildContent></FormField>
+            <FormField Label="@T(retrievalOperation == "query" ? "Question" : retrievalOperation == "read" ? "ArtifactId" : "SearchText")">
                 @if (retrievalOperation == "read")
                 {
-                    <select value="@retrievalText" data-testid="knowledge-retrieval-artifact" @onchange="ChangeRetrievalArtifact"><option value="">@T("SelectArtifact")</option>@foreach (var artifact in RetrievalArtifacts) { <option value="@artifact.ArtifactId">@ArtifactOptionLabel(artifact)</option> }</select>
+                    <ClearableSelect TValue="string" Value="@Convert.ToString(retrievalText, System.Globalization.CultureInfo.InvariantCulture)" data-testid="knowledge-retrieval-artifact" ValueChanged="changed => ChangeRetrievalArtifact(new ChangeEventArgs { Value = changed })"><option value="">@T("SelectArtifact")</option>@foreach (var artifact in RetrievalArtifacts) { <option value="@artifact.ArtifactId">@ArtifactOptionLabel(artifact)</option> }</ClearableSelect>
                 }
                 else
                 {
-                    <input @bind="retrievalText" data-testid="knowledge-retrieval-text" />
+                    <ClearableText UpdateOnInput="false" @bind-Value="retrievalText" data-testid="knowledge-retrieval-text" />
                 }
-            </label>
-            <label><span>@T("SnapshotOptional")</span><select value="@retrievalSnapshot" data-testid="knowledge-retrieval-snapshot" @onchange="ChangeRetrievalSnapshot"><option value="">@T("ActiveSnapshot")</option>@foreach (var snapshot in snapshots) { <option value="@snapshot.Snapshot.Name">@snapshot.Snapshot.Name</option> }</select></label>
+            </FormField>
+            <FormField Label="@T("SnapshotOptional")"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(retrievalSnapshot, System.Globalization.CultureInfo.InvariantCulture)" data-testid="knowledge-retrieval-snapshot" ValueChanged="changed => ChangeRetrievalSnapshot(new ChangeEventArgs { Value = changed })"><option value="">@T("ActiveSnapshot")</option>@foreach (var snapshot in snapshots) { <option value="@snapshot.Snapshot.Name">@snapshot.Snapshot.Name</option> }</ClearableSelect></ChildContent></FormField>
             <div class="knowledge-retrieval-actions"><button class="button-primary" type="button" disabled="@(!CanRunRetrieval)" data-testid="knowledge-retrieval-run" @onclick="VerifyRetrievalAsync"><UiIcon Name="play-circle" /><span>@T("RunVerification")</span></button></div>
         </div>
         @if (retrievalResult is not null)
@@ -144,12 +144,11 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Tools)
     {
-        <section class="panel form-section" data-testid="knowledge-source-tool-exposure">
-        <div class="panel-header"><div><p class="eyebrow">@T("Governance")</p><h2>@T("ToolExposure")</h2><p>@T("ExposureExplanation")</p></div>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</div>
+        <FormSection Title="@T("ToolExposure")" Eyebrow="@T("Governance")" Description="@T("ExposureExplanation")" TestId="knowledge-source-tool-exposure"><Actions>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</Actions><ChildContent>
         @if (exposure is null)
         {
-            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
-            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div> }
+            <FormGrid><FormField Label="@T("Version")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="version" /></ChildContent></FormField><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><FormCheckbox @bind-Value="requiresApproval" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></FormGrid>
+            @if (CanManage) { <FormActions><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></FormActions> }
             @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
         }
         else
@@ -160,7 +159,7 @@ else if (source is not null && readiness is not null)
             </DataGrid>
             <p class="resource-hint">@T("PinnedSourceHelp")</p>
         }
-        </section>
+        </ChildContent></FormSection>
     }
     else if (activeTab == DetailsTab.Access && CanManage)
     {
@@ -168,12 +167,11 @@ else if (source is not null && readiness is not null)
     }
     else
     {
-        <section class="panel form-section" data-testid="knowledge-source-yaml">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("KnowledgeSourceYaml")</h2><p>@T("KnowledgeSourceYamlHelp")</p></div></div>
+        <FormSection Title="@T("KnowledgeSourceYaml")" Eyebrow="@T("RawResource")" Description="@T("KnowledgeSourceYamlHelp")" TestId="knowledge-source-yaml"><ChildContent>
             @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-            <label class="knowledge-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="30" aria-label="@T("ResourceManifest")" data-testid="knowledge-source-yaml-editor" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanManage)"></textarea></label>
-            @if (CanManage) { <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy" data-testid="knowledge-source-yaml-save">@(busy ? T("Saving") : T("SaveYaml"))</button></div> }
-        </section>
+            <FormField Label="@T("ResourceManifest")" Class="knowledge-yaml-field"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="30" aria-label="@T("ResourceManifest")" data-testid="knowledge-source-yaml-editor" @bind-Value="rawYaml" ReadOnly="@(!CanManage)"></ClearableText></ChildContent></FormField>
+            @if (CanManage) { <FormActions><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy" data-testid="knowledge-source-yaml-save">@(busy ? T("Saving") : T("SaveYaml"))</button></FormActions> }
+        </ChildContent></FormSection>
     }
     </main>
 }

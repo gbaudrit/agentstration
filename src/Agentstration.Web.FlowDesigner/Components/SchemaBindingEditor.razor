@@ -42,22 +42,20 @@
         else
         {
             <div class="flow-schema-reference-fields">
-                <label><span>@Localizer["SharedSchema"]</span>
-                    <select disabled="@ReadOnly" value="@SelectedSchemaKey" @onchange="ChangeSchemaAsync" data-testid="@($"{TestId}-resource")">
+                <FormField Label="@Localizer["SharedSchema"]"><ChildContent><ClearableSelect TValue="string" disabled="@ReadOnly" Value="@Convert.ToString(SelectedSchemaKey, System.Globalization.CultureInfo.InvariantCulture)" data-testid="@($"{TestId}-resource")" ValueChanged="changed => ChangeSchemaAsync(new ChangeEventArgs { Value = changed })">
                         @foreach (var schema in Schemas)
                         {
                             <option value="@SchemaKey(schema)">@schema.DisplayName (@schema.Namespace.Value/@schema.Name)</option>
                         }
-                    </select>
-                </label>
-                <label><span>@Localizer["ExactSchemaVersion"]</span>
-                    <select disabled="@ReadOnly" value="@selectedVersion?.Version" @onchange="ChangeVersionAsync" data-testid="@($"{TestId}-version")">
+                    </ClearableSelect>
+                </ChildContent></FormField>
+                <FormField Label="@Localizer["ExactSchemaVersion"]"><ChildContent><ClearableSelect TValue="string" disabled="@ReadOnly" Value="@Convert.ToString(selectedVersion?.Version, System.Globalization.CultureInfo.InvariantCulture)" data-testid="@($"{TestId}-version")" ValueChanged="changed => ChangeVersionAsync(new ChangeEventArgs { Value = changed })">
                         @foreach (var version in VersionsForSelectedSchema)
                         {
                             <option value="@version.Version">@version.Version</option>
                         }
-                    </select>
-                </label>
+                    </ClearableSelect>
+                </ChildContent></FormField>
             </div>
             @if (selectedVersion is not null)
             {

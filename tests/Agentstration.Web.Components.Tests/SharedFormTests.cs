@@ -213,6 +213,109 @@ public sealed class SharedFormTests
         Assert.IsEmpty(cut.FindAll("[role='alertdialog']"));
     }
 
+    [TestMethod]
+    public async Task ChangeOnlyTextKeepsItsDraftUntilCommitAndCanClearBeforeBlur()
+    {
+        using var context = Context();
+        var values = new List<string?>();
+        var cut = context.Render<ClearableText>(parameters => parameters
+            .Add(input => input.Value, "Stored")
+            .Add(input => input.UpdateOnInput, false)
+            .Add(input => input.ValueChanged, (string? value) => values.Add(value)));
+
+        await cut.Find("input").InputAsync(new ChangeEventArgs { Value = "Draft" });
+        Assert.IsEmpty(values, "Typing must not invoke a domain update before the original change event.");
+        cut.Render(parameters => parameters.Add(input => input.Value, "Stored"));
+        Assert.AreEqual("Draft", cut.Find("input").GetAttribute("value"));
+        Assert.IsTrue(cut.Find("button").HasAttribute("blazor:onmousedown:preventDefault"));
+        await cut.Find("button").ClickAsync(new());
+        CollectionAssert.AreEqual(new string?[] { string.Empty }, values);
+        Assert.IsEmpty(cut.FindAll("button"));
+        Assert.IsTrue(context.JSInterop.Invocations.Any(call => call.Identifier == "Blazor._internal.domWrapper.focus"));
+    }
+
+    [TestMethod]
+    public async Task ChangeOnlyTextCommitsOnceAndHonorsExternalReset()
+    {
+        using var context = Context();
+        var values = new List<string?>();
+        var cut = context.Render<ClearableText>(parameters => parameters
+            .Add(input => input.Value, "Initial")
+            .Add(input => input.UpdateOnInput, false)
+            .Add(input => input.ValueChanged, (string? value) => values.Add(value)));
+        await cut.Find("input").InputAsync(new ChangeEventArgs { Value = "Draft" });
+        await cut.Find("input").ChangeAsync(new ChangeEventArgs { Value = "Draft" });
+        CollectionAssert.AreEqual(new[] { "Draft" }, values);
+        await cut.Find("input").InputAsync(new ChangeEventArgs { Value = "Other" });
+        cut.Render(parameters => parameters.Add(input => input.Value, "Reset"));
+        Assert.AreEqual("Reset", cut.Find("input").GetAttribute("value"));
+        CollectionAssert.AreEqual(new[] { "Draft" }, values);
+    }
+
+    [TestMethod]
+    public async Task CheckboxSupportsStandaloneAndValidatedFormsWithoutDuplicateChanges()
+    {
+        using var context = Context();
+        var changes = new List<bool>();
+        var standalone = context.Render<FormCheckbox>(parameters => parameters
+            .Add(input => input.ValueChanged, (bool value) => changes.Add(value)));
+        await standalone.Find("input").ChangeAsync(new ChangeEventArgs { Value = true });
+        CollectionAssert.AreEqual(new[] { true }, changes);
+
+        var model = new CheckboxModel();
+        var editContext = new EditContext(model);
+        var notifications = 0;
+        editContext.OnFieldChanged += (_, _) => notifications++;
+        var form = context.Render<CascadingValue<EditContext>>(parameters => parameters
+            .Add(value => value.Value, editContext)
+            .AddChildContent<FormField>(field => field.Add(value => value.Id, "enabled").Add(value => value.Label, "Enabled")
+                .Add(value => value.Help, "May be changed later.")
+                .AddChildContent<FormCheckbox>(input => input.Add(value => value.Value, model.Enabled)
+                    .Add(value => value.ValueChanged, (bool value) => model.Enabled = value)
+                    .Add(value => value.ValueExpression, () => model.Enabled))));
+        Assert.AreEqual("enabled", form.Find("label").GetAttribute("for"));
+        Assert.AreEqual("enabled", form.Find("input").Id);
+        Assert.AreEqual("enabled-help", form.Find("input").GetAttribute("aria-describedby"));
+        await form.Find("input").ChangeAsync(new ChangeEventArgs { Value = true });
+        Assert.IsTrue(model.Enabled);
+        Assert.AreEqual(1, notifications);
+    }
+
+    [TestMethod]
+    public void RichFieldHelpAndValidationRemainAssociatedWithTheControl()
+    {
+        using var context = Context();
+        var cut = context.Render<FormField>(field => field.Add(value => value.Id, "dynamic-field")
+            .Add(value => value.Label, "Dynamic field")
+            .Add(value => value.LabelContent, builder => builder.AddMarkupContent(0, "<strong>Dynamic field</strong>"))
+            .Add(value => value.HelpContent, builder => builder.AddMarkupContent(0, "<code>Details</code>"))
+            .Add(value => value.Validation, builder => builder.AddContent(0, "Invalid"))
+            .AddChildContent<ClearableText>());
+        Assert.AreEqual("dynamic-field", cut.Find("label").GetAttribute("for"));
+        Assert.AreEqual("dynamic-field-help dynamic-field-messages", cut.Find("input").GetAttribute("aria-describedby"));
+        Assert.AreEqual("polite", cut.Find("#dynamic-field-messages").GetAttribute("aria-live"));
+        Assert.AreEqual("Details", cut.Find("#dynamic-field-help code").TextContent);
+    }
+
+    [TestMethod]
+    public void FormFramesPreserveContextAttributesAndTheirAccessibleHeading()
+    {
+        using var context = Context();
+        var cut = context.Render<FormSection>(parameters => parameters.Add(value => value.Title, "Settings")
+            .Add(value => value.Class, "specialized-layout")
+            .AddUnmatched("data-testid", "settings-form").AddUnmatched("id", "settings")
+            .AddChildContent<FormGrid>(grid => grid.AddUnmatched("data-context", "editor")
+                .AddChildContent<FormActions>(actions => actions.Add(value => value.Busy, true))));
+        Assert.AreEqual("settings-form", cut.Find("section").GetAttribute("data-testid"));
+        Assert.IsTrue(cut.Find("section").ClassList.Contains("specialized-layout"));
+        Assert.AreEqual("settings", cut.Find("section").Id);
+        Assert.AreEqual(cut.Find("h2").Id, cut.Find("section").GetAttribute("aria-labelledby"));
+        Assert.AreEqual("editor", cut.Find(".form-grid").GetAttribute("data-context"));
+        Assert.AreEqual("true", cut.Find(".form-actions").GetAttribute("aria-busy"));
+    }
+
+    private sealed class CheckboxModel { public bool Enabled { get; set; } }
+
     private sealed class TextModel
     {
         [Required] public string Name { get; set; } = string.Empty;

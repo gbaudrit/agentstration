@@ -176,9 +176,7 @@ else
                                         <div><strong>@binding.DisplayName</strong><small><code>@binding.Name</code>@(binding.Required ? T("RequiredSuffix") : T("OptionalSuffix"))</small></div>
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(binding.Description)) { <p>@binding.Description</p> }
-                                    <label>
-                                        <span>@T("WorkspaceResource")</span>
-                                        <select value="@SelectedBinding(binding.Name)" @onchange="args => BindingChanged(binding.Name, args)">
+                                    <FormField Label="@T("WorkspaceResource")"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(SelectedBinding(binding.Name), System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => BindingChanged(binding.Name, new ChangeEventArgs { Value = changed })">
                                             <option value="">@T("SelectBinding", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>
                                             @if (binding.TargetKind == PackBindingTargetKind.ModelProfile)
                                             {
@@ -222,8 +220,8 @@ else
                                                     <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Namespace/@secret.Resource.Name (@T($"SecretStatus.{secret.ValueStatus}"))</option>
                                                 }
                                             }
-                                        </select>
-                                    </label>
+                                        </ClearableSelect>
+                                    </ChildContent></FormField>
                                     <small>@T("UsedBySimple", string.Join(", ", binding.UsedBy.Select(resource => $"{resource.ResourceKind}/{resource.ResourceName}")))</small>
                                     @if (binding.Target is not null && !binding.TargetAvailable) { <p class="inline-warning">@T("PreviousResourceUnavailable")</p> }
                                 </article>
@@ -233,14 +231,14 @@ else
                     @if (preview.AlreadyInstalled)
                     {
                         <section class="pack-reinstall-option" aria-label="@T("PackReplacement")">
-                            <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> @T("ReplaceInstalledPack")</label>
+                            <label class="studio-checkbox"><FormCheckbox @bind-Value="replaceExisting" /> @T("ReplaceInstalledPack")</label>
                             <p class="pack-muted">@T("ReconcileResourcesHelp")</p>
-                            <label class="studio-checkbox"><input type="checkbox" @bind="removeDashboardReferences" /> @T("RemoveDashboardReferencesForRemovedEntries")</label>
+                            <label class="studio-checkbox"><FormCheckbox @bind-Value="removeDashboardReferences" /> @T("RemoveDashboardReferencesForRemovedEntries")</label>
                         </section>
                     }
                 </section>
             }
-            <div class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">@T("Cancel")</button><button class="button-primary" disabled="@(!CanInstall || installing)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallPack"))</button></div>
+            <FormActions Class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">@T("Cancel")</button><button class="button-primary" disabled="@(!CanInstall || installing)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallPack"))</button></FormActions>
     </ModalFrame>
 }
 
@@ -264,19 +262,19 @@ else
                     </label>
                 </section>
                 @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
-                <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">@T("Cancel")</button></div>
+                <FormActions Class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">@T("Cancel")</button></FormActions>
             }
             else
             {
                 @if (forkNotice is not null) { <p class="pack-success" role="status">@forkNotice</p> }
                 <div class="form-grid pack-fork-grid">
-                    <label><span>@T("Publisher")</span><input @bind="forkPublisher" autocomplete="off" spellcheck="false" /></label>
+                    <FormField Label="@T("Publisher")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="forkPublisher" autocomplete="off" spellcheck="false" /></ChildContent></FormField>
                     <ResourceIdentityFields @bind-DisplayName="forkDisplayName" @bind-TechnicalName="forkName" Policy="ResourceNamePolicy.Pack" IsNew="true" />
-                    <label><span>@T("Version")</span><input @bind="forkVersion" autocomplete="off" spellcheck="false" /></label>
-                    <label class="form-span-2"><span>@T("Description")</span><textarea rows="3" @bind="forkDescription"></textarea></label>
+                    <FormField Label="@T("Version")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="forkVersion" autocomplete="off" spellcheck="false" /></ChildContent></FormField>
+                    <FormField Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="3" @bind-Value="forkDescription"></ClearableText></ChildContent></FormField>
                 </div>
                 @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
-                <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">@T("Cancel")</button><button class="button-primary" disabled="@(!CanSubmitFork)" @onclick="ForkAsync">@(forking ? T("Creating") : T("CreatePackProject"))</button></div>
+                <FormActions Class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">@T("Cancel")</button><button class="button-primary" disabled="@(!CanSubmitFork)" @onclick="ForkAsync">@(forking ? T("Creating") : T("CreatePackProject"))</button></FormActions>
             }
         </section>
     </div>
@@ -288,9 +286,9 @@ else
         <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-uninstall-title">
             <h2 id="pack-uninstall-title">@T("UninstallPackQuestion")</h2>
             <p>@T("UninstallPackMessage")</p>
-            <label class="studio-checkbox"><input type="checkbox" @bind="removeDashboardReferences" /> @T("RemovePackEntriesFromDashboards")</label>
+            <label class="studio-checkbox"><FormCheckbox @bind-Value="removeDashboardReferences" /> @T("RemovePackEntriesFromDashboards")</label>
             <p class="pack-muted">@T("DashboardCascadeHelp")</p>
-            <div class="dialog-actions"><button class="button-secondary" @onclick="() => confirmUninstall = false">@T("Cancel")</button><button class="button-danger" @onclick="UninstallAsync">@T("Uninstall")</button></div>
+            <FormActions Class="dialog-actions"><button class="button-secondary" @onclick="() => confirmUninstall = false">@T("Cancel")</button><button class="button-danger" @onclick="UninstallAsync">@T("Uninstall")</button></FormActions>
         </section>
     </div>
 }

@@ -3,6 +3,7 @@ using Agentstration.Agents;
 using Agentstration.Flows;
 using Agentstration.Models;
 using Agentstration.Resources;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Agentstration.Work;
@@ -187,6 +188,26 @@ public sealed class PacksComponentTests
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
+    }
+
+    [TestMethod]
+    public async Task ClearingRequiredPackClassificationPreservesAnInvalidDraftUntilAChoiceIsMade()
+    {
+        using var context = CreateContext();
+        context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
+        var rendered = context.Render<PackComposer>();
+        rendered.WaitForElement(".composer-add");
+        await rendered.Find("[data-testid=pack-project-publisher]").ChangeAsync(new() { Value = "example" });
+        await rendered.Find("[data-testid=pack-project-display-name]").InputAsync(new() { Value = "Example pack" });
+        await rendered.Find(".composer-add").ClickAsync(new());
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid=pack-project-create]").HasAttribute("disabled")));
+        var audience = rendered.FindComponent<ClearableSelect<PackAudience>>();
+        await audience.Find("button").ClickAsync(new());
+        Assert.AreEqual(string.Empty, audience.Find("select").GetAttribute("value"));
+        Assert.IsTrue(rendered.Find("[data-testid=pack-project-create]").HasAttribute("disabled"));
+        Assert.IsTrue(rendered.FindAll(".validation-errors li").Count > 0);
+        await audience.Find("select").ChangeAsync(new() { Value = "Professional" });
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid=pack-project-create]").HasAttribute("disabled")));
     }
 
     private sealed class FakePacksClient : IPacksClient

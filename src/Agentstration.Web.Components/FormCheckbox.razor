@@ -1,0 +1,25 @@
+@using Microsoft.AspNetCore.Components.Forms
+@inherits InputCheckbox
+
+@RenderInput
+
+@code {
+    [CascadingParameter] private FormFieldPresentation? Field { get; set; }
+    private RenderFragment RenderInput => builder => base.BuildRenderTree(builder);
+
+    // Native checkboxes are also used by forms without an EditContext. Binding
+    // supplies the real expression where the owning form performs validation.
+    public FormCheckbox() { ValueExpression = () => Value; }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        var attributes = AdditionalAttributes is null ? new Dictionary<string, object>() : new(AdditionalAttributes);
+        if (Field is not null)
+        {
+            attributes.TryAdd("id", Field.Id);
+            if (Field.DescriptionId is { Length: > 0 } descriptionId) attributes.TryAdd("aria-describedby", descriptionId);
+        }
+        AdditionalAttributes = attributes;
+    }
+}

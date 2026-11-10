@@ -53,8 +53,7 @@ else
                 <MetricCard Label="@T("Format")" Value="@schema.Definition.Format" Detail="@(schema.Definition.Dialect ?? "—")" Status="@(FormatAvailable ? UiStatus.Success : UiStatus.Warning)" />
                 <MetricCard Label="@T("Scope")" Value="@T($"ScopeKind.{schema.ScopeRef!.Value.Kind}")" Detail="@schema.Namespace.Value" Status="UiStatus.Neutral" />
             </section>
-            <section class="panel form-section" data-testid="schema-overview">
-                <div class="panel-header"><div><p class="eyebrow">@T("Overview")</p><h2>@T("ResourceIdentity")</h2><p>@T("OverviewHelp")</p></div></div>
+            <FormSection Title="@T("ResourceIdentity")" Eyebrow="@T("Overview")" Description="@T("OverviewHelp")" TestId="schema-overview"><ChildContent>
                 <dl class="resource-details">
                     <dt>@T("DisplayName")</dt><dd>@schema.Definition.DisplayName</dd>
                     <dt>@T("TechnicalName")</dt><dd><code>@schema.Name</code></dd>
@@ -63,17 +62,16 @@ else
                     <dt>@T("Format")</dt><dd><code>@schema.Definition.Format</code></dd>
                     <dt>@T("Dialect")</dt><dd><code>@(schema.Definition.Dialect ?? "—")</code></dd>
                 </dl>
-            </section>
+            </ChildContent></FormSection>
         </main>
     }
     else if (!IsNew && activeTab == SchemaTab.Yaml && schema is not null)
     {
         <main id="schema-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-            <section class="panel form-section" data-testid="schema-yaml">
-                <div class="panel-header"><div><p class="eyebrow">@T("ResourceManifest")</p><h2>@T("YamlManifest")</h2><p>@T("YamlHelp")</p></div><StatusBadge Text="@T("Draft")" Status="UiStatus.Neutral" /></div>
-                <label class="schema-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="30" aria-label="@T("ResourceManifest")" data-testid="schema-yaml-source" @bind="rawYaml" @bind:event="oninput"></textarea></label>
-                <div class="form-actions"><button class="button-secondary" type="button" @onclick="ApplyRawYaml" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy" data-testid="schema-yaml-save">@(busy ? T("Saving") : T("SaveYaml"))</button></div>
-            </section>
+            <FormSection Title="@T("YamlManifest")" Eyebrow="@T("ResourceManifest")" Description="@T("YamlHelp")" TestId="schema-yaml"><Actions><StatusBadge Text="@T("Draft")" Status="UiStatus.Neutral" /></Actions><ChildContent>
+                <FormField Label="@T("ResourceManifest")" Class="schema-yaml-field"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="30" aria-label="@T("ResourceManifest")" data-testid="schema-yaml-source" @bind-Value="rawYaml"></ClearableText></ChildContent></FormField>
+                <FormActions><button class="button-secondary" type="button" @onclick="ApplyRawYaml" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy" data-testid="schema-yaml-save">@(busy ? T("Saving") : T("SaveYaml"))</button></FormActions>
+            </ChildContent></FormSection>
         </main>
     }
     else if (!IsNew && activeTab == SchemaTab.Versions && schema is not null)
@@ -133,7 +131,7 @@ else
                 </div>
                 <section class="panel schema-designer-panel" data-testid="schema-designer">
                     <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
-                    <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
+                    <FormActions><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></FormActions>
                 </section>
             </section>
         </main>
@@ -168,7 +166,7 @@ else
                     </div>
                     @if (!IsNew)
                     {
-                        <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
+                        <FormActions><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></FormActions>
                     }
                 </section>
                 @if (IsNew)
@@ -176,7 +174,7 @@ else
                     <section class="panel schema-designer-panel" data-testid="schema-designer">
                         <div class="panel-header"><div><p class="eyebrow">@T("DesignerEyebrow")</p><h3>@T("DesignerTitle")</h3><p>@T("DesignerHelp")</p></div></div>
                         <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
-                        <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
+                        <FormActions><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></FormActions>
                     </section>
                 }
             </section>

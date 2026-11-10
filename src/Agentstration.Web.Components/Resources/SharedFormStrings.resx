@@ -175,4 +175,8 @@
   <data name="LabelInvalid" xml:space="preserve"><value>Enter a key without = or line breaks and a non-empty value.</value></data>
   <data name="LabelDuplicate" xml:space="preserve"><value>This key is already used.</value></data>
   <data name="LabelRow" xml:space="preserve"><value>Label {0}</value></data>
+  <data name="Credential" xml:space="preserve"><value>Credential</value></data>
+  <data name="NoSecret" xml:space="preserve"><value>No secret</value></data>
+  <data name="SecretCoordinates" xml:space="preserve"><value>Vault: {0} · {1}/{2}</value></data>
+  <data name="SecretMissingValue" xml:space="preserve"><value>The selected Secret has no configured value.</value></data>
 </root>

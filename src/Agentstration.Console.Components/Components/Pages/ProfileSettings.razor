@@ -54,11 +54,11 @@
         <div class="profile-language">
             <label for="profile-language"><strong>@Localizer["Language"]</strong></label>
             <p>@Localizer["LanguageDescription"]</p>
-            <select id="profile-language" data-testid="profile-language" value="@(Preferences.Language ?? "auto")" @onchange="SelectLanguageAsync" disabled="@Preferences.IsSaving">
+            <ClearableSelect AllowClear="false" TValue="string" id="profile-language" data-testid="profile-language" Value="@Convert.ToString(Preferences.Language ?? "auto", System.Globalization.CultureInfo.InvariantCulture)" disabled="@Preferences.IsSaving" ValueChanged="changed => SelectLanguageAsync(new ChangeEventArgs { Value = changed })">
                 <option value="auto">@Localizer["LanguageAutomatic"]</option>
                 <option value="en-US">English</option>
                 <option value="fr-FR">Français</option>
-            </select>
+            </ClearableSelect>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(Preferences.Error))
