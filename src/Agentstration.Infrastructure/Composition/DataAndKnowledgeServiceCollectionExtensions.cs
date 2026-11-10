@@ -13,6 +13,7 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
     internal static IServiceCollection AddAgentstrationDataAndKnowledge(this IServiceCollection services, AgentstrationCompositionContext context)
     {
         var enableHostedServices = context.Options.EnableHostedServices;
+        services.AddSingleton<Agentstration.Flows.IFlowCompositionResolver, SourceFlowCompositionResolver>();
         services.AddSingleton<DataSourceProfileService>();
         services.AddSingleton<DataSourceManagementService>();
         services.AddSingleton<DataSourceDatasetCompositionService>();

@@ -136,4 +136,19 @@
   <data name="DatasetNoContent" xml:space="preserve"><value>Aucun contenu acquis n’est disponible pour le moment. Lancez une acquisition, puis actualisez son historique.</value></data>
   <data name="DatasetContentAcquisition" xml:space="preserve"><value>Acquisition à consulter</value></data>
   <data name="DatasetYamlHelp" xml:space="preserve"><value>Manifeste en lecture seule de la source de données sauvegardée. Utilisez l’onglet Définition pour modifier sa configuration.</value></data>
+  <data name="SequenceHelp" xml:space="preserve"><value>Les Flows s’exécutent dans cet ordre. Chacun reçoit le résultat précédent dans value et ses paramètres enregistrés. Seules les versions publiées compatibles peuvent être enregistrées.</value></data>
+  <data name="SequenceIdentity" xml:space="preserve"><value>Aucune transformation : conserver l’entrée.</value></data>
+  <data name="SequenceUnavailable" xml:space="preserve"><value>Le Flow publié ou ses dépendances n’ont pas pu être chargés.</value></data>
+  <data name="SequencePosition" xml:space="preserve"><value>Transformation {0}</value></data>
+  <data name="SequenceFlow" xml:space="preserve"><value>Version publiée du Flow</value></data>
+  <data name="SequenceUp" xml:space="preserve"><value>Monter</value></data>
+  <data name="SequenceDown" xml:space="preserve"><value>Descendre</value></data>
+  <data name="SequenceRemove" xml:space="preserve"><value>Retirer la transformation</value></data>
+  <data name="SequenceAdd" xml:space="preserve"><value>Ajouter une transformation</value></data>
+  <data name="CompositionTitle" xml:space="preserve"><value>Orchestration des Flows et transformations</value></data>
+  <data name="CompositionOrchestration" xml:space="preserve"><value>Flow d’orchestration</value></data>
+  <data name="CompositionStandard" xml:space="preserve"><value>Orchestration standard</value></data>
+  <data name="CompositionBoundaryHelp" xml:space="preserve"><value>Configurez les points déclarés. L’acquisition et la publication restent gouvernées par la source.</value></data>
+  <data name="CompositionOrphanHelp" xml:space="preserve"><value>Ce point n’est pas déclaré par l’orchestration sélectionnée. Retirez sa configuration ou sélectionnez son Flow d’origine avant d’enregistrer.</value></data>
+  <data name="CompositionRemovePoint" xml:space="preserve"><value>Retirer la configuration du point</value></data>
 </root>

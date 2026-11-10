@@ -25,6 +25,9 @@ public sealed class KnowledgePlatformResourceProvisioner(
     TimeProvider timeProvider,
     IResourceGovernanceContext governance)
 {
+    public const string DatasetOrchestrationFlowName = "data-source-orchestration-builtin";
+    public const string KnowledgeOrchestrationFlowName = "knowledge-orchestration-builtin";
+    public const string TransformationSequenceFlowName = "content-transformation-sequence-builtin";
     public const string RetrievalToolSetName = "knowledge-retrieval-builtin";
     public const string ProjectionFlowName = "knowledge-projection-builtin";
     public const string RetrievalFlowName = "knowledge-retrieval-builtin";
@@ -63,6 +66,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(KnowledgeAccessSchemas.ToolName(operation))), cancellationToken);
             if (native is not null) await EnsureTenantAccessAsync(native.Value, tenantScope, cancellationToken);
         }
+        await EnsureCompositionFlowsAsync(instanceScope, tenantScope, cancellationToken);
         await EnsureProjectionFlowAsync(instanceScope, cancellationToken);
         await EnsureRetrievalFlowAsync(instanceScope, cancellationToken);
         await EnsureHttpAcquisitionFlowAsync(instanceScope, WebAcquisitionFlowName,
@@ -487,6 +491,67 @@ public sealed class KnowledgePlatformResourceProvisioner(
             RetrievalFlowVersion, graph, cancellationToken);
     }
 
+    private async Task EnsureCompositionFlowsAsync(ResourceScopeRef scope, ResourceScopeRef tenant, CancellationToken ct)
+    {
+        var value = JsonSerializer.SerializeToElement(new { type = "object" });
+        foreach (var (name, contract, boundary) in new[]
+        {
+            (DatasetOrchestrationFlowName, "datasource.orchestration/v1", "acquisition"),
+            (KnowledgeOrchestrationFlowName, "knowledge.orchestration/v1", "projection"),
+            (TransformationSequenceFlowName, "artifact.sequence/v1", (string?)null)
+        })
+        {
+            var result = boundary == "acquisition" ? value : KnowledgeBuiltinSchemas.ArtifactManifestOutput;
+            var sequence = boundary is null ? "transformations" : boundary == "acquisition" ? "transformations" : "postAggregate";
+            var nodes = new List<FlowStepDefinition> { new InputFlowStepDefinition { Name = "input", Schema = boundary is null ? result : value } };
+            if (boundary is not null) nodes.Add(new FlowCompositionPointStepDefinition
+            {
+                Name = boundary,
+                Point = boundary,
+                AllowEmpty = false,
+                InputSchema = value,
+                OutputSchema = result,
+                InputMapping = JsonSerializer.SerializeToElement("${input}")
+            });
+            nodes.Add(new FlowCompositionPointStepDefinition
+            {
+                Name = sequence,
+                Point = sequence,
+                AllowEmpty = true,
+                InputSchema = result,
+                OutputSchema = result,
+                InputMapping = JsonSerializer.SerializeToElement(boundary is null ? "${input}" : "${steps." + boundary + ".output}")
+            });
+            nodes.Add(new OutputFlowStepDefinition
+            {
+                Name = "output",
+                Schema = result,
+                OutputMapping = JsonSerializer.SerializeToElement("${steps." + sequence + ".output}")
+            });
+            await CreateAndPublishFlowAsync(scope, name, name, contract, null, "1.0.0", new()
+            {
+                EntryStep = "input",
+                InputSchema = boundary is null ? result : value,
+                OutputSchema = result,
+                Steps = nodes,
+                Transitions = nodes.Zip(nodes.Skip(1), (left, right) => new FlowTransitionDefinition(left.Name + "-next", left.Name,
+                    "completed", right.Name)).ToArray()
+            }, ct);
+            var flow = (await flows.GetExactAsync(scope, new(name), ct))!.Value;
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var policy = await accessPolicies.GetAsync(flow.Uid, ct);
+                var grants = policy?.Policy.Grants.ToList() ?? [];
+                if (grants.Any(grant => grant.TargetScopeRef == tenant && grant.IncludeDescendants
+                    && grant.Actions.Contains(ResourceAccessAction.Discover) && grant.Actions.Contains(ResourceAccessAction.Use))) break;
+                grants.RemoveAll(grant => grant.TargetScopeRef == tenant);
+                grants.Add(new(tenant, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true));
+                try { _ = await accessPolicies.PutAsync(new(new(flow.Uid, scope, flow.Id.Namespace, FlowResourceKinds.Flow), grants), policy?.ETag, ct); break; }
+                catch (ResourceConcurrencyException) when (attempt < 2) { }
+            }
+        }
+    }
+
     private async Task EnsureProjectionFlowAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
     {
         var input = KnowledgeBuiltinSchemas.ProjectionInput;
@@ -525,6 +590,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
             InputFlowStepDefinition => FlowNodeKind.Input,
             ConditionFlowStepDefinition => FlowNodeKind.Condition,
             FlowCallStepDefinition => FlowNodeKind.Function,
+            FlowCompositionPointStepDefinition => FlowNodeKind.Function,
             ToolFlowStepDefinition => FlowNodeKind.Function,
             ToolRouteFlowStepDefinition => FlowNodeKind.Function,
             OutputFlowStepDefinition => FlowNodeKind.Output,

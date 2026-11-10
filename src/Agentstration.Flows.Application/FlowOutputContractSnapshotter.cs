@@ -57,6 +57,8 @@ internal sealed class FlowOutputContractSnapshotter(IFlowResourceReferenceResolv
         {
             case InputFlowStepDefinition input:
                 return input.Schema ?? graph.InputSchema;
+            case FlowCompositionPointStepDefinition point:
+                return point.OutputSchema;
             case TransformFlowStepDefinition transform:
                 return transform.Schema;
             case ToolFlowStepDefinition tool when resources is not null

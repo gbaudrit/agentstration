@@ -1,0 +1,66 @@
+@implements IDisposable
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+<section class="form-section" data-testid="flow-sequence-editor">
+    <h3>@Title</h3><p>@T("SequenceHelp")</p>
+    @if (loadFailed) { <p role="status">@T("SequenceUnavailable")</p> }
+    @if (Value.Count == 0) { <p class="muted">@T("SequenceIdentity")</p> }
+    @for (var index = 0; index < Value.Count; index++)
+    {
+        var position = index; var call = Value[index]; var selected = options.FirstOrDefault(option => Key(option.Reference) == Key(call.Flow));
+        <fieldset class="form-section" disabled="@ReadOnly" data-testid="flow-sequence-call">
+            <legend>@Localizer["SequencePosition", index + 1]</legend>
+            <label><span>@T("SequenceFlow")</span><select value="@Key(call.Flow)" @onchange="args => SelectAsync(position, args.Value?.ToString())" data-testid="flow-sequence-target">
+                @if (selected is null) { <option value="@Key(call.Flow)">@call.Flow.ResourceId · @call.Flow.Version · @T("SequenceUnavailable")</option> }
+                @foreach (var option in options) { <option value="@Key(option.Reference)">@option.Label</option> }
+            </select></label>
+            <div><span>@T("Parameters")</span><JsonSchemaInputEditor Schema="selected?.Parameters" Value="call.Parameters" ValueChanged="value => SetParametersAsync(position, value)" Disabled="ReadOnly" /></div>
+            <div class="form-actions">
+                <button type="button" class="button-secondary" disabled="@(ReadOnly || index == 0)" @onclick="() => MoveAsync(position, -1)" data-testid="flow-sequence-up">@T("SequenceUp")</button>
+                <button type="button" class="button-secondary" disabled="@(ReadOnly || index == Value.Count - 1)" @onclick="() => MoveAsync(position, 1)" data-testid="flow-sequence-down">@T("SequenceDown")</button>
+                <button type="button" class="text-button" disabled="@ReadOnly" @onclick="() => RemoveAsync(position)" data-testid="flow-sequence-remove">@T("SequenceRemove")</button>
+            </div>
+        </fieldset>
+    }
+    <button type="button" class="button-secondary" disabled="@(ReadOnly || options.Count == 0 || Value.Count >= 32)" @onclick="AddAsync" data-testid="flow-sequence-add">@T("SequenceAdd")</button>
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<FlowCompositionCall> Value { get; set; } = [];
+    [Parameter] public EventCallback<IReadOnlyList<FlowCompositionCall>> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly List<Option> options = [];
+    private bool loadFailed;
+    protected override async Task OnInitializedAsync()
+    {
+        if (Services.GetService(typeof(IFlowApiClient)) is not IFlowApiClient flows) return;
+        try
+        {
+            var summaries = await flows.GetFlowsAsync(cancellation.Token);
+            foreach (var summary in summaries.Take(200))
+            {
+                var flow = await flows.GetFlowAsync(summary.Namespace, summary.Id, summary.ScopeRef, cancellation.Token);
+                if (!flow.Enabled || flow.ScopeRef is null) continue;
+                foreach (var version in await flows.GetFlowVersionsAsync(flow.Namespace, flow.Id, flow.ScopeRef, cancellation.Token))
+                    if (version.Graph?.InputSchema is { } input && input.TryGetProperty("properties", out var properties)
+                        && properties.TryGetProperty("value", out _) && properties.TryGetProperty("parameters", out var parameters))
+                        options.Add(new(new(flow.Id, FlowCallVersionStrategy.Exact, version.Version, flow.Namespace, flow.ScopeRef),
+                            $"{flow.DisplayName ?? flow.Name} · {flow.ScopeRef} · {flow.Namespace}/{flow.Name}:{version.Version}", parameters.Clone()));
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { loadFailed = true; }
+    }
+    private static string Key(FlowCallReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.ResourceId}|{reference.Version}";
+    private Task AddAsync() => ValueChanged.InvokeAsync([.. Value, new FlowCompositionCall { Flow = options[0].Reference }]);
+    private Task RemoveAsync(int position) => ValueChanged.InvokeAsync(Value.Where((_, index) => index != position).ToArray());
+    private Task SetParametersAsync(int position, JsonElement parameters) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position ? value with { Parameters = parameters.Clone() } : value).ToArray());
+    private Task SelectAsync(int position, string? key) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position ? new FlowCompositionCall { Flow = options.Single(option => Key(option.Reference) == key).Reference } : value).ToArray());
+    private Task MoveAsync(int position, int direction)
+    { var values = Value.ToArray(); (values[position], values[position + direction]) = (values[position + direction], values[position]); return ValueChanged.InvokeAsync(values); }
+    private string T(string key) => Localizer[key];
+    private sealed record Option(FlowCallReference Reference, string Label, JsonElement Parameters);
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

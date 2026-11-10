@@ -142,7 +142,7 @@ model {
       }
 
       flow = component 'Flow engine' {
-        description 'Flow definitions, immutable publications, durable Flow Runs, and provider-neutral graph execution'
+        description 'Flow definitions, typed resource-bound composition points, immutable publications, admission-pinned child sequences, durable Flow Runs, and provider-neutral graph execution'
       }
 
       runtime = component 'Runtime execution' {

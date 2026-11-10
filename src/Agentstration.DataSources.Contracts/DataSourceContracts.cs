@@ -4,6 +4,8 @@ using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 
+using Agentstration.Flows;
+
 namespace Agentstration.DataSources.Contracts;
 
 public static class DataSourceResourceKinds
@@ -97,13 +99,23 @@ public sealed record DataSourceOperationAcquisitionBinding(
 /// <summary>A logical dataset rule. Its effective UID partition is assigned by the server, never by a caller.</summary>
 public sealed record DataSourceDatasetProperties(
     StorageRevisionReference Storage, StorageContentPolicy Rule,
-    DataSourceOperationAcquisitionBinding Acquisition);
+    DataSourceOperationAcquisitionBinding Acquisition)
+{
+    public FlowCallReference? Orchestration { get; init; }
+    public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
+    public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; }
+        = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
+}
 
 public sealed record ResolvedDataSourceDataset(
     DataSourceDatasetProperties Definition, ConnectedServiceOperationResource Operation,
     ConnectedServiceOperationTypeVersionDescriptor OperationType,
     JsonElement InputSchema, JsonElement OutputSchema, string Partition,
-    ResolvedDataSourceFlowBinding Flow);
+    ResolvedDataSourceFlowBinding Flow)
+{
+    public ResolvedDataSourceFlowBinding? OperationFlow { get; init; }
+    public ResolvedFlowComposition? Composition { get; init; }
+}
 
 public sealed record DataSourceResource : Resource
 {

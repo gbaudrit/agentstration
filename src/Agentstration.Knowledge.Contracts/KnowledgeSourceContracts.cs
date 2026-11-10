@@ -3,6 +3,8 @@ using System.Text.Json.Serialization;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 
+using Agentstration.Flows;
+
 namespace Agentstration.Knowledge.Contracts;
 
 public static class KnowledgeResourceKinds
@@ -71,6 +73,10 @@ public sealed record KnowledgeSourceProperties
     public IReadOnlyList<KnowledgeDataSourceBinding> DataSources { get; init; } = [];
     public KnowledgeFlowTarget? ProjectionFlow { get; init; }
     public KnowledgeOutputStorage? Output { get; init; }
+    public FlowCallReference? Orchestration { get; init; }
+    public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
+    public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; }
+        = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
 }
 
 public sealed record KnowledgeDataSourceBinding
@@ -80,6 +86,7 @@ public sealed record KnowledgeDataSourceBinding
     public ResourceReference? AcquisitionTarget { get; init; }
     public KnowledgeFlowTarget? TransformationFlow { get; init; }
     public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
     public bool Required { get; init; } = true;
     public TimeSpan? MaximumAge { get; init; }
     public bool RefreshIfNecessary { get; init; }
@@ -139,6 +146,9 @@ public sealed record ResolvedKnowledgeSourceComposition
     public IReadOnlyList<ResolvedKnowledgeDataSourceBinding> DataSources { get; init; } = [];
     public IReadOnlyDictionary<string, ResolvedKnowledgeFlowBinding> TransformationFlows { get; init; }
         = new Dictionary<string, ResolvedKnowledgeFlowBinding>(StringComparer.Ordinal);
+    public ResolvedFlowComposition? ProjectionComposition { get; init; }
+    public IReadOnlyDictionary<string, ResolvedFlowComposition> InputCompositions { get; init; }
+        = new Dictionary<string, ResolvedFlowComposition>();
     public required string DependencyHash { get; init; }
 }
 
@@ -258,6 +268,7 @@ public sealed record KnowledgeProjectionInputEvidence
     public IReadOnlyList<KnowledgeProjectionArtifact> AcquiredArtifacts { get; init; } = [];
     public ResolvedKnowledgeFlowBinding? TransformationFlow { get; init; }
     public string? TransformationFlowRunId { get; init; }
+    public ResolvedFlowComposition? TransformationComposition { get; init; }
     public IReadOnlyList<KnowledgeProjectionArtifact> PreparedArtifacts { get; init; } = [];
 }
 
@@ -274,6 +285,7 @@ public sealed record KnowledgeProjectionResource : Resource
     public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }
     public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
+    public ResolvedFlowComposition? ProjectionComposition { get; init; }
     public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public IReadOnlyList<KnowledgeProjectionInputEvidence> Inputs { get; init; } = [];
     public IReadOnlyList<KnowledgeProjectionInputIssue> InputIssues { get; init; } = [];

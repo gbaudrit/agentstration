@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Flows;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
@@ -42,7 +43,8 @@ public sealed class KnowledgeSourceManagementService(
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     IKnowledgeProjectionInputResolver? projectionInputs = null,
-    IStoragePublicationGateway? publications = null)
+    IStoragePublicationGateway? publications = null,
+    IFlowCompositionResolver? sequences = null)
 {
     public const int MaximumDisplayNameLength = 200;
     public const int MaximumDescriptionLength = 2_000;
@@ -230,16 +232,25 @@ public sealed class KnowledgeSourceManagementService(
         var previous = existing.Composition!;
         if (existing.Definition.ProjectionFlow == changed.ProjectionFlow) Same(FlowEvidence(previous.ProjectionFlow), FlowEvidence(resolved.ProjectionFlow));
         if (existing.Definition.RetrievalFlow == changed.RetrievalFlow) Same(FlowEvidence(previous.RetrievalFlow), FlowEvidence(resolved.RetrievalFlow));
+        if (SameJson(existing.Definition.Orchestration, changed.Orchestration)
+            && SameJson(existing.Definition.Transformations, changed.Transformations)
+            && SameJson(existing.Definition.Compositions, changed.Compositions))
+            Same(previous.ProjectionComposition, resolved.ProjectionComposition);
         foreach (var binding in changed.DataSources)
         {
             var old = existing.Definition.DataSources.SingleOrDefault(value => value.Name == binding.Name);
             if (old?.DataSource == binding.DataSource)
                 Same(previous.DataSources.SingleOrDefault(value => value.BindingName == binding.Name),
                     resolved.DataSources.SingleOrDefault(value => value.BindingName == binding.Name));
+            if (old is not null && SameJson(old.Transformations, binding.Transformations))
+                Same(previous.InputCompositions.GetValueOrDefault(binding.Name), resolved.InputCompositions.GetValueOrDefault(binding.Name));
             if (old is not null && old.TransformationFlow == binding.TransformationFlow)
                 Same(previous.TransformationFlows.GetValueOrDefault(binding.Name), resolved.TransformationFlows.GetValueOrDefault(binding.Name));
         }
     }
+
+    private static bool SameJson(object? left, object? right) => JsonElement.DeepEquals(
+        JsonSerializer.SerializeToElement(left), JsonSerializer.SerializeToElement(right));
 
     private static bool SameDependencies(KnowledgeSourceProperties left, KnowledgeSourceProperties right)
     {
@@ -247,8 +258,11 @@ public sealed class KnowledgeSourceManagementService(
         {
             value.ProjectionFlow,
             value.RetrievalFlow,
+            value.Orchestration,
+            value.Transformations,
+            value.Compositions,
             Inputs = value.DataSources.Select(binding => new
-            { binding.Name, binding.DataSource, binding.AcquisitionTarget, binding.TransformationFlow }).ToArray()
+            { binding.Name, binding.DataSource, binding.AcquisitionTarget, binding.TransformationFlow, binding.Transformations }).ToArray()
         });
         return JsonElement.DeepEquals(Dependencies(left), Dependencies(right));
     }
@@ -384,6 +398,9 @@ public sealed class KnowledgeSourceManagementService(
             try
             {
                 await flows.ValidatePinnedAsync(composition.ProjectionFlow, cancellationToken);
+                foreach (var plan in composition.InputCompositions.Values.Concat(composition.ProjectionComposition is { } global ? [global] : []))
+                    _ = await ResolveSequenceAsync(resource, plan.Orchestration,
+                        plan.Receipt?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), cancellationToken);
                 foreach (var transformation in composition.TransformationFlows.Values)
                     await flows.ValidatePinnedAsync(transformation, cancellationToken);
             }
@@ -466,6 +483,7 @@ public sealed class KnowledgeSourceManagementService(
         var retrieval = retrievalTarget is null ? null : await flows.ResolveAsync(ownerScope, resource.Namespace, retrievalTarget, cancellationToken);
         var dependencies = new List<ResolvedKnowledgeDataSourceBinding>(resource.Definition.DataSources.Count);
         var transformations = new Dictionary<string, ResolvedKnowledgeFlowBinding>(StringComparer.Ordinal);
+        var inputCompositions = new Dictionary<string, ResolvedFlowComposition>(StringComparer.Ordinal);
         var unsupportedDataset = false;
         foreach (var binding in resource.Definition.DataSources)
         {
@@ -488,6 +506,14 @@ public sealed class KnowledgeSourceManagementService(
                     unsupportedDataset = true;
                 }
             }
+            if (binding.Transformations.Count > 0)
+            {
+                if (binding.TransformationFlow is not null)
+                    throw new KnowledgeSourceValidationException("knowledge_source_composition_ambiguous", "Select either the historical transformation or the ordered sequence.");
+                inputCompositions.Add(binding.Name, await ResolveSequenceAsync(resource,
+                    new FlowCallReference("content-transformation-sequence-builtin", ScopeRef: ResourceScopeRef.Instance),
+                    new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["transformations"] = binding.Transformations }, cancellationToken));
+            }
             if (binding.TransformationFlow is null) continue;
             var transformation = await flows.ResolveAsync(ownerScope, resource.Namespace,
                 binding.TransformationFlow, cancellationToken);
@@ -497,10 +523,24 @@ public sealed class KnowledgeSourceManagementService(
             transformations.Add(binding.Name, transformation);
         }
         if (unsupportedDataset) return null;
+        ResolvedFlowComposition? projectionComposition = null;
+        if (resource.Definition.Orchestration is not null || resource.Definition.Transformations.Count > 0 || resource.Definition.Compositions.Count > 0)
+        {
+            var bindings = resource.Definition.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+            if (bindings.ContainsKey("projection") || bindings.ContainsKey("postAggregate") && resource.Definition.Transformations.Count > 0)
+                throw new KnowledgeSourceValidationException("knowledge_source_composition_ambiguous", "The projection boundary is owned by the Knowledge Source; configure each point once.");
+            bindings.Add("projection", [new FlowCompositionCall { Flow = new(projection.Name, FlowCallVersionStrategy.Exact, projection.Version, projection.Namespace, projection.ScopeRef)
+                { DefinitionHash = projection.DefinitionHash }, PassInputDirectly = true }]);
+            if (resource.Definition.Transformations.Count > 0) bindings.Add("postAggregate", resource.Definition.Transformations);
+            projectionComposition = await ResolveSequenceAsync(resource, resource.Definition.Orchestration
+                ?? new FlowCallReference("knowledge-orchestration-builtin", ScopeRef: ResourceScopeRef.Instance), bindings, cancellationToken);
+        }
         var evidence = JsonSerializer.SerializeToElement(new
         {
             projection = FlowEvidence(projection),
             retrieval = FlowEvidence(retrieval),
+            projectionComposition,
+            inputCompositions,
             dataSources = dependencies.OrderBy(value => value.BindingName, StringComparer.Ordinal),
             transformations = transformations.OrderBy(value => value.Key, StringComparer.Ordinal)
                 .Select(value => new { value.Key, Flow = FlowEvidence(value.Value) })
@@ -511,9 +551,20 @@ public sealed class KnowledgeSourceManagementService(
             RetrievalFlow = retrieval,
             DataSources = dependencies,
             TransformationFlows = transformations,
+            ProjectionComposition = projectionComposition,
+            InputCompositions = inputCompositions,
             DependencyHash = Convert.ToHexStringLower(SHA256.HashData(
                 Encoding.UTF8.GetBytes(evidence.GetRawText())))
         };
+    }
+
+    private async Task<ResolvedFlowComposition> ResolveSequenceAsync(KnowledgeSourceResource resource,
+        FlowCallReference root, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken ct)
+    {
+        if (sequences is null) throw new KnowledgeSourceValidationException("knowledge_source_composition_unavailable", "Flow composition is unavailable.");
+        try { return await sequences.ResolveAsync(RequireScope(resource), resource.Namespace, root, bindings, ct); }
+        catch (Exception exception) when (exception is FlowValidationException or KeyNotFoundException)
+        { throw new KnowledgeSourceValidationException("knowledge_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
 
     private static object? FlowEvidence(ResolvedKnowledgeFlowBinding? flow) => flow is null ? null : new

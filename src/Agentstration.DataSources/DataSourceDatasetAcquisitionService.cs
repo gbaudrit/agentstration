@@ -42,7 +42,16 @@ public sealed class DataSourceDatasetAcquisitionService(
         var context = execution.RequireContext("data_source_context_required");
         var records = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceAcquisitionResource>(
             ResourceScopeRef.Workspace(context.WorkspaceId), DataSourceResourceKinds.DataSourceAcquisition, 0, 1000, cancellationToken));
-        var acquisition = records.SingleOrDefault(item => item.Value.Name == id && item.Value.FlowRunId == runId)?.Value;
+        var acquisition = records.SingleOrDefault(item => item.Value.Name == id)?.Value;
+        if (acquisition is not null && acquisition.FlowRunId != runId)
+        {
+            var child = await flows.GetAsync(acquisition.WorkspaceId, runId, acquisition.TenantId, acquisition.CreatedBy, cancellationToken);
+            var native = acquisition.Dataset?.OperationFlow;
+            if (child?.RootFlowRunId != acquisition.FlowRunId || native is null
+                || child.FlowName != native.Name || child.FlowNamespace != native.Namespace
+                || child.DefinitionScope != native.ScopeRef || child.DefinitionHash != native.DefinitionHash)
+                throw Invalid("data_source_invocation_invalid", "The operation does not belong to this accepted acquisition.");
+        }
         if (acquisition?.Dataset is null || Terminal(acquisition.State) || context.PrincipalId != acquisition.CreatedBy
             || acquisition.LogicalScopeRef != execution.ConsumerScope || context.TenantId != acquisition.TenantId)
             throw Invalid("data_source_invocation_invalid", "The invocation does not identify an accepted acquisition in this context.");
@@ -57,8 +66,6 @@ public sealed class DataSourceDatasetAcquisitionService(
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
         if (callerParameters.ValueKind != JsonValueKind.Object || callerParameters.EnumerateObject().Any())
             throw Invalid("data_source_parameters_fixed", "Dataset acquisitions use saved parameters; callers cannot override them.");
-        var dataset = await compositions.ResolveAsync(source, execution.ConsumerScope, cancellationToken);
-        var hash = Digest(JsonSerializer.SerializeToUtf8Bytes(new { source.Uid, source.Generation, dataset }, JsonSerializerOptions.Web));
         var records = await execution.InWorkspaceAsync(() => store.ListExactAsync<DataSourceAcquisitionResource>(
             ResourceScopeRef.Workspace(context.WorkspaceId), DataSourceResourceKinds.DataSourceAcquisition, 0, 1000, cancellationToken));
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
@@ -66,10 +73,13 @@ public sealed class DataSourceDatasetAcquisitionService(
             var prior = records.SingleOrDefault(item => item.Value.DataSourceUid == source.Uid && item.Value.IdempotencyKey == idempotencyKey);
             if (prior is not null)
             {
-                if (prior.Value.RequestHash != hash) throw Invalid("data_source_acquisition_idempotency_conflict", "The idempotency key identifies another configuration.");
+                if (prior.Value.DataSourceGeneration != source.Generation || prior.Value.Dataset is null
+                    || !JsonElement.DeepEquals(JsonSerializer.SerializeToElement(prior.Value.Dataset.Definition), JsonSerializer.SerializeToElement(source.Definition.Dataset))) throw Invalid("data_source_acquisition_idempotency_conflict", "The idempotency key identifies another configuration.");
                 return await SynchronizeAsync(prior, cancellationToken);
             }
         }
+        var dataset = await compositions.ResolveAsync(source, execution.ConsumerScope, cancellationToken);
+        var hash = Digest(JsonSerializer.SerializeToUtf8Bytes(new { source.Uid, source.Generation, dataset }, JsonSerializerOptions.Web));
         foreach (var prior in records.Where(item => item.Value.DataSourceUid == source.Uid))
             if (!Terminal((await SynchronizeAsync(prior, cancellationToken)).Value.State))
                 throw Invalid("data_source_acquisition_already_running", "An acquisition is already active for this dataset.");
@@ -113,7 +123,11 @@ public sealed class DataSourceDatasetAcquisitionService(
         _ = await flows.StartAsync(new(acquisition.FlowRunId, acquisition.Dataset!.Flow, input,
             acquisition.CreatedBy.ToString("D"), acquisition.CorrelationId, acquisition.Name,
             acquisition.TenantId, acquisition.WorkspaceId, acquisition.CreatedBy)
-        { LogicalScopeRef = acquisition.LogicalScopeRef }, cancellationToken);
+        {
+            LogicalScopeRef = acquisition.LogicalScopeRef,
+            Compositions = acquisition.Dataset.Composition?.Receipt?.Bindings
+            ?? new Dictionary<string, IReadOnlyList<Agentstration.Flows.FlowCompositionCall>>()
+        }, cancellationToken);
     }
 
     public async Task ValidateExecutionAsync(DataSourceAcquisitionResource acquisition, CancellationToken cancellationToken)
@@ -131,7 +145,7 @@ public sealed class DataSourceDatasetAcquisitionService(
         {
             Definition = source.Value.Definition with
             { Dataset = acquisition.Dataset!.Definition }
-        }, execution.ConsumerScope, cancellationToken);
+        }, execution.ConsumerScope, cancellationToken, acquisition.Dataset);
     }
 
     public async Task<StoredResource<DataSourceAcquisitionResource>> SynchronizeAsync(

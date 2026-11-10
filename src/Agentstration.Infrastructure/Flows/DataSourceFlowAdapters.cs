@@ -326,7 +326,8 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
                 null,
                 Scope(request.WorkspaceId, request.TenantId, request.PrincipalId) with { LogicalScopeRef = request.LogicalScopeRef })
             {
-                DefinitionScopeRef = request.Flow.ScopeRef
+                DefinitionScopeRef = request.Flow.ScopeRef,
+                Compositions = request.Compositions
             }, cancellationToken);
             return Snapshot(stored.Value);
         }
@@ -373,7 +374,14 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
         run.Output?.Clone(),
         run.Error?.Code,
         run.Error?.Message,
-        run.CompletedAt);
+        run.CompletedAt)
+    {
+        RootFlowRunId = run.RootFlowRunId,
+        FlowName = run.FlowId.Value,
+        FlowNamespace = run.FlowId.Namespace,
+        DefinitionScope = run.DefinitionScopeRef,
+        DefinitionHash = run.Composition?.TemplateHash ?? run.DefinitionHash
+    };
 }
 
 public sealed class DataSourceArtifactReferenceValidator(IResourceStore store)

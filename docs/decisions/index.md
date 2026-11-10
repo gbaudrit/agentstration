@@ -238,3 +238,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 209. [ADR-0209 — Knowledge Tools follow the publishing Console scope](0209-knowledge-tools-follow-the-publishing-console-scope.md)
 
 210. [ADR-0210 — Knowledge exposes native Snapshot access Tools](0210-knowledge-exposes-native-snapshot-access-tools.md)
+
+211. [ADR-0211 — Resources bind ordered Flows to typed composition points](0211-resource-bound-flow-composition-points.md)

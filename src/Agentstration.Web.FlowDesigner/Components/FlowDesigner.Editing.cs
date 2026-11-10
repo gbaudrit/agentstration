@@ -29,6 +29,7 @@ public partial class FlowDesigner
             "tool" => new ToolFlowStepDefinition { Name = name, DisplayName = T("Step.tool"), Tool = DefaultToolReference(), ArgumentsMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
+            "composition" => new FlowCompositionPointStepDefinition { Name = name, Point = name, DisplayName = T("Step.composition"), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
             "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported Flow step type.")

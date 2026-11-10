@@ -132,6 +132,7 @@ else
                 <label class="form-field-wide"><span>@T("DatasetPrefix")</span><input @bind="prefix" maxlength="256" data-testid="dataset-prefix" /><small>@T("DatasetPrefixHelp")</small></label>
                     </div><p class="dataset-note"><UiIcon Name="layers" />@T("DatasetIsolatedContent")</p></section>
                 </div>
+                <SourceFlowCompositionEditor @bind-Orchestration="orchestration" @bind-Value="compositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
             </fieldset>
         </EditForm>
     </div>
@@ -319,6 +320,9 @@ else
                 technicalName = source.Name; displayName = source.Definition.DisplayName; description = source.Definition.Description ?? "";
                 resourceNamespace = source.Namespace.Value; enabled = source.Definition.Enabled;
                 var saved = source.Definition.Dataset!;
+                orchestration = saved.Orchestration;
+                compositionPoints = saved.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+                if (saved.Transformations.Count > 0) compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(compositionPoints) { ["transformations"] = saved.Transformations };
                 prefix = saved.Rule.Prefix; parameters = saved.Acquisition.Parameters.Clone();
                 storageKey = $"{saved.Storage.StorageUid}:{saved.Storage.Generation}:{saved.Storage.BindingDigest}";
                 operationKey = $"{saved.Acquisition.Operation.OperationUid}:{saved.Acquisition.Operation.Generation}:{saved.Acquisition.Operation.DefinitionDigest}";
@@ -358,6 +362,8 @@ else
     private async Task ChangeServiceAsync(ChangeEventArgs value) { serviceKey = value.Value?.ToString() ?? ""; ResetOperation(); await RefreshAsync(); }
     private void ResetOperation() { operationKey = ""; parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; preview = null; }
     private void ChangeOperation(ChangeEventArgs value) { operationKey = value.Value?.ToString() ?? ""; parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; }
+    private FlowCallReference? orchestration;
+    private IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     private async Task SaveAsync() => await RunAsync(async () =>
     {
         if (!HasOperationSelection || enabled && (AcquisitionIssue is not null || !parametersValid
@@ -370,7 +376,7 @@ else
             new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid, operation.Generation, operation.Definition.DefinitionDigest);
         var rule = (source?.Definition.Dataset?.Rule ?? new StorageContentPolicy(Write: true)) with { Prefix = prefix };
         var definition = new DataSourceProperties { DisplayName = displayName.Trim(), Description = description, Enabled = enabled,
-            Dataset = new(storageReference, rule, new(operationReference, parameters)) };
+            Dataset = new(storageReference, rule, new(operationReference, parameters)) { Orchestration = orchestration, Compositions = compositionPoints } };
         var saved = IsNew ? await Client.CreateAsync(new(technicalName, definition, resourceNamespace, scope), cancellation.Token)
             : await Client.UpdateAsync(source!.Namespace, source.Name, scope!.Value, new(definition), etag!, cancellation.Token);
         source = saved.Value; etag = saved.ETag; savedOperation = operation ?? savedOperation; savedServiceKey = serviceKey; activeTab = DatasetTab.Overview;

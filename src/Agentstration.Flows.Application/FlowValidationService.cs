@@ -123,6 +123,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             "inputSchema", null, issues);
         ValidateSchemaContract(definition.OutputSchema, definition.OutputSchemaBinding,
             "outputSchema", null, issues);
+        foreach (var duplicate in definition.Steps.OfType<FlowCompositionPointStepDefinition>().GroupBy(point => point.Point, StringComparer.Ordinal).Where(group => group.Count() > 1))
+            issues.Add(Error("flow_composition_point_duplicate", "Composition point names must be unique within a Flow.", duplicate.First().Name));
         var steps = new Dictionary<string, FlowStepDefinition>(StringComparer.Ordinal);
         foreach (var step in definition.Steps)
         {
@@ -217,6 +219,14 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 if (!ValidContractSchema(transform.Schema))
                     issues.Add(Error("flow_transform_schema_invalid", "The transformed output has an invalid or unsupported schema.", step.Name, property: "schema"));
                 ValidateSchemaContract(transform.Schema, transform.SchemaBinding, "schema", transform.Name, issues);
+                break;
+            case FlowCompositionPointStepDefinition point:
+                if (string.IsNullOrWhiteSpace(point.Point) || point.Point.Length > 128
+                    || !FlowCompositionSchema.IsSupported(point.InputSchema) || !FlowCompositionSchema.IsSupported(point.OutputSchema))
+                    issues.Add(Error("flow_composition_point_invalid", "A composition point requires a bounded name and typed input/output contracts.", step.Name));
+                ValidateJsonExpressions(point.InputMapping, issues, point.Name, "inputMapping");
+                if (point.AllowEmpty && !FlowCompositionSchema.IsAssignable(point.InputSchema, point.OutputSchema))
+                    issues.Add(Error("flow_composition_identity_invalid", "An empty composition must preserve its declared output contract.", point.Name));
                 break;
             case FlowCallStepDefinition flowCall:
                 await ValidateFlowCallAsync(flowCall, transitions, context, issues, token);

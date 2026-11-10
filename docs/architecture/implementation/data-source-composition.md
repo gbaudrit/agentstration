@@ -288,3 +288,28 @@ Storage revision/key/version/digest. History links to the Artifact catalogue and
 its governed preview/download path. Content stays in the selected Storage.
 Previously produced native content receives missing metadata through bounded,
 authorized reconciliation; origins and stored content are not rewritten.
+
+## Configurable Flow sequences
+
+[ADR-0211](../../decisions/0211-resource-bound-flow-composition-points.md) defines
+resource-owned bindings to typed points inside published Flows. A native dataset
+can select a published orchestration and bind ordered `{ flow, parameters }` calls
+to its declared points. The standard orchestration exposes `transformations` after
+the governed operation acquisition. The reserved `acquisition` point is supplied by
+the server; source configuration cannot replace or bypass it. Only the complete
+successful chain publishes the final dataset result.
+
+Knowledge bindings may each declare `transformations`. The Source's global sequence
+runs at `postAggregate`, after its selected projection Flow has combined the prepared
+inputs. These sequences transform Artifact manifests and carry exact Flow receipts
+into projection provenance. A binding cannot combine the historical single
+`transformationFlow` and its new sequence. An optional binding failure is recorded;
+a required or global failure leaves the previous active Snapshot in place.
+
+At save and admission, ordered child references resolve to published versions with
+exact UID and hash evidence and authorized Use. A Flow Run stores the compiled graph
+and accepted bindings separately from the immutable template hash. Saved parameters
+are literal values. Resuming an accepted invocation retains its exact bindings and
+rejects substitution. The Designer exposes composition-point names, identity policy,
+input/output schemas and mapping; source editors expose declared points, published
+child version selection, parameter entry and reordering in English and French.

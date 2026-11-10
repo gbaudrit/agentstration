@@ -372,6 +372,8 @@ internal sealed class AwpAssignmentExecutor(
                         var childInput = flowCall.InputMapping is null
                             ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
                             : await ResolveJsonAsync(flowCall.InputMapping.Value, context, cancellationToken);
+                        if (flowCall.CompositionParameters is { } literalParameters)
+                            childInput = JsonSerializer.SerializeToElement(new { value = childInput, parameters = literalParameters });
                         var child = await ExecuteChildFlowAsync(session, step, childInput,
                             "flowCall", null, cancellationToken);
                         childExecutions.Add(child);

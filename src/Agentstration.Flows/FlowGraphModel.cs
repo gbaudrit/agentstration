@@ -33,6 +33,7 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(ConditionFlowStepDefinition), "condition")]
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
 [JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
+[JsonDerivedType(typeof(FlowCompositionPointStepDefinition), "composition")]
 [JsonDerivedType(typeof(RepeatFlowStepDefinition), "repeat")]
 [JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
 [JsonDerivedType(typeof(ToolRouteFlowStepDefinition), "toolRoute")]
@@ -161,11 +162,15 @@ public sealed record FlowCallReference(
     ResourceNamespace? Namespace = null,
     ResourceScopeRef? ScopeRef = null)
 {
+    public string? DefinitionHash { get; init; }
+    public Guid? ResourceUid { get; init; }
     public FlowId Resolve(ResourceNamespace ownerNamespace) => new(ResourceId, Namespace ?? ownerNamespace);
 }
 
 public sealed record FlowCallStepDefinition : FlowStepDefinition
 {
+    public string? CompositionPoint { get; init; }
+    public JsonElement? CompositionParameters { get; init; }
     public required FlowCallReference Flow { get; init; }
     public JsonElement? InputMapping { get; init; }
 }
@@ -297,6 +302,7 @@ public static class FlowStepDefinitionExtensions
         ConditionFlowStepDefinition => "condition",
         TransformFlowStepDefinition => "transform",
         FlowCallStepDefinition => "flow",
+        FlowCompositionPointStepDefinition => "composition",
         RepeatFlowStepDefinition => "repeat",
         ToolFlowStepDefinition => "tool",
         ToolRouteFlowStepDefinition => "toolRoute",
@@ -311,6 +317,7 @@ public static class FlowStepDefinitionExtensions
         RouterFlowStepDefinition => ["selected", "failed"],
         ConditionFlowStepDefinition => ["true", "false"],
         TransformFlowStepDefinition => ["completed"],
+        FlowCompositionPointStepDefinition => ["completed"],
         ToolFlowStepDefinition => ["success", "error"],
         ToolRouteFlowStepDefinition => ["success", "error"],
         FlowCallStepDefinition => [],

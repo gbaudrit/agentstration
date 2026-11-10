@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Flows;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
@@ -26,6 +27,7 @@ public sealed record DataSourceFlowRunRequest(
     Guid WorkspaceId,
     Guid PrincipalId)
 {
+    public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     public ResourceScopeRef? LogicalScopeRef { get; init; }
 }
 
@@ -35,7 +37,14 @@ public sealed record DataSourceFlowRunSnapshot(
     JsonElement? Output,
     string? ErrorCode,
     string? ErrorMessage,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt)
+{
+    public string? RootFlowRunId { get; init; }
+    public string? FlowName { get; init; }
+    public ResourceNamespace? FlowNamespace { get; init; }
+    public ResourceScopeRef? DefinitionScope { get; init; }
+    public string? DefinitionHash { get; init; }
+}
 
 public interface IDataSourceAcquisitionCompositionResolver
 {

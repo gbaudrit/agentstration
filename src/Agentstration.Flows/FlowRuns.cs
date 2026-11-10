@@ -143,6 +143,7 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    public FlowCompositionReceipt? Composition { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public WorkspaceId WorkspaceId { get; init; }

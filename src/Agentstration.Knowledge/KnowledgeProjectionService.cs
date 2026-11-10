@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Flows;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
@@ -66,6 +67,7 @@ public sealed record KnowledgeProjectionFlowRunRequest(
     Guid PrincipalId)
 {
     public ResourceScopeRef? LogicalScopeRef { get; init; }
+    public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
 }
 
 public sealed record KnowledgeProjectionFlowRunResult(
@@ -196,6 +198,7 @@ public sealed class KnowledgeProjectionService(
                 KnowledgeSourceNamespace = source.Value.Namespace,
                 KnowledgeSourceGeneration = source.Value.Generation,
                 ProjectionFlow = projectionFlow,
+                ProjectionComposition = composition.ProjectionComposition,
                 RetrievalFlow = retrievalFlow,
                 Inputs = resolvedInputs.ToArray(),
                 InputIssues = inputIssues.ToArray(),
@@ -255,10 +258,13 @@ public sealed class KnowledgeProjectionService(
                     CorrelationId = correlationId,
                     ProjectionId = projectionId
                 }, FlowContractJsonOptions);
-                var run = await flowRuns.ExecuteAsync(new(resource.ProjectionFlowRunId, projectionFlow, projectionInput,
+                var run = await flowRuns.ExecuteAsync(new(resource.ProjectionFlowRunId, composition.ProjectionComposition is { } plan ? CompositionBinding(plan, "knowledge.orchestration/v1") : projectionFlow, projectionInput,
                     context.PrincipalId.ToString("D"), correlationId, context.TenantId, context.WorkspaceId,
                     context.PrincipalId)
-                { LogicalScopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext) }, cancellationToken);
+                {
+                    LogicalScopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext),
+                    Compositions = composition.ProjectionComposition?.Receipt?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>()
+                }, cancellationToken);
                 if (run.State != KnowledgeProjectionState.Succeeded)
                     throw Error(run.ErrorCode ?? "knowledge_projection_flow_failed",
                         run.ErrorMessage ?? $"Projection Flow ended with state '{run.State}'.");
@@ -420,18 +426,20 @@ public sealed class KnowledgeProjectionService(
         foreach (var evidence in resolved)
         {
             var binding = source.Definition.DataSources.Single(value => value.Name == evidence.BindingName);
-            if (binding.TransformationFlow is null)
+            var sequence = source.Composition?.InputCompositions.GetValueOrDefault(binding.Name);
+            if (binding.TransformationFlow is null && sequence is null)
             {
                 result.Add(evidence with { PreparedArtifacts = evidence.AcquiredArtifacts });
                 continue;
             }
             try
             {
-                var pinned = source.Composition?.TransformationFlows.GetValueOrDefault(binding.Name)
+                var pinned = sequence is not null ? CompositionBinding(sequence, "artifact.sequence/v1")
+                    : source.Composition?.TransformationFlows.GetValueOrDefault(binding.Name)
                     ?? throw Error("knowledge_projection_dependency_missing",
                         $"Binding '{binding.Name}' has no exact transformation Flow pin.");
                 var flow = await ResolveFlowAsync(pinned,
-                    KnowledgeFlowContracts.ArtifactTransformation, "transformation", cancellationToken);
+                    sequence is null ? KnowledgeFlowContracts.ArtifactTransformation : "artifact.sequence/v1", "transformation", cancellationToken);
                 var runId = "flowrun-transform-" + Hash(JsonSerializer.SerializeToElement(new { projectionId, binding.Name }))[..32];
                 var input = JsonSerializer.SerializeToElement(new KnowledgeArtifactTransformationInput
                 {
@@ -443,9 +451,13 @@ public sealed class KnowledgeProjectionService(
                     CorrelationId = correlationId,
                     TransformationId = $"{source.Name}:{binding.Name}:{evidence.AcquisitionId}"
                 }, FlowContractJsonOptions);
+                if (sequence is not null) input = JsonSerializer.SerializeToElement(new KnowledgeProjectionManifest { Artifacts = evidence.AcquiredArtifacts }, FlowContractJsonOptions);
                 var run = await flowRuns.ExecuteAsync(new(runId, flow, input, context.PrincipalId.ToString("D"),
                     correlationId, context.TenantId, context.WorkspaceId, context.PrincipalId)
-                { LogicalScopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext) }, cancellationToken);
+                {
+                    LogicalScopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext),
+                    Compositions = sequence?.Receipt?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>()
+                }, cancellationToken);
                 if (run.State != KnowledgeProjectionState.Succeeded)
                     throw Error("knowledge_projection_transformation_failed",
                         $"Transformation for binding '{binding.Name}' failed: {run.ErrorMessage ?? run.State.ToString()}.");
@@ -455,6 +467,7 @@ public sealed class KnowledgeProjectionService(
                 {
                     TransformationFlow = flow,
                     TransformationFlowRunId = run.RunId,
+                    TransformationComposition = sequence,
                     PreparedArtifacts = manifest.Artifacts
                 });
             }
@@ -465,6 +478,11 @@ public sealed class KnowledgeProjectionService(
         }
         return (result, issues);
     }
+
+    private static ResolvedKnowledgeFlowBinding CompositionBinding(ResolvedFlowComposition plan, string contract) =>
+        new(plan.Orchestration.ResourceId, plan.Orchestration.Namespace ?? ResourceNamespace.Default,
+            plan.Orchestration.Version!, false, plan.InputSchema, plan.OutputSchema, contract, DefinitionHash: plan.Orchestration.DefinitionHash)
+        { ScopeRef = plan.Orchestration.ScopeRef };
 
     private async Task<ResolvedKnowledgeFlowBinding> ResolveFlowAsync(
         ResolvedKnowledgeFlowBinding resolved,

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Flows;
 using Agentstration.ConnectedServices;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Resources;
@@ -11,13 +12,13 @@ public sealed class DataSourceDatasetCompositionService(
     ConnectedServiceOperationService operations,
     IStorageResolver storage,
     IStorageContentGateway content,
-    IDataSourceAcquisitionCompositionResolver flows)
+    IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null)
 {
     public const string FlowContract = "connected-service-operation-acquisition/v1";
     internal const int MaximumValueBytes = 64 * 1024;
 
     public async Task<ResolvedDataSourceDataset> ResolveAsync(DataSourceResource source,
-        ResourceScopeRef consumer, CancellationToken cancellationToken)
+        ResourceScopeRef consumer, CancellationToken cancellationToken, ResolvedDataSourceDataset? accepted = null)
     {
         var definition = source.Definition.Dataset
             ?? throw Invalid("data_source_dataset_required", "A dataset composition is required.");
@@ -40,7 +41,33 @@ public sealed class DataSourceDatasetCompositionService(
         var effective = definition.Rule with { Prefix = partition };
         await content.ValidateAsync(new(definition.Storage, consumerContext, effective), cancellationToken);
         var flow = await flows.ResolveOperationAsync(consumer, adapter.Flow, cancellationToken);
-        return new(definition, operation, type, input, output, partition, flow);
+        if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null)
+            return new(definition, operation, type, input, output, partition, flow);
+        if (sequences is null || definition.Compositions.ContainsKey("acquisition"))
+            throw Invalid("data_source_composition_invalid", "The acquisition point is owned by the Data Source.");
+        var bindings = definition.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        if (definition.Transformations.Count > 0)
+        {
+            if (bindings.ContainsKey("transformations")) throw Invalid("data_source_composition_ambiguous", "Configure transformations once.");
+            bindings.Add("transformations", definition.Transformations);
+        }
+        bindings.Add("acquisition", [new() { Flow = new(flow.Name, FlowCallVersionStrategy.Exact, flow.Version, flow.Namespace, flow.ScopeRef)
+            { DefinitionHash = flow.DefinitionHash }, PassInputDirectly = true }]);
+        var root = definition.Orchestration ?? new FlowCallReference("data-source-orchestration-builtin", ScopeRef: ResourceScopeRef.Instance);
+        if (accepted?.Composition is { } pinned)
+        { root = pinned.Orchestration; bindings = pinned.Receipt!.Bindings.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal); }
+        try
+        {
+            var composed = await sequences.ResolveAsync(consumer, source.Namespace, root, bindings, cancellationToken);
+            var targetFlow = new ResolvedDataSourceFlowBinding(composed.Orchestration.ResourceId,
+                composed.Orchestration.Namespace ?? source.Namespace, composed.Orchestration.Version!, false,
+                composed.InputSchema, composed.OutputSchema, "datasource.orchestration/v1", composed.Orchestration.DefinitionHash ?? throw Invalid("data_source_composition_invalid", "The orchestration has no immutable definition hash."))
+            { ScopeRef = composed.Orchestration.ScopeRef };
+            return new(definition, operation, type, input, composed.OutputSchema ?? output, partition, targetFlow)
+            { OperationFlow = flow, Composition = composed };
+        }
+        catch (Exception exception) when (exception is Agentstration.Flows.FlowValidationException or KeyNotFoundException)
+        { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
 
     public static string Partition(DataSourceResource source)
