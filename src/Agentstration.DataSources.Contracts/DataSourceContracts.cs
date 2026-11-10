@@ -98,9 +98,10 @@ public sealed record DataSourceOperationAcquisitionBinding(
 
 /// <summary>A logical dataset rule. Its effective UID partition is assigned by the server, never by a caller.</summary>
 public sealed record DataSourceDatasetProperties(
-    StorageRevisionReference Storage, StorageContentPolicy Rule,
+    StorageRevisionReference? Storage, StorageContentPolicy Rule,
     DataSourceOperationAcquisitionBinding Acquisition)
 {
+    public DataSourceAcquisitionPolicy? Lifecycle { get; init; }
     public FlowCallReference? Orchestration { get; init; }
     public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; }
@@ -396,6 +397,11 @@ public sealed record DataSourceAcquisitionResource : Resource
     public ResolvedDataSourceAcquisitionComposition? Composition { get; init; }
     public ResolvedDataSourceDataset? Dataset { get; init; }
     public StorageObject? Content { get; init; }
+    public DirectDataSourceResult? DirectResult { get; init; }
+    public DateTimeOffset? ContentRetiredAt { get; init; }
+    public DateTimeOffset? ContentRetiringAt { get; init; }
+    public bool ContentRetirementPending { get; init; }
+    public IReadOnlyDictionary<string, DateTimeOffset> ProjectionLeases { get; init; } = new Dictionary<string, DateTimeOffset>();
     public DateTimeOffset? WriteNotAfter { get; init; }
     public required string FlowRunId { get; init; }
     public required DataSourceAcquisitionState State { get; init; }

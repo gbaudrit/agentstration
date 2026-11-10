@@ -114,16 +114,18 @@ public sealed class RuntimeWorkerOperationGateway(
                 AgentVersion = request.Agent.Generation,
                 AgentGeneration = request.Agent.Generation,
                 AgentRevisionId = request.Agent.RevisionId,
-                PersistArguments = request.PersistArguments,
+                TransientPayloads = request.TransientPayloads,
+                HasSensitiveArguments = request.TransientPayloads,
+                PersistArguments = request.TransientPayloads ? false : request.PersistArguments,
                 Arguments = request.Arguments?.Clone()
             }, cancellationToken);
         }
         catch (ToolDefinitionInvocationException exception)
         {
             logger.LogWarning("Governed Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, Run {RunId}, Agent {AgentId}, Tool {ToolId}, ToolCall {ToolCallId}, TurnAttempt {TurnAttemptId}",
-                exception.Code, exception.Message, request.ExecutionScopeRef.Value, request.LogicalScopeRef?.Value,
+                exception.Code, request.TransientPayloads ? "Ephemeral execution failed." : exception.Message, request.ExecutionScopeRef.Value, request.LogicalScopeRef?.Value,
                 request.RunId, request.Agent.AgentId, request.Tool.Id, request.ToolCallId, request.TurnAttemptId);
-            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
+            throw new RuntimeGovernedOperationException(exception.Code, request.TransientPayloads ? "Ephemeral execution failed." : exception.Message, exception);
         }
     }
 
@@ -198,14 +200,14 @@ public sealed class RuntimeWorkerOperationGateway(
                 tool,
                 arguments,
                 resolvedRoute)
-            { SecretInputs = run.SecretInputs }, cancellationToken);
+            { SecretInputs = run.SecretInputs, TransientPayloads = run.TransientPayloads }, cancellationToken);
         }
         catch (ToolDefinitionInvocationException exception)
         {
             logger.LogWarning("Governed Flow Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, FlowRun {FlowRunId}, Step {StepDefinitionId}, Attempt {StepAttempt}",
-                exception.Code, exception.Message, run.ExecutionScopeRef.Value, run.Scope.LogicalScopeRef?.Value,
+                exception.Code, run.TransientPayloads ? "Ephemeral execution failed." : exception.Message, run.ExecutionScopeRef.Value, run.Scope.LogicalScopeRef?.Value,
                 run.Id, stepDefinitionId, attempt);
-            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
+            throw new RuntimeGovernedOperationException(exception.Code, run.TransientPayloads ? "Ephemeral execution failed." : exception.Message, exception);
         }
         return new(
             result.Output?.Clone(),

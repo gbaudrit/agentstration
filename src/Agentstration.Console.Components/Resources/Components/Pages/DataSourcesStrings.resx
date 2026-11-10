@@ -151,4 +151,20 @@
   <data name="CompositionBoundaryHelp" xml:space="preserve"><value>Configure the declared points. Acquisition and publication remain governed by the source.</value></data>
   <data name="CompositionOrphanHelp" xml:space="preserve"><value>This binding is not declared by the selected orchestration. Remove it or select its original Flow before saving.</value></data>
   <data name="CompositionRemovePoint" xml:space="preserve"><value>Remove point binding</value></data>
+  <data name="LifecycleTitle" xml:space="preserve"><value>Freshness and history</value></data>
+  <data name="LifecycleEnable" xml:space="preserve"><value>Configure freshness and history</value></data>
+  <data name="LifecycleTtl" xml:space="preserve"><value>Freshness duration (hh:mm:ss)</value></data>
+  <data name="LifecycleTtlHelp" xml:space="preserve"><value>Leave empty for no automatic expiry. The duration starts when the result is successfully available.</value></data>
+  <data name="LifecycleHistory" xml:space="preserve"><value>Keep previous successful versions</value></data>
+  <data name="LifecycleRetention" xml:space="preserve"><value>History retention (hh:mm:ss)</value></data>
+  <data name="LifecycleHistoryHelp" xml:space="preserve"><value>When history is disabled, the latest successful result remains available until replacement succeeds. Active executions and read cursors protect their exact content.</value></data>
+  <data name="LifecycleDurationInvalid" xml:space="preserve"><value>Enter a positive duration as hours:minutes:seconds (at most 3,650 days).</value></data>
+  <data name="LifecycleStorageRequired" xml:space="preserve"><value>Freshness and acquisition history require an input Storage.</value></data>
+  <data name="DirectPermission" xml:space="preserve"><value>Allow direct acquisition without an input Storage</value></data>
+  <data name="DirectPermissionHelp" xml:space="preserve"><value>With no input Storage, each new projection acquires a bounded result in memory. Metadata and provenance remain available; the final Snapshot is stored separately.</value></data>
+  <data name="DirectInput" xml:space="preserve"><value>Direct input · no intermediate Storage</value></data>
+  <data name="DirectResult" xml:space="preserve"><value>Direct result · temporary content</value></data>
+  <data name="DirectResultHelp" xml:space="preserve"><value>The content was passed to its projection; acquisition history retains its identity and provenance.</value></data>
+  <data name="ContentRetired" xml:space="preserve"><value>Content retired · provenance retained</value></data>
+  <data name="ContentRetirementPending" xml:space="preserve"><value>Content retirement pending</value></data>
 </root>

@@ -326,6 +326,7 @@ public sealed record ToolExecutionScope
 
 public sealed record ToolExecutionContext
 {
+    public bool TransientPayloads { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
     public bool HasSensitiveArguments { get; init; }
     public ToolExecutionOwnerKind OwnerKind { get; init; }

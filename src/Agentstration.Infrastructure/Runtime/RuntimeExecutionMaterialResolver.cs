@@ -55,6 +55,10 @@ public sealed class RuntimeExecutionMaterialResolver(
         var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
+        if (run.TransientPayloads && !run.TransientPayloadsAvailable)
+            throw new RuntimeExecutionMaterialException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
+        if (run.TransientPayloads && run.DefinitionSnapshot.Graph?.Steps.Any(step => step.ArtifactOutput is not null) == true)
+            throw new RuntimeExecutionMaterialException("direct_intermediate_storage_refused", "Direct content cannot be captured into an intermediate Artifact.");
         if (!BelongsToAssignment(assignment, run))
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this root assignment.");
         await flowScopes.ValidateAsync(run.Scope, cancellationToken);
@@ -116,6 +120,10 @@ public sealed class RuntimeExecutionMaterialResolver(
         var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
+        if (run.TransientPayloads && !run.TransientPayloadsAvailable)
+            throw new RuntimeExecutionMaterialException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
+        if (run.TransientPayloads && run.DefinitionSnapshot.Graph?.Steps.Any(step => step.ArtifactOutput is not null) == true)
+            throw new RuntimeExecutionMaterialException("direct_intermediate_storage_refused", "Direct content cannot be captured into an intermediate Artifact.");
         if (!BelongsToAssignment(assignment, run))
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this root assignment.");
         await flowScopes.ValidateAsync(run.Scope, cancellationToken);

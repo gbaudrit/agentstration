@@ -40,7 +40,7 @@ model {
           }
 
           dataSourcesApi = component 'DataSources.Api' {
-            description 'Data Source profiles, origins, governed acquisitions, and exact provenance transport'
+            description 'Data Source profiles, origins, direct or retained acquisitions, independent freshness and history, and exact provenance transport'
           }
 
           storageApi = component 'Storage.Api' {
@@ -154,7 +154,7 @@ model {
       }
 
       storageExecution = component 'Storage execution adapters' {
-        description 'Infrastructure-owned exact Storage resolution, local UID-isolated content and Artifact adapters, protected AEP bindings and ASP MCP invocation'
+        description 'Infrastructure-owned exact Storage resolution, local UID-isolated content and Artifact adapters, protected AEP bindings, ASP MCP invocation and lease-aware content retirement'
       }
 
       scheduling = component 'Scheduling and background processing' {

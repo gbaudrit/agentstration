@@ -14,7 +14,7 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
     StoredArtifactReconciliationService artifactReconciliation,
     IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
-    ILogger<DataSourceAcquisitionRecoveryWorker> logger) : BackgroundService
+    ILogger<DataSourceAcquisitionRecoveryWorker> logger, Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance? history = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -32,6 +32,7 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
             await discoveries.RecoverPendingAsync(cancellationToken);
             await projections.RecoverPendingAsync(cancellationToken);
             await artifactReconciliation.ReconcileAsync(cancellationToken);
+            if (history is not null) await history.ReconcileAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)

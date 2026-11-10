@@ -24,6 +24,15 @@ public sealed class StorageContentGateway(
     private readonly IDataProtector protector = protection.CreateProtector("Agentstration.Storage.Content.v1");
     private sealed record Reference(string Kind, string Authority, string Key, string? Version, DateTimeOffset Expires, string? Query);
 
+    public Task<bool> RetireAsync(StorageContentRequest target, StorageObject exact, CancellationToken cancellationToken = default) =>
+        ExecuteAsync(target, async (context, policy, type, token) =>
+        {
+            if (!IsLocal(type)) return await remote.RetireAsync(context, target, type, policy, exact, token);
+            AspValidation.Require(policy.Policy.CanRead && policy.Policy.CanWrite, "forbidden", "Retirement requires read and write authorization.");
+            await authorization.EnsurePermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, token);
+            return await local.RetireAsync(context.Reference, policy, exact, token);
+        }, cancellationToken);
+
     public async Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default) =>
         _ = await ExecuteAsync(target, (_, policy, _, _) =>
         {

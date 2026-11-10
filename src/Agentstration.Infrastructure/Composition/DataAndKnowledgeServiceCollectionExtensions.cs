@@ -14,6 +14,10 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
     {
         var enableHostedServices = context.Options.EnableHostedServices;
         services.AddSingleton<Agentstration.Flows.IFlowCompositionResolver, SourceFlowCompositionResolver>();
+        services.AddSingleton<Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance>();
+        services.AddSingleton<Agentstration.Artifacts.IArtifactMaterializationAdmission>(provider => provider.GetRequiredService<Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance>());
+        services.AddSingleton<IDataSourceHistoryMaintenance>(provider => provider.GetRequiredService<Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance>());
+        services.AddSingleton<IKnowledgeHistoryMaintenance>(provider => provider.GetRequiredService<Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance>());
         services.AddSingleton<DataSourceProfileService>();
         services.AddSingleton<DataSourceManagementService>();
         services.AddSingleton<DataSourceDatasetCompositionService>();

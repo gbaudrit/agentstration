@@ -73,6 +73,7 @@ public sealed record KnowledgeSourceProperties
     public IReadOnlyList<KnowledgeDataSourceBinding> DataSources { get; init; } = [];
     public KnowledgeFlowTarget? ProjectionFlow { get; init; }
     public KnowledgeOutputStorage? Output { get; init; }
+    public KnowledgeProjectionPolicy? Lifecycle { get; init; }
     public FlowCallReference? Orchestration { get; init; }
     public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; }
@@ -90,6 +91,8 @@ public sealed record KnowledgeDataSourceBinding
     public bool Required { get; init; } = true;
     public TimeSpan? MaximumAge { get; init; }
     public bool RefreshIfNecessary { get; init; }
+    public bool AllowStaleOnRefreshFailure { get; init; }
+    public TimeSpan? MaximumFallbackAge { get; init; }
 }
 
 public sealed record KnowledgeSourceResource : Resource
@@ -247,9 +250,17 @@ public sealed record StartKnowledgeProjectionRequest
 public sealed record KnowledgeStorageInput(StorageRevisionReference Storage, string Key,
     string? Version, long Length, string? Sha256);
 
+public sealed record DirectKnowledgeInput(long Length, string Sha256, DateTimeOffset ExpiresAt, string RequestId);
+public sealed record KnowledgeInputRefreshFailure(string? AcquisitionId, string Code, DateTimeOffset FailedAt);
+
 public sealed record KnowledgeProjectionInputEvidence
 {
     public KnowledgeStorageInput? StorageInput { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public DirectKnowledgeInput? DirectInput { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? InputLeaseId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool UsesAcquisitionLifecycle { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public TimeSpan? AcquisitionTimeToLive { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public KnowledgeInputRefreshFailure? RefreshFailure { get; init; }
     public required string BindingName { get; init; }
     public required ResourceScopeRef DataSourceScopeRef { get; init; }
     public required Guid DataSourceUid { get; init; }
@@ -351,7 +362,7 @@ public sealed record KnowledgeArtifactTransformationInput
     public required string TransformationId { get; init; }
 }
 
-public enum KnowledgeSnapshotLifecycleState { Active, Superseded, Unavailable }
+public enum KnowledgeSnapshotLifecycleState { Active, Superseded, Unavailable, Retired, Retiring }
 
 public sealed record KnowledgeSnapshotArtifact
 {
@@ -368,6 +379,7 @@ public sealed record KnowledgeSnapshotArtifact
 
 public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
 {
+    [JsonIgnore] public DateTimeOffset? ContentRetiredAt { get; init; }
     public required Guid KnowledgeSourceUid { get; init; }
     public ResourceScopeRef? KnowledgeSourceScopeRef { get; init; }
     public required string KnowledgeSourceName { get; init; }
@@ -387,6 +399,9 @@ public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
 
 public sealed record KnowledgeSnapshotObservedResource : Resource
 {
+    public IReadOnlyList<Guid> RetiringSnapshots { get; init; } = [];
+    public IReadOnlyDictionary<Guid, DateTimeOffset> RetiredSnapshots { get; init; } = new Dictionary<Guid, DateTimeOffset>();
+    public IReadOnlyList<Guid> RetirementPendingSnapshots { get; init; } = [];
     public required Guid KnowledgeSourceUid { get; init; }
     public string? ActiveSnapshotName { get; init; }
     public Guid? ActiveSnapshotUid { get; init; }

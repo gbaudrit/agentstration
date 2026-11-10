@@ -27,6 +27,7 @@ public sealed record DataSourceFlowRunRequest(
     Guid WorkspaceId,
     Guid PrincipalId)
 {
+    public bool TransientPayloads { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     public ResourceScopeRef? LogicalScopeRef { get; init; }
 }
@@ -39,6 +40,7 @@ public sealed record DataSourceFlowRunSnapshot(
     string? ErrorMessage,
     DateTimeOffset? CompletedAt)
 {
+    public bool TransientPayloadsAvailable { get; init; } = true;
     public string? RootFlowRunId { get; init; }
     public string? FlowName { get; init; }
     public ResourceNamespace? FlowNamespace { get; init; }

@@ -187,8 +187,9 @@ public sealed class RuntimeWorkerExecutionService(
         return await operations.InvokeToolAsync(new RuntimeGovernedToolRequest(
             agent, tool, toolCallId, turnId, turnAttemptId, turn.StepExecutionId,
             material.TenantId, material.WorkspaceId, material.PrincipalId, material.RunId,
-            arguments, material is RuntimeDirectAgentExecutionMaterial direct ? direct.Execution.PersistToolArguments : null)
+            arguments, authorization.Assignment.TransientPayloads ? false : material is RuntimeDirectAgentExecutionMaterial direct ? direct.Execution.PersistToolArguments : null)
         {
+            TransientPayloads = authorization.Assignment.TransientPayloads,
             ExecutionScopeRef = material.ScopeRef,
             LogicalScopeRef = material.LogicalScopeRef
         }, lease.Token);
@@ -202,6 +203,8 @@ public sealed class RuntimeWorkerExecutionService(
         CancellationToken cancellationToken)
     {
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
+        if (authorization.Assignment.TransientPayloads)
+            throw new RuntimeExecutionMaterialException("direct_intermediate_storage_refused", "Direct content cannot be captured into an intermediate Artifact.");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
         return await operations.StoreArtifactAsync(proof.WorkspaceId, proof.AssignmentId, name, contentType, content, lease.Token);
     }
@@ -237,6 +240,8 @@ public sealed class RuntimeWorkerExecutionService(
             throw new RuntimeExecutionMaterialException("flow_artifact_request_too_large",
                 "A Flow Artifact request cannot exceed 1 MiB or 64 provenance entries.");
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
+        if (authorization.Assignment.TransientPayloads)
+            throw new RuntimeExecutionMaterialException("direct_intermediate_storage_refused", "Direct content cannot be captured into an intermediate Artifact.");
         var step = AuthorizedFlowStep(authorization, stepExecutionId, "Flow Artifact capture");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
         return await operations.CaptureFlowArtifactAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,

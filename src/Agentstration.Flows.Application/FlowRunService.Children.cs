@@ -160,6 +160,7 @@ public sealed partial class FlowRunService
             FlowId = targetId,
             FlowVersion = resolved.Version,
             Composition = composed.Receipt,
+            TransientPayloads = parent.TransientPayloads,
             DefinitionState = FlowDefinitionState.Published,
             DefinitionHash = resolved.DefinitionHash,
             DefinitionScopeRef = resolved.ScopeRef,

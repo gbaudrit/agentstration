@@ -327,7 +327,8 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
                 Scope(request.WorkspaceId, request.TenantId, request.PrincipalId) with { LogicalScopeRef = request.LogicalScopeRef })
             {
                 DefinitionScopeRef = request.Flow.ScopeRef,
-                Compositions = request.Compositions
+                Compositions = request.Compositions,
+                TransientPayloads = request.TransientPayloads
             }, cancellationToken);
             return Snapshot(stored.Value);
         }
@@ -376,6 +377,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
         run.Error?.Message,
         run.CompletedAt)
     {
+        TransientPayloadsAvailable = run.TransientPayloadsAvailable,
         RootFlowRunId = run.RootFlowRunId,
         FlowName = run.FlowId.Value,
         FlowNamespace = run.FlowId.Namespace,

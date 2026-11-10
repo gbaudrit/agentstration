@@ -30,6 +30,9 @@ public sealed record RuntimeAssignmentAttempt
 
 public sealed record RuntimeWorkerAssignment
 {
+    public bool TransientPayloads { get; init; }
+    public string? TransientPayloadTicket { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] public bool TransientPayloadsAvailable { get; init; } = true;
     public required WorkspaceId WorkspaceId { get; init; }
     public ResourceScopeRef? ScopeRef { get; init; }
     public ResourceScopeRef ExecutionScopeRef => ScopeRef ?? ResourceScopeRef.Workspace(WorkspaceId.Value);

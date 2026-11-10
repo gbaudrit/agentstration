@@ -58,6 +58,7 @@ public sealed record RuntimeGovernedToolRequest(
     JsonElement? Arguments,
     bool? PersistArguments)
 {
+    public bool TransientPayloads { get; init; }
     public ResourceScopeRef ExecutionScopeRef { get; init; } = WorkspaceId.Value != Guid.Empty
         ? ResourceScopeRef.Workspace(WorkspaceId.Value)
         : TenantId != Guid.Empty

@@ -55,6 +55,21 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
         return item;
     }
 
+    public async Task<bool> RetireAsync(StorageRevisionReference storage, AspAccessContext context, StorageObject exact, CancellationToken cancellationToken)
+    {
+        Validate(storage, context);
+        AspValidation.DemandKey(context, exact.Key);
+        var directory = paths.EnsureDirectoryFor(storage);
+        await using var lease = await LockAsync(directory, cancellationToken);
+        var state = await ReadStateAsync(directory, cancellationToken);
+        if (!state.Objects.TryGetValue(exact.Key, out var entry)) return true;
+        AspValidation.Require(entry.Item.Version == exact.Version && entry.Item.Length == exact.Length && entry.Item.Sha256 == exact.Sha256,
+            "version_unavailable", "The result no longer matches the exact retirement receipt.");
+        state.Objects.Remove(exact.Key);
+        await CommitAsync(directory, state, cancellationToken);
+        return true;
+    }
+
     public async Task<AspProviderPage> ListAsync(StorageRevisionReference storage, AspAccessContext context,
         string prefix, string? after, int limit, CancellationToken cancellationToken)
     {

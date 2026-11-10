@@ -131,13 +131,15 @@ public sealed partial class KnowledgeAccessService(
 
     private bool NeedsPreparation(KnowledgeSourceResource source, KnowledgeSnapshotResource? snapshot) => snapshot is null
         || snapshot.KnowledgeSourceGeneration != source.Generation
-        || source.Definition.DataSources.Any(binding =>
+        || (source.Definition.Lifecycle is { } policy
+            ? policy.TimeToLive is { } ttl && clock.GetUtcNow() >= snapshot.PublishedAt + ttl
+            : source.Definition.DataSources.Any(binding =>
         {
             var evidence = snapshot.ProjectionInputs.SingleOrDefault(value => value.BindingName == binding.Name);
             if (evidence is null && !binding.Required && !binding.RefreshIfNecessary) return false;
             return !KnowledgeFreshness.IsFresh(binding, evidence?.AcquiredAt, clock)
                 || KnowledgeFreshness.RequiresRefresh(binding, evidence?.AcquiredAt, clock);
-        });
+        }));
 
     private async Task<(KnowledgeSnapshotResource? Snapshot, KnowledgeAccessResult? Pending)> SelectAsync(
         KnowledgeSourceResource source, string? snapshotId, string? preparationId, CancellationToken ct)
@@ -148,7 +150,7 @@ public sealed partial class KnowledgeAccessService(
         if (pending is null)
         {
             var active = await snapshots.GetActiveAsync(Id(source), ct);
-            if (active?.LifecycleState != KnowledgeSnapshotLifecycleState.Unavailable && !NeedsPreparation(source, active?.Snapshot))
+            if (active?.LifecycleState is not (KnowledgeSnapshotLifecycleState.Unavailable or KnowledgeSnapshotLifecycleState.Retired) && !NeedsPreparation(source, active?.Snapshot))
                 return (active!.Snapshot, null);
             var previous = (await projections.ListAsync(Id(source), ct))
                 .Where(value => value.KnowledgeSourceGeneration == source.Generation && value.CreatedBy == Context().PrincipalId)
@@ -180,6 +182,8 @@ public sealed partial class KnowledgeAccessService(
         {
             var result = (await task).Value;
             if (result.State != KnowledgeProjectionState.Succeeded || result.SnapshotName is null)
+            {
+                if (await ExpiredFallbackAsync(source, ct) is { } fallback) return (fallback, null);
                 return (null, new()
                 {
                     State = "failed",
@@ -187,10 +191,22 @@ public sealed partial class KnowledgeAccessService(
                     ProjectionId = result.Name,
                     ErrorCode = result.ErrorCode ?? "knowledge_access_preparation_failed"
                 });
+            }
             return (await ExactAsync(source, result.SnapshotName, ct), null);
         }
         catch (KnowledgeProjectionException exception)
-        { return (null, new() { State = "failed", SourceUid = source.Uid, ErrorCode = exception.Code }); }
+        {
+            if (await ExpiredFallbackAsync(source, ct) is { } fallback) return (fallback, null);
+            return (null, new() { State = "failed", SourceUid = source.Uid, ErrorCode = exception.Code });
+        }
+    }
+
+    private async Task<KnowledgeSnapshotResource?> ExpiredFallbackAsync(KnowledgeSourceResource source, CancellationToken ct)
+    {
+        if (source.Definition.Lifecycle?.AllowExpiredOnRefreshFailure != true) return null;
+        var active = await snapshots.GetActiveAsync(Id(source), ct);
+        return active is not null && active.LifecycleState is not (KnowledgeSnapshotLifecycleState.Unavailable or KnowledgeSnapshotLifecycleState.Retired)
+            ? await ExactAsync(source, active.Snapshot.Name, ct) : null;
     }
 
     private async Task<StoredResource<KnowledgeProjectionResource>> PrepareAsync(KnowledgeSourceResource source, string key,
@@ -217,12 +233,18 @@ public sealed partial class KnowledgeAccessService(
         finally { preparations.TryRemove(taskKey, out _); if (admitted) preparationAdmission.Release(); }
     }
 
+    private async Task EnsureNewReadAllowedAsync(KnowledgeSourceResource source, KnowledgeSnapshotResource snapshot, CancellationToken ct)
+    {
+        try { await snapshots.EnsureNewReadAllowedAsync(source, snapshot, ct); }
+        catch (KnowledgeSnapshotException exception) { throw Error(exception.Code); }
+    }
+
     private async Task<AccessToken> SessionAsync(KnowledgeSourceResource source, KnowledgeSnapshotResource snapshot,
         string kind, CancellationToken ct)
     {
         var scope = ResourceScopeRef.Workspace(Context().WorkspaceId);
         var sessions = await InWorkspaceAsync(() => resources.ListExactAsync<KnowledgeReadSessionResource>(scope, SessionKind, 0, MaximumSessions, ct));
-        var reusable = sessions.FirstOrDefault(value => value.Value.SourceUid == source.Uid && value.Value.SnapshotUid == snapshot.Uid
+        var reusable = sessions.FirstOrDefault(value => value.Value.Ready && value.Value.SourceUid == source.Uid && value.Value.SnapshotUid == snapshot.Uid
             && value.Value.PrincipalId == Context().PrincipalId && value.Value.TenantId == Context().TenantId
             && value.Value.ExpiresAt > clock.GetUtcNow());
         if (reusable is not null) return Token(kind, source) with
@@ -233,6 +255,7 @@ public sealed partial class KnowledgeAccessService(
             SessionGeneration = reusable.Value.Generation,
             Expires = reusable.Value.ExpiresAt
         };
+        await EnsureNewReadAllowedAsync(source, snapshot, ct);
         var occupied = sessions.ToDictionary(value => value.Value.Name, StringComparer.Ordinal);
         var start = Random.Shared.Next(MaximumSessions);
         // Fixed slots and conditional writes bound durable leases even across concurrent server processes.
@@ -244,6 +267,7 @@ public sealed partial class KnowledgeAccessService(
             var session = new KnowledgeReadSessionResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
+                Ready = false,
                 Kind = SessionKind,
                 Metadata = new() { Name = name, Namespace = ResourceNamespace.Default },
                 ScopeRef = scope,
@@ -259,6 +283,19 @@ public sealed partial class KnowledgeAccessService(
             try
             {
                 var stored = await InWorkspaceAsync(() => resources.PutExactAsync(scope, session, previous?.ETag, previous is null, ct));
+                try { await EnsureNewReadAllowedAsync(source, snapshot, ct); }
+                catch (KnowledgeAccessException)
+                {
+                    try
+                    {
+                        _ = await InWorkspaceAsync(() => resources.PutExactAsync(scope, stored.Value with
+                        { Generation = checked(stored.Value.Generation + 1), ExpiresAt = clock.GetUtcNow() }, stored.ETag, false, ct));
+                    }
+                    catch (ResourceConcurrencyException) { }
+                    throw;
+                }
+                stored = await InWorkspaceAsync(() => resources.PutExactAsync(scope, stored.Value with
+                { Generation = checked(stored.Value.Generation + 1), Ready = true }, stored.ETag, false, ct));
                 return Token(kind, source) with
                 {
                     Snapshot = snapshot.Name,

@@ -22,6 +22,7 @@ public sealed class DataSourceDatasetCompositionService(
     {
         var definition = source.Definition.Dataset
             ?? throw Invalid("data_source_dataset_required", "A dataset composition is required.");
+        ValidateLifecycle(definition);
         var (operation, type) = await operations.ResolveAsync(definition.Acquisition.Operation, consumer, true, cancellationToken);
         var adapter = type.Acquisition
             ?? throw Invalid("data_source_operation_adapter_unavailable", "This operation type has no acquisition adapter.");
@@ -32,14 +33,17 @@ public sealed class DataSourceDatasetCompositionService(
         var input = Schema(operation.Definition.Definition, adapter.InputSchemaProperty);
         var output = Schema(operation.Definition.Definition, adapter.OutputSchemaProperty);
         ValidateValue(input, definition.Acquisition.Parameters);
-        var consumerContext = new StorageResolutionContext(consumer, source.Address);
-        var target = await storage.ResolveAsync(definition.Storage, consumerContext, cancellationToken);
-        if (!target.Capabilities.List || !target.Capabilities.Read || !target.Capabilities.Write
-            || !definition.Rule.List || !definition.Rule.Read || !definition.Rule.Write)
-            throw Invalid("data_source_storage_capability_required", "Acquisition requires list, read and write capabilities.");
         var partition = Partition(source);
-        var effective = definition.Rule with { Prefix = partition };
-        await content.ValidateAsync(new(definition.Storage, consumerContext, effective), cancellationToken);
+        if (definition.Storage is { } inputStorage)
+        {
+            var consumerContext = new StorageResolutionContext(consumer, source.Address);
+            var target = await storage.ResolveAsync(inputStorage, consumerContext, cancellationToken);
+            if (!target.Capabilities.List || !target.Capabilities.Read || !target.Capabilities.Write
+                || !definition.Rule.List || !definition.Rule.Read || !definition.Rule.Write)
+                throw Invalid("data_source_storage_capability_required", "Acquisition requires list, read and write capabilities.");
+            var effective = definition.Rule with { Prefix = partition };
+            await content.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
+        }
         var flow = await flows.ResolveOperationAsync(consumer, adapter.Flow, cancellationToken);
         if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null)
             return new(definition, operation, type, input, output, partition, flow);
@@ -70,6 +74,20 @@ public sealed class DataSourceDatasetCompositionService(
         { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
 
+    public static void ValidateLifecycle(DataSourceDatasetProperties definition)
+    {
+        var policy = definition.Lifecycle;
+        if (definition.Storage is null && policy?.AllowDirect != true)
+            throw Invalid("data_source_direct_permission_required", "Direct acquisition requires explicit permission.");
+        if (policy is null) return;
+        if (policy.TimeToLive is { } ttl && (ttl <= TimeSpan.Zero || ttl > TimeSpan.FromDays(3650))
+            || policy.HistoryRetention is { } retention && (retention <= TimeSpan.Zero || retention > TimeSpan.FromDays(3650))
+            || policy.KeepHistory && policy.HistoryRetention is null || !policy.KeepHistory && policy.HistoryRetention is not null)
+            throw Invalid("data_source_lifecycle_invalid", "Lifecycle durations must be positive, bounded, and consistent with the history setting.");
+        if (definition.Storage is null && (policy.TimeToLive is not null || policy.KeepHistory))
+            throw Invalid("data_source_retained_storage_required", "Acquisition freshness and history require an exact-readable input Storage.");
+    }
+
     public static string Partition(DataSourceResource source)
     {
         var prefix = source.Definition.Dataset!.Rule.Prefix;
@@ -84,7 +102,7 @@ public sealed class DataSourceDatasetCompositionService(
     public static StorageContentRequest Target(DataSourceAcquisitionResource acquisition, ResourceScopeRef consumer)
     {
         var dataset = acquisition.Dataset!;
-        return new(dataset.Definition.Storage,
+        return new(dataset.Definition.Storage ?? throw Invalid("data_source_content_unavailable", "This acquisition has no retained input Storage."),
             new(consumer, ResourceAddress.Create(acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName)),
             dataset.Definition.Rule with { Prefix = dataset.Partition });
     }

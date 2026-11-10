@@ -19,6 +19,9 @@ internal static class FlowPlaneServiceCollectionExtensions
         services.AddSingleton<IFlowDiscoveryPolicy, FlowDiscoveryPolicy>();
         services.AddSingleton<IFlowUsePolicy, FlowUsePolicy>();
         services.AddSingleton<IFlowAgentReferenceResolver, FlowAgentReferenceResolver>();
+        services.AddSingleton<DirectExecutionPayloadPersistence>();
+        services.AddSingleton<Agentstration.Flows.Storage.Abstractions.IFlowPayloadPersistence>(provider => provider.GetRequiredService<DirectExecutionPayloadPersistence>());
+        services.AddSingleton<Agentstration.Runtime.Abstractions.IRuntimeAssignmentPayloadPersistence>(provider => provider.GetRequiredService<DirectExecutionPayloadPersistence>());
         services.AddSingleton<FlowService>();
         services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
         services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();

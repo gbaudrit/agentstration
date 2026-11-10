@@ -151,4 +151,20 @@
   <data name="CompositionBoundaryHelp" xml:space="preserve"><value>Configurez les points déclarés. L’acquisition et la publication restent gouvernées par la source.</value></data>
   <data name="CompositionOrphanHelp" xml:space="preserve"><value>Ce point n’est pas déclaré par l’orchestration sélectionnée. Retirez sa configuration ou sélectionnez son Flow d’origine avant d’enregistrer.</value></data>
   <data name="CompositionRemovePoint" xml:space="preserve"><value>Retirer la configuration du point</value></data>
+  <data name="LifecycleTitle" xml:space="preserve"><value>Fraîcheur et historique</value></data>
+  <data name="LifecycleEnable" xml:space="preserve"><value>Configurer la fraîcheur et la conservation</value></data>
+  <data name="LifecycleTtl" xml:space="preserve"><value>Durée de fraîcheur (hh:mm:ss)</value></data>
+  <data name="LifecycleTtlHelp" xml:space="preserve"><value>Laissez vide pour ne pas appliquer d’expiration automatique. La durée commence lorsque le résultat est disponible avec succès.</value></data>
+  <data name="LifecycleHistory" xml:space="preserve"><value>Conserver les versions précédentes réussies</value></data>
+  <data name="LifecycleRetention" xml:space="preserve"><value>Durée de conservation de l’historique (hh:mm:ss)</value></data>
+  <data name="LifecycleHistoryHelp" xml:space="preserve"><value>Sans historique, le dernier résultat réussi reste disponible jusqu’au succès de son remplacement. Les exécutions et curseurs de lecture en cours protègent leur contenu exact.</value></data>
+  <data name="LifecycleDurationInvalid" xml:space="preserve"><value>Saisissez une durée positive sous la forme heures:minutes:secondes (au maximum 3 650 jours).</value></data>
+  <data name="LifecycleStorageRequired" xml:space="preserve"><value>La fraîcheur et l’historique des acquisitions nécessitent un Storage d’entrée.</value></data>
+  <data name="DirectPermission" xml:space="preserve"><value>Autoriser l’acquisition directe sans Storage d’entrée</value></data>
+  <data name="DirectPermissionHelp" xml:space="preserve"><value>Sans Storage d’entrée, chaque nouvelle projection acquiert un résultat borné en mémoire. Les métadonnées et la provenance restent disponibles ; le Snapshot final est stocké séparément.</value></data>
+  <data name="DirectInput" xml:space="preserve"><value>Entrée directe · sans Storage intermédiaire</value></data>
+  <data name="DirectResult" xml:space="preserve"><value>Résultat direct · contenu temporaire</value></data>
+  <data name="DirectResultHelp" xml:space="preserve"><value>Le contenu a été transmis à sa projection ; l’historique d’acquisition conserve son identité et sa provenance.</value></data>
+  <data name="ContentRetired" xml:space="preserve"><value>Contenu retiré · provenance conservée</value></data>
+  <data name="ContentRetirementPending" xml:space="preserve"><value>Retrait du contenu en attente</value></data>
 </root>

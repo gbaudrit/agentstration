@@ -110,7 +110,8 @@ public sealed class KnowledgeRetrievalFlowGateway(FlowRunService runs) : IKnowle
                 scope)
             {
                 DefinitionScopeRef = request.Flow.ScopeRef,
-                SecretInputs = request.ExecutionContext?.SecretInputs ?? []
+                SecretInputs = request.ExecutionContext?.SecretInputs ?? [],
+                TransientPayloads = request.ExecutionContext?.TransientPayloads == true
             }, cancellationToken);
             var completed = await AwaitCompletionAsync(stored.Value.Id, scope, cancellationToken);
             if (completed.Value.Status != FlowRunStatus.Succeeded)

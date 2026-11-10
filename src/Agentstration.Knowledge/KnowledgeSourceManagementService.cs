@@ -331,6 +331,15 @@ public sealed class KnowledgeSourceManagementService(
         if (resource.Definition.ProjectionParameters.ValueKind != JsonValueKind.Object
             || Encoding.UTF8.GetByteCount(resource.Definition.ProjectionParameters.GetRawText()) > KnowledgeProjectionService.MaximumParametersBytes)
             throw new KnowledgeSourceValidationException("knowledge_projection_parameters_invalid", "Automatic projection parameters must be a bounded JSON object.");
+        if (resource.Definition.Lifecycle is { } lifecycle)
+        {
+            if (lifecycle.TimeToLive is { } ttl && (ttl <= TimeSpan.Zero || ttl > TimeSpan.FromDays(3650))
+                || lifecycle.HistoryRetention is { } retention && (retention <= TimeSpan.Zero || retention > TimeSpan.FromDays(3650))
+                || lifecycle.KeepHistory && lifecycle.HistoryRetention is null || !lifecycle.KeepHistory && lifecycle.HistoryRetention is not null)
+                throw new KnowledgeSourceValidationException("knowledge_source_lifecycle_invalid", "Lifecycle durations must be positive, bounded, and consistent with history.");
+            if (resource.Definition.Output is null)
+                throw new KnowledgeSourceValidationException("knowledge_output_storage_required", "Projection lifecycle requires an output Storage.");
+        }
         ValidateTarget(resource.Definition.ProjectionFlow, "projection");
         ValidateTarget(resource.Definition.RetrievalFlow, "retrieval");
         if (resource.Definition.DataSources.Count is < 1 or > KnowledgeProjectionService.MaximumInputs)
@@ -359,6 +368,9 @@ public sealed class KnowledgeSourceManagementService(
             if (binding.MaximumAge is { } maximumAge && maximumAge < TimeSpan.Zero)
                 throw new KnowledgeSourceValidationException("knowledge_source_data_source_maximum_age_invalid",
                     $"Binding '{binding.Name}' maximum age cannot be negative.");
+            if (binding.AllowStaleOnRefreshFailure && (binding.MaximumFallbackAge is null || binding.MaximumFallbackAge <= TimeSpan.Zero)
+                || !binding.AllowStaleOnRefreshFailure && binding.MaximumFallbackAge is not null)
+                throw new KnowledgeSourceValidationException("knowledge_source_fallback_invalid", "Stale fallback requires an explicit positive age ceiling.");
             ValidateTarget(binding.TransformationFlow, "transformation");
         }
         if (resource.Definition.Enabled

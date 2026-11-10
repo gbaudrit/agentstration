@@ -598,7 +598,7 @@ public sealed class McpToolInvoker(
         context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? context.RunId : null,
         context.FlowStepId,
         context.InvocationId, context.AgentVersion, context.AgentGeneration, context.HasSensitiveArguments)
-    { SecretInputs = context.SecretInputs };
+    { SecretInputs = context.SecretInputs, TransientPayloads = context.TransientPayloads };
 
     private static ToolDefinitionCallerKind CallerKind(ToolExecutionContext context) => context.OwnerKind switch
     {

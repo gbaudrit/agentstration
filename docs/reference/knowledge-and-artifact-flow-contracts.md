@@ -122,3 +122,27 @@ version or content reference.
 Conflicting reuse is refused. Pending attempts retain exact input evidence and
 resume through the ordinary Flow service. See
 [ADR-0207](../decisions/0207-knowledge-publishes-retained-storage-content.md).
+
+### Freshness, direct inputs, and history
+
+The optional native dataset `lifecycle` controls acquisition TTL from successful
+completion. No input Storage requires explicit `allowDirect`; TTL and input history
+require Storage. Direct input data is an ephemeral projection handoff, never a
+reusable acquisition or intermediate Artifact. It expires and cannot resume after
+process loss. Composed child Flows are supported; Flow-backed Tool Definitions
+inside direct work are refused because their WorkItems would retain the payload.
+
+Knowledge independently configures Snapshot `timeToLive`, `keepHistory`,
+`historyRetention` and `allowExpiredOnRefreshFailure`. A binding may set
+`allowStaleOnRefreshFailure` with `maximumFallbackAge` at least its Data Source TTL.
+Refresh is attempted first, and provenance records its failure before any fallback.
+A failed replacement preserves the previous active Snapshot. An exact native read
+cursor remains attached to its Snapshot to the original lease expiry, even if a
+new Snapshot is published meanwhile.
+
+Cleanup preserves metadata and producer/Storage provenance after retiring bytes.
+Active input/read leases and Workspace executions postpone cleanup. Built-in local
+Storage supports exact retirement; supported remote ASP stores use a conditional
+empty replacement, while unsupported/revoked providers remain pending. Provider
+backups and object version history have their own retention settings. Existing
+resources without lifecycle keep legacy binding freshness rules.

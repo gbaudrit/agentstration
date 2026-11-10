@@ -121,4 +121,14 @@
   <data name="Yes" xml:space="preserve"><value>Oui</value></data>
   <data name="No" xml:space="preserve"><value>Non</value></data>
   <data name="NativeLegacyRetrievalHelp" xml:space="preserve"><value>Les Tools natifs read, search_regex et get_status accèdent directement aux Snapshots. Ce Flow facultatif sert uniquement aux appels REST de consultation personnalisée.</value></data>
+  <data name="LifecycleTitle" xml:space="preserve"><value>Fraîcheur et historique des Snapshots</value></data>
+  <data name="AllowExpiredFallback" xml:space="preserve"><value>Autoriser le Snapshot actif expiré après un échec de reprojection</value></data>
+  <data name="AllowInputFallback" xml:space="preserve"><value>Autoriser une ancienne acquisition après un échec de rafraîchissement</value></data>
+  <data name="InputFallbackAge" xml:space="preserve"><value>Âge maximal pour le repli (hh:mm:ss)</value></data>
+  <data name="InputFallbackAgeHelp" xml:space="preserve"><value>Le rafraîchissement est toujours tenté d’abord. Ce plafond doit être au moins égal à la durée de fraîcheur de la Data Source ; il ne retarde jamais le rafraîchissement. Les résultats directs ne peuvent pas servir de repli.</value></data>
+  <data name="FallbackInvalid" xml:space="preserve"><value>Choisissez une entrée stockée et un âge maximal de repli positif, au moins égal à la durée de fraîcheur de sa Data Source.</value></data>
+  <data name="LifecycleInvalid" xml:space="preserve"><value>Vérifiez la durée de fraîcheur, la conservation de l’historique et le Storage de sortie sélectionné.</value></data>
+  <data name="DataSourceOwnsFreshness" xml:space="preserve"><value>Cette Data Source fixe la fraîcheur des acquisitions et leur rafraîchissement. Le plafond de repli s’applique uniquement après un échec de rafraîchissement.</value></data>
+  <data name="SnapshotState.Retired" xml:space="preserve"><value>Retiré</value></data>
+  <data name="SnapshotState.Retiring" xml:space="preserve"><value>Retrait en attente</value></data>
 </root>

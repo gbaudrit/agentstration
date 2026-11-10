@@ -25,6 +25,7 @@ public sealed record EnsureRootFlowRunCommand(
     string? TriggerMessageId,
     FlowRunScope Scope)
 {
+    public bool TransientPayloads { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     public ResourceScopeRef? DefinitionScopeRef { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
@@ -53,6 +54,7 @@ public sealed partial class FlowRunService
         var run = new FlowRun
         {
             Composition = composed.Receipt,
+            TransientPayloads = command.TransientPayloads,
             WorkspaceId = command.Scope.WorkspaceId,
             Id = command.RunId,
             FlowId = command.FlowId,
@@ -106,7 +108,9 @@ public sealed partial class FlowRunService
 
     private static void ValidateRootIdentity(FlowRun run, EnsureRootFlowRunCommand command)
     {
-        if (run.Scope != command.Scope
+        if (run.TransientPayloads && !run.TransientPayloadsAvailable)
+            throw new FlowValidationException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
+        if (run.TransientPayloads != command.TransientPayloads || run.Scope != command.Scope
             || run.FlowId != command.FlowId
             || run.RootFlowRunId is not null
             || run.NestingDepth != 0

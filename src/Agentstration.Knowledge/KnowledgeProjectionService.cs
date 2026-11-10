@@ -21,6 +21,8 @@ public sealed class KnowledgeProjectionException(string code, string message, Ex
 
 public interface IKnowledgeProjectionInputResolver
 {
+    Task ReleaseAsync(KnowledgeProjectionInputEvidence evidence, CancellationToken cancellationToken) => Task.CompletedTask;
+
     Task<ResolvedKnowledgeDataSourceBinding> ResolveDependencyAsync(
         ResourceScopeRef ownerScope,
         ResourceNamespace ownerNamespace,
@@ -67,6 +69,7 @@ public sealed record KnowledgeProjectionFlowRunRequest(
     Guid PrincipalId)
 {
     public ResourceScopeRef? LogicalScopeRef { get; init; }
+    public bool TransientPayloads { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
 }
 
@@ -99,7 +102,7 @@ public sealed class KnowledgeProjectionService(
     IKnowledgeSnapshotArtifactResolver artifacts,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
-    IKnowledgeOutputPublisher outputPublisher)
+    IKnowledgeOutputPublisher outputPublisher, IKnowledgeHistoryMaintenance? history = null)
 {
     private static readonly JsonSerializerOptions FlowContractJsonOptions = CreateFlowContractJsonOptions();
     private readonly ConcurrentDictionary<(Guid WorkspaceId, Guid SourceUid), SemaphoreSlim> gates = new();
@@ -141,6 +144,7 @@ public sealed class KnowledgeProjectionService(
             throw Error("knowledge_projection_capacity", "The projection admission capacity has been reached.");
         try { await gate.WaitAsync(cancellationToken); }
         catch { admission.Release(); throw; }
+        var leasedInputs = new List<KnowledgeProjectionInputEvidence>(source.Value.Definition.DataSources.Count);
         try
         {
             var scopeRef = executionScope;
@@ -166,17 +170,38 @@ public sealed class KnowledgeProjectionService(
                 if (previous.Value.State != KnowledgeProjectionState.Running) return previous;
             }
             var correlationId = previous?.Value.CorrelationId ?? (string.IsNullOrWhiteSpace(request.CorrelationId) ? projectionId : request.CorrelationId.Trim());
-            var resolvedInputs = new List<KnowledgeProjectionInputEvidence>(source.Value.Definition.DataSources.Count);
+            var resolvedInputs = leasedInputs;
             var inputIssues = new List<KnowledgeProjectionInputIssue>();
             if (previous is not null)
             {
-                foreach (var evidence in previous.Value.Inputs)
+                try
                 {
-                    var binding = source.Value.Definition.DataSources.Single(value => value.Name == evidence.BindingName);
-                    var dependency = composition.DataSources.Single(value => value.BindingName == evidence.BindingName);
-                    await inputs.RevalidateAsync(KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef,
-                        source.Value.Namespace, binding, dependency, evidence, cancellationToken);
-                    resolvedInputs.Add(evidence);
+                    foreach (var evidence in previous.Value.Inputs)
+                    {
+                        var binding = source.Value.Definition.DataSources.Single(value => value.Name == evidence.BindingName);
+                        var dependency = composition.DataSources.Single(value => value.BindingName == evidence.BindingName);
+                        await inputs.RevalidateAsync(KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef,
+                            source.Value.Namespace, binding, dependency, evidence, cancellationToken);
+                        resolvedInputs.Add(evidence.DirectInput is null ? evidence : await inputs.ResolveAsync(
+                            KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? scopeRef, source.Value.Namespace, binding,
+                            dependency, evidence.AcquisitionId, projectionId + ":" + binding.Name, cancellationToken));
+                    }
+                }
+                catch (KnowledgeProjectionException exception)
+                {
+                    // A lost direct handoff is terminal for this accepted attempt. Never replay its acquisition.
+                    var failed = previous.Value with
+                    {
+                        Generation = checked(previous.Value.Generation + 1),
+                        State = KnowledgeProjectionState.Failed,
+                        CompletedAt = timeProvider.GetUtcNow(),
+                        ErrorCode = exception.Code,
+                        ErrorMessage = "The accepted input is no longer available.",
+                        Status = new() { ProvisioningState = ProvisioningState.Failed }
+                    };
+                    try { _ = await InWorkspaceAsync(() => store.PutExactAsync(scopeRef, failed, previous.ETag, false, cancellationToken)); }
+                    catch (ResourceConcurrencyException) { }
+                    throw;
                 }
             }
             var resource = new KnowledgeProjectionResource
@@ -200,7 +225,7 @@ public sealed class KnowledgeProjectionService(
                 ProjectionFlow = projectionFlow,
                 ProjectionComposition = composition.ProjectionComposition,
                 RetrievalFlow = retrievalFlow,
-                Inputs = resolvedInputs.ToArray(),
+                Inputs = RetainedEvidence(resolvedInputs),
                 InputIssues = inputIssues.ToArray(),
                 ProjectionFlowRunId = $"flowrun-knowledge-{projectionId[11..]}",
                 State = KnowledgeProjectionState.Running,
@@ -240,7 +265,7 @@ public sealed class KnowledgeProjectionService(
 
                 if (stored.Value.Inputs.Count == 0)
                     stored = await InWorkspaceAsync(() => store.PutExactAsync(scopeRef, stored.Value with
-                    { Generation = checked(stored.Value.Generation + 1), Inputs = resolvedInputs.ToArray(), InputIssues = inputIssues.ToArray() }, stored.ETag, false, cancellationToken));
+                    { Generation = checked(stored.Value.Generation + 1), Inputs = RetainedEvidence(resolvedInputs), InputIssues = inputIssues.ToArray() }, stored.ETag, false, cancellationToken));
                 var transformation = await TransformAsync(source.Value, resolvedInputs, projectionId, correlationId, context, cancellationToken);
                 var prepared = transformation.Inputs;
                 inputIssues.AddRange(transformation.Issues);
@@ -263,6 +288,7 @@ public sealed class KnowledgeProjectionService(
                     context.PrincipalId)
                 {
                     LogicalScopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext),
+                    TransientPayloads = prepared.Any(value => value.DirectInput is not null),
                     Compositions = composition.ProjectionComposition?.Receipt?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>()
                 }, cancellationToken);
                 if (run.State != KnowledgeProjectionState.Succeeded)
@@ -283,15 +309,16 @@ public sealed class KnowledgeProjectionService(
                 var completed = stored.Value with
                 {
                     Generation = checked(stored.Value.Generation + 1),
-                    Inputs = prepared,
+                    Inputs = RetainedEvidence(prepared),
                     InputIssues = inputIssues.ToArray(),
                     State = KnowledgeProjectionState.Succeeded,
-                    CompletedAt = run.CompletedAt ?? timeProvider.GetUtcNow(),
-                    Manifest = manifest,
+                    CompletedAt = timeProvider.GetUtcNow(),
+                    Manifest = prepared.Any(value => value.DirectInput is not null) ? manifest with { Artifacts = manifest.Artifacts.Select(value => value with { ContentBase64 = null }).ToArray() } : manifest,
                     SnapshotName = snapshot.Value.Name,
                     Status = new() { ProvisioningState = ProvisioningState.Succeeded }
                 };
                 var result = await InWorkspaceAsync(() => store.PutExactAsync(scopeRef, completed, stored.ETag, false, cancellationToken));
+                if (history is not null) await history.MaintainAsync(source.Value, cancellationToken);
                 return result;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -301,6 +328,8 @@ public sealed class KnowledgeProjectionService(
                 var mapped = exception as KnowledgeProjectionException
                     ?? (exception is StorageException storage ? Error(storage.Code, storage.Message, storage)
                         : Error("knowledge_projection_failed", exception.Message, exception));
+                if (resolvedInputs.Any(value => value.DirectInput is not null))
+                    mapped = Error(mapped.Code, "The projection could not complete.", mapped);
                 var failed = stored.Value with
                 {
                     Generation = checked(stored.Value.Generation + 1),
@@ -317,8 +346,13 @@ public sealed class KnowledgeProjectionService(
         }
         finally
         {
-            gate.Release();
-            admission.Release();
+            try
+            {
+                foreach (var evidence in leasedInputs)
+                    try { await inputs.ReleaseAsync(evidence, CancellationToken.None); }
+                    catch (Exception exception) when (exception is KnowledgeProjectionException or ResourceConcurrencyException or AuthorizationDeniedException) { }
+            }
+            finally { gate.Release(); admission.Release(); }
         }
     }
 
@@ -456,6 +490,7 @@ public sealed class KnowledgeProjectionService(
                     correlationId, context.TenantId, context.WorkspaceId, context.PrincipalId)
                 {
                     LogicalScopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext),
+                    TransientPayloads = evidence.DirectInput is not null,
                     Compositions = sequence?.Receipt?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>()
                 }, cancellationToken);
                 if (run.State != KnowledgeProjectionState.Succeeded)
@@ -478,6 +513,13 @@ public sealed class KnowledgeProjectionService(
         }
         return (result, issues);
     }
+
+    private static IReadOnlyList<KnowledgeProjectionInputEvidence> RetainedEvidence(IEnumerable<KnowledgeProjectionInputEvidence> values) =>
+        values.Select(value => value.DirectInput is null ? value : value with
+        {
+            AcquiredArtifacts = value.AcquiredArtifacts.Select(artifact => artifact with { ContentBase64 = null }).ToArray(),
+            PreparedArtifacts = value.PreparedArtifacts.Select(artifact => artifact with { ContentBase64 = null }).ToArray()
+        }).ToArray();
 
     private static ResolvedKnowledgeFlowBinding CompositionBinding(ResolvedFlowComposition plan, string contract) =>
         new(plan.Orchestration.ResourceId, plan.Orchestration.Namespace ?? ResourceNamespace.Default,
@@ -603,8 +645,13 @@ public sealed class KnowledgeProjectionService(
                     || prior.Value.CreatedAt == incoming.Value.CreatedAt && string.CompareOrdinal(prior.Value.Name, incoming.Value.Name) > 0))
                     return; // A late completion cannot displace a newer accepted projection.
             }
+            if (current?.Value.RetiringSnapshots.Contains(snapshot.Uid) == true || current?.Value.RetiredSnapshots.ContainsKey(snapshot.Uid) == true)
+                throw Error("knowledge_snapshot_content_retired", "The selected Snapshot content has been retired.");
             var observed = new KnowledgeSnapshotObservedResource
             {
+                RetiringSnapshots = current?.Value.RetiringSnapshots ?? [],
+                RetiredSnapshots = current?.Value.RetiredSnapshots ?? new Dictionary<Guid, DateTimeOffset>(),
+                RetirementPendingSnapshots = current?.Value.RetirementPendingSnapshots ?? [],
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = KnowledgeResourceKinds.KnowledgeSnapshotObservedState,
                 Metadata = new() { Name = name, Namespace = source.Namespace },

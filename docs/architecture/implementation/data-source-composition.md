@@ -313,3 +313,27 @@ are literal values. Resuming an accepted invocation retains its exact bindings a
 rejects substitution. The Designer exposes composition-point names, identity policy,
 input/output schemas and mapping; source editors expose declared points, published
 child version selection, parameter entry and reordering in English and French.
+
+## Independent content lifecycle
+
+Native datasets may explicitly opt into `lifecycle`: `allowDirect`, `timeToLive`,
+`keepHistory` and `historyRetention`. TTL/history require retained input Storage;
+no Storage requires explicit direct permission on the saved read-only Operation.
+Direct payloads cross acquisition, transformations and projection in bounded
+process-local memory. Persisted Flow/runtime records retain redacted metadata and
+opaque tickets, not the content. Restart or expiry refuses the accepted handoff.
+Only final Snapshot publication creates its retained output Artifact.
+
+Knowledge has its own optional `lifecycle`, including Snapshot TTL, history and
+`allowExpiredOnRefreshFailure`. Bindings independently permit an age-bounded stored
+input fallback after a failed refresh. Provenance identifies both the failed
+refresh and exact reused acquisition. Existing binding refresh settings remain
+applicable to datasets without the new lifecycle.
+
+History maintenance uses the existing recovery worker, current authorization,
+conditional retirement claims and exact provider checks. Running projections,
+native input/read leases and conservatively all nonterminal Workspace Flows defer
+retirement. Local providers remove exact content; remote ASP providers may use a
+verified conditional empty replacement when supported, otherwise cleanup remains
+pending. Immutable Snapshots and Artifact provenance remain visible after their
+bytes retire. See [ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).
