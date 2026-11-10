@@ -22,7 +22,7 @@ else
             <CollectionValue Label="@T("Version")">@item.Version</CollectionValue>
             <CollectionValue Label="@T("Updated")">@item.UpdatedAt.LocalDateTime.ToString("g")</CollectionValue>
         </Information>
-        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id})")"><a href="@DetailsUrl(item)">@T("Open")</a></CollectionActions></Actions>
+        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")"><a href="@DetailsUrl(item)">@T("Open")</a></CollectionActions></Actions>
     </CollectionView>
 }
 </div>

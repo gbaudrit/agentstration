@@ -14,7 +14,7 @@
 
 <ResourceToolbar Label="@T("AgentFilters")">
     <ChildContent>
-        <SearchBox Value="search" ValueChanged="value => search = value" Placeholder="@T("SearchAgentsPlaceholder")" Label="@T("SearchAgents")" />
+        <SearchBox Value="@search" ValueChanged="value => search = value" Placeholder="@T("SearchAgentsPlaceholder")" Label="@T("SearchAgents")" />
         <select @bind="status" aria-label="@T("FilterAgentStatus")"><option value="">@T("StatusAll")</option><option value="Accepted">@T("StatusValid")</option><option value="Deployed">@T("StatusDeployed")</option><option value="Failed">@T("StatusFailed")</option></select>
     </ChildContent>
     <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@(loading ? T("Refreshing") : T("Refresh"))</button></Actions>
@@ -45,10 +45,10 @@ else
             <CollectionValue Label="@T("Deployment")">@if (item.DeploymentUrl is not null) { <span class="agent-deployment-line"><a class="text-button" href="@item.DeploymentUrl">@item.DeploymentId</a><StatusBadge Text="@DeploymentStatusLabel(item.Runtime)" Status="@PlatformDashboardService.ToStatus(item.Runtime)" /></span> } else { <span>@DeploymentStatusLabel(item.Runtime)</span> }</CollectionValue>
             <CollectionValue Label="@T("LastActivity")">@LastActivity(item.LastActivity)</CollectionValue>
         </Information>
-        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id})")">
+        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")">
             <a href="@EditUrl(item)">@T("Open")</a>
-            @if (item.Namespace.IsDefault) { <a href="@RunUrl(item)">@T("Run")</a> }
-            @if (item.Namespace.IsDefault && !item.IsManaged && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <a href="@EditUrl(item)#definition">@T("EditDefinition")</a><PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">@T("Delete")</button></PermissionGate> }
+            @if (item.Namespace.IsDefault) { <PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a href="@RunUrl(item)">@T("Run")</a></PermissionGate> }
+            @if (item.Namespace.IsDefault && !item.IsManaged && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a href="@EditUrl(item)#definition">@T("EditDefinition")</a></PermissionGate><PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">@T("Delete")</button></PermissionGate> }
             <button type="button" @onclick="() => selected = item">@T("QuickInspect")</button>
         </CollectionActions></Actions>
     </CollectionView>

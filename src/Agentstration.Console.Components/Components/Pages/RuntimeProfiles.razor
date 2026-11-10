@@ -23,7 +23,7 @@ else
             <CollectionValue Label="@T("Streaming")">@StreamingLabel(profile.Properties.Execution.Streaming)</CollectionValue>
             <CollectionValue Label="@T("Usage")">@DeploymentCount(profile.UsageCount)</CollectionValue>
         </Information>
-        <Actions Context="profile"><CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name})")"><a href="@Url(profile)">@T("Open")</a></CollectionActions></Actions>
+        <Actions Context="profile"><CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name}, {profile.ScopeRef})")"><a href="@Url(profile)">@T("Open")</a></CollectionActions></Actions>
     </CollectionView>
 }
 

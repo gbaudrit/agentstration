@@ -12,7 +12,7 @@
 </PageHeader>
 
 <FilterBar>
-    <SearchBox Value="search" ValueChanged="SearchChanged" Placeholder="@T("SearchPlaceholder")" />
+    <SearchBox Value="@search" ValueChanged="SearchChanged" Placeholder="@T("SearchPlaceholder")" />
     <select @bind="providerFilter" aria-label="@T("FilterByProvider")"><option value="">@T("AllProviders")</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName</option> }</select>
     <select @bind="statusFilter" aria-label="@T("FilterByStatus")"><option value="">@T("AllStatuses")</option><option value="ready">@T("Status.Ready")</option><option value="providerUnavailable">@T("Status.ProviderUnavailable")</option><option value="modelUnavailable">@T("Status.ModelUnavailable")</option><option value="invalidConfiguration">@T("Status.InvalidConfiguration")</option><option value="unknown">@T("Status.Unknown")</option></select>
     <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("ApplyFilters")</button>
@@ -41,7 +41,7 @@ else
             <CollectionValue Label="@T("Model")"><code>@profile.Properties.Model.Name</code></CollectionValue>
             <CollectionValue Label="@T("Usage")">@(profile.Properties.UsageCount is { } count ? AgentCount(count) : "—")</CollectionValue>
         </Information>
-        <Actions Context="profile"><CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name})")">
+        <Actions Context="profile"><CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name}, {profile.ScopeRef})")">
             <a href="@DetailsUrl(profile)">@T("Open")</a>
             @if (!profile.IsManaged && ResourceOwnershipContext.CanManage(profile.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" @onclick="() => RequestDeleteAsync(profile)">@T("Delete")</button></PermissionGate> }
         </CollectionActions></Actions>
