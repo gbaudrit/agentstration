@@ -1,4 +1,5 @@
 export const Checkpoints = {
+  collections: { contract: 'collections-contract-verified' },
   organizationStructure: {
     instance: 'organization-structure-instance',
     tenantCreated: 'organization-structure-tenant-created',

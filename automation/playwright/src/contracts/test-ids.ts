@@ -1,4 +1,5 @@
 export const TestIds = {
+  toolCategories: { editor: 'resource-tool-category-editor', displayName: 'category-display-name' },
   common: {
     iconPicker: 'icon-picker',
     schemaInputEditor: 'schema-input-editor',

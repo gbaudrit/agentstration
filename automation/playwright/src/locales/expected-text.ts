@@ -299,3 +299,9 @@ export const OrganizationStructureTextByLocale = {
     openWorkspace: (name: string) => `Ouvrir l’espace de travail ${name}`,
   },
 } as const;
+
+/** Independent collection vocabulary; deliberately not derived from product RESX. */
+export const CollectionTextByLocale = {
+  'en-US': { scope: 'Owner scope', state: 'State', actions: 'Actions', unknown: 'Unknown', scopeTypes: ['Instance', 'Tenant', 'Workspace'] },
+  'fr-FR': { scope: 'Périmètre propriétaire', state: 'État', actions: 'Actions', unknown: 'Inconnu', scopeTypes: ['Instance', 'Tenant', 'Espace de travail'] },
+} as const;
