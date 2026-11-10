@@ -47,3 +47,11 @@ AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true npm run test:smoke -- tests/shared-forms.
 ```
 
 Le smoke CI complet exécute aussi les régressions existantes. Les cas Bootstrap et Pending nécessitent leurs fixtures isolées et sont ignorés quand des URL externes sont fournies. Les captures/checkpoints et les traces d’échec restent attachés aux résultats Playwright. Les résultats définitifs et liens CI sont consignés dans #1128 et la PR empilée.
+
+Les trois parcours `exercise-shared-form`, `exercise-form-adapter` et `exercise-form-workflow` sont aussi enregistrés pour le CLI de captures. Exemple, avec les navigateurs Playwright installés :
+
+```sh
+npm run capture -- --plan examples/shared-form.capture-plan.json --output /tmp/shared-form-capture
+```
+
+Les pages de compte et l’interaction en attente utilisent leurs spécifications dédiées, car elles nécessitent des options de fixture particulières.
