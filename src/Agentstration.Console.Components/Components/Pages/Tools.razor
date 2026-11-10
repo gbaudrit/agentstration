@@ -48,7 +48,7 @@ else
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { var toolsTask = Client.GetToolsAsync(); var providersTask = Client.GetProvidersAsync(default); await Task.WhenAll(toolsTask, providersTask); tools = toolsTask.Result; providers = providersTask.Result; if (Services.GetService<IExtensionsClient>() is { } client) extensions = await client.GetExtensionInventoryAsync(default); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
+    private async Task LoadAsync() { loading = true; error = null; try { var toolsTask = Client.GetToolsAsync(); var providersTask = Client.GetProvidersAsync(default); await Task.WhenAll(toolsTask, providersTask); tools = toolsTask.Result; providers = providersTask.Result; if (Services.GetService<IExtensionsClient>() is { } client) extensions = await client.GetExtensionInventoryAsync(default); page = Math.Clamp(page, 1, Math.Max(1, (FilteredTools.Count + 19) / 20)); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
     private string ProviderDisplayName(ToolResource tool)
     {
         return ManagingExtension(tool)?.DisplayName ?? providers.FirstOrDefault(value =>

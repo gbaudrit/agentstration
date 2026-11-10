@@ -129,5 +129,17 @@
       "url": "https://github.com/gbaudrit/agentstration/issues/1097",
       "title": "Consolidate collection filtering, paging and result states"
     }
+  ],
+  "pullRequests": [
+    {
+      "number": 1107,
+      "url": "https://github.com/gbaudrit/agentstration/pull/1107",
+      "scope": "foundations"
+    },
+    {
+      "number": 1108,
+      "url": "https://github.com/gbaudrit/agentstration/pull/1108",
+      "scope": "initial pilot adoption"
+    }
   ]
 }

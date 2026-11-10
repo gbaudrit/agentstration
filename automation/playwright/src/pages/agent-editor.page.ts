@@ -31,6 +31,7 @@ export class AgentEditorPage {
       { waitUntil: 'domcontentloaded' },
     );
     if (!response?.ok()) throw new Error(`Agent page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
     await this.openEdit();
     await this.form.waitFor({ state: 'visible' });
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
@@ -65,6 +66,7 @@ export class AgentEditorPage {
       this.page.waitForURL(url => url.pathname === `/agents/${encodeURIComponent(name)}`),
       this.page.getByTestId(TestIds.agentEditor.createAndDeploy).click(),
     ]);
+    await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
     await this.openEdit();
     await this.page.getByTestId(TestIds.agentEditor.form).waitFor({ state: 'visible' });
     await expect(this.form).toHaveAttribute('data-interactive', 'true');

@@ -199,12 +199,14 @@ else
     [Parameter] public string? Name { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? AgentNamespace { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "context")] public string? ContextScopeRef { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
 
     private readonly CancellationTokenSource cancellation = new();
+    private string? loadedKey;
     private AgentEditorModel? model;
     private AgentResource? savedResource;
     private bool overviewMode;
@@ -279,6 +281,10 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        var contextScope = ContextScopeRef ?? ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? ScopeRefValue;
+        var key = $"{AgentResourceNamespace.Value}|{Name}|{ScopeRefValue ?? contextScope}|{contextScope}";
+        if (loadedKey == key) return;
+        loadedKey = key;
         loading = true;
         errorMessage = null;
         try

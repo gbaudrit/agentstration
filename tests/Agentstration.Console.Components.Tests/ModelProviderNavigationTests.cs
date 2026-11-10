@@ -27,6 +27,32 @@ public sealed partial class ModelProviderNavigationTests
     private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Guid.Parse("b07e7249-b525-4c32-a7bb-5e805fc768e7"));
 
     [TestMethod]
+    public async Task LeavingModelProfileDuringUsageLoadingCancelsTheRemainingLoad()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(out _);
+        var response = new TaskCompletionSource<ModelProfileUsagesResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var profiles = new ExistingModelProfilesClient { PendingUsages = response.Task };
+        context.Services.AddSingleton<IModelProfilesClient>(profiles);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance");
+        var rendered = context.Render<ObservedModelProfileEditor>(parameters => parameters
+            .Add(value => value.Name, "shared-reasoning"));
+        var completion = rendered.Instance.ParameterCompletion;
+        Assert.IsFalse(completion.IsCompleted);
+        await context.DisposeComponentsAsync();
+        response.SetResult(new([], 0));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => completion);
+        Assert.IsNull(profiles.RequestedResolutionContextScope);
+    }
+
+    private sealed class ObservedModelProfileEditor : ModelProfileEditor
+    {
+        public Task ParameterCompletion { get; private set; } = Task.CompletedTask;
+        protected override Task OnParametersSetAsync() => ParameterCompletion = base.OnParametersSetAsync();
+    }
+
+    [TestMethod]
     public void ProviderDetailsOffersModelProfileCreationWithProviderContext()
     {
         using var culture = new TestCultureScope("en-US");
@@ -786,6 +812,7 @@ public sealed partial class ModelProviderNavigationTests
 
     private sealed class ExistingModelProfilesClient(bool hasUsages = true) : IModelProfilesClient
     {
+        public Task<ModelProfileUsagesResponse>? PendingUsages { get; init; }
         public ResourceScopeRef? RequestedProfileContextScope { get; private set; }
         public ResourceScopeRef? RequestedUsageContextScope { get; private set; }
         public ResourceScopeRef? RequestedResolutionContextScope { get; private set; }
@@ -829,7 +856,7 @@ public sealed partial class ModelProviderNavigationTests
 
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
             string profileName,
-            CancellationToken cancellationToken) => Task.FromResult(hasUsages
+            CancellationToken cancellationToken) => PendingUsages ?? Task.FromResult(hasUsages
                 ? Usages
                 : new ModelProfileUsagesResponse([], 0));
 

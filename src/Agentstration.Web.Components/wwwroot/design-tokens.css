@@ -340,6 +340,8 @@
 .app-shell .clearable-field > :is(input,textarea,select) { width: 100%; min-width: 0; padding-right: calc(var(--form-action-size) + var(--space-3)); }
 .field-clear { position: absolute; right: var(--space-1); top: 50%; transform: translateY(-50%); min-width: 34px; min-height: 34px; display: grid; place-items: center; border: 0; border-radius: var(--form-radius); background: transparent; color: var(--muted); font-size: 1.25rem; cursor: pointer; }
 .clearable-multiline .field-clear { top: var(--space-1); transform: none; }
+.app-shell .clearable-field > :is(select,input[type="number"]) { padding-right: calc(var(--form-action-size) + var(--space-8)); }
+.clearable-field > :is(select,input[type="number"]) + .field-clear { right: var(--space-6); }
 .field-clear:hover { color: var(--text); background: var(--surface); }
 .field-clear:focus-visible { outline: 2px solid var(--form-focus-color); outline-offset: -2px; }
 fieldset:disabled .field-clear { display: none; }

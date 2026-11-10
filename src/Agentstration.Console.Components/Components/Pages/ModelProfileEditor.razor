@@ -235,6 +235,9 @@ else
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
     private readonly CancellationTokenSource cancellation = new();
+    private readonly CancellationToken lifetimeToken;
+    private bool disposed;
+    public ModelProfileEditor() => lifetimeToken = cancellation.Token;
     private ModelProfileEditorModel? model; private ModelProfileResource? resource; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private string usageSearch = string.Empty;
     private readonly List<string?> usageCursors = [null];
@@ -318,24 +321,25 @@ else
             else
             {
                 var snapshot = RequestedScope is { } requestedScope && RequestedContext is { } requestedContext
-                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, requestedScope, requestedContext, cancellation.Token)
+                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, requestedScope, requestedContext, lifetimeToken)
                     : RequestedScope is { } exactScope
-                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, exactScope, cancellation.Token)
-                    : await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
+                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, exactScope, lifetimeToken)
+                    : await Client.GetModelProfileAsync(SelectedNamespace, Name!, lifetimeToken);
                 resource = snapshot.Value; model = ModelProfileEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag;
                 if (activeTab == ModelProfileTab.Access && !CanManage) activeTab = ModelProfileTab.Definition;
                 await LoadUsagePageAsync(true);
+                lifetimeToken.ThrowIfCancellationRequested();
                 resolution = selectedScope is { } resolutionScope && RequestedContext is { } resolutionContext
-                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, resolutionScope, resolutionContext, cancellation.Token)
+                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, resolutionScope, resolutionContext, lifetimeToken)
                     : selectedScope is { } exactResolutionScope
-                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, exactResolutionScope, cancellation.Token)
-                    : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
+                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, exactResolutionScope, lifetimeToken)
+                    : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, lifetimeToken);
             }
             var dependencyScope = selectedScope ?? RequestedContext;
             providers = dependencyScope is { } consumerScope
-                ? await ProvidersClient.GetModelProvidersAsync(consumerScope, cancellation.Token)
-                : await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
-            extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
+                ? await ProvidersClient.GetModelProvidersAsync(consumerScope, lifetimeToken)
+                : await ProvidersClient.GetModelProvidersAsync(lifetimeToken);
+            extensions = await ExtensionsClient.GetExtensionsAsync(lifetimeToken);
             if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
             ConfigureOptionEditor();
         }
@@ -352,11 +356,12 @@ else
     }
     private async Task LoadUsagePageAsync(bool reset)
     {
+        if (disposed) return;
         if (IsNew) return;
         if (reset) { usagePage = 0; usageCursors.Clear(); usageCursors.Add(null); usageNextCursor = null; usageTotal = null; }
         var version = ++usageVersion;
         pendingUsage?.Cancel(); pendingUsage?.Dispose();
-        var currentRequest = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+        var currentRequest = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken);
         pendingUsage = currentRequest;
         usageLoading = true; usageError = null;
         try
@@ -390,8 +395,8 @@ else
         {
             var dependencyScope = selectedScope ?? RequestedContext;
             models = dependencyScope is { } consumerScope
-                ? await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, consumerScope, cancellation.Token)
-                : await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, cancellation.Token);
+                ? await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, consumerScope, lifetimeToken)
+                : await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, lifetimeToken);
         }
         catch (AgentstrationApiException exception) { warning = T("ModelsCannotBeDiscovered", exception.Message); }
         finally { loadingModels = false; }
@@ -403,8 +408,8 @@ else
         {
             if (!rawOptions && optionEditor?.CanGuide == true) model.ProviderOptionsJson = optionEditor.ToProviderOptionsJson();
             ResourceSnapshot<ModelProfileResource> snapshot = IsNew
-                ? await Client.CreateModelProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token)
-                : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, model.ToPutRequest(), etag!, cancellation.Token);
+                ? await Client.CreateModelProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, lifetimeToken)
+                : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, model.ToPutRequest(), etag!, lifetimeToken);
             resource = snapshot.Value; model = ModelProfileEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef;
             savedFingerprint = Fingerprint;
             etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
@@ -420,10 +425,10 @@ else
         try
         {
             resolution = selectedScope is { } scope && CurrentContext is { } currentContext
-                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, scope, currentContext, cancellation.Token)
+                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, scope, currentContext, lifetimeToken)
                 : selectedScope is { } exactScope
-                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, exactScope, cancellation.Token)
-                : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
+                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, exactScope, lifetimeToken)
+                : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, lifetimeToken);
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { diagnosing = false; }
@@ -432,7 +437,7 @@ else
     private async Task DeleteAsync()
     {
         if (!CanManage || model is null || etag is null) return; confirmDelete = false;
-        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), model.Name, DateTimeOffset.Now, UiStatus.Success)); savedFingerprint = Fingerprint; invalidInput = false; Navigation.NavigateTo("/modelprofiles"); }
+        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, etag, lifetimeToken); Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), model.Name, DateTimeOffset.Now, UiStatus.Success)); savedFingerprint = Fingerprint; invalidInput = false; Navigation.NavigateTo("/modelprofiles"); }
         catch (AgentstrationApiException exception) { error = exception; }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
@@ -517,7 +522,7 @@ else
     private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
     private static string DetailsUrl(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef) =>
         ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(@namespace, ModelResourceKinds.ModelProfile, name), scopeRef);
-    public void Dispose() { pendingUsage?.Cancel(); cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { if (disposed) return; disposed = true; usageVersion++; pendingUsage?.Cancel(); cancellation.Cancel(); cancellation.Dispose(); }
 
     private enum ModelProfileTab { Definition, Overview, Access, Usages, Yaml }
 }

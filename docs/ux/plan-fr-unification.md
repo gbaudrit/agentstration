@@ -98,4 +98,6 @@ Les relations natives parent/enfant sont vérifiées. Les scénarios #1098 à #1
 
 ## Livraison initiale
 
+Socle : [PR #1107](https://github.com/gbaudrit/agentstration/pull/1107). Écrans pilotes et validation : [PR #1108](https://github.com/gbaudrit/agentstration/pull/1108).
+
 Le socle et les écrans pilotes sont implémentés sur la branche d’intégration. Consulter la [matrice d’adoption et des reports](adoption-des-composants.md), les [contrats des composants et des thèmes](component-contracts.md) et le [compte rendu de validation avec captures](validation-implementation.md). Les thèmes nommés restent une capacité future, distincte de l’apparence clair/sombre/système déjà disponible. Les FR restent ouvertes pour le suivi des scénarios et de la validation UX.
