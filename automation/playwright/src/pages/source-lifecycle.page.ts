@@ -89,7 +89,7 @@ export class SourceLifecyclePage {
     // Return through the acquisition history link, as an operator would.
     await this.openSource(consoleUrl, name, 'acquisitions');
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitionRow)
-      .filter({ hasText: acquisition.flowRunId }).getByRole('link').click();
+      .filter({ hasText: acquisition.flowRunId }).locator('.resource-name-link').click();
     await expect(this.page.getByTestId(TestIds.flowObservability.runDetails)).toBeVisible();
     const summary = this.page.getByTestId(TestIds.sourceLifecycle.runError);
     await expect(summary).toContainText('acquisition_failed');

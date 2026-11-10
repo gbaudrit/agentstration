@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/tools/categories"
 @inject IToolCategoriesClient Categories
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolCategoriesStrings> Localizer
@@ -38,5 +39,5 @@ else
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
     }
-    private static string CategoryUrl(ToolCategoryResource value) => ConsoleResourceUrls.Resource("/tools/categories", value.Name, value.Namespace, value.ScopeRef);
+    private string CategoryUrl(ToolCategoryResource value) => ResourceOwnershipContext.Resource(Services, "/tools/categories", value.Name, value.Namespace, value.ScopeRef);
 }

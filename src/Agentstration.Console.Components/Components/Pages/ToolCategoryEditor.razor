@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/tools/categories/new"
 @page "/tools/categories/{Name}"
 @inject IToolCategoriesClient Categories
@@ -31,12 +32,15 @@ else
                 <section class="tool-category-provider" data-provider="@ProviderKey(group)">
                     <header class="tool-category-provider-header">
                         <div class="tool-category-provider-identity">
-                            <span class="tool-category-provider-icon" aria-hidden="true"><TablerIcon Name="server" /></span>
-                            <span><small>@ProviderKind(group)</small><strong>@ProviderDisplayName(group)</strong><code>@ProviderTechnicalName(group)</code></span>
+                            @if (group.Provider is { } provider)
+                            {
+                                <div><CollectionIdentity DisplayName="@ProviderDisplayName(group)" Namespace="@provider.Namespace.Value" Name="@provider.Name" Href="@ProviderUrl(provider)" IconName="server"><Badges><ManagedResourceBadge IsManaged="@provider.Governance.IsManaged" /></Badges></CollectionIdentity><ResourceScopeBadge ScopeRef="provider.ScopeRef" /><small>@ProviderKind(group)</small></div>
+                            }
+                            else { <strong>@ProviderDisplayName(group)</strong> }
                         </div>
                         <div class="tool-category-provider-summary">
                             <span><strong>@SelectedCount(group)</strong> @T("SelectedOf", group.Tools.Count)</span>
-                            @if (group.Provider is not null) { <a href="@ProviderUrl(group.Provider)">@T("OpenProvider")</a> }
+                            @if (group.Provider is not null) { <CollectionActions ResourceName="@($"{group.Provider.Namespace}/{group.Provider.Name}, {group.Provider.ScopeRef}")"><a href="@ProviderUrl(group.Provider)">@T("OpenProvider")</a></CollectionActions> }
                         </div>
                     </header>
                     @if (group.Tools.Count == 0)
@@ -211,8 +215,8 @@ else
         && (reference.ScopeRef ?? tool.ScopeRef) == provider.ScopeRef;
     private static string ToolKey(ToolResource tool) => $"{tool.ScopeRef?.Value}|{tool.Namespace.Value}|{tool.Name}";
     private static string ReferenceKey(ResourceReference reference) => $"{reference.ScopeRef?.Value}|{(reference.Namespace ?? ResourceNamespace.Default).Value}|{reference.Name}";
-    private static string ToolUrl(ToolResource value) => ConsoleResourceUrls.Resource("/tools", value.Name, value.Namespace, value.ScopeRef);
-    private static string ProviderUrl(ToolProviderResource value) => ConsoleResourceUrls.Resource("/tools/providers", value.Name, value.Namespace, value.ScopeRef);
+    private string ToolUrl(ToolResource value) => ResourceOwnershipContext.Resource(Services, "/tools", value.Name, value.Namespace, value.ScopeRef);
+    private string ProviderUrl(ToolProviderResource value) => ResourceOwnershipContext.Resource(Services, "/tools/providers", value.Name, value.Namespace, value.ScopeRef);
     private static string ToolInputId(string name) => $"category-tool-{Uri.EscapeDataString(name)}";
     private sealed record ProviderToolGroup(ToolProviderResource? Provider, IReadOnlyList<ToolResource> Tools);
 }

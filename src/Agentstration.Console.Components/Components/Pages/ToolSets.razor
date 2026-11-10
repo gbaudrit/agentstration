@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/tools/sets"
 @inject IToolSetsClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolSetsStrings> Localizer
@@ -44,5 +45,5 @@ else
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
     }
-    private static string DetailsUrl(ToolSetResource value) => ConsoleResourceUrls.Resource("/tools/sets", value.Name, value.Namespace, value.ScopeRef);
+    private string DetailsUrl(ToolSetResource value) => ResourceOwnershipContext.Resource(Services, "/tools/sets", value.Name, value.Namespace, value.ScopeRef);
 }

@@ -60,11 +60,11 @@ public static class ConsoleResourceUrls
         return Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(url, additions);
     }
 
-    public static string Resource(string collection, string name, ResourceNamespace @namespace, ResourceScopeRef? scopeRef)
+    public static string Resource(string collection, string name, ResourceNamespace @namespace, ResourceScopeRef? scopeRef, ResourceScopeRef? contextScopeRef = null)
     {
         var path = $"{collection}/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
         return scopeRef is { } owner
-            ? $"{path}&scopeRef={Uri.EscapeDataString(owner.Value)}&context={Uri.EscapeDataString(owner.Value)}"
+            ? $"{path}&scopeRef={Uri.EscapeDataString(owner.Value)}&context={Uri.EscapeDataString((contextScopeRef ?? owner).Value)}"
             : path;
     }
 
