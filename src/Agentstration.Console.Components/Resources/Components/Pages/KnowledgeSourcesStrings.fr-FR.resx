@@ -131,4 +131,7 @@
   <data name="DataSourceOwnsFreshness" xml:space="preserve"><value>Cette Data Source fixe la fraîcheur des acquisitions et leur rafraîchissement. Le plafond de repli s’applique uniquement après un échec de rafraîchissement.</value></data>
   <data name="SnapshotState.Retired" xml:space="preserve"><value>Retiré</value></data>
   <data name="SnapshotState.Retiring" xml:space="preserve"><value>Retrait en attente</value></data>
+  <data name="DirectInput" xml:space="preserve"><value>Entrée directe</value></data>
+  <data name="InputFallbackUsed" xml:space="preserve"><value>Ancienne acquisition utilisée</value></data>
+  <data name="InputRefreshFailed" xml:space="preserve"><value>Échec du rafraîchissement :</value></data>
 </root>

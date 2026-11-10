@@ -131,4 +131,7 @@
   <data name="DataSourceOwnsFreshness" xml:space="preserve"><value>This Data Source controls acquisition freshness and refresh. The fallback ceiling only applies after a failed refresh.</value></data>
   <data name="SnapshotState.Retired" xml:space="preserve"><value>Retired</value></data>
   <data name="SnapshotState.Retiring" xml:space="preserve"><value>Retirement pending</value></data>
+  <data name="DirectInput" xml:space="preserve"><value>Direct input</value></data>
+  <data name="InputFallbackUsed" xml:space="preserve"><value>Older acquisition used</value></data>
+  <data name="InputRefreshFailed" xml:space="preserve"><value>Refresh failed:</value></data>
 </root>
