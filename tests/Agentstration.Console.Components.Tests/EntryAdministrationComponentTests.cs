@@ -432,6 +432,32 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("/settings/organization/structure", rendered.Find("a.button-primary").GetAttribute("href"));
     }
 
+    [TestMethod]
+    public void ClearingDescriptionKeepsTheSelectedBindingAndDoesNotPublishOrSaveImplicitly()
+    {
+        using var context = CreateContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var editor = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "prepare-report"));
+        editor.WaitForElement("[data-testid='entry-tab-definition']").Click();
+        editor.Find("[data-testid='entry-description']").Input("Unsaved description");
+        var selected = editor.Find("[data-testid='target-resource']").GetAttribute("value");
+        var description = editor.Find("[data-testid='entry-description']");
+        var field = description.Closest(".form-field")!;
+        Assert.AreEqual(description.Id, field.QuerySelector("label")!.GetAttribute("for"));
+        field.QuerySelector(".field-clear")!.Click();
+
+        Assert.AreEqual(string.Empty, editor.Find("[data-testid='entry-description']").GetAttribute("value"));
+        Assert.AreEqual(selected, editor.Find("[data-testid='target-resource']").GetAttribute("value"));
+        Assert.IsNull(client.SavedEntry);
+        editor.Find("[data-testid='entry-save-draft']").Click();
+        editor.WaitForAssertion(() => Assert.IsNotNull(client.SavedEntry));
+        var saved = client.SavedEntry;
+        Assert.IsNotNull(saved);
+        Assert.IsNull(saved.Description);
+    }
+
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
 
     private static BunitContext CreateContext()

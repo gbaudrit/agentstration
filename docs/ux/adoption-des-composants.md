@@ -58,3 +58,10 @@ Le comportement de sauvegarde reste dans chaque famille. Le socle ne devient ni 
 - Les défauts indépendants de l’audit gardent leur suivi propre ; cette matrice ne les présente pas tous comme corrigés.
 
 Voir les [contrats techniques](component-contracts.md), le [plan et les tickets](plan-fr-unification.md) et la [maquette de référence](maquette-ecran-type.md).
+
+
+## Formulaires complémentaires — #1124
+
+La livraison complémentaire [#1124](https://github.com/gbaudrit/agentstration/issues/1124) étend les champs communs à neuf éditeurs : Secrets, Coffres, fournisseurs d’outils, catégories d’outils, Sources de données, Profils de source de données, Sources de connaissances, Entrées et Schémas. Elle porte sur les champs ordinaires et leurs associations label/aide/validation ; elle conserve les commandes et éditeurs spécialisés de chaque famille.
+
+La [matrice détaillée et les captures](formulaires-complementaires/README.md) distinguent cette adoption des champs d’une refonte complète des fiches. Les listes restent suivies séparément dans #1121 ; les écrans d’administration, les formulaires de registres de Sources et les autres surfaces reportées ci-dessus conservent leur disposition. Le nouveau scénario réutilisable #1125 attend la validation UX explicite et la fusion de la PR d’implémentation.

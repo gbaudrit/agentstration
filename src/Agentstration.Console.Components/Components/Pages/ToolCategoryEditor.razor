@@ -18,13 +18,13 @@ else
         <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Details")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("MemberCount", selected.Count)" Status="UiStatus.Info" /> }</div>
         <div class="form-grid">
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" DisplayNameTestId="category-display-name" TechnicalNameTestId="category-name" />
-            <label class="form-span-2"><span>@T("CategoryDescription")</span><textarea @bind="description" rows="3"></textarea></label>
+            <FormField Label="@T("CategoryDescription")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" rows="3"></ClearableText></FormField>
             <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolCategory" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
         </div>
     </section>
 
     <section class="panel form-section">
-        <div class="panel-header tool-category-members-header"><div><p class="eyebrow">@T("Membership")</p><h2>@T("ChooseTools")</h2><p>@T("MembershipHelp")</p></div><label class="tool-category-search"><span aria-hidden="true"><TablerIcon Name="search" /></span><span class="sr-only">@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("SearchPlaceholder")" /></label></div>
+        <div class="panel-header tool-category-members-header"><div><p class="eyebrow">@T("Membership")</p><h2>@T("ChooseTools")</h2><p>@T("MembershipHelp")</p></div><div class="tool-category-search"><SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" Label="@T("Search")" /></div></div>
         <div class="tool-category-provider-list" data-testid="category-members">
             @foreach (var group in ProviderGroups)
             {

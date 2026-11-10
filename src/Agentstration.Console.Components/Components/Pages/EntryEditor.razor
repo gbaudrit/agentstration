@@ -118,7 +118,7 @@ else
                 <div class="form-grid">
                     <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="resourceName" Policy="ResourceNamePolicy.Entry" IsNew="@IsNew" DisplayNameTestId="entry-display-name" TechnicalNameTestId="entry-name" />
                     <ResourceScopeFormField ResourceKind="@EntryResourceKinds.Entry" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-                    <label class="form-span-2"><span>@T("Description")</span><textarea @bind="description" rows="2" data-testid="entry-description"></textarea></label>
+                    <FormField Label="@T("Description")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" rows="2" data-testid="entry-description"></ClearableText></FormField>
                 </div>
             </section>
 
@@ -146,8 +146,8 @@ else
             <section class="panel form-section" data-testid="entry-appearance-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Presentation")</p><h2>@T("WorkplaceAppearance")</h2></div></div>
                 <div class="form-grid">
-                <label><span>@T("Presentation")</span><select data-testid="presentation-kind" @bind="presentationKind"><option value="Prompt">@T("Presentation.Prompt")</option><option value="Form">@T("Presentation.Form")</option></select></label>
-                <label><span>@T("Placeholder")</span><input @bind="placeholder" data-testid="entry-placeholder" /></label>
+                <FormField Label="@T("Presentation")"><ClearableSelect TValue="EntryPresentationKind" data-testid="presentation-kind" @bind-Value="presentationKind"><option value="Prompt">@T("Presentation.Prompt")</option><option value="Form">@T("Presentation.Form")</option></ClearableSelect></FormField>
+                <FormField Label="@T("Placeholder")"><ClearableText @bind-Value="placeholder" data-testid="entry-placeholder" /></FormField>
                 <div class="form-span-2">
                     <IconPicker @bind-Value="icon"
                                 SelectedLabel="@T("SelectedIcon")"
@@ -167,10 +167,10 @@ else
             <section class="panel form-section" data-testid="entry-interaction-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("ExecutionExperience")</p><h2>@T("InteractionPresentation")</h2><p>@T("InteractionHelp")</p></div></div>
                 <div class="form-grid">
-                    <label><span>@T("AgentIdentities")</span><select data-testid="participants-visibility" @bind="participantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@EnumLabel("Participants", value)</option> }</select><small>@T("ParticipantVisibilityHelp")</small></label>
-                    <label><span>@T("Progress")</span><select data-testid="progress-visibility" @bind="progressVisibility">@foreach (var value in Enum.GetValues<EntryProgressVisibility>()) { <option value="@value">@EnumLabel("Progress", value)</option> }</select></label>
-                    <label><span>@T("Task")</span><select data-testid="task-display" @bind="taskDisplay">@foreach (var value in Enum.GetValues<EntryTaskDisplay>()) { <option value="@value">@EnumLabel("TaskDisplay", value)</option> }</select></label>
-                    <label><span>@T("Results")</span><select data-testid="results-display" @bind="resultDisplay">@foreach (var value in Enum.GetValues<EntryResultDisplay>()) { <option value="@value">@EnumLabel("ResultDisplay", value)</option> }</select></label>
+                    <FormField Label="@T("AgentIdentities")" Help="@T("ParticipantVisibilityHelp")"><ClearableSelect TValue="EntryParticipantVisibility" data-testid="participants-visibility" @bind-Value="participantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@EnumLabel("Participants", value)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("Progress")"><ClearableSelect TValue="EntryProgressVisibility" data-testid="progress-visibility" @bind-Value="progressVisibility">@foreach (var value in Enum.GetValues<EntryProgressVisibility>()) { <option value="@value">@EnumLabel("Progress", value)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("Task")"><ClearableSelect TValue="EntryTaskDisplay" data-testid="task-display" @bind-Value="taskDisplay">@foreach (var value in Enum.GetValues<EntryTaskDisplay>()) { <option value="@value">@EnumLabel("TaskDisplay", value)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("Results")"><ClearableSelect TValue="EntryResultDisplay" data-testid="results-display" @bind-Value="resultDisplay">@foreach (var value in Enum.GetValues<EntryResultDisplay>()) { <option value="@value">@EnumLabel("ResultDisplay", value)</option> }</ClearableSelect></FormField>
                 </div>
             </section>
 
@@ -183,12 +183,12 @@ else
                             <article class="entry-field-card" @key="field" data-testid="entry-field-card" data-field-index="@index">
                             <header><div><strong>@FieldTitle(field)</strong><span>@EnumLabel("FieldType", field.Type)</span></div>@if (field.Primary) { <StatusBadge Text="@T("PrimaryInput")" Status="UiStatus.Info" /> }</header>
                             <div class="form-grid">
-                                <label><span>@T("Name")</span><input @bind="field.Name" data-testid="entry-field-name" /></label>
-                                <label><span>@T("Label")</span><input @bind="field.Label" data-testid="entry-field-label" /></label>
-                                <label><span>@T("Description")</span><input @bind="field.Description" data-testid="entry-field-description" /></label>
-                                <label><span>@T("Placeholder")</span><input @bind="field.Placeholder" data-testid="entry-field-placeholder" /></label>
-                                <label><span>@T("Type")</span><select @bind="field.Type" data-testid="entry-field-type">@foreach (var type in Enum.GetValues<EntryFieldType>()) { <option value="@type">@EnumLabel("FieldType", type)</option> }</select></label>
-                                @if (field.Type is EntryFieldType.Choice or EntryFieldType.MultiChoice) { <label><span>@T("OptionsValueLabel")</span><input @bind="field.Options" /></label> }
+                                <FormField Label="@T("Name")"><ClearableText @bind-Value="field.Name" data-testid="entry-field-name" /></FormField>
+                                <FormField Label="@T("Label")"><ClearableText @bind-Value="field.Label" data-testid="entry-field-label" /></FormField>
+                                <FormField Label="@T("Description")" Optional="true"><ClearableText @bind-Value="field.Description" data-testid="entry-field-description" /></FormField>
+                                <FormField Label="@T("Placeholder")"><ClearableText @bind-Value="field.Placeholder" data-testid="entry-field-placeholder" /></FormField>
+                                <FormField Label="@T("Type")"><ClearableSelect TValue="EntryFieldType" @bind-Value="field.Type" data-testid="entry-field-type">@foreach (var type in Enum.GetValues<EntryFieldType>()) { <option value="@type">@EnumLabel("FieldType", type)</option> }</ClearableSelect></FormField>
+                                @if (field.Type is EntryFieldType.Choice or EntryFieldType.MultiChoice) { <FormField Label="@T("OptionsValueLabel")"><ClearableText @bind-Value="field.Options" /></FormField> }
                                 <div class="entry-toggle-group">
                                     <label class="entry-toggle"><input type="checkbox" @bind="field.Required" data-testid="entry-field-required" /><span>@T("Required")</span></label>
                                     <label class="entry-toggle"><input type="radio" name="primary-input" checked="@field.Primary" @onclick="() => SetPrimary(field)" data-testid="entry-field-primary" /><span>@T("PrimaryInput")</span></label>
@@ -207,8 +207,8 @@ else
             <section class="panel form-section" data-testid="entry-binding-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Execution")</p><h2>@T("BindingAndResolvedTarget")</h2></div></div>
                 <div class="form-grid">
-                    <label><span>@T("TargetKind")</span><select data-testid="target-kind" value="@bindingKind" @onchange="BindingKindChanged"><option value="Agent">@T("Binding.Agent")</option><option value="Flow">@T("Flow")</option></select></label>
-                    <label><span>@T("TargetResource")</span><select data-testid="target-resource" @bind="resourceId"><option value="">@T("SelectTarget", EnumLabel("Binding", bindingKind))</option>@foreach (var resource in resources) { <option value="@ResourceKey(resource)">@resource.Name · @resource.ScopeRef · @resource.Namespace · @resource.Version · @resource.State</option> }</select></label>
+                    <FormField Label="@T("TargetKind")"><ClearableSelect TValue="EntryBindingKind" data-testid="target-kind" Value="@bindingKind" ValueExpression="@(() => bindingKind)" ValueChanged="value => BindingKindChanged(new ChangeEventArgs { Value = value })"><option value="Agent">@T("Binding.Agent")</option><option value="Flow">@T("Flow")</option></ClearableSelect></FormField>
+                    <FormField Label="@T("TargetResource")"><ClearableSelect TValue="string" data-testid="target-resource" @bind-Value="resourceId"><option value="">@T("SelectTarget", EnumLabel("Binding", bindingKind))</option>@foreach (var resource in resources) { <option value="@ResourceKey(resource)">@resource.Name · @resource.ScopeRef · @resource.Namespace · @resource.Version · @resource.State</option> }</ClearableSelect></FormField>
                 </div>
                 @if (bindingKind == EntryBindingKind.Agent) { <p class="resource-hint">@T("DirectAgentFlowHelp")</p> }
                 <div class="entry-resolution-grid">
@@ -220,7 +220,7 @@ else
             <section class="panel form-section" data-testid="entry-behavior-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Behavior")</p><h2>@T("ConversationAndExecution")</h2></div></div>
                 <div class="entry-behavior-layout">
-                    <label><span>@T("TaskCreation")</span><select @bind="taskMode" data-testid="entry-task-mode"><option value="Automatic">@T("TaskCreation.Automatic")</option><option value="OnDemand">@T("TaskCreation.OnDemand")</option><option value="Never">@T("TaskCreation.Never")</option></select></label>
+                    <FormField Label="@T("TaskCreation")"><ClearableSelect TValue="TaskCreationMode" @bind-Value="taskMode" data-testid="entry-task-mode"><option value="Automatic">@T("TaskCreation.Automatic")</option><option value="OnDemand">@T("TaskCreation.OnDemand")</option><option value="Never">@T("TaskCreation.Never")</option></ClearableSelect></FormField>
                     <div class="entry-toggle-list">
                         <label class="entry-toggle"><input type="checkbox" @bind="allowConversation" data-testid="entry-allow-conversation" /><span><strong>@T("AllowConversation")</strong><small>@T("AllowConversationHelp")</small></span></label>
                         <label class="entry-toggle"><input type="checkbox" @bind="streamResponse" data-testid="entry-stream-response" /><span><strong>@T("StreamResponse")</strong><small>@T("StreamResponseHelp")</small></span></label>
@@ -238,8 +238,8 @@ else
                         {
                             <article class="entry-suggestion-card" @key="suggestion" data-testid="entry-suggestion-card">
                                 <div class="form-grid entry-suggestion-form">
-                                    <label class="entry-suggestion-label"><span>@T("Label")</span><input @bind="suggestion.Label" data-testid="entry-suggestion-label" /></label>
-                                    <label class="entry-suggestion-value"><span>@T("Value")</span><textarea @bind="suggestion.Value" rows="3" data-testid="entry-suggestion-value"></textarea></label>
+                                    <FormField Label="@T("Label")" Class="entry-suggestion-label"><ClearableText @bind-Value="suggestion.Label" data-testid="entry-suggestion-label" /></FormField>
+                                    <FormField Label="@T("Value")" Class="entry-suggestion-value"><ClearableText Multiline="true" @bind-Value="suggestion.Value" rows="3" data-testid="entry-suggestion-value"></ClearableText></FormField>
                                     <div class="entry-suggestion-actions">
                                         <button type="button"
                                                 class="button-danger entry-suggestion-remove"
