@@ -69,6 +69,8 @@ The Agent Definition tab groups Identity, Behavior, Model, Execution and Labels.
 
 The existing `ResourceAccessPanel` puts permissions ahead of collapsible identity/governance details. It searches the authorized target inventory, renders at most 50 matching options with an honest count, and keeps exact scope coordinates. This bounds the selector rendering, not the existing inventory API. Discover/use/propagation remain independent rights with existing domain validation. Cancel restores the last loaded/saved policy without calling the API; saves preserve the ETag contract and read-only permissions.
 
+A selected target is a pending grant and enables Save without a separate add step. Saving includes the validated pending grant together with listed changes. “Add to list” optionally prepares a batch; “Cancel addition” clears the pending target and rights without discarding listed changes. Invalid pending targets block the entire save. See the [access save correction](acces-enregistrement/README.md).
+
 ## Incomplete label drafts and YAML
 
 `LabelsEditor` ignores entirely empty placeholder rows. Partial/duplicate entries remain local and mark the EditContext invalid without publishing an unserializable map into the resource binding. Publishing resumes only for a valid set of non-empty rows. Keep the inline row feedback; do not add a second field-level ValidationMessage beneath this editor.

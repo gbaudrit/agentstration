@@ -114,9 +114,8 @@ export class ResourceAccessPage {
   public async addGrant(scopeRef: string): Promise<void> {
     await this.openAddition();
     await this.page.getByTestId(TestIds.resourceAccess.target).selectOption(scopeRef);
-    await this.page.getByTestId(TestIds.resourceAccess.add).click();
-    await this.grant(scopeRef).waitFor({ state: 'visible' });
     await this.save();
+    await this.grant(scopeRef).waitFor({ state: 'visible' });
     await this.expectPersistedGrant(scopeRef, true);
   }
 

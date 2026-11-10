@@ -57,17 +57,18 @@
 
             @if (canManage && AvailableTargets.Count > 0)
             {
-                <button class="button-secondary" type="button" disabled="@saving" @onclick="() => adding = !adding" aria-expanded="@adding.ToString().ToLowerInvariant()" aria-controls="@addId" data-testid="resource-access-open-add">@(adding ? T("CloseAdd") : T("Add"))</button>
+                <button class="button-secondary" type="button" disabled="@saving" @onclick="ToggleAddition" aria-expanded="@adding.ToString().ToLowerInvariant()" aria-controls="@addId" data-testid="resource-access-open-add">@(adding ? T("CloseAdd") : T("Add"))</button>
                 <div class="access-add" id="@addId" hidden="@(!adding)">
-                    <FormField Label="@T("SearchTargets")"><ClearableText Value="@targetSearch" ValueChanged="value => { targetSearch = value; selectedTarget = string.Empty; }" Type="search" Disabled="@saving" data-testid="resource-access-search" /></FormField>
-                    <FormField Label="@T("TargetScope")"><ClearableSelect TValue="string" Disabled="@saving" @bind-Value="selectedTarget" data-testid="resource-access-target"><option value="">@T("SelectTarget")</option>@foreach (var target in FilteredTargets.Take(50)) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("SearchTargets")"><ClearableText Value="@targetSearch" ValueChanged="value => { targetSearch = value; SelectTarget(string.Empty); }" Type="search" Disabled="@saving" data-testid="resource-access-search" /></FormField>
+                    <FormField Label="@T("TargetScope")"><ClearableSelect TValue="string" Disabled="@saving" Value="@selectedTarget" ValueChanged="SelectTarget" ValueExpression="@(() => selectedTarget)" data-testid="resource-access-target"><option value="">@T("SelectTarget")</option>@foreach (var target in FilteredTargets.Take(50)) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</ClearableSelect></FormField>
                     <small>@T("TargetResults", Math.Min(50, FilteredTargets.Count), FilteredTargets.Count)</small>
                     <div class="access-actions">
                         <label><input type="checkbox" @bind="addDiscover" disabled="@saving" />@T("Discover")</label>
                         <label><input type="checkbox" @bind="addUse" disabled="@saving" />@T("Use")</label>
                         <label><input type="checkbox" @bind="addDescendants" disabled="@(saving || ResourceScopeRef.TryParse(selectedTarget, out var targetScope) && targetScope.Kind == ResourceScopeKind.Workspace)" />@T("IncludeDescendants")</label>
                     </div>
-                    <button class="button-secondary" type="button" data-testid="resource-access-add" disabled="@(saving || string.IsNullOrWhiteSpace(selectedTarget) || (!addDiscover && !addUse))" @onclick="Add">@T("Add")</button>
+                    <small>@T("PendingGrantHelp")</small>
+                    <button class="button-secondary" type="button" data-testid="resource-access-add" disabled="@(saving || string.IsNullOrWhiteSpace(selectedTarget) || (!addDiscover && !addUse))" @onclick="Add">@T("AddToList")</button>
                 </div>
             }
             else if (!canManage)
@@ -81,7 +82,7 @@
             @if (saved) { <p class="access-success" role="status" data-testid="resource-access-saved">@T("Saved")</p> }
             @if (canManage)
             {
-                <div class="form-actions"><button class="text-button" type="button" @onclick="Discard" disabled="@(saving || !dirty)" data-testid="resource-access-discard">@T("Discard")</button><button class="button-primary" type="button" data-testid="resource-access-save" disabled="@(saving || invalidGrant || !dirty)" @onclick="SaveAsync">@(saving ? T("Saving") : T("Save"))</button></div>
+                <div class="form-actions"><button class="text-button" type="button" @onclick="Discard" disabled="@(saving || (!dirty && !adding))" data-testid="resource-access-discard">@T("Discard")</button><button class="button-primary" type="button" data-testid="resource-access-save" disabled="@(saving || invalidGrant || (!dirty && !HasPendingGrant))" @onclick="SaveAsync">@(saving ? T("Saving") : T("Save"))</button></div>
             }
         </article>
         <details class="panel access-details"><summary>@T("ResourceDetails")</summary>
@@ -136,7 +137,9 @@
     private string selectedTarget = string.Empty;
     private IReadOnlyList<ResourceScopeTargetResponse> FilteredTargets => AvailableTargets.Where(target => $"{target.DisplayName} {target.ScopeRef.Value}".Contains(targetSearch, StringComparison.CurrentCultureIgnoreCase)).ToArray();
     private bool loading = true, loadError, canManage, dirty, saving, saveError, saved, invalidTarget;
-    private bool invalidGrant => grants.Any(value => !value.Discover && !value.Use);
+    private bool HasPendingGrant => adding && !string.IsNullOrWhiteSpace(selectedTarget);
+    private bool invalidGrant => grants.Any(value => !value.Discover && !value.Use)
+        || HasPendingGrant && !addDiscover && !addUse;
     private IReadOnlyList<ResourceScopeTargetResponse> AvailableTargets => targets
         .Where(value => IsDescendant(value.ScopeRef, OwnerScopeRef)
             && grants.All(grant => grant.TargetScopeRef != value.ScopeRef))
@@ -152,7 +155,7 @@
 
     private async Task LoadAsync()
     {
-        loading = true; loadError = saveError = saved = invalidTarget = false; dirty = false; grants.Clear();
+        loading = true; loadError = saveError = saved = invalidTarget = false; dirty = false; grants.Clear(); ResetAddition();
         try
         {
             inventory = await Scopes.GetAsync(cancellation.Token);
@@ -179,26 +182,43 @@
         finally { loading = false; }
     }
 
-    private void Add()
+    private void ToggleAddition()
     {
         if (!canManage || saving) return;
-        if (!ResourceScopeRef.TryParse(selectedTarget, out var scopeRef) || !IsDescendant(scopeRef, OwnerScopeRef))
+        if (adding) ResetAddition(); else adding = true;
+        invalidTarget = false;
+    }
+    private void SelectTarget(string value)
+    {
+        selectedTarget = value;
+        saved = saveError = invalidTarget = false;
+    }
+    private void ResetAddition()
+    {
+        selectedTarget = targetSearch = string.Empty; adding = false; addDiscover = addUse = true; addDescendants = false;
+    }
+    private void Add() => TryAddPendingGrant();
+    private bool TryAddPendingGrant()
+    {
+        if (!canManage || saving) return false;
+        if (!ResourceScopeRef.TryParse(selectedTarget, out var scopeRef) || !IsDescendant(scopeRef, OwnerScopeRef)
+            || AvailableTargets.All(target => target.ScopeRef != scopeRef))
         {
             invalidTarget = true;
             saved = false;
-            return;
+            return false;
         }
-        if (!addDiscover && !addUse) return;
-        if (grants.Any(grant => grant.TargetScopeRef == scopeRef)) { invalidTarget = true; return; }
+        if (!addDiscover && !addUse) return false;
         invalidTarget = false;
         grants.Add(new(scopeRef, addDiscover, addUse, addDescendants && scopeRef.Kind != ResourceScopeKind.Workspace));
-        selectedTarget = targetSearch = string.Empty; adding = false; addDiscover = addUse = true; addDescendants = false; MarkDirty();
+        ResetAddition(); MarkDirty();
+        return true;
     }
     private void Discard()
     {
         if (saving) return;
         grants.Clear(); grants.AddRange(savedGrants.Select(GrantModel.From));
-        selectedTarget = targetSearch = string.Empty; adding = false; addDiscover = addUse = true; addDescendants = false;
+        ResetAddition();
         dirty = saveError = saved = invalidTarget = false;
     }
     private void Remove(GrantModel grant) { grants.Remove(grant); MarkDirty(); }
@@ -212,7 +232,8 @@
 
     private async Task SaveAsync()
     {
-        if (!canManage || identity is null || invalidGrant) return;
+        if (!canManage || saving || identity is null || invalidGrant) return;
+        if (HasPendingGrant && !TryAddPendingGrant()) return;
         saving = true; saveError = saved = false;
         try
         {

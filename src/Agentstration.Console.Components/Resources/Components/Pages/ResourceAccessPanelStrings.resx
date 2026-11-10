@@ -43,7 +43,9 @@
   <data name="Remove"><value>Remove</value></data>
   <data name="TargetScope"><value>Target scope</value></data>
   <data name="SelectTarget"><value>Select a descendant scope</value></data>
-  <data name="Add"><value>Add grant</value></data>
+  <data name="Add"><value>New grant</value></data>
+  <data name="AddToList"><value>Add to list</value></data>
+  <data name="PendingGrantHelp"><value>This grant will be included when you save. Add it to the list to prepare another one.</value></data>
   <data name="ReadOnlyPolicy"><value>You can inspect this policy, but you are not authorized to change grants in the owner scope.</value></data>
   <data name="GrantActionsRequired"><value>Every grant must allow Discover, Use, or both.</value></data>
   <data name="InvalidTarget"><value>Select a valid descendant scope. Owner, parent, sibling, and unrelated scopes cannot receive this grant.</value></data>
@@ -59,6 +61,6 @@
 <data name="ResourceDetails"><value>Resource details</value></data>
 <data name="SearchTargets"><value>Search scopes</value></data>
 <data name="TargetResults"><value>Results: {0} of {1}. Refine the search if needed.</value></data>
-<data name="CloseAdd"><value>Close addition</value></data>
+<data name="CloseAdd"><value>Cancel addition</value></data>
 <data name="Discard"><value>Discard changes</value></data>
 </root>
