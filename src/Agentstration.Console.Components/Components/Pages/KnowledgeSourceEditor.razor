@@ -21,8 +21,9 @@
 else
 {
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
-    <EditForm Model="this" OnValidSubmit="SaveAsync" FormName="knowledge-source-editor" class="panel form-section">
+    <EditForm Model="this" OnValidSubmit="RequestSaveAsync" FormName="knowledge-source-editor" class="panel form-section">
         <fieldset class="resource-definition-fields" disabled="@(busy || !interactive)" data-testid="knowledge-source-definition-fields" data-interactive="@(interactive ? "true" : "false")">
+        @if (!IsNew) { <div class="form-actions"><button class="button-secondary" type="submit" disabled="@(bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></div> }
         <div class="form-grid">
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
             @if (IsNew)
@@ -31,7 +32,6 @@ else
             }
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
             <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
-            @if (!IsNew) { <label class="knowledge-choice form-span-2"><input type="checkbox" @bind="rebindDependencies" data-testid="knowledge-rebind-dependencies" /><span><strong>@T("RebindDependencies")</strong><small>@T("RebindDependenciesHelp")</small></span></label> }
             @if (HasNativeDatasetInput && savedOutput is null && string.IsNullOrEmpty(outputStorageKey)) { <p class="form-alert form-alert-info form-span-2" role="status">@T("NativeDatasetDraftHelp")</p> }
             <label class="form-field-wide"><span>@T("OutputStorage")</span><select @bind="outputStorageKey" data-testid="knowledge-output-storage">
                 <option value="">@T("ArtifactOutputDefault")</option>
@@ -60,10 +60,12 @@ else
                 }
             </section>
         </div>
-        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" disabled="@(busy || !interactive || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))">@(busy ? T("Saving") : T("Save"))</button></div>
+        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))">@(busy ? T("Saving") : T("Save"))</button></div>
         </fieldset>
     </EditForm>
 }
+
+<ConfirmationDialog IsOpen="confirmRebind" Title="@T("RebindDependencies")" Message="@T("RebindDependenciesHelp")" ConfirmLabel="@T("ConfirmRebindDependencies")" CancelLabel="@T("Cancel")" OnConfirm="ConfirmRebindAsync" OnCancel="() => confirmRebind = false" TestId="knowledge-rebind-confirmation" />
 
 @code {
     [Parameter] public string? Name { get; set; }
@@ -91,7 +93,7 @@ else
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
         description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
-    private bool enabled, busy, interactive, rebindDependencies, loading = true;
+    private bool enabled, busy, interactive, rebindDependencies, rebindRequested, confirmRebind, loading = true;
     private bool HasNativeDatasetInput => bindings.Any(binding => dataSources.Any(source => source.Definition.Dataset is not null && DataSourceKey(source) == binding.DataSourceKey));
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
@@ -144,6 +146,22 @@ else
         }
         catch (Exception exception) { message = exception.Message; }
         finally { loading = false; }
+    }
+
+    private Task RequestSaveAsync()
+    {
+        if (!rebindRequested) return SaveAsync();
+        rebindRequested = false;
+        if (!busy && interactive && !bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed)) confirmRebind = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmRebindAsync()
+    {
+        confirmRebind = false;
+        rebindDependencies = true;
+        try { await SaveAsync(); }
+        finally { rebindDependencies = false; }
     }
 
     private async Task SaveAsync()

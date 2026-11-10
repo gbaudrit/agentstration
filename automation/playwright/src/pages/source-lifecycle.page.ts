@@ -238,6 +238,7 @@ export class SourceLifecyclePage {
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
     await this.configureBinding(0, f.sources[0], 'primary');
     await this.saveKnowledge();
+    await this.updateKnowledgeDependencies(consoleUrl, text);
     const simple = await this.runProjection(consoleUrl);
     await this.assertProjection(consoleUrl, simple, [first]);
     await this.retrieve(consoleUrl, simple);
@@ -414,6 +415,25 @@ export class SourceLifecyclePage {
     await expect(this.page).toHaveURL(new RegExp(`/knowledge-sources/${this.fixture.knowledge}(?:\\?|$)`));
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.knowledgeDetails)).toBeVisible();
   }
+  private async updateKnowledgeDependencies(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
+    const before = await this.read<ResourceWire>(consoleUrl, this.knowledgeApi());
+    await this.editKnowledge(consoleUrl);
+    const update = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeRebindDependencies);
+    await expect(update).toHaveText(text.updateDependencies);
+    await update.click();
+    const confirmation = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeRebindConfirmation);
+    await expect(confirmation).toContainText(text.dependencyUpdateHelp);
+    await confirmation.getByRole('button', { name: text.cancel, exact: true }).click();
+    await expect(confirmation).toHaveCount(0);
+    expect((await this.read<ResourceWire>(consoleUrl, this.knowledgeApi())).generation).toBe(before.generation);
+    await update.click();
+    const confirm = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeRebindConfirm);
+    await expect(confirm).toHaveText(text.confirmDependencyUpdate);
+    await confirm.click();
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.knowledgeDetails)).toBeVisible();
+    await expect.poll(async () => (await this.read<ResourceWire>(consoleUrl, this.knowledgeApi())).generation).toBeGreaterThan(before.generation);
+  }
+
   private async editKnowledge(consoleUrl: string): Promise<void> {
     await this.open(consoleUrl, `/knowledge-sources/${this.fixture.knowledge}/edit`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
   }

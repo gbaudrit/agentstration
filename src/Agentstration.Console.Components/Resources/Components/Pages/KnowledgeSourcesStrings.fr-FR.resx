@@ -81,7 +81,8 @@
   <data name="RefreshIfNecessary" xml:space="preserve"><value>Actualiser les acquisitions si nécessaire</value></data>
   <data name="ContentVersion" xml:space="preserve"><value>Version du contenu</value></data>
   <data name="OutputStorageInvalid" xml:space="preserve"><value>Le Storage de sortie ou la règle de destination est indisponible, incompatible ou non autorisé. Vérifiez la révision sélectionnée, les restrictions et les accès.</value></data>
-  <data name="RebindDependencies" xml:space="preserve"><value>Résoudre les révisions actuelles des dépendances</value></data>
-  <data name="RebindDependenciesHelp" xml:space="preserve"><value>Adopter explicitement les révisions actuelles des Data Sources et des Flows lors de l’enregistrement. Les Snapshots existants conservent leurs références d’origine.</value></data>
+  <data name="RebindDependencies" xml:space="preserve"><value>Mettre à jour les dépendances</value></data>
+  <data name="RebindDependenciesHelp" xml:space="preserve"><value>Enregistrer cette configuration et prendre en compte les modifications des Data Sources et des Flows pour les prochaines projections ? Les Snapshots déjà publiés conservent leurs références d’origine.</value></data>
   <data name="ProjectionFlowNotStarted" xml:space="preserve"><value>Flow non démarré</value></data>
+  <data name="ConfirmRebindDependencies" xml:space="preserve"><value>Enregistrer et mettre à jour</value></data>
 </root>

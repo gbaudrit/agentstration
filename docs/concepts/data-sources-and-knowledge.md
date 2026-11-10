@@ -102,7 +102,7 @@ A Knowledge Source also selects a `knowledge.retrieval/v1` Flow. Search, query, 
 
 The built-in `knowledge-retrieval-builtin` Flow provides deterministic local text search, query, and read over retained Storage publications or historical filesystem-backed Snapshot Artifacts. Search interleaves bounded matches across the Snapshot entries; it is not a model-backed semantic index. Binary interpretation, spreadsheet analysis, semantic search, or answer synthesis requires a different governed retrieval composition and any required Tools.
 
-A Knowledge Source may publish source-specific `search`, `query`, and `read` Tools. Their source identity and operation are fixed by the Tool definition, and the existing Tool pipeline and internal MCP provider retain authorization, assignment, execution, and audit ownership.
+A Knowledge Source may publish source-specific `search`, `query`, and `read` Tools. Their source identity and operation are fixed by the Tool definition, and the existing Tool pipeline and internal MCP provider retain authorization, assignment, execution, and audit ownership. Publication follows the selected logical Instance, Tenant or Workspace scope for the Tools and ToolSet; the exposure receipt and execution content remain in the corresponding operational Workspace ([ADR-0209](../decisions/0209-knowledge-tools-follow-the-publishing-console-scope.md)). The editor’s **Update dependencies** action explicitly saves the current configuration and updates dependency pins after confirmation; ordinary saving preserves the existing pins.
 
 ## Flow contract catalog
 

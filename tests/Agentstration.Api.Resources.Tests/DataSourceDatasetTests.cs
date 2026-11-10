@@ -21,6 +21,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Storage;
+using Agentstration.Tools.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
@@ -34,6 +35,54 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
 {
     private static readonly ResourceScopeRef Owner = ResourceScopeRef.Instance;
     private static readonly JsonElement Empty = JsonSerializer.SerializeToElement(new { });
+
+    [TestMethod]
+    public async Task InstanceKnowledgePublishesLogicalToolsAndExecutesAgainstItsOperationalSnapshot()
+    {
+        await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var fixture = await PrepareAsync(factory.Services);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
+        var source = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
+            Source("tool-input", fixture, JsonSerializer.SerializeToElement(new { dataset = "instance-tool-content" })), default);
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, Owner);
+        _ = await AcquireAsync(client, source.Value.Name);
+        var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            Metadata = new() { Name = "instance-tools" },
+            ScopeRef = Owner,
+            Definition = new()
+            {
+                DisplayName = "Instance Tools",
+                Output = new(fixture.Storage, new(Write: true)),
+                DataSources = [new() { Name = "input", DataSource = new(source.Value.Name, Owner) }],
+                ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
+                RetrievalFlow = new() { Name = "knowledge-retrieval-builtin", ScopeRef = Owner }
+            }
+        }, default);
+        _ = await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(
+            new(knowledge.Value.Name, ScopeRef: Owner), new(), default);
+        using var response = await client.PostAsJsonAsync($"/api/knowledgesources/{knowledge.Value.Name}/tool-exposure?scopeRef=/instance",
+            new PublishKnowledgeSourceToolExposureRequest());
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
+        var exposure = (await response.Content.ReadFromJsonAsync<KnowledgeSourceToolExposureResource>())!;
+        Assert.AreEqual(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId), exposure.ScopeRef);
+        Assert.AreEqual(Owner, exposure.ToolSet.ScopeRef);
+        Assert.HasCount(3, exposure.Operations);
+        Assert.IsTrue(exposure.Operations.All(value => value.Tool.ScopeRef == Owner));
+        using var reloaded = await client.GetAsync($"/api/knowledgesources/{knowledge.Value.Name}/tool-exposure?scopeRef=/instance");
+        Assert.AreEqual(HttpStatusCode.OK, reloaded.StatusCode);
+        var search = exposure.Operations.Single(value => value.Operation == KnowledgeSourceOperation.Search).Tool;
+        using var executed = await client.PostAsJsonAsync($"/api/tools/{search.Name}/run?scopeRef=/instance",
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { request = new { query = "instance-tool-content" } }), ToolRunMode.Execute));
+        Assert.AreEqual(HttpStatusCode.OK, executed.StatusCode, await executed.Content.ReadAsStringAsync());
+        var result = (await executed.Content.ReadFromJsonAsync<RunToolResponse>())!;
+        Assert.AreEqual("completed", result.Status, JsonSerializer.Serialize(result));
+        Assert.Contains("instance-tool-content", result.Output!.Value.GetRawText());
+    }
 
     [TestMethod]
     public async Task NativeProjectionAndRetrievalHonorLowerStorageReadBounds()
@@ -170,7 +219,14 @@ public sealed class DataSourceDatasetTests : ResourceManagementApiTestBase
         Assert.AreEqual(refresh && maximumAgeSeconds == 0, completed.Value.Inputs[0].AcquisitionId != initialAcquisition.Name);
         Assert.IsNotNull(completed.Value.Inputs[0].TransformationFlowRunId);
         var snapshots = factory.Services.GetRequiredService<KnowledgeSnapshotService>();
-        var published = (await snapshots.GetActiveAsync(new(created.Value.Name, ScopeRef: Owner), default))!.Snapshot;
+        var activeView = (await snapshots.GetActiveAsync(new(created.Value.Name, ScopeRef: Owner), default))!;
+        Assert.AreEqual(KnowledgeSnapshotLifecycleState.Active, activeView.LifecycleState);
+        var published = activeView.Snapshot;
+        var listedSnapshots = await client.GetFromJsonAsync<KnowledgeSnapshotView[]>(
+            $"/api/knowledgesources/{created.Value.Name}/snapshots?scopeRef=/instance");
+        Assert.AreEqual(KnowledgeSnapshotLifecycleState.Active, listedSnapshots!.Single().LifecycleState);
+        Assert.AreEqual(KnowledgeSnapshotLifecycleState.Active,
+            (await snapshots.GetAsync(new(published.Name, published.Namespace), default)).LifecycleState);
         Assert.HasCount(2, published.Artifacts);
         Assert.IsTrue(published.Artifacts.All(item => item.Content?.Target.Storage.StorageUid == output.Value.Uid));
         Assert.AreNotEqual(fixture.Storage.StorageUid, published.Artifacts[0].Content!.Target.Storage.StorageUid);

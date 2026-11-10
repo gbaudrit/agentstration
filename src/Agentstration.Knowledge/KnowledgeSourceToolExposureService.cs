@@ -44,7 +44,9 @@ public sealed class KnowledgeSourceToolExposureService(
         bool requiresApproval,
         CancellationToken cancellationToken)
     {
-        var scopeRef = CurrentWorkspaceScope();
+        var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
+        var executionScope = administrative is null ? CurrentWorkspaceScope() : ResourceScopeRef.Workspace(administrative.WorkspaceId);
+        var scopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? executionScope;
         var source = await sources.ResolveForUseAsync(id, scopeRef, cancellationToken);
         var readiness = await sources.GetReadinessForUseAsync(id, scopeRef, cancellationToken);
         var retrieval = readiness.Retrieval
@@ -186,7 +188,7 @@ public sealed class KnowledgeSourceToolExposureService(
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = KnowledgeResourceKinds.KnowledgeSourceToolExposure,
             Metadata = new ResourceMetadata { Name = source.Value.Name, Namespace = source.Value.Namespace },
-            ScopeRef = scopeRef,
+            ScopeRef = executionScope,
             Uid = existing?.Value.Uid ?? Guid.Empty,
             Generation = existing is null ? 1 : checked(existing.Value.Generation + 1),
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
@@ -199,10 +201,12 @@ public sealed class KnowledgeSourceToolExposureService(
             ToolSetVersion = version,
             Operations = operations
         };
-        var stored = await scopeOperations.WriteAsync(exposure, scopeRef, AuthorizationPermissions.ResourcesWrite,
-            token => store.PutExactAsync(scopeRef, exposure, existing?.ETag, existing is null, token), cancellationToken);
+        StoredResource<KnowledgeSourceToolExposureResource> stored;
+        using (administrative is null ? null : requestScopes.Push(administrative))
+            stored = await scopeOperations.WriteAsync(exposure, executionScope, AuthorizationPermissions.ResourcesWrite,
+                token => store.PutExactAsync(executionScope, exposure, existing?.ETag, existing is null, token), cancellationToken);
         await audit.WriteAsync(new(SecurityAuditActions.KnowledgeSourceToolExposurePublished,
-            WorkspaceId: scopeRef.TargetId), cancellationToken);
+            WorkspaceId: executionScope.TargetId), cancellationToken);
         return stored;
     }
 

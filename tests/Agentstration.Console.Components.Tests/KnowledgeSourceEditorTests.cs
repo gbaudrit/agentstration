@@ -171,7 +171,7 @@ public sealed class KnowledgeSourceEditorTests
             .Input("{\"format\":\"markdown\"}");
         rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").Change("25:30:45");
         rendered.Find("[data-testid='knowledge-binding-refresh']").Change(true);
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
 
         rendered.WaitForAssertion(() =>
         {
@@ -198,7 +198,7 @@ public sealed class KnowledgeSourceEditorTests
         rendered.WaitForElement("[data-testid='knowledge-source-binding-acquisition-target']")
             .Change("documents");
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Targeted documentation");
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
 
         rendered.WaitForAssertion(() =>
             Assert.AreEqual("documents", client.CreatedRequest?.Properties.DataSources.Single().AcquisitionTarget?.Name));
@@ -222,7 +222,7 @@ public sealed class KnowledgeSourceEditorTests
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNull(client.CreatedRequest);
-            Assert.IsTrue(rendered.Find("button[type='submit']").HasAttribute("disabled"));
+            Assert.IsTrue(rendered.Find("[data-testid=knowledge-source-save]").HasAttribute("disabled"));
             StringAssert.Contains(rendered.Find("[role='alert']").TextContent, "valid JSON object");
         });
     }
@@ -242,7 +242,7 @@ public sealed class KnowledgeSourceEditorTests
         rendered.FindAll("[data-testid='knowledge-source-data-source-bindings'] select")[1]
             .Change($"{FlowClientStub.WorkspaceScope.Value}|default|artifact-transform-builtin|1.0.0");
         rendered.WaitForElement("[data-schema-path='$.format'] input").Input("markdown");
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
 
         rendered.WaitForAssertion(() => Assert.AreEqual("markdown",
             client.CreatedRequest?.Properties.DataSources[0].Configuration.GetProperty("format").GetString()));
@@ -291,9 +291,11 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
-    public void EditionPreservesThePersistedSourceConfiguration()
+    [DataRow("en-US", "Update dependencies", "Save and update", "Cancel")]
+    [DataRow("fr-FR", "Mettre à jour les dépendances", "Enregistrer et mettre à jour", "Annuler")]
+    public void EditionPreservesThePersistedSourceConfiguration(string cultureName, string buttonLabel, string confirmLabel, string cancelLabel)
     {
-        using var culture = new TestCultureScope("en-US");
+        using var culture = new TestCultureScope(cultureName);
         var existing = ProjectedSource() with
         {
             Definition = ProjectedSource().Definition with
@@ -313,8 +315,25 @@ public sealed class KnowledgeSourceEditorTests
             rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']")));
         Assert.AreEqual("49:02:03",
             rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").GetAttribute("value"));
-        rendered.Find("[data-testid='knowledge-rebind-dependencies']").Change(true);
-        rendered.Find("button[type='submit']").Click();
+        var rebind = rendered.Find("[data-testid=knowledge-rebind-dependencies]");
+        Assert.AreEqual("BUTTON", rebind.TagName);
+        Assert.AreEqual(buttonLabel, rebind.TextContent);
+        rebind.Click();
+        var confirmation = rendered.WaitForElement("[data-testid=knowledge-rebind-confirmation]");
+        Assert.IsNull(client.UpdatedRequest);
+        Assert.AreEqual(cancelLabel, confirmation.QuerySelector(".button-secondary")!.TextContent);
+        rendered.Find("[data-testid=knowledge-rebind-confirmation] .button-secondary").Click();
+        Assert.IsEmpty(rendered.FindAll("[data-testid=knowledge-rebind-confirmation]"));
+        Assert.IsNull(client.UpdatedRequest);
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.UpdatedRequest));
+        Assert.IsFalse(client.UpdatedRequest!.RebindDependencies);
+        var ordinarySave = client.UpdatedRequest;
+        rendered.Find("[data-testid=knowledge-rebind-dependencies]").Click();
+        rendered.WaitForElement("[data-testid=knowledge-rebind-confirmation]");
+        Assert.AreSame(ordinarySave, client.UpdatedRequest);
+        Assert.AreEqual(confirmLabel, rendered.Find("[data-testid=knowledge-rebind-confirmation-confirm]").TextContent);
+        rendered.Find("[data-testid=knowledge-rebind-confirmation-confirm]").Click();
 
         rendered.WaitForAssertion(() => Assert.AreEqual("markdown",
             client.UpdatedRequest?.Properties.DataSources[0].Configuration.GetProperty("format").GetString()));
@@ -532,7 +551,7 @@ public sealed class KnowledgeSourceEditorTests
                 rendered.Find("[data-testid='knowledge-source-name']").GetAttribute("value"));
             Assert.IsEmpty(rendered.FindAll(".knowledge-edit-action"));
         });
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
         rendered.WaitForAssertion(() => Assert.IsNotNull(client.UpdatedRequest));
 
         rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
@@ -564,7 +583,7 @@ public sealed class KnowledgeSourceEditorTests
         });
 
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Updated documentation");
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(client.UpdatedRequest);

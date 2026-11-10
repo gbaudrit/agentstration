@@ -149,7 +149,7 @@ else if (source is not null && readiness is not null)
         @if (exposure is null)
         {
             <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
-            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div> }
+            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" data-testid="knowledge-publish-tools" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div> }
             @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
         }
         else
@@ -202,9 +202,10 @@ else if (source is not null && readiness is not null)
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private IReadOnlyList<DetailsTab> VisibleTabs => [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, .. (CanManage ? [DetailsTab.Access] : Array.Empty<DetailsTab>()), DetailsTab.Yaml];
     private bool CanManage => source is not null && ResourceOwnershipContext.CanManage(source.ScopeRef ?? ResourceScopeRef.Instance, Services);
-    private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
-        ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
-        : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
+    private string ToolSetUrl => exposure is null ? "/tools/sets" : ScopedToolUrl(
+        exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
+            ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
+            : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}", exposure.ToolSet.ScopeRef);
     private bool IsUnresolvedDraft => source is { Definition.Enabled: false, Composition: null };
     private bool CanStartProjection => readiness?.Ready == true && projectionParametersValid && !busy;
     private JsonElement? ProjectionParametersSchema => JsonSchemaInputSchema.ObjectProperty(
@@ -438,9 +439,16 @@ else if (source is not null && readiness is not null)
     private string ToolUrl(ResourceReference value)
     {
         var address = value.Resolve(SourceNamespace, ToolResourceKinds.Tool);
-        return address.Namespace.IsDefault
+        return ScopedToolUrl(address.Namespace.IsDefault
             ? $"/tools/{Uri.EscapeDataString(address.Name)}"
-            : $"/tools/{Uri.EscapeDataString(address.Name)}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+            : $"/tools/{Uri.EscapeDataString(address.Name)}?namespace={Uri.EscapeDataString(address.Namespace.Value)}", value.ScopeRef);
+    }
+    private string ScopedToolUrl(string url, ResourceScopeRef? scope)
+    {
+        if (scope is null) return url;
+        url += $"{(url.Contains('?') ? "&" : "?")}scopeRef={Uri.EscapeDataString(scope.Value.Value)}";
+        var context = ResourceOwnershipContext.TryGetCurrent(Services) ?? scope.Value;
+        return url + $"&context={Uri.EscapeDataString(context.Value)}";
     }
     private string ToolNamespace(ResourceReference value) => value.Resolve(SourceNamespace, ToolResourceKinds.Tool).Namespace.Value;
     private static string TabId(DetailsTab tab) => $"knowledge-source-{tab.ToString().ToLowerInvariant()}-tab";
