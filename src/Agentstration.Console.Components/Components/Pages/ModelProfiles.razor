@@ -14,7 +14,7 @@
 <FilterBar>
     <SearchBox Value="@search" ValueChanged="SearchChanged" Placeholder="@T("SearchPlaceholder")" />
     <select @bind="providerFilter" aria-label="@T("FilterByProvider")"><option value="">@T("AllProviders")</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName</option> }</select>
-    <select @bind="statusFilter" aria-label="@T("FilterByStatus")"><option value="">@T("AllStatuses")</option><option value="ready">@T("Status.Ready")</option><option value="providerUnavailable">@T("Status.ProviderUnavailable")</option><option value="modelUnavailable">@T("Status.ModelUnavailable")</option><option value="invalidConfiguration">@T("Status.InvalidConfiguration")</option><option value="unknown">@T("Status.Unknown")</option></select>
+    <select @bind="statusFilter" aria-label="@T("FilterByStatus")"><option value="">@T("AllStatuses")</option><option value="available">@T("Status.Available")</option><option value="unavailable">@T("Status.Unavailable")</option><option value="incompatible">@T("Status.Incompatible")</option><option value="unknown">@T("Status.Unknown")</option></select>
     <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("ApplyFilters")</button>
 </FilterBar>
 
@@ -26,16 +26,16 @@ else if (loading && profiles is null)
 {
     <LoadingState Message="@T("Loading")" />
 }
-else if (profiles?.Count == 0)
+else if (FilteredProfiles.Count == 0)
 {
     <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/modelprofiles/new">@T("CreateModelProfile")</a></EmptyState>
 }
 else
 {
-    <CollectionView TItem="ModelProfileSummaryResponse" Items="profiles ?? []" InformationLabels="@(new[] { T("Provider"), T("Model"), T("Usage") })">
+    <CollectionView TItem="ModelProfileSummaryResponse" Items="FilteredProfiles" InformationLabels="@(new[] { T("Provider"), T("Model"), T("Usage") })">
         <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@DetailsUrl(profile)" IconName="layers" Domain="model"><Badges><ManagedResourceBadge IsManaged="@profile.IsManaged" /></Badges></CollectionIdentity></Identity>
         <Scope Context="profile"><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Workspace" /></Scope>
-        <State Context="profile"><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@ModelManagementUi.Status(profile.Properties.Status)" /></State>
+        <State Context="profile"><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@StatusTone(profile.Properties.Status)" /></State>
         <Information Context="profile">
             <CollectionValue Label="@T("Provider")">@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</CollectionValue>
             <CollectionValue Label="@T("Model")"><code>@profile.Properties.Model.Name</code></CollectionValue>
@@ -64,7 +64,18 @@ else
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string DeleteMessage => pendingDelete is null ? string.Empty : T("DeleteMessage", pendingDelete.Name);
     private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
-    private string StatusLabel(string status) => Localizer[$"Status.{status switch { "ready" => "Ready", "providerUnavailable" => "ProviderUnavailable", "modelUnavailable" => "ModelUnavailable", "invalidConfiguration" => "InvalidConfiguration", _ => "Unknown" }}"];
+    private static string StatusKey(string? status) => status?.ToLowerInvariant() switch
+    {
+        "available" => "Available", "unavailable" => "Unavailable", "incompatible" => "Incompatible",
+        "ready" => "Ready", "providerunavailable" => "ProviderUnavailable",
+        "modelunavailable" => "ModelUnavailable", "invalidconfiguration" => "InvalidConfiguration", _ => "Unknown"
+    };
+    private IReadOnlyList<ModelProfileSummaryResponse> FilteredProfiles => ModelManagementUi.FilterProfiles(profiles ?? [], search)
+        .Where(profile => (string.IsNullOrEmpty(providerFilter) || string.Equals(profile.Properties.Provider.Name, providerFilter, StringComparison.Ordinal))
+            && (string.IsNullOrEmpty(statusFilter) || StatusKey(profile.Properties.Status) == StatusKey(statusFilter)))
+        .ToArray();
+    private string StatusLabel(string? status) => Localizer[$"Status.{StatusKey(status)}"];
+    private static UiStatus StatusTone(string? status) => StatusKey(status) == "Unknown" ? UiStatus.Neutral : ModelManagementUi.Status(status);
     protected override async Task OnInitializedAsync() { try { providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token); } catch (AgentstrationApiException) { } await LoadAsync(); }
     private async Task SearchChanged(string value) { search = value; await LoadAsync(); }
     private async Task LoadAsync()
