@@ -74,18 +74,21 @@
                             var inputId = ToolInputId(tool);
                             <div class="agent-tool-option @(inherited ? "inherited" : null)">
                                 <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@effective" disabled="@(inherited || (!usable && !assigned))" @onchange="args => ToggleAsync(tool.Metadata.Name, (bool)args.Value!)" />
-                                <label class="agent-tool-card-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
-                                <span class="agent-tool-copy">
-                                    <strong><a class="agent-tool-name" href="@ToolUrl(tool)">@tool.Definition.DisplayName</a>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }</strong>
+
+                                <div class="agent-tool-copy">
+                                    <CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench" class="resource-name-link agent-tool-name"><Badges><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" /></Badges></CollectionIdentity>
+                                    <ResourceScopeBadge ScopeRef="tool.ScopeRef" />
+                                    @if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }
                                     @if (inherited)
                                     {
                                         <span class="tool-status inherited"><i></i>@T("GrantedViaToolSet", ToolSetSources(tool.Metadata.Name))</span>
                                     }
                                     else
                                     {
-                                        <label class="@ToolStatusClass(usable, assigned)" for="@inputId"><i></i>@(usable ? T("Available") : assigned ? T("AssignedUnavailable") : T("NotUsable"))</label>
+                                        <StatusBadge Text="@(usable ? T("Available") : assigned ? T("AssignedUnavailable") : T("NotUsable"))" Status="@(usable ? UiStatus.Success : UiStatus.Warning)" />
                                     }
-                                </span>
+                                </div>
+                                <CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><a href="@ToolUrl(tool)">@T("InspectTool")</a></CollectionActions>
                             </div>
                         }
                     </div>

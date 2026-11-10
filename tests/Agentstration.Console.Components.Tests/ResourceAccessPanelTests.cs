@@ -121,7 +121,7 @@ public sealed class ResourceAccessPanelTests
 
     private static BunitContext Context(FakePolicies policies, FakeScopes scopes)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(scopes);
         context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
@@ -140,7 +140,7 @@ public sealed class ResourceAccessPanelTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var scopes = new FakeScopes(uid, tenant);
         var policies = new FakePolicies();
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(scopes);
         context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
@@ -184,7 +184,7 @@ public sealed class ResourceAccessPanelTests
                 new(uid, ResourceScopeRef.Instance, ResourceNamespace.Default, "Agent", 1),
                 [new(tenant, [ResourceAccessAction.Use])]), "\"policy-1\"")
         };
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeScopes(uid, tenant, canWriteOwner: false));
         context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
@@ -209,7 +209,7 @@ public sealed class ResourceAccessPanelTests
     {
         var uid = Guid.NewGuid();
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeScopes(uid, tenant));
         context.Services.AddSingleton<IResourceAccessPolicyClient>(new FakePolicies());
@@ -234,7 +234,7 @@ public sealed class ResourceAccessPanelTests
         var uid = Guid.NewGuid();
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var policies = new FakePolicies();
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeScopes(uid, tenant));
         context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);

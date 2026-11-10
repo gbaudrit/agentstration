@@ -1,7 +1,8 @@
 @namespace Agentstration.Web.Components
+@using Agentstration.Resources
 @implements IDisposable
 @inject IServiceProvider Services
-@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
 
 @if (EffectiveKind is { } kind)
 {
@@ -18,7 +19,8 @@
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     [Parameter] public ResourceScopeKind? Kind { get; set; }
     [Parameter] public bool Compact { get; set; }
-    [Parameter] public bool ShowName { get; set; }
+    [Parameter] public bool ShowName { get; set; } = true;
+    [Parameter] public string? DisplayName { get; set; }
     private ConsoleContextState? context;
     private ResourceScopeKind? EffectiveKind => ScopeRef?.Kind ?? Kind;
     // Only names already authorized in the shared context snapshot may be disclosed.
@@ -26,6 +28,7 @@
     {
         get
         {
+            if (!string.IsNullOrWhiteSpace(DisplayName)) return DisplayName;
             var current = context?.Current;
             if (current is null || ScopeRef is not { } scope || scope.Kind == ResourceScopeKind.Instance) return null;
             var option = current.Contexts.FirstOrDefault(value => value.ScopeRef == scope.Value);

@@ -21,7 +21,7 @@ public sealed class OverviewRenderingTests
     public void OverviewDisplaysMetricsWhileRunEventsAreStillLoading()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var api = new MockApiClient(TimeProvider.System);
         var eventStream = new ControlledEventStream();
         context.Services.AddSingleton(new PlatformDashboardService(
@@ -75,7 +75,7 @@ public sealed class OverviewRenderingTests
     public void RunEventFailureRemainsConfinedToItsPanel()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IAgentstrationEventStream>(new FailingEventStream());
 
@@ -92,7 +92,7 @@ public sealed class OverviewRenderingTests
     public void OverviewLocalizesMetricDetailsInFrench()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var api = new MockApiClient(TimeProvider.System);
         var eventStream = new ControlledEventStream();
         eventStream.Complete([]);
@@ -128,7 +128,7 @@ public sealed class OverviewRenderingTests
     public void OverviewDisplaysReadyTilesWithoutWaitingForSlowTiles()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var api = new MockApiClient(TimeProvider.System);
         var work = new StubWorkClient();
         work.DelayNextSummary();

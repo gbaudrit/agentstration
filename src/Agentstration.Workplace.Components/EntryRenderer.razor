@@ -1,19 +1,29 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 <section class="entry-renderer" data-entry-role="@Role.ToString().ToLowerInvariant()" data-testid="workplace-entry" data-entry-id="@Definition.Id.Value" data-entry-namespace="@Definition.Id.Namespace.Value">
     @if (Definition.Presentation.Kind == EntryPresentationKind.Prompt)
     {
-        <PromptEntry Definition="Definition" InitialValue="@PrimaryInitialValue" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy" />
+        <PromptEntry Definition="Definition" InitialValue="@PrimaryInitialValue" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy"><Header>@ResourceHeader</Header></PromptEntry>
     }
     else if (Definition.Presentation.Kind == EntryPresentationKind.Form)
     {
-        <FormEntry Definition="Definition" InitialValues="InitialValues" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy" />
+        <FormEntry Definition="Definition" InitialValues="InitialValues" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy"><Header>@ResourceHeader</Header></FormEntry>
     }
     else
     {
         <p role="alert">@Localizer["EntryPresentationUnavailable"]</p>
     }
+    @if (ResourceHref is not null) { <CollectionActions ResourceName="@Definition.DisplayName"><a href="@ResourceHref">@Shared["OpenItem"]</a></CollectionActions> }
 </section>
 
 @code {
+    [Parameter] public string? ResourceHref { get; set; }
+    [Parameter] public string? WorkspaceDisplayName { get; set; }
+    private RenderFragment ResourceHeader => @<header class="entry-heading">
+        <CollectionIdentity DisplayName="@Definition.DisplayName" Namespace="@Definition.Id.Namespace.Value" Name="@Definition.Id.Value" Href="@ResourceHref" IconName="@(Definition.Presentation.Icon ?? "entry")" HeadingLevel="2" />
+        <ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(Definition.WorkspaceId.Value)" DisplayName="@WorkspaceDisplayName" />
+        @if (Definition.Description is not null) { <p>@Definition.Description</p> }
+    </header>;
+
     [Parameter, EditorRequired] public required EntryResource Definition { get; set; }
     [Parameter] public DashboardItemRole Role { get; set; } = DashboardItemRole.Standard;
     [Parameter, EditorRequired] public required EventCallback<IReadOnlyDictionary<string, JsonElement>> OnSubmit { get; set; }

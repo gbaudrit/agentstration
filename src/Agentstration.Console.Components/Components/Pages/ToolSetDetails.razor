@@ -36,10 +36,18 @@ else if (toolSet is not null)
         {
             <article class="panel" data-testid="toolset-version">
                 <div class="panel-header"><div><h3>@T("VersionLabel", version.Version)</h3><code>@version.DefinitionHash</code></div><StatusBadge Text="@T("Immutable")" Status="UiStatus.Success" /></div>
-                <DataGrid TItem="PublishedToolSetMember" Items="version.Members">
-                    <Header><tr><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Generation")</th><th>@T("Approval")</th></tr></Header>
-                    <Row Context="member"><tr><td><code>@member.Capability</code></td><td><code>@member.Route</code></td><td><a class="text-button" href="@ToolUrl(member)">@member.ToolNamespace/@member.ToolName</a></td><td>@member.ProviderNamespace/@member.ProviderName</td><td>@member.ToolGeneration</td><td>@T(member.RequiresApproval ? "Required" : "NotRequired")</td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="PublishedToolSetMember" Items="version.Members" InformationLabels="@(new string[] { T("Capability"), T("Route"), T("Provider"), T("Generation"), T("Approval") })" IdentityLabel="@T("Tool")">
+        <Identity Context="member"><CollectionIdentity DisplayName="@member.ToolName" Namespace="@member.ToolNamespace.Value" Name="@member.ToolName" Href="@ToolUrl(member)" IconName="wrench" /></Identity>
+        <Scope Context="member"><ResourceScopeBadge ScopeRef="member.ToolScopeRef" /></Scope>
+        <Information Context="member">
+            <CollectionValue Label="@T("Capability")"><code>@member.Capability</code></CollectionValue>
+            <CollectionValue Label="@T("Route")"><code>@member.Route</code></CollectionValue>
+            <CollectionValue Label="@T("Provider")">@member.ProviderNamespace/@member.ProviderName</CollectionValue>
+            <CollectionValue Label="@T("Generation")">@member.ToolGeneration</CollectionValue>
+            <CollectionValue Label="@T("Approval")">@T(member.RequiresApproval ? "Required" : "NotRequired")</CollectionValue>
+        </Information>
+    <Actions Context="member"><CollectionActions ResourceName="@($"{member.ToolNamespace}/{member.ToolName}, {member.ToolScopeRef}")"><a href="@ToolUrl(member)">@T("Inspect")</a></CollectionActions></Actions>
+                </CollectionView>
             </article>
         }
     </section>

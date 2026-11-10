@@ -78,14 +78,14 @@ else
                                     {
                                         var configured = composition.Single(value => value.EntryResourceId == EntryId(entry));
                                         <article @key="EntryId(entry)" class="workspace-entry-row included" data-testid="dashboard-entry-row" data-entry-id="@entry.Id" data-entry-namespace="@entry.Namespace.Value">
-                                            <label class="workspace-entry-toggle"><input type="checkbox" data-testid="dashboard-entry-toggle" checked @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
+                                            <label class="workspace-entry-toggle"><input type="checkbox" data-testid="dashboard-entry-toggle" checked @onchange="args => ToggleEntry(entry, args)" /><span>@entry.DisplayName</span></label><CollectionIdentity DisplayName="@entry.DisplayName" Namespace="@entry.Namespace.Value" Name="@entry.Name" Href="@ConsoleResourceUrls.Entry(new EntryId(entry.Name, entry.Namespace))" IconName="entry" /><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(entry.WorkspaceId)" /><small>@T("EntryVersion", entry.Version)</small>
                                             <div class="workspace-entry-config @(role == DashboardItemRole.Primary ? "without-order" : null)">
                                                 <label><span>@T("Role")</span><select data-testid="dashboard-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry, args)" title="@T("OnlyOnePrimaryEntry")"><option value="Primary">@T("Role.Primary")</option><option value="Featured">@T("Role.Featured")</option><option value="Standard">@T("Role.Standard")</option></select></label>
                                                 @if (role != DashboardItemRole.Primary)
                                                 {
-                                                    <div class="workspace-entry-order-actions" aria-label="@T("DashboardEntryOrderActions", entry.DisplayName)">
+                                                    <div class="workspace-entry-order-actions" aria-label="@T("DashboardEntryOrderActions", entry.DisplayName)"><CollectionActions ResourceName="@entry.DisplayName">
                                                         <button type="button" data-testid="dashboard-entry-move-up" disabled="@(!CanMoveEntry(entry, -1))" title="@T("MoveUp")" aria-label="@T("MoveDashboardEntryUp", entry.DisplayName)" @onclick="() => MoveEntry(entry, -1)">↑</button>
-                                                        <button type="button" data-testid="dashboard-entry-move-down" disabled="@(!CanMoveEntry(entry, 1))" title="@T("MoveDown")" aria-label="@T("MoveDashboardEntryDown", entry.DisplayName)" @onclick="() => MoveEntry(entry, 1)">↓</button>
+                                                        <button type="button" data-testid="dashboard-entry-move-down" disabled="@(!CanMoveEntry(entry, 1))" title="@T("MoveDown")" aria-label="@T("MoveDashboardEntryDown", entry.DisplayName)" @onclick="() => MoveEntry(entry, 1)">↓</button></CollectionActions>
                                                     </div>
                                                 }
                                             </div>
@@ -101,7 +101,7 @@ else
                                 @foreach (var entry in ExcludedEntries)
                                 {
                                     <article @key="EntryId(entry)" class="workspace-entry-row excluded" data-testid="dashboard-entry-row" data-entry-id="@entry.Id" data-entry-namespace="@entry.Namespace.Value">
-                                        <label class="workspace-entry-toggle"><input type="checkbox" data-testid="dashboard-entry-toggle" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
+                                        <label class="workspace-entry-toggle"><input type="checkbox" data-testid="dashboard-entry-toggle" @onchange="args => ToggleEntry(entry, args)" /><span>@entry.DisplayName</span></label><CollectionIdentity DisplayName="@entry.DisplayName" Namespace="@entry.Namespace.Value" Name="@entry.Name" Href="@ConsoleResourceUrls.Entry(new EntryId(entry.Name, entry.Namespace))" IconName="entry" /><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(entry.WorkspaceId)" /><small>@T("EntryVersion", entry.Version)</small>
                                         <span class="workspace-entry-excluded">@T("NotShown")</span>
                                     </article>
                                 }

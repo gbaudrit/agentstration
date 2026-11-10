@@ -15,7 +15,7 @@ public sealed class ModelProfilePickerTests
     public async Task SelectedProfileUsesOneSummaryAndChoosingAnotherRestoresTheDisclosureFocus()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var original = Summary("original", "Original profile", ResourceScopeRef.Instance);
         var alternative = Summary("alternative", "Alternative profile", ResourceScopeRef.Instance);
@@ -38,7 +38,7 @@ public sealed class ModelProfilePickerTests
         Assert.IsFalse(string.IsNullOrEmpty(description));
         var describedRow = rendered.FindAll("[id]").Single(element => element.Id == description);
         StringAssert.Contains(describedRow.TextContent, "Original profile");
-        StringAssert.Contains(describedRow.TextContent, "/instance");
+        Assert.AreEqual("/instance", describedRow.QuerySelector(".resource-scope-badge")!.GetAttribute("title"));
         StringAssert.Contains(currentChoice.TextContent, "Selected");
         Assert.IsEmpty(rendered.FindAll(".collection-pager"));
         Assert.IsEmpty(changes);
@@ -54,7 +54,7 @@ public sealed class ModelProfilePickerTests
     public async Task PagingAndFilteringRetainTheSelectedProfileOutsideTheVisiblePage()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var profiles = Enumerable.Range(0, 25).Select(index => Summary($"profile-{index:D2}", $"Profile {index:D2}", ResourceScopeRef.Instance)).ToArray();
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient(profiles));
@@ -81,7 +81,7 @@ public sealed class ModelProfilePickerTests
     [TestMethod]
     public async Task DisposingDuringInitialLookupStopsTheSelectionContinuation()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var response = new TaskCompletionSource<ModelProfileLookupPageResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         CancellationToken lookupToken = default;
@@ -106,7 +106,7 @@ public sealed class ModelProfilePickerTests
     [TestMethod]
     public async Task SupersededLookupIsCancelledAndCannotReplaceNewResultsOrTheSelection()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var original = Summary("selected", "Saved selection", ResourceScopeRef.Instance);
         var oldResponse = new TaskCompletionSource<ModelProfileLookupPageResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -149,7 +149,7 @@ public sealed class ModelProfilePickerTests
     public void NewAgentSelectionReplacesAMissingDefaultWithTheDisplayedProfile()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         string? selectedName = null;
@@ -175,7 +175,7 @@ public sealed class ModelProfilePickerTests
     public void HomonymousProfilesDisplayAndSelectTheirExactScope()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceScope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient([

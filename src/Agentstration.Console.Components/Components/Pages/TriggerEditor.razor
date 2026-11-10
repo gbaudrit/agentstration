@@ -24,7 +24,7 @@ else if (notFound)
 else
 {
     <PageHeader Title="@(IsNew ? T("NewTrigger") : model.DisplayName)" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))" TestId="resource-trigger-editor">
-        <Actions><a class="button-secondary" href="@(IsNew ? "/triggers" : $"/triggers/{Uri.EscapeDataString(model.Name)}")">@T("Cancel")</a></Actions>
+        <Actions><a class="button-secondary" href="@(IsNew ? "/triggers" : ConsoleResourceUrls.WithOwnerScope($"/triggers/{Uri.EscapeDataString(model.Name)}?namespace={Uri.EscapeDataString(ResourceNamespace.Parse(NamespaceValue).Value)}", existing?.Value.ScopeRef))">@T("Cancel")</a></Actions>
     </PageHeader>
 
     @if (!CanManage) { <div class="form-alert form-alert-danger" role="alert">@T("ManagePermissionDenied")</div> }
@@ -94,13 +94,14 @@ else
         else
         {
             <UnsavedChangesBar IsVisible="@IsDirty" Message="@T("UnsavedMessage")">
-                <Actions><a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(model.Name)}")">@T("Discard")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? T("Saving") : T("SaveChanges"))</button></Actions>
+                <Actions><a class="button-secondary" href="@(ConsoleResourceUrls.WithOwnerScope($"/triggers/{Uri.EscapeDataString(model.Name)}?namespace={Uri.EscapeDataString(ResourceNamespace.Parse(NamespaceValue).Value)}", existing?.Value.ScopeRef))">@T("Discard")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? T("Saving") : T("SaveChanges"))</button></Actions>
             </UnsavedChangesBar>
         }
     </EditForm>
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
     [Parameter] public string? Name { get; set; }
     private TriggerEditorModel? model;
     private ResourceSnapshot<TriggerResource>? existing;
@@ -131,7 +132,7 @@ else
             }
             else
             {
-                existing = await Client.GetAsync(ResourceNamespace.Default, Name!, CancellationToken.None);
+                existing = await Client.GetAsync(ResourceNamespace.Parse(NamespaceValue), Name!, CancellationToken.None);
                 if (existing is null) { notFound = true; return; }
                 model = From(existing.Value);
             }
@@ -210,7 +211,7 @@ else
             var saved = await Client.SaveAsync(resource, IsNew ? null : existing!.ETag, CancellationToken.None);
             Notifications.Add(new(Guid.NewGuid(), IsNew ? T("Notification.Created") : T("Notification.Updated"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
             savedFingerprint = Fingerprint;
-            Navigation.NavigateTo($"/triggers/{Uri.EscapeDataString(saved.Value.Name)}");
+            Navigation.NavigateTo(ConsoleResourceUrls.Resource("/triggers", saved.Value.Name, saved.Value.Namespace, TriggerUi.DefinitionScope(saved.Value)));
         }
         catch (Exception exception) { error = TriggerUi.ErrorMessage(exception, Localizer); }
         finally { saving = false; }

@@ -1,16 +1,26 @@
 <div class="collection-identity">
     <ResourceIcon IconName="@IconName" Domain="@Domain" />
     <div class="collection-identity-text">
-        <a class="resource-name-link" href="@Href" title="@DisplayName">@DisplayName</a>
-        <div class="collection-qualified-name"><UiIcon Name="folder" /><CopyableValue Value="@($"{Namespace}/{Name}")" /></div>
+        <div role="@(HeadingLevel is null ? null : "heading")" aria-level="@HeadingLevel">
+        @if (Href is not null) { <a class="resource-name-link" href="@Href" title="@DisplayName" @attributes="LinkAttributes">@DisplayName</a> }
+        else if (OnOpen.HasDelegate) { <button type="button" class="resource-name-link collection-identity-button" title="@DisplayName" @onclick="OnOpen" @attributes="LinkAttributes">@DisplayName</button> }
+        else { <strong title="@DisplayName">@DisplayName</strong> }
+        </div>
+        @if (Name is not null)
+        {
+            <div class="collection-qualified-name">@if (Namespace is not null) { <UiIcon Name="folder" /> }<CopyableValue Value="@(Namespace is null ? Name : $"{Namespace}/{Name}")" /></div>
+        }
         @Badges
     </div>
 </div>
 @code {
     [Parameter, EditorRequired] public string DisplayName { get; set; } = string.Empty;
-    [Parameter, EditorRequired] public string Namespace { get; set; } = string.Empty;
-    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
-    [Parameter, EditorRequired] public string Href { get; set; } = string.Empty;
+    [Parameter] public string? Namespace { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public EventCallback OnOpen { get; set; }
+    [Parameter] public int? HeadingLevel { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? LinkAttributes { get; set; }
     [Parameter] public string IconName { get; set; } = "layers";
     [Parameter] public string Domain { get; set; } = "neutral";
     [Parameter] public RenderFragment? Badges { get; set; }

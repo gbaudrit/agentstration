@@ -14,7 +14,7 @@ public sealed class LabelYamlDraftTests
     [TestMethod]
     public async Task IncompleteLabelsNeverReplaceTheSerializableAgentDefinition()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var model = new AgentEditorModel
         {

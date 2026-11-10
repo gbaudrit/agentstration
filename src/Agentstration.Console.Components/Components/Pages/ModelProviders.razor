@@ -22,17 +22,17 @@ else if (providers?.Count == 0)
 }
 else
 {
-    <DataGrid TItem="ModelProviderResponse" Items="providers ?? []">
-        <Header><tr><th>@T("Provider")</th><th>@T("Namespace")</th><th>@T("Type")</th><th>@T("Management")</th><th>@T("Status")</th><th>@T("Models")</th><th></th></tr></Header>
-        <Row Context="provider"><tr>
-            <td><span class="resource-name-with-scope"><strong>@provider.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@provider.ScopeRef" Compact /></span><code>@provider.Name</code></td>
-            <td><code>@provider.Namespace</code></td>
-            <td>@provider.Properties.ContributionId</td><td>@provider.Properties.RegistrationSource</td>
-            <td><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>
-            <td>@ModelCount(provider.Properties.ModelCount)</td>
-            <td><a class="text-button" href="@DetailsUrl(provider)">@T("ViewDetails") →</a></td>
-        </tr></Row>
-    </DataGrid>
+    <CollectionView TItem="ModelProviderResponse" Items="providers ?? []" InformationLabels="@(new string[] { T("Type"), T("Management"), T("Models") })" >
+        <Identity Context="provider"><CollectionIdentity DisplayName="@provider.Properties.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@DetailsUrl(provider)" IconName="server" Domain="model" /></Identity>
+        <Scope Context="provider"><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName /></Scope>
+        <State Context="provider"><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></State>
+        <Information Context="provider">
+            <CollectionValue Label="@T("Type")">@provider.Properties.ContributionId</CollectionValue>
+            <CollectionValue Label="@T("Management")">@provider.Properties.RegistrationSource</CollectionValue>
+            <CollectionValue Label="@T("Models")">@ModelCount(provider.Properties.ModelCount)</CollectionValue>
+        </Information>
+        <Actions Context="provider"><CollectionActions ResourceName="@($"{provider.Properties.DisplayName} ({provider.Namespace}/{provider.Name}, {provider.ScopeRef})")"><a href="@DetailsUrl(provider)">@T("ViewDetails")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {
@@ -51,6 +51,6 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
     }
-    private static string DetailsUrl(ModelProviderResponse provider) => $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    private static string DetailsUrl(ModelProviderResponse provider) => ConsoleResourceUrls.Resource("/modelproviders", provider.Name, ResourceNamespace.Parse(provider.Namespace), provider.ScopeRef);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

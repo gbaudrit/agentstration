@@ -68,7 +68,7 @@
   font-family: var(--font-family-sans);
 }
 
-.app-shell.theme-dark {
+.app-shell.theme-dark, .auth-page.theme-dark {
   --color-background-app: #080e18;
   --color-background-sidebar: #0d1625;
   --color-surface: #111c2b;

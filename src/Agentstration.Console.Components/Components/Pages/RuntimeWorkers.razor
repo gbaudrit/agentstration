@@ -1,3 +1,4 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/settings/runtime-workers"
 @implements IDisposable
 @inject IRuntimeApiClient Client
@@ -10,18 +11,20 @@ else if (items.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyM
 else
 {
     <section class="runtime-workers-grid">
-    <DataGrid TItem="RuntimeWorkerSummaryResponse" Items="items">
-        <Header><tr><th>@T("Worker")</th><th>@T("Presence")</th><th>@T("Session")</th><th>@T("Version")</th><th>@T("Capacity")</th><th>@T("Capabilities")</th><th>@T("LastSeen")</th></tr></Header>
-        <Row Context="item"><tr data-testid="runtime-worker-row" data-worker-id="@item.WorkerId.ToString("D")" data-presence="@item.Presence" data-session-id="@item.SessionId?.ToString("D")">
-            <td data-label="@T("Worker")"><a class="resource-name-link runtime-primary" href="@WorkerUrl(item)">@item.DisplayName</a><small><code class="runtime-token" title="@item.WorkerId.ToString("D")">@item.WorkerId</code></small></td>
-            <td data-label="@T("Presence")"><StatusBadge Text="@T($"Presence.{item.Presence}")" Status="@PlatformDashboardService.ToStatus(item.Presence.ToString())" /><small>@T($"Enrollment.{item.EnrollmentState}")</small></td>
-            <td data-label="@T("Session")"><code class="runtime-token" title="@item.SessionId?.ToString("D")">@(item.SessionId?.ToString("D") ?? "—")</code></td>
-            <td data-label="@T("Version")"><span class="runtime-primary">@SoftwareVersion(item.SoftwareVersion)</span>@if (SoftwareBuild(item.SoftwareVersion) is { } build) { <small class="runtime-token" title="@item.SoftwareVersion">+@build</small> }</td>
-            <td data-label="@T("Capacity")"><span class="runtime-primary">@(item.MaximumConcurrentAssignments?.ToString() ?? "—")</span><small>@T("ActiveAssignments", item.ActiveAssignments)</small></td>
-            <td data-label="@T("Capabilities")" class="runtime-capabilities">@string.Join(", ", item.Capabilities.Select(FormatCapability))</td>
-            <td data-label="@T("LastSeen")">@(item.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")</td>
-        </tr></Row>
-    </DataGrid>
+    <CollectionView TItem="RuntimeWorkerSummaryResponse" Items="items" InformationLabels="@(new string[] { T("Session"), T("Version"), T("Capacity"), T("Capabilities"), T("LastSeen") })" RowTestId="runtime-worker-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-worker-id"] = item.WorkerId.ToString("D"), ["data-presence"] = item.Presence.ToString(), ["data-session-id"] = item.SessionId?.ToString("D") ?? string.Empty })" IdentityLabel="@T("Worker")" StateLabel="@T("Presence")">
+        <Identity Context="item">
+<CollectionIdentity DisplayName="@item.DisplayName" Name="@item.WorkerId.ToString()" Href="@WorkerUrl(item)" IconName="server" /></Identity>
+        <State Context="item">
+<StatusBadge Text="@T($"Presence.{item.Presence}")" Status="@PlatformDashboardService.ToStatus(item.Presence.ToString())" /><small>@T($"Enrollment.{item.EnrollmentState}")</small></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Session")"><code class="runtime-token" title="@item.SessionId?.ToString("D")">@(item.SessionId?.ToString("D") ?? "—")</code></CollectionValue>
+            <CollectionValue Label="@T("Version")"><span class="runtime-primary">@SoftwareVersion(item.SoftwareVersion)</span>@if (SoftwareBuild(item.SoftwareVersion) is { } build) { <small class="runtime-token" title="@item.SoftwareVersion">+@build</small> }</CollectionValue>
+            <CollectionValue Label="@T("Capacity")"><span class="runtime-primary">@(item.MaximumConcurrentAssignments?.ToString() ?? "—")</span><small>@T("ActiveAssignments", item.ActiveAssignments)</small></CollectionValue>
+            <CollectionValue Label="@T("Capabilities")">@string.Join(", ", item.Capabilities.Select(FormatCapability))</CollectionValue>
+            <CollectionValue Label="@T("LastSeen")">@(item.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@item.DisplayName"><a href="@WorkerUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
+    </CollectionView>
     </section>
 }
 

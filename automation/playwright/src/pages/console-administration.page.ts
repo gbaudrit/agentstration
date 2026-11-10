@@ -1,3 +1,4 @@
+import { revealCollectionAction } from './collection-actions.js';
 import { expect, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
@@ -107,6 +108,7 @@ export class ConsoleAdministrationPage {
     await this.page.getByTestId(TestIds.consoleAdministration.patCreate).click();
     const row = this.page.getByTestId(TestIds.consoleAdministration.patTokenRow).filter({ hasText: name });
     await row.waitFor({ state: 'visible' });
+    await revealCollectionAction(row.getByTestId(TestIds.consoleAdministration.patRevoke));
     await row.getByTestId(TestIds.consoleAdministration.patRevoke).click();
     await row.getByTestId(TestIds.consoleAdministration.patRevoke).waitFor({ state: 'detached' });
   }

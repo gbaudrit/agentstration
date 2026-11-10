@@ -54,15 +54,16 @@ else
         }
         else
         {
-            <DataGrid TItem="DataSourceAcquisitionResource" Items="acquisitions">
-                <Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Version")</th><th>@T("AcquiredArtifacts")</th></tr></Header>
-                <Row Context="item">
-                    <tr data-testid="data-source-acquisition-row" data-state="@item.State">
-                        <td data-label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</td>
-                        <td data-label="@T("State")"><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" /></td>
-                        <td data-label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td>
-                        <td data-label="@T("Version")"><code>@item.Composition.Profile.Version</code></td>
-                        <td data-label="@T("AcquiredArtifacts")">
+            <CollectionView TItem="DataSourceAcquisitionResource" Items="acquisitions" RowTestId="data-source-acquisition-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" InformationLabels="@(new[] { T("Created"), T("Version"), T("AcquiredArtifacts") })" IsExpanded="@(item => previewAcquisition == item.Uid && item.Manifest is { Artifacts.Count: > 0 })">
+                <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Name" IconName="database" /></Identity>
+                <Scope Context="item"><ResourceScopeBadge ScopeRef="item.ScopeRef" /></Scope>
+                <State Context="item"><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" /></State>
+                <Information Context="item">
+                    <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
+                    <CollectionValue Label="@T("Version")"><code>@item.Composition.Profile.Version</code></CollectionValue>
+                    <CollectionValue Label="@T("AcquiredArtifacts")">@(item.Manifest?.Artifacts.Count.ToString() ?? "—")</CollectionValue>
+                </Information>
+                <Actions Context="item"><CollectionActions ResourceName="@item.Name"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId">@T("FlowRun")</a>
                             @if (item.Manifest is { Artifacts.Count: > 0 })
                             {
                                 <div class="data-source-acquisition-actions">
@@ -86,16 +87,9 @@ else
                             {
                                 <span class="muted">—</span>
                             }
-                        </td>
-                    </tr>
-                    @if (previewAcquisition == item.Uid && item.Manifest is { Artifacts.Count: > 0 } manifest)
-                    {
-                        <tr class="data-source-acquisition-preview-row"><td colspan="5">
-                            <DataSourceAcquisitionArtifacts @key="item.Uid" Artifacts="manifest.Artifacts" ContextScope="CurrentConsoleScope" />
-                        </td></tr>
-                    }
-                </Row>
-            </DataGrid>
+                        </CollectionActions></Actions>
+                <Details Context="item"><div class="data-source-acquisition-preview-row"><DataSourceAcquisitionArtifacts @key="item.Uid" Artifacts="item.Manifest!.Artifacts" ContextScope="CurrentConsoleScope" /></div></Details>
+            </CollectionView>
         }
         </section>
         @if (toolAcquisition is { } template)
@@ -128,23 +122,45 @@ else
             <h3>@T("DiscoveryHistory")</h3>
             @if (discoveries.Count > 0)
             {
-                <DataGrid TItem="DataSourceDiscoveryResource" Items="discoveries"><Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Version")</th></tr></Header>
-                    <Row Context="item"><tr data-testid="data-source-discovery-row" data-state="@item.State"><td data-label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</td><td data-label="@T("State")"><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@DiscoveryTone(item.State)" /></td><td data-label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td><td data-label="@T("Version")"><code>@item.Composition.Profile.Version</code></td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="DataSourceDiscoveryResource" Items="discoveries" InformationLabels="@(new string[] { T("FlowRun"), T("Version") })" RowTestId="data-source-discovery-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" IdentityLabel="@T("Created")" StateLabel="@T("State")">
+        <Identity Context="item">
+@item.CreatedAt.ToLocalTime().ToString("g")</Identity>
+        <State Context="item">
+<StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@DiscoveryTone(item.State)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></CollectionValue>
+            <CollectionValue Label="@T("Version")"><code>@item.Composition.Profile.Version</code></CollectionValue>
+        </Information>
+    </CollectionView>
             }
             else { <p class="muted">@T("NoDiscovery")</p> }
         </section>
         }
         else
         {
-        @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <DataGrid TItem="DataSourceDiscoveryChoice" Items="manifest.Choices"><Header><tr><th>@T("Choice")</th><th>@T("Parent")</th><th>@T("State")</th><th>@T("TargetName")</th></tr></Header><Row Context="choice"><tr data-testid="data-source-discovery-choice"><td><strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></td><td>@(choice.ParentId ?? "—")</td><td>@(choice.Eligible ? T("Eligible") : T("Ineligible"))</td><td><input value="@PromotionName(choice)" @oninput="args => promotionNames[choice.Id] = args.Value?.ToString() ?? string.Empty" aria-label="@T("TargetName")" /><button class="button-secondary" type="button" disabled="@(!CanApplyChoice(choice))" data-testid="@(MatchingTarget(choice) is { Stale: true } ? "data-source-reconcile-target" : null)" title="@ChoiceActionHelp(choice)" @onclick="() => ApplyChoiceAsync(choice)">@T(ChoiceActionLabel(choice))</button></td></tr></Row></DataGrid> }
+        @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <CollectionView TItem="DataSourceDiscoveryChoice" Items="manifest.Choices" InformationLabels="@(new string[] { T("Parent"), T("TargetName") })" RowTestId="data-source-discovery-choice" IdentityLabel="@T("Choice")" StateLabel="@T("State")">
+        <Identity Context="choice">
+<strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></Identity>
+        <State Context="choice">
+@(choice.Eligible ? T("Eligible") : T("Ineligible"))</State>
+        <Information Context="choice">
+            <CollectionValue Label="@T("Parent")">@(choice.ParentId ?? "—")</CollectionValue>
+            <CollectionValue Label="@T("TargetName")"><input value="@PromotionName(choice)" @oninput="args => promotionNames[choice.Id] = args.Value?.ToString() ?? string.Empty" aria-label="@T("TargetName")" /></CollectionValue>
+        </Information>
+    <Actions Context="choice"><CollectionActions ResourceName="@choice.DisplayName"><button class="button-secondary" type="button" disabled="@(!CanApplyChoice(choice))" data-testid="@(MatchingTarget(choice) is { Stale: true } ? "data-source-reconcile-target" : null)" title="@ChoiceActionHelp(choice)" @onclick="() => ApplyChoiceAsync(choice)">@T(ChoiceActionLabel(choice))</button></CollectionActions></Actions></CollectionView> }
         @if (targets.Count > 0)
         {
             <h3>@T("AcquisitionTargets")</h3>
             @if (targets.Any(item => item.Stale)) { <p class="muted">@T("ReconcileHelp")</p> }
-            <DataGrid TItem="DataSourceAcquisitionTargetView" Items="targets"><Header><tr><th>@T("Name")</th><th>@T("Choice")</th><th>@T("State")</th></tr></Header>
-                <Row Context="item"><tr data-testid="data-source-acquisition-target-row"><td>@item.Target.DisplayName<br/><code>@item.Target.Name</code></td><td>@item.Target.ChoiceDisplayName</td><td title="@(item.Stale && !CanReconcile(item) ? T("ReconcileUnavailable") : null)"><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></td></tr></Row>
-            </DataGrid>
+            <CollectionView TItem="DataSourceAcquisitionTargetView" Items="targets" InformationLabels="@(new string[] { T("Choice") })" RowTestId="data-source-acquisition-target-row" IdentityLabel="@T("Name")" StateLabel="@T("State")">
+        <Identity Context="item">
+@item.Target.DisplayName<br/><code>@item.Target.Name</code></Identity>
+        <State Context="item">
+<StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Choice")">@item.Target.ChoiceDisplayName</CollectionValue>
+        </Information>
+    </CollectionView>
         }
         }
         </div>

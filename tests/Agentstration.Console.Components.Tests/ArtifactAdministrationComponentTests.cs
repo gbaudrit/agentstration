@@ -14,7 +14,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactContentIsOnlyReadAfterExplicitActionAndUsesTabs()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("governed preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -44,7 +44,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactCanLoadCompleteContentInBoundedChunks()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         const string expected = "complete governed artifact content";
         var client = new ArtifactClient(expected, maximumBackendChunk: 8);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -72,7 +72,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactDisablesInlineFullContentWhenArtifactIsTooLarge()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview", declaredLength: 4L * 1024 * 1024 + 1);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -94,7 +94,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactMovesDeleteToHeaderAndRequiresALaterRetentionDate()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -119,7 +119,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void ArtifactListUsesReadableClickableReferencesForStagedAndDurableArtifacts()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -153,7 +153,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void ArtifactTerminologyExplainsAvailabilityInFrench()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("aperçu");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -181,7 +181,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactDisplaysMegabytesAndKeepsTheExactByteCount()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview", declaredLength: 19_343);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -201,7 +201,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactProvenanceLinksToGovernedResources()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -226,7 +226,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void DurableArtifactHasGovernedMetadataDetails()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);

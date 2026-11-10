@@ -113,4 +113,4 @@
 <data name="SaveBeforeApply"><value>Save your changes before applying the configuration.</value></data>
 <data name="YamlFormInvalid"><value>The form contains incomplete or invalid values. This YAML view is read-only and retains the last valid definition. Correct the fields in Definition to edit or save it.</value></data>
 <data name="YamlNeedsValidForm"><value>Complete the invalid fields in Definition before opening the YAML.</value></data>
-</root>
+<data name="InspectTool" xml:space="preserve"><value>Inspect</value></data></root>

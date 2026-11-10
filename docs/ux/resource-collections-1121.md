@@ -1,7 +1,8 @@
 # Resource collection adoption (#1121)
 
-Implementation scope: the five routes below, on `ux/unification-formulaires`.
-The reusable cross-family browser scenario remains deferred in [#1122](https://github.com/gbaudrit/agentstration/issues/1122) until explicit maintainer UX acceptance and merge. This implementation does not close either issue.
+Closure scope now includes every Console and Workplace functional list, including operations, administration/account and embedded collections. The five routes below are wave 1. See the [complete adoption inventory](all-list-adoption-1121.md) and its [surface manifest](https://github.com/gbaudrit/agentstration/blob/feat/1121-resource-collections/docs/ux/collection-surfaces-1121.json).
+
+The maintainer requested a separate draft #1122 coverage PR stacked on the implementation before merge. That explicit ordering exception is recorded in [#1122](https://github.com/gbaudrit/agentstration/issues/1122); it is not UX acceptance. Neither issue is closed by implementation delivery.
 
 `CollectionView<TItem>` uses the existing `DataGrid` for tables and a semantic list of cards with labelled definition lists. It renders one view at a time. Narrow screens initially select cards; an accessible view switch retains the user's choice through resizing. Family adapters own requests, filters, error/loading/empty states, commands and confirmations. `CollectionValue` reuses each family's information template in both renderers.
 
@@ -15,18 +16,18 @@ The reusable cross-family browser scenario remains deferred in [#1122](https://g
 
 All five use `CollectionIdentity` → `ResourceScopeBadge` → applicable `StatusBadge` → family information → `CollectionActions`. Identity uses the existing `ResourceIcon` renderer, a primary display-name anchor and a folder-marked secondary qualified name. Copy writes the complete invariant `namespace/name`. Copy and action controls are siblings of the anchor and stop click propagation. Long names truncate visually; complete text remains in the DOM, title and clipboard, and qualified identities expand on keyboard focus.
 
-Owner names come exclusively from the already-authorized `ConsoleContextState` snapshot. Collection adapters opt into `ResourceScopeBadge.ShowName`; other callers retain their existing compact presentation. There is no per-row name resolution or invented name for an inaccessible owner. Type and name are distinct from namespace. Long tenant/workspace names use a bounded single line, complete screen-reader text, hover/focus disclosure and a tap-pinned small native popover; Escape and leaving focus dismiss it. Native top-layer panels avoid clipping in horizontally scrollable tables. Instance is named by its localized type.
+Owner names come exclusively from the already-authorized `ConsoleContextState` snapshot. The scope badge now lives in the shared component library and shows authorized readable names by default; Workplace and grant/organization adapters may supply names from their already-authorized parent responses. There is no per-row name resolution or invented name for an inaccessible owner. Type and name are distinct from namespace. Long tenant/workspace names use a bounded single line, complete screen-reader text, hover/focus disclosure and a tap-pinned small native popover; Escape and leaving focus dismiss it. Native top-layer panels avoid clipping in horizontally scrollable tables. Instance is named by its localized type.
 
 The final Actions disclosure has native Enter/Space activation, arrow/Home/End navigation, Escape, outside dismissal, Tab exit and focus restoration. Command-specific permissions, management restrictions and detail-page access policies remain family-owned. Shared tables preserve local horizontal scrolling; mobile defaults to cards without dropping identity, scope, applicable state or actions.
 
 ## Parallel work and shared ownership
 
-Base: `1ec6d94` (#1114), including #1097. No open PR targeted the base branch when implementation started. Potential overlaps to reconcile before merge:
+First-wave base: `1ec6d94` (#1114), including #1097. The expanded implementation reconciles `35eadf4` (#1126) from the current integration branch. No open PR targeted the base branch when implementation started. Potential overlaps to reconcile before merge:
 
 - #1092/#1093/#1094: Model Profile list/editor and usage/query work. This change touches the collection adapter and adds only an additive summary `IsManaged` field; it does not change pickers, usage queries or editor workflows.
 - #1095: bounded collection adoption. The new frame has no query/pagination service; existing bounds and total semantics stay in each adapter.
 - #1110: `ResourceIcon` artwork and inheritance. The renderer and storage are unchanged; collections supply family fallbacks only.
-- Shared components: `ResourceScopeBadge` (name opt-in), `StatusBadge` (decorative semantic icon), `CopyableValue` (complete-value disclosure and click isolation), `SharedFormStrings`, collection CSS/JS. No changes to `ResourceActionBar`, resource headers or the form framework.
+- Shared components: `ResourceScopeBadge` (name opt-in), `StatusBadge` (decorative semantic icon), `CopyableValue` (complete-value disclosure and click isolation), `SharedFormStrings`, collection CSS/JS. Form field behavior and commands remain unchanged; Entry form headers reuse the common identity without duplicating the title or changing submission.
 - Existing governed Extension inventory page object accepts table rows and cards; no new reusable journey is introduced.
 
 ## Validation evidence

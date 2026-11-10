@@ -170,4 +170,4 @@
 <data name="Structure.CreateFailed"><value>La création a échoué. Actualisez la structure avant de réessayer.</value></data>
 <data name="OpenTenant.Named"><value>Ouvrir le tenant {0}</value></data>
 <data name="OpenWorkspace.Named"><value>Ouvrir l’espace de travail {0}</value></data>
-</root>
+<data name="ToggleTenant" xml:space="preserve"><value>Déplier ou replier le tenant : {0}</value></data></root>

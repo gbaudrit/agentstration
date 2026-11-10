@@ -104,10 +104,16 @@ else if (artifact is not null)
                 }
                 else
                 {
-                    <DataGrid TItem="ArtifactLease" Items="artifact.Leases">
-                        <Header><tr><th>@T("Consumer")</th><th>@T("Operations")</th><th>@T("Expires")</th><th>@T("State")</th></tr></Header>
-                        <Row Context="lease"><tr><td>@lease.ConsumerKind · <code>@lease.ConsumerId</code></td><td>@string.Join(", ", lease.Operations)</td><td>@lease.ExpiresAt.ToLocalTime().ToString("g")</td><td>@(lease.RevokedAt is null ? T("Active") : T("Revoked"))</td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="ArtifactLease" Items="artifact.Leases" InformationLabels="@(new string[] { T("Operations"), T("Expires") })" IdentityLabel="@T("Consumer")" StateLabel="@T("State")">
+        <Identity Context="lease">
+@lease.ConsumerKind · <code>@lease.ConsumerId</code></Identity>
+        <State Context="lease">
+<StatusBadge Text="@(lease.RevokedAt is null ? T("Active") : T("Revoked"))" Status="@(lease.RevokedAt is null ? UiStatus.Success : UiStatus.Neutral)" /></State>
+        <Information Context="lease">
+            <CollectionValue Label="@T("Operations")">@string.Join(", ", lease.Operations)</CollectionValue>
+            <CollectionValue Label="@T("Expires")">@lease.ExpiresAt.ToLocalTime().ToString("g")</CollectionValue>
+        </Information>
+    </CollectionView>
                 }
             </section>
         }

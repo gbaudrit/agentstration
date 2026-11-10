@@ -32,7 +32,7 @@ public sealed class SchemaConsoleTests
             StringAssert.Contains(rendered.Markup, SchemaFormatIds.JsonSchema);
             StringAssert.Contains(rendered.Markup, Scope.Value);
             StringAssert.Contains(rendered.Find("[data-testid='schema-details-link']").GetAttribute("href"), "/schemas/contact");
-            Assert.HasCount(5, rendered.FindAll("[data-testid='schema-row'] td"));
+            Assert.HasCount(6, rendered.FindAll("[data-testid='schema-row'] td"));
             Assert.HasCount(0, rendered.FindAll("[data-testid='schema-row'] .text-button"));
         });
     }
@@ -343,7 +343,7 @@ public sealed class SchemaConsoleTests
 
     private static BunitContext Context(ISchemasClient client)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(client);

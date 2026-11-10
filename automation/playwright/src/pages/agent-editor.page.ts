@@ -1,3 +1,4 @@
+import { revealCollectionAction } from './collection-actions.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit, selectFirstAvailable, type ControlSelection } from './controls.js';
@@ -102,6 +103,7 @@ export class AgentEditorPage {
         .and(this.page.locator(`[data-profile="${candidate}"]`));
       try { await expect(choice).toBeEnabled({ timeout: 5000 }); }
       catch { continue; }
+      await revealCollectionAction(choice);
       await choice.click(); return;
     }
     throw new Error(`No available model profile matches [${candidates.join(', ')}].`);

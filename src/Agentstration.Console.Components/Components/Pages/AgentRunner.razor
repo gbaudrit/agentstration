@@ -151,10 +151,21 @@ else
         @if (history.Count == 0) { <EmptyState Title="@I("NoRunsYet")" Message="@I("NoRunsYetMessage")" /> }
         else
         {
-            <DataGrid TItem="RuntimeRun" Items="history">
-                <Header><tr><th>@I("Run")</th><th>@I("Date")</th><th>@I("Status")</th><th>@I("Duration")</th><th>@I("Initiator")</th><th>@I("Version")</th><th>@I("Prompt")</th><th>@I("Origin")</th></tr></Header>
-                <Row Context="run"><tr><td><a href="/runs/@run.Id?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@I($"RunState.{run.Status.State}")" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
-            </DataGrid>
+            <CollectionView TItem="RuntimeRun" Items="history" InformationLabels="@(new string[] { I("Date"), I("Duration"), I("Initiator"), I("Version"), I("Prompt"), I("Origin") })" IdentityLabel="@I("Run")" StateLabel="@I("Status")">
+        <Identity Context="run">
+<CollectionIdentity DisplayName="@ShortId(run.Id)" Name="@run.Id" Href="@($"/runs/{run.Id}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}&context={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")" IconName="agent" /></Identity>
+        <Scope Context="run"><ResourceScopeBadge ScopeRef="run.ExecutionScopeRef" /></Scope>
+        <State Context="run">
+<StatusBadge Text="@I($"RunState.{run.Status.State}")" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></State>
+        <Information Context="run">
+            <CollectionValue Label="@I("Date")">@run.Status.CreatedAt.LocalDateTime.ToString("g")</CollectionValue>
+            <CollectionValue Label="@I("Duration")">@Duration(run)</CollectionValue>
+            <CollectionValue Label="@I("Initiator")">@run.Properties.Initiator</CollectionValue>
+            <CollectionValue Label="@I("Version")">@run.Properties.Agent.Version</CollectionValue>
+            <CollectionValue Label="@I("Prompt")">@PromptPreview(run)</CollectionValue>
+            <CollectionValue Label="@I("Origin")">@run.Properties.Origin</CollectionValue>
+        </Information>
+    </CollectionView>
         }
     </section>
 }

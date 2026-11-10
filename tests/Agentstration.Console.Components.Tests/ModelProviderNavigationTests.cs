@@ -566,7 +566,7 @@ public sealed partial class ModelProviderNavigationTests
     private static BunitContext CreateContext(out StubModelProvidersClient providers,
         IReadOnlyList<ExtensionResponse>? extensions = null)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         providers = new StubModelProvidersClient();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProvidersClient>(providers);

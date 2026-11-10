@@ -81,7 +81,16 @@ else
     }
     else if (activeTab == "Deployments")
     {
-        <DataGrid TItem="FlowVersionResponse" Items="versions"><Header><tr><th>@T("Deployment")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Published")</th></tr></Header><Row Context="version"><tr><td><code>local</code></td><td>@version.Version</td><td><StatusBadge Text="@(version.Version == flow.ActiveVersion ? T("Active") : T("Published"))" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></td><td>@version.PublishedAt.LocalDateTime.ToString("g")</td></tr></Row></DataGrid>
+        <CollectionView TItem="FlowVersionResponse" Items="versions" InformationLabels="@(new string[] { T("Version"), T("Published") })" IdentityLabel="@T("Deployment")" StateLabel="@T("Status")">
+        <Identity Context="version">
+<code>local</code></Identity>
+        <State Context="version">
+<StatusBadge Text="@(version.Version == flow.ActiveVersion ? T("Active") : T("Published"))" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></State>
+        <Information Context="version">
+            <CollectionValue Label="@T("Version")">@version.Version</CollectionValue>
+            <CollectionValue Label="@T("Published")">@version.PublishedAt.LocalDateTime.ToString("g")</CollectionValue>
+        </Information>
+    </CollectionView>
     }
     else if (activeTab == "Access" && IsOwnerContext)
     {

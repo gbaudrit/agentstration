@@ -19,7 +19,7 @@ public sealed class VaultGrantPersistenceTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, workspace);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
 
@@ -34,7 +34,7 @@ public sealed class VaultGrantPersistenceTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, workspace);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
@@ -53,7 +53,7 @@ public sealed class VaultGrantPersistenceTests
         Assert.AreEqual(0, editor.FindAll(".unsaved-changes-bar").Count);
         var reopened = context.Render<VaultEditor>(parameters => parameters
             .Add(component => component.Name, "shared"));
-        reopened.WaitForAssertion(() => Assert.AreEqual("Default", reopened.Find(".grant-target-identity strong").TextContent));
+        reopened.WaitForAssertion(() => Assert.AreEqual("Default", reopened.Find(".grant-target-identity .disclosure-trigger").TextContent));
     }
 
     [TestMethod]
@@ -62,7 +62,7 @@ public sealed class VaultGrantPersistenceTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, workspace);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
@@ -83,7 +83,7 @@ public sealed class VaultGrantPersistenceTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, workspace);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/secrets/credential?scopeRef={Uri.EscapeDataString(tenant.Value)}");
@@ -106,7 +106,7 @@ public sealed class VaultGrantPersistenceTests
         using var culture = new TestCultureScope(locale);
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid()));
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
@@ -136,7 +136,7 @@ public sealed class VaultGrantPersistenceTests
     {
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid())) { ValueConfigured = true };
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
@@ -158,7 +158,7 @@ public sealed class VaultGrantPersistenceTests
     {
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid()));
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);

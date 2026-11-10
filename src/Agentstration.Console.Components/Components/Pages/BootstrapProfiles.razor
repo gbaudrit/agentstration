@@ -114,10 +114,16 @@ else
         @if (preview is not null)
         {
             <div class="bootstrap-preview-summary"><StatusBadge Text="@(preview.CanApply ? T("Ready") : T("Invalid"))" Status="@(preview.CanApply ? UiStatus.Success : UiStatus.Danger)" /><span><code>@preview.Digest[..12]</code></span><span>@T("ResourceCount", preview.Resources.Count)</span></div>
-            <DataGrid TItem="BootstrapResourcePreview" Items="preview.Resources">
-                <Header><tr><th>@T("Profile")</th><th>@T("Resource")</th><th>@T("ExpectedAction")</th><th>@T("Details")</th></tr></Header>
-                <Row Context="item"><tr><td><code>@item.Profile</code></td><td><strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></td><td><StatusBadge Text="@DispositionLabel(item.Disposition)" Status="@DispositionTone(item.Disposition)" /></td><td>@if (item.Message is not null) { <span class="inline-warning">@item.Message</span> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@detail.Description</small></li> }</ul> }</td></tr></Row>
-            </DataGrid>
+            <CollectionView TItem="BootstrapResourcePreview" Items="preview.Resources" InformationLabels="@(new string[] { T("Profile"), T("Details") })" IdentityLabel="@T("Resource")" StateLabel="@T("ExpectedAction")">
+        <Identity Context="item">
+<strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></Identity>
+        <State Context="item">
+<StatusBadge Text="@DispositionLabel(item.Disposition)" Status="@DispositionTone(item.Disposition)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Profile")"><code>@item.Profile</code></CollectionValue>
+            <CollectionValue Label="@T("Details")">@if (item.Message is not null) { <span class="inline-warning">@item.Message</span> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@detail.Description</small></li> }</ul> }</CollectionValue>
+        </Information>
+    </CollectionView>
             <div class="bootstrap-apply"><p>@T("ApplyDescription")</p><button class="button-primary" disabled="@(!preview.CanApply || busy)" @onclick="() => confirmApply = true">@T("ApplyPreview")</button></div>
         }
     </section>
@@ -135,10 +141,20 @@ else
         @if (view.Applications.Count == 0) { <EmptyState Title="@T("NoManualApplication")" Message="@T("NoManualApplicationMessage")" /> }
         else
         {
-            <DataGrid TItem="BootstrapApplicationResource" Items="view.Applications">
-                <Header><tr><th>@T("Started")</th><th>@T("Profiles")</th><th>@T("Target")</th><th>@T("Status")</th><th>@T("Results")</th><th></th></tr></Header>
-                <Row Context="application"><tr><td>@application.Definition.StartedAt.ToLocalTime().ToString("g")</td><td>@string.Join(" → ", application.Definition.Profiles)</td><td>@TargetLabel(application.Definition.Target)</td><td><StatusBadge Text="@ApplicationStatusLabel(application.Definition.Status)" Status="@ApplicationTone(application.Definition.Status)" /></td><td>@application.Definition.Resources.Count</td><td><button class="text-button" disabled="@busy" @onclick="() => ShowApplicationAsync(application.Metadata.Name)">@T("View")</button></td></tr></Row>
-            </DataGrid>
+            <CollectionView TItem="BootstrapApplicationResource" Items="view.Applications" InformationLabels="@(new string[] { T("Started"), T("Results") })" IdentityLabel="@T("Profiles")" ScopeLabel="@T("Target")" StateLabel="@T("Status")">
+        <Identity Context="application">
+@string.Join(" → ", application.Definition.Profiles)</Identity>
+        <Scope Context="application">
+@TargetLabel(application.Definition.Target)</Scope>
+        <State Context="application">
+<StatusBadge Text="@ApplicationStatusLabel(application.Definition.Status)" Status="@ApplicationTone(application.Definition.Status)" /></State>
+        <Information Context="application">
+            <CollectionValue Label="@T("Started")">@application.Definition.StartedAt.ToLocalTime().ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("Results")">@application.Definition.Resources.Count</CollectionValue>
+        </Information>
+        <Actions Context="application">
+<CollectionActions ResourceName="@(application.Metadata.Name)"><button class="text-button" disabled="@busy" @onclick="() => ShowApplicationAsync(application.Metadata.Name)">@T("View")</button></CollectionActions></Actions>
+    </CollectionView>
         }
     </section>
 
@@ -169,10 +185,16 @@ else
             }
             else
             {
-                <DataGrid TItem="BootstrapAppliedResource" Items="selectedApplication.Definition.Resources">
-                    <Header><tr><th>@T("Profile")</th><th>@T("Resource")</th><th>@T("Outcome")</th><th>@T("Message")</th></tr></Header>
-                    <Row Context="item"><tr><td><code>@item.Profile</code></td><td><strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></td><td><StatusBadge Text="@DispositionLabel(item.Disposition)" Status="@DispositionTone(item.Disposition)" /></td><td>@item.Message</td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="BootstrapAppliedResource" Items="selectedApplication.Definition.Resources" InformationLabels="@(new string[] { T("Profile"), T("Message") })" IdentityLabel="@T("Resource")" StateLabel="@T("Outcome")">
+        <Identity Context="item">
+<strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></Identity>
+        <State Context="item">
+<StatusBadge Text="@DispositionLabel(item.Disposition)" Status="@DispositionTone(item.Disposition)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Profile")"><code>@item.Profile</code></CollectionValue>
+            <CollectionValue Label="@T("Message")">@item.Message</CollectionValue>
+        </Information>
+    </CollectionView>
             }
         </section>
     }

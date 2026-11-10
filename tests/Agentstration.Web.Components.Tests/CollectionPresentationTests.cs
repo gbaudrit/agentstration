@@ -72,6 +72,62 @@ public sealed class CollectionPresentationTests
         StringAssert.Contains(badge.Markup, "Managed / read-only");
     }
 
+    [TestMethod]
+    public async Task ReadOnlyOperationalCollectionOmitsInventedColumnsAndPreservesCardMetadata()
+    {
+        using var context = Context();
+        var cut = context.Render<CollectionView<string>>(parameters => parameters
+            .Add(value => value.Items, ["event-1"])
+            .Add(value => value.IdentityLabel, "Event")
+            .Add(value => value.Identity, item => builder => builder.AddContent(0, item))
+            .Add(value => value.InformationLabels, ["Occurred"])
+            .Add(value => value.Information, _ => builder =>
+            {
+                builder.OpenComponent<CollectionValue>(0);
+                builder.AddAttribute(1, nameof(CollectionValue.Label), "Occurred");
+                builder.AddAttribute(2, nameof(CollectionValue.ChildContent), (RenderFragment)(content => content.AddContent(0, "2026-11-10")));
+                builder.CloseComponent();
+            })
+            .Add(value => value.ItemAttributes, item => new Dictionary<string, object> { ["class"] = "selected-event", ["data-event-id"] = item }));
+        CollectionAssert.AreEqual(new[] { "Event", "Occurred" }, cut.FindAll("th").Select(value => value.TextContent).ToArray());
+        await cut.FindAll(".collection-view-switch button")[1].ClickAsync(new());
+        Assert.AreEqual("event-1", cut.Find(".collection-card.selected-event").GetAttribute("data-event-id"));
+        Assert.IsEmpty(cut.FindAll(".collection-actions, .status-badge, .resource-owner-scope"));
+    }
+
+    [TestMethod]
+    public async Task ExpandedDetailsRemainAttachedToTheCorrectItemAcrossPresentations()
+    {
+        using var context = Context();
+        var cut = context.Render<CollectionView<string>>(parameters => parameters
+            .Add(value => value.Items, ["first", "second"])
+            .Add(value => value.Identity, item => builder => builder.AddContent(0, item))
+            .Add(value => value.InformationLabels, [])
+            .Add(value => value.Information, _ => _ => { })
+            .Add(value => value.IsExpanded, item => item == "second")
+            .Add(value => value.Details, item => builder => builder.AddContent(0, $"Artifacts of {item}")));
+        Assert.AreEqual("1", cut.Find(".collection-expanded td").GetAttribute("colspan"));
+        Assert.AreEqual("Artifacts of second", cut.Find(".collection-expanded").TextContent);
+        await cut.FindAll(".collection-view-switch button")[1].ClickAsync(new());
+        Assert.IsEmpty(cut.FindAll(".collection-card")[0].QuerySelectorAll(".collection-expanded"));
+        Assert.AreEqual("Artifacts of second", cut.FindAll(".collection-card")[1].QuerySelector(".collection-expanded")!.TextContent);
+    }
+
+    [TestMethod]
+    public async Task InPageInspectionAndUnqualifiedIdentifiersDoNotInventResourceRoutes()
+    {
+        using var context = Context();
+        var opened = 0;
+        var cut = context.Render<CollectionIdentity>(parameters => parameters
+            .Add(value => value.DisplayName, "Build 1")
+            .Add(value => value.Name, "build-id")
+            .Add(value => value.OnOpen, () => opened++));
+        Assert.IsEmpty(cut.FindAll("a"));
+        Assert.AreEqual("build-id", cut.Find("code").TextContent);
+        await cut.Find(".collection-identity-button").ClickAsync(new());
+        Assert.AreEqual(1, opened);
+    }
+
     private static BunitContext Context()
     {
         var context = new BunitContext();

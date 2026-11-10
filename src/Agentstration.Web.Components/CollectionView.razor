@@ -13,14 +13,15 @@
             <ul class="collection-cards">
                 @foreach (var item in Items)
                 {
-                    <li class="collection-card">
+                    <li data-testid="@RowTestId" @attributes="Attributes(item, true)">
                         @Identity(item)
                         <dl>
-                            <CollectionValue Label="@Shared["Scope"]">@Scope(item)</CollectionValue>
-                            @if (State is not null) { <CollectionValue Label="@Shared["CollectionState"]">@State(item)</CollectionValue> }
+                            @if (Scope is not null) { <CollectionValue Label="@(ScopeLabel ?? Shared["Scope"])">@Scope(item)</CollectionValue> }
+                            @if (State is not null) { <CollectionValue Label="@(StateLabel ?? Shared["CollectionState"])">@State(item)</CollectionValue> }
                             @Information(item)
                         </dl>
-                        <div class="collection-actions">@Actions(item)</div>
+                        @if (Actions is not null) { <div class="collection-actions">@Actions(item)</div> }
+                        @if (Details is not null && IsExpanded?.Invoke(item) == true) { <div class="collection-expanded">@Details(item)</div> }
                     </li>
                 }
             </ul>
@@ -29,30 +30,48 @@
     else
     {
         <DataGrid TItem="TItem" Items="Items">
-            <Header><tr><th scope="col">@Shared["CollectionResource"]</th><th scope="col">@Shared["Scope"]</th>@if (State is not null) { <th scope="col">@Shared["CollectionState"]</th> }@foreach (var heading in InformationLabels) { <th scope="col">@heading</th> }<th scope="col">@Shared["CollectionActions"]</th></tr></Header>
-            <Row Context="item"><tr>
+            <Header><tr><th scope="col">@(IdentityLabel ?? Shared["CollectionResource"])</th>@if (Scope is not null) { <th scope="col">@(ScopeLabel ?? Shared["Scope"])</th> }@if (State is not null) { <th scope="col">@(StateLabel ?? Shared["CollectionState"])</th> }@foreach (var heading in InformationLabels) { <th scope="col">@heading</th> }@if (Actions is not null) { <th scope="col">@Shared["CollectionActions"]</th> }</tr></Header>
+            <Row Context="item"><tr data-testid="@RowTestId" @attributes="Attributes(item, false)">
                 <td class="collection-identity-cell">@Identity(item)</td>
-                <td>@Scope(item)</td>
+                @if (Scope is not null) { <td>@Scope(item)</td> }
                 @if (State is not null) { <td>@State(item)</td> }
                 @Information(item)
-                <td class="collection-actions">@Actions(item)</td>
-            </tr></Row>
+                @if (Actions is not null) { <td class="collection-actions">@Actions(item)</td> }
+            </tr>
+            @if (Details is not null && IsExpanded?.Invoke(item) == true)
+            {
+                <tr class="collection-expanded"><td colspan="@(1 + (Scope is null ? 0 : 1) + (State is null ? 0 : 1) + InformationLabels.Length + (Actions is null ? 0 : 1))">@Details(item)</td></tr>
+            }
+            </Row>
         </DataGrid>
     }
 </div>
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<TItem> Items { get; set; } = [];
     [Parameter, EditorRequired] public RenderFragment<TItem> Identity { get; set; } = null!;
-    [Parameter, EditorRequired] public RenderFragment<TItem> Scope { get; set; } = null!;
+    [Parameter] public string? IdentityLabel { get; set; }
+    [Parameter] public string? ScopeLabel { get; set; }
+    [Parameter] public string? StateLabel { get; set; }
+    [Parameter] public string? RowTestId { get; set; }
+    [Parameter] public Func<TItem, IReadOnlyDictionary<string, object>>? ItemAttributes { get; set; }
+    [Parameter] public Func<TItem, bool>? IsExpanded { get; set; }
+    [Parameter] public RenderFragment<TItem>? Details { get; set; }
+    [Parameter] public RenderFragment<TItem>? Scope { get; set; }
     [Parameter] public RenderFragment<TItem>? State { get; set; }
     [Parameter, EditorRequired] public string[] InformationLabels { get; set; } = [];
     [Parameter, EditorRequired] public RenderFragment<TItem> Information { get; set; } = null!;
-    [Parameter, EditorRequired] public RenderFragment<TItem> Actions { get; set; } = null!;
+    [Parameter] public RenderFragment<TItem>? Actions { get; set; }
     private ElementReference root;
     private bool cards;
     private bool selectedView;
     private IJSObjectReference? module;
     private DotNetObjectReference<CollectionView<TItem>>? reference;
+    private IReadOnlyDictionary<string, object> Attributes(TItem item, bool card)
+    {
+        var values = ItemAttributes?.Invoke(item) is { } source ? new Dictionary<string, object>(source) : [];
+        if (card) values["class"] = values.TryGetValue("class", out var value) ? $"collection-card {value}" : "collection-card";
+        return values;
+    }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;

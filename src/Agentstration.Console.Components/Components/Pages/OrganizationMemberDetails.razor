@@ -33,10 +33,16 @@ else
             <div class="form-actions"><button class="button-primary" @onclick="LinkExternalIdentityAsync">@T("LinkExternalIdentity")</button></div>
             @if (member.ExternalIdentities.Count > 0)
             {
-                <DataGrid TItem="ExternalIdentity" Items="member.ExternalIdentities">
-                    <Header><tr><th>@T("Issuer")</th><th>@T("Subject")</th><th>@T("Linked")</th><th></th></tr></Header>
-                    <Row Context="identity"><tr><td><code>@identity.Issuer</code></td><td><code>@identity.Subject</code></td><td>@identity.LinkedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">@T("Unlink")</button></td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="ExternalIdentity" Items="member.ExternalIdentities" InformationLabels="@(new string[] { T("Subject"), T("Linked") })" IdentityLabel="@T("Issuer")">
+        <Identity Context="identity">
+<code>@identity.Issuer</code></Identity>
+        <Information Context="identity">
+            <CollectionValue Label="@T("Subject")"><code>@identity.Subject</code></CollectionValue>
+            <CollectionValue Label="@T("Linked")">@identity.LinkedAt.ToLocalTime().ToString("g")</CollectionValue>
+        </Information>
+        <Actions Context="identity">
+<CollectionActions ResourceName="@(identity.Subject)"><button class="text-button" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">@T("Unlink")</button></CollectionActions></Actions>
+    </CollectionView>
             }
         </section>
         <section class="panel" style="margin-top:18px">

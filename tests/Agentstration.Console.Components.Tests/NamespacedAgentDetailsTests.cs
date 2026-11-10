@@ -21,7 +21,7 @@ public sealed class NamespacedAgentDetailsTests
     public void BootstrapAgentRedirectsToTheEditableNamespacedEditor()
     {
         using var culture = new CultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddSingleton<IManagementApiClient>(new FakeManagementClient(packManaged: false));
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         context.Services.AddSingleton<IAgentRunnerRuntimeClient>(new FakeRuntimeClient());
@@ -39,7 +39,7 @@ public sealed class NamespacedAgentDetailsTests
     public async Task PageShowsPackBindingsAndPreparesTheExactNamespacedAgentRevision()
     {
         using var culture = new CultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var agents = new FakeManagementClient();
         var runtime = new FakeRuntimeClient();
         context.Services.AddSingleton<IManagementApiClient>(agents);
@@ -130,7 +130,7 @@ public sealed class NamespacedAgentDetailsTests
     public void FrenchCatalogLocalizesNamespacedAgentOperations()
     {
         using var culture = new CultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var localizer = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<NamespacedAgentDetailsStrings>>();
 

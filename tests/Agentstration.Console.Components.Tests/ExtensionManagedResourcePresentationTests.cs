@@ -32,7 +32,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     public void ManagedResourcePanelResolvesReadableExtensionAndReciprocalLink(string cultureName, string bundleVersionLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
 
@@ -59,7 +59,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     [TestMethod]
     public void ManagedToolSetShowsExtensionAndHidesDeleteAction()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolSetsClient>(new ToolSetsClientStub());
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
@@ -81,7 +81,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     [TestMethod]
     public void ManagedResourceDoesNotLinkToAResourceWithAnotherUid()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
         var rendered = context.Render<ExtensionManagedResourcePanel>(parameters => parameters
@@ -94,7 +94,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     [TestMethod]
     public void ToolSetDetailsRequestsTheExactScopeForTheResourceAndVersions()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new ToolSetsClientStub();
         context.Services.AddSingleton<IToolSetsClient>(client);
@@ -116,7 +116,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     public void ProfileListShowsExtensionAndDistinctBundleVersion(string cultureName, string managedLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfilesClientStub());
@@ -138,7 +138,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     public void ManagedProfileKeepsAccessAdministrationAvailable(string cultureName, string accessLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfilesClientStub());
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());

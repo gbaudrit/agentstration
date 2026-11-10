@@ -36,4 +36,9 @@
   <data name="TenantAdministration" xml:space="preserve"><value>Tenant administration</value></data>
   <data name="ConfirmContextChange" xml:space="preserve"><value>You have unsaved changes. Discard them and change context?</value></data>
   <data name="ContextChangeFailed" xml:space="preserve"><value>Context change failed</value></data>
+<data name="NotificationTone.Success" xml:space="preserve"><value>Success</value></data>
+<data name="NotificationTone.Warning" xml:space="preserve"><value>Warning</value></data>
+<data name="NotificationTone.Danger" xml:space="preserve"><value>Error</value></data>
+<data name="NotificationTone.Info" xml:space="preserve"><value>Information</value></data>
+<data name="NotificationTone.Neutral" xml:space="preserve"><value>Notice</value></data>
 </root>

@@ -142,7 +142,7 @@ public sealed class SourceRegistryConsoleTests
 
     private static BunitContext Context(ISourceRegistriesClient client, ISecretsClient? secrets = null)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(client);
         context.Services.AddSingleton(secrets ?? new StubSecretsClient());

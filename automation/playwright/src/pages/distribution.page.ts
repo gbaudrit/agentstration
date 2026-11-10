@@ -29,7 +29,7 @@ export class DistributionPage {
     await this.open(consoleUrl, '/extensions', 'extensions');
     await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.distribution.extensionCatalogTab).click();
-    const detail = this.page.locator('#extensions-panel-catalog a.text-button[href^="/extensions/"]').first();
+    const detail = this.page.locator('#extensions-panel-catalog a.resource-name-link[href^="/extensions/"]').first();
     await detail.waitFor({ state: 'visible' });
     await detail.click();
     await this.page.getByTestId(TestIds.distribution.extensionDetails).waitFor({ state: 'visible' });

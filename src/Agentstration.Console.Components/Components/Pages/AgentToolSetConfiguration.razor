@@ -14,8 +14,8 @@
             var assignment = Assignment(version);
             <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version" data-scope="@version.ScopeRef?.Value">
                 <header class="agent-toolset-header">
-                    <div class="agent-toolset-identity"><span class="agent-toolset-icon" aria-hidden="true"><TablerIcon Name="layers" /></span><div><span class="agent-toolset-kind">@T("PublishedToolSet")</span><h3>@version.ToolSetName</h3><code>@version.Namespace/@version.ToolSetName:@version.Version</code></div></div>
-                    <a class="text-button" href="@ToolSetUrl(version)">@T("InspectToolSet") →</a>
+                    <CollectionIdentity DisplayName="@version.ToolSetName" Namespace="@version.Namespace.Value" Name="@version.ToolSetName" Href="@ToolSetUrl(version)" IconName="layers" /><ResourceScopeBadge ScopeRef="version.ScopeRef" /><code>@version.Version</code>
+
                 </header>
                 <div class="agent-toolset-assignment">
                     <input id="@FullInputId(version)" type="checkbox" checked="@(assignment is not null)" @onchange="args => ToggleFullAsync(version, (bool)args.Value!)" />
@@ -37,6 +37,7 @@
                         </div>
                     </div>
                 }
+            <CollectionActions ResourceName="@version.ToolSetName"><a href="@ToolSetUrl(version)">@T("InspectToolSet")</a></CollectionActions>
             </article>
         }
         </div>

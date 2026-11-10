@@ -17,7 +17,7 @@ public sealed class ParameterComponentTests
     [TestMethod]
     public void ListRendersVisibleTypedValueAndExactScope()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var scope = ResourceScopeRef.Tenant(Guid.NewGuid());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IParametersClient>(new StubClient(new ParameterResource
@@ -33,7 +33,7 @@ public sealed class ParameterComponentTests
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual("12", rendered.Find("[data-testid='parameter-row'] td:nth-child(3) code").TextContent);
+            Assert.AreEqual("12", rendered.Find("[data-testid='parameter-row'] td:nth-child(4) code").TextContent);
             StringAssert.Contains(rendered.Markup, scope.Value);
             StringAssert.Contains(rendered.Markup, "/parameters/retry-count?scopeRef=");
         });

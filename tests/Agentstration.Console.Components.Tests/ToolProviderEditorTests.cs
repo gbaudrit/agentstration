@@ -14,7 +14,7 @@ public sealed class ToolProviderEditorTests
     [TestMethod]
     public void ProviderSectionsAreRenderedAsExclusiveTabs()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolsClient>(new ProviderClient());
 
@@ -48,7 +48,7 @@ public sealed class ToolProviderEditorTests
     public void ClearingConnectionCommandDoesNotChangeItsTransportOrInvokeProviderCommands(string locale)
     {
         using var culture = new TestCultureScope(locale);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolsClient>(new ProviderClient());

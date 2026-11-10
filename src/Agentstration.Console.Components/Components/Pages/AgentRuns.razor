@@ -1,9 +1,22 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/agent-runs"
 @implements IDisposable
 @inject IRuntimeApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunsStrings> Localizer
 <PageTitle>@T("PageTitle")</PageTitle><PageHeader Title="@T("Title")" Description="@T("Description")" />
 <div data-testid="flow-observability-agent-runs">
-@if(items is null){<LoadingState Message="@T("Loading")"/>}else if(items.Count == 0){<EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"/>}else{<DataGrid TItem="ExecutionSummary" Items="items"><Header><tr><th>@T("Run")</th><th>@T("Agent")</th><th>@T("Status")</th><th>@T("Started")</th><th>@T("Duration")</th><th>@T("Outcome")</th></tr></Header><Row Context="item"><tr><td><a href="/runs/@Uri.EscapeDataString(item.Id)"><code>@item.Id</code></a></td><td><strong>@item.Agent</strong></td><td><StatusBadge Text="@T($"RunState.{item.Status}")" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.StartedAt.LocalDateTime.ToString("g")</td><td>@(item.Duration?.ToString("g")??T("Live"))</td><td>@(item.Error??item.Result??"—")</td></tr></Row></DataGrid>}
+@if(items is null){<LoadingState Message="@T("Loading")"/>}else if(items.Count == 0){<EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"/>}else{<CollectionView TItem="ExecutionSummary" Items="items" InformationLabels="@(new string[] { T("Agent"), T("Started"), T("Duration"), T("Outcome") })" IdentityLabel="@T("Run")" StateLabel="@T("Status")">
+        <Identity Context="item">
+<CollectionIdentity DisplayName="@item.Id" Name="@item.Id" Href="@($"/runs/{Uri.EscapeDataString(item.Id)}")" IconName="agent" /></Identity>
+        <State Context="item">
+<StatusBadge Text="@T($"RunState.{item.Status}")" Status="@PlatformDashboardService.ToStatus(item.Status)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Agent")"><strong>@item.Agent</strong></CollectionValue>
+            <CollectionValue Label="@T("Started")">@item.StartedAt.LocalDateTime.ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("Duration")">@(item.Duration?.ToString("g")??T("Live"))</CollectionValue>
+            <CollectionValue Label="@T("Outcome")">@(item.Error??item.Result??"—")</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@item.Id"><a href="@($"/runs/{Uri.EscapeDataString(item.Id)}")">@Shared["OpenItem"]</a></CollectionActions></Actions>
+    </CollectionView>}
 </div>
 @code{private readonly CancellationTokenSource cancellation=new();private IReadOnlyList<ExecutionSummary>? items;protected override async Task OnInitializedAsync()=>items=await Client.GetExecutionsAsync(cancellation.Token);private string T(string key)=>Localizer[key];public void Dispose(){cancellation.Cancel();cancellation.Dispose();}}

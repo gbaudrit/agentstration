@@ -20,7 +20,7 @@ public sealed class AgentCollectionPermissionsTests
     {
         var workspaceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var scope = $"/workspaces/{workspaceId:D}";
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
         context.Services.AddSingleton<IManagementApiClient>(new MockApiClient(TimeProvider.System));

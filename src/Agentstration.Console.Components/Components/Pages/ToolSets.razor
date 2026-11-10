@@ -13,10 +13,21 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (toolSets.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
 else
 {
-    <DataGrid TItem="ToolSetResource" Items="toolSets">
-        <Header><tr><th>@T("ToolSet")</th><th>@T("Version")</th><th>@T("Members")</th><th>@T("Category")</th><th>@T("State")</th><th></th></tr></Header>
-        <Row Context="toolSet"><tr data-testid="toolset-row"><td><span class="resource-name-with-scope"><strong>@toolSet.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="toolSet.ScopeRef" Compact /></span><code>@toolSet.Namespace/@toolSet.Name</code></td><td><code>@toolSet.Definition.Version</code></td><td>@toolSet.Definition.Members.Count</td><td>@(toolSet.Definition.Category?.Name ?? "—")</td><td><StatusBadge Text="@T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(toolSet.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@DetailsUrl(toolSet)">@T("Inspect")</a></td></tr></Row>
-    </DataGrid>
+    <CollectionView TItem="ToolSetResource" Items="toolSets" InformationLabels="@(new string[] { T("Version"), T("Members"), T("Category") })" RowTestId="toolset-row" IdentityLabel="@T("ToolSet")" StateLabel="@T("State")">
+        <Identity Context="toolSet">
+<CollectionIdentity DisplayName="@toolSet.Definition.DisplayName" Namespace="@toolSet.Namespace.Value" Name="@toolSet.Name" Href="@DetailsUrl(toolSet)" IconName="layers"><Badges><ManagedResourceBadge IsManaged="@toolSet.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
+        <Scope Context="toolSet">
+<ResourceScopeBadge ScopeRef="toolSet.ScopeRef" ShowName /></Scope>
+        <State Context="toolSet">
+<StatusBadge Text="@T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(toolSet.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></State>
+        <Information Context="toolSet">
+            <CollectionValue Label="@T("Version")"><code>@toolSet.Definition.Version</code></CollectionValue>
+            <CollectionValue Label="@T("Members")">@toolSet.Definition.Members.Count</CollectionValue>
+            <CollectionValue Label="@T("Category")">@(toolSet.Definition.Category?.Name ?? "—")</CollectionValue>
+        </Information>
+        <Actions Context="toolSet">
+<CollectionActions ResourceName="@($"{toolSet.Definition.DisplayName} ({toolSet.Namespace}/{toolSet.Name}, {toolSet.ScopeRef})")"><a class="text-button" href="@DetailsUrl(toolSet)">@T("Inspect")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {
@@ -33,7 +44,5 @@ else
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
     }
-    private static string DetailsUrl(ToolSetResource value) => value.Namespace.IsDefault
-        ? $"/tools/sets/{Uri.EscapeDataString(value.Name)}"
-        : $"/tools/sets/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+    private static string DetailsUrl(ToolSetResource value) => ConsoleResourceUrls.Resource("/tools/sets", value.Name, value.Namespace, value.ScopeRef);
 }

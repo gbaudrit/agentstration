@@ -37,7 +37,7 @@ public sealed class ModelProfileCollectionStatusTests
             $"profile-{index}", $"profile-{index}",
             new($"Profile {index}", null, new("provider", "provider", "Provider"), new("model"),
                 new(), new(), new(), item.Item1, null), ScopeRef: ResourceScopeRef.Instance)).ToArray();
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
         using var handler = new SummaryHandler(profiles);

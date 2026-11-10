@@ -119,7 +119,7 @@ public sealed class RuntimeObservabilityConsoleTests
 
     private static BunitContext CreateContext(IRuntimeApiClient client)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLogging();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(client);

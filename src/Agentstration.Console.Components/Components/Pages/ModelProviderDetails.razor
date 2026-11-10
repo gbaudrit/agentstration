@@ -76,7 +76,19 @@ else
             @if (modelsError is not null) { <div class="form-alert form-alert-warning">@modelsError</div> }
             @if (discoveryResult is not null) { <div class="form-alert form-alert-success" role="status" data-testid="model-discovery-result">@DiscoverySummary(discoveryResult)</div> }
             @if (models.Count == 0) { <EmptyState Title="@T("NoModelsDiscovered")" Message="@T("NoModelsMessage")" /> }
-            else { <DataGrid TItem="AvailableModelResponse" Items="models"><Header><tr><th>@T("Model")</th><th>@T("Status")</th><th>@T("Capabilities")</th><th>@T("Input")</th><th>@T("Output")</th><th>@T("Actions")</th></tr></Header><Row Context="item"><tr><td>@if (!string.IsNullOrWhiteSpace(item.ResourceName)) { <a class="text-button model-details-link" href="@ModelDetailsUrl(item)" data-testid="open-model-details"><strong>@item.DisplayName</strong></a> } else { <strong>@item.DisplayName</strong> }<br /><code>@item.Name</code></td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" /></td><td>@Features(item)</td><td>@ContentTypes(item.Specification.Input)</td><td>@ContentTypes(item.Specification.Output)</td><td>@if (string.Equals(item.Status, "available", StringComparison.OrdinalIgnoreCase)) { <a class="text-button" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a> }</td></tr></Row></DataGrid> }
+            else { <CollectionView TItem="AvailableModelResponse" Items="models" InformationLabels="@(new string[] { T("Capabilities"), T("Input"), T("Output") })" IdentityLabel="@T("Model")" StateLabel="@T("Status")">
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(string.IsNullOrWhiteSpace(item.ResourceName) ? null : model!.Namespace)" Name="@(item.ResourceName ?? item.Name)" Href="@(string.IsNullOrWhiteSpace(item.ResourceName) ? null : ModelDetailsUrl(item))" IconName="layers" Domain="model" data-testid="open-model-details" /><code>@item.Name</code></Identity>
+        <Scope Context="item"><ResourceScopeBadge ScopeRef="selectedScope" /></Scope>
+        <State Context="item">
+<StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Capabilities")">@Features(item)</CollectionValue>
+            <CollectionValue Label="@T("Input")">@ContentTypes(item.Specification.Input)</CollectionValue>
+            <CollectionValue Label="@T("Output")">@ContentTypes(item.Specification.Output)</CollectionValue>
+        </Information>
+        <Actions Context="item">
+@if (string.Equals(item.Status, "available", StringComparison.OrdinalIgnoreCase)) { <CollectionActions ResourceName="@(item.DisplayName)"> <a class="text-button" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a> </CollectionActions> }</Actions>
+    </CollectionView> }
         </section>
         @if (usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("ModelProfileUsages")</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><a href="@ProfileUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul></section> }
     }

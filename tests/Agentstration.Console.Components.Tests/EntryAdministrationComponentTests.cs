@@ -135,7 +135,7 @@ public sealed class EntryAdministrationComponentTests
     [TestMethod]
     public async Task EntryEditorRawYamlUsesTheSameEditableDraftAndSavePath()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
@@ -462,7 +462,7 @@ public sealed class EntryAdministrationComponentTests
 
     private static BunitContext CreateContext()
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }

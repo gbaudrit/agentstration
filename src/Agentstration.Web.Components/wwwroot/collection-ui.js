@@ -22,7 +22,7 @@ export function attachActions(root) {
         if (root.open) { panel.showPopover(); positionPanel(panel, trigger); }
         else panel.hidePopover();
     };
-    const items = () => [...root.querySelectorAll('a[href], button:not(:disabled)')];
+    const items = () => [...root.querySelectorAll('a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled)')];
     const close = (restore) => { root.open = false; toggle(); if (restore) trigger.focus(); };
     const keydown = event => {
         if (event.key === 'Escape' && root.open) { event.preventDefault(); event.stopPropagation(); close(true); }

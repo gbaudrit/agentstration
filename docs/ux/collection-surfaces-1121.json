@@ -1,0 +1,2355 @@
+{
+  "scope": "All current Console and Workplace functional collections; aliases are not counted as separate surfaces. Fixed navigation and form/enum fields are not list screens. Specialized renderers retain domain semantics.",
+  "baseline": "35eadf47c7980eb4f905e91502744c5567636eac + first-wave PR #1123",
+  "frames": [
+    {
+      "id": "run-grid-flow-run",
+      "source": "src/Agentstration.Console.Components/Components/RunGrid.razor",
+      "line": 3,
+      "host": "console",
+      "routes": [
+        "/flow-runs",
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "FlowRun",
+      "identityLabel": "Flow",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Started",
+        "Duration",
+        "Version",
+        "Deployment",
+        "Trigger",
+        "StartedBy"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-operations-table-work-task-operations-summary",
+      "source": "src/Agentstration.Console.Components/Components/WorkOperations/TaskOperationsTable.razor",
+      "line": 9,
+      "host": "console",
+      "routes": [
+        "/tasks",
+        "/work"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "WorkTaskOperationsSummary",
+      "identityLabel": "Task",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Interaction",
+        "CurrentActivity",
+        "FlowRuns",
+        "Results",
+        "Artifacts",
+        "Updated"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-provider-editor-tool-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor",
+      "line": 65,
+      "host": "console",
+      "routes": [
+        "/tools/providers/new",
+        "/tools/providers/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolResource",
+      "identityLabel": "Name",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Enabled"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "extensions-extension-inventory-item-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "line": 227,
+      "host": "console",
+      "routes": [
+        "/extensions"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ExtensionInventoryItemResponse",
+      "identityLabel": "Extension",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Connection",
+        "Enrollment",
+        "Contributions"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agent-runs-execution-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRuns.razor",
+      "line": 8,
+      "host": "console",
+      "routes": [
+        "/agent-runs"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ExecutionSummary",
+      "identityLabel": "Run",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Agent",
+        "Started",
+        "Duration",
+        "Outcome"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agent-editor-resolved-agent-tool-set-assignment",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
+      "line": 75,
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ResolvedAgentToolSetAssignment",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Version",
+        "DefinitionHash",
+        "EffectiveMembers"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "runtime-worker-details-runtime-assignment-placement-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkerDetails.razor",
+      "line": 50,
+      "host": "console",
+      "routes": [
+        "/settings/runtime-workers/{WorkerId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "RuntimeAssignmentPlacementResponse",
+      "identityLabel": "Run",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Runtime",
+        "Attempts",
+        "Updated"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-sets-tool-set-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor",
+      "line": 16,
+      "host": "console",
+      "routes": [
+        "/tools/sets"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolSetResource",
+      "identityLabel": "ToolSet",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Version",
+        "Members",
+        "Category"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-providers-tool-provider-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
+      "line": 10,
+      "host": "console",
+      "routes": [
+        "/tools/providers"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolProviderResource",
+      "identityLabel": "Name",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Type",
+        "Tools",
+        "Enabled"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "model-provider-details-available-model-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "line": 79,
+      "host": "console",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "AvailableModelResponse",
+      "identityLabel": "Model",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Capabilities",
+        "Input",
+        "Output"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "trigger-details-trigger-occurrence",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "line": 63,
+      "host": "console",
+      "routes": [
+        "/triggers/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "TriggerOccurrence",
+      "identityLabel": "Kind",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Scheduled",
+        "ActuallyFired",
+        "GenerationLabel",
+        "WorkDetails"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "durable-artifact-content-flow-run-artifact-materialization",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DurableArtifactContent.razor",
+      "line": 66,
+      "host": "console",
+      "routes": [
+        "/artifacts/durable/{Id}",
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "FlowRunArtifactMaterialization",
+      "identityLabel": "FlowRun",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Artifact",
+        "Expires"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "pack-project-details-pack-project-build-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "line": 214,
+      "host": "console",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "PackProjectBuildResource",
+      "identityLabel": "Version",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Revision",
+        "Created",
+        "Artifact"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-set-details-published-tool-set-member",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
+      "line": 39,
+      "host": "console",
+      "routes": [
+        "/tools/sets/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "PublishedToolSetMember",
+      "identityLabel": "Tool",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Capability",
+        "Route",
+        "Provider",
+        "Generation",
+        "Approval"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-members-agentstration-identity-contracts-local-account-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "line": 26,
+      "host": "console",
+      "routes": [
+        "/settings/organization/members"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Agentstration.Identity.Contracts.LocalAccountResponse",
+      "identityLabel": "Account",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Principal",
+        "InstanceRole"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-members-agentstration-identity-contracts-organization-member-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "line": 46,
+      "host": "console",
+      "routes": [
+        "/settings/organization/members"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Agentstration.Identity.Contracts.OrganizationMemberResponse",
+      "identityLabel": "Member",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Identity",
+        "AssignedAccess"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-resource-preview",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "line": 117,
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "BootstrapResourcePreview",
+      "identityLabel": "Resource",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Profile",
+        "Details"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-application-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "line": 144,
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "BootstrapApplicationResource",
+      "identityLabel": "Profiles",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Started",
+        "Results"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-applied-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "line": 188,
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "BootstrapAppliedResource",
+      "identityLabel": "Resource",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Profile",
+        "Message"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "packs-installed-pack-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "line": 43,
+      "host": "console",
+      "routes": [
+        "/packs"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "InstalledPackResource",
+      "identityLabel": "Pack",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Purpose",
+        "Audience",
+        "Version",
+        "Resources",
+        "Installed"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "staged-artifact-details-artifact-lease",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
+      "line": 107,
+      "host": "console",
+      "routes": [
+        "/artifacts/staged/{Id}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ArtifactLease",
+      "identityLabel": "Consumer",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Operations",
+        "Expires"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-sources-data-source-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSources.razor",
+      "line": 15,
+      "host": "console",
+      "routes": [
+        "/data-sources"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceResource",
+      "identityLabel": "Name",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Profile"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "secrets-secret-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
+      "line": 21,
+      "host": "console",
+      "routes": [
+        "/secrets"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SecretResponse",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Vault",
+        "Type"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flows-flow-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
+      "line": 16,
+      "host": "console",
+      "routes": [
+        "/flows"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "FlowSummary",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Kind",
+        "Version",
+        "Updated"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-access-access-row",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor",
+      "line": 12,
+      "host": "console",
+      "routes": [
+        "/settings/organization/access"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "AccessRow",
+      "identityLabel": "Principal",
+      "scope": true,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Role",
+        "Inheritance"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-details-flow-version-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
+      "line": 84,
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "FlowVersionResponse",
+      "identityLabel": "Deployment",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Version",
+        "Published"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "extension-details-extension-inventory-connection-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "line": 85,
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ExtensionInventoryConnectionResponse",
+      "identityLabel": "Registration",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Endpoint",
+        "Origin"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "extension-details-extension-managed-resource-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "line": 232,
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ExtensionManagedResourceResponse",
+      "identityLabel": "Identity",
+      "scope": true,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Type",
+        "Version"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "extension-details-extension-option-set-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "line": 269,
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ExtensionOptionSetResponse",
+      "identityLabel": "OptionSet",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Target",
+        "Preferred",
+        "SupportedVersions"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "extension-details-extension-option-usage-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "line": 289,
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ExtensionOptionUsageResponse",
+      "identityLabel": "ModelProfile",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Contract",
+        "Diagnostics"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-providers-source-provider-summary-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviders.razor",
+      "line": 26,
+      "host": "console",
+      "routes": [
+        "/sourceproviders"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SourceProviderSummaryResponse",
+      "identityLabel": "Provider",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Extension",
+        "Contribution"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plans-resource-plan-snapshot",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
+      "line": 44,
+      "host": "console",
+      "routes": [
+        "/resource-plans"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ResourcePlanSnapshot",
+      "identityLabel": "Plan",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Changes",
+        "Validation",
+        "Updated"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "runtime-workers-runtime-worker-summary-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor",
+      "line": 14,
+      "host": "console",
+      "routes": [
+        "/settings/runtime-workers"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "RuntimeWorkerSummaryResponse",
+      "identityLabel": "Worker",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Session",
+        "Version",
+        "Capacity",
+        "Capabilities",
+        "LastSeen"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "deployments-agent-instance-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Deployments.razor",
+      "line": 22,
+      "host": "console",
+      "routes": [
+        "/agent-instances",
+        "/deployments"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "AgentInstanceResponse",
+      "identityLabel": "Agent",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Run",
+        "Execution",
+        "Worker",
+        "RuntimeProfile",
+        "Started",
+        "LastActivity",
+        "Lease"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-definitions-tool-definition-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor",
+      "line": 16,
+      "host": "console",
+      "routes": [
+        "/tools/definitions"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolDefinitionResource",
+      "identityLabel": "Tool",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "FlowImplementation",
+        "RequiresApproval"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "triggers-trigger-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",
+      "line": 44,
+      "host": "console",
+      "routes": [
+        "/triggers"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "TriggerResource",
+      "identityLabel": "Trigger",
+      "scope": true,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Schedule",
+        "Target",
+        "NextOccurrence",
+        "LastOutcome"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "vaults-vault-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Vaults.razor",
+      "line": 14,
+      "host": "console",
+      "routes": [
+        "/vaults"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "VaultResponse",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Provider",
+        "Location"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-source-profiles-data-source-profile-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor",
+      "line": 17,
+      "host": "console",
+      "routes": [
+        "/data-source-profiles"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceProfileResource",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "ActiveVersion",
+        "DraftVersion"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-registries-source-registry-registration-view",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "line": 60,
+      "host": "console",
+      "routes": [
+        "/settings/source-registries",
+        "/settings/source-registries/new",
+        "/settings/source-registries/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SourceRegistryRegistrationView",
+      "identityLabel": "Registry",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "EndpointType",
+        "LastResult",
+        "NextRefresh",
+        "Enabled"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "model-providers-model-provider-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor",
+      "line": 25,
+      "host": "console",
+      "routes": [
+        "/modelproviders"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ModelProviderResponse",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Type",
+        "Management",
+        "Models"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "parameters-parameter-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Parameters.razor",
+      "line": 17,
+      "host": "console",
+      "routes": [
+        "/parameters"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ParameterResource",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "ValueType",
+        "Value"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "artifacts-staged-artifact-view",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
+      "line": 16,
+      "host": "console",
+      "routes": [
+        "/artifacts"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "StagedArtifactView",
+      "identityLabel": "Artifact",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Producer",
+        "Size",
+        "Expires"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "artifacts-flow-run-artifact-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
+      "line": 39,
+      "host": "console",
+      "routes": [
+        "/artifacts"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "FlowRunArtifactResource",
+      "identityLabel": "Artifact",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "FlowRun",
+        "Step",
+        "MediaType",
+        "Size",
+        "Created"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-scopes-resource-scope-inventory-item-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceScopes.razor",
+      "line": 87,
+      "host": "console",
+      "routes": [
+        "/settings/resource-scopes"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ResourceScopeInventoryItemResponse",
+      "identityLabel": "Resource",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Kind",
+        "Updated"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-categories-tool-category-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor",
+      "line": 16,
+      "host": "console",
+      "routes": [
+        "/tools/categories"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolCategoryResource",
+      "identityLabel": "Category",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "DescriptionColumn",
+        "Members"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agents-agent-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Agents.razor",
+      "line": 37,
+      "host": "console",
+      "routes": [
+        "/agents"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "AgentSummary",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Definition",
+        "GenerationHeader",
+        "ModelProfile",
+        "Deployment",
+        "LastActivity"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "model-profiles-model-profile-summary-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
+      "line": 35,
+      "host": "console",
+      "routes": [
+        "/modelprofiles"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ModelProfileSummaryResponse",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Provider",
+        "Model",
+        "Usage"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-source-editor-data-source-acquisition-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "line": 57,
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceAcquisitionResource",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Created",
+        "Version",
+        "AcquiredArtifacts"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-source-editor-data-source-discovery-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "line": 125,
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceDiscoveryResource",
+      "identityLabel": "Created",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "FlowRun",
+        "Version"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-source-editor-data-source-discovery-choice",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "line": 141,
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceDiscoveryChoice",
+      "identityLabel": "Choice",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Parent",
+        "TargetName"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-source-editor-data-source-acquisition-target-view",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "line": 155,
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceAcquisitionTargetView",
+      "identityLabel": "Name",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Choice"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-security-audit-agentstration-security-contracts-security-audit-event",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor",
+      "line": 25,
+      "host": "console",
+      "routes": [
+        "/settings/organization/security-audit"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Agentstration.Security.Contracts.SecurityAuditEvent",
+      "identityLabel": "Action",
+      "scope": true,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Time",
+        "Actor",
+        "Target",
+        "Correlation"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "model-profile-editor-model-capability-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "line": 204,
+      "host": "console",
+      "routes": [
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ModelCapabilityResponse",
+      "identityLabel": "Capability",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Provider",
+        "Model",
+        "Adapter",
+        "Effective",
+        "Values"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-data-source-binding-readiness",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "line": 48,
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KnowledgeDataSourceBindingReadiness",
+      "identityLabel": "BindingName",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "DataSource",
+        "TransformationFlowOptional"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-projection-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "line": 73,
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KnowledgeProjectionResource",
+      "identityLabel": "Projection",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Inputs",
+        "FlowRun",
+        "Snapshot",
+        "Created"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-projection-input-evidence",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "line": 89,
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KnowledgeProjectionInputEvidence",
+      "identityLabel": "BindingName",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "DataSource",
+        "Acquisition",
+        "Transformation",
+        "Artifacts"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-snapshot-view",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "line": 115,
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KnowledgeSnapshotView",
+      "identityLabel": "Snapshot",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Published",
+        "Artifacts"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-snapshot-artifact",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "line": 135,
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KnowledgeSnapshotArtifact",
+      "identityLabel": "ArtifactId",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "MediaType",
+        "Size",
+        "ProducerFlow",
+        "StorageFlow"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-source-tool-operation-exposure",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "line": 203,
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KnowledgeSourceToolOperationExposure",
+      "identityLabel": "Operation",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Capability",
+        "Route",
+        "Tool"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "schemas-schema-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Schemas.razor",
+      "line": 21,
+      "host": "console",
+      "routes": [
+        "/schemas"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SchemaResource",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Format",
+        "Dialect",
+        "Generation"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-source-profile-editor-data-source-profile-revision-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
+      "line": 54,
+      "host": "console",
+      "routes": [
+        "/data-source-profiles/new",
+        "/data-source-profiles/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceProfileRevisionResource",
+      "identityLabel": "Version",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Created"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "knowledge-sources-knowledge-source-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor",
+      "line": 15,
+      "host": "console",
+      "routes": [
+        "/knowledge-sources"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KnowledgeSourceResource",
+      "identityLabel": "KnowledgeSource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "DataSources",
+        "ProjectionFlow",
+        "RetrievalFlow"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "runtime-profiles-runtime-profile-summary-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfiles.razor",
+      "line": 17,
+      "host": "console",
+      "routes": [
+        "/runtimeprofiles"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "RuntimeProfileSummaryResponse",
+      "identityLabel": "CollectionResource",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Runtime",
+        "Session",
+        "Streaming",
+        "Usage"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-governance-audit-tool-execution-hook-evaluation",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolGovernanceAudit.razor",
+      "line": 74,
+      "host": "console",
+      "routes": [
+        "/tool-governance/{Owner}/{RunId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolExecutionHookEvaluation",
+      "identityLabel": "Hook",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Order",
+        "Source",
+        "ResourceGeneration",
+        "Code"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "settings-string-name-string-address",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Settings.razor",
+      "line": 8,
+      "host": "console",
+      "routes": [
+        "/settings"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "(string Name,string Address)",
+      "identityLabel": "Plane",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "BaseAddress"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "schema-editor-schema-version-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "line": 98,
+      "host": "console",
+      "routes": [
+        "/schemas/new",
+        "/schemas/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SchemaVersionResource",
+      "identityLabel": "Version",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "PublishedAt",
+        "DefinitionHash"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "sources-source-console-list-item",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "line": 84,
+      "host": "console",
+      "routes": [
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SourceConsoleListItem",
+      "identityLabel": "Source",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Origin",
+        "LatestImport"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-member-details-external-identity",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
+      "line": 36,
+      "host": "console",
+      "routes": [
+        "/settings/organization/members/{UserId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ExternalIdentity",
+      "identityLabel": "Issuer",
+      "scope": false,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Subject",
+        "Linked"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agent-runner-runtime-run",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "line": 154,
+      "host": "console",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "RuntimeRun",
+      "identityLabel": "Run",
+      "scope": true,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Date",
+        "Duration",
+        "Initiator",
+        "Version",
+        "Prompt",
+        "Origin"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tools-tool-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Tools.razor",
+      "line": 24,
+      "host": "console",
+      "routes": [
+        "/tools"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolResource",
+      "identityLabel": "Tool",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Provider",
+        "Enabled"
+      ],
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-changes-view-resource-plan-field-difference",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanChangesView.razor",
+      "line": 38,
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ResourcePlanFieldDifference",
+      "identityLabel": "Field",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Current",
+        "Proposed"
+      ],
+      "validation": "pending-final-campaign"
+    }
+  ],
+  "specialized": [
+    {
+      "id": "entries-entry-catalog",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Entries.razor",
+      "host": "console",
+      "routes": [
+        "/entries"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Resource cards reuse CollectionIdentity, owner badge, publication StatusBadge, separate governance and final CollectionActions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "cleanup-terminal-runtime-runs",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "host": "console",
+      "routes": [
+        "/cleanup"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Selection remains inline and batch deletion retains confirmation/dependency order. Identity and owner are copied from existing inventory responses; scoped keys and ETag/delete requests distinguish homonyms.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "cleanup-terminal-flow-runs",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "host": "console",
+      "routes": [
+        "/cleanup"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Selection remains inline and batch deletion retains confirmation/dependency order. Identity and owner are copied from existing inventory responses; scoped keys and ETag/delete requests distinguish homonyms.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "cleanup-terminal-tasks",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "host": "console",
+      "routes": [
+        "/cleanup"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Selection remains inline and batch deletion retains confirmation/dependency order. Identity and owner are copied from existing inventory responses; scoped keys and ETag/delete requests distinguish homonyms.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "cleanup-entries",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "host": "console",
+      "routes": [
+        "/cleanup"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Selection remains inline and batch deletion retains confirmation/dependency order. Identity and owner are copied from existing inventory responses; scoped keys and ETag/delete requests distinguish homonyms.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "cleanup-flows",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "host": "console",
+      "routes": [
+        "/cleanup"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Selection remains inline and batch deletion retains confirmation/dependency order. Identity and owner are copied from existing inventory responses; scoped keys and ETag/delete requests distinguish homonyms.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "cleanup-agents",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "host": "console",
+      "routes": [
+        "/cleanup"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Selection remains inline and batch deletion retains confirmation/dependency order. Identity and owner are copied from existing inventory responses; scoped keys and ETag/delete requests distinguish homonyms.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "console-conversations-conversation-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConsoleConversations.razor",
+      "host": "console",
+      "routes": [
+        "/conversations"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bounded to the existing 50 conversations; primary replay link and complete interaction identifier, common scope/state, final Open menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-workspaces-tenants",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationWorkspaces.razor",
+      "host": "console",
+      "routes": [
+        "/settings/organization/structure",
+        "/settings/organization/workspaces"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve expandable hierarchy and current-context restrictions; primary permitted links, full-value scope disclosure and final authorized commands.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "organization-workspaces-tenant-workspaces",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationWorkspaces.razor",
+      "host": "console",
+      "routes": [
+        "/settings/organization/structure",
+        "/settings/organization/workspaces"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve expandable hierarchy and current-context restrictions; primary permitted links, full-value scope disclosure and final authorized commands.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-scopes-scope-hierarchy",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceScopes.razor",
+      "host": "console",
+      "routes": [
+        "/settings/resource-scopes"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native context selection preserves exact scope roots; inventory rows use the common frame and owner/context links.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "extensions-enrollments",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "host": "console",
+      "routes": [
+        "/extensions"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Enrollment scopes and pairing forms remain domain-owned; common identity/scope/status and final menus preserve pairing, expiry and management restrictions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "extension-details-bundle-installations",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bundle state, immutable versions, hashes and schema disclosures retain domain semantics. Resource inventories use the common frame with separate Managed marker.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "extension-details-option-contract-versions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bundle state, immutable versions, hashes and schema disclosures retain domain semantics. Resource inventories use the common frame with separate Managed marker.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-profile-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep native profile selection and nested plan diagnostics; application/history/result tables use the shared frame and existing disposition badges.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "bootstrap-profiles-nested-preview-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep native profile selection and nested plan diagnostics; application/history/result tables use the shared frame and existing disposition badges.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "packs-pack-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "host": "console",
+      "routes": [
+        "/packs"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "packs-managed-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "host": "console",
+      "routes": [
+        "/packs"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "packs-projects",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "host": "console",
+      "routes": [
+        "/packs"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "packs-archive-preview-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "host": "console",
+      "routes": [
+        "/packs"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "packs-archive-preview-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "host": "console",
+      "routes": [
+        "/packs"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "pack-project-details-source-documents",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Source document selection remains native alongside its specialized editors; builds use the common frame with exact identity and inline inspection.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-registry-discovery-discovered-sources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "host": "console",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve server skip/count/total and explicit Load more, independent trust/verification/freshness and exact version pinning. Do not invent an installed-resource route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-registry-discovery-discovered-versions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "host": "console",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve server skip/count/total and explicit Load more, independent trust/verification/freshness and exact version pinning. Do not invent an installed-resource route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "source-registry-discovery-registry-observations",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "host": "console",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve server skip/count/total and explicit Load more, independent trust/verification/freshness and exact version pinning. Do not invent an installed-resource route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-access-panel-access-grants",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceAccessPanel.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/data-source-profiles/new",
+        "/data-source-profiles/{Name}",
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/flows/{FlowId}",
+        "/knowledge-sources/{Name}",
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}",
+        "/modelproviders/new",
+        "/modelproviders/{Name}",
+        "/namespaces/{AgentNamespace}/agents/{Name}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}",
+        "/runtimeprofiles/new",
+        "/runtimeprofiles/{Name}",
+        "/secrets/new",
+        "/secrets/{Name}",
+        "/tools/sets/{Name}",
+        "/tools/{Name}",
+        "/vaults/new",
+        "/vaults/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native grant field editing preserves authorization/ETag semantics; common authorized scope disclosures and final Remove menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "descendant-use-grant-editor-descendant-use-grants",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DescendantUseGrantEditor.razor",
+      "host": "console",
+      "routes": [
+        "/parameters/new",
+        "/parameters/{Name}",
+        "/secrets/new",
+        "/secrets/{Name}",
+        "/vaults/new",
+        "/vaults/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep scope/grant editing and inherited propagation controls; common full-name disclosure and final Remove command.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agent-tool-configuration-tool-provider-groups",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolConfiguration.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep grant selection and ToolSet inheritance semantics; exact scoped identity, common state/governance and final Inspect menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agent-tool-configuration-tool-categories",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolConfiguration.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep grant selection and ToolSet inheritance semantics; exact scoped identity, common state/governance and final Inspect menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agent-tool-configuration-effective-tools",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolConfiguration.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep grant selection and ToolSet inheritance semantics; exact scoped identity, common state/governance and final Inspect menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agent-tool-set-configuration-published-toolset-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolSetConfiguration.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep version pinning and subset checkbox selection, with shared resource identity/scope and final inspection.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "agent-tool-set-configuration-toolset-member-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolSetConfiguration.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep version pinning and subset checkbox selection, with shared resource identity/scope and final inspection.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-category-editor-provider-groups",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/tools/categories/new",
+        "/tools/categories/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Match provider and member identity by scope/namespace/name. Keep native selection, missing references, common availability badges and final Open menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-category-editor-tool-members",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/tools/categories/new",
+        "/tools/categories/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Match provider and member identity by scope/namespace/name. Keep native selection, missing references, common availability badges and final Open menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tool-category-editor-unavailable-members",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/tools/categories/new",
+        "/tools/categories/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Match provider and member identity by scope/namespace/name. Keep native selection, missing references, common availability badges and final Open menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "model-profile-picker-reference-results",
+      "source": "src/Agentstration.Console.Components/Components/ModelProfiles/ModelProfilePicker.razor",
+      "host": "console",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Retain 20-result cursor pages, selection outside the current page and bounded search. Resource identity/scope/status and final Choose menu preserve disabled choices and focus restoration.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "runtime-placement-summary-assignment-attempts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimePlacementSummary.razor",
+      "host": "console",
+      "routes": [
+        "/agents/{Name}/run",
+        "/flow-runs/{RunId}",
+        "/runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Retain chronological attempts, fencing/lease and worker context with existing common status badges; no invented management actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-run-details-execution-nodes",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep execution grouping, correlation and bounded event buffers; existing exact scoped links, business details and common status primitives remain domain-owned.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-run-details-agent-executions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep execution grouping, correlation and bounded event buffers; existing exact scoped links, business details and common status primitives remain domain-owned.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-run-details-tool-invocations",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep execution grouping, correlation and bounded event buffers; existing exact scoped links, business details and common status primitives remain domain-owned.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "flow-run-timeline-execution-events",
+      "source": "src/Agentstration.Console.Components/Components/FlowRunTimeline.razor",
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Chronological renderer stays native; retain correlation, filtering, live bounds and event/detail controls rather than flattening into resource columns.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-details-task-flow-runs",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "host": "console",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep chronological and pending-action forms; run/artifact identity uses complete identifiers, artifact commands end in the common menu. Immutable results/messages gain no invented status or route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-details-task-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "host": "console",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep chronological and pending-action forms; run/artifact identity uses complete identifiers, artifact commands end in the common menu. Immutable results/messages gain no invented status or route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-details-task-artifacts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "host": "console",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep chronological and pending-action forms; run/artifact identity uses complete identifiers, artifact commands end in the common menu. Immutable results/messages gain no invented status or route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-details-pending-actions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "host": "console",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep chronological and pending-action forms; run/artifact identity uses complete identifiers, artifact commands end in the common menu. Immutable results/messages gain no invented status or route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-details-conversation-messages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "host": "console",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep chronological and pending-action forms; run/artifact identity uses complete identifiers, artifact commands end in the common menu. Immutable results/messages gain no invented status or route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-details-task-activity",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "host": "console",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep chronological and pending-action forms; run/artifact identity uses complete identifiers, artifact commands end in the common menu. Immutable results/messages gain no invented status or route.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-changes-view-reviewed-bindings",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanChangesView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Proposed resources retain proposal semantics, common identity and existing operation badges; field differences use the common frame.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-changes-view-resource-changes",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanChangesView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Proposed resources retain proposal semantics, common identity and existing operation badges; field differences use the common frame.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-validation-view-validation-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanValidationView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep domain severity, resource context and messages; existing StatusBadge owns the common icon/text/tone presentation.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-application-view-application-operations",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanApplicationView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep ordered apply outcomes and existing common status badges; no new execution commands or lifecycle.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-activity-view-plan-activity",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanActivityView.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep immutable actor/activity chronology and domain navigation; do not manufacture resource ownership or actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-details-functional-roles",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve role/integration binding editors, reviewed change sets and native diagnostics. No business planning workflow or graph redesign.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-details-functional-integrations",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve role/integration binding editors, reviewed change sets and native diagnostics. No business planning workflow or graph redesign.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "resource-plan-details-materialization-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve role/integration binding editors, reviewed change sets and native diagnostics. No business planning workflow or graph redesign.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "data-source-acquisition-artifacts-acquired-artifact-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionArtifacts.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve native artifact selector and staged/durable content viewers; nested histories use the common frame.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tasks-conversations",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Tasks.razor",
+      "host": "workplace",
+      "routes": [
+        "/w/{WorkspaceName}/tasks"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native activity tabs/cards retain the same datasets and filters; shared identity/scope/status/actions preserve exact Workspace/dashboard destinations.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "tasks-tasks",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Tasks.razor",
+      "host": "workplace",
+      "routes": [
+        "/w/{WorkspaceName}/tasks"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native activity tabs/cards retain the same datasets and filters; shared identity/scope/status/actions preserve exact Workspace/dashboard destinations.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "home-featured-entries",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "host": "workplace",
+      "routes": [
+        "/",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep prompt/form Entry behavior, validation, suggestions and submission; shared resource header and permitted entry-start navigation. Mobile alternatives remain native navigation choices.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "home-standard-entries",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "host": "workplace",
+      "routes": [
+        "/",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep prompt/form Entry behavior, validation, suggestions and submission; shared resource header and permitted entry-start navigation. Mobile alternatives remain native navigation choices.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "home-mobile-entry-choices",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "host": "workplace",
+      "routes": [
+        "/",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Keep prompt/form Entry behavior, validation, suggestions and submission; shared resource header and permitted entry-start navigation. Mobile alternatives remain native navigation choices.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "interaction-view-conversation-thread",
+      "source": "src/Agentstration.Workplace.Components/InteractionView.razor",
+      "host": "workplace",
+      "routes": [
+        "/",
+        "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Retain chronological interleaving of messages, activities, results, pending actions and artifacts; shared task/artifact cards and common statuses are reused.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "conversation-panel-conversation-messages",
+      "source": "src/Agentstration.Workplace.Components/ConversationPanel.razor",
+      "host": "workplace",
+      "routes": [],
+      "renderer": "native-specialized",
+      "adaptation": "Native message author/content/time semantics remain; no invented state, namespace or command.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-timeline-task-activities",
+      "source": "src/Agentstration.Workplace.Components/TaskTimeline.razor",
+      "host": "workplace",
+      "routes": [],
+      "renderer": "native-specialized",
+      "adaptation": "Native chronological activity list retains existing business content; read-only items gain no invented actions.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "task-progress-timeline-functional-progress",
+      "source": "src/Agentstration.Workplace.Components/TaskProgressTimeline.razor",
+      "host": "workplace",
+      "routes": [
+        "/w/{WorkspaceName}/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Preserve progress start/completion folding, current/terminal markers and accessible chronological semantics.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "artifact-list-task-artifacts",
+      "source": "src/Agentstration.Workplace.Components/ArtifactList.razor",
+      "host": "workplace",
+      "routes": [
+        "/w/{WorkspaceName}/tasks/{TaskId:guid}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Shared artifact identity, actual Workspace scope, business metadata and final Download menu; empty feedback is bilingual.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "notification-center-notifications",
+      "source": "src/Agentstration.Workplace.Components/NotificationCenter.razor",
+      "host": "workplace",
+      "routes": [
+        "/w/{WorkspaceName}/notifications"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Retain unread-first ordering and mark-read commands; shared identity/scope, read/unread text/icon/tone and final menu.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "event-list-event-feed",
+      "source": "src/Agentstration.Web.Components/EventList.razor",
+      "host": "console",
+      "routes": [],
+      "renderer": "native-specialized",
+      "adaptation": "Shared chronological event renderer retains order/source/correlation and full event links; severity and final Open reuse common primitives.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "main-layout-console-notifications",
+      "source": "src/Agentstration.Web.Components/MainLayout.razor",
+      "host": "console",
+      "routes": [],
+      "renderer": "native-specialized",
+      "adaptation": "Notifications use common status badges. Context and command choices keep their native composite keyboard/navigation semantics, authorized labels and exact destinations; no nested action controls are invented inside navigation options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "main-layout-context-choice",
+      "source": "src/Agentstration.Web.Components/MainLayout.razor",
+      "host": "console",
+      "routes": [],
+      "renderer": "native-specialized",
+      "adaptation": "Notifications use common status badges. Context and command choices keep their native composite keyboard/navigation semantics, authorized labels and exact destinations; no nested action controls are invented inside navigation options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "main-layout-command-results",
+      "source": "src/Agentstration.Web.Components/MainLayout.razor",
+      "host": "console",
+      "routes": [],
+      "renderer": "native-specialized",
+      "adaptation": "Notifications use common status badges. Context and command choices keep their native composite keyboard/navigation semantics, authorized labels and exact destinations; no nested action controls are invented inside navigation options.",
+      "validation": "pending-final-campaign"
+    },
+    {
+      "id": "pat-personal-access-tokens",
+      "source": "src/Agentstration.Web/Pages/Account/Pat.cshtml",
+      "host": "console",
+      "routes": [
+        "/account/pat"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Static Razor Pages preserve antiforgery and token privacy; ResourceIcon/scope/status and native final Actions reuse shared CSS/JS without adding a Blazor circuit.",
+      "validation": "pending-final-campaign"
+    }
+  ]
+}

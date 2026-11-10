@@ -20,7 +20,7 @@ public sealed class CollectionScopeTests
             tenant, "tenant", longName, Guid.Empty, string.Empty, string.Empty,
             new HashSet<string>(), [],
             [new(scope.Value, ConsoleContextKind.Tenant, tenant, "tenant", longName, null, null, longName)]));
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var state = new ConsoleContextState(provider);

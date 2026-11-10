@@ -134,7 +134,7 @@
         <aside class="notification-panel" aria-label="@T("Notifications")" data-testid="console-notifications-panel">
             <header><div><p class="eyebrow">@T("Activity")</p><h2>@T("Notifications")</h2></div><button class="icon-button" @onclick="Notifications.TogglePanel" aria-label="@T("CloseNotifications")">×</button></header>
             @if (Notifications.Items.Count == 0) { <EmptyState Title="@T("AllQuiet")" Message="@T("OperationalNotices")" /> }
-            else { <button class="text-button" @onclick="Notifications.MarkAllRead">@T("MarkAllRead")</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><StatusIndicator Text="@item.Title" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
+            else { <button class="text-button" @onclick="Notifications.MarkAllRead">@T("MarkAllRead")</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><strong>@item.Title</strong><StatusBadge Text="@T($"NotificationTone.{item.Status}")" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
         </aside>
     }
 

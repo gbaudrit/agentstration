@@ -189,7 +189,7 @@ public sealed class WorkOperationsComponentTests
 
     private static BunitContext CreateContext()
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }

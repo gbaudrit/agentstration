@@ -211,16 +211,18 @@ else
         }
         else
         {
-            <DataGrid TItem="PackProjectBuildResource" Items="builds">
-                <Header><tr><th>@T("Version")</th><th>@T("Revision")</th><th>@T("Created")</th><th>@T("Artifact")</th><th></th></tr></Header>
-                <Row Context="build"><tr class="@(selectedBuild?.Uid == build.Uid ? "selected-build" : null)">
-                    <td><strong>@build.Definition.Version</strong></td>
-                    <td>@build.Definition.ProjectRevision</td>
-                    <td>@build.Definition.CreatedAt.ToLocalTime().ToString("g")</td>
-                    <td><code>@ShortHash(build.Definition.Artifact.Sha256)</code><br /><small>@FormatBytes(build.Definition.Artifact.Length)</small></td>
-                    <td class="studio-action-cell"><div class="studio-actions"><button class="text-button" @onclick="() => PreviewAsync(build)">@T("Preview")</button><a class="text-button" href="@DownloadPath(build)">@T("Download")</a></div></td>
-                </tr></Row>
-            </DataGrid>
+            <CollectionView TItem="PackProjectBuildResource" Items="builds" InformationLabels="@(new string[] { T("Revision"), T("Created"), T("Artifact") })" ItemAttributes="@((build) => new Dictionary<string, object> { ["class"] = selectedBuild?.Uid == build.Uid ? "selected-build" : string.Empty })" IdentityLabel="@T("Version")">
+        <Identity Context="build">
+<CollectionIdentity DisplayName="@build.Definition.Version" Namespace="@build.Namespace.Value" Name="@build.Name" OnOpen="() => PreviewAsync(build)" IconName="package" /></Identity>
+        <Scope Context="build"><ResourceScopeBadge ScopeRef="build.ScopeRef" /></Scope>
+        <Information Context="build">
+            <CollectionValue Label="@T("Revision")">@build.Definition.ProjectRevision</CollectionValue>
+            <CollectionValue Label="@T("Created")">@build.Definition.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("Artifact")"><code>@ShortHash(build.Definition.Artifact.Sha256)</code><br /><small>@FormatBytes(build.Definition.Artifact.Length)</small></CollectionValue>
+        </Information>
+        <Actions Context="build">
+<CollectionActions ResourceName="@(build.Definition.Version)"><div class="studio-actions"><button class="text-button" @onclick="() => PreviewAsync(build)">@T("Preview")</button><a class="text-button" href="@DownloadPath(build)">@T("Download")</a></div></CollectionActions></Actions>
+    </CollectionView>
         }
     </section>
 }

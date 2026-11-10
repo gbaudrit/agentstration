@@ -82,4 +82,4 @@
   <data name="AcquisitionToolForbidden"><value>You do not have permission to create a Tool from this acquisition.</value></data>
   <data name="AcquisitionToolCreateFailed"><value>The Tool could not be created from this acquisition.</value></data>
   <data name="Cancel"><value>Cancel</value></data>
-</root>
+<data name="VersionState.Active"><value>Active</value></data><data name="VersionState.Published"><value>Published</value></data></root>

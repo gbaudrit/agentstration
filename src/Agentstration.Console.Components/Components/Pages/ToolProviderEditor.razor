@@ -62,11 +62,24 @@ else
 
     @if (!IsNew && activeTab == ProviderTab.Tools) { <section class="panel tool-provider-section" id="tools" data-testid="provider-tools-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="wrench" /></span><div><p class="eyebrow">@T("ToolsEyebrow")</p><h2>@T("Tools")</h2><p>@T("ToolsDiscovered", ToolCount(tools.Count))</p></div></div></div>
         @if (tools.Count == 0) { <EmptyState Title="@T("NoToolsTitle")" Message="@T("NoToolsMessage")" /> }
-        else { <DataGrid TItem="ToolResource" Items="tools"><Header><tr><th>@T("Name")</th><th>@T("Status")</th><th>@T("Enabled")</th><th></th></tr></Header><Row Context="tool"><tr><td><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></td><td>@AvailabilityLabel(tool.Definition.Discovery?.Available == true)</td><td><input type="checkbox" checked="@tool.Definition.Enabled" disabled="@(!CanMutate || tool.Governance.IsManaged)" @onchange="args => EnableAsync(tool, (bool)args.Value!)" /></td><td><a class="text-button" href="@ToolUrl(tool)">@T("Inspect")</a></td></tr></Row></DataGrid> }
+        else { <CollectionView TItem="ToolResource" Items="tools" InformationLabels="@(new string[] { T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
+        <Identity Context="tool">
+<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><Badges><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
+        <Scope Context="tool">
+<ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName /></Scope>
+        <State Context="tool">
+<StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></State>
+        <Information Context="tool">
+            <CollectionValue Label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</CollectionValue>
+        </Information>
+        <Actions Context="tool">
+<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><label><input type="checkbox" checked="@tool.Definition.Enabled" disabled="@(!CanMutate || tool.Governance.IsManaged)" @onchange="args => EnableAsync(tool, (bool)args.Value!)" />@T("Enabled")</label><a class="text-button" href="@ToolUrl(tool)">@T("Inspect")</a></CollectionActions></Actions>
+    </CollectionView> }
     </section> }
 }
 
 @code {
+    private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }

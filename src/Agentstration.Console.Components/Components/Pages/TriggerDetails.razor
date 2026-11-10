@@ -27,7 +27,7 @@ else
             {
                 @if (trigger.Definition.Enabled) { <button class="button-secondary" disabled="@changingState" @onclick="DisableAsync">@(changingState ? T("Disabling") : T("Disable"))</button> }
                 else { <button class="button-primary" @onclick="() => confirmEnable = true" data-testid="trigger-enable">@T("Enable")</button> }
-                <a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(trigger.Name)}/edit")">@T("Edit")</a>
+                <a class="button-secondary" href="@ConsoleResourceUrls.WithOwnerScope($"/triggers/{Uri.EscapeDataString(trigger.Name)}/edit?namespace={Uri.EscapeDataString(trigger.Namespace.Value)}", TriggerUi.DefinitionScope(trigger))">@T("Edit")</a>
                 <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button>
             }
             <a class="button-secondary" href="/triggers">@T("Back")</a>
@@ -60,14 +60,18 @@ else
                 @if (history.Count == 0) { <EmptyState Title="@T("NoOccurrences")" Message="@T("NoOccurrencesMessage")" /> }
                 else
                 {
-                    <DataGrid TItem="TriggerOccurrence" Items="history">
-                        <Header><tr><th>@T("Kind")</th><th>@T("Scheduled")</th><th>@T("ActuallyFired")</th><th>@T("Outcome")</th><th>@T("GenerationLabel")</th><th>@T("WorkDetails")</th></tr></Header>
-                        <Row Context="occurrence"><tr data-testid="trigger-occurrence-row" data-trigger-occurrence-id="@occurrence.Id">
-                            <td>@T($"OccurrenceKind.{occurrence.Kind}")</td><td>@TriggerUi.FormatDate(occurrence.ScheduledAt)</td><td>@TriggerUi.FormatDate(occurrence.FiredAt)</td>
-                            <td><StatusBadge Text="@T($"OccurrenceOutcome.{occurrence.Outcome}")" Status="@OccurrenceStatus(occurrence.Outcome)" /></td><td>@occurrence.TriggerGeneration</td>
-                            <td>@if (TaskUrl(occurrence) is { } taskUrl) { <a class="text-button" href="@taskUrl">@T("OpenTask")</a> } else if (occurrence.ErrorCode is not null) { <details><summary>@occurrence.ErrorCode</summary><p>@occurrence.ErrorMessage</p></details> } else { <span>—</span> }</td>
-                        </tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="TriggerOccurrence" Items="history" InformationLabels="@(new string[] { T("Scheduled"), T("ActuallyFired"), T("GenerationLabel"), T("WorkDetails") })" RowTestId="trigger-occurrence-row" ItemAttributes="@((occurrence) => new Dictionary<string, object> { ["data-trigger-occurrence-id"] = occurrence.Id })" IdentityLabel="@T("Kind")" StateLabel="@T("Outcome")">
+        <Identity Context="occurrence">
+@T($"OccurrenceKind.{occurrence.Kind}")</Identity>
+        <State Context="occurrence">
+<StatusBadge Text="@T($"OccurrenceOutcome.{occurrence.Outcome}")" Status="@OccurrenceStatus(occurrence.Outcome)" /></State>
+        <Information Context="occurrence">
+            <CollectionValue Label="@T("Scheduled")">@TriggerUi.FormatDate(occurrence.ScheduledAt)</CollectionValue>
+            <CollectionValue Label="@T("ActuallyFired")">@TriggerUi.FormatDate(occurrence.FiredAt)</CollectionValue>
+            <CollectionValue Label="@T("GenerationLabel")">@occurrence.TriggerGeneration</CollectionValue>
+            <CollectionValue Label="@T("WorkDetails")">@if (TaskUrl(occurrence) is { } taskUrl) { <a class="text-button" href="@taskUrl">@T("OpenTask")</a> } else if (occurrence.ErrorCode is not null) { <details><summary>@occurrence.ErrorCode</summary><p>@occurrence.ErrorMessage</p></details> } else { <span>—</span> }</CollectionValue>
+        </Information>
+    </CollectionView>
                 }
             </section>
         }
@@ -125,6 +129,7 @@ else
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteTriggerTitle")" Message="@T("DeleteTriggerMessage")" ConfirmLabel="@T("DeleteTrigger")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
     [Parameter] public string Name { get; set; } = "";
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
     private static readonly string[] Tabs = ["Overview", "Definition", "Access", "YAML"];
@@ -146,7 +151,7 @@ else
     private async Task LoadAsync()
     {
         loading = true; notFound = false; message = null;
-        try { stored = await Client.GetAsync(ResourceNamespace.Default, Name, CancellationToken.None); if (stored is null) { notFound = true; return; } await LoadHistoryAsync(); }
+        try { stored = await Client.GetAsync(ResourceNamespace.Parse(NamespaceValue), Name, CancellationToken.None); if (stored is null) { notFound = true; return; } await LoadHistoryAsync(); }
         catch (Exception exception) { SetError(exception); }
         finally { loading = false; }
     }
