@@ -52,10 +52,13 @@ jobs:
         include:
           - project: desktop-chromium
             shard: 1
-            shards: 2
+            shards: 3
           - project: desktop-chromium
             shard: 2
-            shards: 2
+            shards: 3
+          - project: desktop-chromium
+            shard: 3
+            shards: 3
           - project: mobile-chromium
             shard: 1
             shards: 2
