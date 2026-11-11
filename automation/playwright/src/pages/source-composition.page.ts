@@ -2,13 +2,16 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { SourceLifecycleFixtures } from '../fixtures/source-lifecycle.js';
 import { SourcePolicyFixtures } from '../fixtures/source-policies.js';
+import { SourcePolicyTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 import { SourcePoliciesPage } from './source-policies.page.js';
 
 export class SourceCompositionPage {
   public constructor(private readonly page: Page) {}
   public get evidence(): Locator { return this.page.getByTestId(TestIds.sourceLifecycle.projectionProvenance); }
 
-  public async exercise(base: string): Promise<void> {
+  public get creation(): Locator { return this.page.getByTestId(TestIds.sourcePolicies.transformationCreator); }
+
+  public async exercise(base: string, locale: SupportedTestLocale, onDraftCreated?: () => Promise<void>): Promise<void> {
     this.page.setDefaultTimeout(15_000);
     const api = new SourcePolicyFixtures(this.page, base);
     const fixture = await api.prepare();
@@ -18,6 +21,7 @@ export class SourceCompositionPage {
     await api.knowledge(fixture, untransformedKnowledge, [untransformed], true);
     const untransformedProjection = await new SourcePoliciesPage(this.page).project(base, untransformedKnowledge, api);
     expect(untransformedProjection.projectionComposition.receipt.bindings.postAggregate).toEqual([]);
+    await this.createTransformationFromDefinition(base, untransformedKnowledge, `created-${fixture.suffix}`, api, locale, onDraftCreated);
     const flows = new SourceLifecycleFixtures(this.page);
     const nativeChild = `native-transform-${fixture.suffix}`;
     const incompatible = `incompatible-${fixture.suffix}`;
@@ -129,6 +133,66 @@ export class SourceCompositionPage {
     await this.page.getByTitle(projection.metadata.name, { exact: true }).click();
     await expect(this.evidence).toBeVisible();
     await editor.assertResponsive();
+  }
+
+  private async createTransformationFromDefinition(base: string, source: string, name: string, api: SourcePolicyFixtures,
+    locale: SupportedTestLocale, onDraftCreated?: () => Promise<void>): Promise<void> {
+    const editor = new SourcePoliciesPage(this.page);
+    await editor.openKnowledge(base, source);
+    const before = (await api.api('GET', `/api/knowledgesources/${source}?scopeRef=%2Finstance`)).value;
+    const displayName = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName);
+    const pendingName = `${before.definition.displayName}-unsaved`;
+    await displayName.fill(pendingName); await displayName.blur();
+    const sequence = this.page.getByTestId(TestIds.sourcePolicies.composition).getByTestId(TestIds.sourcePolicies.sequence);
+    const create = sequence.getByTestId(TestIds.sourcePolicies.createTransformation);
+    await expect(create).toHaveText(SourcePolicyTextByLocale[locale].createTransformation);
+    await expect(create).toBeEnabled(); await create.click();
+    await this.page.getByTestId(TestIds.sourcePolicies.transformationDisplayName).fill(name);
+    await this.page.getByTestId(TestIds.sourcePolicies.transformationDisplayName).blur();
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.transformationName)).toHaveValue(name);
+    const popupPromise = this.page.context().waitForEvent('page');
+    // Enter creates the draft without submitting the containing source form.
+    await this.page.getByTestId(TestIds.sourcePolicies.transformationName).press('Enter');
+    const designer = await popupPromise;
+    try {
+      await designer.waitForURL(url => url.pathname === `/flows/${name}/designer` && url.searchParams.get('context') === '/instance');
+      await expect(this.creation).toContainText(SourcePolicyTextByLocale[locale].createdTransformation);
+      const draft = (await api.api('GET', `/api/flows/${name}/draft?scopeRef=%2Finstance`)).value.value;
+      expect(draft.scopeRef).toBe('/instance');
+      expect(draft.definition.inputSchema.properties.value.properties.artifacts.type).toBe('array');
+      expect(draft.definition.outputSchema).toEqual(draft.definition.inputSchema.properties.value);
+      expect(draft.definition.inputSchema.required).toEqual(['value', 'parameters']);
+      expect(draft.definition.steps.some((step: any) => step.type === 'transform')).toBe(true);
+      await expect(displayName).toHaveValue(pendingName);
+      expect((await api.api('GET', `/api/knowledgesources/${source}?scopeRef=%2Finstance`)).value.generation).toBe(before.generation);
+      await onDraftCreated?.();
+      await new SourceCompositionPage(designer).publishDesigner('1.0.0');
+    } finally { await designer.close(); }
+    await expect(displayName).toHaveValue(pendingName);
+    const unchanged = (await api.api('GET', `/api/knowledgesources/${source}?scopeRef=%2Finstance`)).value;
+    expect(unchanged.generation).toBe(before.generation);
+    expect(unchanged.definition.displayName).toBe(before.definition.displayName);
+    await sequence.getByTestId(TestIds.sourcePolicies.refreshFlows).click();
+    const rows = sequence.getByTestId(TestIds.sourcePolicies.call);
+    const count = await rows.count();
+    await sequence.getByTestId(TestIds.sourcePolicies.add).click();
+    await expect(rows).toHaveCount(count + 1);
+    const row = rows.nth(count);
+    await row.getByTestId(TestIds.sourcePolicies.target).selectOption(`/instance|default|${name}|1.0.0`);
+    await expect(row).toHaveAttribute('data-flow-reference', `/instance|default|${name}|1.0.0`);
+    await editor.saveKnowledge(source, api);
+    const projected = await editor.project(base, source, api);
+    expect(projected.projectionComposition.receipt.bindings.postAggregate[0].flow.resourceId).toBe(name);
+  }
+
+  private async publishDesigner(version: string): Promise<void> {
+    await expect(this.page.getByTestId(TestIds.flowObservability.designer)).toBeVisible();
+    if (!await this.page.locator('.publish-version input').isVisible()) await this.page.locator('.designer-more-toggle').click();
+    await this.page.locator('.publish-version input').fill(version);
+    await this.page.locator('.publish-version input').blur();
+    await expect(this.page.getByTestId(TestIds.flowObservability.designerPublish)).toBeEnabled();
+    await this.page.getByTestId(TestIds.flowObservability.designerPublish).click();
+    await expect(this.page.getByTestId(TestIds.flowObservability.designerPublicationSuccess)).toBeVisible();
   }
 
   private async append(sequence: Locator, name: string, tag: string): Promise<void> {

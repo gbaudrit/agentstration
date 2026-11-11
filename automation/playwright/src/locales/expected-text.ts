@@ -303,10 +303,10 @@ export const OrganizationStructureTextByLocale = {
 
 /** Independent acceptance text for the #1116/#1118 lifecycle/composition delta. */
 export const SourcePolicyTextByLocale = {
-  'en-US': { ttl: 'Freshness duration (hh:mm:ss)', history: 'Keep previous successful versions',
+  'en-US': { createTransformation: 'Create a transformation Flow', createdTransformation: 'Draft created.', ttl: 'Freshness duration (hh:mm:ss)', history: 'Keep previous successful versions',
     direct: 'Direct result', composition: 'Flow composition', failed: 'Failed', retired: 'Retired',
     storageRequired: 'Freshness and history require an input Storage.', fallback: 'Allow an older acquisition after a failed refresh' },
-  'fr-FR': { ttl: 'Durée de fraîcheur (hh:mm:ss)', history: 'Conserver les versions précédentes réussies',
+  'fr-FR': { createTransformation: 'Créer un flow de transformation', createdTransformation: 'Brouillon créé.', ttl: 'Durée de fraîcheur (hh:mm:ss)', history: 'Conserver les versions précédentes réussies',
     direct: 'Résultat direct', composition: 'Composition des Flows', failed: 'Échec', retired: 'Retiré',
     storageRequired: 'La fraîcheur et la conservation nécessitent un Storage d’entrée.', fallback: 'Autoriser une ancienne acquisition après un échec de rafraîchissement' },
 } as const;

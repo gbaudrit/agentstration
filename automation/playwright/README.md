@@ -286,6 +286,10 @@ Both journeys have en-US/fr-FR desktop and mobile test cases and catalog entries
 The composition journey includes a 20,000-character retained synthetic dataset and
 explicit standard Knowledge orchestration with an empty `postAggregate` sequence.
 It exercises projection envelopes larger than the separate saved-parameter budget.
+It also creates a typed transformation from the Definition, verifies that Enter
+does not save pending source edits, publishes it in a separate Designer tab,
+refreshes candidates, saves the binding and successfully projects its output.
+The `source-transformation-draft-created` checkpoint captures the creation state.
 
 The isolated `SourcePolicyHost` fixture exposes a loopback-only control endpoint
 protected by a random per-campaign key. It advances only lifecycle/local Storage
