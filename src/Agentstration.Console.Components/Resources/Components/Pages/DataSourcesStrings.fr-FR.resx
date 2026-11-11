@@ -167,4 +167,14 @@
   <data name="DirectResultHelp" xml:space="preserve"><value>Le contenu a été transmis à sa projection ; l’historique d’acquisition conserve son identité et sa provenance.</value></data>
   <data name="ContentRetired" xml:space="preserve"><value>Contenu retiré · provenance conservée</value></data>
   <data name="ContentRetirementPending" xml:space="preserve"><value>Retrait du contenu en attente</value></data>
+  <data name="SequenceCreate" xml:space="preserve"><value>Créer un flow de transformation</value></data>
+  <data name="SequenceCreateHelp" xml:space="preserve"><value>Les contrats d’entrée et de sortie sont préremplis pour ce point. Le Designer s’ouvre dans un autre onglet ; vos modifications de la source restent ici.</value></data>
+  <data name="SequenceNoPublishedFlows" xml:space="preserve"><value>Aucun Flow de transformation publié n’est disponible dans ce contexte. Créez-en un, définissez sa transformation et publiez-le, puis actualisez la liste.</value></data>
+  <data name="SequenceRefresh" xml:space="preserve"><value>Actualiser les Flows</value></data>
+  <data name="SequenceCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="SequenceCreateDraft" xml:space="preserve"><value>Créer le brouillon et ouvrir le Designer</value></data>
+  <data name="SequenceOpenDesigner" xml:space="preserve"><value>Ouvrir le Designer dans un autre onglet</value></data>
+  <data name="SequenceCreated" xml:space="preserve"><value>Brouillon créé. Après sa publication dans le Designer, actualisez les Flows pour l’ajouter à la séquence.</value></data>
+  <data name="SequenceCreateFailed" xml:space="preserve"><value>Le brouillon n’a pas pu être créé. Vérifiez le nom, le contexte et les droits de création des Flows, puis réessayez.</value></data>
+  <data name="SequenceClose" xml:space="preserve"><value>Fermer</value></data>
 </root>

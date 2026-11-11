@@ -325,6 +325,20 @@ Child validation failures retain their stable error code through the governed AW
 error response (HTTP 422), including `flow_composition_value_too_large` for an oversized
 value, rather than surfacing as an unhandled HTTP 500.
 
+
+The Definition editor provides **Create a transformation Flow** alongside adding
+an existing published Flow. It creates a draft in the current owner context,
+prepopulates the `{ value, parameters }` input and output contracts from the point
+(or the previous child's output when appending), and opens the Designer in a new
+tab. Source edits stay in the original tab. The initial transform preserves
+`input.value`; publication uses the ordinary Designer workflow. Refreshing the
+catalog exposes the published version without saving or replacing source edits.
+The empty catalog and loading failures have separate localized explanations.
+The selector resolves input schemas from the canonical Input step as well as the
+graph fallback. `POST /api/flows/drafts` accepts optional `transformation` value
+schemas; the application validates their bounded profile before creating any
+resource and generates the envelope and graph using the existing draft service.
+
 ## Independent content lifecycle
 
 Native datasets may explicitly opt into `lifecycle`: `allowDirect`, `timeToLive`,

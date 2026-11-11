@@ -19,7 +19,7 @@ using Microsoft.Extensions.Logging;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class KnowledgeSourceEditorTests
+public sealed partial class KnowledgeSourceEditorTests
 {
     [TestMethod]
     public async Task PrerenderDisablesNativeContentSelectionUntilInteractive()
@@ -896,6 +896,9 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class FlowClientStub : IFlowApiClient
     {
+        public FlowGraphDefinition? SequenceGraph { get; init; }
+        public CreateFlowDraftRequest? CreatedTransformation { get; private set; }
+        public bool FailCreation { get; init; }
         internal static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
 
@@ -930,7 +933,7 @@ public sealed class KnowledgeSourceEditorTests
             return Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new(flowId, "1.0.0", null,
                 new WorkflowFlowDefinition("input", [], [], []),
                 new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract }, DateTimeOffset.UtcNow,
-                new FlowGraphDefinition { EntryStep = "input", InputSchema = inputSchema })]);
+                (flowId == "artifact-transform-builtin" ? SequenceGraph : null) ?? new FlowGraphDefinition { EntryStep = "input", InputSchema = inputSchema })]);
         }
         private static string Contract(string flowId) => flowId switch
         {
@@ -946,7 +949,17 @@ public sealed class KnowledgeSourceEditorTests
         public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public async IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, [EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
-        public Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken)
+        {
+            if (FailCreation) throw new HttpRequestException("Synthetic rejection.");
+            CreatedTransformation = request;
+            return Task.FromResult(new FlowDraftResponse(new()
+            {
+                WorkspaceId = new(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")), ScopeRef = request.ScopeRef,
+                Id = request.Name + "-draft", FlowId = new(request.Name), DisplayName = request.DisplayName,
+                Definition = new() { EntryStep = "input" }, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+            }, "created"));
+        }
         public Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowDraftResponse> SaveDraftAsync(string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowValidationResponse> ValidateDraftAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
