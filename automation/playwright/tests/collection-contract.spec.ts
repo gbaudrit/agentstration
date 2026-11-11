@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { CollectionContractPage } from '../src/pages/collection-contract.page.js';
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
 import { inspectCollections } from '../src/journeys/inspect-collections.journey.js';
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
@@ -35,6 +37,10 @@ for (const variant of [
         await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);
         await pages.ensureTheme(variant.theme);
         await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+        if (route === '/account/pat') {
+          await new CollectionContractPage(page).open(product.consoleUrl, route);
+          await pages.consoleAdministration.createToken(`collection-menu-${randomUUID().slice(0, 8)}`);
+        }
         await inspectCollections(journeyContext, { route, locale: variant.locale });
       });
     }

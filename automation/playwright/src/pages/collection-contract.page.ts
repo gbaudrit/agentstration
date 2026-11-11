@@ -204,7 +204,7 @@ export class CollectionContractPage {
     await trigger.focus();
     await trigger.press('ArrowDown');
     await expect(menu).toHaveAttribute('open', '');
-    const items = menu.locator('a[href], button:enabled, input:enabled, select:enabled');
+    const items = menu.locator('a[href]:visible, button:enabled:visible, input:enabled:visible, select:enabled:visible');
     expect(await menu.locator('a[href], button, input, select').count()).toBeGreaterThan(0);
     if (await items.count()) {
       await expect(items.first()).toBeFocused();
