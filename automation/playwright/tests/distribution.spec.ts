@@ -6,19 +6,25 @@ import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 import { expect, test } from '../src/fixtures/test.js';
 
-test('local AEP extensions expose inventory and detail states @smoke', async ({ page, product }, testInfo) => {
+test('local AEP extensions expose inventory and detail states @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   const context = { ...product, pages, checkpoint: ignoreCheckpoints };
   await authenticateConsole(context, {});
   await pages.distribution.openFirstExtensionDetails(product.consoleUrl);
   await pages.distribution.open(product.consoleUrl, `/extensions/enrollment/${randomUUID()}`, 'extensionDetails');
-  try {
-    for (const variant of [
-      { locale: 'en-US', theme: 'dark', width: 1440 },
-      { locale: 'en-US', theme: 'light', width: 1440 },
-      { locale: 'fr-FR', theme: 'dark', width: 390 },
-      { locale: 'fr-FR', theme: 'light', width: 390 },
-    ] as const) {
+});
+
+for (const variant of [
+  { locale: 'en-US', theme: 'dark', width: 1440 },
+  { locale: 'en-US', theme: 'light', width: 1440 },
+  { locale: 'fr-FR', theme: 'dark', width: 390 },
+  { locale: 'fr-FR', theme: 'light', width: 390 },
+] as const) {
+  test(`collection version identity and primary choice ${variant.locale} ${variant.theme} ${variant.width === 390 ? 'mobile @responsive' : 'desktop'} @smoke`, async ({ page, product }, testInfo) => {
+    const pages = new ProductPages(page);
+    await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+    await pages.distribution.openFirstExtensionDetails(product.consoleUrl);
+    try {
       await page.setViewportSize({ width: variant.width, height: variant.width === 390 ? 844 : 1000 });
       await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);
       await pages.ensureTheme(variant.theme);
@@ -37,13 +43,11 @@ test('local AEP extensions expose inventory and detail states @smoke', async ({ 
       }
       await pages.distribution.inspectDirectProfileChoice(product.consoleUrl);
       await capture('profile-primary-choice');
+    } finally {
+      await pages.consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
     }
-  } finally {
-    await pages.consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
-    await page.setViewportSize({ width: 1440, height: 1000 });
-  }
-
-});
+  });
+}
 
 test('the local Git extension can back an explicitly configured Source Provider @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
