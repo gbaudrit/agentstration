@@ -424,6 +424,7 @@ fieldset:disabled .field-clear { display: none; }
  .unsaved-changes-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
  .unsaved-changes-actions > :last-child { grid-column: 1 / -1; }
  .unsaved-changes-bar { bottom: calc(var(--mobile-navigation-height) + var(--space-2) + env(safe-area-inset-bottom)); }
+ .resource-form > .form-actions { bottom: calc(var(--mobile-navigation-height) + var(--space-2) + env(safe-area-inset-bottom)); }
  .label-editor-row { grid-template-columns: minmax(0,1fr) auto; }
  .label-editor-row > .form-field { grid-column: 1; }
  .label-remove { grid-column: 2; grid-row: 1 / 3; align-self: center; margin-top: 0; }
