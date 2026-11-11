@@ -20,3 +20,5 @@ The draft adds 115 cases (98 route/tab/alias cases, ten populated workflows, fou
 The French/light collection variants restore the shared account preference to English/dark in teardown, so subsequent existing journeys keep their own locale contract. The expanded campaign uses three desktop and two mobile CI shards while retaining the 25-minute job limit and existing per-test timeouts.
 
 Expanded cases use a dedicated worker fixture pool, so repeated domain journeys with fixed resource names cannot collide with preexisting regressions. A focused consecutive run of both Trigger scenarios passed in distinct managed hosts.
+
+The maintainer's version/action refinement is also asserted by the shared page object: present version metadata has a visible meaningful label/value inside the identity text column and outside its link. Multiple primary commands remain visible outside disclosure menus; a group without secondary content has no empty menu. The maintained distribution and Agent selection journeys in the implementation PR cover the populated version roles, primary command visibility, desktop/mobile and theme/locale variants.

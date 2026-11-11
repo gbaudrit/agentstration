@@ -63,11 +63,25 @@ export class CollectionContractPage {
       await expect(identity.locator('.resource-icon')).toBeVisible();
       const primary = identity.locator('.resource-name-link, strong').first();
       await expect(primary).toBeVisible();
+      for (const version of await identity.locator('.collection-version').all()) {
+        await expect(version.locator('.collection-version-label')).toBeVisible();
+        expect((await version.locator('.collection-version-label').textContent())?.trim()).not.toBe('');
+        expect((await version.locator('code').textContent())?.trim()).not.toBe('');
+        await expect(version.locator('xpath=ancestor::a')).toHaveCount(0);
+        await expect(version.locator('xpath=ancestor::*[contains(@class, "collection-identity-text")]')).toHaveCount(1);
+      }
       const code = identity.locator('.collection-qualified-name code');
       if (await code.count()) {
         expect(await code.textContent()).not.toMatch(/\s\/|\/\s/);
         await expect(identity.locator('.copy-value')).toHaveCount(1);
       }
+    }
+    for (const group of await this.page.locator('.collection-action-group:visible').all()) {
+      const primary = group.locator('.collection-primary-actions');
+      await expect(primary.locator('details')).toHaveCount(0);
+      const commands = primary.locator('button, a');
+      for (const command of await commands.all()) await expect(command).toBeVisible();
+      if (!await group.locator('.collection-actions-panel').count()) await expect(group.locator('details')).toHaveCount(0);
     }
     for (const state of await states.all()) {
       await expect(state.locator('.ui-icon')).toBeVisible();
