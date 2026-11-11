@@ -81,15 +81,16 @@ export class SourcePolicyFixtures {
     expect(response.ok(), `${method} ${path}: ${await response.text()}`).toBe(true);
     return { value: await response.json(), etag: response.headers()['etag'] };
   }
-  public async source(fixture: SourcePolicyFixture, name: string, lifecycle: unknown, direct = false): Promise<void> {
+  public async source(fixture: SourcePolicyFixture, name: string, lifecycle: unknown, direct = false, dataset = `synthetic-${name}`): Promise<void> {
     await this.api('POST', '/api/datasources', { name, scopeRef: '/instance', properties: { displayName: name, dataset: {
       storage: direct ? null : fixture.storageRef, lifecycle, rule: { write: true },
-      acquisition: { operation: fixture.operationRef, parameters: { dataset: `synthetic-${name}` } },
+      acquisition: { operation: fixture.operationRef, parameters: { dataset } },
     } } });
   }
   public async knowledge(fixture: SourcePolicyFixture, name: string, inputs: string[]): Promise<void> {
     await this.api('POST', '/api/knowledgesources', { name, scopeRef: '/instance', properties: { displayName: name,
       enabled: true, dataSources: inputs.map((source, index) => ({ name: `input-${index + 1}`, dataSource: { name: source, scopeRef: '/instance' } })),
+      orchestration: { resourceId: 'knowledge-orchestration-builtin', scopeRef: '/instance', namespace: 'default', versionStrategy: 'exact', version: '1.0.0' },
       projectionFlow: { name: 'knowledge-projection-builtin', scopeRef: '/instance', version: '1.0.0', useActiveVersion: false },
       output: { storage: fixture.storageRef, rule: { write: true } },
     } });

@@ -18,7 +18,7 @@ export class SourcePoliciesPage {
     const text = SourcePolicyTextByLocale[locale];
     await control.change({});
     await this.createDirect(base, fixture, direct, text.ttl);
-    await fixtures.source(fixture, stored, {});
+    await fixtures.source(fixture, stored, {}, false, 'x'.repeat(20_000));
     await this.openDataset(base, stored);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('01:00:00');
     await this.page.getByTestId(TestIds.sourcePolicies.history).check();
@@ -39,6 +39,7 @@ export class SourcePoliciesPage {
     await this.openKnowledge(base, knowledge);
     await expect(this.page.getByTestId(TestIds.sourcePolicies.ttl)).toHaveValue('00:20:00');
     const first = await this.project(base, knowledge, fixtures);
+    expect(first.projectionComposition.receipt.bindings.postAggregate).toEqual([]);
     expect(first.inputs[0].directInput).toBeTruthy();
     expect(first.inputs[1].storageInput).toBeTruthy();
     await this.page.goto(`${base}/data-sources/${direct}?context=%2Finstance&scopeRef=%2Finstance&view=acquisitions`);

@@ -283,6 +283,10 @@ reorders two parameterized children, rejects an incompatible selection without
 losing the draft, and checks independent input/global sequences and failed output.
 Both journeys have en-US/fr-FR desktop and mobile test cases and catalog entries.
 
+The lifecycle journey includes a 20,000-character retained synthetic dataset and
+explicit standard Knowledge orchestration with an empty `postAggregate` sequence.
+It exercises projection envelopes larger than the separate saved-parameter budget.
+
 The isolated `SourcePolicyHost` fixture exposes a loopback-only control endpoint
 protected by a random per-campaign key. It advances only lifecycle/local Storage
 clocks; worker registration and runtime assignment clocks remain real. Its write
