@@ -30,7 +30,7 @@ function positionPanel(panel, trigger) {
     panel.style.top = `${Math.max(8, Math.min(rect.bottom + 4, innerHeight - panel.offsetHeight - 8))}px`;
 }
 export function attachActions(root) {
-    if (!root?.isConnected) return;
+    if (!root?.isConnected || actions.has(root)) return;
     const trigger = root.querySelector('summary');
     const panel = root.querySelector('.collection-actions-panel');
     if (!trigger || !panel) return;

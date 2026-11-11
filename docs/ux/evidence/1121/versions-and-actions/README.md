@@ -33,7 +33,7 @@ Implemented-UX acceptance and both merges remain pending. These observations do 
 
 All **nine maintained browser cases passed**, zero failed/skipped/flaky, producing **36 captures** (28 version/selection views and eight Extension command views). The Extension captures include a real pending announcement and two available enrollments; commands are tested without executing credential mutations. ArrowDown opens the secondary menu, Escape dismisses it and restores summary focus.
 
-Direct navigation additionally waits for the shared permission context before loading enrollments. The delayed-permission component test failed before the correction and passes afterwards. The complete Fast lane passes **984 tests**, zero skipped; Release solution and all ten browser hosts build with zero warnings/errors. TypeScript, five JavaScript lifecycle tests, five fixture tests and the documentation production build pass. Full regression and final CI results are maintained in the issue and PR descriptions.
+Direct navigation additionally waits for the shared permission context before loading enrollments. The delayed-permission component test failed before the correction and passes afterwards. The complete Fast lane passes **984 tests**, zero skipped; Release solution and all ten browser hosts build with zero warnings/errors. TypeScript, six JavaScript lifecycle tests, five fixture tests and the documentation production build pass. Full regression and final CI results are maintained in the issue and PR descriptions.
 
 [Structured browser results](./results.json) preserve case names, project, duration and source captures. UX acceptance remains pending.
 
@@ -44,3 +44,5 @@ These 36 captures were refreshed after form PR #1129 merged as `a60d76e335dce185
 The browser regression also checks the loaded scope picker: its right-aligned help uses the existing left-opening tooltip, keeping desktop document width bounded, while mobile retains the existing panel. The test failed on the combined source before this correction and passes afterwards. Version/theme/viewport variants are independent cases with the unchanged 120-second test timeout.
 
 Full deterministic integration lane on the combined implementation: **1,011 passed, 12 optional external integrations skipped**, zero failures. Final Browser UX/documentation CI for both drafts is recorded in the issues and PRs.
+
+A subsequent action-menu regression makes initialization idempotent across repeated Blazor renders: one ArrowDown focuses the first command rather than advancing twice. The new lifecycle test fails before the fix and all six JavaScript tests pass afterwards. The correction changes event binding only; the captured HTML/CSS remains unchanged.
