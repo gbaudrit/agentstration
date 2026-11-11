@@ -314,6 +314,17 @@ rejects substitution. The Designer exposes composition-point names, identity pol
 input/output schemas and mapping; source editors expose declared points, published
 child version selection, parameter entry and reordering in English and French.
 
+
+An empty `postAggregate` sequence preserves the projection manifest. The required
+projection child still executes even when no transformation is configured. Saved
+literal parameters remain bounded to 65,536 JSON characters; values passed between
+composed Flows have a separate limit of 1,048,576 JSON characters. The larger value
+budget accounts for retained content repeated in acquisition evidence and the
+projection manifest. Native content and Storage limits remain independently enforced.
+Child validation failures retain their stable error code through the governed AWP
+error response (HTTP 422), including `flow_composition_value_too_large` for an oversized
+value, rather than surfacing as an unhandled HTTP 500.
+
 ## Independent content lifecycle
 
 Native datasets may explicitly opt into `lifecycle`: `allowDirect`, `timeToLive`,

@@ -14,6 +14,58 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task NativeKnowledgeWithoutTransformationsPreservesContentBeyondTheParameterBudget(bool orchestrate)
+    {
+        await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var fixture = await PrepareAsync(factory.Services);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
+        var payload = new string('x', 20_000);
+        var source = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
+            Source("untransformed-input", fixture, JsonSerializer.SerializeToElement(new { dataset = payload })), default);
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, Owner);
+        _ = await AcquireAsync(client, source.Value.Name);
+        var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            Metadata = new() { Name = "untransformed-knowledge" },
+            ScopeRef = Owner,
+            Definition = new()
+            {
+                DisplayName = "Untransformed knowledge",
+                Output = new(fixture.Storage, new(Write: true)),
+                ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
+                Orchestration = orchestrate ? new("knowledge-orchestration-builtin", ScopeRef: Owner) : null,
+                DataSources = [new() { Name = "input", DataSource = new(source.Value.Name, Owner) }]
+            }
+        }, default);
+        var projected = await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(
+            new(knowledge.Value.Name, ScopeRef: Owner), new(), default);
+        var repository = factory.Services.GetRequiredService<IFlowRepository>();
+        var run = (await repository.GetRunExactAsync(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId),
+            projected.Value.ProjectionFlowRunId, default))!.Value;
+        Assert.IsTrue(run.Input.GetRawText().Length > 65_536, "The retained content is repeated in the projection evidence and input manifest.");
+        Assert.AreEqual(KnowledgeProjectionState.Succeeded, projected.Value.State, projected.Value.ErrorMessage);
+        Assert.IsNotNull(projected.Value.SnapshotName);
+        var outputArtifact = run.Output!.Value.GetProperty("artifacts")[0];
+        using var content = JsonDocument.Parse(Convert.FromBase64String(outputArtifact.GetProperty("contentBase64").GetString()!));
+        Assert.AreEqual(payload, content.RootElement.GetProperty("dataset").GetString());
+        if (orchestrate)
+        {
+            Assert.HasCount(0, run.Composition!.Bindings["postAggregate"]);
+            var child = (await repository.ListRunsAsync(run.Scope, null, null, 0, 100, default)).Items
+                .Single(candidate => candidate.Value.ParentFlowRunId == run.Id).Value;
+            Assert.AreEqual("knowledge-projection-builtin", child.FlowId.Value);
+            Assert.IsTrue(JsonElement.DeepEquals(run.Input, child.Input));
+            Assert.IsTrue(JsonElement.DeepEquals(run.Output.Value, child.Output!.Value));
+        }
+    }
+
+    [TestMethod]
     public async Task NativeDatasetAndKnowledgeExecutePinnedOrderedSequencesThroughGovernedChildren()
     {
         await using var factory = Factory();

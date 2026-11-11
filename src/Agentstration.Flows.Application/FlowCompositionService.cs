@@ -40,7 +40,7 @@ public sealed class FlowCompositionService(FlowService flows)
             var mapping = point.InputMapping ?? JsonSerializer.SerializeToElement("${transition.output}");
             foreach (var call in configured)
             {
-                if (call.Parameters.ValueKind != JsonValueKind.Object || call.Parameters.GetRawText().Length > 65536) throw Error("flow_composition_parameters_invalid");
+                if (call.Parameters.ValueKind != JsonValueKind.Object || call.Parameters.GetRawText().Length > FlowCompositionSchema.MaximumParametersLength) throw Error("flow_composition_parameters_invalid");
                 var child = await ResolveCallAsync(call.Flow, consumer, template.FlowId.Namespace, ct);
                 await RejectCyclesAsync(child, consumer, [Key(template)], 0, ct);
                 if (child.Graph?.Steps.OfType<FlowCompositionPointStepDefinition>().Any(p => !p.AllowEmpty) == true)

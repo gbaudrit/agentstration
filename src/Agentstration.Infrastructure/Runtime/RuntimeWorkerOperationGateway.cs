@@ -311,9 +311,16 @@ public sealed class RuntimeWorkerOperationGateway(
         int? iteration,
         CancellationToken cancellationToken)
     {
-        var child = await flowRuns.CreateOrGetAssignedChildExactAsync(executionScopeRef, parentRunId,
-            stepDefinitionId, input, purpose, iteration, cancellationToken);
-        return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone());
+        try
+        {
+            var child = await flowRuns.CreateOrGetAssignedChildExactAsync(executionScopeRef, parentRunId,
+                stepDefinitionId, input, purpose, iteration, cancellationToken);
+            return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone());
+        }
+        catch (FlowValidationException exception)
+        {
+            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
+        }
     }
 
     private static ChatRole ToRole(RuntimeMessageRole role) => role switch
