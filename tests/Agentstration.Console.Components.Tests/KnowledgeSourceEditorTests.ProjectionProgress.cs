@@ -37,6 +37,7 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.IsTrue(rendered.Find("[data-testid='knowledge-start-projection']").HasAttribute("disabled"));
         await rendered.InvokeAsync(clock.Tick);
         rendered.WaitForAssertion(() => Assert.AreEqual(1, rendered.FindAll("[data-testid='knowledge-projection-row']").Count));
+        Assert.AreEqual("_blank", rendered.Find("[data-testid='knowledge-projection-row'] a[href*='/flow-runs/']").GetAttribute("target"));
         Assert.AreEqual(2, client.ProjectionStarts); // Includes fixture preparation; polling must never start a second request.
         client.Projections[0] = completed;
         client.Snapshots = [ExistingSnapshot()];

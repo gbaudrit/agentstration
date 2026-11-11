@@ -144,4 +144,5 @@
   <data name="ProjectionRefreshUnavailable" xml:space="preserve"><value>Le suivi n’a pas pu être actualisé. Le traitement peut continuer ; réessayez l’actualisation.</value></data>
   <data name="ProjectionFailed" xml:space="preserve"><value>La projection n’a pas abouti : {0}</value></data>
   <data name="ProjectionAccepted" xml:space="preserve"><value>Projection acceptée. Le suivi s’actualise automatiquement.</value></data>
+  <data name="FlowRunNewTab" xml:space="preserve"><value>Afficher l’exécution de Flow {0} dans un nouvel onglet.</value></data>
 </root>
