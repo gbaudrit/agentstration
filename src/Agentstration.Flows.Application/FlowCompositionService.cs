@@ -132,8 +132,14 @@ public sealed class FlowCompositionService(FlowService flows)
             || reference.VersionStrategy == FlowCallVersionStrategy.Exact && string.IsNullOrWhiteSpace(reference.Version))
             throw Error("flow_composition_reference_invalid");
         var id = reference.Resolve(ownerNamespace);
-        var resolved = await flows.ResolveAsync(consumer, new(id, reference.VersionStrategy == FlowCallVersionStrategy.Exact ? reference.Version : null,
-            reference.VersionStrategy == FlowCallVersionStrategy.Active, id.Namespace, reference.ScopeRef), ownerNamespace, ct);
+        FlowVersion resolved;
+        try
+        {
+            resolved = await flows.ResolveAsync(consumer, new(id, reference.VersionStrategy == FlowCallVersionStrategy.Exact ? reference.Version : null,
+                reference.VersionStrategy == FlowCallVersionStrategy.Active, id.Namespace, reference.ScopeRef), ownerNamespace, ct);
+        }
+        catch (Exception exception) when (exception is FlowReferenceOutsideScopeException or FlowReferenceAmbiguousException or FlowNotFoundException)
+        { throw Error("flow_composition_child_unavailable"); }
         var resource = await flows.GetExactAsync(resolved.ScopeRef, id, ct);
         if (resource?.Value.Enabled != true) throw Error("flow_composition_child_unavailable");
         await flows.ValidateUseAsync(resolved.ScopeRef, id, resolved.Version, consumer, reference.ResourceUid, ct);

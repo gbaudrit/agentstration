@@ -8,6 +8,18 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    public async Task CompositionTranslatesOutsideScopeReferencesIntoValidationFailures()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        await CreatePublishedGraphAsync(fixture, "scoped-composition-child", CompositionChild());
+        var compiler = new FlowCompositionService(fixture.Service);
+        var forbidden = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => compiler.ResolveCallAsync(
+            new("scoped-composition-child", ScopeRef: ResourceScopeRef.Workspace(Guid.NewGuid())),
+            TestScope.AccessScopeRef, ResourceNamespace.Default, default));
+        Assert.AreEqual("flow_composition_child_unavailable", forbidden.Code);
+    }
+
+    [TestMethod]
     public async Task CompositionPinsOrderedCallsAndLiteralParametersWithoutRemovingFixedSteps()
     {
         await using var fixture = await FlowFixture.CreateAsync();
