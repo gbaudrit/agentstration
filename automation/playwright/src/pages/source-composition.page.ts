@@ -62,7 +62,8 @@ export class SourceCompositionPage {
     expect(transformed.content.previous.previous.dataset).toBe('redacted');
     const identity = (await api.api('GET', '/api/identity/context')).value;
     const forbidden = `descendant-only-${fixture.suffix}`;
-    const forbiddenScope = `/workspaces/${identity.context.workspaceId}`;
+    expect(identity.availableWorkspaces.length).toBeGreaterThan(0);
+    const forbiddenScope = `/workspaces/${identity.availableWorkspaces[0].id}`;
     await publish(forbidden, 'fixture.transform/v1', childInput, object,
       [{ type: 'output', name: 'output', schema: object, outputMapping: '${input.value}' }], undefined, forbiddenScope);
     const current = await api.api('GET', `/api/datasources/${source}?scopeRef=%2Finstance`);
@@ -74,6 +75,7 @@ export class SourceCompositionPage {
       headers: { 'X-Agentstration-Context': '/instance', 'If-Match': current.etag! }, data: { properties: forbiddenProperties },
     });
     expect([400, 403, 422]).toContain(refused.status());
+    expect((await refused.json()).type).toContain('data_source_composition_invalid');
     await editor.openDataset(base, source);
     await expect(sequence.getByTestId(TestIds.sourcePolicies.call).nth(0).getByTestId(TestIds.sourcePolicies.target)).not.toContainText(forbidden);
     await sequence.getByTestId(TestIds.sourcePolicies.call).nth(0).getByTestId(TestIds.sourcePolicies.target).selectOption(`/instance|default|${incompatible}|1.0.0`);
@@ -90,9 +92,12 @@ export class SourceCompositionPage {
     await publish(manifestChild, 'fixture.manifest/v1', manifestInput, schema,
       [{ type: 'output', name: 'output', schema, outputMapping: '${input.value}' }]);
     await publish(failChild, 'fixture.manifest/v1', manifestInput, schema, [
-      { type: 'transform', name: 'reject', mapping: {}, schema: { type: 'object', properties: { mandatory: { type: 'string' } }, required: ['mandatory'] } },
-      { type: 'output', name: 'output', schema, outputMapping: '${input.value}' },
-    ], [{ id: 'reject', fromStep: 'input', event: 'completed', toStep: 'reject' }, { id: 'finish', fromStep: 'reject', event: 'completed', toStep: 'output' }]);
+      { type: 'condition', name: 'decide', left: '${input.parameters.tag}', operator: 'equals', right: 'allow' },
+      { type: 'output', name: 'approved', outcome: 'success', schema, outputMapping: '${input.value}' },
+      { type: 'output', name: 'rejected', outcome: 'error', code: 'fixture_post_aggregate_failed', message: 'Synthetic post-aggregation failure.' },
+    ], [{ id: 'decide', fromStep: 'input', event: 'completed', toStep: 'decide' },
+      { id: 'approve', fromStep: 'decide', event: 'true', toStep: 'approved' },
+      { id: 'reject', fromStep: 'decide', event: 'false', toStep: 'rejected' }]);
     await api.knowledge(fixture, knowledge, [source, second]);
     await editor.openKnowledge(base, knowledge);
     const bindings = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding);

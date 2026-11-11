@@ -102,7 +102,7 @@ export class SourcePoliciesPage {
     await this.page.goto(`${base}/data-sources/new?composition=dataset&context=%2Finstance`);
     await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toHaveAttribute('data-interactive', 'true');
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceDisplayName).fill(name);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceName).fill(name);
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceName)).toHaveValue(name);
     await this.page.getByTestId(TestIds.sourcePolicies.service).selectOption(fixture.service.uid);
     await this.page.getByTestId(TestIds.sourcePolicies.operation).selectOption(`${fixture.operation.uid}:${fixture.operation.generation}:${fixture.operation.definition.definitionDigest}`);
     await this.page.locator('[data-schema-path="$.dataset"] input').fill('synthetic-direct');
