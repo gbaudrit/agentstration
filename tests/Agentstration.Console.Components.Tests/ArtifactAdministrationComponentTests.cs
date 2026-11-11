@@ -11,6 +11,23 @@ namespace Agentstration.Web.Tests;
 public sealed class ArtifactAdministrationComponentTests
 {
     [TestMethod]
+    public void ArtifactIdentityCopiesTheCompleteIdentifierOutsideTheNavigationLink()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        const string identifier = "artifact-0123456789abcdef0123456789abcdef";
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ArtifactReference>(parameters => parameters
+            .Add(value => value.Name, "Report")
+            .Add(value => value.Identifier, identifier)
+            .Add(value => value.IdentifierLabel, "Identifier")
+            .Add(value => value.Href, "/artifacts/staged/" + identifier));
+        Assert.AreEqual(identifier, rendered.Find(".copyable-value code").TextContent);
+        Assert.HasCount(0, rendered.FindAll("a .copy-value"));
+        Assert.IsNotNull(rendered.Find(".resource-icon"));
+        Assert.AreEqual("/artifacts/staged/" + identifier, rendered.Find("a").GetAttribute("href"));
+    }
+
+    [TestMethod]
     public void StagedArtifactContentIsOnlyReadAfterExplicitActionAndUsesTabs()
     {
         using var culture = new TestCultureScope("en-US");
@@ -129,9 +146,8 @@ public sealed class ArtifactAdministrationComponentTests
         rendered.WaitForElement("[data-testid='durable-artifact-row']");
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']"));
         StringAssert.Contains(rendered.Markup, "index.html");
-        StringAssert.Contains(
-            rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']").TextContent,
-            client.Durable.ArtifactId.ToString());
+        Assert.AreEqual(client.Durable.ArtifactId.ToString(),
+            rendered.Find("[data-testid='durable-artifact-row'] .collection-identity-cell .copyable-value code").TextContent);
 
         rendered.FindAll("button").Single(value => value.TextContent.Contains("Local copies", StringComparison.Ordinal)).Click();
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
@@ -144,9 +160,8 @@ public sealed class ArtifactAdministrationComponentTests
             rendered.Find(".artifact-status .metric-help").GetAttribute("class"),
             "metric-help-left");
         StringAssert.Contains(rendered.Markup, "index.html");
-        StringAssert.Contains(
-            rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,
-            client.Artifact.ArtifactId.ToString());
+        Assert.AreEqual(client.Artifact.ArtifactId.ToString(),
+            rendered.Find("[data-testid='staged-artifact-row'] .collection-identity-cell .copyable-value code").TextContent);
     }
 
     [TestMethod]

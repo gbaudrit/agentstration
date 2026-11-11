@@ -153,7 +153,7 @@ export class AgentInstanceObservabilityPage {
 
   public async followRunLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
     const prefix = instance.runKind === 'FlowRun' ? 'flow-runs' : 'runs';
-    await this.instanceRow(instance.instanceId).locator(`a[href="/${prefix}/${instance.runId}"]`).click();
+    await this.instanceRow(instance.instanceId).locator(`a.instance-run-link[href^="/${prefix}/${instance.runId}"]`).click();
     await this.expectContextualPath(consoleUrl, `/${prefix}/${instance.runId}`);
   }
 

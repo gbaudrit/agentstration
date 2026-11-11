@@ -715,11 +715,12 @@
       ],
       "renderer": "CollectionView",
       "itemType": "AgentInstanceResponse",
-      "identityLabel": "Agent",
-      "scope": false,
+      "identityLabel": "AgentInstance",
+      "scope": true,
       "state": false,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
+        "Agent",
         "Run",
         "Execution",
         "Worker",
@@ -728,7 +729,8 @@
         "LastActivity",
         "Lease"
       ],
-      "validation": "pending-final-campaign"
+      "validation": "pending-final-campaign",
+      "scopeMeaning": "Existing ExecutionScopeRef; no definition-owner lookup."
     },
     {
       "id": "tool-definitions-tool-definition-resource",
@@ -890,7 +892,7 @@
       "identityLabel": "Artifact",
       "scope": false,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Producer",
         "Size",
@@ -911,7 +913,7 @@
       "identityLabel": "Artifact",
       "scope": false,
       "state": false,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "FlowRun",
         "Step",

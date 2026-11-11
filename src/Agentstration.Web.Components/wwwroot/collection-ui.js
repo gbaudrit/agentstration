@@ -1,9 +1,23 @@
 const collections = new WeakMap();
 export function observeCollection(root, receiver) {
     const query = matchMedia('(max-width: 760px)');
-    const changed = () => receiver.invokeMethodAsync('SetNarrow', query.matches);
+    let active = true;
+    const release = () => {
+        active = false;
+        query.removeEventListener('change', changed);
+        window.removeEventListener('pagehide', release);
+    };
+    const changed = () => {
+        if (!active || !root.isConnected) { release(); return; }
+        receiver.invokeMethodAsync('SetNarrow', query.matches).catch(error => {
+            // A resize can finish after navigation or component disposal closes the circuit.
+            if (!active || !root.isConnected) return;
+            throw error;
+        });
+    };
     query.addEventListener('change', changed);
-    collections.set(root, () => query.removeEventListener('change', changed));
+    window.addEventListener('pagehide', release, { once: true });
+    collections.set(root, release);
     changed();
 }
 export function releaseCollection(root) { collections.get(root)?.(); collections.delete(root); }
