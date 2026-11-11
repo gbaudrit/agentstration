@@ -135,7 +135,8 @@ export class ProductPages {
   public async ensureTheme(theme: 'light' | 'dark'): Promise<void> {
     const shell = this.page.getByTestId(TestIds.console.shell);
     await this.page.locator(`[data-testid="${TestIds.console.shell}"][data-preferences-ready="true"]`).waitFor({ state: 'visible' });
-    if (await shell.evaluate((element, expected) => element.classList.contains(`theme-${expected}`), theme)) return;
+    // Attribute reads re-resolve through login/culture reloads; evaluate loses its context.
+    if (await shell.getAttribute('data-theme') === theme) return;
     await this.page.getByTestId(TestIds.console.themeToggle).click();
     await this.page.locator(`[data-testid="${TestIds.console.shell}"].theme-${theme}`).waitFor({ state: 'visible' });
   }
