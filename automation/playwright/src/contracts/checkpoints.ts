@@ -1,4 +1,5 @@
 export const Checkpoints = {
+  sourcePolicies: { lifecycle: 'source-policies-lifecycle-verified', composition: 'source-composition-verified' },
   organizationStructure: {
     instance: 'organization-structure-instance',
     tenantCreated: 'organization-structure-tenant-created',

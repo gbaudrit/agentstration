@@ -1,4 +1,17 @@
 export const TestIds = {
+  sourcePolicies: {
+    pointName: 'composition-point-name', configureStep: 'configure-selected-step', datasetError: 'dataset-error-code',
+    definitionFields: 'dataset-definition-fields', service: 'dataset-service', operation: 'dataset-operation',
+    storage: 'dataset-storage', direct: 'dataset-allow-direct', lifecycle: 'source-lifecycle-editor',
+    enable: 'lifecycle-enable', ttl: 'lifecycle-ttl', history: 'lifecycle-history', retention: 'lifecycle-retention',
+    directResult: 'dataset-direct-result', fallbackEvidence: 'knowledge-input-fallback', directEvidence: 'knowledge-input-direct', latestAcquisition: 'dataset-latest-acquisition',
+    definitionTab: 'dataset-definition-tab', acquisitionsTab: 'dataset-acquisitions-tab',
+    knowledgeDefinitionFields: 'knowledge-source-definition-fields', fallback: 'knowledge-binding-fallback',
+    fallbackAge: 'knowledge-binding-fallback-age', expiredFallback: 'knowledge-expired-fallback',
+    composition: 'source-flow-composition', root: 'source-orchestration', sequence: 'flow-sequence-editor',
+    call: 'flow-sequence-call', target: 'flow-sequence-target', up: 'flow-sequence-up', down: 'flow-sequence-down',
+    remove: 'flow-sequence-remove', add: 'flow-sequence-add',
+  },
   common: {
     iconPicker: 'icon-picker',
     schemaInputEditor: 'schema-input-editor',

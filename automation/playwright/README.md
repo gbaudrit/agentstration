@@ -270,3 +270,33 @@ npm run capture -- --plan examples/exercise-organization-structure.capture-plan.
 The local capture automatically selects the `OrganizationStructureHost` fixture with Local authentication. Its disposable platform administrator is `admin / Fixture973!Admin`; `tenant-admin`, `workspace-admin`, and `structure-viewer` share `Fixture973!Access`. The fixture provisions accounts through the existing identity services and grants only `tenant-admin` a Tenant-scoped Admin role. It exposes no product test endpoint. Every run uses isolated SQLite storage and unique Tenant/Workspace names.
 
 The journey covers explicit parent selection, empty Tenant expansion, search, keyboard creation, required/invalid/duplicate/reserved names, context opening links and URLs, the localized checked Current context indicator, Tenant/Workspace global selection, restricted inventory and cross-Tenant creation denial, and viewport bounds. A Workspace-scoped Admin also verifies successful sibling creation without an implicit access grant or context switch. The specification runs the same journey in English/French on desktop/mobile. For an external disposable instance, provide equivalent accounts using the journey's `tenantAdminUsername`, `workspaceAdminUsername`, `viewerUsername`, and `restrictedPassword` inputs and override the platform credentials; the fixture is never seeded into external instances.
+
+### Source content policies and configurable Flow sequences
+
+`source-policies.spec.ts` adds the focused deltas from #1116 and #1118 on top of
+source-lifecycle coverage. `exercise-source-policies` saves/reopens direct and
+retained input policies, advances acquisition and Snapshot freshness independently,
+forces a failed refresh, checks explicit age-bounded fallback, and observes history
+retirement while the active Snapshot survives. `exercise-source-composition` edits
+a typed point in the Designer, verifies fixed anonymization and empty identity,
+reorders two parameterized children, rejects an incompatible selection without
+losing the draft, and checks independent input/global sequences and failed output.
+Both journeys have en-US/fr-FR desktop and mobile test cases and catalog entries.
+
+The isolated `SourcePolicyHost` fixture exposes a loopback-only control endpoint
+protected by a random per-campaign key. It advances only lifecycle/local Storage
+clocks; worker registration and runtime assignment clocks remain real. Its write
+failure is synthetic and does not contact an external provider. Fixture control
+routes exist only in the automation executable, never the product host. Build the
+Release solution before a browser campaign and set
+`AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true` to freeze build outputs.
+
+```bash
+npm exec tsc -- --noEmit
+AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true npm exec playwright -- test source-policies.spec.ts
+```
+
+The maintainer explicitly requested this coverage in a child branch above the
+implementation PR #1131 before merge. This is a sequencing exception to the usual
+UX-validation gate, not approval of the implemented UX. #1116/#1118 and the draft
+PRs stay open pending review and merge.
