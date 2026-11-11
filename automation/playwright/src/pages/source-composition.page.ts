@@ -126,8 +126,11 @@ export class SourceCompositionPage {
   }
 
   private async append(sequence: Locator, name: string, tag: string): Promise<void> {
+    const rows = sequence.getByTestId(TestIds.sourcePolicies.call);
+    const count = await rows.count();
     await sequence.getByTestId(TestIds.sourcePolicies.add).click();
-    const row = sequence.getByTestId(TestIds.sourcePolicies.call).last();
+    await expect(rows).toHaveCount(count + 1);
+    const row = rows.nth(count);
     const target = row.getByTestId(TestIds.sourcePolicies.target);
     await target.selectOption(`/instance|default|${name}|1.0.0`);
     await expect(row).toHaveAttribute('data-flow-reference', `/instance|default|${name}|1.0.0`);
