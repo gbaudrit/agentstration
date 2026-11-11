@@ -1,9 +1,10 @@
 {
-  "description": "Actual executable application, version placement and configurable primary/secondary action follow-up. Source and captures are committed together.",
+  "description": "Actual executable application after merged form unification #1129: version metadata and configurable primary/secondary actions.",
+  "sourceSnapshot": "04f7dfe (implementation) including a60d76e (#1129)",
   "statistics": {
-    "startTime": "2026-11-11T10:43:11.567Z",
-    "duration": 383675.527,
-    "expected": 5,
+    "startTime": "2026-11-11T11:39:25.257Z",
+    "duration": 340162.078,
+    "expected": 9,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0
@@ -13,14 +14,42 @@
       "title": "local AEP extensions expose inventory and detail states @smoke",
       "project": "desktop-chromium",
       "status": "passed",
-      "durationMs": 68739,
+      "durationMs": 5545,
+      "captures": []
+    },
+    {
+      "title": "collection version identity and primary choice en-US dark desktop @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 14917,
+      "captures": []
+    },
+    {
+      "title": "collection version identity and primary choice en-US light desktop @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 14410,
+      "captures": []
+    },
+    {
+      "title": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 19230,
+      "captures": []
+    },
+    {
+      "title": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 17187,
       "captures": []
     },
     {
       "title": "governed extension inventory en-US desktop @smoke",
       "project": "desktop-chromium",
       "status": "passed",
-      "durationMs": 62330,
+      "durationMs": 44013,
       "captures": [
         "enrollment-primary-actions-en-US-desktop-dark.png",
         "enrollment-primary-actions-en-US-desktop-light.png"
@@ -30,7 +59,7 @@
       "title": "governed extension inventory en-US mobile @responsive @smoke",
       "project": "mobile-chromium",
       "status": "passed",
-      "durationMs": 55176,
+      "durationMs": 46907,
       "captures": [
         "enrollment-primary-actions-en-US-mobile-dark.png",
         "enrollment-primary-actions-en-US-mobile-light.png"
@@ -40,7 +69,7 @@
       "title": "governed extension inventory fr-FR mobile @responsive @smoke",
       "project": "mobile-chromium",
       "status": "passed",
-      "durationMs": 55659,
+      "durationMs": 43706,
       "captures": [
         "enrollment-primary-actions-fr-FR-mobile-dark.png",
         "enrollment-primary-actions-fr-FR-mobile-light.png"
@@ -50,7 +79,7 @@
       "title": "governed extension inventory fr-FR desktop @locale @smoke",
       "project": "locale-contracts",
       "status": "passed",
-      "durationMs": 57781,
+      "durationMs": 45416,
       "captures": [
         "enrollment-primary-actions-fr-FR-desktop-dark.png",
         "enrollment-primary-actions-fr-FR-desktop-light.png"
