@@ -11,7 +11,7 @@ public sealed partial class FlowTests
     public async Task TransformationDraftCreatesAndPublishesTheTypedValueEnvelopeInItsOwnerScope()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new AlwaysValidFlowValidator(), TimeProvider.System);
+        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new FlowGraphValidator(new ExistingResourceResolver()), TimeProvider.System);
         var value = JsonSerializer.SerializeToElement(new { type = "object", properties = new { artifacts = new { type = "array" } }, required = new[] { "artifacts" }, additionalProperties = false });
         var draft = await drafts.CreateExactAsync(TestScope.WorkspaceId, ResourceScopeRef.Instance,
             new CreateFlowDraftCommand("created-transformation", "Created transformation", null, null, "EmptyFlow")
@@ -36,7 +36,7 @@ public sealed partial class FlowTests
     public async Task InvalidTransformationContractsCreateNeitherResourceNorDraft(string schema)
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new AlwaysValidFlowValidator(), TimeProvider.System);
+        var drafts = new FlowDraftService(fixture.Repository, fixture.Service, new FlowGraphValidator(new ExistingResourceResolver()), TimeProvider.System);
         using var invalid = JsonDocument.Parse(schema);
         var value = JsonSerializer.SerializeToElement(new { type = "object" });
         var error = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => drafts.CreateAsync(TestScope.WorkspaceId,
