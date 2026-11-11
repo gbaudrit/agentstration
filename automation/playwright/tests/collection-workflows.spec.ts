@@ -21,7 +21,11 @@ const cases: ReadonlyArray<{ name: string; run: Journey<Record<string, never>> }
   { name: 'ToolSets, provider groups and pinned Agent members', run: context => administerGovernedToolSets(context, {}) },
   { name: 'tasks, Flow executions, events and Agent runs', run: context => inspectFlowObservability(context, {}) },
   { name: 'Trigger occurrences and operational ownership', run: context => exerciseOperationalTriggers(context, {}) },
-  { name: 'members, personal tokens and command results', run: context => inspectConsoleAdministration(context, {}) },
+  { name: 'members, personal tokens and command results', run: async context => {
+    await authenticateConsole(context, {});
+    await context.pages.organizationWorkspaces.selectByName('default');
+    await inspectConsoleAdministration(context, {});
+  } },
   { name: 'Schema versions', run: context => exerciseSchemaAdministration(context, {}) },
   { name: 'provider models and Model Profile capabilities', run: context => exerciseModelAdministration(context, {
     providerName: 'collection-ollama', providerDisplayName: 'Collection Ollama',
