@@ -10,7 +10,7 @@ import { exerciseSchemaAdministration } from '../src/journeys/exercise-schema-ad
 import { exerciseModelAdministration } from '../src/journeys/exercise-model-administration.journey.js';
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
 
-test.use({ authenticationMode: 'Local' });
+test.use({ authenticationMode: 'Local', collectionCampaign: true });
 
 const cases: ReadonlyArray<{ name: string; run: Journey<Record<string, never>> }> = [
   { name: 'acquisition history and profile revisions', run: context => administerDataSources(context, {}) },

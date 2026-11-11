@@ -6,7 +6,7 @@ import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 import { test } from '../src/fixtures/test.js';
 
-test.use({ authenticationMode: 'Local' });
+test.use({ authenticationMode: 'Local', collectionCampaign: true });
 
 // Independent cases: one failing family does not suppress the other collection checks.
 const routes = [

@@ -8,6 +8,7 @@ interface AgentstrationWorkerFixtures {
   acquisitionFailureFixture: boolean;
   governedInventoryFixture: boolean;
   organizationStructureFixture: boolean;
+  collectionCampaign: boolean;
   authenticationMode: 'Development' | 'Local';
   aiProvider: 'Deterministic' | 'Managed';
 }
@@ -22,6 +23,8 @@ export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFi
   acquisitionFailureFixture: [false, { option: true, scope: 'worker' }],
   governedInventoryFixture: [false, { option: true, scope: 'worker' }],
   organizationStructureFixture: [false, { option: true, scope: 'worker' }],
+  // The worker-scoped key gives the expanded campaign its own managed product data.
+  collectionCampaign: [false, { option: true, scope: 'worker' }],
   product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture }, use) => {
     const external = resolveExternalProductAddresses(process.env);
     if (external) {

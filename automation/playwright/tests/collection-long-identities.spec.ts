@@ -4,7 +4,7 @@ import { authenticateConsole } from '../src/journeys/authenticate-console.journe
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { CollectionContractPage } from '../src/pages/collection-contract.page.js';
 
-test.use({ authenticationMode: 'Local', hasTouch: true });
+test.use({ authenticationMode: 'Local', hasTouch: true, collectionCampaign: true });
 
 for (const variant of [
   { name: 'desktop dark', width: 1440, height: 1000, locale: 'en-US', theme: 'dark', tag: '' },

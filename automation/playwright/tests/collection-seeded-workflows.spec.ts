@@ -8,7 +8,7 @@ import { createPackProject } from '../src/journeys/create-pack-project.journey.j
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
 
 // The existing observability/Workplace journeys use the seeded Development topology.
-test.use({ authenticationMode: 'Development' });
+test.use({ authenticationMode: 'Development', collectionCampaign: true });
 
 test('populated collection contract: tasks, Flow executions, events and Agent runs @collections @smoke', async ({ page, product }, testInfo) => {
   test.setTimeout(420_000);
