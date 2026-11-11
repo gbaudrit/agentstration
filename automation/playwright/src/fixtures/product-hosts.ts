@@ -14,6 +14,7 @@ export interface ProductAddresses {
 }
 
 export interface ProductHosts extends ProductAddresses {
+  formPendingInteractionId?: string;
   platformHealth?: PlatformHealthTestControl;
   runtimeWorker?: RuntimeWorkerTestControl;
   stop(): Promise<void>;
@@ -70,10 +71,13 @@ export async function startProductHosts(
   acquisitionFailureFixture = false,
   governedInventoryFixture = false,
   organizationStructureFixture = false,
+  initialBootstrapEnabled = true,
+  formPendingFixture = false,
 ): Promise<ProductHosts> {
+  if (formPendingFixture && !organizationStructureFixture) throw new Error('Pending form data requires the organization fixture.');
   if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
   return await withReservedLoopbackPorts(7, ports => startProductHostsOnPorts(
-    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, ports,
+    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, initialBootstrapEnabled, formPendingFixture, ports,
   ));
 }
 
@@ -83,6 +87,8 @@ async function startProductHostsOnPorts(
   acquisitionFailureFixture: boolean,
   governedInventoryFixture: boolean,
   organizationStructureFixture: boolean,
+  initialBootstrapEnabled: boolean,
+  formPendingFixture: boolean,
   ports: readonly LoopbackPortReservation[],
 ): Promise<ProductHosts> {
   const runId = `${Date.now()}-${process.pid}`;
@@ -171,6 +177,7 @@ async function startProductHostsOnPorts(
   await consolePort.release();
   const consoleHost = runDotnet(consoleProject, path.join(workDirectory, 'console.log'), {
     ...(organizationStructureFixture ? { ORGANIZATION_STRUCTURE_READY_FILE: fixtureReadyFile } : {}),
+    ...(formPendingFixture ? { SHARED_FORM_PENDING_FIXTURE: 'true' } : {}),
     ...(governedInventoryFixture ? { GOVERNED_INVENTORY_READY_FILE: fixtureReadyFile } : {}),
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: consoleUrl,
@@ -184,7 +191,7 @@ async function startProductHostsOnPorts(
     Agentstration__Authentication__Mode: authenticationMode,
     Agentstration__Authentication__DevelopmentGrantPlatformAdministrator: 'true',
     Agentstration__Bootstrap__Path: bootstrapPath,
-    Agentstration__Bootstrap__InitialBootstrapEnabled: 'true',
+    Agentstration__Bootstrap__InitialBootstrapEnabled: String(initialBootstrapEnabled),
     Agentstration__Bootstrap__InitialProfiles__0: 'development',
     Agentstration__ManagementApi__BaseAddress: `${consoleUrl}/`,
     Agentstration__RuntimeApi__BaseAddress: `${runtimeProxy.url}/`,
@@ -265,7 +272,9 @@ async function startProductHostsOnPorts(
     throw error;
   }
 
+  const formPending = formPendingFixture ? JSON.parse(await fs.readFile(fixtureReadyFile, 'utf8')) as { interactionId: string } : undefined;
   return {
+    ...(formPending ? { formPendingInteractionId: formPending.interactionId } : {}),
     consoleUrl,
     workplaceUrl,
     platformHealth: runtimeProxy,
