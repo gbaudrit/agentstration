@@ -5,7 +5,7 @@ Captured from the executable Console and Workplace with deterministic local serv
 ## Campaign provenance
 
 - Baseline route campaign: 45 distinct Console routes × four viewport/locale/theme variants = **180 distinct route checks**. The raw [campaign.json](campaign.json) includes four duplicate PAT checks and five populated source/Pack checkpoints. Route checks verified successful rendering, applicable responsive collection mode, complete clipboard values, menu keyboard/Escape/focus behavior where a menu existed, and document width. Empty collections remain empty-state evidence.
-- The baseline ended with three stale-circuit JavaScript errors after rapid navigation. The collection observer now unsubscribes on detach/pagehide and only suppresses a pending callback after teardown. Three focused JavaScript tests cover that lifecycle.
+- The baseline ended with three stale-circuit JavaScript errors after rapid navigation. The collection observer now unsubscribes on detach/pagehide and only suppresses a pending callback after teardown. Five focused JavaScript tests cover observer teardown and late initialization of detached menus/disclosures.
 - The final [delta campaign](delta-campaign.json), against `4347b6b`, passed **19 captures** plus 15 rapid route/resize checks with **zero unhandled page errors**. It replaces Artifact and PAT images, adds genuinely active Agent instances in all four variants and refreshes Workplace. Native PAT light/dark follows the emulated system color scheme.
 - All resource/tenant identifiers are disposable local fixtures. No generated token secret is included. UX acceptance and both merges remain pending.
 

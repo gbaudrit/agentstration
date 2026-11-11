@@ -7,6 +7,25 @@ import { repositoryRoot } from '../fixtures/repository.js';
 const source = await fs.readFile(path.join(repositoryRoot, 'src/Agentstration.Web.Components/wwwroot/collection-ui.js'), 'utf8');
 const module = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
+test('late initialization after navigation tolerates missing and detached element references', () => {
+  const browser = environment();
+  for (const root of [null, undefined, { isConnected: false }]) {
+    module.observeCollection(root, { invokeMethodAsync: () => assert.fail('Detached collection callback') });
+    module.attachActions(root);
+    module.attachDisclosure(root);
+    module.releaseCollection(root);
+    module.releaseActions(root);
+    module.releaseDisclosure(root);
+  }
+  assert.equal(browser.listeners.size, 0);
+});
+
+test('replaced action and disclosure contents cannot crash the containing Blazor circuit', () => {
+  const replaced = { isConnected: true, querySelector: () => null };
+  module.attachActions(replaced);
+  module.attachDisclosure(replaced);
+});
+
 function environment() {
   const listeners = new Set<EventListenerOrEventListenerObject>();
   const media = new EventTarget();

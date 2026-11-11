@@ -1,3 +1,4 @@
+import { revealCollectionAction } from './collection-actions.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
@@ -160,4 +161,3 @@ export class DescendantSecretsPage {
     await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
   }
 }
-import { revealCollectionAction } from './collection-actions.js';
