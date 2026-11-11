@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { revealCollectionAction } from './collection-actions.js';
 
 export interface ResourceAccessIdentity {
   uid: string;
@@ -121,7 +122,9 @@ export class ResourceAccessPage {
 
   public async removeGrant(scopeRef: string): Promise<void> {
     const grant = this.grant(scopeRef);
-    await grant.getByTestId(TestIds.resourceAccess.remove).click();
+    const remove = grant.getByTestId(TestIds.resourceAccess.remove);
+    await revealCollectionAction(remove);
+    await remove.click();
     await grant.waitFor({ state: 'detached' });
     await this.save();
     await this.expectPersistedGrant(scopeRef, false);

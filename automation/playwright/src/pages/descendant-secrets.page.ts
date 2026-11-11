@@ -86,7 +86,9 @@ export class DescendantSecretsPage {
 
   public async removeGrant(scopeRef: string): Promise<void> {
     await this.openAccessTab();
-    await this.grantRow(scopeRef).getByTestId(TestIds.secretGrants.grantRemove).click();
+    const remove = this.grantRow(scopeRef).getByTestId(TestIds.secretGrants.grantRemove);
+    await revealCollectionAction(remove);
+    await remove.click();
     await this.grantRow(scopeRef).waitFor({ state: 'detached' });
   }
 
@@ -158,3 +160,4 @@ export class DescendantSecretsPage {
     await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
   }
 }
+import { revealCollectionAction } from './collection-actions.js';

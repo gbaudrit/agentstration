@@ -1,3 +1,4 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/artifacts"
 @inject IArtifactsClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
@@ -28,6 +29,7 @@ else if (!showDurable)
             <CollectionValue Label="@T("Size")">@Size(item.Length)</CollectionValue>
             <CollectionValue Label="@T("Expires")">@item.ExpiresAt.ToLocalTime().ToString("g")</CollectionValue>
         </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@item.FileName"><a href="@StagedUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
     </CollectionView>
     }
 }
@@ -46,6 +48,7 @@ else
             <CollectionValue Label="@T("Size")">@Size(item.Receipt.Length)</CollectionValue>
             <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
         </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@DurableName(item)"><a href="@DurableUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
     </CollectionView>
     }
 }
