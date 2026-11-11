@@ -12,6 +12,7 @@ using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Bunit.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,33 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class ExtensionsConsoleTests
 {
+    [TestMethod]
+    public async Task DirectEnrollmentNavigationWaitsForPermissionsBeforeLoadingCommands()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var snapshot = new TaskCompletionSource<ConsoleContextSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var state = new ConsoleContextState(new DeferredContextProvider(snapshot.Task));
+        context.Services.AddSingleton(state);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/extensions?tab=enrollments");
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        Assert.AreEqual(0, client.EnrollmentCalls);
+        snapshot.SetResult(await new WritableContextProvider().GetAsync(default));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("true", rendered.Find("[data-testid='extensions-tab-enrollments']").GetAttribute("aria-selected"));
+            Assert.HasCount(2, rendered.FindAll(".enrollment-management-actions .collection-primary-actions button"));
+            Assert.HasCount(1, rendered.FindAll(".enrollment-management-actions .collection-actions-panel button"));
+            Assert.AreEqual(1, client.EnrollmentCalls);
+        });
+    }
+
     [TestMethod]
     public async Task ToolCatalogRefreshKeepsAFilteredPageReadableAfterResourcesAreRemoved()
     {
@@ -146,6 +174,8 @@ public sealed class ExtensionsConsoleTests
             _ = card.QuerySelector(".enrollment-status") ?? throw new AssertFailedException("The enrollment status stack is missing.");
             _ = card.QuerySelector(".enrollment-action-layout") ?? throw new AssertFailedException("The enrollment action layout is missing.");
             Assert.AreEqual("Enrôler l’extension", card.QuerySelector("button.button-primary")?.TextContent.Trim());
+            Assert.IsNull(card.QuerySelector(".enrollment-actions details"), "Enrollment commands must be directly available.");
+            StringAssert.Contains(card.QuerySelector(".collection-identity-versions")!.TextContent, "1.0.0");
             Assert.AreEqual("/extensions/llama-cpp-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", card.QuerySelector("a.resource-name-link")?.GetAttribute("href"));
             Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/']"));
             Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/aep/enrollment/pair']"));
@@ -381,11 +411,13 @@ public sealed class ExtensionsConsoleTests
 
         var actions = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button");
         Assert.HasCount(3, actions);
+        Assert.HasCount(2, rendered.FindAll(".enrollment-management-actions .collection-primary-actions button"));
+        Assert.HasCount(1, rendered.FindAll(".enrollment-management-actions .collection-actions-panel button"));
         Assert.AreEqual("Renouveler l’identifiant", actions[0].TextContent.Trim());
-        Assert.AreEqual("Révoquer l’identifiant", actions[1].TextContent.Trim());
-        Assert.AreEqual("Désenrôler", actions[2].TextContent.Trim());
+        Assert.AreEqual("Désenrôler", actions[1].TextContent.Trim());
+        Assert.AreEqual("Révoquer l’identifiant", actions[2].TextContent.Trim());
 
-        await actions[2].ClickAsync(new());
+        await actions[1].ClickAsync(new());
         var dialog = rendered.Find("[role='alertdialog']");
         StringAssert.Contains(dialog.TextContent, "L’identifiant actuel sera invalidé");
         await dialog.QuerySelector("button.button-danger")!.ClickAsync(new());
@@ -409,7 +441,7 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
         await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
-        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button")[2];
+        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions .collection-primary-actions button")[1];
         await unenroll.ClickAsync(new());
         await rendered.Find("[role='alertdialog'] button.button-danger").ClickAsync(new());
 
@@ -437,7 +469,7 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
         await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
-        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button")[2];
+        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions .collection-primary-actions button")[1];
         await unenroll.ClickAsync(new());
         await rendered.Find("[role='alertdialog'] button.button-danger").ClickAsync(new());
         await rendered.Find("[data-testid='extensions-tab-summary']").ClickAsync(new());
@@ -905,6 +937,11 @@ public sealed class ExtensionsConsoleTests
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class DeferredContextProvider(Task<ConsoleContextSnapshot> snapshot) : IConsoleContextProvider
+    {
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => snapshot.WaitAsync(cancellationToken);
     }
 
     private sealed class WritableContextProvider : IConsoleContextProvider

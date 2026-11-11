@@ -315,7 +315,6 @@
       "state": false,
       "actions": true,
       "informationKeys": [
-        "Version",
         "DefinitionHash",
         "EffectiveMembers"
       ],
@@ -329,7 +328,10 @@
         "sharedHostSpecifications": [],
         "routeEvidence": [],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+      },
+      "identityVersionKeys": [
+        "Version"
+      ]
     },
     {
       "id": "runtime-worker-details-runtime-assignment-placement-response",
@@ -377,7 +379,6 @@
       "state": true,
       "actions": true,
       "informationKeys": [
-        "Version",
         "Members",
         "Category"
       ],
@@ -424,7 +425,10 @@
           }
         ],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+      },
+      "identityVersionKeys": [
+        "Version"
+      ]
     },
     {
       "id": "tool-providers-tool-provider-resource",
@@ -983,7 +987,6 @@
       "informationKeys": [
         "Purpose",
         "Audience",
-        "Version",
         "Resources",
         "Installed"
       ],
@@ -1030,7 +1033,10 @@
           }
         ],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+      },
+      "identityVersionKeys": [
+        "Version"
+      ]
     },
     {
       "id": "staged-artifact-details-artifact-lease",
@@ -1203,7 +1209,6 @@
       "actions": true,
       "informationKeys": [
         "Kind",
-        "Version",
         "Updated"
       ],
       "validation": "source-adopted-and-regression-mapped",
@@ -1249,7 +1254,10 @@
           }
         ],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+      },
+      "identityVersionKeys": [
+        "Version"
+      ]
     },
     {
       "id": "organization-access-access-row",
@@ -1392,8 +1400,7 @@
       "state": false,
       "actions": false,
       "informationKeys": [
-        "Type",
-        "Version"
+        "Type"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -1405,7 +1412,10 @@
         "sharedHostSpecifications": [],
         "routeEvidence": [],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+      },
+      "identityVersionKeys": [
+        "Version"
+      ]
     },
     {
       "id": "extension-details-extension-option-set-response",
@@ -1938,8 +1948,7 @@
       "state": false,
       "actions": true,
       "informationKeys": [
-        "ActiveVersion",
-        "DraftVersion"
+        "ManagingExtension"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -1984,7 +1993,11 @@
           }
         ],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+      },
+      "identityVersionKeys": [
+        "ActiveVersion",
+        "DraftVersion"
+      ]
     },
     {
       "id": "source-registries-source-registry-registration-view",
@@ -2448,7 +2461,6 @@
       "actions": true,
       "informationKeys": [
         "Definition",
-        "GenerationHeader",
         "ModelProfile",
         "Deployment",
         "LastActivity"
@@ -2496,7 +2508,10 @@
           }
         ],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+      },
+      "identityVersionKeys": [
+        "GenerationHeader"
+      ]
     },
     {
       "id": "model-profiles-model-profile-summary-response",
@@ -2989,8 +3004,7 @@
       "actions": true,
       "informationKeys": [
         "Format",
-        "Dialect",
-        "Generation"
+        "Dialect"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -3035,7 +3049,10 @@
           }
         ],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+      },
+      "identityVersionKeys": [
+        "Generation"
+      ]
     },
     {
       "id": "data-source-profile-editor-data-source-profile-revision-resource",
@@ -4143,7 +4160,7 @@
         "/extensions"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Enrollment scopes and pairing forms remain domain-owned; common identity/scope/status and final menus preserve pairing, expiry and management restrictions.",
+      "adaptation": "Enrollment identity includes labeled version. CollectionActions exposes multiple primary commands directly; optional secondary credential commands retain the keyboard menu. Owner selection, permissions and confirmations remain family-owned.",
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
         "sourceReviewed": true,
@@ -5048,7 +5065,7 @@
         "/agents/{Name}"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Retain 20-result cursor pages, selection outside the current page and bounded search. Resource identity/scope/status and final Choose menu preserve disabled choices and focus restoration.",
+      "adaptation": "Native selection cards retain selected/invalid rules, filters, paging and focus restoration. Choose is an explicit primary CollectionActions command with no empty secondary menu.",
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
         "sourceReviewed": true,

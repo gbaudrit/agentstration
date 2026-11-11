@@ -229,14 +229,13 @@ else
                         @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <div class="extension-bundle-diagnostic"><strong>@T("Diagnostics")</strong><p>@installation.Diagnostic</p></div> }
                         @if (resources.Length > 0)
                         {
-                            <div class="extension-bundle-grid" data-testid="extension-managed-resources"><CollectionView TItem="ExtensionManagedResourceResponse" Items="resources" InformationLabels="@(new string[] { T("Type"), T("Version") })" IdentityLabel="@T("Identity")" ScopeLabel="@T("Scope")" StateLabel="@T("State")">
-        <Identity Context="resource"><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@(installation.State != ExtensionBundleInstallationState.Degraded ? ManagedResourceUrl(resource) : null)" IconName="layers"><Badges><ManagedResourceBadge IsManaged="true" /></Badges></CollectionIdentity></Identity>
+                            <div class="extension-bundle-grid" data-testid="extension-managed-resources"><CollectionView TItem="ExtensionManagedResourceResponse" Items="resources" InformationLabels="@(new string[] { T("Type") })" IdentityLabel="@T("Identity")" ScopeLabel="@T("Scope")" StateLabel="@T("State")">
+        <Identity Context="resource"><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@(installation.State != ExtensionBundleInstallationState.Degraded ? ManagedResourceUrl(resource) : null)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(resource.Version)" /></Versions><Badges><ManagedResourceBadge IsManaged="true" /></Badges></CollectionIdentity></Identity>
         <Scope Context="resource">
 <ResourceScopeBadge ScopeRef="resource.ScopeRef" ShowName /></Scope>
 
         <Information Context="resource">
             <CollectionValue Label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></CollectionValue>
-            <CollectionValue Label="@T("Version")"><code>@(resource.Version ?? "—")</code></CollectionValue>
         </Information>
     </CollectionView></div>
                         }

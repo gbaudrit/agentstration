@@ -305,3 +305,8 @@ export const CollectionTextByLocale = {
   'en-US': { scope: 'Owner scope', state: 'State', actions: 'Actions', unknown: 'Unknown', scopeTypes: ['Instance', 'Tenant', 'Workspace'] },
   'fr-FR': { scope: 'Périmètre propriétaire', state: 'État', actions: 'Actions', unknown: 'Inconnu', scopeTypes: ['Instance', 'Tenant', 'Espace de travail'] },
 } as const;
+
+export const CollectionVersionTextByLocale = {
+  'en-US': { version: 'Version', active: 'Active version', draft: 'Draft version', generation: 'Generation' },
+  'fr-FR': { version: 'Version', active: 'Version active', draft: 'Version du brouillon', generation: 'Génération' },
+} as const;

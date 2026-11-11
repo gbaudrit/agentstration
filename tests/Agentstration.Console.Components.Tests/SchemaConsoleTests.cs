@@ -32,7 +32,9 @@ public sealed class SchemaConsoleTests
             StringAssert.Contains(rendered.Markup, SchemaFormatIds.JsonSchema);
             StringAssert.Contains(rendered.Markup, Scope.Value);
             StringAssert.Contains(rendered.Find("[data-testid='schema-details-link']").GetAttribute("href"), "/schemas/contact");
-            Assert.HasCount(6, rendered.FindAll("[data-testid='schema-row'] td"));
+            Assert.HasCount(5, rendered.FindAll("[data-testid='schema-row'] td"));
+            Assert.AreEqual("Generation", rendered.Find(".collection-version-label").TextContent);
+            Assert.AreEqual("2", rendered.Find(".collection-version code").TextContent);
             Assert.HasCount(0, rendered.FindAll("[data-testid='schema-row'] .text-button"));
         });
     }

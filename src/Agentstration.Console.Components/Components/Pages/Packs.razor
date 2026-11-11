@@ -40,15 +40,14 @@ else
     }
     else
     {
-        <CollectionView TItem="InstalledPackResource" Items="packs" InformationLabels="@(new string[] { T("Purpose"), T("Audience"), T("Version"), T("Resources"), T("Installed") })" ItemAttributes="@((pack) => new Dictionary<string, object> { ["class"] = IsSelected(pack) ? "selected-pack" : string.Empty })" IdentityLabel="@T("Pack")" StateLabel="@T("Status")">
-        <Identity Context="pack"><CollectionIdentity DisplayName="@DisplayName(pack)" Namespace="@pack.Namespace.Value" Name="@pack.Name" OnOpen="() => SelectAsync(pack)" IconName="package" /><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></Identity>
+        <CollectionView TItem="InstalledPackResource" Items="packs" InformationLabels="@(new string[] { T("Purpose"), T("Audience"), T("Resources"), T("Installed") })" ItemAttributes="@((pack) => new Dictionary<string, object> { ["class"] = IsSelected(pack) ? "selected-pack" : string.Empty })" IdentityLabel="@T("Pack")" StateLabel="@T("Status")">
+        <Identity Context="pack"><CollectionIdentity DisplayName="@DisplayName(pack)" Namespace="@pack.Namespace.Value" Name="@pack.Name" OnOpen="() => SelectAsync(pack)" IconName="package"><Versions><CollectionVersion Label="@T("Version")" Value="@(pack.Definition.Version)" /></Versions></CollectionIdentity><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></Identity>
         <Scope Context="pack"><ResourceScopeBadge ScopeRef="pack.ScopeRef" /></Scope>
         <State Context="pack">
 <StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" /></State>
         <Information Context="pack">
             <CollectionValue Label="@T("Purpose")"><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></CollectionValue>
             <CollectionValue Label="@T("Audience")">@AudienceLabel(pack.Definition.Audience)</CollectionValue>
-            <CollectionValue Label="@T("Version")"><code>@pack.Definition.Version</code></CollectionValue>
             <CollectionValue Label="@T("Resources")">@pack.Definition.ManagedResources.Count</CollectionValue>
             <CollectionValue Label="@T("Installed")"><time datetime="@pack.Definition.InstalledAt.ToString("O")">@pack.Definition.InstalledAt.ToLocalTime().ToString("g")</time></CollectionValue>
         </Information>
@@ -131,7 +130,7 @@ else
             <div class="pack-resource-list">
                 @foreach (var project in projects)
                 {
-                    <article><CollectionIdentity DisplayName="@(project.Definition.DisplayName ?? project.Definition.PackName)" Namespace="@project.Namespace.Value" Name="@project.Name" Href="@($"/pack-projects/{project.Uid:D}")" IconName="package" /><ResourceScopeBadge ScopeRef="project.ScopeRef" /><span class="pack-kind">@T("Project")</span><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @project.Definition.Version · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small><CollectionActions ResourceName="@(project.Definition.DisplayName ?? project.Definition.PackName)"><button class="text-button" @onclick="() => OpenProject(project.Uid)">@T("Open")</button></CollectionActions></article>
+                    <article><CollectionIdentity DisplayName="@(project.Definition.DisplayName ?? project.Definition.PackName)" Namespace="@project.Namespace.Value" Name="@project.Name" Href="@($"/pack-projects/{project.Uid:D}")" IconName="package"><Versions><CollectionVersion Label="@T("Version")" Value="@(project.Definition.Version)" /></Versions></CollectionIdentity><ResourceScopeBadge ScopeRef="project.ScopeRef" /><span class="pack-kind">@T("Project")</span><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small><CollectionActions ResourceName="@(project.Definition.DisplayName ?? project.Definition.PackName)"><button class="text-button" @onclick="() => OpenProject(project.Uid)">@T("Open")</button></CollectionActions></article>
                 }
             </div>
         </section>

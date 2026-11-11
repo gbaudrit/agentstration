@@ -6,12 +6,43 @@ import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 import { expect, test } from '../src/fixtures/test.js';
 
-test('local AEP extensions expose inventory and detail states @smoke', async ({ page, product }) => {
+test('local AEP extensions expose inventory and detail states @smoke', async ({ page, product }, testInfo) => {
   const pages = new ProductPages(page);
   const context = { ...product, pages, checkpoint: ignoreCheckpoints };
   await authenticateConsole(context, {});
   await pages.distribution.openFirstExtensionDetails(product.consoleUrl);
   await pages.distribution.open(product.consoleUrl, `/extensions/enrollment/${randomUUID()}`, 'extensionDetails');
+  try {
+    for (const variant of [
+      { locale: 'en-US', theme: 'dark', width: 1440 },
+      { locale: 'en-US', theme: 'light', width: 1440 },
+      { locale: 'fr-FR', theme: 'dark', width: 390 },
+      { locale: 'fr-FR', theme: 'light', width: 390 },
+    ] as const) {
+      await page.setViewportSize({ width: variant.width, height: variant.width === 390 ? 844 : 1000 });
+      await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);
+      await pages.ensureTheme(variant.theme);
+      const capture = async (name: string) => {
+        const path = testInfo.outputPath(`${name}-${variant.locale}-${variant.theme}.png`);
+        await page.screenshot({ path, fullPage: true });
+        await testInfo.attach(name, { path, contentType: 'image/png' });
+      };
+      for (const route of ['/data-source-profiles', '/flows', '/agents', '/extensions?tab=catalog&context=%2Finstance']) {
+        await pages.distribution.inspectVersionPlacement(product.consoleUrl, route, variant.locale);
+        await capture(route.split('?')[0].slice(1));
+        if (variant.width === 1440) {
+          await pages.distribution.showCollectionTable();
+          await capture(`${route.split('?')[0].slice(1)}-table`);
+        }
+      }
+      await pages.distribution.inspectDirectProfileChoice(product.consoleUrl);
+      await capture('profile-primary-choice');
+    }
+  } finally {
+    await pages.consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  }
+
 });
 
 test('the local Git extension can back an explicitly configured Source Provider @smoke', async ({ page, product }) => {

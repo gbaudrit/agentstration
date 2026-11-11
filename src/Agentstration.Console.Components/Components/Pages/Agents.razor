@@ -34,13 +34,12 @@ else if (Filtered.Count == 0)
 }
 else
 {
-    <CollectionView TItem="AgentSummary" Items="Filtered" InformationLabels="@(new[] { T("Definition"), T("GenerationHeader"), T("ModelProfile"), T("Deployment"), T("LastActivity") })">
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@EditUrl(item)" IconName="agent" Domain="agent"><Badges><ManagedResourceBadge IsManaged="@item.IsManaged" /></Badges></CollectionIdentity></Identity>
+    <CollectionView TItem="AgentSummary" Items="Filtered" InformationLabels="@(new[] { T("Definition"), T("ModelProfile"), T("Deployment"), T("LastActivity") })">
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@EditUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><Badges><ManagedResourceBadge IsManaged="@item.IsManaged" /></Badges></CollectionIdentity></Identity>
         <Scope Context="item"><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" /></Scope>
         <State Context="item"><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" /></State>
         <Information Context="item">
             <CollectionValue Label="@T("Definition")"><strong>@ResourceName(item.Type)</strong></CollectionValue>
-            <CollectionValue Label="@T("GenerationHeader")"><code>@item.Version</code></CollectionValue>
             <CollectionValue Label="@T("ModelProfile")"><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></CollectionValue>
             <CollectionValue Label="@T("Deployment")">@if (item.DeploymentUrl is not null) { <span class="agent-deployment-line"><a class="text-button" href="@item.DeploymentUrl">@item.DeploymentId</a><StatusBadge Text="@DeploymentStatusLabel(item.Runtime)" Status="@PlatformDashboardService.ToStatus(item.Runtime)" /></span> } else { <span>@DeploymentStatusLabel(item.Runtime)</span> }</CollectionValue>
             <CollectionValue Label="@T("LastActivity")">@LastActivity(item.LastActivity)</CollectionValue>

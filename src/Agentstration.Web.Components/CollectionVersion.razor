@@ -1,0 +1,5 @@
+<span class="collection-version"><span class="collection-version-label">@Label</span><code>@(string.IsNullOrWhiteSpace(Value) ? "—" : Value)</code></span>
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string? Value { get; set; }
+}

@@ -42,6 +42,7 @@ public sealed class ModelProfilePickerTests
         StringAssert.Contains(currentChoice.TextContent, "Selected");
         Assert.IsEmpty(rendered.FindAll(".collection-pager"));
         Assert.IsEmpty(changes);
+        Assert.IsEmpty(rendered.FindAll(".model-profile-choice-actions details"), "Choosing a profile is a primary action and must not require a menu.");
         var focusRequests = context.JSInterop.Invocations.Count(call => call.Identifier == "Blazor._internal.domWrapper.focus");
         await rendered.Find("[data-profile='/instance|default|alternative']").ClickAsync(new());
         Assert.AreEqual(focusRequests + 1, context.JSInterop.Invocations.Count(call => call.Identifier == "Blazor._internal.domWrapper.focus"));
