@@ -1,5 +1,6 @@
 const collections = new WeakMap();
 export function observeCollection(root, receiver) {
+    if (!root?.isConnected) return;
     const query = matchMedia('(max-width: 760px)');
     let active = true;
     const release = () => {
@@ -29,8 +30,10 @@ function positionPanel(panel, trigger) {
     panel.style.top = `${Math.max(8, Math.min(rect.bottom + 4, innerHeight - panel.offsetHeight - 8))}px`;
 }
 export function attachActions(root) {
+    if (!root?.isConnected) return;
     const trigger = root.querySelector('summary');
     const panel = root.querySelector('.collection-actions-panel');
+    if (!trigger || !panel) return;
     const toggle = () => {
         trigger.setAttribute('aria-expanded', String(root.open));
         if (root.open) { panel.showPopover(); positionPanel(panel, trigger); }
@@ -66,8 +69,10 @@ export function releaseActions(root) { actions.get(root)?.(); actions.delete(roo
 
 const disclosures = new WeakMap();
 export function attachDisclosure(root) {
+    if (!root?.isConnected) return;
     const trigger = root.querySelector('button');
     const panel = root.querySelector('[popover]');
+    if (!trigger || !panel) return;
     let pinned = false;
     const show = () => { panel.showPopover(); positionPanel(panel, trigger); trigger.setAttribute('aria-expanded', 'true'); };
     const hide = () => { panel.hidePopover(); trigger.setAttribute('aria-expanded', 'false'); };
