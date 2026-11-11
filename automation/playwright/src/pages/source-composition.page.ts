@@ -12,6 +12,12 @@ export class SourceCompositionPage {
     this.page.setDefaultTimeout(15_000);
     const api = new SourcePolicyFixtures(this.page, base);
     const fixture = await api.prepare();
+    const untransformed = `untransformed-${fixture.suffix}`;
+    const untransformedKnowledge = `untransformed-knowledge-${fixture.suffix}`;
+    await api.source(fixture, untransformed, {}, false, 'x'.repeat(20_000));
+    await api.knowledge(fixture, untransformedKnowledge, [untransformed], true);
+    const untransformedProjection = await new SourcePoliciesPage(this.page).project(base, untransformedKnowledge, api);
+    expect(untransformedProjection.projectionComposition.receipt.bindings.postAggregate).toEqual([]);
     const flows = new SourceLifecycleFixtures(this.page);
     const nativeChild = `native-transform-${fixture.suffix}`;
     const incompatible = `incompatible-${fixture.suffix}`;

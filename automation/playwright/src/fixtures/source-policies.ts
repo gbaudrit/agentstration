@@ -87,10 +87,10 @@ export class SourcePolicyFixtures {
       acquisition: { operation: fixture.operationRef, parameters: { dataset } },
     } } });
   }
-  public async knowledge(fixture: SourcePolicyFixture, name: string, inputs: string[]): Promise<void> {
+  public async knowledge(fixture: SourcePolicyFixture, name: string, inputs: string[], orchestrate = false): Promise<void> {
     await this.api('POST', '/api/knowledgesources', { name, scopeRef: '/instance', properties: { displayName: name,
       enabled: true, dataSources: inputs.map((source, index) => ({ name: `input-${index + 1}`, dataSource: { name: source, scopeRef: '/instance' } })),
-      orchestration: { resourceId: 'knowledge-orchestration-builtin', scopeRef: '/instance', namespace: 'default', versionStrategy: 'exact', version: '1.0.0' },
+      ...(orchestrate ? { orchestration: { resourceId: 'knowledge-orchestration-builtin', scopeRef: '/instance', namespace: 'default', versionStrategy: 'exact', version: '1.0.0' } } : {}),
       projectionFlow: { name: 'knowledge-projection-builtin', scopeRef: '/instance', version: '1.0.0', useActiveVersion: false },
       output: { storage: fixture.storageRef, rule: { write: true } },
     } });
