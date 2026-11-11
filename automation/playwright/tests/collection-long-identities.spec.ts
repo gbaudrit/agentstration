@@ -14,6 +14,10 @@ for (const variant of [
 ] as const) {
   test.describe(variant.name, () => {
     test.use({ viewport: { width: variant.width, height: variant.height }, colorScheme: variant.theme, locale: variant.locale });
+    test.afterEach(async ({ page, product }) => {
+      if (variant.locale !== 'en-US' || variant.theme !== 'dark')
+        await new ProductPages(page).consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
+    });
     test(`long owners and homonymous identities ${variant.tag} @collections @smoke`, async ({ page, product }, testInfo) => {
       const pages = new ProductPages(page);
       await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});

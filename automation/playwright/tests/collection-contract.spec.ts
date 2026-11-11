@@ -29,6 +29,10 @@ for (const variant of [
 ] as const) {
   test.describe(variant.name, () => {
     test.use({ locale: variant.locale, colorScheme: variant.theme, viewport: { width: variant.width, height: variant.height } });
+    test.afterEach(async ({ page, product }) => {
+      if (variant.locale !== 'en-US')
+        await new ProductPages(page).consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
+    });
     for (const route of routes) {
       test(`collection contract ${route} ${variant.tag} @collections @smoke`, async ({ page, product, context }) => {
         const pages = new ProductPages(page);
