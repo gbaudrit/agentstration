@@ -1,6 +1,8 @@
 @page "/knowledge-sources/{Name}"
-@implements IDisposable
+@implements IAsyncDisposable
 @inject IKnowledgeSourcesClient Client
+@inject IFlowApiClient Flows
+@inject TimeProvider Clock
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
@@ -56,7 +58,22 @@ else if (source is not null && readiness is not null)
     else if (activeTab == DetailsTab.Projections)
     {
         <section class="panel form-section" data-testid="knowledge-projections" data-interactive="@(interactive ? "true" : "false")">
-            <div class="panel-header"><div><p class="eyebrow">@T("Projection")</p><h2>@T("ProjectionHistory")</h2><p>@T("ProjectionHelp")</p></div><button class="button-primary" type="button" disabled="@(!CanStartProjection)" data-testid="knowledge-start-projection" @onclick="StartProjectionAsync">@T("StartProjection")</button></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Projection")</p><h2>@T("ProjectionHistory")</h2><p>@T("ProjectionHelp")</p></div><button class="button-primary" type="button" disabled="@(!CanStartProjection)" data-testid="knowledge-start-projection" @onclick="StartProjectionAsync">@T(projectionStarting || HasActiveProjection ? "ProjectionRunning" : "StartProjection")</button></div>
+            @if (projectionStarting || HasActiveProjection)
+            {
+                <div class="form-alert" role="status" aria-live="polite" data-testid="knowledge-projection-progress">
+                    <progress aria-label="@T("ProjectionRunning")"></progress>
+                    <strong>@ProjectionProgressLabel</strong>
+                    @if (projectionRun is { } liveRun)
+                    {
+                        <span>@T("ProjectionStepProgress", liveRun.Steps.Count(step => step.Status == FlowStepRunStatus.Succeeded), liveRun.Steps.Count)</span>
+                        <a href="@FlowRunUrl(liveRun.Id, liveRun.ExecutionScopeRef, liveRun.Scope.LogicalScopeRef)">@T("FlowRun")</a>
+                    }
+                    @if (projectionStartedAt is { } started) { <span>@T("ProjectionElapsed", (Clock.GetUtcNow() - started).ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture))</span> }
+                </div>
+            }
+            @if (projectionRefreshError is not null) { <p class="inline-warning" role="status">@projectionRefreshError</p> }
+            <div class="form-actions"><button class="button-secondary" type="button" disabled="@(!interactive || refreshingProjections)" @onclick="RefreshProjectionsManuallyAsync" data-testid="knowledge-projection-refresh">@T("Refresh")</button></div>
             <div class="knowledge-projection-parameters"><span>@T("ProjectionParameters")</span><div data-testid="knowledge-projection-parameters"><JsonSchemaInputEditor Schema="ProjectionParametersSchema" Value="projectionParameters" ValueChanged="value => projectionParameters = value" ValidationChanged="state => projectionParametersValid = state.IsValid" Disabled="busy" /></div><small>@T("JsonObjectHelp")</small></div>
             @if (projections.Count == 0) { <p class="muted">@T("NoProjections")</p> }
             else
@@ -155,6 +172,21 @@ else if (source is not null && readiness is not null)
     private KnowledgeProjectionResource? selectedProjection;
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
     private KnowledgeSnapshotView? selectedSnapshot;
+    private readonly SemaphoreSlim projectionRefreshGate = new(1, 1);
+    private Task polling = Task.CompletedTask;
+    private int sourceRevision;
+    private bool projectionStarting, refreshingProjections;
+    private string? projectionRequestId, projectionRefreshError;
+    private DateTimeOffset? projectionStartedAt;
+    private FlowRun? projectionRun;
+    private KnowledgeProjectionResource? LiveProjection => projections.FirstOrDefault(value => value.IdempotencyKey == projectionRequestId && projectionRequestId is not null)
+        ?? projections.FirstOrDefault(value => IsActiveProjection(value.State));
+    private bool HasActiveProjection => projections.Any(value => IsActiveProjection(value.State));
+    private static bool IsActiveProjection(KnowledgeProjectionState state) => state is KnowledgeProjectionState.Pending or KnowledgeProjectionState.Running or KnowledgeProjectionState.WaitingForChild or KnowledgeProjectionState.WaitingForInput;
+    private string ProjectionProgressLabel => LiveProjection is null ? T("ProjectionStarting")
+        : projectionRun?.Status == FlowRunStatus.Succeeded ? T("ProjectionPublishing")
+        : projectionRun is not null ? T("ProjectionRunning")
+        : LiveProjection.Inputs.Count == 0 ? T("ProjectionAcquiring") : T("ProjectionPreparing");
     private bool loading = true, busy, failed, requiresApproval, confirmDelete, interactive, projectionParametersValid = true;
     private DetailsTab activeTab;
     private string version = "1.0.0",
@@ -169,7 +201,7 @@ else if (source is not null && readiness is not null)
             ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
             : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}", exposure.ToolSet.ScopeRef);
     private bool IsUnresolvedDraft => source is { Definition.Enabled: false, Composition: null };
-    private bool CanStartProjection => interactive && readiness?.Ready == true && projectionParametersValid && !busy;
+    private bool CanStartProjection => interactive && readiness?.Ready == true && projectionParametersValid && !busy && !HasActiveProjection;
     private JsonElement? ProjectionParametersSchema => JsonSchemaInputSchema.ObjectProperty(
         readiness?.Projection?.InputSchema, "parameters");
     private KnowledgeSnapshotView? ActiveSnapshot => snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active);
@@ -177,6 +209,19 @@ else if (source is not null && readiness is not null)
         ? $"/knowledge-sources/{Uri.EscapeDataString(Name)}?view=snapshots"
         : $"/knowledge-sources/{Uri.EscapeDataString(Name)}?namespace={Uri.EscapeDataString(SourceNamespace.Value)}&view=snapshots";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override void OnInitialized() => polling = PollProjectionsAsync();
+    private async Task PollProjectionsAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1), Clock);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellation.Token))
+                if (interactive && !loading && source is not null && (projectionStarting || HasActiveProjection || activeTab == DetailsTab.Projections))
+                    await InvokeAsync(() => RefreshProjectionStatusAsync(false));
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+    }
+
     protected override Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender) { interactive = true; StateHasChanged(); }
@@ -184,6 +229,9 @@ else if (source is not null && readiness is not null)
     }
     protected override async Task OnParametersSetAsync()
     {
+        sourceRevision++;
+        projectionRun = null;
+        projectionRefreshError = null;
         loading = true;
         error = null;
         try
@@ -337,11 +385,89 @@ else if (source is not null && readiness is not null)
             ? snapshots.FirstOrDefault()
             : snapshots.FirstOrDefault(value => value.Snapshot.Name == selectedSnapshot.Snapshot.Name) ?? snapshots.FirstOrDefault();
     }
-    private Task StartProjectionAsync() => RunActionAsync(async () =>
+    private async Task RefreshProjectionStatusAsync(bool includeSnapshots)
     {
-        await Client.StartProjectionAsync(SourceNamespace, Name,
-            new StartKnowledgeProjectionRequest { Parameters = projectionParameters.Clone(), IdempotencyKey = Guid.NewGuid().ToString("N") }, cancellation.Token);
-    }, "ProjectionCompleted");
+        try { await projectionRefreshGate.WaitAsync(cancellation.Token); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return; }
+        var revision = sourceRevision;
+        refreshingProjections = true;
+        var requestedName = Name;
+        var requestedNamespace = SourceNamespace;
+        var requestedUid = source?.Uid;
+        try
+        {
+            var hadActive = HasActiveProjection;
+            var history = await Client.GetProjectionsAsync(requestedNamespace, requestedName, cancellation.Token);
+            if (revision != sourceRevision || requestedName != Name || requestedNamespace != SourceNamespace || requestedUid != source?.Uid || cancellation.IsCancellationRequested) return;
+            var selectedName = selectedProjection?.Name;
+            projections = history.OrderByDescending(value => value.CreatedAt).ToArray();
+            selectedProjection = projections.FirstOrDefault(value => value.Name == selectedName) ?? LiveProjection ?? projections.FirstOrDefault();
+            projectionStartedAt = LiveProjection?.CreatedAt ?? projectionStartedAt;
+            projectionRun = null;
+            if (LiveProjection is { Inputs.Count: > 0 } active)
+            {
+                try
+                {
+                    var liveRun = await Flows.GetFlowRunAsync(active.ProjectionFlowRunId, ResourceScopeRef.Workspace(active.WorkspaceId), cancellation.Token);
+                    if (revision != sourceRevision || cancellation.IsCancellationRequested) return;
+                    projectionRun = liveRun;
+                }
+                catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { }
+                catch (NotSupportedException) { }
+            }
+            if (includeSnapshots || hadActive && !HasActiveProjection)
+            {
+                var latestSnapshots = await Client.GetSnapshotsAsync(requestedNamespace, requestedName, cancellation.Token);
+                var latestReadiness = await Client.GetReadinessAsync(requestedNamespace, requestedName, cancellation.Token);
+                if (revision != sourceRevision || cancellation.IsCancellationRequested) return;
+                snapshots = latestSnapshots.OrderByDescending(value => value.Snapshot.PublishedAt).ToArray();
+                selectedSnapshot = snapshots.FirstOrDefault(value => value.Snapshot.Name == selectedSnapshot?.Snapshot.Name) ?? snapshots.FirstOrDefault();
+                readiness = latestReadiness;
+            }
+            projectionRefreshError = null;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception) { if (revision == sourceRevision) projectionRefreshError = T("ProjectionRefreshUnavailable"); }
+        finally
+        {
+            refreshingProjections = false;
+            projectionRefreshGate.Release();
+            if (!cancellation.IsCancellationRequested) StateHasChanged();
+        }
+    }
+    private Task RefreshProjectionsManuallyAsync() => RefreshProjectionStatusAsync(true);
+    private async Task StartProjectionAsync()
+    {
+        if (!CanStartProjection) return;
+        var revision = sourceRevision;
+        busy = true; projectionStarting = true; failed = false; message = null; projectionRefreshError = null;
+        projectionStartedAt = Clock.GetUtcNow();
+        projectionRequestId = Guid.NewGuid().ToString("N");
+        projectionRun = null;
+        try
+        {
+            var started = await Client.StartProjectionAsync(SourceNamespace, Name,
+                new StartKnowledgeProjectionRequest { Parameters = projectionParameters.Clone(), IdempotencyKey = projectionRequestId }, cancellation.Token);
+            if (revision != sourceRevision || cancellation.IsCancellationRequested) return;
+            projections = projections.Where(value => value.Name != started.Value.Name).Prepend(started.Value).OrderByDescending(value => value.CreatedAt).ToArray();
+            selectedProjection = started.Value;
+            failed = started.Value.State is KnowledgeProjectionState.Failed or KnowledgeProjectionState.Cancelled or KnowledgeProjectionState.TimedOut;
+            message = failed ? T("ProjectionFailed", started.Value.ErrorMessage ?? started.Value.ErrorCode ?? T($"ProjectionState.{started.Value.State}"))
+                : T(started.Value.State == KnowledgeProjectionState.Succeeded ? "ProjectionCompleted" : "ProjectionAccepted");
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.Contains("/storage_", StringComparison.Ordinal) == true
+            || exception.ProblemType?.Contains("/knowledge_output_", StringComparison.Ordinal) == true)
+        { failed = true; message = T("OutputStorageInvalid"); }
+        catch (AgentstrationApiException exception) when (exception.ProblemType == "https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported")
+        { failed = true; message = T("NativeDatasetProjectionUnavailable"); }
+        catch (Exception exception) { failed = true; message = exception.Message; }
+        finally
+        {
+            try { if (!cancellation.IsCancellationRequested && revision == sourceRevision) await RefreshProjectionStatusAsync(true); }
+            finally { busy = false; projectionStarting = false; projectionRequestId = null; }
+        }
+    }
     private Task SelectSnapshotAsync(KnowledgeSnapshotView value) => RunActionAsync(async () => { await Client.SelectActiveSnapshotAsync(SourceNamespace, Name, value.Snapshot.Name, cancellation.Token); }, "SnapshotActivated");
     private Task ToggleEnabledAsync() => RunActionAsync(async () =>
     {
@@ -421,5 +547,10 @@ else if (source is not null && readiness is not null)
         public required KnowledgeSourceProperties Definition { get; init; }
     }
     private enum DetailsTab { Overview, Definition, Projections, Snapshots, Retrieval, Tools, Access, Yaml }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public async ValueTask DisposeAsync()
+    {
+        await cancellation.CancelAsync();
+        await polling;
+        cancellation.Dispose();
+    }
 }

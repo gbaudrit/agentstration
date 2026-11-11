@@ -401,6 +401,8 @@ public sealed class ArtifactAdministrationComponentTests
         public StagedArtifactView Artifact { get; }
         public FlowRunArtifactResource Durable { get; set; }
         public int ContentReadCount { get; private set; }
+        public IReadOnlyList<FlowRunArtifactResource>? DurableCatalog { get; set; }
+        public bool RejectDurableCatalog { get; set; }
         public bool HasLocalCopy { get; set; } = true;
 
         public Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default) =>
@@ -431,7 +433,7 @@ public sealed class ArtifactAdministrationComponentTests
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<FlowRunArtifactResource>> GetDurableAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<FlowRunArtifactResource>>([Durable]);
+            RejectDurableCatalog ? throw new HttpRequestException("Catalogue unavailable") : Task.FromResult<IReadOnlyList<FlowRunArtifactResource>>(DurableCatalog ?? [Durable]);
 
         public Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default) =>
             Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);

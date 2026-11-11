@@ -141,6 +141,23 @@ Flow-backed Tool Definitions for direct execution.
 
 ## Output, failures and limits
 
+The output media type field offers common text and JSON MIME types and accepts a
+custom value. Leave it empty to inherit the input type. The selected type must
+match the produced content: an Agent returning plain text needs `text/plain`;
+`application/json` and `+json` types require valid JSON without Markdown fences or
+surrounding explanation. Invalid output reports `artifact_processing_json_invalid`
+with that remedy; malformed input reports `artifact_processing_input_json_invalid`
+and asks you to correct the source content or media type. Neither error includes
+document content.
+
+The Flow Run **Input / Output** tab shows the returned value and retained Artifacts
+associated with that execution, including outputs linked by processing provenance
+and existing Artifacts referenced by its output manifest.
+Artifact links remain available after direct execution payloads expire. An empty
+returned value and an expired temporary payload have distinct explanations; the
+catalog does not reconstruct or persist expired direct content. Refresh the panel
+if final Snapshot publication has completed after the Flow Run.
+
 For retained execution, each successful input produces one new durable Artifact.
 Originals remain intact. Direct execution returns inline content until final publication.
 All processing regions must succeed and all outputs must be prepared before final

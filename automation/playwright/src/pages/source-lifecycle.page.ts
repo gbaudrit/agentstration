@@ -451,8 +451,10 @@ export class SourceLifecyclePage {
     }, { timeout: 90_000 }).toBe(true);
     expect(result.state, result.errorMessage ?? undefined).toBe(4);
     expect(result.snapshotName).toBeTruthy();
-    await this.openKnowledge(consoleUrl, 'projections');
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionRow).locator(`button[title="${result.metadata.name}"]`).click();
+    const completedRow = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionRow).filter({ has: this.page.locator(`button[title="${result.metadata.name}"]`) });
+    await expect(completedRow).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionProgress)).toHaveCount(0);
+    await completedRow.locator(`button[title="${result.metadata.name}"]`).click();
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.projectionProvenance)).toBeVisible();
     return result;
   }

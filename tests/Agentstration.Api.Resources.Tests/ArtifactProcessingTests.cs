@@ -217,6 +217,44 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         Assert.AreEqual(originalMode, current.AccessMode);
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task JsonOutputFailureExplainsTheFormatMismatchWithoutEchoingContent(bool transient)
+    {
+        await using var factory = Factory();
+        var current = await GetBootstrapContextAsync(factory);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
+        var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
+        var (owner, step, _, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Content,
+            "{}", "application/json", transient);
+        await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
+        var error = await Assert.ThrowsAsync<RuntimeGovernedOperationException>(() =>
+            processor.ExecuteOwnerAsync(owner, step, 0, "prepare", Element("private-output-text"), default));
+        Assert.AreEqual("artifact_processing_json_invalid", error.Code);
+        Assert.Contains("output is not valid JSON", error.Message);
+        Assert.Contains("text/plain", error.Message);
+        Assert.DoesNotContain("private-output-text", error.Message);
+        // A valid replacement can be retried without re-acquiring or publishing partial content.
+        await processor.ExecuteOwnerAsync(owner, step, 0, "prepare", Element("{\"redacted\":true}"), default);
+    }
+
+    [TestMethod]
+    public async Task InvalidJsonInputIsDistinguishedFromInvalidTransformationOutput()
+    {
+        await using var factory = Factory();
+        var current = await GetBootstrapContextAsync(factory);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
+        var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
+        var (owner, step, _, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Content,
+            "private-invalid-input", "application/json", true);
+        var error = await Assert.ThrowsAsync<RuntimeGovernedOperationException>(() =>
+            processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default));
+        Assert.AreEqual("artifact_processing_input_json_invalid", error.Code);
+        Assert.Contains("input Artifact", error.Message);
+        Assert.DoesNotContain("private-invalid-input", error.Message);
+    }
+
     private static async Task<(FlowRun Owner, ArtifactTransformFlowStepDefinition Step, FlowRun Child, JsonElement Item)> SetupAsync(
         IServiceProvider services, RequestContext current, ArtifactProcessingMode mode, string content, string media = "text/plain", bool transient = false, ResourceScopeRef? logicalScope = null)
     {

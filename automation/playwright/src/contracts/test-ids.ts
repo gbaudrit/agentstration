@@ -1,5 +1,6 @@
 export const TestIds = {
   artifactProcessing: {
+    outputMediaType: 'artifact-output-media-type',
     inputArtifact: 'artifact-transformation-input', processingRun: 'artifact-processing-run',
     palette: 'flow-palette-artifactTransform', mode: 'artifact-processing-mode',
     startPort: 'artifact-processing-start-port', resultPort: 'artifact-processing-result-port',
@@ -158,6 +159,8 @@ export const TestIds = {
   },
   sourceLifecycle: {
     runError: 'flow-run-error',
+    output: 'flow-run-output', outputRefresh: 'flow-run-output-refresh',
+    outputExpired: 'flow-run-output-expired', outputEmpty: 'flow-run-output-empty', outputArtifact: 'flow-run-output-artifact',
     profiles: 'resource-data-source-profiles', profileEditor: 'data-source-profile-editor', sources: 'resource-data-sources',
     knowledgeSources: 'resource-knowledge-sources', knowledgeDetails: 'resource-knowledge-source-details',
     projectionProvenance: 'knowledge-projection-provenance', snapshots: 'knowledge-snapshots',
@@ -224,6 +227,8 @@ export const TestIds = {
     knowledgeSourceProjections: 'knowledge-projections',
     knowledgeSourceProjectionParameters: 'knowledge-projection-parameters',
     knowledgeSourceStartProjection: 'knowledge-start-projection',
+    knowledgeSourceProjectionProgress: 'knowledge-projection-progress',
+    knowledgeSourceProjectionRefresh: 'knowledge-projection-refresh',
     knowledgeSourceProjectionRow: 'knowledge-projection-row',
   },
   schemaAdministration: {
@@ -476,6 +481,8 @@ export const TestIds = {
     flowRunSubmit: 'flow-run-submit',
     runDetails: 'flow-observability-run-details',
     runError: 'flow-run-error',
+    output: 'flow-run-output', outputRefresh: 'flow-run-output-refresh',
+    outputExpired: 'flow-run-output-expired', outputEmpty: 'flow-run-output-empty', outputArtifact: 'flow-run-output-artifact',
     runTokenUsage: 'flow-run-token-usage',
     agentRunner: 'flow-observability-agent-runner',
     agentRunPrompt: 'agent-run-prompt',

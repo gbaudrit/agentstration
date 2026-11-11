@@ -689,6 +689,7 @@ public sealed partial class KnowledgeSourceEditorTests
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(knowledge);
+        context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton(dataSourcesClient ?? new DataSourcesClientStub());
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
         return context;
@@ -821,6 +822,10 @@ public sealed partial class KnowledgeSourceEditorTests
     private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, KnowledgeSourceToolExposureResource? exposure = null, IReadOnlyList<KnowledgeSnapshotView>? snapshots = null, KnowledgeRetrievalResult? retrievalResult = null) : IKnowledgeSourcesClient
     {
         public List<KnowledgeProjectionResource> Projections { get; } = [];
+        public Func<StartKnowledgeProjectionRequest, CancellationToken, Task<ResourceSnapshot<KnowledgeProjectionResource>>>? ProjectionStarter { get; set; }
+        public int ProjectionStarts { get; private set; }
+        public int ProjectionReads { get; private set; }
+        public bool RejectProjectionRefresh { get; set; }
         public IReadOnlyList<KnowledgeSnapshotView> Snapshots { get; set; } = snapshots ?? [];
         public bool RejectNativeDataset { get; set; }
         public bool DependenciesStale { get; set; }
@@ -872,11 +877,17 @@ public sealed partial class KnowledgeSourceEditorTests
         }
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(exposure);
         public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>(Projections);
+        public Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
+        {
+            ProjectionReads++;
+            if (RejectProjectionRefresh) throw new HttpRequestException("Refresh unavailable");
+            return Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>(Projections.ToArray());
+        }
         public Task<ResourceSnapshot<KnowledgeProjectionResource>> StartProjectionAsync(ResourceNamespace @namespace, string name, StartKnowledgeProjectionRequest request, CancellationToken cancellationToken = default)
         {
             StartedProjectionRequest = request;
+            ProjectionStarts++;
+            if (ProjectionStarter is not null) return ProjectionStarter(request, cancellationToken);
             var projection = new KnowledgeProjectionResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -891,6 +902,7 @@ public sealed partial class KnowledgeSourceEditorTests
                 RetrievalFlow = new("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
                 ProjectionFlowRunId = "flowrun-knowledge-0123456789abcdef",
                 State = KnowledgeProjectionState.Succeeded,
+                IdempotencyKey = request.IdempotencyKey,
                 CorrelationId = "projection-0123456789abcdef",
                 CreatedBy = Guid.NewGuid(),
                 TenantId = Guid.NewGuid(),

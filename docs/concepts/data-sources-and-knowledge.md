@@ -196,3 +196,11 @@ requires its own qualified publication adapter. See
 [ADR-0208](../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md).
 
 Implementation evidence: [native Knowledge access validation](../architecture/implementation/knowledge-native-access-validation-2026-11-10.md).
+
+The Knowledge Source **Projections** tab polls the existing projection history
+while a projection runs. It shows an indeterminate activity indicator, elapsed
+time and acquisition/preparation/publication phases; once the root Flow exists,
+it also links its execution and reports completed root steps. The history and
+Snapshots refresh after success or failure, without retrying the start request.
+Reloading the page resumes observation of an existing active projection. A
+refresh failure leaves processing in progress and offers an explicit refresh.

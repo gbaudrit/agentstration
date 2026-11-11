@@ -197,4 +197,15 @@
   <data name="GovernanceEvaluations"><value>Gouvernance ({0})</value></data>
   <data name="Error.ModelOutputTokenLimit"><value>Le modèle a atteint sa limite de tokens de génération sans produire de réponse finale. Augmentez le budget de sortie ou vérifiez les réglages du raisonnement.</value></data>
   <data name="Error.ModelEmptyResponse"><value>Le modèle a terminé sans produire de réponse finale. Vérifiez sa réponse et ses paramètres de génération.</value></data>
+  <data name="OutputRefresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="TransientOutputUnavailable" xml:space="preserve"><value>Le contenu temporaire de cette exécution directe n’est plus disponible. Les artefacts conservés restent accessibles via leurs liens.</value></data>
+  <data name="NoReturnedOutput" xml:space="preserve"><value>Le Flow n’a renvoyé aucune valeur de sortie.</value></data>
+  <data name="NoReturnedOutputHelp" xml:space="preserve"><value>Vérifiez le mapping de l’étape Sortie finale pour transmettre le résultat connecté. Les artefacts produits sont listés ci-dessous indépendamment.</value></data>
+  <data name="ProducedArtifacts" xml:space="preserve"><value>Artefacts de sortie</value></data>
+  <data name="ProducedArtifactsLoading" xml:space="preserve"><value>Chargement des artefacts produits…</value></data>
+  <data name="ProducedArtifactsUnavailable" xml:space="preserve"><value>Les artefacts produits n’ont pas pu être chargés. Réessayez l’actualisation.</value></data>
+  <data name="NoProducedArtifacts" xml:space="preserve"><value>Aucun artefact conservé n’est associé à cette exécution.</value></data>
+  <data name="OutputBytes" xml:space="preserve"><value>{0} octets</value></data>
+  <data name="Error.ArtifactOutputJsonInvalid" xml:space="preserve"><value>La transformation a produit un contenu qui n’est pas du JSON valide, alors que le type de média de sortie exige du JSON (application/json ou +json). Demandez à l’Agent ou au Flow de traitement de renvoyer du JSON valide, sans balises Markdown ni texte autour. Si vous souhaitez du texte brut, choisissez text/plain comme type de média de sortie, publiez le Flow de transformation modifié et sélectionnez sa nouvelle version dans la source de connaissances.</value></data>
+  <data name="Error.ArtifactInputJsonInvalid" xml:space="preserve"><value>L’artefact d’entrée déclare un type de média JSON, mais son contenu n’est pas du JSON valide. Corrigez le contenu de la source ou son type de média, puis relancez la transformation.</value></data>
 </root>

@@ -78,7 +78,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                     if (IsJson(session.Input.MediaType))
                     {
                         try { content = JsonSerializer.Deserialize<JsonElement>(text); }
-                        catch (JsonException) { throw Error("artifact_processing_json_invalid"); }
+                        catch (JsonException) { throw Error("artifact_processing_input_json_invalid"); }
                     }
                     else content = text;
                 }
@@ -463,5 +463,10 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             catch (JsonException) { throw Error("artifact_processing_json_invalid"); }
         }
     }
-    private static RuntimeGovernedOperationException Error(string code) => new(code, "Artifact processing refused an invalid, unavailable or conflicting content operation.");
+    private static RuntimeGovernedOperationException Error(string code) => new(code, code switch
+    {
+        "artifact_processing_json_invalid" => "The transformation output is not valid JSON, but its output media type requires JSON (application/json or +json). Return valid JSON without Markdown fences or surrounding text, or set the transformation output media type to text/plain if plain text is intended.",
+        "artifact_processing_input_json_invalid" => "The input Artifact declares a JSON media type, but its content is not valid JSON. Correct the source content or its media type before retrying the transformation.",
+        _ => "Artifact processing refused an invalid, unavailable or conflicting content operation."
+    });
 }

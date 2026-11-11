@@ -33,4 +33,30 @@ public sealed partial class FlowDesignerReadOnlyTests
         rendered.Render(parameters => parameters.Add(component => component.ReadOnly, true));
         Assert.IsTrue(rendered.Find("[data-testid='artifact-input-mapping']").HasAttribute("disabled"));
     }
+    [TestMethod]
+    [DataRow("en-US", "enter your own")]
+    [DataRow("fr-FR", "valeur libre")]
+    public void ArtifactMediaTypeOffersSuggestionsAndPreservesCustomValues(string language, string help)
+    {
+        using var culture = new CultureScope(language);
+        using var context = CreateContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        ArtifactTransformFlowStepDefinition? changed = null;
+        var rendered = context.Render<FlowArtifactTransformInspector>(parameters => parameters
+            .Add(component => component.Step, new ArtifactTransformFlowStepDefinition { Name = "transform" })
+            .Add(component => component.ActiveTab, FlowStepSettingsTab.Configuration)
+            .Add(component => component.Changed, value => changed = (ArtifactTransformFlowStepDefinition)value));
+        var input = rendered.Find("[data-testid='artifact-output-media-type']");
+        var list = rendered.Find("datalist");
+        Assert.AreEqual(list.Id, input.GetAttribute("list"));
+        Assert.IsTrue(list.QuerySelectorAll("option").Any(option => option.GetAttribute("value") == "text/plain"));
+        Assert.IsTrue(list.QuerySelectorAll("option").Any(option => option.GetAttribute("value") == "application/json"));
+        Assert.Contains(help, rendered.Markup);
+        input.Change("application/vnd.example.redacted+json");
+        Assert.AreEqual("application/vnd.example.redacted+json", changed?.OutputMediaType);
+        input.Change("");
+        Assert.IsNull(changed?.OutputMediaType);
+        rendered.Render(parameters => parameters.Add(component => component.ReadOnly, true));
+        Assert.IsTrue(rendered.Find("[data-testid='artifact-output-media-type']").HasAttribute("disabled"));
+    }
 }

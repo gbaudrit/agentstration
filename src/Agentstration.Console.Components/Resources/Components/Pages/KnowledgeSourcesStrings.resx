@@ -134,4 +134,14 @@
   <data name="DirectInput" xml:space="preserve"><value>Direct input</value></data>
   <data name="InputFallbackUsed" xml:space="preserve"><value>Older acquisition used</value></data>
   <data name="InputRefreshFailed" xml:space="preserve"><value>Refresh failed:</value></data>
+  <data name="ProjectionStarting" xml:space="preserve"><value>Starting projection…</value></data>
+  <data name="ProjectionRunning" xml:space="preserve"><value>Projection in progress…</value></data>
+  <data name="ProjectionAcquiring" xml:space="preserve"><value>Acquiring Data Sources…</value></data>
+  <data name="ProjectionPreparing" xml:space="preserve"><value>Preparing inputs and transformations…</value></data>
+  <data name="ProjectionPublishing" xml:space="preserve"><value>Publishing Snapshot…</value></data>
+  <data name="ProjectionStepProgress" xml:space="preserve"><value>{0} of {1} steps completed.</value></data>
+  <data name="ProjectionElapsed" xml:space="preserve"><value>Elapsed: {0}</value></data>
+  <data name="ProjectionRefreshUnavailable" xml:space="preserve"><value>Progress could not be refreshed. Processing may still continue; try refreshing again.</value></data>
+  <data name="ProjectionFailed" xml:space="preserve"><value>Projection did not succeed: {0}</value></data>
+  <data name="ProjectionAccepted" xml:space="preserve"><value>Projection accepted. Progress will refresh automatically.</value></data>
 </root>

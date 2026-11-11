@@ -25,6 +25,35 @@ namespace Agentstration.Web.Tests;
 public sealed class FlowDetailsDesignerTests
 {
     [TestMethod]
+    [DataRow("en-US", "artifact_processing_json_invalid", "text/plain")]
+    [DataRow("fr-FR", "artifact_processing_json_invalid", "text/plain")]
+    [DataRow("en-US", "artifact_processing_input_json_invalid", "input Artifact")]
+    [DataRow("fr-FR", "artifact_processing_input_json_invalid", "artefact d’entrée")]
+    public void ArtifactJsonErrorsExplainTheCorrectSideAndRemedy(string language, string code, string explanation)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspace = WorkspaceId.New();
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var run = new FlowRun
+        {
+            Id = "invalid-json-run", WorkspaceId = workspace, FlowId = new("anonymization"), FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Failed, Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = FlowClientStub.Now,
+            Error = new(code, "Old generic error"),
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, new("anonymization"), "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+        var rendered = context.Render<FlowRunDetails>(p => p.Add(c => c.RunId, run.Id));
+        Assert.Contains(explanation, rendered.Find("[data-testid='flow-run-error']").TextContent);
+        Assert.DoesNotContain("Old generic error", rendered.Find("[data-testid='flow-run-error']").TextContent);
+    }
+
+    [TestMethod]
     [DataRow("/instance")]
     [DataRow("/tenants/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")]
     [DataRow("/workspaces/11111111-1111-1111-1111-111111111111")]

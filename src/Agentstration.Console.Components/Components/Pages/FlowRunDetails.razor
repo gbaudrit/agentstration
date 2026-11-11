@@ -137,7 +137,7 @@ else
                         {
                             <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("ChildFlowRun")</dt><dd>@if (selected.ChildFlowRunId is { } childRunId) { <a href="@($"/flow-runs/{Uri.EscapeDataString(childRunId)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")"><code>@childRunId</code></a> } else { <span>—</span> }</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
                             <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
-                            @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@selected.Error.Message</p></div> }
+                            @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@RunErrorMessage(selected.Error)</p></div> }
                         }
                     </article>
                     }
@@ -192,7 +192,7 @@ else
         {
             <section class="flow-run-io-panels" aria-label="@T("RunInputAndOutput")">
                 <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Input")</h2></div><pre>@Pretty(run.Input)</pre></article>
-                <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Output")</h2></div><pre>@Pretty(run.Output)</pre></article>
+                <FlowRunOutput Run="run" />
             </section>
         }
         else if (activeTab == RunTab.Worker)
@@ -588,6 +588,8 @@ else
     private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
     private string RunErrorMessage(FlowRunError error) => error.Code switch
     {
+        "artifact_processing_json_invalid" => T("Error.ArtifactOutputJsonInvalid"),
+        "artifact_processing_input_json_invalid" => T("Error.ArtifactInputJsonInvalid"),
         "agent_model_profile_unavailable" => T("Error.AgentModelProfileUnavailable"),
         "model_output_token_limit" => T("Error.ModelOutputTokenLimit"),
         "model_empty_response" => T("Error.ModelEmptyResponse"),

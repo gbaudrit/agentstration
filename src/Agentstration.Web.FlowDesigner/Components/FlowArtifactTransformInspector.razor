@@ -14,7 +14,9 @@
     <label>@T("ArtifactMaximumInput")<input type="number" min="1" max="1048576" disabled="@ReadOnly" value="@Step.MaximumContentBytes" @onchange="e => LimitChangedAsync(e, false)" /></label>
     <label>@T("ArtifactMaximumOutput")<input type="number" min="1" max="16777216" disabled="@ReadOnly" value="@Step.MaximumOutputBytes" @onchange="OutputLimitChangedAsync" /></label>
     <label>@T("ArtifactOutputName")<input disabled="@ReadOnly" value="@Step.OutputFileName" @onchange="e => Changed.InvokeAsync(Step with { OutputFileName = Optional(e) })" /></label>
-    <label>@T("ArtifactOutputMediaType")<input disabled="@ReadOnly" value="@Step.OutputMediaType" @onchange="e => Changed.InvokeAsync(Step with { OutputMediaType = Optional(e) })" /></label>
+    <label>@T("ArtifactOutputMediaType")<input list="@mediaTypesId" data-testid="artifact-output-media-type" disabled="@ReadOnly" value="@Step.OutputMediaType" @onchange="e => Changed.InvokeAsync(Step with { OutputMediaType = Optional(e) })" /></label>
+    <datalist id="@mediaTypesId">@foreach (var media in SuggestedMediaTypes) { <option value="@media"></option> }</datalist>
+    <small>@T("ArtifactOutputMediaTypeHelp")</small>
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
 {
@@ -35,6 +37,8 @@
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
     private bool invalidJson;
+    private readonly string mediaTypesId = "artifact-media-types-" + Guid.NewGuid().ToString("N");
+    private static readonly string[] SuggestedMediaTypes = ["text/plain", "application/json", "text/markdown", "text/csv", "text/html", "text/xml", "application/ld+json", "application/geo+json"];
     private string T(string key) => Localizer[key].Value;
     private static string? Optional(ChangeEventArgs args) => string.IsNullOrWhiteSpace(args.Value?.ToString()) ? null : args.Value.ToString();
     private Task ModeChangedAsync(ChangeEventArgs args) => Enum.TryParse<ArtifactProcessingMode>(args.Value?.ToString(), out var mode)

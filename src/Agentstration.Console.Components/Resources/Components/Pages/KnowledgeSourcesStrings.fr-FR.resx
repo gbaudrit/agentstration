@@ -134,4 +134,14 @@
   <data name="DirectInput" xml:space="preserve"><value>Entrée directe</value></data>
   <data name="InputFallbackUsed" xml:space="preserve"><value>Ancienne acquisition utilisée</value></data>
   <data name="InputRefreshFailed" xml:space="preserve"><value>Échec du rafraîchissement :</value></data>
+  <data name="ProjectionStarting" xml:space="preserve"><value>Démarrage de la projection…</value></data>
+  <data name="ProjectionRunning" xml:space="preserve"><value>Projection en cours…</value></data>
+  <data name="ProjectionAcquiring" xml:space="preserve"><value>Acquisition des sources de données…</value></data>
+  <data name="ProjectionPreparing" xml:space="preserve"><value>Préparation des entrées et des transformations…</value></data>
+  <data name="ProjectionPublishing" xml:space="preserve"><value>Publication du Snapshot…</value></data>
+  <data name="ProjectionStepProgress" xml:space="preserve"><value>{0} étape(s) terminée(s) sur {1}.</value></data>
+  <data name="ProjectionElapsed" xml:space="preserve"><value>Durée : {0}</value></data>
+  <data name="ProjectionRefreshUnavailable" xml:space="preserve"><value>Le suivi n’a pas pu être actualisé. Le traitement peut continuer ; réessayez l’actualisation.</value></data>
+  <data name="ProjectionFailed" xml:space="preserve"><value>La projection n’a pas abouti : {0}</value></data>
+  <data name="ProjectionAccepted" xml:space="preserve"><value>Projection acceptée. Le suivi s’actualise automatiquement.</value></data>
 </root>
