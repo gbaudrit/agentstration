@@ -80,7 +80,14 @@ export class DistributionPage {
     }
     const identity = this.page.locator('.enrollment-identity .collection-identity').first();
     await expect(identity.locator('.collection-version')).toBeVisible();
-    expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    const viewport = await this.page.evaluate(() => ({
+      width: innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      overflow: [...document.querySelectorAll('body *')].map(element => ({ element, rect: element.getBoundingClientRect() }))
+        .filter(({ element, rect }) => rect.right > innerWidth + 1 && getComputedStyle(element).display !== 'none')
+        .map(({ element, rect }) => ({ tag: element.tagName, classes: element.className.toString(), right: rect.right, text: element.textContent?.trim().slice(0, 80) })).slice(0, 12),
+    }));
+    expect(viewport.scrollWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(viewport.width + 1);
   }
 
   public async inspectDirectProfileChoice(consoleUrl: string): Promise<void> {
