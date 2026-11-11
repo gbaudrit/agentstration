@@ -9,7 +9,10 @@ test('every collection adapter and native renderer has a unique assertion mappin
   expect(collectionSurfaces.length).toBe(collectionManifest.frames.length + collectionManifest.specialized.length);
   for (const surface of collectionSurfaces) {
     expect(fs.existsSync(path.join(repositoryRoot, surface.source)), surface.id).toBe(true);
-    expect(surface.contract).toBe(surface.renderer === 'CollectionView' ? 'shared-frame' : 'native-applicable');
+    expect(surface.contract).toBe(surface.mounting === 'unmounted-legacy' ? 'unmounted-legacy' : surface.renderer === 'CollectionView' ? 'shared-frame' : 'native-applicable');
+    if (!surface.routes.length && surface.mounting !== 'unmounted-legacy')
+      expect(surface.sharedHostSpecifications.length, `${surface.id}: explicit live host mapping`).toBeGreaterThan(0);
+    if (surface.mounting === 'unmounted-legacy') expect(surface.sharedHostSpecifications).toEqual([]);
     for (const file of [surface.pageObject, surface.specification, surface.populatedSpecification,
       surface.identitySpecification, ...surface.domainSpecifications, ...surface.sharedHostSpecifications]) {
       expect(fs.existsSync(path.join(automationRoot, file)), `${surface.id}: ${file}`).toBe(true);
