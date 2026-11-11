@@ -157,7 +157,23 @@ export class SourceCompositionPage {
   private async authorPoint(base: string, name: string): Promise<void> {
     await this.page.goto(`${base}/flows/${name}/designer?scopeRef=%2Finstance&context=%2Finstance`);
     await expect(this.page.getByTestId(TestIds.flowObservability.designer)).toBeVisible();
-    await this.page.locator('.flow-node').filter({ has: this.page.locator('strong', { hasText: /^Extensions$/ }) }).locator('.flow-node-settings').click();
+    const settings = this.page.locator('.flow-node').filter({ has: this.page.locator('strong', { hasText: /^Extensions$/ }) }).locator('.flow-node-settings');
+    await expect(async () => {
+      if (!await this.page.getByTestId(TestIds.flowObservability.stepSettingsConfigurationTab).isVisible()) {
+        const button = await settings.boundingBox();
+        const zoom = await this.page.locator('.flow-zoom-controls').boundingBox();
+        if (button && zoom && button.y < zoom.y + zoom.height && button.y + button.height > zoom.y
+          && button.x < zoom.x + zoom.width && button.x + button.width > zoom.x) {
+          const canvas = await this.page.locator('.flow-diagram-canvas').boundingBox();
+          if (!canvas) throw new Error('The composition diagram is not measurable.');
+          const x = canvas.x + canvas.width * 0.1; const y = canvas.y + canvas.height * 0.45;
+          await this.page.mouse.move(x, y); await this.page.mouse.down();
+          await this.page.mouse.move(x, y + 150, { steps: 10 }); await this.page.mouse.up();
+        }
+        await settings.click({ timeout: 2_000 });
+      }
+      await expect(this.page.getByTestId(TestIds.flowObservability.stepSettingsConfigurationTab)).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
     await this.page.getByTestId(TestIds.flowObservability.stepSettingsConfigurationTab).click();
     await this.page.getByTestId(TestIds.sourcePolicies.pointName).fill('redactedTransformations');
     await this.page.getByTestId(TestIds.sourcePolicies.pointName).blur();
