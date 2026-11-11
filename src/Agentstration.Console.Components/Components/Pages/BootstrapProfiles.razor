@@ -36,8 +36,7 @@ else
         @if (view.Catalog.Error is not null) { <p class="error-panel">@view.Catalog.Error</p> }
     </section>
 
-    <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">@T("Step", 1)</p><h2>@T("SelectProfiles")</h2><p class="muted">@T("SelectProfilesDescription")</p></div></div>
+    <FormSection Title="@T("SelectProfiles")" Eyebrow="@T("Step", 1)"><ChildContent>
         @if (sourceProfile is not null && sourceSelection is not null)
         {
             <div class="bootstrap-profile-grid">
@@ -54,7 +53,7 @@ else
                 @foreach (var profile in view.Catalog.Profiles)
                 {
                     <label class="bootstrap-profile-card @(selectedProfiles.Contains(profile.Name) ? "selected" : null) @(profile.Valid ? null : "invalid")">
-                        <input type="checkbox" checked="@selectedProfiles.Contains(profile.Name)" disabled="@(!CanSelect(profile))" @onchange="args => ToggleProfile(profile, args)" />
+                        <FormCheckbox Value="@selectedProfiles.Contains(profile.Name)" disabled="@(!CanSelect(profile))" ValueChanged="changed => ToggleProfile(profile, new ChangeEventArgs { Value = changed })" />
                         <span><strong>@profile.DisplayName</strong><small><code>@profile.Name</code> · @ScopeLabel(profile.Scope) · @T("ResourceCount", profile.ResourceCount)</small>@if (profile.Description is not null) { <span>@profile.Description</span> }@if (!profile.Valid) { <span class="inline-warning">@profile.Error</span> }</span>
                     </label>
                 }
@@ -70,27 +69,25 @@ else
                 }
             </ol>
         }
-    </section>
+    </ChildContent></FormSection>
 
     @if (SelectedScope is BootstrapProfileScope.Tenant or BootstrapProfileScope.Workspace)
     {
-        <section class="panel">
-            <div class="panel-header"><div><p class="eyebrow">@T("Step", 2)</p><h2>@T("ChooseTarget")</h2></div></div>
+        <FormSection Title="@T("ChooseTarget")" Eyebrow="@T("Step", 2)"><ChildContent>
             @if (SelectedScope == BootstrapProfileScope.Tenant)
             {
-                <label class="bootstrap-target"><span>@T("Tenant")</span><select value="@selectedTenantId" @onchange="SelectTenant"><option value="">@T("SelectTenant")</option>@foreach (var tenant in view.Tenants) { <option value="@tenant.Id">@tenant.DisplayName — @tenant.Name</option> }</select></label>
+                <FormField Label="@T("Tenant")" Class="bootstrap-target"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(selectedTenantId, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => SelectTenant(new ChangeEventArgs { Value = changed })"><option value="">@T("SelectTenant")</option>@foreach (var tenant in view.Tenants) { <option value="@tenant.Id">@tenant.DisplayName — @tenant.Name</option> }</ClearableSelect></ChildContent></FormField>
             }
             else
             {
-                <label class="bootstrap-target"><span>@T("Workspace")</span><select value="@selectedWorkspaceId" @onchange="SelectWorkspace"><option value="">@T("SelectWorkspace")</option>@foreach (var workspace in view.Workspaces) { <option value="@workspace.WorkspaceId">@workspace.TenantDisplayName / @workspace.WorkspaceDisplayName — @workspace.TenantName/@workspace.WorkspaceName</option> }</select></label>
+                <FormField Label="@T("Workspace")" Class="bootstrap-target"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(selectedWorkspaceId, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => SelectWorkspace(new ChangeEventArgs { Value = changed })"><option value="">@T("SelectWorkspace")</option>@foreach (var workspace in view.Workspaces) { <option value="@workspace.WorkspaceId">@workspace.TenantDisplayName / @workspace.WorkspaceDisplayName — @workspace.TenantName/@workspace.WorkspaceName</option> }</ClearableSelect></ChildContent></FormField>
             }
-        </section>
+        </ChildContent></FormSection>
     }
 
     @if (SelectedBindings.Count > 0)
     {
-        <section class="panel">
-            <div class="panel-header"><div><p class="eyebrow">@T("Step", 3)</p><h2>@T("ResolveBindings")</h2><p class="muted">@T("ResolveBindingsDescription")</p></div></div>
+        <FormSection Title="@T("ResolveBindings")" Eyebrow="@T("Step", 3)"><ChildContent>
             <div class="bootstrap-binding-grid">
                 @foreach (var item in SelectedBindings)
                 {
@@ -101,16 +98,15 @@ else
                         <legend>@item.Binding.DisplayName</legend>
                         <p><code>@item.Profile/@item.Binding.Name</code> · @BindingTargetKindLabel(item.Binding.TargetKind)@if (item.Binding.Required) { <span> · @T("Required")</span> }</p>
                         @if (item.Binding.Description is not null) { <p class="muted">@item.Binding.Description</p> }
-                        <label><span>@T("Resource")</span><select value="@BindingTargetValue(input)" disabled="@(selectedWorkspaceId is null || busy)" @onchange="args => UpdateBindingTarget(key, args)"><option value="">@T("SelectCompatibleResource")</option>@foreach (var option in options) { <option value="@BindingTargetValue(option)">@option.DisplayName — @(option.ScopeRef?.Value ?? T("InheritedScope"))/@option.Namespace/@option.Name@(option.Planned ? $" ({T("Planned")})" : null)</option> }</select></label>
+                        <FormField Label="@T("Resource")"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(BindingTargetValue(input), System.Globalization.CultureInfo.InvariantCulture)" disabled="@(selectedWorkspaceId is null || busy)" ValueChanged="changed => UpdateBindingTarget(key, new ChangeEventArgs { Value = changed })"><option value="">@T("SelectCompatibleResource")</option>@foreach (var option in options) { <option value="@BindingTargetValue(option)">@option.DisplayName — @(option.ScopeRef?.Value ?? T("InheritedScope"))/@option.Namespace/@option.Name@(option.Planned ? $" ({T("Planned")})" : null)</option> }</ClearableSelect></ChildContent></FormField>
                         @if (selectedWorkspaceId is not null && options.Count == 0) { <p class="inline-warning">@T("NoCompatibleResource", BindingTargetKindLabel(item.Binding.TargetKind))</p> }
                     </fieldset>
                 }
             </div>
-        </section>
+        </ChildContent></FormSection>
     }
 
-    <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">@T("Step", PreviewStep)</p><h2>@T("Preview")</h2><p class="muted">@T("PreviewDescription")</p></div><button class="button-primary" disabled="@(!CanPreview || busy)" @onclick="PreviewAsync">@(previewing ? T("Previewing") : T("PreviewApplication"))</button></div>
+    <FormSection Title="@T("Preview")" Eyebrow="@T("Step", PreviewStep)"><Actions><button class="button-primary" disabled="@(!CanPreview || busy)" @onclick="PreviewAsync">@(previewing ? T("Previewing") : T("PreviewApplication"))</button></Actions><ChildContent>
         @if (preview is not null)
         {
             <div class="bootstrap-preview-summary"><StatusBadge Text="@(preview.CanApply ? T("Ready") : T("Invalid"))" Status="@(preview.CanApply ? UiStatus.Success : UiStatus.Danger)" /><span><code>@preview.Digest[..12]</code></span><span>@T("ResourceCount", preview.Resources.Count)</span></div>
@@ -126,18 +122,16 @@ else
     </CollectionView>
             <div class="bootstrap-apply"><p>@T("ApplyDescription")</p><button class="button-primary" disabled="@(!preview.CanApply || busy)" @onclick="() => confirmApply = true">@T("ApplyPreview")</button></div>
         }
-    </section>
+    </ChildContent></FormSection>
 
     @if (lastApplication is not null)
     {
-        <section class="panel">
-            <div class="panel-header"><div><p class="eyebrow">@T("LatestResult")</p><h2>@ApplicationStatusLabel(lastApplication.Definition.Status)</h2></div><StatusBadge Text="@ApplicationStatusLabel(lastApplication.Definition.Status)" Status="@ApplicationTone(lastApplication.Definition.Status)" /></div>
+        <FormSection Title="@ApplicationStatusLabel(lastApplication.Definition.Status)" Eyebrow="@T("LatestResult")"><Actions><StatusBadge Text="@ApplicationStatusLabel(lastApplication.Definition.Status)" Status="@ApplicationTone(lastApplication.Definition.Status)" /></Actions><ChildContent>
             <div class="bootstrap-preview-summary"><span>@T("CreatedCount", Count(lastApplication, BootstrapResourceDisposition.Create))</span><span>@T("SkippedCount", Count(lastApplication, BootstrapResourceDisposition.Skip))</span><span>@T("ConflictsCount", Count(lastApplication, BootstrapResourceDisposition.Conflict))</span><span>@T("FailedCount", Count(lastApplication, BootstrapResourceDisposition.Failed))</span></div>
-        </section>
+        </ChildContent></FormSection>
     }
 
-    <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">@T("AuditTrail")</p><h2>@T("ApplicationHistory")</h2></div></div>
+    <FormSection Title="@T("ApplicationHistory")" Eyebrow="@T("AuditTrail")"><ChildContent>
         @if (view.Applications.Count == 0) { <EmptyState Title="@T("NoManualApplication")" Message="@T("NoManualApplicationMessage")" /> }
         else
         {
@@ -156,12 +150,11 @@ else
 <CollectionActions ResourceName="@(application.Metadata.Name)"><button class="text-button" disabled="@busy" @onclick="() => ShowApplicationAsync(application.Metadata.Name)">@T("View")</button></CollectionActions></Actions>
     </CollectionView>
         }
-    </section>
+    </ChildContent></FormSection>
 
     @if (selectedApplication is not null)
     {
-        <section class="panel" id="bootstrap-application-detail">
-            <div class="panel-header"><div><p class="eyebrow">@T("ApplicationDetail")</p><h2>@selectedApplication.Metadata.Name</h2></div><StatusBadge Text="@ApplicationStatusLabel(selectedApplication.Definition.Status)" Status="@ApplicationTone(selectedApplication.Definition.Status)" /></div>
+        <FormSection Title="@selectedApplication.Metadata.Name" Eyebrow="@T("ApplicationDetail")" id="bootstrap-application-detail"><Actions><StatusBadge Text="@ApplicationStatusLabel(selectedApplication.Definition.Status)" Status="@ApplicationTone(selectedApplication.Definition.Status)" /></Actions><ChildContent>
             <dl class="resource-details">
                 <dt>@T("Actor")</dt><dd><code>@selectedApplication.Definition.ActorPrincipalId</code></dd>
                 <dt>@T("Source")</dt><dd>@selectedApplication.Definition.Source</dd>
@@ -196,7 +189,7 @@ else
         </Information>
     </CollectionView>
             }
-        </section>
+        </ChildContent></FormSection>
     }
 }
 
@@ -207,7 +200,7 @@ else
             <h2 id="bootstrap-confirm-title">@T("ApplyBootstrapProfiles")</h2>
             <p>@T("ApplyConfirmation")</p>
             <p><strong>@string.Join(" → ", selectedProfiles)</strong><br />@CurrentTargetLabel</p>
-            <div class="dialog-actions"><button class="button-secondary" disabled="@applying" @onclick="() => confirmApply = false">@T("Cancel")</button><button class="button-primary" disabled="@applying" @onclick="ApplyAsync">@(applying ? T("Applying") : T("ApplyProfiles"))</button></div>
+            <FormActions Class="dialog-actions"><button class="button-secondary" disabled="@applying" @onclick="() => confirmApply = false">@T("Cancel")</button><button class="button-primary" disabled="@applying" @onclick="ApplyAsync">@(applying ? T("Applying") : T("ApplyProfiles"))</button></FormActions>
         </section>
     </div>
 }

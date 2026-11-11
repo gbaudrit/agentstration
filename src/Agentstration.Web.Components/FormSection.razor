@@ -1,4 +1,4 @@
-<section data-testid="@TestId" class="panel form-section" aria-labelledby="@titleId">
+<section @attributes="AdditionalAttributes" data-testid="@(TestId ?? AdditionalAttributes?.GetValueOrDefault("data-testid"))" class="panel form-section @Class" aria-labelledby="@titleId">
     <div class="panel-header"><div>
         @if (!string.IsNullOrWhiteSpace(Eyebrow)) { <p class="eyebrow">@Eyebrow</p> }
         <h2 id="@titleId">@Title</h2>
@@ -14,5 +14,7 @@
     [Parameter] public RenderFragment? Actions { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public string? TestId { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
     private readonly string titleId = $"section-{Guid.NewGuid():N}";
 }

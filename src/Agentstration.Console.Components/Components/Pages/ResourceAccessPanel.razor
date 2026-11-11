@@ -45,9 +45,9 @@
                         <div class="access-grant" role="listitem" data-testid="resource-access-grant" data-scope-ref="@grant.TargetScopeRef.Value">
                             <div class="access-target"><ResourceScopeBadge ScopeRef="grant.TargetScopeRef" DisplayName="@TargetName(grant.TargetScopeRef)" /><code>@grant.TargetScopeRef.Value</code></div>
                             <div class="access-actions" aria-label="@T("AllowedActions")">
-                                <label><input type="checkbox" checked="@grant.Discover" disabled="@(!canManage || saving)" @onchange="args => SetAction(grant, ResourceAccessAction.Discover, (bool)(args.Value ?? false))" />@T("Discover")</label>
-                                <label><input type="checkbox" checked="@grant.Use" disabled="@(!canManage || saving)" @onchange="args => SetAction(grant, ResourceAccessAction.Use, (bool)(args.Value ?? false))" />@T("Use")</label>
-                                <label><input type="checkbox" checked="@grant.IncludeDescendants" disabled="@(!canManage || saving || grant.TargetScopeRef.Kind == ResourceScopeKind.Workspace)" @onchange="args => SetPropagation(grant, (bool)(args.Value ?? false))" />@T("IncludeDescendants")</label>
+                                <label><FormCheckbox Value="@grant.Discover" disabled="@(!canManage || saving)" ValueChanged="changed => SetAction(grant, ResourceAccessAction.Discover, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("Discover")</label>
+                                <label><FormCheckbox Value="@grant.Use" disabled="@(!canManage || saving)" ValueChanged="changed => SetAction(grant, ResourceAccessAction.Use, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("Use")</label>
+                                <label><FormCheckbox Value="@grant.IncludeDescendants" disabled="@(!canManage || saving || grant.TargetScopeRef.Kind == ResourceScopeKind.Workspace)" ValueChanged="changed => SetPropagation(grant, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("IncludeDescendants")</label>
                             </div>
                             @if (canManage) { <CollectionActions ResourceName="@TargetName(grant.TargetScopeRef)"><button class="button-secondary" type="button" disabled="@saving" data-testid="resource-access-remove" @onclick="() => Remove(grant)">@T("Remove")</button></CollectionActions> }
                         </div>
@@ -63,9 +63,9 @@
                     <FormField Label="@T("TargetScope")"><ClearableSelect TValue="string" Disabled="@saving" Value="@selectedTarget" ValueChanged="SelectTarget" ValueExpression="@(() => selectedTarget)" data-testid="resource-access-target"><option value="">@T("SelectTarget")</option>@foreach (var target in FilteredTargets.Take(50)) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</ClearableSelect></FormField>
                     <small>@T("TargetResults", Math.Min(50, FilteredTargets.Count), FilteredTargets.Count)</small>
                     <div class="access-actions">
-                        <label><input type="checkbox" @bind="addDiscover" disabled="@saving" />@T("Discover")</label>
-                        <label><input type="checkbox" @bind="addUse" disabled="@saving" />@T("Use")</label>
-                        <label><input type="checkbox" @bind="addDescendants" disabled="@(saving || ResourceScopeRef.TryParse(selectedTarget, out var targetScope) && targetScope.Kind == ResourceScopeKind.Workspace)" />@T("IncludeDescendants")</label>
+                        <label><FormCheckbox @bind-Value="addDiscover" disabled="@saving" />@T("Discover")</label>
+                        <label><FormCheckbox @bind-Value="addUse" disabled="@saving" />@T("Use")</label>
+                        <label><FormCheckbox @bind-Value="addDescendants" disabled="@(saving || ResourceScopeRef.TryParse(selectedTarget, out var targetScope) && targetScope.Kind == ResourceScopeKind.Workspace)" />@T("IncludeDescendants")</label>
                     </div>
                     <small>@T("PendingGrantHelp")</small>
                     <button class="button-secondary" type="button" data-testid="resource-access-add" disabled="@(saving || string.IsNullOrWhiteSpace(selectedTarget) || (!addDiscover && !addUse))" @onclick="Add">@T("AddToList")</button>
@@ -82,7 +82,7 @@
             @if (saved) { <p class="access-success" role="status" data-testid="resource-access-saved">@T("Saved")</p> }
             @if (canManage)
             {
-                <div class="form-actions"><button class="text-button" type="button" @onclick="Discard" disabled="@(saving || (!dirty && !adding))" data-testid="resource-access-discard">@T("Discard")</button><button class="button-primary" type="button" data-testid="resource-access-save" disabled="@(saving || invalidGrant || (!dirty && !HasPendingGrant))" @onclick="SaveAsync">@(saving ? T("Saving") : T("Save"))</button></div>
+                <FormActions><button class="text-button" type="button" @onclick="Discard" disabled="@(saving || (!dirty && !adding))" data-testid="resource-access-discard">@T("Discard")</button><button class="button-primary" type="button" data-testid="resource-access-save" disabled="@(saving || invalidGrant || (!dirty && !HasPendingGrant))" @onclick="SaveAsync">@(saving ? T("Saving") : T("Save"))</button></FormActions>
             }
         </article>
         <details class="panel access-details"><summary>@T("ResourceDetails")</summary>

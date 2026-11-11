@@ -44,7 +44,7 @@ else if (inventory is not null)
 
     <div class="cleanup-toolbar">
         <SearchBox Value="@search" ValueChanged="value => search = value" Placeholder="@T("SearchPlaceholder")" Label="@T("SearchLabel")" />
-        <label class="cleanup-select-all cleanup-select-everything"><input type="checkbox" checked="@IsEverythingSelected" @onchange="args => SelectEverything(args.Value is true)" disabled="@(inventory.All.Count == 0 || deleting)" /> <span>@T("SelectEverything")</span></label>
+        <label class="cleanup-select-all cleanup-select-everything"><FormCheckbox Value="@IsEverythingSelected" disabled="@(inventory.All.Count == 0 || deleting)" ValueChanged="changed => SelectEverything((new ChangeEventArgs { Value = changed }).Value is true)" /> <span>@T("SelectEverything")</span></label>
         <button class="text-button" type="button" @onclick="ClearSelection" disabled="@(SelectedCount == 0 || deleting)">@T("ClearSelection")</button>
     </div>
 
@@ -54,21 +54,21 @@ else if (inventory is not null)
         <section class="panel cleanup-group" data-kind="@group.Kind">
             <header>
                 <div><p class="eyebrow">@T($"Kind.{group.Kind}")</p><h2>@T($"GroupTitle.{group.Kind}", visible.Count)</h2><p>@T($"GroupDescription.{group.Kind}")</p></div>
-                <label class="cleanup-select-all"><input type="checkbox" checked="@IsGroupSelected(visible)" @onchange="args => SelectGroup(visible, args.Value is true)" disabled="@(visible.Count == 0 || deleting)" /> <span>@T("SelectAll")</span></label>
+                <label class="cleanup-select-all"><FormCheckbox Value="@IsGroupSelected(visible)" disabled="@(visible.Count == 0 || deleting)" ValueChanged="changed => SelectGroup(visible, (new ChangeEventArgs { Value = changed }).Value is true)" /> <span>@T("SelectAll")</span></label>
             </header>
             @if (group.Kind == "Entries")
             {
                 <div class="cleanup-options cleanup-entry-options">
                     <div><strong>@T("EntryOptionsTitle")</strong><p>@T("EntryOptionsDescription")</p></div>
-                    <label><input type="checkbox" @bind="removeDashboardReferences" disabled="@deleting" /> <span>@T("RemoveDashboardReferences")</span></label>
-                    <label><input type="checkbox" @bind="closeInteractions" disabled="@deleting" /> <span>@T("CloseInteractions")</span></label>
+                    <label><FormCheckbox @bind-Value="removeDashboardReferences" disabled="@deleting" /> <span>@T("RemoveDashboardReferences")</span></label>
+                    <label><FormCheckbox @bind-Value="closeInteractions" disabled="@deleting" /> <span>@T("CloseInteractions")</span></label>
                 </div>
             }
             else if (group.Kind == "Flows")
             {
                 <div class="cleanup-options cleanup-flow-options">
                     <div><strong>@T("FlowOptionsTitle")</strong><p>@T("FlowOptionsDescription")</p></div>
-                    <label><input type="checkbox" @bind="deleteSystemManagedFlows" disabled="@deleting" /> <span>@T("DeleteSystemManagedFlows")</span></label>
+                    <label><FormCheckbox @bind-Value="deleteSystemManagedFlows" disabled="@deleting" /> <span>@T("DeleteSystemManagedFlows")</span></label>
                 </div>
             }
             @if (visible.Count == 0)
@@ -81,7 +81,7 @@ else if (inventory is not null)
                     @foreach (var candidate in visible)
                     {
                         <div class="cleanup-row @(selected.Contains(candidate.Key) ? "selected" : null)">
-                            <input type="checkbox" aria-label="@candidate.DisplayName" checked="@selected.Contains(candidate.Key)" @onchange="args => Select(candidate, args.Value is true)" disabled="@deleting" />
+                            <FormCheckbox aria-label="@candidate.DisplayName" Value="@selected.Contains(candidate.Key)" disabled="@deleting" ValueChanged="changed => Select(candidate, (new ChangeEventArgs { Value = changed }).Value is true)" />
                             <span class="cleanup-row-kind"><UiIcon Name="@Icon(candidate.Kind)" /></span>
                             <CollectionIdentity DisplayName="@candidate.DisplayName" Namespace="@(candidate.Kind is CleanupResourceKind.Agent or CleanupResourceKind.Flow or CleanupResourceKind.Entry ? candidate.Namespace.Value : null)" Name="@candidate.Id" Href="@CandidateUrl(candidate)" IconName="@Icon(candidate.Kind)" /><ResourceScopeBadge ScopeRef="candidate.ScopeRef" />
                             <span class="cleanup-row-detail">@KindLabel(candidate.Kind)@if (!string.IsNullOrWhiteSpace(candidate.Detail)) { <small>@candidate.Detail</small> }</span>
@@ -128,8 +128,8 @@ else if (inventory is not null)
                     <div><dt>@T($"Kind.{summary.Kind}")</dt><dd>@summary.Count</dd></div>
                 }
             </dl>
-            <label class="cleanup-acknowledgement"><input type="checkbox" @bind="acknowledged" data-testid="cleanup-acknowledgement" /> <span>@T("Acknowledge")</span></label>
-            <div class="dialog-actions"><button class="button-secondary" type="button" @onclick="CloseConfirmation" data-testid="cancel-cleanup">@T("Cancel")</button><button class="button-danger" type="button" data-testid="confirm-cleanup" @onclick="DeleteSelectedAsync" disabled="@(!acknowledged)">@T("ConfirmDelete")</button></div>
+            <label class="cleanup-acknowledgement"><FormCheckbox @bind-Value="acknowledged" data-testid="cleanup-acknowledgement" /> <span>@T("Acknowledge")</span></label>
+            <FormActions Class="dialog-actions"><button class="button-secondary" type="button" @onclick="CloseConfirmation" data-testid="cancel-cleanup">@T("Cancel")</button><button class="button-danger" type="button" data-testid="confirm-cleanup" @onclick="DeleteSelectedAsync" disabled="@(!acknowledged)">@T("ConfirmDelete")</button></FormActions>
         </section>
     </div>
 }

@@ -20,20 +20,18 @@
 else
 {
 <EditForm @key="model" EditContext="FormContext" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirtyFromForm" @onchange="MarkDirtyFromForm"><DataAnnotationsValidator /><ValidationSummary />
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("VaultResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusText(status)" Status="@(status == "available" ? UiStatus.Success : UiStatus.Danger)" /> }</div>
-        <div class="form-grid"><ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="vault-display-name" TechnicalNameTestId="vault-name" /><FormField Label="@T("Provider")" Required="true"><ClearableSelect TValue="string" @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></ClearableSelect></FormField>@if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }</div>
-    </section>
+    <FormSection Title="@T("VaultResource")" Eyebrow="@T("Identity")"><Actions>@if (status is not null) { <StatusBadge Text="@StatusText(status)" Status="@(status == "available" ? UiStatus.Success : UiStatus.Danger)" /> }</Actions><ChildContent>
+        <FormGrid><ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="vault-display-name" TechnicalNameTestId="vault-name" /><FormField Label="@T("Provider")" Required="true"><ClearableSelect TValue="string" @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></ClearableSelect></FormField>@if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }</FormGrid>
+    </ChildContent></FormSection>
     <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" OnChanged="MarkDirty" />
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Bootstrap")</p><h2>@T("MasterKey")</h2></div>@if (!IsNew && model.ProviderType == "local" && status != "available") { <button type="button" class="button-primary" @onclick="() => confirmInitialize = true" disabled="@busy">@T("InitializeLocalVault")</button> }</div>
+    <FormSection Title="@T("MasterKey")" Eyebrow="@T("Bootstrap")"><Actions>@if (!IsNew && model.ProviderType == "local" && status != "available") { <button type="button" class="button-primary" @onclick="() => confirmInitialize = true" disabled="@busy">@T("InitializeLocalVault")</button> }</Actions><ChildContent>
         <p>@T("MasterKeyHelp")</p>
         @if (keyFilePath is not null) { <div class="form-alert form-alert-warning"><strong>@T("BackUpMasterKey")</strong><span><code>@keyFilePath</code></span></div> }
-    </section>
+    </ChildContent></FormSection>
     @if (saveError && error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
     @if (IsNew)
     {
-        <div class="form-actions"><a class="button-secondary" href="/vaults">@T("Cancel")</a><button type="submit" class="button-primary" disabled="@busy">@(busy ? T("Saving") : T("SaveVault"))</button></div>
+        <FormActions><a class="button-secondary" href="/vaults">@T("Cancel")</a><button type="submit" class="button-primary" disabled="@busy">@(busy ? T("Saving") : T("SaveVault"))</button></FormActions>
     }
     else
     {

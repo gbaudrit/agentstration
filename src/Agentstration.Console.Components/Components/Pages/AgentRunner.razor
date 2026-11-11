@@ -62,25 +62,24 @@ else
     <EditForm Model="model" OnValidSubmit="RunAsync" FormName="agent-runner" class="resource-form">
         <DataAnnotationsValidator />
         <ValidationSummary />
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("QuickRun")</p><h2>@T("UserInput")</h2></div><button class="text-button" type="button" @onclick="() => advanced = !advanced">@(advanced ? T("HideAdvanced") : T("AdvancedRun"))</button></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>@T("Prompt")</span><InputTextArea @bind-Value="model.Prompt" rows="7" placeholder="@T("PromptPlaceholder")" data-testid="agent-run-prompt" /><ValidationMessage For="() => model.Prompt" /></label>
+        <FormSection Title="@T("UserInput")" Eyebrow="@T("QuickRun")"><Actions><button class="text-button" type="button" @onclick="() => advanced = !advanced">@(advanced ? T("HideAdvanced") : T("AdvancedRun"))</button></Actions><ChildContent>
+            <FormGrid>
+                <FormField Label="@T("Prompt")" Class="form-span-2"><Validation><ValidationMessage For="() => model.Prompt" /></Validation><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="model.Prompt" rows="7" placeholder="@T("PromptPlaceholder")" data-testid="agent-run-prompt" /></ChildContent></FormField>
                 @if (advanced)
                 {
-                    <label><span>@T("Context")</span><InputTextArea @bind-Value="model.Context" rows="7" /></label>
-                    <label><span>@T("RuntimeParameterOverrides")</span><InputTextArea @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /><small>@T("RuntimeParameterOverridesHelp")</small></label>
-                    <label><span>@T("TimeoutSeconds")</span><InputNumber @bind-Value="model.TimeoutSeconds" /><ValidationMessage For="() => model.TimeoutSeconds" /></label>
-                    <label><span>@T("Streaming")</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@T($"Streaming.{value}")</option> }</InputSelect><small>@T("StreamingHelp")</small></label>
-                    <label><span>@T("ToolArguments")</span><InputSelect @bind-Value="model.ToolArgumentRetention"><option value="@ToolArgumentRetentionMode.Inherit">@T("ToolArguments.Inherit")</option><option value="@ToolArgumentRetentionMode.Retain">@T("ToolArguments.Retain")</option><option value="@ToolArgumentRetentionMode.DoNotRetain">@T("ToolArguments.DoNotRetain")</option></InputSelect><small>@T("ToolArgumentsHelp")</small></label>
+                    <FormField Label="@T("Context")"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="model.Context" rows="7" /></ChildContent></FormField>
+                    <FormField Label="@T("RuntimeParameterOverrides")"><HelpContent>@T("RuntimeParameterOverridesHelp")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /></ChildContent></FormField>
+                    <FormField Label="@T("TimeoutSeconds")"><Validation><ValidationMessage For="() => model.TimeoutSeconds" /></Validation><ChildContent><ClearableNumber @bind-Value="model.TimeoutSeconds" /></ChildContent></FormField>
+                    <FormField Label="@T("Streaming")"><HelpContent>@T("StreamingHelp")</HelpContent><ChildContent><ClearableSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@T($"Streaming.{value}")</option> }</ClearableSelect></ChildContent></FormField>
+                    <FormField Label="@T("ToolArguments")"><HelpContent>@T("ToolArgumentsHelp")</HelpContent><ChildContent><ClearableSelect @bind-Value="model.ToolArgumentRetention"><option value="@ToolArgumentRetentionMode.Inherit">@T("ToolArguments.Inherit")</option><option value="@ToolArgumentRetentionMode.Retain">@T("ToolArguments.Retain")</option><option value="@ToolArgumentRetentionMode.DoNotRetain">@T("ToolArguments.DoNotRetain")</option></ClearableSelect></ChildContent></FormField>
                 }
-            </div>
+            </FormGrid>
             <div class="runner-actions">
                 <button class="button-primary" type="submit" disabled="@(IsBusy || !CanRun)" data-testid="agent-run-submit">@(IsBusy ? T("Running") : T("Run"))</button>
                 <button class="button-danger" type="button" @onclick="CancelAsync" disabled="@(!CanCancel)">@T("Stop")</button>
                 <button class="button-secondary" type="button" @onclick="RetryAsync" disabled="@(state.Run is null || IsBusy)">@T("Retry")</button>
             </div>
-        </section>
+        </ChildContent></FormSection>
     </EditForm>
 
     @if (state.Run is not null)
@@ -146,8 +145,7 @@ else
         </section>
     }
 
-    <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">@I("History")</p><h2>@I("RecentAgentRuns")</h2></div></div>
+    <FormSection Title="@I("RecentAgentRuns")" Eyebrow="@I("History")"><ChildContent>
         @if (history.Count == 0) { <EmptyState Title="@I("NoRunsYet")" Message="@I("NoRunsYetMessage")" /> }
         else
         {
@@ -167,7 +165,7 @@ else
         </Information>
     </CollectionView>
         }
-    </section>
+    </ChildContent></FormSection>
 }
 
 </div>

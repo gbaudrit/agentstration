@@ -113,7 +113,7 @@
     overflow-x: auto;
 }
 
-.knowledge-projection-parameters textarea {
+.knowledge-projection-parameters ::deep textarea {
     box-sizing: border-box;
     width: 100%;
     min-height: 9rem;
@@ -180,8 +180,8 @@
     font-weight: 700;
 }
 
-.knowledge-retrieval-form input,
-.knowledge-retrieval-form select {
+.knowledge-retrieval-form ::deep input,
+.knowledge-retrieval-form ::deep select {
     width: 100%;
 }
 
@@ -294,7 +294,7 @@
     background: color-mix(in srgb, var(--primary-soft) 32%, var(--surface-2));
 }
 
-.knowledge-choice input {
+.knowledge-choice ::deep input {
     width: 1.05rem !important;
     min-height: 1.05rem !important;
     margin: 0;
@@ -439,7 +439,7 @@
     gap: .5rem;
 }
 
-.knowledge-yaml-field textarea {
+.knowledge-yaml-field ::deep textarea {
     width: 100%;
 }
 
@@ -464,7 +464,7 @@
     font-weight: 700;
 }
 
-.knowledge-parameters-editor textarea {
+.knowledge-parameters-editor ::deep textarea {
     width: 100%;
     resize: vertical;
 }

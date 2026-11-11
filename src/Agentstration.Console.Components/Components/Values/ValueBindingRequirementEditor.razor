@@ -12,49 +12,48 @@
         </div>
     </div>
     <p><span>@T("Binding.ExpectedType"):</span> <code>@Requirement.ValueType</code>@if (!string.IsNullOrWhiteSpace(Requirement.Format)) { <span> · @T("Binding.ExpectedFormat"): <code>@Requirement.Format</code></span> }</p>
-    <div class="form-grid">
-        <label><span>@T("Binding.ValueSource")</span>
-            <select value="@selection.Kind" @onchange="SourceChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-kind")">
+    <FormGrid>
+        <FormField Label="@T("Binding.ValueSource")"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(selection.Kind, System.Globalization.CultureInfo.InvariantCulture)" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-kind")" ValueChanged="changed => SourceChangedAsync(new ChangeEventArgs { Value = changed })">
                 @if (!Sources.Contains(selection.Kind)) { <option value="@selection.Kind" disabled>@T("Binding.SourceUnavailable")</option> }
                 @foreach (var kind in Sources) { <option value="@kind">@T($"Binding.Source.{kind}")</option> }
-            </select>
-        </label>
+            </ClearableSelect>
+        </ChildContent></FormField>
         @if (selection.Kind == ValueBindingSourceKind.Literal && Sources.Contains(selection.Kind))
         {
-            <label><span>@T("Binding.LiteralValue")</span>
+            <FormField Label="@T("Binding.LiteralValue")" Required="@Requirement.Required">
                 @if (Requirement.AllowedValues is { Count: > 0 } allowedValues)
                 {
-                    <select value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")">
+                    <ClearableSelect TValue="string" Value="@Convert.ToString(literalText, System.Globalization.CultureInfo.InvariantCulture)" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" ValueChanged="changed => LiteralChangedAsync(new ChangeEventArgs { Value = changed })">
                         <option value="">@T("Binding.SelectValue")</option>
                         @foreach (var value in allowedValues) { <option value="@DisplayValue(value)">@DisplayValue(value)</option> }
-                    </select>
+                    </ClearableSelect>
                 }
                 else if (Requirement.ValueType == "boolean")
                 {
-                    <select value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")">
+                    <ClearableSelect TValue="string" Value="@Convert.ToString(literalText, System.Globalization.CultureInfo.InvariantCulture)" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" ValueChanged="changed => LiteralChangedAsync(new ChangeEventArgs { Value = changed })">
                         <option value="">@T("Binding.SelectValue")</option><option value="true">@T("Binding.True")</option><option value="false">@T("Binding.False")</option>
-                    </select>
+                    </ClearableSelect>
                 }
                 else
                 {
-                    <input value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" />
+                    <ClearableText UpdateOnInput="false" Value="@literalText" Disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" ValueChanged="changed => LiteralChangedAsync(new ChangeEventArgs { Value = changed })" />
                 }
-            </label>
+            </FormField>
         }
         else if (selection.Kind is ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)
         {
             <div class="contextual-binding-target">
-                <label><span>@T("Binding.ExactResource")</span>
-                    <select @key="TargetValue(selection.Resource)" @onchange="TargetChangedAsync" disabled="@(Disabled || !Sources.Contains(selection.Kind))" data-testid="@(TestIdPrefix + "-binding-target")">
+                <FormField Label="@T("Binding.ExactResource")" Required="@Requirement.Required">
+                    <ClearableSelect TValue="string" Value="@TargetValue(selection.Resource)" @key="TargetValue(selection.Resource)" ValueChanged="changed => TargetChangedAsync(new ChangeEventArgs { Value = changed })" disabled="@(Disabled || !Sources.Contains(selection.Kind))" data-testid="@(TestIdPrefix + "-binding-target")">
                         <option value="" selected="@(!selection.IsConfigured)">@T("Binding.SelectResource")</option>
                         @if (!Available && selection.Resource is { } missing) { <option value="@TargetValue(missing)" selected disabled>@T("Binding.UnavailableSelection", missing.ScopeRef, missing.Namespace, missing.Name)</option> }
                         @foreach (var option in CurrentOptions) { <option value="@TargetValue(option.Address)" selected="@(option.Address == selection.Resource)">@option.DisplayName — @option.Address.ScopeRef/@option.Address.Namespace/@option.Address.Name</option> }
-                    </select>
-                </label>
+                    </ClearableSelect>
+                </FormField>
                 <button type="button" class="button-secondary" disabled="@(Disabled || CreationContext is null || !Sources.Contains(selection.Kind))" @onclick="OpenCreator" data-testid="@(TestIdPrefix + "-binding-create")">@T(selection.Kind == ValueBindingSourceKind.Parameter ? "Binding.CreateParameter" : "Binding.CreateSecret")</button>
             </div>
         }
-    </div>
+    </FormGrid>
     @if (ValidationError is { } message) { <p class="inline-warning" role="alert">@message</p> }
     @if (selection.Kind == ValueBindingSourceKind.Secret) { <p class="inline-info">@T("Binding.SecretValueHidden")</p> }
 </div>

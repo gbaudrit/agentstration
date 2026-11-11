@@ -5,36 +5,36 @@
 
 @if (IsOpen && Context is { } creationContext)
 {
-    <div class="dialog-backdrop" role="presentation" @onclick="CancelAsync">
-        <section class="dialog contextual-value-dialog" role="dialog" aria-modal="true" aria-labelledby="contextual-parameter-title" @onclick:stopPropagation data-testid="contextual-parameter-creator">
+    <ModalFrame IsOpen="true" TitleId="contextual-parameter-title" Class="contextual-value-dialog" Busy="@busy" OnClose="CancelAsync">
+        <div data-testid="contextual-parameter-creator">
             <h2 id="contextual-parameter-title">@T("Parameter.Title")</h2>
             <p>@T("Parameter.Help")</p>
             @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
             <EditForm Model="model" OnValidSubmit="CreateAsync" FormName="contextual-parameter-creator-form">
                 <DataAnnotationsValidator /><ValidationSummary />
-                <div class="form-grid">
+                <FormGrid>
                     <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Parameter" IsNew="true" DisplayNameTestId="contextual-parameter-display-name" TechnicalNameTestId="contextual-parameter-name" />
-                    <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
+                    <FormField Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="model.Description" /></ChildContent></FormField>
                     <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="creationContext.ScopeRef" /></label>
-                    <label><span>@T("ValueType")</span><InputSelect @bind-Value="model.ValueType" disabled="@(creationContext.ValueType is not null)" data-testid="contextual-parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</InputSelect></label>
+                    <FormField Label="@T("ValueType")"><ChildContent><ClearableSelect @bind-Value="model.ValueType" disabled="@(creationContext.ValueType is not null)" data-testid="contextual-parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</ClearableSelect></ChildContent></FormField>
                     @if (!string.IsNullOrWhiteSpace(creationContext.Format)) { <p class="form-span-2 inline-info">@T("ExpectedFormat", creationContext.Format)</p> }
-                    <label class="form-span-2"><span>@T("Value")</span>
+                    <FormField Label="@T("Value")" Class="form-span-2">
                         @if (creationContext.AllowedValues is { Count: > 0 } allowedValues)
                         {
-                            <InputSelect @bind-Value="model.Value" data-testid="contextual-parameter-value">
+                            <ClearableSelect @bind-Value="model.Value" data-testid="contextual-parameter-value">
                                 @foreach (var value in allowedValues) { <option value="@EditorValue(value)">@EditorValue(value)</option> }
-                            </InputSelect>
+                            </ClearableSelect>
                         }
                         else
                         {
-                            <InputText @bind-Value="model.Value" data-testid="contextual-parameter-value" />
+                            <ClearableText UpdateOnInput="false" @bind-Value="model.Value" data-testid="contextual-parameter-value" />
                         }
-                    </label>
-                </div>
-                <div class="dialog-actions"><button type="button" class="button-secondary" @onclick="CancelAsync">@T("Cancel")</button><button type="submit" class="button-primary" disabled="@busy" data-testid="contextual-parameter-create">@(busy ? T("Creating") : T("CreateAndUse"))</button></div>
+                    </FormField>
+                </FormGrid>
+                <FormActions Class="dialog-actions"><button type="button" class="button-secondary" disabled="@busy" @onclick="CancelAsync">@T("Cancel")</button><button type="submit" class="button-primary" disabled="@busy" data-testid="contextual-parameter-create">@(busy ? T("Creating") : T("CreateAndUse"))</button></FormActions>
             </EditForm>
-        </section>
-    </div>
+        </div>
+    </ModalFrame>
 }
 
 @code {

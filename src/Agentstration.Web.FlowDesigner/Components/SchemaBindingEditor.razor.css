@@ -11,7 +11,7 @@
 .flow-schema-empty > div { display: flex; gap: .6rem; flex-wrap: wrap; }
 .flow-schema-reference-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(8rem, 1fr); gap: .75rem; }
 .flow-schema-reference-fields label { display: grid; min-width: 0; gap: .35rem; }
-.flow-schema-reference-fields select { min-width: 0; max-width: 100%; }
+.flow-schema-reference-fields ::deep select { min-width: 0; max-width: 100%; }
 .flow-schema-reference-summary { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin: 0; }
 .flow-schema-reference-summary code { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 720px) { .flow-schema-binding-heading, .flow-schema-reference-fields { grid-template-columns: 1fr; flex-direction: column; } .flow-schema-heading-actions { width: 100%; align-items: stretch; flex-direction: column; } .flow-schema-mode { justify-content: stretch; } .flow-schema-mode button { flex: 1; } .flow-schema-remove, .flow-schema-empty button { width: 100%; } .flow-schema-empty > div { flex-direction: column; } }

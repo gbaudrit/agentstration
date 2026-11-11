@@ -1,3 +1,5 @@
+Integration update: #1129 merged as a60d76e335dce1853e2d8fbd81a6ea3ef25d9018. The list below is the prior 59-file overlap checkpoint; 16 actual merge conflicts were reconciled while preserving form controls and collection contracts.
+
 src/Agentstration.Console.Client/ConsoleModels.cs
 src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor
 src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor

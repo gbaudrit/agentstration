@@ -123,7 +123,7 @@ public sealed class NamespacedAgentDetailsTests
         await rendered.Find("#agent-yaml-tab").ClickAsync(new());
         var source = rendered.Find("[data-testid='pack-agent-yaml'] textarea");
         Assert.IsTrue(source.HasAttribute("readonly"));
-        Assert.IsTrue(source.TextContent.Contains("binding: model-reasoning", StringComparison.Ordinal));
+        Assert.IsTrue((source.GetAttribute("value") ?? string.Empty).Contains("binding: model-reasoning", StringComparison.Ordinal));
     }
 
     [TestMethod]

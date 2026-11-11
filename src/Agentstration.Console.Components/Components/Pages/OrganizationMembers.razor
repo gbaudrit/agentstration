@@ -9,18 +9,19 @@
 
 @if (canManageLocalAccounts)
 {
-    <section class="panel" style="margin-bottom:18px">
-        <div class="panel-header"><div><h2>@T("LocalAccounts")</h2><p class="muted">@T("LocalAccounts.Description")</p></div></div>
+    <FormSection Title="@T("LocalAccounts")" style="margin-bottom:18px"><ChildContent>
         @if (!string.IsNullOrWhiteSpace(accountMessage)) { <p class="form-alert @(accountError ? "form-alert-danger" : "form-alert-success")">@accountMessage</p> }
-        <div class="form-grid">
-            <label><span>@T("Username")</span><input @bind="newUserName" autocomplete="off" /></label>
-            <label><span>@T("DisplayName")</span><input @bind="newDisplayName" /></label>
-            <label><span>@T("EmailOptional")</span><input @bind="newEmail" type="email" autocomplete="off" /></label>
-            <label><span>@T("InitialPassword")</span><input @bind="newPassword" type="password" autocomplete="new-password" /></label>
-            <label><span>@T("Workspace")</span><select @bind="newWorkspaceId">@foreach(var workspace in view?.Workspaces ?? []){<option value="@workspace.Id">@workspace.DisplayName</option>}</select></label>
-            <label><span>@T("Role")</span><select @bind="newRole">@foreach(var role in Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</select></label>
-        </div>
-        <div class="form-actions"><button class="button-primary" @onclick="CreateAccountAsync" disabled="@savingAccount">@(savingAccount ? T("Creating") : T("CreateLocalAccount"))</button></div>
+        <CascadingValue Value="AccountContext"><FormDraftMonitor InvalidInputChanged="value => invalidAccount = value" /><ValidationSummary />
+        <FormGrid>
+            <FormField Label="@T("Username")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newUserName" autocomplete="off" /></ChildContent></FormField>
+            <FormField Label="@T("DisplayName")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newDisplayName" /></ChildContent></FormField>
+            <FormField Label="@T("EmailOptional")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newEmail" Type="email" autocomplete="off" /></ChildContent></FormField>
+            <FormField Label="@T("InitialPassword")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newPassword" Type="password" autocomplete="new-password" /></ChildContent></FormField>
+            <FormField Label="@T("Workspace")"><ChildContent><ClearableSelect @bind-Value="newWorkspaceId">@foreach(var workspace in view?.Workspaces ?? []){<option value="@workspace.Id">@workspace.DisplayName</option>}</ClearableSelect></ChildContent></FormField>
+            <FormField Label="@T("Role")"><ChildContent><ClearableSelect @bind-Value="newRole">@foreach(var role in Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</ClearableSelect></ChildContent></FormField>
+        </FormGrid>
+        <FormActions><button class="button-primary" @onclick="CreateAccountAsync" disabled="@(savingAccount || invalidAccount)">@(savingAccount ? T("Creating") : T("CreateLocalAccount"))</button></FormActions>
+        </CascadingValue>
         @if (localAccounts.Count > 0)
         {
             <CollectionView TItem="Agentstration.Identity.Contracts.LocalAccountResponse" Items="localAccounts" InformationLabels="@(new string[] { T("Principal"), T("InstanceRole") })" IdentityLabel="@T("Account")" StateLabel="@T("Status")">
@@ -36,7 +37,7 @@
 <CollectionActions ResourceName="@(account.UserName)"><button class="text-button" @onclick="() => SetEnabledAsync(account, account.PrincipalStatus != PrincipalStatus.Active)">@(account.PrincipalStatus == PrincipalStatus.Active ? T("Disable") : T("Enable"))</button></CollectionActions></Actions>
     </CollectionView>
         }
-    </section>
+    </ChildContent></FormSection>
 }
 
 @if (view is null) { <LoadingState Message="@T("LoadingMembers")" /> }
@@ -61,6 +62,9 @@ else
     private IReadOnlyList<Agentstration.Identity.Contracts.LocalAccountResponse> localAccounts = [];
     private bool canManageLocalAccounts; private bool savingAccount; private bool accountError;
     private string newUserName = ""; private string newDisplayName = ""; private string? newEmail; private string newPassword = "";
+    private EditContext? accountContext;
+    private EditContext AccountContext => accountContext ??= new(this);
+    private bool invalidAccount;
     private Guid newWorkspaceId; private string newRole = Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.Member; private string? accountMessage;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnInitializedAsync()
@@ -73,6 +77,7 @@ else
     }
     private async Task CreateAccountAsync()
     {
+        if (invalidAccount) return;
         savingAccount = true; accountMessage = null;
         try
         {

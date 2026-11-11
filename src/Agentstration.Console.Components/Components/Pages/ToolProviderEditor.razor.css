@@ -146,7 +146,7 @@
     border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
 }
 
-.provider-enabled-toggle input {
+.provider-enabled-toggle ::deep input {
     width: 17px !important;
     min-height: 17px !important;
     margin: 0;

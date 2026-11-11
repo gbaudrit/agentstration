@@ -32,15 +32,15 @@ else
         <form method="post" asp-page-handler="ChangePassword" class="auth-form">
             <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
             <label asp-for="Input.CurrentPassword">@Auth["CurrentPassword"]</label>
-            <input asp-for="Input.CurrentPassword" autocomplete="current-password" />
-            <span asp-validation-for="Input.CurrentPassword" class="field-error"></span>
+            <input asp-for="Input.CurrentPassword" autocomplete="current-password" clear-label="@Auth["CurrentPassword"]" validation-id="Input_CurrentPassword-error" />
+            <span id="Input_CurrentPassword-error" asp-validation-for="Input.CurrentPassword" class="field-error"></span>
             <label asp-for="Input.NewPassword">@Auth["NewPassword"]</label>
-            <input asp-for="Input.NewPassword" autocomplete="new-password" />
-            <span asp-validation-for="Input.NewPassword" class="field-error"></span>
+            <input asp-for="Input.NewPassword" autocomplete="new-password" clear-label="@Auth["NewPassword"]" validation-id="Input_NewPassword-error" />
+            <span id="Input_NewPassword-error" asp-validation-for="Input.NewPassword" class="field-error"></span>
             <p class="password-guidance">@Auth["PasswordGuidance"]</p>
             <label asp-for="Input.ConfirmPassword">@Auth["ConfirmNewPassword"]</label>
-            <input asp-for="Input.ConfirmPassword" autocomplete="new-password" />
-            <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
+            <input asp-for="Input.ConfirmPassword" autocomplete="new-password" clear-label="@Auth["ConfirmNewPassword"]" validation-id="Input_ConfirmPassword-error" />
+            <span id="Input_ConfirmPassword-error" asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
             <button type="submit" class="primary-action">@Auth["ChangePassword"]</button>
         </form>
     </section>

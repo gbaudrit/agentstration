@@ -48,7 +48,7 @@
     margin: 0;
 }
 
-.artifact-retention-editor input {
+.artifact-retention-editor ::deep input {
     width: 100%;
 }
 

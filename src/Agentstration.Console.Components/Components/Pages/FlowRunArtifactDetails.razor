@@ -34,14 +34,13 @@ else if (artifact is not null)
                 <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("g")" Detail="@T("Immutable")" />
             </section>
 
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
+            <FormSection Title="@T("Producer")" Eyebrow="@T("Provenance")"><ChildContent>
                 <dl class="resource-details durable-artifact-details-grid">
                     <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)">@artifact.ProducerFlowRunId</a></dd>
                     <dt>@T("FlowStep")</dt><dd><code>@artifact.ProducerFlowStepId</code></dd>
                     <dt>@T("SourceArtifact")</dt><dd><a class="text-button" href="@StagedUrl(artifact.SourceArtifactId)">@artifact.SourceArtifactId</a></dd>
                 </dl>
-            </section>
+            </ChildContent></FormSection>
 
         }
         else if (activeTab == DetailsTab.Content)
@@ -50,18 +49,16 @@ else if (artifact is not null)
         }
         else
         {
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Storage")</p><h2>@T("StorageReceipt")</h2><p>@T("StorageReceiptHelp")</p></div></div>
+            <FormSection Title="@T("StorageReceipt")" Eyebrow="@T("Storage")" Description="@T("StorageReceiptHelp")"><ChildContent>
                 <dl class="resource-details durable-artifact-details-grid">
                     <dt>@T("StorageFlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.Receipt.StorageFlowRunId)">@artifact.Receipt.StorageFlowRunId</a></dd>
                     <dt>@T("MediaType")</dt><dd>@artifact.Receipt.MediaType</dd>
                     <dt>@T("Size")</dt><dd>@SizeInMegabytes(artifact.Receipt.Length) · @ExactSize(artifact.Receipt.Length)</dd>
                     <dt>SHA-256</dt><dd><code>@artifact.Receipt.Sha256</code></dd>
                 </dl>
-            </section>
+            </ChildContent></FormSection>
 
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("StorageProvenance")</h2></div></div>
+            <FormSection Title="@T("StorageProvenance")" Eyebrow="@T("Provenance")"><ChildContent>
                 @if (VisibleProvenance(artifact).Count == 0)
                 {
                     <p class="muted">@T("NoStorageProvenance")</p>
@@ -75,7 +72,7 @@ else if (artifact is not null)
                         }
                     </dl>
                 }
-            </section>
+            </ChildContent></FormSection>
         }
     </main>
 }

@@ -194,4 +194,8 @@
 <data name="EventLevel.Error" xml:space="preserve"><value>Erreur</value></data>
 <data name="EventLevel.Critical" xml:space="preserve"><value>Critique</value></data>
 <data name="EventLevel.Unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="Credential" xml:space="preserve"><value>Identifiant</value></data>
+  <data name="NoSecret" xml:space="preserve"><value>Aucun secret</value></data>
+  <data name="SecretCoordinates" xml:space="preserve"><value>Coffre : {0} · {1}/{2}</value></data>
+  <data name="SecretMissingValue" xml:space="preserve"><value>Le secret sélectionné ne possède aucune valeur configurée.</value></data>
 </root>

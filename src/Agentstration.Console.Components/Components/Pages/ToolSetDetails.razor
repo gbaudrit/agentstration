@@ -25,12 +25,10 @@ else if (toolSet is not null)
         <MetricCard Label="@T("PublishedVersions")" Value="@versions.Count.ToString()" Detail="@T("Immutable")" Status="UiStatus.Success" />
     </section>
     <ExtensionManagedResourcePanel Governance="toolSet.Governance" ScopeRef="@(toolSet.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="toolSet.Namespace" Kind="@ToolResourceKinds.ToolSet" Name="@toolSet.Name" Uid="toolSet.Uid" />
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Metadata")</p><h2>@T("DescriptiveMetadata")</h2><p>@T("MetadataHelp")</p></div></div>
+    <FormSection Title="@T("DescriptiveMetadata")" Eyebrow="@T("Metadata")" Description="@T("MetadataHelp")"><ChildContent>
         <dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@toolSet.Namespace/@toolSet.Name</code></dd><dt>@T("Category")</dt><dd>@(toolSet.Definition.Category?.Name ?? "—")</dd><dt>@T("Tags")</dt><dd>@Map(toolSet.Metadata.Tags)</dd><dt>@T("Annotations")</dt><dd>@Map(toolSet.Metadata.Annotations)</dd></dl>
-    </section>
-    <section class="panel form-section" data-testid="toolset-versions">
-        <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("PublishedVersions")</h2><p>@T("PinnedHelp")</p></div></div>
+    </ChildContent></FormSection>
+    <FormSection Title="@T("PublishedVersions")" Eyebrow="@T("Publication")" Description="@T("PinnedHelp")" TestId="toolset-versions"><ChildContent>
         @if (versions.Count == 0) { <p class="muted">@T("NoVersions")</p> }
         @foreach (var version in versions.OrderByDescending(value => value.PublishedAt))
         {
@@ -50,7 +48,7 @@ else if (toolSet is not null)
                 </CollectionView>
             </article>
         }
-    </section>
+    </ChildContent></FormSection>
     }
     else if (CanManage)
     {
@@ -60,7 +58,7 @@ else if (toolSet is not null)
 
 @if (confirmDelete)
 {
-    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-toolset-title"><h2 id="delete-toolset-title">@T("DeleteTitle")</h2><p>@T("DeleteHelp")</p><div class="form-actions"><button class="button-secondary" type="button" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" type="button" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></div></section>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-toolset-title"><h2 id="delete-toolset-title">@T("DeleteTitle")</h2><p>@T("DeleteHelp")</p><FormActions><button class="button-secondary" type="button" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" type="button" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></FormActions></section>
 }
 
 @code {
