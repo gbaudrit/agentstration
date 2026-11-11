@@ -13,7 +13,7 @@ export const inspectCollections: Journey<InspectCollectionsInput> = async (conte
   const collections = new CollectionContractPage(context.pages.page);
   if (input.route) await collections.open(context.consoleUrl, input.route);
   const observation = await collections.inspect(input.locale ?? 'en-US');
-  if (input.requirePopulated && observation.identities + observation.frames === 0)
+  if (input.requirePopulated && observation.identities === 0)
     throw new Error(`The deterministic collection fixture was empty: ${observation.url}`);
   await context.checkpoint({ name: Checkpoints.collections.contract, page: context.pages.page });
 };

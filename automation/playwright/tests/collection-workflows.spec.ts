@@ -34,6 +34,9 @@ const cases: ReadonlyArray<{ name: string; run: Journey<Record<string, never>> }
 ];
 
 for (const scenario of cases) {
+  test.describe(scenario.name, () => {
+  // Reuse the same seeded Development topology as the existing observability journey.
+  test.use({ authenticationMode: scenario.name === 'tasks, Flow executions, events and Agent runs' ? 'Development' : 'Local' });
   test(`populated collection contract: ${scenario.name} @collections @smoke`, async ({ page, product }, testInfo) => {
     test.setTimeout(420_000);
     const observations = await withCollectionAssertions(
@@ -42,8 +45,11 @@ for (const scenario of cases) {
     expect(observations.length).toBeGreaterThan(0);
     await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });
   });
+  });
 }
 
+test.describe('seeded Workplace collections', () => {
+test.use({ authenticationMode: 'Development' });
 test('Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke', async ({ page, product, context }, testInfo) => {
   const pages = new ProductPages(page);
   const journeyContext = { ...product, pages, checkpoint: ignoreCheckpoints };
@@ -70,4 +76,5 @@ test('Workplace populated entry, conversation, task, activity and notifications 
   observations.push(await collections.inspect('en-US'));
   await pages.workplace.markFirstNotificationRead();
   await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });
+});
 });

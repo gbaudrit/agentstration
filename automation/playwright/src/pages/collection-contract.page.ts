@@ -52,7 +52,8 @@ export class CollectionContractPage {
       }
       for (const row of await frame.locator('tbody > tr:not(.collection-expanded), .collection-card').all()) {
         const action = row.locator('.collection-actions');
-        if (await action.count()) await expect(action).toBeVisible();
+        // Some rows have no applicable command even when the collection has an Actions column.
+        if (await action.locator(':scope > *').count()) await expect(action).toBeVisible();
         // Business fields may contain links; the item identity remains in the first cell/card block.
         const firstIdentity = row.locator('.collection-identity-cell, :scope > .collection-identity').first();
         if (await firstIdentity.count()) expect((await firstIdentity.textContent())?.trim()).not.toBe('');
