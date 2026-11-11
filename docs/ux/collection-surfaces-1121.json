@@ -173,7 +173,7 @@
     {
       "id": "extensions-extension-inventory-item-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
-      "line": 227,
+      "line": 226,
       "host": "console",
       "routes": [
         "/extensions"
@@ -302,7 +302,7 @@
     {
       "id": "agent-editor-resolved-agent-tool-set-assignment",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
-      "line": 75,
+      "line": 74,
       "host": "console",
       "routes": [
         "/agents/new",
@@ -367,7 +367,7 @@
     {
       "id": "tool-sets-tool-set-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor",
-      "line": 16,
+      "line": 17,
       "host": "console",
       "routes": [
         "/tools/sets"
@@ -433,7 +433,7 @@
     {
       "id": "tool-providers-tool-provider-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
-      "line": 10,
+      "line": 11,
       "host": "console",
       "routes": [
         "/tools/providers"
@@ -561,7 +561,7 @@
     {
       "id": "durable-artifact-content-flow-run-artifact-materialization",
       "source": "src/Agentstration.Console.Components/Components/Pages/DurableArtifactContent.razor",
-      "line": 66,
+      "line": 65,
       "host": "console",
       "routes": [
         "/artifacts/durable/{Id}",
@@ -594,7 +594,7 @@
     {
       "id": "pack-project-details-pack-project-build-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
-      "line": 214,
+      "line": 212,
       "host": "console",
       "routes": [
         "/pack-projects/{ProjectId:guid}"
@@ -625,7 +625,7 @@
     {
       "id": "tool-set-details-published-tool-set-member",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
-      "line": 39,
+      "line": 37,
       "host": "console",
       "routes": [
         "/tools/sets/{Name}"
@@ -658,7 +658,7 @@
     {
       "id": "organization-members-agentstration-identity-contracts-local-account-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
-      "line": 26,
+      "line": 27,
       "host": "console",
       "routes": [
         "/settings/organization/members"
@@ -721,7 +721,7 @@
     {
       "id": "organization-members-agentstration-identity-contracts-organization-member-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
-      "line": 46,
+      "line": 47,
       "host": "console",
       "routes": [
         "/settings/organization/members"
@@ -784,7 +784,7 @@
     {
       "id": "bootstrap-profiles-bootstrap-resource-preview",
       "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
-      "line": 117,
+      "line": 113,
       "host": "console",
       "routes": [
         "/settings/bootstrap"
@@ -847,7 +847,7 @@
     {
       "id": "bootstrap-profiles-bootstrap-application-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
-      "line": 144,
+      "line": 138,
       "host": "console",
       "routes": [
         "/settings/bootstrap"
@@ -910,7 +910,7 @@
     {
       "id": "bootstrap-profiles-bootstrap-applied-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
-      "line": 188,
+      "line": 181,
       "host": "console",
       "routes": [
         "/settings/bootstrap"
@@ -1041,7 +1041,7 @@
     {
       "id": "staged-artifact-details-artifact-lease",
       "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
-      "line": 107,
+      "line": 106,
       "host": "console",
       "routes": [
         "/artifacts/staged/{Id}"
@@ -1071,7 +1071,7 @@
     {
       "id": "data-sources-data-source-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSources.razor",
-      "line": 15,
+      "line": 16,
       "host": "console",
       "routes": [
         "/data-sources"
@@ -1420,7 +1420,7 @@
     {
       "id": "extension-details-extension-option-set-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
-      "line": 269,
+      "line": 268,
       "host": "console",
       "routes": [
         "/extensions/{RegistrationName}",
@@ -1452,7 +1452,7 @@
     {
       "id": "extension-details-extension-option-usage-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
-      "line": 289,
+      "line": 288,
       "host": "console",
       "routes": [
         "/extensions/{RegistrationName}",
@@ -1483,7 +1483,7 @@
     {
       "id": "source-providers-source-provider-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviders.razor",
-      "line": 26,
+      "line": 27,
       "host": "console",
       "routes": [
         "/sourceproviders"
@@ -1674,7 +1674,7 @@
     {
       "id": "deployments-agent-instance-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Deployments.razor",
-      "line": 22,
+      "line": 23,
       "host": "console",
       "routes": [
         "/agent-instances",
@@ -1745,7 +1745,7 @@
     {
       "id": "tool-definitions-tool-definition-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor",
-      "line": 16,
+      "line": 17,
       "host": "console",
       "routes": [
         "/tools/definitions"
@@ -1808,7 +1808,7 @@
     {
       "id": "triggers-trigger-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",
-      "line": 44,
+      "line": 45,
       "host": "console",
       "routes": [
         "/triggers"
@@ -2069,7 +2069,7 @@
     {
       "id": "model-providers-model-provider-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor",
-      "line": 25,
+      "line": 26,
       "host": "console",
       "routes": [
         "/modelproviders"
@@ -2194,7 +2194,7 @@
     {
       "id": "artifacts-staged-artifact-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
-      "line": 16,
+      "line": 17,
       "host": "console",
       "routes": [
         "/artifacts"
@@ -2258,7 +2258,7 @@
     {
       "id": "artifacts-flow-run-artifact-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
-      "line": 39,
+      "line": 41,
       "host": "console",
       "routes": [
         "/artifacts"
@@ -2387,7 +2387,7 @@
     {
       "id": "tool-categories-tool-category-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor",
-      "line": 16,
+      "line": 17,
       "host": "console",
       "routes": [
         "/tools/categories"
@@ -2613,7 +2613,7 @@
     {
       "id": "data-source-editor-data-source-discovery-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 125,
+      "line": 126,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -2644,7 +2644,7 @@
     {
       "id": "data-source-editor-data-source-discovery-choice",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 141,
+      "line": 142,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -2675,7 +2675,7 @@
     {
       "id": "data-source-editor-data-source-acquisition-target-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 155,
+      "line": 156,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -2960,7 +2960,7 @@
     {
       "id": "knowledge-source-details-knowledge-source-tool-operation-exposure",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 203,
+      "line": 202,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -3087,7 +3087,7 @@
     {
       "id": "knowledge-sources-knowledge-source-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor",
-      "line": 15,
+      "line": 16,
       "host": "console",
       "routes": [
         "/knowledge-sources"
@@ -3308,7 +3308,7 @@
     {
       "id": "schema-editor-schema-version-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
-      "line": 98,
+      "line": 96,
       "host": "console",
       "routes": [
         "/schemas/new",
@@ -3339,7 +3339,7 @@
     {
       "id": "sources-source-console-list-item",
       "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
-      "line": 84,
+      "line": 83,
       "host": "console",
       "routes": [
         "/settings/sources",
@@ -3403,7 +3403,7 @@
     {
       "id": "organization-member-details-external-identity",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
-      "line": 36,
+      "line": 34,
       "host": "console",
       "routes": [
         "/settings/organization/members/{UserId:guid}"
@@ -3433,7 +3433,7 @@
     {
       "id": "agent-runner-runtime-run",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
-      "line": 154,
+      "line": 152,
       "host": "console",
       "routes": [
         "/agents/{Name}/run",

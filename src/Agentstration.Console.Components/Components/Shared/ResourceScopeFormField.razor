@@ -5,13 +5,13 @@
 
 @if (targets is null)
 {
-    <FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]">
+    <FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]" TooltipOpenToLeft>
         <ClearableSelect TValue="string" Value="@Localizer["ResourceScope.Loading"].Value" disabled AllowClear="false"><option>@Localizer["ResourceScope.Loading"]</option></ClearableSelect>
     </FormField>
 }
 else if (targets.Count == 0)
 {
-    <FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]">
+    <FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]" TooltipOpenToLeft>
         <ClearableSelect TValue="string" Value="@Localizer["ResourceScope.Unavailable"].Value" disabled AllowClear="false"><option>@Localizer["ResourceScope.Unavailable"]</option></ClearableSelect>
     </FormField>
 }
