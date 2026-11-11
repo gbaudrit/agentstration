@@ -453,6 +453,7 @@ export class SourceLifecyclePage {
     expect(result.snapshotName).toBeTruthy();
     const completedRow = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionRow).filter({ has: this.page.locator(`button[title="${result.metadata.name}"]`) });
     await expect(completedRow).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjections)).toHaveJSProperty('scrollLeft', 0);
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionProgress)).toHaveCount(0);
     await completedRow.locator(`button[title="${result.metadata.name}"]`).click();
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.projectionProvenance)).toBeVisible();
