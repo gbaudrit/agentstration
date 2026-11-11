@@ -259,6 +259,7 @@ internal sealed class AwpAssignmentExecutor(
         var current = graph.EntryStep;
         var visited = new HashSet<string>(StringComparer.Ordinal);
         JsonElement? transitionOutput = null;
+        FlowRunError? transitionFailure = null;
         AwpAssignmentExecutionResult? final = null;
         var cleanupArtifacts = new List<AwpCapturedFlowArtifact>();
         try
@@ -447,8 +448,8 @@ internal sealed class AwpAssignmentExecutor(
                         eventName = outputStep.Outcome.HasValue ? outputStep.Name : "completed";
                         if (outcome == FlowOutputOutcome.Error)
                         {
-                            errorCode = outputStep.Code ?? "FLOW_FAILED";
-                            errorMessage = outputStep.Message ?? "Flow execution failed.";
+                            errorCode = outputStep.Code ?? transitionFailure?.Code ?? "FLOW_FAILED";
+                            errorMessage = outputStep.Message ?? transitionFailure?.Message ?? "Flow execution failed.";
                         }
                         final = new(output, outputStep.Outcome.HasValue ? outputStep.Name : null,
                             outcome == FlowOutputOutcome.Error ? "error" : "success",
@@ -564,6 +565,8 @@ internal sealed class AwpAssignmentExecutor(
                 if (transition is null)
                     throw new AwpExecutionNotSupportedException("flow_transition_missing",
                         $"No '{eventName}' transition leaves step '{current}'.");
+                transitionFailure = errorCode is not null ? new(errorCode, errorMessage ?? "The Flow step failed.")
+                    : stepDefinition is TransformFlowStepDefinition or ConditionFlowStepDefinition ? transitionFailure : null;
                 current = transition.ToStep;
                 transitionOutput = output?.Clone();
             }
@@ -653,6 +656,12 @@ internal sealed class AwpAssignmentExecutor(
         var input = definition.ArtifactsMapping is { } mapping
             ? await ResolveJsonAsync(mapping, context, cancellationToken)
             : context.TransitionOutput ?? JsonSerializer.SerializeToElement<object?>(null);
+        // Source-bound transformations use the exact { value, parameters } composition envelope.
+        // Unwrap only this shape; never fall back to another input when an explicit mapping is wrong.
+        if (input.ValueKind == JsonValueKind.Object && input.EnumerateObject().Count() == 2
+            && input.TryGetProperty("parameters", out var parameters) && parameters.ValueKind == JsonValueKind.Object
+            && input.TryGetProperty("value", out var value))
+            input = value;
         var items = input.ValueKind == JsonValueKind.Array ? input
             : input.ValueKind == JsonValueKind.Object && input.TryGetProperty("artifacts", out var artifacts) ? artifacts
             : throw new AwpExecutionNotSupportedException("artifact_processing_manifest_required", "Artifact processing requires an Artifact array or manifest.");

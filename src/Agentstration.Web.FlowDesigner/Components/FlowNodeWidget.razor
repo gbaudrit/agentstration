@@ -6,21 +6,27 @@
     <span class="flow-port-handle input @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@Localizer["InputConnectionHandle"]" aria-label="@Localizer["InputConnectionHandle"]">
         <PortRenderer Port="Node.Input" />
     </span>
+    @if (Node.Source.Type == "artifactTransform" && Node.Outputs.FirstOrDefault(port => port.EventName == "process") is { } processingStart)
+    {
+        <span class="flow-port-handle processing-start @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" data-testid="artifact-processing-start-port" title="@Localizer["ArtifactProcessingStartPort"]" aria-label="@Localizer["ArtifactProcessingStartPort"]">
+            <PortRenderer Port="processingStart" />
+        </span>
+    }
     @if (Node.ProcessingResult is { } processingResult)
     {
-        <span class="flow-port-handle processing-result @(Node.Locked ? "locked" : null)" style="left: 50%; top: 100%" title="@Localizer["ArtifactProcessingResultPort"]" aria-label="@Localizer["ArtifactProcessingResultPort"]">
+        <span class="flow-port-handle processing-result @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" data-testid="artifact-processing-result-port" title="@Localizer["ArtifactProcessingResultPort"]" aria-label="@Localizer["ArtifactProcessingResultPort"]">
             <PortRenderer Port="processingResult" />
         </span>
     }
     <span class="flow-node-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(Node.Source.Type)" /></span>
     <span class="flow-node-copy"><strong title="@Node.Source.DisplayName">@Node.Source.DisplayName</strong><small>@Node.Source.Type</small></span>
     @if (Node.Source.Resource is not null) { <code title="@Node.Source.Resource">@Short(Node.Source.Resource)</code> }
-    @for (var index = 0; index < Node.Outputs.Count; index++)
+    @for (var index = 0; index < SideOutputs.Count; index++)
     {
-        var output = Node.Outputs[index];
-        var top = 100d * (index + 1) / (Node.Outputs.Count + 1);
+        var output = SideOutputs[index];
+        var top = 100d * (index + 1) / (SideOutputs.Count + 1);
         <span class="flow-port-handle output @OutcomeClass(output) @(Node.Locked ? "locked" : null)" style="top: @top.ToString(System.Globalization.CultureInfo.InvariantCulture)%" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@OutputLabel(output)" aria-label="@OutputLabel(output)">
-            @if (Node.Outputs.Count > 1)
+            @if (SideOutputs.Count > 1)
             {
                 <span class="flow-port-label">@OutcomeSymbol(output)@output.EventName</span>
             }
@@ -33,6 +39,7 @@
     [Inject] private IStringLocalizer<FlowDesignerStrings> Localizer { get; set; } = default!;
     [CascadingParameter] private FlowNodeInteractionContext? Interactions { get; set; }
     [Parameter, EditorRequired] public FlowDiagramNode Node { get; set; } = default!;
+    private IReadOnlyList<FlowDiagramPort> SideOutputs => Node.Outputs.Where(port => port.Alignment != Blazor.Diagrams.Core.Models.PortAlignment.Bottom).ToArray();
     private Task OpenSettingsAsync() => Interactions?.OpenSettingsAsync(Node.Source.Name) ?? Task.CompletedTask;
     private static string Short(string value) => value[(value.LastIndexOf('/') + 1)..];
     private string OutputLabel(FlowDiagramPort output) => output.Outcome is { } outcome

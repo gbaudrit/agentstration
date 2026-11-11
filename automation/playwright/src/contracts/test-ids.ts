@@ -2,6 +2,7 @@ export const TestIds = {
   artifactProcessing: {
     inputArtifact: 'artifact-transformation-input', processingRun: 'artifact-processing-run',
     palette: 'flow-palette-artifactTransform', mode: 'artifact-processing-mode',
+    startPort: 'artifact-processing-start-port', resultPort: 'artifact-processing-result-port',
     manifestMapping: 'artifact-manifest-mapping', inputMapping: 'artifact-input-mapping', resultMapping: 'artifact-result-mapping',
   },
   sourcePolicies: {

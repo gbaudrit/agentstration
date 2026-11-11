@@ -174,4 +174,5 @@
   <data name="ArtifactResultMapping" xml:space="preserve"><value>Mapping du résultat du traitement (JSON, facultatif)</value></data>
   <data name="ArtifactResultHelp" xml:space="preserve"><value>En mode contenu, input et transition.output désignent le résultat du traitement à capturer. En mode accès, terminez le brouillon avec output_complete ; le retour du traitement permet à cette étape de le finaliser.</value></data>
   <data name="ArtifactProcessingResultPort" xml:space="preserve"><value>Résultat du traitement</value></data>
+  <data name="ArtifactProcessingStartPort" xml:space="preserve"><value>Traitement</value></data>
 </root>

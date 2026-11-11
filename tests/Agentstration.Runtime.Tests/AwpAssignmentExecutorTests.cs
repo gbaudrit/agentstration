@@ -16,6 +16,45 @@ public sealed class AwpAssignmentExecutorTests
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [TestMethod]
+    [DataRow("array", true)]
+    [DataRow("manifest", true)]
+    [DataRow("envelope-array", true)]
+    [DataRow("envelope-manifest", true)]
+    [DataRow("invalid-mapping", false)]
+    [DataRow("invalid-value", false)]
+    [DataRow("foreign-envelope", false)]
+    public async Task ArtifactProcessingAcceptsTheCompositionEnvelopeWithoutHidingInvalidMappings(string shape, bool accepted)
+    {
+        var items = JsonSerializer.SerializeToElement(new[] { new { artifactId = "input-artifact" } });
+        var manifest = JsonSerializer.SerializeToElement(new { artifacts = items });
+        var input = shape switch
+        {
+            "array" => items,
+            "manifest" => manifest,
+            "envelope-array" => JsonSerializer.SerializeToElement(new { value = items, parameters = new { } }),
+            "foreign-envelope" => JsonSerializer.SerializeToElement(new { value = manifest, parameters = new { }, other = true }),
+            "invalid-value" => JsonSerializer.SerializeToElement(new { value = "not-artifacts", parameters = new { } }),
+            _ => JsonSerializer.SerializeToElement(new { value = manifest, parameters = new { } })
+        };
+        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
+            new InputFlowStepDefinition { Name = "input" },
+            new ArtifactTransformFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement(shape == "invalid-mapping" ? "${input.missing}" : "${transition.output}") },
+            new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success },
+            new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
+            Transitions = [new("start", "input", "completed", "process"), new("done", "process", "completed", "completed"), new("failed", "process", "error", "failure")] };
+        var (result, handler) = await ExecuteGraphAsync(graph, input);
+        Assert.AreEqual(accepted ? "success" : "error", result.Outcome);
+        if (accepted)
+            Assert.AreEqual("input-artifact", handler.ArtifactProcessingRequests.Single(request => request.Action == "open").Arguments.GetProperty("artifactId").GetString());
+        else
+        {
+            Assert.AreEqual("artifact_processing_manifest_required", result.ErrorCode);
+            Assert.AreEqual("Artifact processing requires an Artifact array or manifest.", result.ErrorMessage);
+            Assert.IsEmpty(handler.ArtifactProcessingRequests);
+        }
+    }
+
+    [TestMethod]
     public async Task ArtifactTransformationAdaptsGenericToolInputAndPreparesAllResultsBeforePublishing()
     {
         var processing = new ArtifactTransformFlowStepDefinition { Name = "process",

@@ -179,4 +179,5 @@
   <data name="ArtifactResultMapping" xml:space="preserve"><value>Processing result mapping (JSON, optional)</value></data>
   <data name="ArtifactResultHelp" xml:space="preserve"><value>In content mode, input and transition.output reference the processing result to capture. In access mode, complete the output draft using output_complete; returning from processing allows this step to finalize it.</value></data>
   <data name="ArtifactProcessingResultPort" xml:space="preserve"><value>Processing result</value></data>
+  <data name="ArtifactProcessingStartPort" xml:space="preserve"><value>Processing</value></data>
 </root>

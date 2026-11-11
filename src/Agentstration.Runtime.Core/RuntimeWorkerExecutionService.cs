@@ -233,8 +233,6 @@ public sealed class RuntimeWorkerExecutionService(
         if (arguments.GetRawText().Length > 1_048_576 || action is not ("open" or "prepare" or "finish" or "abort"))
             throw new RuntimeExecutionMaterialException("artifact_processing_request_invalid", "The Artifact processing request is invalid or too large.");
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
-        if (authorization.Assignment.TransientPayloads)
-            throw new RuntimeExecutionMaterialException("direct_intermediate_storage_refused", "Direct content cannot create intermediate Artifacts.");
         var step = AuthorizedFlowStep(authorization, stepExecutionId, "Artifact processing");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
         return await operations.ProcessArtifactAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,

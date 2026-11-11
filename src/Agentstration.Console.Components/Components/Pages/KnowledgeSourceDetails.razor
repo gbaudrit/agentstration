@@ -45,7 +45,7 @@ else if (source is not null && readiness is not null)
             </div>
             @if (readiness.DataSources is { Count: > 0 } inputReadiness)
             {
-                <DataGrid TItem="KnowledgeDataSourceBindingReadiness" Items="inputReadiness"><Header><tr><th>@T("BindingName")</th><th>@T("DataSource")</th><th>@T("State")</th><th>@T("TransformationFlowOptional")</th></tr></Header><Row Context="item"><tr><td><strong>@item.Name</strong></td><td><code>@(item.DataSourceUid?.ToString("D") ?? "—")</code></td><td><StatusBadge Text="@T(item.Ready ? "Ready" : "NotReady")" Status="@(item.Ready ? UiStatus.Success : UiStatus.Warning)" />@if (item.Issue is not null) { <small>@(IsUnresolvedDraft ? T("DisabledDraftNotReady") : item.Issue)</small> }</td><td>@(item.Transformation is null ? T("IdentityTransformation") : $"{item.Transformation.Namespace}/{item.Transformation.Name}:{item.Transformation.Version}")</td></tr></Row></DataGrid>
+                <DataGrid TItem="KnowledgeDataSourceBindingReadiness" Items="inputReadiness"><Header><tr><th>@T("BindingName")</th><th>@T("DataSource")</th><th>@T("State")</th><th>@T("TransformationFlowOptional")</th></tr></Header><Row Context="item"><tr><td><strong>@item.Name</strong></td><td><code>@(item.DataSourceUid?.ToString("D") ?? "—")</code></td><td><StatusBadge Text="@T(item.Ready ? "Ready" : "NotReady")" Status="@(item.Ready ? UiStatus.Success : UiStatus.Warning)" />@if (item.Issue is not null) { <small>@(IsUnresolvedDraft ? T("DisabledDraftNotReady") : item.Issue)</small> }</td><td>@TransformationLabel(item)</td></tr></Row></DataGrid>
             }
         </section>
     }
@@ -219,11 +219,26 @@ else if (source is not null && readiness is not null)
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
     }
-    private void SourceProjectionSaved(KnowledgeSourceResource saved)
+    private async Task SourceProjectionSaved(KnowledgeSourceResource saved)
     {
         source = saved;
-        message = T("SourceSaved");
-        failed = false;
+        try
+        {
+            var snapshotTask = Client.GetAsync(SourceNamespace, Name, cancellation.Token);
+            var readinessTask = Client.GetReadinessAsync(SourceNamespace, Name, cancellation.Token);
+            await Task.WhenAll(snapshotTask, readinessTask);
+            var snapshot = await snapshotTask;
+            source = snapshot.Value;
+            etag = snapshot.ETag;
+            readiness = await readinessTask;
+            message = T("SourceSaved");
+            failed = false;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            message = exception.Message;
+            failed = true;
+        }
     }
     private void SelectTab(DetailsTab tab)
     {
@@ -365,6 +380,14 @@ else if (source is not null && readiness is not null)
             : $"/artifacts/durable/{Uri.EscapeDataString(value.ArtifactId)}";
     private static string ArtifactOptionLabel(KnowledgeSnapshotArtifact value) =>
         $"{ShortIdentifier(value.ArtifactId)} · {value.MediaType} · {FormatSize(value.Length)}";
+    private string TransformationLabel(KnowledgeDataSourceBindingReadiness binding)
+    {
+        var sequence = source?.Composition?.InputCompositions.GetValueOrDefault(binding.Name)?.Receipt?.Bindings.GetValueOrDefault("transformations")
+            ?? source?.Definition.DataSources.FirstOrDefault(value => value.Name == binding.Name)?.Transformations ?? [];
+        if (sequence.Count > 0)
+            return string.Join(" → ", sequence.Select(call => $"{call.Flow.Namespace ?? source!.Namespace}/{call.Flow.ResourceId}:{call.Flow.Version ?? "—"}"));
+        return binding.Transformation is { } flow ? $"{flow.Namespace}/{flow.Name}:{flow.Version}" : T("IdentityTransformation");
+    }
     private static string FlowIdentity(ResolvedKnowledgeFlowBinding value) => $"{value.Namespace} · {value.Version}";
     private static string FlowUrl(ResolvedKnowledgeFlowBinding value) => value.Namespace.IsDefault
         ? $"/flows/{Uri.EscapeDataString(value.Name)}"

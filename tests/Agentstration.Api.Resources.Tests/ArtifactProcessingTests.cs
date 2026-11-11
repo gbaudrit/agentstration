@@ -6,6 +6,7 @@ using Agentstration.Flows;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,14 +19,16 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
     private static JsonElement Element<T>(T value) => JsonSerializer.SerializeToElement(value);
 
     [TestMethod]
-    public async Task AccessProcessingPinsInputAndSupportsReadSearchWriteCorrectionAndVerifiedPublication()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task AccessProcessingPinsInputAndSupportsReadSearchWriteCorrectionAndVerifiedPublication(bool transient)
     {
         await using var factory = Factory();
         var current = await GetBootstrapContextAsync(factory);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
         var artifacts = factory.Services.GetRequiredService<ArtifactManagementService>();
         var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
-        var (owner, step, child, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Access, "Alice 😀 alice@example.test");
+        var (owner, step, child, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Access, "Alice 😀 alice@example.test", transient: transient);
         var opened = await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
         Assert.AreEqual(JsonValueKind.Null, opened.GetProperty("content").ValueKind);
         Assert.AreEqual("Alice 😀 alice@example.test", (await processor.ExecuteToolAsync(child, "input_read", Element(new { }), default)).GetProperty("content").GetString());
@@ -49,24 +52,37 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         var result = await processor.ExecuteOwnerAsync(owner, step, 0, "finish", Element(new { }), default);
         var replay = await processor.ExecuteOwnerAsync(owner, step, 0, "finish", Element(new { }), default);
         Assert.IsTrue(JsonElement.DeepEquals(result, replay));
-        var output = (await artifacts.GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(result.GetProperty("artifactId").GetString()!), default))!.Value;
-        Assert.AreEqual(owner.Id, output.ProducerFlowRunId);
-        Assert.AreEqual(step.Name, output.ProducerFlowStepId);
-        Assert.AreEqual(item.GetProperty("artifactId").GetString(), output.Receipt.Provenance["inputArtifactId"]);
-        var bytes = await factory.Services.GetRequiredService<IArtifactDurableStore>().ReadAsync(owner.WorkspaceId, output.Receipt.OpaqueReference, 0, 1024, default);
-        Assert.AreEqual("PERSON_1 😀", Encoding.UTF8.GetString(bytes.Span));
-        Assert.AreEqual("Alice 😀 alice@example.test", (await artifacts.ReadAsync(StagedArtifactId.Parse(item.GetProperty("artifactId").GetString()!), 0, 1024, null, default)).ContentBase64 is var encoded ? Encoding.UTF8.GetString(Convert.FromBase64String(encoded)) : null);
-        Assert.IsFalse(string.IsNullOrWhiteSpace(output.Receipt.Sha256));
+        if (transient)
+        {
+            Assert.AreEqual("inline", result.GetProperty("kind").GetString());
+            Assert.AreEqual("PERSON_1 😀", Encoding.UTF8.GetString(Convert.FromBase64String(result.GetProperty("contentBase64").GetString()!)));
+            Assert.IsEmpty(await artifacts.ListStagedAsync(default));
+            Assert.IsEmpty(await artifacts.ListFlowRunArtifactsAsync(default));
+            Assert.IsEmpty(await factory.Services.GetRequiredService<IRuntimeExecutionStateStore>().ListAsync(owner.WorkspaceId, owner.Id, "artifact-processing-v1", null, default));
+        }
+        else
+        {
+            var output = (await artifacts.GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(result.GetProperty("artifactId").GetString()!), default))!.Value;
+            Assert.AreEqual(owner.Id, output.ProducerFlowRunId);
+            Assert.AreEqual(step.Name, output.ProducerFlowStepId);
+            Assert.AreEqual(item.GetProperty("artifactId").GetString(), output.Receipt.Provenance["inputArtifactId"]);
+            var bytes = await factory.Services.GetRequiredService<IArtifactDurableStore>().ReadAsync(owner.WorkspaceId, output.Receipt.OpaqueReference, 0, 1024, default);
+            Assert.AreEqual("PERSON_1 😀", Encoding.UTF8.GetString(bytes.Span));
+            Assert.AreEqual("Alice 😀 alice@example.test", (await artifacts.ReadAsync(StagedArtifactId.Parse(item.GetProperty("artifactId").GetString()!), 0, 1024, null, default)).ContentBase64 is var encoded ? Encoding.UTF8.GetString(Convert.FromBase64String(encoded)) : null);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(output.Receipt.Sha256));
+        }
     }
 
     [TestMethod]
-    public async Task AccessProcessingRefusesForeignCursorsStaleWritesConflictingReplayAndUncompletedOutput()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task AccessProcessingRefusesForeignCursorsStaleWritesConflictingReplayAndUncompletedOutput(bool transient)
     {
         await using var factory = Factory();
         var current = await GetBootstrapContextAsync(factory);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
         var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
-        var (owner, step, child, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Access, "private content");
+        var (owner, step, child, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Access, "private content", transient: transient);
         await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
         await processor.ExecuteOwnerAsync(owner, step, 1, "open", item, default);
         var read = await processor.ExecuteToolAsync(child, "input_read", Element(new { length = 3 }), default);
@@ -90,32 +106,36 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
     }
 
     [TestMethod]
-    public async Task ContentProcessingCapturesStructuredResultsAndRefusesOversizedInput()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ContentProcessingCapturesStructuredResultsAndRefusesOversizedInput(bool transient)
     {
         await using var factory = Factory();
         var current = await GetBootstrapContextAsync(factory);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
         var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
-        var (owner, step, _, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Content, "{\"name\":\"Alice\"}", "application/json");
+        var (owner, step, _, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Content, "{\"name\":\"Alice\"}", "application/json", transient: transient);
         var opened = await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
         Assert.AreEqual("Alice", opened.GetProperty("content").GetProperty("name").GetString());
         await processor.ExecuteOwnerAsync(owner, step, 0, "prepare", Element(new { name = "PERSON_1" }), default);
         var result = await processor.ExecuteOwnerAsync(owner, step, 0, "finish", Element(new { }), default);
-        Assert.AreEqual("durable", result.GetProperty("kind").GetString());
+        Assert.AreEqual(transient ? "inline" : "durable", result.GetProperty("kind").GetString());
         var tooSmall = step with { MaximumContentBytes = 4 };
         var failure = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => processor.ExecuteOwnerAsync(owner, tooSmall, 1, "open", item, default));
         Assert.AreEqual("artifact_processing_content_too_large", failure.Code);
     }
 
     [TestMethod]
-    public async Task ProcessingContextsDoNotGrantCrossWorkspaceArtifactAccess()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ProcessingContextsDoNotGrantCrossWorkspaceArtifactAccess(bool transient)
     {
         await using var factory = Factory();
         var current = await GetBootstrapContextAsync(factory);
         var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         using var scope = scopes.Push(current);
         var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
-        var (owner, step, child, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Access, "workspace secret");
+        var (owner, step, child, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Access, "workspace secret", transient: transient);
         await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
         var foreignWorkspace = Guid.NewGuid();
         var foreign = child with { Scope = child.Scope with { WorkspaceId = new(foreignWorkspace) } };
@@ -126,26 +146,54 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         Assert.AreEqual("artifact_processing_access_denied", denied.Code);
     }
 
+    [TestMethod]
+    public async Task DirectProcessingExpiresWithItsOwnerAndAbortCannotRecreateADraft()
+    {
+        await using var factory = Factory();
+        var current = await GetBootstrapContextAsync(factory);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
+        var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
+        var (owner, step, child, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Access, "private content", transient: true);
+        await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
+        await processor.ExecuteOwnerAsync(owner, step, 0, "abort", Element(new { }), default);
+        var aborted = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default));
+        Assert.AreEqual("artifact_processing_expired", aborted.Code);
+        foreach (var unavailable in new[] { owner with { TransientPayloadsAvailable = false }, owner with { CreatedAt = owner.CreatedAt - DirectExecutionPayloadPersistence.Lifetime } })
+        {
+            var error = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => processor.ExecuteOwnerAsync(unavailable, step, 1, "open", item, default));
+            Assert.AreEqual("direct_content_unavailable", error.Code);
+        }
+        Assert.IsEmpty(await factory.Services.GetRequiredService<ArtifactManagementService>().ListStagedAsync(default));
+    }
+
     private static async Task<(FlowRun Owner, ArtifactTransformFlowStepDefinition Step, FlowRun Child, JsonElement Item)> SetupAsync(
-        IServiceProvider services, RequestContext current, ArtifactProcessingMode mode, string content, string media = "text/plain")
+        IServiceProvider services, RequestContext current, ArtifactProcessingMode mode, string content, string media = "text/plain", bool transient = false)
     {
         var artifacts = services.GetRequiredService<ArtifactManagementService>();
-        var staged = await artifacts.CreateStagedAsync(new("source.txt", media,
-            new() { Kind = ArtifactProducerKind.FlowRun, Id = "input-" + Guid.NewGuid().ToString("N") }), default);
-        await artifacts.WriteAsync(staged.Value.ArtifactId, 0, Encoding.UTF8.GetBytes(content), default);
-        await artifacts.SealAsync(staged.Value.ArtifactId, default);
+        JsonElement item;
+        if (transient)
+            item = Element(new { artifactId = "direct-input", kind = "inline", name = "source.txt", mediaType = media,
+                contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content)) });
+        else
+        {
+            var staged = await artifacts.CreateStagedAsync(new("source.txt", media,
+                new() { Kind = ArtifactProducerKind.FlowRun, Id = "input-" + Guid.NewGuid().ToString("N") }), default);
+            await artifacts.WriteAsync(staged.Value.ArtifactId, 0, Encoding.UTF8.GetBytes(content), default);
+            await artifacts.SealAsync(staged.Value.ArtifactId, default);
+            item = Element(new { artifactId = staged.Value.ArtifactId.ToString(), kind = "staged" });
+        }
         var step = new ArtifactTransformFlowStepDefinition { Name = "anonymize", Mode = mode };
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, step] };
         var flowId = new FlowId("artifact-processing-test");
         var version = new FlowVersion(ResourceScopeRef.Workspace(current.WorkspaceId), flowId, "1.0.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")), new Dictionary<string, string>(), DateTimeOffset.UtcNow, graph, FlowDefinitionHash.Compute(graph));
-        var owner = new FlowRun { Id = "flowrun-" + Guid.NewGuid().ToString("N"), WorkspaceId = new(current.WorkspaceId),
+        var owner = new FlowRun { TransientPayloads = transient, Id = "flowrun-" + Guid.NewGuid().ToString("N"), WorkspaceId = new(current.WorkspaceId),
             FlowId = flowId, FlowVersion = version.Version, DefinitionSnapshot = version, DefinitionHash = version.DefinitionHash,
             Scope = new(current.TenantId, new(current.WorkspaceId), current.PrincipalId), Input = Element(new { }),
             CreatedAt = DateTimeOffset.UtcNow, Steps = [new FlowStepRun { StepName = step.Name, StepType = "artifactTransform", Attempt = 1 }] };
         await services.GetRequiredService<IFlowRepository>().CreateRunAsync(owner, default);
         var child = owner with { Id = "flowrun-processing-" + Guid.NewGuid().ToString("N"), ParentFlowRunId = owner.Id,
             RootFlowRunId = owner.Id, ArtifactProcessing = new(owner.Id, step.Name, 1, 0) };
-        return (owner, step, child, Element(new { artifactId = staged.Value.ArtifactId.ToString(), kind = "staged" }));
+        return (owner, step, child, item);
     }
 }

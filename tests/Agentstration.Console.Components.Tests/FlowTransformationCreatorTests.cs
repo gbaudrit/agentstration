@@ -14,6 +14,39 @@ namespace Agentstration.Web.Tests;
 public sealed partial class KnowledgeSourceEditorTests
 {
     [TestMethod]
+    public void OverviewDescribesTheOrderedInputTransformationsInsteadOfAnIdentityTransformation()
+    {
+        var source = ProjectedSource();
+        var original = source.Definition.DataSources[0];
+        source = source with { Definition = source.Definition with { DataSources = [original with { Transformations = [
+            new() { Flow = new("redact", FlowCallVersionStrategy.Exact, "2.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) },
+            new() { Flow = new("verify", FlowCallVersionStrategy.Exact, "1.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) }] }] } };
+        using var context = CreateContext(new KnowledgeClientStub(source));
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
+        rendered.WaitForAssertion(() => Assert.Contains("default/redact:2.0.0 → default/verify:1.0.0", rendered.Find("tbody").TextContent));
+    }
+
+    [TestMethod]
+    public void ReopeningASequenceSelectsItsSavedVersionRatherThanTheFirstCatalogEntry()
+    {
+        using var context = CreateContext(new KnowledgeClientStub());
+        var input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = ManifestValueSchema, parameters = new { type = "object" } } });
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { TransformationVersions = ["1.0.0", "2.0.0"],
+            SequenceGraph = new() { EntryStep = "input", InputSchema = input, OutputSchema = ManifestValueSchema } });
+        var call = new FlowCompositionCall { Flow = new("artifact-transform-builtin", FlowCallVersionStrategy.Exact, "2.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) };
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var rendered = context.Render<FlowSequenceEditor>(parameters => parameters.Add(value => value.Value, [call]));
+            var selected = rendered.Find("[data-testid=flow-sequence-target] option[selected]");
+            Assert.EndsWith("|2.0.0", selected.GetAttribute("value"));
+            Assert.Contains(":2.0.0", selected.TextContent);
+            rendered.Find("[data-testid=flow-sequence-refresh]").Click();
+            Assert.EndsWith("|2.0.0", rendered.Find("[data-testid=flow-sequence-target] option[selected]").GetAttribute("value"));
+            rendered.Dispose();
+        }
+    }
+
+    [TestMethod]
     [DataRow("en-US", "No published transformation Flow", "Create a transformation Flow")]
     [DataRow("fr-FR", "Aucun Flow de transformation publié", "Créer un flow de transformation")]
     public void EmptyTransformationCatalogExplainsCreationAndHonorsReadOnly(string locale, string empty, string create)

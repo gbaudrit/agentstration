@@ -45,13 +45,21 @@ Access ends on expiry, owner termination, attempt change or completed publicatio
 Existing unrelated Agent Tools retain their own authorization; these scoped Tools
 do not revoke broader grants or imply that an arbitrary Agent is confined.
 
-Output is a draft stored through the existing staging subsystem. Every successful
+Retained execution stores its output draft through the existing staging subsystem. Every successful
 write creates a sealed revision that can be read and searched. Writes require an
 expected revision and a replay identifier; a changed replay is refused. Corrections
 invalidate a previous completion declaration. Cursors bind the session, input or
 output side, revision and UTF-16 position. Search matches use that same range unit.
 An explicit completion selects a technically valid output revision. It does not
 prove anonymization quality.
+
+Direct execution under ADR-0212 instead keeps input and output drafts in the
+existing bounded process-local handoff cache, sharing its admission budget and
+owner lifetime. It performs no intermediate Artifact creation or document-bearing
+runtime state persistence. Scoped content operations have the same revision,
+replay and cursor rules. The owning step returns a bounded inline manifest; only
+final Snapshot publication writes retained content. Expired, aborted or cold
+execution fails without implicit reacquisition or a Storage fallback.
 
 All processing results are prepared before any output Artifact is registered.
 Only the owning step persists and catalogues the final immutable outputs through
@@ -77,8 +85,9 @@ distributed transaction guarantee is introduced.
   superseded revisions. State persistence holds metadata and references, not
   document contents. A partially written unsealed revision fails closed.
 - Binary extraction, OCR, automatic semantic chunking and vector search are not
-  part of this decision. Direct ephemeral acquisition refuses intermediate
-  Artifact creation under ADR-0212.
+  part of this decision. Direct ephemeral acquisition continues to refuse
+  intermediate Artifact creation under ADR-0212; its processing drafts remain
+  in memory and current inline publication limits still apply.
 - Deferred reusable Designer/browser coverage is tracked by native child
   [#1145](https://github.com/gbaudrit/agentstration/issues/1145), after maintainer UX
   validation and implementation merge.

@@ -13,8 +13,8 @@
         <fieldset class="form-section" disabled="@ReadOnly" data-testid="flow-sequence-call" data-flow-reference="@Key(call.Flow)">
             <legend>@Localizer["SequencePosition", index + 1]</legend>
             <label><span>@T("SequenceFlow")</span><select value="@Key(call.Flow)" @onchange="args => SelectAsync(position, args.Value?.ToString())" data-testid="flow-sequence-target">
-                @if (selected is null) { <option value="@Key(call.Flow)">@call.Flow.ResourceId · @call.Flow.Version · @T("SequenceUnavailable")</option> }
-                @foreach (var option in options) { <option value="@Key(option.Reference)">@option.Label</option> }
+                @if (selected is null) { <option value="@Key(call.Flow)" selected>@call.Flow.ResourceId · @call.Flow.Version · @T("SequenceUnavailable")</option> }
+                @foreach (var option in options) { <option value="@Key(option.Reference)" selected="@(Key(option.Reference) == Key(call.Flow))">@option.Label</option> }
             </select></label>
             <div><span>@T("Parameters")</span><JsonSchemaInputEditor Schema="selected?.Parameters" Value="call.Parameters" ValueChanged="value => SetParametersAsync(position, value)" Disabled="ReadOnly" /></div>
             <div class="form-actions">

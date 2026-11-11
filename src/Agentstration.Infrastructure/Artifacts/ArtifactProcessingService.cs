@@ -9,15 +9,16 @@ using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Storage;
 using Agentstration.Infrastructure.Storage;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure.Artifacts;
 
-/// <summary>Execution-owned content capabilities. State contains references only; documents live in Artifact storage.</summary>
+/// <summary>Execution-owned content capabilities. Direct drafts stay in the bounded handoff cache; retained drafts use Artifact storage.</summary>
 public sealed class ArtifactProcessingService(ArtifactManagementService artifacts, IArtifactDurableStore durable,
     WorkspaceArtifactStorage selectableStorage, IRuntimeExecutionStateStore states, IFlowRepository runs,
-    TimeProvider clock) : IDisposable
+    TimeProvider clock, DirectExecutionPayloadPersistence direct, IAuthorizationService authorization, ICurrentRequestContext current) : IDisposable
 {
     private const string RuntimeType = "artifact-processing-v1";
     private const int MaximumInputBytes = 16 * 1024 * 1024;
@@ -27,11 +28,11 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
     private readonly SemaphoreSlim[] gates = Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
     public void Dispose() { foreach (var gate in gates) gate.Dispose(); }
 
-    private sealed record Input(string Id, string Kind, string Name, string MediaType, long Length, string Sha256, string? Reference = null);
+    private sealed record Input(string Id, string Kind, string Name, string MediaType, long Length, string Sha256, string? Reference = null, string? DirectContent = null);
     private sealed record WriteReceipt(string Id, string Digest, int Revision);
     private sealed record Session(Input Input, string OutputId, string OutputName, string MediaType,
         int Revision, int? CompletedRevision, DateTimeOffset ExpiresAt, IReadOnlyList<WriteReceipt> Writes,
-        string? DurableReference = null, JsonElement? Result = null);
+        string? DurableReference = null, JsonElement? Result = null, string? DirectOutput = null);
     private sealed record Cursor(string Session, string Side, int Revision, int Offset);
 
     public async Task<JsonElement> ExecuteOwnerAsync(FlowRun owner, ArtifactTransformFlowStepDefinition step,
@@ -44,6 +45,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         await gate.WaitAsync(token);
         try
         {
+            await EnsureExecutionAccessAsync(owner, token);
             var session = await LoadAsync(owner, key, token);
             if (action == "open")
             {
@@ -52,10 +54,16 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                     var input = await ResolveInputAsync(arguments, owner, key, token);
                     if (input.Length > MaximumInputBytes || step.Mode == ArtifactProcessingMode.Content && input.Length > step.MaximumContentBytes)
                         throw Error("artifact_processing_content_too_large");
-                    var output = await StageAsync(owner, step, key + ":0", step.OutputFileName ?? input.Name,
-                        step.OutputMediaType ?? input.MediaType, ReadOnlyMemory<byte>.Empty, input, token);
-                    session = new(input, output.ArtifactId.ToString(), output.FileName, output.MediaType, 0, null,
-                        clock.GetUtcNow() + TimeSpan.FromHours(1), []);
+                    if (owner.TransientPayloads)
+                        session = new(input, "direct-" + key, step.OutputFileName ?? input.Name, step.OutputMediaType ?? input.MediaType,
+                            0, null, owner.CreatedAt + DirectExecutionPayloadPersistence.Lifetime, [], DirectOutput: string.Empty);
+                    else
+                    {
+                        var output = await StageAsync(owner, step, key + ":0", step.OutputFileName ?? input.Name,
+                            step.OutputMediaType ?? input.MediaType, ReadOnlyMemory<byte>.Empty, input, token);
+                        session = new(input, output.ArtifactId.ToString(), output.FileName, output.MediaType, 0, null,
+                            clock.GetUtcNow() + TimeSpan.FromHours(1), []);
+                    }
                     await SaveAsync(owner, key, session, token);
                 }
                 else if (session.Input.Id != Text(arguments, "artifactId")) throw Error("artifact_processing_input_changed");
@@ -80,8 +88,9 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             EnsureLive(session);
             if (action == "abort")
             {
-                if (session.Result is null) await artifacts.PurgeAsync(StagedArtifactId.Parse(session.OutputId), token);
-                await SaveAsync(owner, key, session with { ExpiresAt = clock.GetUtcNow() }, token);
+                if (session.Result is null && !owner.TransientPayloads) await artifacts.PurgeAsync(StagedArtifactId.Parse(session.OutputId), token);
+                await SaveAsync(owner, key, session with { ExpiresAt = clock.GetUtcNow(),
+                    DirectOutput = owner.TransientPayloads ? string.Empty : null, Input = session.Input with { DirectContent = null }, Result = null }, token);
                 return Element(new { aborted = true });
             }
             if (action is not ("prepare" or "finish")) throw Error("artifact_processing_action_invalid");
@@ -98,6 +107,17 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             }
             if (session.CompletedRevision != session.Revision) throw Error("artifact_processing_output_incomplete");
             if (action == "prepare") return Element(new { prepared = true, revision = session.Revision });
+            if (owner.TransientPayloads)
+            {
+                var bytes = Utf8.GetBytes(session.DirectOutput!);
+                // The existing Knowledge inline publication contract is bounded to 64 KiB.
+                if (bytes.Length > 65536) throw Error("artifact_processing_direct_output_too_large");
+                var manifest = Element(new { artifactId = session.OutputId, kind = "inline", disposition = "publishable",
+                    name = session.OutputName, mediaType = session.MediaType, digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                    contentBase64 = Convert.ToBase64String(bytes) });
+                await SaveAsync(owner, key, session with { Result = manifest }, token);
+                return manifest;
+            }
             var outputStage = (await artifacts.GetStagedAsync(StagedArtifactId.Parse(session.OutputId), null,
                 ArtifactLeaseOperation.Read, token))?.Value ?? throw Error("artifact_processing_output_unavailable");
             var reference = session.DurableReference;
@@ -138,6 +158,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             return manifestItem;
         }
         catch (ArtifactValidationException exception) { throw Error(exception.Code); }
+        catch (FlowValidationException exception) { throw Error(exception.Code); }
         catch (AuthorizationDeniedException) { throw Error("artifact_processing_access_denied"); }
         catch (StorageException exception) { throw Error(exception.Code); }
         finally { gate.Release(); }
@@ -165,6 +186,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         await gate.WaitAsync(token);
         try
         {
+            await EnsureExecutionAccessAsync(owner, token);
             var session = await LoadAsync(owner, key, token) ?? throw Error("artifact_processing_context_missing");
             EnsureLive(session);
             if (session.Result is not null) throw Error("artifact_processing_closed");
@@ -172,7 +194,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             if (action is "input_info" or "output_info")
                 return Element(new { name = side == "input" ? session.Input.Name : session.OutputName,
                     mediaType = side == "input" ? session.Input.MediaType : session.MediaType,
-                    sizeBytes = side == "input" ? session.Input.Length : (await OutputStageAsync(session, token)).Length,
+                    sizeBytes = side == "input" ? session.Input.Length : session.DirectOutput is { } directOutput ? Utf8.GetByteCount(directOutput) : (await OutputStageAsync(session, token)).Length,
                     revision = side == "input" ? 0 : session.Revision, completed = side == "output" && session.CompletedRevision == session.Revision,
                     rangeUnit = "utf16Characters" });
             if (action == "output_write")
@@ -240,6 +262,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             catch (RegexMatchTimeoutException) { throw Error("artifact_processing_regex_timeout"); }
         }
         catch (ArtifactValidationException exception) { throw Error(exception.Code); }
+        catch (FlowValidationException exception) { throw Error(exception.Code); }
         catch (AuthorizationDeniedException) { throw Error("artifact_processing_access_denied"); }
         catch (StorageException exception) { throw Error(exception.Code); }
         finally { gate.Release(); }
@@ -267,9 +290,15 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         try { bytes = Utf8.GetBytes(previous[..offset] + Text(arguments, "content") + previous[(offset + deleted)..]); }
         catch (EncoderFallbackException) { throw Error("artifact_processing_utf8_required"); }
         if (bytes.Length > step.MaximumOutputBytes) throw Error("artifact_processing_output_too_large");
-        var stage = await StageAsync(owner, step, key + ":" + command + ":" + digest,
-            session.OutputName, session.MediaType, bytes, session.Input, token);
-        var updated = session with { OutputId = stage.ArtifactId.ToString(), Revision = session.Revision + 1, CompletedRevision = null,
+        var outputId = session.OutputId;
+        if (!owner.TransientPayloads)
+        {
+            var stage = await StageAsync(owner, step, key + ":" + command + ":" + digest,
+                session.OutputName, session.MediaType, bytes, session.Input, token);
+            outputId = stage.ArtifactId.ToString();
+        }
+        var updated = session with { OutputId = outputId, DirectOutput = owner.TransientPayloads ? Utf8.GetString(bytes) : null,
+            Revision = session.Revision + 1, CompletedRevision = null,
             Writes = [.. session.Writes, new(command, digest, session.Revision + 1)] };
         await SaveAsync(owner, key, updated, token);
         return updated;
@@ -288,6 +317,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             catch (FormatException) { throw Error("artifact_processing_content_invalid"); }
             var input = new Input(id, "inline", OptionalText(value, "name") ?? "input.txt",
                 OptionalText(value, "mediaType") ?? "text/plain", bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+            if (owner.TransientPayloads) return input with { DirectContent = encoded };
             var staged = await StageAsync(owner, new() { Name = "input" }, key + ":input", input.Name, input.MediaType, bytes, input, token);
             return input with { Reference = staged.ArtifactId.ToString() };
         }
@@ -319,9 +349,11 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         {
             token.ThrowIfCancellationRequested();
             var length = (int)Math.Min(65536, input.Length - bytes.Length);
-            var chunk = input.Kind == "durable"
-                ? await durable.ReadAsync(owner.WorkspaceId, input.Reference!, bytes.Length, length, token)
-                : Convert.FromBase64String((await artifacts.ReadAsync(StagedArtifactId.Parse(input.Reference!), bytes.Length, length, null, token)).ContentBase64);
+            var chunk = input.DirectContent is { } directContent
+                ? Convert.FromBase64String(directContent).AsMemory((int)bytes.Length, length)
+                : input.Kind == "durable"
+                    ? await durable.ReadAsync(owner.WorkspaceId, input.Reference!, bytes.Length, length, token)
+                    : Convert.FromBase64String((await artifacts.ReadAsync(StagedArtifactId.Parse(input.Reference!), bytes.Length, length, null, token)).ContentBase64);
             if (chunk.Length == 0 || chunk.Length > length) throw Error("artifact_processing_input_incomplete");
             await bytes.WriteAsync(chunk, token);
         }
@@ -334,6 +366,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
     private async Task<StagedArtifactResource> StageAsync(FlowRun owner, ArtifactTransformFlowStepDefinition step,
         string identity, string name, string media, ReadOnlyMemory<byte> bytes, Input input, CancellationToken token)
     {
+        if (owner.TransientPayloads) throw Error("direct_intermediate_storage_refused");
         var digest = Convert.ToHexStringLower(SHA256.HashData(bytes.Span));
         var producerId = "artifact-processing:" + Hash(identity);
         var stored = await artifacts.GetStagedByProducerIdForWriteAsync(producerId, token)
@@ -363,6 +396,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         ?? throw Error("artifact_processing_output_unavailable");
     private async Task<string> OutputTextAsync(Session session, CancellationToken token)
     {
+        if (session.DirectOutput is { } output) return output;
         var stage = await OutputStageAsync(session, token);
         using var bytes = new MemoryStream();
         while (bytes.Length < stage.Length)
@@ -377,10 +411,29 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         try { return Utf8.GetString(bytes.GetBuffer(), 0, (int)bytes.Length); }
         catch (DecoderFallbackException) { throw Error("artifact_processing_utf8_required"); }
     }
-    private async Task<Session?> LoadAsync(FlowRun owner, string key, CancellationToken token) =>
-        (await states.GetExactAsync(owner.ExecutionScopeRef, owner.Id, RuntimeType, key, token))?.Payload.Deserialize<Session>(Json);
-    private Task SaveAsync(FlowRun owner, string key, Session session, CancellationToken token) =>
-        states.StoreAsync(new(owner.ExecutionScopeRef, owner.Id, RuntimeType, key, Element(session), clock.GetUtcNow()), token);
+    private async Task EnsureExecutionAccessAsync(FlowRun owner, CancellationToken token)
+    {
+        var request = current.Current;
+        if (request.WorkspaceId != owner.WorkspaceId.Value || request.TenantId != owner.Scope.TenantId
+            || request.PrincipalId != owner.Scope.PrincipalId) throw Error("artifact_processing_access_denied");
+        await authorization.EnsurePermissionAsync(request, AuthorizationPermissions.RunsExecute, token);
+    }
+    private async Task<Session?> LoadAsync(FlowRun owner, string key, CancellationToken token)
+    {
+        if (!owner.TransientPayloads)
+            return (await states.GetExactAsync(owner.ExecutionScopeRef, owner.Id, RuntimeType, key, token))?.Payload.Deserialize<Session>(Json);
+        if (!owner.TransientPayloadsAvailable || owner.CreatedAt + DirectExecutionPayloadPersistence.Lifetime <= clock.GetUtcNow())
+            throw Error("direct_content_unavailable");
+        return direct.GetProcessing<Session>(owner.ExecutionScopeRef, key);
+    }
+    private Task SaveAsync(FlowRun owner, string key, Session session, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!owner.TransientPayloads)
+            return states.StoreAsync(new(owner.ExecutionScopeRef, owner.Id, RuntimeType, key, Element(session), clock.GetUtcNow()), token);
+        direct.StoreProcessing(owner.ExecutionScopeRef, key, session, owner.CreatedAt + DirectExecutionPayloadPersistence.Lifetime);
+        return Task.CompletedTask;
+    }
     private SemaphoreSlim Gate(string key) => gates[(int)(Convert.ToUInt32(key[..8], 16) % (uint)gates.Length)];
     private void EnsureLive(Session session) { if (session.ExpiresAt <= clock.GetUtcNow()) throw Error("artifact_processing_expired"); }
     private static string Key(FlowRun owner, string step, int attempt, int index) => Hash($"{owner.ExecutionScopeRef.Value}:{owner.Id}:{step}:{attempt}:{index}");

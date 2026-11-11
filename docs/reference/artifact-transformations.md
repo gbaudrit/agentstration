@@ -16,6 +16,18 @@ manifest. In an existing authored Flow, check the final Output mapping: use
 `"${transition.output}"` to forward the connected step rather than a fixed earlier
 mapping result. Existing authored drafts and publications are not rewritten.
 
+## Selecting the input
+
+The Artifact-list mapping defaults to `"${transition.output}"`. It accepts an
+Artifact array, a manifest containing `artifacts`, or the exact source-composition
+envelope `{ "value": ..., "parameters": {} }`. That envelope is unwrapped once.
+Use `"${input.value}"` to explicitly select a source transformation's manifest.
+An invalid explicit mapping fails; the step never substitutes a different input.
+
+The separate **Processing input mapping** is optional. Empty or `null` passes the
+complete per-Artifact processing envelope described below; it is not a missing
+Artifact-list mapping.
+
 ## Content mode
 
 Use **Content (text or JSON)** for a processor that accepts ordinary values.
@@ -98,9 +110,30 @@ These Tools restrict the access they provide. Other Tools already assigned to an
 Agent continue to use their own grants; choosing an Agent with broader access
 does not revoke those grants.
 
+## Direct acquisitions without intermediate storage
+
+A source using direct acquisition can use the same content/access processing
+connections. Its input and editable output stay in the existing bounded,
+process-local direct handoff cache. No staged or durable intermediate Artifact,
+document-bearing runtime state, persisted Tool arguments or execution payload is
+created. Reads, regex searches, revision-checked writes, correction and completion
+keep the same behavior as retained processing.
+
+The step returns an inline manifest for the next transformation or projection.
+Only final Snapshot publication materializes that content in the selected output
+Storage. The direct input and final inline output are bounded to 64 KiB each by
+the current source publication contract; larger drafts cannot be finalized.
+Drafts share the direct handoff admission limits (64 MiB per Workspace, 256 MiB
+per process, 4,096 entries) and expire no later than 15 minutes after the owning
+Flow was created. Capacity failure preserves accepted content. Aborted drafts
+cannot be reopened. Cold or expired executions fail explicitly; they do not
+reacquire or fall back to disk. This does not enable ordinary Artifact capture or
+Flow-backed Tool Definitions for direct execution.
+
 ## Output, failures and limits
 
-Each successful input produces one new durable Artifact. Originals remain intact.
+For retained execution, each successful input produces one new durable Artifact.
+Originals remain intact. Direct execution returns inline content until final publication.
 All processing regions must succeed and all outputs must be prepared before final
 registration begins. The owning step persists the outputs and returns an ordinary
 publishable Artifact manifest. Receipts link the producing Flow/step, processing
@@ -113,6 +146,9 @@ bounded to 16 MiB; output defaults to 8 MiB and permits at most 16 MiB, with at 
 are limited to 1,024 characters, searches return at most 50 matches and have a
 100 ms regex timeout. Contexts expire after one hour. Superseded or abandoned
 staged revisions follow existing staging retention and cleanup.
+
+An error Output without an explicit code/message preserves the originating step's
+trusted error. An explicit code or message still overrides it.
 
 A failed processor, incomplete output, invalid JSON, stale revision, foreign cursor,
 unsupported media or oversized content prevents a successful step result. No

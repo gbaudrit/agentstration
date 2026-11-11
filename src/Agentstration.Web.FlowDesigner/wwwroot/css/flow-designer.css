@@ -261,3 +261,5 @@
     .step-settings-tabs{padding:0 10px;overflow-x:auto}
     .step-settings-tabs button{padding-inline:12px;white-space:nowrap}
 }
+
+.flow-port-handle.processing-start,.flow-port-handle.processing-result{top:100%;transform:translate(-50%,-50%)}.flow-port-handle.processing-start{left:30%}.flow-port-handle.processing-result{left:70%}.flow-port-handle.processing-result .diagram-port{background:var(--surface);border-color:var(--primary)}

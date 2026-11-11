@@ -22,6 +22,28 @@ namespace Agentstration.Web.Tests;
 public sealed partial class KnowledgeSourceEditorTests
 {
     [TestMethod]
+    public void DependencyRebindingRefreshesReadinessBeforeLaunchingAProjectionWithoutReloadingThePage()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var source = ProjectedSource();
+        var client = new KnowledgeClientStub(source) { DependenciesStale = true };
+        using var context = CreateContext(client);
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(component => component.Name, source.Name));
+        rendered.WaitForElement("[data-testid=knowledge-source-projections-tab]").Click();
+        Assert.IsTrue(rendered.Find("[data-testid=knowledge-start-projection]").HasAttribute("disabled"));
+        rendered.Find("[data-testid=knowledge-source-definition-tab]").Click();
+        rendered.WaitForElement("[data-testid=knowledge-rebind-dependencies]").Click();
+        rendered.FindComponent<EditForm>().Find("form").Submit();
+        rendered.WaitForElement("[data-testid=knowledge-rebind-confirmation-confirm]").Click();
+        rendered.WaitForAssertion(() => Assert.IsTrue(client.UpdatedRequest?.RebindDependencies));
+        rendered.WaitForAssertion(() => Assert.IsTrue(client.ReadinessCalls >= 2));
+        rendered.Find("[data-testid=knowledge-source-projections-tab]").Click();
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid=knowledge-start-projection]").HasAttribute("disabled")));
+        rendered.Find("[data-testid=knowledge-start-projection]").Click();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.StartedProjectionRequest));
+    }
+
+    [TestMethod]
     public async Task PrerenderDisablesNativeContentSelectionUntilInteractive()
     {
         using var culture = new TestCultureScope("en-US");
@@ -801,6 +823,8 @@ public sealed partial class KnowledgeSourceEditorTests
         public List<KnowledgeProjectionResource> Projections { get; } = [];
         public IReadOnlyList<KnowledgeSnapshotView> Snapshots { get; set; } = snapshots ?? [];
         public bool RejectNativeDataset { get; set; }
+        public bool DependenciesStale { get; set; }
+        public int ReadinessCalls { get; private set; }
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
         public StartKnowledgeProjectionRequest? StartedProjectionRequest { get; private set; }
@@ -826,20 +850,26 @@ public sealed partial class KnowledgeSourceEditorTests
         public Task<ResourceSnapshot<KnowledgeSourceResource>> UpdateAsync(ResourceNamespace @namespace, string name, PutKnowledgeSourceRequest request, string etag, CancellationToken cancellationToken = default)
         {
             UpdatedRequest = request;
+            if (source is not null) source = source with { Definition = request.Properties };
+            if (request.RebindDependencies) DependenciesStale = false;
             return source is not null
-                ? Task.FromResult(new ResourceSnapshot<KnowledgeSourceResource>(source with { Definition = request.Properties }, "\"etag-2\""))
+                ? Task.FromResult(new ResourceSnapshot<KnowledgeSourceResource>(source, "\"etag-2\""))
                 : throw new NotSupportedException();
         }
         public Task<ResourceSnapshot<KnowledgeSourceResource>> SetEnabledAsync(ResourceNamespace @namespace, string name, bool enabled, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<KnowledgeSourceReadiness> GetReadinessAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
-            source is { Definition.Enabled: false, Composition: null }
+        public Task<KnowledgeSourceReadiness> GetReadinessAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
+        {
+            ReadinessCalls++;
+            if (DependenciesStale) return Task.FromResult(new KnowledgeSourceReadiness(false, false, null, ["Pinned Data Source dependency for binding 'documentation' is stale."]));
+            return source is { Definition.Enabled: false, Composition: null }
                 ? Task.FromResult(new KnowledgeSourceReadiness(false, false, null, ["Non-executable draft"]))
                 : Task.FromResult(new KnowledgeSourceReadiness(true, true,
                 new ResolvedKnowledgeFlowBinding("knowledge-retrieval-builtin", ResourceNamespace.Default, "1.0.0", true, null, null, KnowledgeFlowContracts.Retrieval),
                 [],
                 new ResolvedKnowledgeFlowBinding("knowledge-projection-builtin", ResourceNamespace.Default, "1.0.0", true, ProjectionInputSchema, null, KnowledgeFlowContracts.Projection),
                 [new("documentation", DataSourceScope, Guid.NewGuid(), true, null, null)]));
+        }
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(exposure);
         public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
@@ -897,6 +927,7 @@ public sealed partial class KnowledgeSourceEditorTests
     private sealed class FlowClientStub : IFlowApiClient
     {
         public FlowGraphDefinition? SequenceGraph { get; init; }
+        public IReadOnlyList<string> TransformationVersions { get; init; } = ["1.0.0"];
         public CreateFlowDraftRequest? CreatedTransformation { get; private set; }
         public bool FailCreation { get; init; }
         internal static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
@@ -930,10 +961,11 @@ public sealed partial class KnowledgeSourceEditorTests
                 "artifact-transform-builtin" => TransformationInputSchema,
                 _ => (JsonElement?)null
             };
-            return Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new(flowId, "1.0.0", null,
-                new WorkflowFlowDefinition("input", [], [], []),
-                new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract }, DateTimeOffset.UtcNow,
-                (flowId == "artifact-transform-builtin" ? SequenceGraph : null) ?? new FlowGraphDefinition { EntryStep = "input", InputSchema = inputSchema })]);
+            return Task.FromResult<IReadOnlyList<FlowVersionResponse>>((flowId == "artifact-transform-builtin" ? TransformationVersions : ["1.0.0"])
+                .Select(version => new FlowVersionResponse(flowId, version, null,
+                    new WorkflowFlowDefinition("input", [], [], []),
+                    new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract }, DateTimeOffset.UtcNow,
+                    (flowId == "artifact-transform-builtin" ? SequenceGraph : null) ?? new FlowGraphDefinition { EntryStep = "input", InputSchema = inputSchema })).ToArray());
         }
         private static string Contract(string flowId) => flowId switch
         {
