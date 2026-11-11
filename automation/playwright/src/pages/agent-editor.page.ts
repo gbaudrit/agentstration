@@ -63,9 +63,18 @@ export class AgentEditorPage {
   }
 
   public async createAndDeploy(name: string): Promise<void> {
+    const submit = this.page.getByTestId(TestIds.agentEditor.createAndDeploy);
+    if ((this.page.viewportSize()?.width ?? 1440) <= 620) {
+      await submit.scrollIntoViewIfNeeded();
+      const button = await submit.boundingBox();
+      const navigation = await this.page.getByTestId(TestIds.console.sidebar).boundingBox();
+      expect(button).not.toBeNull();
+      expect(navigation).not.toBeNull();
+      expect(button!.y + button!.height, 'The primary action must clear the fixed mobile navigation').toBeLessThanOrEqual(navigation!.y);
+    }
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/agents/${encodeURIComponent(name)}`),
-      this.page.getByTestId(TestIds.agentEditor.createAndDeploy).click(),
+      submit.click(),
     ]);
     await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
     await this.openEdit();
