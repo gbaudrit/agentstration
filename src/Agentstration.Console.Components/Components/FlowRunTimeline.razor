@@ -151,7 +151,7 @@
     else
     {
         <div class="flow-raw-toolbar">
-            <label><span class="sr-only">@T("FilterEventType")</span><select @bind="rawType"><option value="">@T("AllEventTypes")</option>@foreach (var type in Enum.GetValues<FlowRunEventType>()) { <option value="@type">@EventTypeLabel(type)</option> }</select></label>
+            <FormField Label="@T("FilterEventType")"><LabelContent><span class="sr-only">@T("FilterEventType")</span></LabelContent><ChildContent><ClearableSelect @bind-Value="rawType"><option value="">@T("AllEventTypes")</option>@foreach (var type in Enum.GetValues<FlowRunEventType>()) { <option value="@type">@EventTypeLabel(type)</option> }</ClearableSelect></ChildContent></FormField>
             <span>@T("ShowingEvents", VisibleRawEvents.Count, FilteredRawEvents.Count)</span>
         </div>
         <ol class="flow-raw-events">

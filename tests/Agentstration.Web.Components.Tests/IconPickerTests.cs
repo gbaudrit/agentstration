@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Components.Tests;
 
@@ -20,6 +21,7 @@ public sealed class IconPickerTests
     public async Task PickerSearchesAndSelectsAnIcon()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var selected = string.Empty;
         var rendered = context.Render<IconPicker>(parameters => parameters
             .Add(value => value.Value, selected)

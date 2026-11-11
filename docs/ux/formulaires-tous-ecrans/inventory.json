@@ -1,0 +1,511 @@
+{
+  "screens": [
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "family": "operations"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "family": "administration"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "routes": [
+        "/cleanup"
+      ],
+      "family": "administration"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
+      "routes": [
+        "/data-source-profiles/new",
+        "/data-source-profiles/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "family": "distribution"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "routes": [
+        "/extensions"
+      ],
+      "family": "distribution"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
+      "routes": [
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/FlowOrchestrationEditor.razor",
+      "routes": [
+        "/flows/{FlowId}/orchestration",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "family": "operations"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "family": "operations"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ModelDetails.razor",
+      "routes": [
+        "/models/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "routes": [
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "routes": [
+        "/namespaces/{AgentNamespace}/agents/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor",
+      "routes": [
+        "/flows/new"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
+      "routes": [
+        "/settings/organization/members/{UserId:guid}"
+      ],
+      "family": "administration"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "routes": [
+        "/settings/organization/members"
+      ],
+      "family": "administration"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/OrganizationWorkspaces.razor",
+      "routes": [
+        "/settings/organization/structure",
+        "/settings/organization/workspaces"
+      ],
+      "family": "administration"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "family": "distribution"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "family": "distribution"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "family": "distribution"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor",
+      "routes": [
+        "/parameters/new",
+        "/parameters/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ProfileSettings.razor",
+      "routes": [
+        "/settings/profile"
+      ],
+      "family": "administration"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "family": "distribution"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
+      "routes": [
+        "/resource-plans"
+      ],
+      "family": "distribution"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
+      "routes": [
+        "/runtimeprofiles/new",
+        "/runtimeprofiles/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "routes": [
+        "/schemas/new",
+        "/schemas/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "routes": [
+        "/secrets/new",
+        "/secrets/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "routes": [
+        "/settings/source-registries",
+        "/settings/source-registries/new",
+        "/settings/source-registries/{Name}"
+      ],
+      "family": "sources"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "family": "sources"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "family": "sources"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
+      "routes": [
+        "/artifacts/staged/{Id}"
+      ],
+      "family": "operations"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "routes": [
+        "/tools/categories/new",
+        "/tools/categories/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
+      "routes": [
+        "/tools/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor",
+      "routes": [
+        "/tools/providers/new",
+        "/tools/providers/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "routes": [
+        "/triggers/{Name}"
+      ],
+      "family": "operations"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/TriggerEditor.razor",
+      "routes": [
+        "/triggers/new",
+        "/triggers/{Name}/edit"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
+      "routes": [
+        "/vaults/new",
+        "/vaults/{Name}"
+      ],
+      "family": "resource editors"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "routes": [
+        "/workspaces"
+      ],
+      "family": "administration"
+    },
+    {
+      "path": "src/Agentstration.Console.Web/Pages/Login.cshtml",
+      "routes": [
+        "/login"
+      ],
+      "family": "server account forms"
+    },
+    {
+      "path": "src/Agentstration.Web/Pages/Account/Pat.cshtml",
+      "routes": [
+        "/account/pat"
+      ],
+      "family": "server account forms"
+    },
+    {
+      "path": "src/Agentstration.Web/Pages/Account/Security.cshtml",
+      "routes": [
+        "/account/security"
+      ],
+      "family": "server account forms"
+    },
+    {
+      "path": "src/Agentstration.Web/Pages/Bootstrap.cshtml",
+      "routes": [
+        "/bootstrap"
+      ],
+      "family": "server account forms"
+    },
+    {
+      "path": "src/Agentstration.Web/Pages/Login.cshtml",
+      "routes": [
+        "/login"
+      ],
+      "family": "server account forms"
+    }
+  ],
+  "helpers": [
+    "src/Agentstration.Console.Components/Components/FlowRunTimeline.razor",
+    "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor",
+    "src/Agentstration.Console.Components/Components/ModelProfiles/ModelProfilePicker.razor",
+    "src/Agentstration.Console.Components/Components/Pages/AgentToolConfiguration.razor",
+    "src/Agentstration.Console.Components/Components/Pages/AgentToolSetConfiguration.razor",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionArtifacts.razor",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionToolEditor.razor",
+    "src/Agentstration.Console.Components/Components/Pages/DescendantUseGrantEditor.razor",
+    "src/Agentstration.Console.Components/Components/Pages/ResourceAccessPanel.razor",
+    "src/Agentstration.Console.Components/Components/Shared/PackAgentDefinitionForm.razor",
+    "src/Agentstration.Console.Components/Components/Shared/ResourceScopeFormField.razor",
+    "src/Agentstration.Console.Components/Components/Shared/ResourceScopePicker.razor",
+    "src/Agentstration.Console.Components/Components/Values/ContextualParameterCreator.razor",
+    "src/Agentstration.Console.Components/Components/Values/ContextualSecretCreator.razor",
+    "src/Agentstration.Console.Components/Components/Values/ValueBindingRequirementEditor.razor",
+    "src/Agentstration.Web.Components/ClearableText.razor",
+    "src/Agentstration.Web.Components/IconPicker.razor",
+    "src/Agentstration.Web.Components/JsonSchema/JsonSchemaField.razor",
+    "src/Agentstration.Web.Components/JsonSchema/JsonSchemaInputEditor.razor",
+    "src/Agentstration.Web.Components/LabelsEditor.razor",
+    "src/Agentstration.Web.Components/MainLayout.razor",
+    "src/Agentstration.Web.Components/ResourceIdentityFields.razor",
+    "src/Agentstration.Web.Components/Schemas/SchemaDocumentEditor.razor",
+    "src/Agentstration.Web.Components/Schemas/SchemaPropertyNode.razor",
+    "src/Agentstration.Web.Components/SearchBox.razor",
+    "src/Agentstration.Web.Components/SecretReferencePicker.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowAgentInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowConditionInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowInputInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowOutputInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowRouterInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowToolInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowTransformInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/SchemaBindingEditor.razor",
+    "src/Agentstration.Workplace.Components/ConversationComposer.razor",
+    "src/Agentstration.Workplace.Components/EntryFieldRenderer.razor",
+    "src/Agentstration.Workplace.Components/PendingActionPanel.razor",
+    "src/Agentstration.Workplace.Components/PromptEntry.razor"
+  ],
+  "excluded": [
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Agents.razor",
+      "routes": [
+        "/agents"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/FlowRuns.razor",
+      "routes": [
+        "/flow-runs"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
+      "routes": [
+        "/modelprofiles"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Parameters.razor",
+      "routes": [
+        "/parameters"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ResourceScopes.razor",
+      "routes": [
+        "/settings/resource-scopes"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/RunEvents.razor",
+      "routes": [
+        "/run-events"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Schemas.razor",
+      "routes": [
+        "/schemas"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
+      "routes": [
+        "/secrets"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Tasks.razor",
+      "routes": [
+        "/tasks",
+        "/work"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ToolGovernanceAudit.razor",
+      "routes": [
+        "/tool-governance/{Owner}/{RunId}"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Tools.razor",
+      "routes": [
+        "/tools"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",
+      "routes": [
+        "/triggers"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "routes": [
+        "/",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ]
+    },
+    {
+      "path": "src/Agentstration.Workplace.Web/Components/Pages/Tasks.razor",
+      "routes": [
+        "/w/{WorkspaceName}/tasks"
+      ]
+    }
+  ]
+}

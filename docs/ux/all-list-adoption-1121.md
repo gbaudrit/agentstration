@@ -24,7 +24,7 @@ Adapters configure the placement explicitly (button labels below stand for the a
 </CollectionActions>
 ```
 
-Omit `Secondary` when it does not apply. Existing child content without named slots keeps the prior secondary-menu behavior. When reconciling the shared files with parallel form PR #1129, preserve the version slot, Primary/Secondary slots, shared identity/action CSS and direct Model Profile selection; no source from that unmerged branch is imported.
+Omit `Secondary` when it does not apply. Existing child content without named slots keeps the prior secondary-menu behavior. Form PR #1129 was subsequently merged into the integration branch as `a60d76e`. This branch incorporates it and reconciles 16 conflicted files: shared FormSection/FormGrid/FormActions, FormCheckbox and ClearableText adoption are retained alongside collection identities, version metadata, scopes and Primary/Secondary actions. Shared translations are combined, scoped input styles use deep selectors, and the native authentication theme keeps collection styles and authenticated-form behavior. The 59-file list below remains the historical overlap checkpoint, not an unresolved draft dependency.
 
 
 
@@ -286,7 +286,7 @@ The maintainer explicitly requested a stacked draft #1122 coverage PR before mer
 
 ### Parallel form adoption #1129
 
-Draft [PR #1129](https://github.com/gbaudrit/agentstration/pull/1129), branch `feat/ux-all-form-screens`, is not in the integration baseline. The overlap review found 59 shared files at this checkpoint. Its field/control migration remains owned by that PR; this implementation owns collection frames, identities, scope/state presentation, action menus and their regression locators. Neither unmerged branch is silently incorporated into the other. Reconcile these changes before either merge, preserving both field behavior and collection semantics.
+[PR #1129](https://github.com/gbaudrit/agentstration/pull/1129), branch `feat/ux-all-form-screens`, merged into `ux/unification-formulaires` as `a60d76e335dce1853e2d8fbd81a6ea3ef25d9018` during this follow-up. Its form/control migration is incorporated explicitly. The earlier 59-file overlap checkpoint remains below for traceability; 16 actual conflicts were reconciled by keeping shared form controls/wrappers and their native theme/validation behavior together with collection identity, ownership, version/state and action contracts. Both regression suites must be rerun against the combined source; final results are recorded in the PR descriptions.
 
 Highest-risk overlap: `ConsoleModels.cs` URL helpers, ordinary editor files with embedded collections, `PromptEntry` headers, native PAT markup/authentication layout, shared RESX keys and `design-tokens.css`. The unused legacy Secret picker is left to the form migration rather than duplicated here.
 

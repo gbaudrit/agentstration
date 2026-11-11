@@ -32,18 +32,18 @@ else
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="runtime-profile-editor" class="resource-form" data-testid="runtime-profile-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
         <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><ValidationSummary />
         <fieldset class="resource-definition-fields" disabled="@(!CanManage || saving)" data-testid="runtime-profile-definition-fields">
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("RuntimeResource")</h2></div></div><FormGrid>
+        <FormSection Title="@T("RuntimeResource")" Eyebrow="@T("Identity")"><ChildContent><FormGrid>
             <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="runtime-profile-display-name" TechnicalNameTestId="runtime-profile-name" />
             <FormField Label="@T("Namespace")"><ChildContent><ClearableText @bind-Value="model.Namespace" disabled="@(!IsNew)" /></ChildContent><Validation><ValidationMessage For="() => model.Namespace" /></Validation></FormField>
             <ResourceScopeFormField ResourceKind="@RuntimeProfileResourceKinds.RuntimeProfile" Value="@selectedScope" ValueChanged="ScopeChanged" Disabled="@(!IsNew)" />
             <FormField Required="true" Label="@T("RuntimeType")" Class="form-span-2"><ChildContent><ClearableText @bind-Value="model.RuntimeType" /><small>@T("RuntimeTypeHelpPrefix") <code>microsoft-agent-framework</code> @T("RuntimeTypeHelpSuffix")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeType" /></Validation></FormField>
-        </FormGrid></section>
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Defaults")</p><h2>@T("ExecutionPolicy")</h2></div></div><FormGrid>
+        </FormGrid></ChildContent></FormSection>
+        <FormSection Title="@T("ExecutionPolicy")" Eyebrow="@T("Defaults")"><ChildContent><FormGrid>
             <FormField Required="true" Label="@T("SessionMode")"><ChildContent><ClearableSelect @bind-Value="model.SessionMode">@foreach (var value in Enum.GetValues<RuntimeSessionMode>()) { <option value="@value">@SessionLabel(value)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.SessionMode" /></Validation></FormField>
             <FormField Required="true" Label="@T("ToolInvocation")"><ChildContent><ClearableSelect @bind-Value="model.ToolInvocation">@foreach (var value in Enum.GetValues<RuntimeToolInvocationMode>()) { <option value="@value">@ToolInvocationLabel(value)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ToolInvocation" /></Validation></FormField>
             <FormField Required="true" Label="@T("Streaming")"><ChildContent><ClearableSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@StreamingLabel(value)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.Streaming" /></Validation></FormField>
-        </FormGrid></section>
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Adapter")</p><h2>@T("RuntimeOptions")</h2></div><span>@T("Advanced")</span></div><FormGrid><FormField Label="@T("RuntimeSpecificJson")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.RuntimeOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("RuntimeJsonHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeOptionsJson" /></Validation></FormField></FormGrid></section>
+        </FormGrid></ChildContent></FormSection>
+        <FormSection Title="@T("RuntimeOptions")" Eyebrow="@T("Adapter")"><Actions><span>@T("Advanced")</span></Actions><ChildContent><FormGrid><FormField Label="@T("RuntimeSpecificJson")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.RuntimeOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("RuntimeJsonHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeOptionsJson" /></Validation></FormField></FormGrid></ChildContent></FormSection>
         </fieldset>
         @if (CanManage) { <FormActions Busy="@saving"><a class="button-secondary" href="/runtimeprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="runtime-profile-save">@(saving ? T("Saving") : IsNew ? T("CreateProfileAction") : T("SaveChanges"))</button></FormActions> }
     </EditForm>

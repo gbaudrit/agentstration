@@ -33,15 +33,15 @@ else
     }
     else if (tab == Tab.Definition || IsNew)
     {
-        <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)"><div class="form-grid">
+        <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)"><FormGrid>
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="data-source-display-name" TechnicalNameTestId="data-source-name" />
             <FormField Label="@T("Namespace")"><ClearableText @bind-Value="sourceNamespace" Disabled="@(!IsNew)" /></FormField>
             @if (IsNew) { <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSource" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
             <FormField Label="@T("Description")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" maxlength="2000"></ClearableText></FormField>
-            <label class="data-source-choice form-span-2" data-testid="data-source-enabled-option"><input type="checkbox" @bind="enabled" /><span class="data-source-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
+            <label class="data-source-choice form-span-2" data-testid="data-source-enabled-option"><FormCheckbox @bind-Value="enabled" /><span class="data-source-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
             <FormField Label="@T("Profile")" Class="form-span-2" Required="true"><ClearableSelect TValue="string" Value="@profileKey" ValueExpression="@(() => profileKey)" ValueChanged="value => ChangeProfile(new ChangeEventArgs { Value = value })" required data-testid="data-source-profile"><option value="">@T("Select")</option>@foreach (var item in profiles) { <option value="@ProfileKey(item)">@item.Definition.DisplayName · @item.ActiveVersion · @item.ScopeRef</option> }@if (readiness?.Profile is { } resolvedProfile && profiles.All(item => ProfileKey(item) != ProfileKey(resolvedProfile))) { <option value="@ProfileKey(resolvedProfile)">@resolvedProfile.Definition.DisplayName · @resolvedProfile.Version · @resolvedProfile.ScopeRef</option> }</ClearableSelect></FormField>
             <div class="form-field-wide schema-backed-input" data-testid="data-source-configuration"><span>@T("Configuration")</span><JsonSchemaInputEditor Schema="ConfigurationSchema" Value="configuration" ValueChanged="value => configuration = value" ValidationChanged="state => configurationValid = state.IsValid" Disabled="busy" /></div>
-        </div>@if (CanManage) { <div class="form-actions"><button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !configurationValid)">@(busy ? T("Saving") : T("Save"))</button></div> }</fieldset></EditForm>
+        </FormGrid>@if (CanManage) { <FormActions><button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !configurationValid)">@(busy ? T("Saving") : T("Save"))</button></FormActions> }</fieldset></EditForm>
     }
     else if (tab == Tab.Acquisitions)
     {
@@ -103,10 +103,10 @@ else
     else if (tab == Tab.Discovery)
     {
         <section class="panel form-section data-source-discovery" data-testid="data-source-discovery">
-        <div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("DiscoveryTargets")</h2><p>@T("DiscoveryHelp")</p></div><div class="form-actions">
+        <div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("DiscoveryTargets")</h2><p>@T("DiscoveryHelp")</p></div><FormActions>
             <button class="button-secondary" type="button" disabled="@(busy || refreshing)" data-testid="data-source-refresh-discovery" @onclick="RefreshOperationsAsync">@T("Refresh")</button>
             <button class="button-primary" type="button" data-testid="data-source-start-discovery" disabled="@(busy || HasActiveDiscovery || readiness?.Discovery is null)" @onclick="StartDiscoveryAsync">@T("StartDiscovery")</button>
-        </div></div>
+        </FormActions></div>
         @if (readiness?.Discovery is { } discoveryFlow)
         {
             <a class="data-source-flow-card" href="@DiscoveryFlowUrl" data-testid="data-source-discovery-flow-link"><span class="data-source-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("DiscoveryFlowTitle")</small><strong>@discoveryFlow.Name</strong><code>@discoveryFlow.ScopeRef · @discoveryFlow.Namespace/@discoveryFlow.Version</code></span><UiIcon Name="arrow-right" /></a>
@@ -146,7 +146,7 @@ else
 @(choice.Eligible ? T("Eligible") : T("Ineligible"))</State>
         <Information Context="choice">
             <CollectionValue Label="@T("Parent")">@(choice.ParentId ?? "—")</CollectionValue>
-            <CollectionValue Label="@T("TargetName")"><input value="@PromotionName(choice)" @oninput="args => promotionNames[choice.Id] = args.Value?.ToString() ?? string.Empty" aria-label="@T("TargetName")" /></CollectionValue>
+            <CollectionValue Label="@T("TargetName")"><ClearableText Value="@PromotionName(choice)" aria-label="@T("TargetName")" ValueChanged="changed => promotionNames[choice.Id] = (new ChangeEventArgs { Value = changed }).Value?.ToString() ?? string.Empty" /></CollectionValue>
         </Information>
     <Actions Context="choice"><CollectionActions ResourceName="@choice.DisplayName"><button class="button-secondary" type="button" disabled="@(!CanApplyChoice(choice))" data-testid="@(MatchingTarget(choice) is { Stale: true } ? "data-source-reconcile-target" : null)" title="@ChoiceActionHelp(choice)" @onclick="() => ApplyChoiceAsync(choice)">@T(ChoiceActionLabel(choice))</button></CollectionActions></Actions></CollectionView> }
         @if (targets.Count > 0)
@@ -173,11 +173,10 @@ else
     }
     else if (tab == Tab.Yaml)
     {
-        <section class="panel form-section" data-testid="data-source-yaml-editor">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("DataSourceYaml")</h2><p>@T("DataSourceYamlHelp")</p></div></div>
-            <label class="data-source-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" aria-label="@T("ResourceManifest")" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanManage)"></textarea></label>
-            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@(busy ? T("Saving") : T("SaveYaml"))</button></div> }
-        </section>
+        <FormSection Title="@T("DataSourceYaml")" Eyebrow="@T("RawResource")" Description="@T("DataSourceYamlHelp")" TestId="data-source-yaml-editor"><ChildContent>
+            <FormField Label="@T("ResourceManifest")" Class="data-source-yaml-field"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="28" aria-label="@T("ResourceManifest")" @bind-Value="rawYaml" ReadOnly="@(!CanManage)"></ClearableText></ChildContent></FormField>
+            @if (CanManage) { <FormActions><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@(busy ? T("Saving") : T("SaveYaml"))</button></FormActions> }
+        </ChildContent></FormSection>
     }
 }
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("Delete")" Message="@T("DeleteConfirm")" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />

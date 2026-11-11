@@ -484,11 +484,11 @@ public sealed class DataSourceEditorTests
         await using var context = DiscoveryContext(client, new ManualTimeProvider());
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-discovery-choice]");
-        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)").HasAttribute("disabled"));
         rendered.Find("[data-testid=data-source-discovery-choice] input").Input("documents-v2");
-        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)").HasAttribute("disabled"));
         rendered.Find("[data-testid=data-source-discovery-choice] input").Input(targetName);
-        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)").HasAttribute("disabled"));
         var button = rendered.Find("[data-testid=data-source-reconcile-target]");
         Assert.AreEqual(reconcile, button.TextContent);
         Assert.IsFalse(button.HasAttribute("disabled"));
@@ -501,7 +501,7 @@ public sealed class DataSourceEditorTests
             Assert.AreEqual("documents", client.Reconciled.Value.Request.ChoiceId);
             Assert.AreEqual("\"target-v1\"", client.Reconciled.Value.ETag);
             StringAssert.Contains(rendered.Find("[data-testid=data-source-acquisition-target-row]").TextContent, current);
-            var promotedButton = rendered.Find("[data-testid=data-source-discovery-choice] button");
+            var promotedButton = rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)");
             Assert.AreEqual(cultureName == "fr-FR" ? "Déjà promu" : "Already promoted", promotedButton.TextContent);
             Assert.IsTrue(promotedButton.HasAttribute("disabled"));
             Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-reconcile-target]"));

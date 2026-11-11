@@ -21,7 +21,7 @@
     <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-artifact-title">
         <h2 id="delete-artifact-title">@T("DeleteTitle")</h2>
         <p>@T("PurgeHelp")</p>
-        <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => confirmPurge = false">@T("Cancel")</button><button class="button-danger" type="button" disabled="@busy" @onclick="PurgeAsync">@T("ConfirmDelete")</button></div>
+        <FormActions><button class="button-secondary" type="button" @onclick="() => confirmPurge = false">@T("Cancel")</button><button class="button-danger" type="button" disabled="@busy" @onclick="PurgeAsync">@T("ConfirmDelete")</button></FormActions>
     </section>
 }
 
@@ -61,8 +61,7 @@ else if (artifact is not null)
                 <MetricCard Label="@T("Expires")" Value="@artifact.ExpiresAt.ToLocalTime().ToString("g")" Detail="@T("LeaseCount", artifact.Leases.Count)" />
             </section>
 
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
+            <FormSection Title="@T("Producer")" Eyebrow="@T("Provenance")"><ChildContent>
                 <dl class="resource-details artifact-details-grid">
                     <dt>@T("ProducerKind")</dt><dd>@artifact.Producer.Kind</dd>
                     <dt>@T("ProducerId")</dt><dd>@if (ProducerUrl(artifact.Producer) is { } producerUrl) { <a class="text-button" href="@producerUrl"><code>@artifact.Producer.Id</code></a> } else { <code>@artifact.Producer.Id</code> }</dd>
@@ -74,7 +73,7 @@ else if (artifact is not null)
                     <dt>@T("Correlation")</dt><dd>@(artifact.Producer.CorrelationId ?? "—")</dd>
                     <dt>@T("StagingService")</dt><dd>@artifact.BindingNamespace/@artifact.BindingName · <a class="text-button" href="@ToolSetUrl(artifact)">@artifact.ToolSetNamespace/@artifact.ToolSetName:@artifact.ToolSetVersion</a></dd>
                 </dl>
-            </section>
+            </ChildContent></FormSection>
 
             @if (artifact.FailureCode is not null)
             {
@@ -94,7 +93,7 @@ else if (artifact is not null)
                     <div><span>@T("ConsumerLeases")</span><strong>@artifact.Leases.Count</strong></div>
                 </div>
                 <div class="artifact-retention-editor">
-                    <label><span>@T("NewExpiration")</span><input type="datetime-local" value="@expiration" @onchange="SetExpiration" aria-describedby="retention-help" /></label>
+                    <FormField Label="@T("NewExpiration")"><ChildContent><ClearableText UpdateOnInput="false" Type="datetime-local" Value="@expiration" aria-describedby="retention-help" ValueChanged="changed => SetExpiration(new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
                     <button class="button-primary" type="button" disabled="@(busy || !CanExtendRetention)" @onclick="ExtendAsync">@T("ExtendRetention")</button>
                 </div>
                 <small id="retention-help" class="artifact-retention-help">@T(CanExtendRetention ? "RetentionReady" : "RetentionMustExtend")</small>

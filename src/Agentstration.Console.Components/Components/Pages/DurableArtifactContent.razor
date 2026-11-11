@@ -55,8 +55,7 @@ else
         }
     </section>
 
-    <section class="panel form-section" data-testid="durable-artifact-materialization-history">
-        <div class="panel-header"><div><p class="eyebrow">@T("Materialization")</p><h2>@T("MaterializationHistory")</h2><p>@T("MaterializationHistoryHelp")</p></div></div>
+    <FormSection Title="@T("MaterializationHistory")" Eyebrow="@T("Materialization")" Description="@T("MaterializationHistoryHelp")" TestId="durable-artifact-materialization-history"><ChildContent>
         @if (materializations.Count == 0)
         {
             <p class="muted">@T("NoMaterializations")</p>
@@ -87,7 +86,7 @@ else
                         </CollectionActions> }</Actions>
     </CollectionView>
         }
-    </section>
+    </ChildContent></FormSection>
 }
 
 @code {

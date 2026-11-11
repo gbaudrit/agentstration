@@ -12,9 +12,11 @@
 </span>
 
 @code {
+    [Parameter] public bool AllowClear { get; set; } = true;
+    public ClearableSelect() { ValueExpression = () => Value!; }
     [CascadingParameter] private FormFieldPresentation? Field { get; set; }
     private RenderFragment RenderInput => builder => base.BuildRenderTree(builder);
-    private bool CanClear => (EditContext is not null || default(TValue) is null) && !typeof(TValue).IsArray && !string.IsNullOrEmpty(CurrentValueAsString)
+    private bool CanClear => AllowClear && (EditContext is not null || default(TValue) is null) && !typeof(TValue).IsArray && !string.IsNullOrEmpty(CurrentValueAsString)
         && !(AdditionalAttributes?.TryGetValue("disabled", out var value) == true && value is not false);
     protected override void OnParametersSet()
     {

@@ -24,18 +24,16 @@ else
     @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("UsedWarning", UsageCount(usages.Count))</div> }
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="source-provider-editor" class="resource-form">
         <DataAnnotationsValidator /><ValidationSummary />
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProviderResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</div>
-            <div class="form-grid">
+        <FormSection Title="@T("ProviderResource")" Eyebrow="@T("Identity")"><Actions>@if (status is not null) { <StatusBadge Text="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</Actions><ChildContent>
+            <FormGrid>
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="source-provider-display-name" TechnicalNameTestId="source-provider-name" />
-                <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
+                <FormField Label="@T("Namespace")"><Validation><ValidationMessage For="() => model.Namespace" /></Validation><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="model.Namespace" Disabled="@(!IsNew)" /></ChildContent></FormField>
                 <ResourceScopeFormField ResourceKind="@SourceResourceKinds.SourceProvider" Value="selectedScope" ValueChanged="ScopeChangedAsync" Disabled="@(!IsNew)" />
-                <label><span>@T("ExtensionRegistration")</span><select value="@model.ExtensionId" @onchange="ExtensionChanged" data-testid="source-provider-extension"><option value="">@T("SelectExtension")</option>@foreach (var extension in EligibleExtensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</select><ValidationMessage For="() => model.ExtensionId" /></label>
-                <label><span>@T("Contribution")</span><select @bind="model.ContributionId" data-testid="source-provider-contribution"><option value="">@T("SelectContribution")</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</select><ValidationMessage For="() => model.ContributionId" /></label>
-            </div>
-        </section>
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Connection")</p><h2>@T("ExtensionOwnedEndpoint")</h2><p>@T("ConnectionHelp")</p></div></div>
+                <FormField Label="@T("ExtensionRegistration")"><Validation><ValidationMessage For="() => model.ExtensionId" /></Validation><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(model.ExtensionId, System.Globalization.CultureInfo.InvariantCulture)" data-testid="source-provider-extension" ValueChanged="changed => ExtensionChanged(new ChangeEventArgs { Value = changed })"><option value="">@T("SelectExtension")</option>@foreach (var extension in EligibleExtensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</ClearableSelect></ChildContent></FormField>
+                <FormField Label="@T("Contribution")"><Validation><ValidationMessage For="() => model.ContributionId" /></Validation><ChildContent><ClearableSelect @bind-Value="model.ContributionId" data-testid="source-provider-contribution"><option value="">@T("SelectContribution")</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</ClearableSelect></ChildContent></FormField>
+            </FormGrid>
+        </ChildContent></FormSection>
+        <FormSection Title="@T("ExtensionOwnedEndpoint")" Eyebrow="@T("Connection")" Description="@T("ConnectionHelp")"><ChildContent>
             @if (SelectedExtension is { } selected)
             {
                 <dl class="resource-details"><dt>@T("AepEndpoint")</dt><dd><code>@selected.Endpoint</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(selected.Extension?.Id ?? T("NotObserved"))</code></dd><dt>@T("Source")</dt><dd>@selected.DiscoverySource</dd></dl>
@@ -45,8 +43,8 @@ else
                 else { <ul class="resource-links">@foreach (var optionSet in optionSets) { <li><CollectionIdentity DisplayName="@optionSet.Id" Name="@optionSet.Id" IconName="adjustments" /><code>@optionSet.PreferredVersion · @optionSet.Scope</code></li> }</ul> }
             }
             @if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")">@T("LastChecked", status.CheckedAt.ToLocalTime().ToString("g")) — @StatusLabel(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> · @status.Details</span> }</p> }
-        </section>
-        <div class="form-actions"><a class="button-secondary" href="/sourceproviders">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="source-provider-submit">@(saving ? T("Saving") : IsNew ? T("CreateProviderAction") : T("SaveChanges"))</button></div>
+        </ChildContent></FormSection>
+        <FormActions><a class="button-secondary" href="/sourceproviders">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="source-provider-submit">@(saving ? T("Saving") : IsNew ? T("CreateProviderAction") : T("SaveChanges"))</button></FormActions>
     </EditForm>
 
     @if (!IsNew && usages.Count > 0)

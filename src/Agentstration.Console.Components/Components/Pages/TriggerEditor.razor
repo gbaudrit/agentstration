@@ -35,23 +35,20 @@ else
         <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
         <ValidationSummary />
 
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("TriggerResource")</h2></div>@if (!IsNew) { <StatusBadge Text="@(existing!.Value.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(existing.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /> }</div>
+        <FormSection Title="@T("TriggerResource")" Eyebrow="@T("Identity")"><Actions>@if (!IsNew) { <StatusBadge Text="@(existing!.Value.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(existing.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /> }</Actions><ChildContent>
             <FormGrid>
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Trigger" IsNew="@IsNew" TechnicalNameHelp="@T("ImmutableNameHelp")" DisplayNameTestId="trigger-display-name" TechnicalNameTestId="trigger-name" />
                 <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
             </FormGrid>
-        </section>
+        </ChildContent></FormSection>
 
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Target")</p><h2>@T("PublishedFlow")</h2></div></div>
+        <FormSection Title="@T("PublishedFlow")" Eyebrow="@T("Target")"><ChildContent>
             <FormGrid>
                 <FormField Required="true" Label="@T("Flow")" Class="form-span-2"><ChildContent><ClearableSelect @bind-Value="model.FlowKey" data-testid="trigger-flow"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.ScopeRef · @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</ClearableSelect><small>@T("FlowResolutionHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.FlowKey" /></Validation></FormField>
             </FormGrid>
-        </section>
+        </ChildContent></FormSection>
 
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("When")</p><h2>@T("Schedule")</h2></div><button class="button-secondary" type="button" @onclick="PreviewAsync">@T("Preview")</button></div>
+        <FormSection Title="@T("Schedule")" Eyebrow="@T("When")"><Actions><button class="button-secondary" type="button" @onclick="PreviewAsync">@T("Preview")</button></Actions><ChildContent>
             <FormGrid>
                 <FormField Required="true" Label="@T("ScheduleType")"><ChildContent><ClearableSelect @bind-Value="model.ScheduleType"><option value="@TriggerScheduleType.Once">@T("ScheduleType.Once")</option><option value="@TriggerScheduleType.Interval">@T("ScheduleType.Interval")</option><option value="@TriggerScheduleType.Cron">@T("ScheduleType.Cron")</option></ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ScheduleType" /></Validation></FormField>
                 <FormField Required="true" Label="@T("TimeZone")"><ChildContent><ClearableSelect @bind-Value="model.TimeZone">@foreach (var zone in timeZones) { <option value="@zone">@zone</option> }</ClearableSelect><small>@T("TimeZoneHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.TimeZone" /></Validation></FormField>
@@ -67,7 +64,7 @@ else
                 }
                 else
                 {
-                    <label><span>@T("Preset")</span><select value="@cronPreset" @onchange="ApplyCronPreset"><option value="advanced">@T("Preset.Advanced")</option><option value="weekdayMorning">@T("Preset.WeekdaysMorning")</option><option value="dailyMorning">@T("Preset.DailyMorning")</option><option value="weeklyMonday">@T("Preset.MondayMorning")</option></select></label>
+                    <FormField Label="@T("Preset")"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(cronPreset, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => ApplyCronPreset(new ChangeEventArgs { Value = changed })"><option value="advanced">@T("Preset.Advanced")</option><option value="weekdayMorning">@T("Preset.WeekdaysMorning")</option><option value="dailyMorning">@T("Preset.DailyMorning")</option><option value="weeklyMonday">@T("Preset.MondayMorning")</option></ClearableSelect></ChildContent></FormField>
                     <FormField Label="@T("CronExpression")"><ChildContent><ClearableText @bind-Value="model.CronExpression" /><small>@T("CronHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.CronExpression" /></Validation></FormField>
                 }
                 <FormField Label="@T("MissedOccurrence")"><ChildContent><ClearableSelect @bind-Value="model.MisfirePolicy"><option value="@TriggerMisfirePolicy.FireOnce">@T("Misfire.FireOnce")</option><option value="@TriggerMisfirePolicy.Skip">@T("Misfire.Skip")</option></ClearableSelect><small>@T("MisfireHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.MisfirePolicy" /></Validation></FormField>
@@ -78,15 +75,14 @@ else
             {
                 <div class="trigger-preview" aria-live="polite"><strong>@T("NextOccurrences")</strong><ol>@foreach (var value in preview) { <li>@TriggerUi.OccurrenceLabel(value, model.TimeZone, TimeProvider.GetUtcNow(), Localizer)</li> }</ol></div>
             }
-        </section>
+        </ChildContent></FormSection>
 
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("StaticInput")</h2></div><button class="text-button" type="button" @onclick="FormatInput">@T("FormatJson")</button></div>
+        <FormSection Title="@T("StaticInput")" Eyebrow="@T("What")"><Actions><button class="text-button" type="button" @onclick="FormatInput">@T("FormatJson")</button></Actions><ChildContent>
             <FormGrid>
                 <FormField Label="@T("JsonObject")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.InputJson" rows="10" class="trigger-json form-code-editor" data-testid="trigger-input" /><small>@T("StaticInputHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.InputJson" /></Validation></FormField>
             </FormGrid>
             @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="form-alert form-alert-danger" role="alert">@inputError</p> }
-        </section>
+        </ChildContent></FormSection>
 
         @if (IsNew)
         {

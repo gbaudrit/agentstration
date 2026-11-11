@@ -21,8 +21,8 @@ else
             <div><p class="eyebrow">@T("ConfigurationScope")</p><h2 id="workspace-context-title">@T("ChooseDashboard")</h2><p>@T("DashboardContextHelp")</p></div>
         </div>
         <div class="workspace-overview-controls">
-            <label class="workspace-picker"><span>@T("Workspace")</span><select data-testid="workspace-picker" value="@workspaceId" @onchange="WorkspaceChanged">@foreach (var item in workspaces) { <option value="@item.Id.ToString("D")">@item.DisplayName</option> }</select></label>
-            <label class="workspace-picker"><span>@T("Dashboard")</span><select value="@dashboardName" @onchange="DashboardChanged" disabled="@(dashboards.Count == 0)">@if (dashboards.Count == 0) { <option value="">@T("NewDashboard")</option> } else { @foreach (var item in dashboards) { <option value="@item.Value.Name">@item.Value.DisplayName@(item.Value.IsDefault ? T("DefaultSuffix") : "")</option> } }</select></label>
+            <FormField Label="@T("Workspace")" Class="workspace-picker"><ChildContent><ClearableSelect TValue="string" data-testid="workspace-picker" Value="@Convert.ToString(workspaceId, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => WorkspaceChanged(new ChangeEventArgs { Value = changed })">@foreach (var item in workspaces) { <option value="@item.Id.ToString("D")">@item.DisplayName</option> }</ClearableSelect></ChildContent></FormField>
+            <FormField Label="@T("Dashboard")" Class="workspace-picker"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(dashboardName, System.Globalization.CultureInfo.InvariantCulture)" disabled="@(dashboards.Count == 0)" ValueChanged="changed => DashboardChanged(new ChangeEventArgs { Value = changed })">@if (dashboards.Count == 0) { <option value="">@T("NewDashboard")</option> } else { @foreach (var item in dashboards) { <option value="@item.Value.Name">@item.Value.DisplayName@(item.Value.IsDefault ? T("DefaultSuffix") : "")</option> } }</ClearableSelect></ChildContent></FormField>
             <button class="button-secondary workspace-new-button" type="button" @onclick="NewDashboard"><UiIcon Name="plus" />@T("NewDashboard")</button>
         </div>
     </section>
@@ -51,8 +51,8 @@ else
                                     NoResultsLabel="@T("NoIconsFound")"
                                     MoreResultsLabel="@T("MoreIconsAvailable")" />
                     </div>
-                    <label><span>@T("Description")</span><textarea @bind="description" rows="4" placeholder="@T("DashboardDescriptionPlaceholder")"></textarea></label>
-                    <label class="dashboard-default-toggle"><input type="checkbox" @bind="isDefault" /><span><strong>@T("DefaultDashboard")</strong><small>@T("DefaultDashboardHelp")</small></span></label>
+                    <FormField Label="@T("Description")"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="description" rows="4" placeholder="@T("DashboardDescriptionPlaceholder")"></ClearableText></ChildContent></FormField>
+                    <label class="dashboard-default-toggle"><FormCheckbox @bind-Value="isDefault" /><span><strong>@T("DefaultDashboard")</strong><small>@T("DefaultDashboardHelp")</small></span></label>
                 </div>
             </section>
             <section class="panel workspace-composition" aria-labelledby="dashboard-composition-title">
@@ -78,9 +78,9 @@ else
                                     {
                                         var configured = composition.Single(value => value.EntryResourceId == EntryId(entry));
                                         <article @key="EntryId(entry)" class="workspace-entry-row included" data-testid="dashboard-entry-row" data-entry-id="@entry.Id" data-entry-namespace="@entry.Namespace.Value">
-                                            <label class="workspace-entry-toggle"><input type="checkbox" data-testid="dashboard-entry-toggle" checked @onchange="args => ToggleEntry(entry, args)" /><span>@entry.DisplayName</span></label><CollectionIdentity DisplayName="@entry.DisplayName" Namespace="@entry.Namespace.Value" Name="@entry.Name" Href="@ConsoleResourceUrls.Entry(new EntryId(entry.Name, entry.Namespace))" IconName="entry" /><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(entry.WorkspaceId)" /><small>@T("EntryVersion", entry.Version)</small>
+                                            <label class="workspace-entry-toggle"><FormCheckbox data-testid="dashboard-entry-toggle" Value="true" ValueChanged="changed => ToggleEntry(entry, new ChangeEventArgs { Value = changed })" /><span>@entry.DisplayName</span></label><CollectionIdentity DisplayName="@entry.DisplayName" Namespace="@entry.Namespace.Value" Name="@entry.Name" Href="@ConsoleResourceUrls.Entry(new EntryId(entry.Name, entry.Namespace))" IconName="entry" /><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(entry.WorkspaceId)" /><small>@T("EntryVersion", entry.Version)</small>
                                             <div class="workspace-entry-config @(role == DashboardItemRole.Primary ? "without-order" : null)">
-                                                <label><span>@T("Role")</span><select data-testid="dashboard-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry, args)" title="@T("OnlyOnePrimaryEntry")"><option value="Primary">@T("Role.Primary")</option><option value="Featured">@T("Role.Featured")</option><option value="Standard">@T("Role.Standard")</option></select></label>
+                                                <FormField Label="@T("Role")"><ChildContent><ClearableSelect TValue="string" data-testid="dashboard-entry-role" Value="@Convert.ToString(configured.Role, System.Globalization.CultureInfo.InvariantCulture)" title="@T("OnlyOnePrimaryEntry")" ValueChanged="changed => ChangeRole(entry, new ChangeEventArgs { Value = changed })"><option value="Primary">@T("Role.Primary")</option><option value="Featured">@T("Role.Featured")</option><option value="Standard">@T("Role.Standard")</option></ClearableSelect></ChildContent></FormField>
                                                 @if (role != DashboardItemRole.Primary)
                                                 {
                                                     <div class="workspace-entry-order-actions" aria-label="@T("DashboardEntryOrderActions", entry.DisplayName)"><CollectionActions ResourceName="@entry.DisplayName">
@@ -101,7 +101,7 @@ else
                                 @foreach (var entry in ExcludedEntries)
                                 {
                                     <article @key="EntryId(entry)" class="workspace-entry-row excluded" data-testid="dashboard-entry-row" data-entry-id="@entry.Id" data-entry-namespace="@entry.Namespace.Value">
-                                        <label class="workspace-entry-toggle"><input type="checkbox" data-testid="dashboard-entry-toggle" @onchange="args => ToggleEntry(entry, args)" /><span>@entry.DisplayName</span></label><CollectionIdentity DisplayName="@entry.DisplayName" Namespace="@entry.Namespace.Value" Name="@entry.Name" Href="@ConsoleResourceUrls.Entry(new EntryId(entry.Name, entry.Namespace))" IconName="entry" /><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(entry.WorkspaceId)" /><small>@T("EntryVersion", entry.Version)</small>
+                                        <label class="workspace-entry-toggle"><FormCheckbox data-testid="dashboard-entry-toggle" ValueChanged="changed => ToggleEntry(entry, new ChangeEventArgs { Value = changed })" /><span>@entry.DisplayName</span></label><CollectionIdentity DisplayName="@entry.DisplayName" Namespace="@entry.Namespace.Value" Name="@entry.Name" Href="@ConsoleResourceUrls.Entry(new EntryId(entry.Name, entry.Namespace))" IconName="entry" /><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(entry.WorkspaceId)" /><small>@T("EntryVersion", entry.Version)</small>
                                         <span class="workspace-entry-excluded">@T("NotShown")</span>
                                     </article>
                                 }

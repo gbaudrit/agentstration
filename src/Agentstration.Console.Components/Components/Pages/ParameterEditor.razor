@@ -13,13 +13,13 @@
 @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
 @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("Referenced", usages.Count)</div> }
 <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="parameter-editor" class="resource-form" data-testid="parameter-form"><DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><ValidationSummary />
-    <fieldset class="resource-definition-fields" disabled="@busy"><section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ParameterResource")</h2></div></div><FormGrid>
+    <fieldset class="resource-definition-fields" disabled="@busy"><FormSection Title="@T("ParameterResource")" Eyebrow="@T("Identity")"><ChildContent><FormGrid>
         <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Parameter" IsNew="@IsNew" DisplayNameTestId="parameter-display-name" TechnicalNameTestId="parameter-name" />
         <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
         @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
         <FormField Required="true" Label="@T("ValueType")"><ChildContent><ClearableSelect @bind-Value="model.ValueType" data-testid="parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ValueType" /></Validation></FormField>
         <FormField Label="@T("Value")" Class="form-span-2"><ChildContent><ClearableText @bind-Value="model.Value" data-testid="parameter-value" /><small>@T("Value.Help")</small></ChildContent><Validation><ValidationMessage For="() => model.Value" /></Validation></FormField>
-    </FormGrid></section>
+    </FormGrid></ChildContent></FormSection>
     <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" />
     </fieldset>
     <FormActions Busy="@busy"><a class="button-secondary" href="/parameters">@T("Cancel")</a><button type="submit" class="button-primary" disabled="@busy" data-testid="parameter-save">@(busy ? T("Saving") : T("Save"))</button></FormActions>

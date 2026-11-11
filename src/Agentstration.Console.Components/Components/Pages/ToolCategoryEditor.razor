@@ -15,14 +15,13 @@
 else
 {
     @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")">@message</div> }
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Details")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("MemberCount", selected.Count)" Status="UiStatus.Info" /> }</div>
-        <div class="form-grid">
+    <FormSection Title="@T("Details")" Eyebrow="@T("Identity")"><Actions>@if (!IsNew) { <StatusBadge Text="@T("MemberCount", selected.Count)" Status="UiStatus.Info" /> }</Actions><ChildContent>
+        <FormGrid>
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" DisplayNameTestId="category-display-name" TechnicalNameTestId="category-name" />
             <FormField Label="@T("CategoryDescription")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" rows="3"></ClearableText></FormField>
             <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolCategory" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-        </div>
-    </section>
+        </FormGrid>
+    </ChildContent></FormSection>
 
     <section class="panel form-section">
         <div class="panel-header tool-category-members-header"><div><p class="eyebrow">@T("Membership")</p><h2>@T("ChooseTools")</h2><p>@T("MembershipHelp")</p></div><div class="tool-category-search"><SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" Label="@T("Search")" /></div></div>
@@ -56,8 +55,7 @@ else
                             var assigned = selected.Contains(ToolKey(tool));
                             var usable = Assignable(tool);
                             <div class="tool-category-member">
-                                <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => Toggle(tool, (bool)args.Value!)" />
-
+                                <FormCheckbox id="@inputId" aria-label="@tool.Definition.DisplayName" Value="@assigned" disabled="@(!usable && !assigned)" ValueChanged="changed => Toggle(tool, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />
                                 <div class="tool-category-member-copy">
                                     <CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><Badges><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" /></Badges></CollectionIdentity>
                                     <ResourceScopeBadge ScopeRef="tool.ScopeRef" />
@@ -80,8 +78,7 @@ else
                     {
                         var inputId = ToolInputId(ReferenceKey(missing.Reference));
                         <div class="tool-category-member unavailable">
-                            <input id="@inputId" type="checkbox" checked @onchange="args => ToggleMissing(missing, (bool)args.Value!)" />
-
+                            <FormCheckbox id="@inputId" Value="true" ValueChanged="changed => ToggleMissing(missing, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />
                             <div class="tool-category-member-copy"><strong>@missing.Reference.Name <HelpTooltip Text="@T("MissingMember")" /></strong><StatusBadge Text="@T("Missing")" Status="UiStatus.Warning" /></div>
                         </div>
                     }
@@ -94,14 +91,14 @@ else
             }
         </div>
     </section>
-    <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
+    <FormActions><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></FormActions>
 }
 
 @if (confirmDelete)
 {
     <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-category-title">
         <h2 id="delete-category-title">@T("DeleteTitle")</h2><p>@T("DeleteExplanation")</p>
-        <div class="form-actions"><button class="button-secondary" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></div>
+        <FormActions><button class="button-secondary" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></FormActions>
     </section>
 }
 

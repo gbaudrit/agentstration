@@ -19,8 +19,8 @@ else
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" />
             <FormField Label="@T("Namespace")"><ClearableText @bind-Value="namespaceValue" Disabled="@(!IsNew)" /></FormField>
             <FormField Optional="true" Label="@T("DefinitionDescription")" Class="form-span-2"><ClearableText Multiline @bind-Value="description" rows="2" /></FormField>
-            <label><input type="checkbox" @bind="enabled" /> <span>@T("Enabled")</span></label>
-            <label><input type="checkbox" @bind="requiresApproval" /> <span>@T("RequiresApproval")</span></label>
+            <label><FormCheckbox @bind-Value="enabled" /> <span>@T("Enabled")</span></label>
+            <label><FormCheckbox @bind-Value="requiresApproval" /> <span>@T("RequiresApproval")</span></label>
             <FormField Required="true" Label="@T("TimeoutSeconds")"><ClearableNumber @bind-Value="timeoutSeconds" min="1" max="900" /></FormField>
         </FormGrid>
     </section>
@@ -40,7 +40,7 @@ else
     <section class="panel"><div class="panel-header"><h2>@T("FlowImplementation")</h2></div>
         <FormGrid>
             <FormField Required="true" Label="@T("Flow")"><ClearableSelect TValue="string" data-testid="tool-definition-flow" @bind-Value="selectedFlow" @bind-Value:after="FlowSelectionChangedAsync"><option value="">—</option>@foreach(var flow in flows){<option value="@FlowKey(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name (@flow.ActiveVersion)</option>}</ClearableSelect></FormField>
-            <label><input type="checkbox" data-testid="tool-definition-use-active-version" @bind="useActiveVersion" @bind:after="LoadContractAsync" /> <span>@T("UseActiveVersion")</span></label>
+            <label><FormCheckbox data-testid="tool-definition-use-active-version" @bind-Value="useActiveVersion" @bind-Value:after="LoadContractAsync" /> <span>@T("UseActiveVersion")</span></label>
             @if (!useActiveVersion) { <FormField Label="@T("Version")"><ClearableText UpdateOnInput="false" data-testid="tool-definition-version" @bind-Value="flowVersion" @bind-Value:after="LoadContractAsync" /></FormField> }
             <div class="form-span-2">
                 @if (loadingContract)

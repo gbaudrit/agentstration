@@ -144,7 +144,7 @@ public sealed class EntryAdministrationComponentTests
         await rendered.Find("[data-testid='entry-tab-yaml']").ClickAsync(new());
 
         var editor = rendered.Find("[data-testid='entry-yaml-editor'] textarea");
-        Assert.IsTrue(editor.ParentElement!.ClassList.Contains("entry-yaml-field"));
+        Assert.IsTrue(editor.Closest(".entry-yaml-field") is not null);
         var yaml = editor.GetAttribute("value") ?? editor.TextContent;
         Assert.IsTrue(yaml.Contains("kind: Entry", StringComparison.Ordinal));
         Assert.IsTrue(yaml.Contains("suggestions:", StringComparison.Ordinal));
@@ -237,7 +237,7 @@ public sealed class EntryAdministrationComponentTests
         await rendered.Find("[data-testid='entry-tab-yaml']").ClickAsync(new());
         var yamlEditor = rendered.Find("[data-testid='entry-yaml-editor'] textarea");
         Assert.IsTrue(yamlEditor.HasAttribute("readonly"));
-        Assert.IsTrue(yamlEditor.ParentElement!.ClassList.Contains("entry-yaml-field"));
+        Assert.IsTrue(yamlEditor.Closest(".entry-yaml-field") is not null);
         Assert.IsFalse(rendered.FindAll("button").Any(value => value.TextContent.Contains("Save YAML", StringComparison.Ordinal)));
         var workplaceLink = rendered.FindAll("a").Single(value => value.TextContent.Contains("Use in Workplace", StringComparison.Ordinal));
         Assert.AreEqual("workspaces?entry=main&entryNamespace=agentstration.daily-life-assistant", workplaceLink.GetAttribute("href")?.TrimStart('/'));

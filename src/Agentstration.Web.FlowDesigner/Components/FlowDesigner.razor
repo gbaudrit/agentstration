@@ -48,7 +48,7 @@ else
                     <div class="designer-more-menu">
                         <button class="button-secondary" disabled="@(!Editor.CanUndo)" @onclick="Undo">@T("Undo")</button>
                         <button class="button-secondary" disabled="@(!Editor.CanRedo)" @onclick="Redo">@T("Redo")</button>
-                        <label class="publish-version">@T("Version")<input aria-label="@T("PublishVersion")" @bind="publishVersion" /></label>
+                        <FormField Label="@T("Version")" Class="publish-version"><ChildContent><ClearableText UpdateOnInput="false" aria-label="@T("PublishVersion")" @bind-Value="publishVersion" /></ChildContent></FormField>
                         <button class="button-primary" data-testid="flow-designer-publish" disabled="@publishing" aria-busy="@publishing" @onclick="PublishAsync">@T(publishing ? "Publishing" : "Publish")</button>
                     </div>
                 </div>
@@ -174,8 +174,8 @@ else
                                         {
                                             <div class="inspector-details-group">
                                                 <div class="inspector-details-heading"><h3>@T("StepDetails")</h3><span class="inspector-step-type">@T($"Step.{SelectedStep.Type()}")</span></div>
-                                                <label>@T("StepDisplayName")<input data-testid="step-display-name" disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
-                                                <label>@T("StepId")<input data-testid="step-name" disabled="@(ReadOnly || SelectedStep is not OutputFlowStepDefinition)" value="@SelectedStep.Name" @onchange="UpdateOutputNameAsync" /></label>
+                                                <FormField Label="@T("StepDisplayName")"><ChildContent><ClearableText UpdateOnInput="false" data-testid="step-display-name" Disabled="@ReadOnly" Value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" ValueChanged="changed => UpdateDisplayNameAsync(new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
+                                                <FormField Label="@T("StepId")"><ChildContent><ClearableText UpdateOnInput="false" data-testid="step-name" Disabled="@(ReadOnly || SelectedStep is not OutputFlowStepDefinition)" Value="@SelectedStep.Name" ValueChanged="changed => UpdateOutputNameAsync(new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
                                             </div>
                                         }
                                         @if (SelectedStep is InputFlowStepDefinition input)
@@ -261,20 +261,20 @@ else
                 {
                     <section class="transition-editor" data-testid="selected-transition-editor">
                         <h4>@T("TransitionDetails")</h4>
-                        <label>@T("TransitionId")<input value="@selectedTransition.Id" readonly /></label>
-                        <label>@T("From")<select data-testid="transition-from" disabled="@ReadOnly" value="@selectedTransition.FromStep" @onchange="UpdateTransitionFromAsync">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                        <label>@T("Event")@if (TransitionEvents(selectedTransition) is { Count: > 0 } events)
-                        { <select data-testid="transition-event" disabled="@ReadOnly" value="@selectedTransition.Event" @onchange="UpdateTransitionEventAsync">@foreach (var item in events) { <option value="@item">@item</option> }</select> }
-                        else { <input data-testid="transition-event" disabled="@ReadOnly" value="@selectedTransition.Event" @onchange="UpdateTransitionEventAsync" /> }</label>
-                        <label>@T("To")<select data-testid="transition-to" disabled="@ReadOnly" value="@selectedTransition.ToStep" @onchange="UpdateTransitionToAsync">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                        <label>@T("TransitionCondition")<input data-testid="transition-condition" disabled="@ReadOnly" value="@selectedTransition.Condition" @onchange="UpdateTransitionConditionAsync" /></label>
-                        <label>@T("TransitionPriority")<input data-testid="transition-priority" disabled="@ReadOnly" type="number" value="@selectedTransition.Priority" @onchange="UpdateTransitionPriorityAsync" /></label>
+                        <FormField Label="@T("TransitionId")"><ChildContent><ClearableText Value="@selectedTransition.Id" ReadOnly="true" /></ChildContent></FormField>
+                        <FormField Label="@T("From")"><ChildContent><ClearableSelect TValue="string" data-testid="transition-from" disabled="@ReadOnly" Value="@Convert.ToString(selectedTransition.FromStep, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateTransitionFromAsync(new ChangeEventArgs { Value = changed })">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</ClearableSelect></ChildContent></FormField>
+                        <FormField Label="@T("Event")">@if (TransitionEvents(selectedTransition) is { Count: > 0 } events)
+                        { <ClearableSelect TValue="string" data-testid="transition-event" disabled="@ReadOnly" Value="@Convert.ToString(selectedTransition.Event, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateTransitionEventAsync(new ChangeEventArgs { Value = changed })">@foreach (var item in events) { <option value="@item">@item</option> }</ClearableSelect> }
+                        else { <ClearableText UpdateOnInput="false" data-testid="transition-event" Disabled="@ReadOnly" Value="@selectedTransition.Event" ValueChanged="changed => UpdateTransitionEventAsync(new ChangeEventArgs { Value = changed })" /> }</FormField>
+                        <FormField Label="@T("To")"><ChildContent><ClearableSelect TValue="string" data-testid="transition-to" disabled="@ReadOnly" Value="@Convert.ToString(selectedTransition.ToStep, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateTransitionToAsync(new ChangeEventArgs { Value = changed })">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</ClearableSelect></ChildContent></FormField>
+                        <FormField Label="@T("TransitionCondition")"><ChildContent><ClearableText UpdateOnInput="false" data-testid="transition-condition" Disabled="@ReadOnly" Value="@selectedTransition.Condition" ValueChanged="changed => UpdateTransitionConditionAsync(new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
+                        <FormField Label="@T("TransitionPriority")"><ChildContent><ClearableText UpdateOnInput="false" data-testid="transition-priority" Disabled="@ReadOnly" Type="number" Value="@(selectedTransition.Priority?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)" ValueChanged="changed => UpdateTransitionPriorityAsync(new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
                         <button class="button-danger" disabled="@ReadOnly" @onclick="() => RemoveTransitionAsync(selectedTransition.Id)">@T("DeleteTransition")</button>
                     </section>
                 }
-                <label>@T("From")<select data-testid="transition-new-from" disabled="@ReadOnly" @bind="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                <label>@T("Event")<input data-testid="transition-new-event" disabled="@ReadOnly" @bind="transitionEvent" /></label>
-                <label>@T("To")<select data-testid="transition-new-to" disabled="@ReadOnly" @bind="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                <FormField Label="@T("From")"><ChildContent><ClearableSelect data-testid="transition-new-from" disabled="@ReadOnly" @bind-Value="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</ClearableSelect></ChildContent></FormField>
+                <FormField Label="@T("Event")"><ChildContent><ClearableText UpdateOnInput="false" data-testid="transition-new-event" Disabled="@ReadOnly" @bind-Value="transitionEvent" /></ChildContent></FormField>
+                <FormField Label="@T("To")"><ChildContent><ClearableSelect data-testid="transition-new-to" disabled="@ReadOnly" @bind-Value="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</ClearableSelect></ChildContent></FormField>
                 <button class="button-secondary" data-testid="transition-new-add" disabled="@ReadOnly" @onclick="AddTransitionAsync">@T("AddTransition")</button>
                 <ul class="transition-list">@foreach (var transition in Editor.State.Resource.Definition.Transitions) { <li><button class="@(Editor.State.Selection.TransitionId == transition.Id ? "selected" : null)" @onclick="() => SelectTransitionAsync(transition.Id)">@transition.FromStep —@transition.Event→ @transition.ToStep</button><button disabled="@ReadOnly" aria-label="@T("DeleteTransitionNamed", transition.Id)" @onclick="() => RemoveTransitionAsync(transition.Id)">×</button></li> }</ul>
             </aside>
@@ -306,7 +306,7 @@ else
 
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="EffectiveInputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<div class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></div></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="EffectiveInputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<FormActions Class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></FormActions></section></div>
     }
     @if (connectionContractPrompt is { } contractPrompt)
     {

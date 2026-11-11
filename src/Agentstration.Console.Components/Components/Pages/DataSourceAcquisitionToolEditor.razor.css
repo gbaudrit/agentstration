@@ -17,7 +17,7 @@
     overflow-wrap: anywhere;
 }
 
-.acquisition-tool-recipe select {
+.acquisition-tool-recipe ::deep select {
     width: 100%;
 }
 
