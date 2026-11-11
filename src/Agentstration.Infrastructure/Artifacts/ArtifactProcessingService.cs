@@ -18,7 +18,8 @@ namespace Agentstration.Infrastructure.Artifacts;
 /// <summary>Execution-owned content capabilities. Direct drafts stay in the bounded handoff cache; retained drafts use Artifact storage.</summary>
 public sealed class ArtifactProcessingService(ArtifactManagementService artifacts, IArtifactDurableStore durable,
     WorkspaceArtifactStorage selectableStorage, IRuntimeExecutionStateStore states, IFlowRepository runs,
-    TimeProvider clock, DirectExecutionPayloadPersistence direct, IAuthorizationService authorization, ICurrentRequestContext current) : IDisposable
+    TimeProvider clock, DirectExecutionPayloadPersistence direct, IAuthorizationService authorization, ICurrentRequestContext current,
+    IRequestContextScopeFactory scopes) : IDisposable
 {
     private const string RuntimeType = "artifact-processing-v1";
     private const int MaximumInputBytes = 16 * 1024 * 1024;
@@ -46,6 +47,8 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         try
         {
             await EnsureExecutionAccessAsync(owner, token);
+            // Artifacts belong to the trusted operational Workspace even when the Flow is Instance/Tenant-owned.
+            using var operational = scopes.Push(current.Current);
             var session = await LoadAsync(owner, key, token);
             if (action == "open")
             {
@@ -187,6 +190,8 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         try
         {
             await EnsureExecutionAccessAsync(owner, token);
+            // Artifacts belong to the trusted operational Workspace even when the Flow is Instance/Tenant-owned.
+            using var operational = scopes.Push(current.Current);
             var session = await LoadAsync(owner, key, token) ?? throw Error("artifact_processing_context_missing");
             EnsureLive(session);
             if (session.Result is not null) throw Error("artifact_processing_closed");

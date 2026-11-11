@@ -18,7 +18,9 @@ public sealed class ArtifactProcessingContentTool(RuntimeExecutionToolMaterial o
 
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
-        if (!current.IsInitialized || current.Current.PrincipalId != invocation.PrincipalId
+        if (current.AccessMode is not (ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration)
+            || current.Current.PrincipalId == Guid.Empty || current.Current.TenantId == Guid.Empty || current.Current.WorkspaceId == Guid.Empty
+            || current.Current.PrincipalId != invocation.PrincipalId
             || current.Current.TenantId != invocation.TenantId || current.Current.WorkspaceId != invocation.WorkspaceId.Value
             || string.IsNullOrWhiteSpace(invocation.RunId) || invocation.CallerKind is not (ToolDefinitionCallerKind.Flow or ToolDefinitionCallerKind.Agent))
             throw new ToolDefinitionInvocationException("artifact_processing_scope_invalid", "Content operations require the trusted Artifact processing execution.");

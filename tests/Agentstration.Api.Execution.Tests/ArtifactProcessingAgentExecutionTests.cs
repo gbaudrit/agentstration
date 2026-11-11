@@ -2,6 +2,10 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Artifacts;
+using Agentstration.Agents;
+using Agentstration.Models;
+using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
@@ -25,17 +29,27 @@ namespace Agentstration.Api.Tests;
 public sealed class ArtifactProcessingAgentExecutionTests
 {
     [TestMethod]
-    [DataRow("agent", ArtifactProcessingMode.Content, false)]
-    [DataRow("agent", ArtifactProcessingMode.Access, false)]
-    [DataRow("tool", ArtifactProcessingMode.Content, false)]
-    [DataRow("tool", ArtifactProcessingMode.Access, false)]
-    [DataRow("template-tool", ArtifactProcessingMode.Content, false)]
-    [DataRow("direct-template-tool", ArtifactProcessingMode.Content, false)]
-    [DataRow("agent", ArtifactProcessingMode.Content, true)]
-    [DataRow("agent", ArtifactProcessingMode.Access, true)]
-    [DataRow("direct-template-tool", ArtifactProcessingMode.Content, true)]
-    [DataRow("tool", ArtifactProcessingMode.Access, true)]
-    public async Task RealWorkerProcessesAnArtifactWithAnUnchangedAgentAndScopedContentTools(string processor, ArtifactProcessingMode mode, bool transient)
+    [DataRow("agent", ArtifactProcessingMode.Content, false, ResourceScopeKind.Workspace)]
+    [DataRow("agent", ArtifactProcessingMode.Access, false, ResourceScopeKind.Workspace)]
+    [DataRow("tool", ArtifactProcessingMode.Content, false, ResourceScopeKind.Workspace)]
+    [DataRow("tool", ArtifactProcessingMode.Access, false, ResourceScopeKind.Workspace)]
+    [DataRow("template-tool", ArtifactProcessingMode.Content, false, ResourceScopeKind.Workspace)]
+    [DataRow("direct-template-tool", ArtifactProcessingMode.Content, false, ResourceScopeKind.Workspace)]
+    [DataRow("agent", ArtifactProcessingMode.Content, true, ResourceScopeKind.Workspace)]
+    [DataRow("agent", ArtifactProcessingMode.Access, true, ResourceScopeKind.Workspace)]
+    [DataRow("direct-template-tool", ArtifactProcessingMode.Content, true, ResourceScopeKind.Workspace)]
+    [DataRow("tool", ArtifactProcessingMode.Access, true, ResourceScopeKind.Workspace)]
+    [DataRow("tool", ArtifactProcessingMode.Content, false, ResourceScopeKind.Instance)]
+    [DataRow("tool", ArtifactProcessingMode.Content, true, ResourceScopeKind.Instance)]
+    [DataRow("tool", ArtifactProcessingMode.Access, false, ResourceScopeKind.Instance)]
+    [DataRow("tool", ArtifactProcessingMode.Access, true, ResourceScopeKind.Instance)]
+    [DataRow("tool", ArtifactProcessingMode.Content, false, ResourceScopeKind.Tenant)]
+    [DataRow("tool", ArtifactProcessingMode.Content, true, ResourceScopeKind.Tenant)]
+    [DataRow("tool", ArtifactProcessingMode.Access, false, ResourceScopeKind.Tenant)]
+    [DataRow("tool", ArtifactProcessingMode.Access, true, ResourceScopeKind.Tenant)]
+    [DataRow("agent", ArtifactProcessingMode.Access, false, ResourceScopeKind.Instance)]
+    [DataRow("agent", ArtifactProcessingMode.Access, true, ResourceScopeKind.Instance)]
+    public async Task RealWorkerProcessesAnArtifactWithAnUnchangedAgentAndScopedContentTools(string processor, ArtifactProcessingMode mode, bool transient, ResourceScopeKind kind)
     {
         var directory = Path.Combine(Path.GetTempPath(), "artifact-agent-execution-" + Guid.NewGuid().ToString("N"));
         var model = new ProcessingModel();
@@ -47,6 +61,8 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", directory);
                 builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+                if (kind != ResourceScopeKind.Workspace)
+                    builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", "true");
                 AwpTestWorker.Configure(builder);
                 builder.ConfigureServices(services =>
                 {
@@ -57,9 +73,56 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 });
             });
             using var client = factory.CreateClient();
+            var agentTemplate = processor == "agent" && kind != ResourceScopeKind.Workspace
+                ? await client.GetFromJsonAsync<AgentResource>("/api/agents/sql-expert") : null;
             await using var worker = await AwpTestWorker.StartAsync(factory);
             var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+            var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+            var operational = kind switch
+            {
+                ResourceScopeKind.Instance => await topology.GetInstanceOperationsWorkspaceAsync(default),
+                ResourceScopeKind.Tenant => await topology.GetTenantOperationsWorkspaceAsync(current.TenantId, default),
+                _ => null
+            };
+            if (operational is not null) current = new(current.PrincipalId, operational.TenantId, operational.Id);
+            var ownerScope = kind switch
+            {
+                ResourceScopeKind.Instance => ResourceScopeRef.Instance,
+                ResourceScopeKind.Tenant => ResourceScopeRef.Tenant(current.TenantId),
+                _ => ResourceScopeRef.Workspace(current.WorkspaceId)
+            };
             using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
+            var processingAgent = "sql-expert";
+            if (agentTemplate is not null)
+            {
+                if (kind == ResourceScopeKind.Tenant)
+                {
+                    using var sharedScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(current);
+                    var resources = factory.Services.GetRequiredService<IResourceStore>();
+                    var modelProfile = (await resources.GetExactAsync<ModelProfileResource>(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
+                        agentTemplate.Definition.ModelProfile.Namespace ?? ResourceNamespace.Default, ModelResourceKinds.ModelProfile, agentTemplate.Definition.ModelProfile.Name), default))!.Value;
+                    var runtimeProfile = (await resources.GetExactAsync<RuntimeProfileResource>(ScopedResourceAddress.Create(ResourceScopeRef.Instance,
+                        agentTemplate.Definition.RuntimeProfile.Namespace ?? ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile, agentTemplate.Definition.RuntimeProfile.Name), default))!.Value;
+                    var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+                    foreach (var dependency in new Resource[] { modelProfile, runtimeProfile })
+                    {
+                        var existing = await policies.GetAsync(dependency.Uid, default);
+                        var grants = (existing?.Policy.Grants ?? []).Where(grant => grant.TargetScopeRef != ownerScope)
+                            .Append(new ResourceAccessGrant(ownerScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use])).ToArray();
+                        await policies.PutAsync(new(new(dependency.Uid, ResourceScopeRef.Instance, dependency.Namespace, dependency.Kind, dependency.Generation), grants), existing?.ETag, default);
+                    }
+                }
+                using var agentDefinitionScope = kind == ResourceScopeKind.Instance
+                    ? factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(current)
+                    : factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(current);
+                var agents = factory.Services.GetRequiredService<AgentManagementService>();
+                var agent = await agents.PutAgentAsync(new AgentResource { ApiVersion = agentTemplate.ApiVersion, Kind = agentTemplate.Kind,
+                    Metadata = new() { Name = "scoped-anonymizer" }, ScopeRef = ownerScope, Definition = agentTemplate.Definition with
+                    { ModelProfile = agentTemplate.Definition.ModelProfile with { ScopeRef = ResourceScopeRef.Instance },
+                        RuntimeProfile = agentTemplate.Definition.RuntimeProfile with { ScopeRef = ResourceScopeRef.Instance } } }, null, true, default);
+                await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default, agent.Value.Name, ownerScope, agent.Value.Generation, default);
+                processingAgent = agent.Value.Name;
+            }
             var artifacts = factory.Services.GetRequiredService<ArtifactManagementService>();
             var content = !transient && mode == ArtifactProcessingMode.Access && processor == "agent" ? "Alice " + new string('x', 200_000) : "Alice";
             var inputId = "direct-input";
@@ -81,7 +144,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 EntryStep = "input",
                 Steps = [new InputFlowStepDefinition { Name = "input" },
                     new ArtifactTransformFlowStepDefinition { Name = "process", Mode = mode },
-                    new AgentFlowStepDefinition { Name = "anonymize", Agent = new("sql-expert"),
+                    new AgentFlowStepDefinition { Name = "anonymize", Agent = new(processingAgent, ScopeRef: ownerScope),
                         InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
                     new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success,
                         OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
@@ -93,18 +156,18 @@ public sealed class ArtifactProcessingAgentExecutionTests
             };
             if (processor is "tool" or "template-tool" or "direct-template-tool")
             {
-                var generic = new ToolFlowStepDefinition { Name = "anonymize", Tool = new(AgentstrationToolProvider.ToolResourceName("test.anonymizer")),
+                var generic = new ToolFlowStepDefinition { Name = "anonymize", Tool = new(AgentstrationToolProvider.ToolResourceName("test.anonymizer"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance),
                     ArgumentsMapping = JsonSerializer.SerializeToElement(mode == ArtifactProcessingMode.Content
                         ? (object)"${input}" : new { text = "${steps.read.output.content}", language = "fr" }) };
                 var processing = (ArtifactTransformFlowStepDefinition)graph.Steps.Single(step => step.Name == "process");
                 var body = mode == ArtifactProcessingMode.Content
                     ? new FlowStepDefinition[] { generic }
-                    : [new ToolFlowStepDefinition { Name = "read", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.input_read")) },
+                    : [new ToolFlowStepDefinition { Name = "read", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.input_read"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance) },
                         generic,
-                        new ToolFlowStepDefinition { Name = "write", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.output_write")),
+                        new ToolFlowStepDefinition { Name = "write", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.output_write"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance),
                             ArgumentsMapping = JsonSerializer.SerializeToElement(new { content = "${steps.anonymize.output.redacted}", expectedRevision = 0, requestId = "write" }) },
-                        new ToolFlowStepDefinition { Name = "verify", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.output_read")) },
-                        new ToolFlowStepDefinition { Name = "complete", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.output_complete")),
+                        new ToolFlowStepDefinition { Name = "verify", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.output_read"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance) },
+                        new ToolFlowStepDefinition { Name = "complete", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.output_complete"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance),
                             ArgumentsMapping = JsonSerializer.SerializeToElement(new { expectedRevision = 1 }) }];
                 processing = processing with { ProcessingInputMapping = mode == ArtifactProcessingMode.Content
                     ? JsonSerializer.SerializeToElement(new { text = "${input.content}", language = "fr" }) : null,
@@ -129,21 +192,28 @@ public sealed class ArtifactProcessingAgentExecutionTests
                         .. graph.Transitions.Where(edge => edge.FromStep != "input")]
                 };
             }
+            using var definitionScope = kind switch
+            {
+                ResourceScopeKind.Instance => factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(current),
+                ResourceScopeKind.Tenant => factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(current),
+                _ => factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current)
+            };
             var flows = factory.Services.GetRequiredService<FlowService>();
-            var flow = await flows.CreateAsync(new WorkspaceId(current.WorkspaceId), new("artifact-agent", null, "1.0.0", true,
-                new DirectFlowDefinition(new(FlowTargetKind.Agent, "sql-expert")), Graph: graph), default);
-            await flows.PublishVersionAsync(new WorkspaceId(current.WorkspaceId), flow.Value.Id, "1.0.0", true, default);
+            var flow = await flows.CreateExactAsync(ownerScope, new("artifact-agent", null, "1.0.0", true,
+                processor == "agent" ? new DirectFlowDefinition(new(FlowTargetKind.Agent, processingAgent, ScopeRef: ownerScope))
+                    : new WorkflowFlowDefinition("input", [new("input", FlowNodeKind.Input), new("completed", FlowNodeKind.Output)], [new("input", "completed")], ["completed"]), Graph: graph), ResourceNamespace.Default, default);
+            await flows.PublishVersionExactAsync(ownerScope, flow.Value.Id, "1.0.0", true, default);
             var input = JsonSerializer.SerializeToElement(new { artifacts = new[] { item } });
             if (processor is "template-tool" or "direct-template-tool") input = JsonSerializer.SerializeToElement(new { value = input, parameters = new { } });
             var runs = factory.Services.GetRequiredService<FlowRunService>();
-            var executionScope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
+            var executionScope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId) { LogicalScopeRef = ownerScope };
             string runId;
-            if (transient)
+            if (transient || kind != ResourceScopeKind.Workspace)
             {
                 var started = await runs.EnsureRootAsync(new("flowrun-direct-transform", flow.Value.Id, "1.0.0", "local",
                     FlowRunTrigger.Api, FlowInvocationOrigin.Api, current.PrincipalId.ToString(), null, null, "direct-transform-test",
                     input, "knowledge-projection:direct-transform-test", false, null, null, null, null, executionScope)
-                    { TransientPayloads = true }, default);
+                    { TransientPayloads = transient, DefinitionScopeRef = ownerScope }, default);
                 runId = started.Value.Id;
             }
             else
@@ -162,7 +232,10 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 await Task.Delay(25);
             }
             Assert.AreEqual(FlowRunStatus.Succeeded, run?.Status, JsonSerializer.Serialize(new { run?.Error, run?.Steps }));
-            var outputItem = run!.Output!.Value.GetProperty("artifacts")[0];
+            using var artifactObservation = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
+            Assert.AreEqual(ownerScope, run!.Scope.AccessScopeRef);
+            Assert.AreEqual(current.WorkspaceId, run.WorkspaceId.Value);
+            var outputItem = run.Output!.Value.GetProperty("artifacts")[0];
             var outputId = outputItem.GetProperty("artifactId").GetString()!;
             Assert.AreNotEqual(inputId, outputId, "The generated transformation output must follow the inserted Artifact processor.");
             if (transient)
@@ -214,6 +287,12 @@ public sealed class ArtifactProcessingAgentExecutionTests
         }
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public Task TenantAgentProcessesArtifactsWithExplicitSharedProfileAccess(bool transient) =>
+        RealWorkerProcessesAnArtifactWithAnUnchangedAgentAndScopedContentTools("agent", ArtifactProcessingMode.Access, transient, ResourceScopeKind.Tenant);
 
     private sealed class GenericAnonymizerTool : IInternalMcpToolHandler
     {

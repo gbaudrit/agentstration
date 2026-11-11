@@ -110,6 +110,15 @@ These Tools restrict the access they provide. Other Tools already assigned to an
 Agent continue to use their own grants; choosing an Agent with broader access
 does not revoke those grants.
 
+## Instance and Tenant execution
+
+Instance- and Tenant-owned processing keeps its logical resource scope. Artifact
+operations run inside the execution's trusted operational Workspace, using the
+same Principal, Tenant, Workspace and authorization restrictions. That temporary
+context is restored on success or refusal; it does not grant access to a caller-
+selected Workspace or change the published Flow. Scoped content Tools support
+these trusted administrative contexts as well as ordinary Workspace execution.
+
 ## Direct acquisitions without intermediate storage
 
 A source using direct acquisition can use the same content/access processing

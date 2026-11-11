@@ -166,8 +166,59 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         Assert.IsEmpty(await factory.Services.GetRequiredService<ArtifactManagementService>().ListStagedAsync(default));
     }
 
+    [TestMethod]
+    [DataRow(ResourceScopeKind.Instance)]
+    [DataRow(ResourceScopeKind.Tenant)]
+    public async Task AdministrativeProcessingUsesItsOperationalWorkspaceAndRestoresTheLogicalContext(ResourceScopeKind kind)
+    {
+        await using var factory = Factory();
+        var bootstrap = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var current = factory.Services.GetRequiredService<ICurrentRequestContext>();
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var workspace = kind == ResourceScopeKind.Instance ? await topology.GetInstanceOperationsWorkspaceAsync(default)
+            : await topology.GetTenantOperationsWorkspaceAsync(bootstrap.TenantId, default);
+        var context = new RequestContext(bootstrap.PrincipalId, workspace.TenantId, workspace.Id);
+        var ownerScope = kind == ResourceScopeKind.Instance ? ResourceScopeRef.Instance : ResourceScopeRef.Tenant(context.TenantId);
+        (FlowRun Owner, ArtifactTransformFlowStepDefinition Step, FlowRun Child, JsonElement Item) fixture;
+        using (scopes.Push(context)) fixture = await SetupAsync(factory.Services, context, ArtifactProcessingMode.Access, "Alice", logicalScope: ownerScope);
+        var owner = fixture.Owner;
+        var child = fixture.Child;
+        IDisposable Enter(RequestContext value) => kind == ResourceScopeKind.Instance ? scopes.PushInstance(value) : scopes.PushTenantAdministration(value);
+        using var administrative = Enter(context);
+        var originalMode = current.AccessMode;
+        var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
+        await processor.ExecuteOwnerAsync(owner, fixture.Step, 0, "open", fixture.Item, default);
+        Assert.AreEqual(originalMode, current.AccessMode);
+        Assert.AreEqual("Alice", (await processor.ExecuteToolAsync(child, "input_read", Element(new { }), default)).GetProperty("content").GetString());
+        await processor.ExecuteToolAsync(child, "output_write", Element(new { content = "PERSON_1", expectedRevision = 0, requestId = "anonymize" }), default);
+        var incomplete = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => processor.ExecuteOwnerAsync(owner, fixture.Step, 0, "prepare", Element(new { }), default));
+        Assert.AreEqual("artifact_processing_output_incomplete", incomplete.Code);
+        Assert.AreEqual(originalMode, current.AccessMode);
+        await processor.ExecuteToolAsync(child, "output_complete", Element(new { expectedRevision = 1 }), default);
+        await processor.ExecuteOwnerAsync(owner, fixture.Step, 0, "prepare", Element(new { }), default);
+        var result = await processor.ExecuteOwnerAsync(owner, fixture.Step, 0, "finish", Element(new { }), default);
+        Assert.AreEqual(originalMode, current.AccessMode);
+        using (Enter(context with { Restriction = new AuthorizationRestriction(Guid.NewGuid(), context.WorkspaceId, new HashSet<string>(StringComparer.Ordinal)) }))
+        {
+            var denied = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => processor.ExecuteOwnerAsync(owner, fixture.Step, 1, "open", fixture.Item, default));
+            Assert.AreEqual("artifact_processing_access_denied", denied.Code);
+        }
+        Assert.AreEqual(originalMode, current.AccessMode);
+        var artifacts = factory.Services.GetRequiredService<ArtifactManagementService>();
+        using (scopes.Push(context))
+        {
+            var output = (await artifacts.GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(result.GetProperty("artifactId").GetString()!), default))!.Value;
+            Assert.AreEqual(context.WorkspaceId, output.WorkspaceId.Value);
+            Assert.AreEqual(owner.Id, output.ProducerFlowRunId);
+        }
+        using (scopes.Push(bootstrap))
+            Assert.IsNull(await artifacts.GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(result.GetProperty("artifactId").GetString()!), default));
+        Assert.AreEqual(originalMode, current.AccessMode);
+    }
+
     private static async Task<(FlowRun Owner, ArtifactTransformFlowStepDefinition Step, FlowRun Child, JsonElement Item)> SetupAsync(
-        IServiceProvider services, RequestContext current, ArtifactProcessingMode mode, string content, string media = "text/plain", bool transient = false)
+        IServiceProvider services, RequestContext current, ArtifactProcessingMode mode, string content, string media = "text/plain", bool transient = false, ResourceScopeRef? logicalScope = null)
     {
         var artifacts = services.GetRequiredService<ArtifactManagementService>();
         JsonElement item;
@@ -185,11 +236,11 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         var step = new ArtifactTransformFlowStepDefinition { Name = "anonymize", Mode = mode };
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, step] };
         var flowId = new FlowId("artifact-processing-test");
-        var version = new FlowVersion(ResourceScopeRef.Workspace(current.WorkspaceId), flowId, "1.0.0", null,
+        var version = new FlowVersion(logicalScope ?? ResourceScopeRef.Workspace(current.WorkspaceId), flowId, "1.0.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")), new Dictionary<string, string>(), DateTimeOffset.UtcNow, graph, FlowDefinitionHash.Compute(graph));
         var owner = new FlowRun { TransientPayloads = transient, Id = "flowrun-" + Guid.NewGuid().ToString("N"), WorkspaceId = new(current.WorkspaceId),
             FlowId = flowId, FlowVersion = version.Version, DefinitionSnapshot = version, DefinitionHash = version.DefinitionHash,
-            Scope = new(current.TenantId, new(current.WorkspaceId), current.PrincipalId), Input = Element(new { }),
+            Scope = new(current.TenantId, new(current.WorkspaceId), current.PrincipalId) { LogicalScopeRef = logicalScope }, Input = Element(new { }),
             CreatedAt = DateTimeOffset.UtcNow, Steps = [new FlowStepRun { StepName = step.Name, StepType = "artifactTransform", Attempt = 1 }] };
         await services.GetRequiredService<IFlowRepository>().CreateRunAsync(owner, default);
         var child = owner with { Id = "flowrun-processing-" + Guid.NewGuid().ToString("N"), ParentFlowRunId = owner.Id,
