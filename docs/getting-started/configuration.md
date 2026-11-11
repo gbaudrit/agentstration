@@ -2,6 +2,8 @@
 
 Agentstration uses standard ASP.NET Core configuration. JSON settings can be overridden by environment variables using double underscores, for example `AI__Provider=Deterministic`.
 
+For opt-in HTTP request/response logging and Aspire payload traces, see [HTTP diagnostics](../reference/http-diagnostics.md). Configure `Observability:Http` on each participating host, or on the AppHost to forward the options to its Web, Workplace and Worker resources.
+
 The main verified settings are:
 
 | Setting | Current default | Purpose |

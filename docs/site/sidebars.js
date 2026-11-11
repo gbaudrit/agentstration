@@ -133,6 +133,7 @@ const sidebars = {
         'reference/resources/agents',
         'reference/secrets-and-vaults',
         'reference/configuration',
+        'reference/http-diagnostics',
         'reference/identity-and-authorization',
         'reference/current-capabilities',
       ],

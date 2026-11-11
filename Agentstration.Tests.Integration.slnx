@@ -18,6 +18,7 @@
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.OpenApi.Tests/Agentstration.Extensions.OpenApi.Tests.csproj" />
+    <Project Path="tests/Agentstration.Http.Diagnostics.Tests/Agentstration.Http.Diagnostics.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Workplace.Web.Tests/Agentstration.Workplace.Web.Tests.csproj" />
   </Folder>

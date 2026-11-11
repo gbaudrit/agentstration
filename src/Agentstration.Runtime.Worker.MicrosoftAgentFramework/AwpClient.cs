@@ -19,12 +19,19 @@ internal sealed class AwpClient : IDisposable
 
     public AwpClient(Uri authority, AwpClientCredential credential, AwpWorkerSessionId sessionId,
         TimeProvider timeProvider, int retryCount, HttpMessageHandler? handler = null)
+        : this(authority, credential, sessionId, timeProvider, retryCount,
+            handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: true))
+    {
+    }
+
+    public AwpClient(Uri authority, AwpClientCredential credential, AwpWorkerSessionId sessionId,
+        TimeProvider timeProvider, int retryCount, HttpClient httpClient)
     {
         this.credential = credential;
         this.sessionId = sessionId;
         this.timeProvider = timeProvider;
         this.retryCount = retryCount;
-        http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: true);
+        http = httpClient;
         http.BaseAddress = authority;
         http.Timeout = Timeout.InfiniteTimeSpan;
     }

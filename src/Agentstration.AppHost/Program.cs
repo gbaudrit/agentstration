@@ -309,6 +309,7 @@ var runtimeWorkerCredentials = AwpDevelopmentWorkerCredentials.Provision(
     Path.Combine(slotDataPath, "awp-workers"), instanceId, runtimeWorkerCount);
 
 var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-console")
+    .WithHttpDiagnostics(builder.Configuration)
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Agentstration__InstanceId", instanceId)
     .WithEnvironment("Agentstration__SlotDataPath", slotDataPath)
@@ -381,6 +382,7 @@ for (var index = 0; index < runtimeWorkerCredentials.Count; index++)
 {
     var credential = runtimeWorkerCredentials[index];
     builder.AddProject<Projects.Agentstration_Runtime_Worker_MicrosoftAgentFramework>($"runtime-worker-{index + 1}")
+        .WithHttpDiagnostics(builder.Configuration)
         .WithEnvironment("Agentstration__Slot", slot)
         .WithEnvironment("Agentstration__RuntimeWorker__AuthorityUrl", console.GetEndpoint("http"))
         .WithEnvironment("Agentstration__RuntimeWorker__WorkerId", credential.WorkerId.ToString("D"))
@@ -394,6 +396,7 @@ for (var index = 0; index < runtimeWorkerCredentials.Count; index++)
 }
 
 var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agentstration-workplace")
+    .WithHttpDiagnostics(builder.Configuration)
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Agentstration__InstanceId", instanceId)
     .WithEnvironment("Agentstration__ApiBaseUrl", console.GetEndpoint("http"))
