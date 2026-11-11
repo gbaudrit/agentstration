@@ -6,6 +6,8 @@ using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Storage.Abstractions;
+using Agentstration.Identity.Contracts;
+using Agentstration.Storage;
 using Agentstration.Infrastructure.Storage;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -136,6 +138,8 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             return manifestItem;
         }
         catch (ArtifactValidationException exception) { throw Error(exception.Code); }
+        catch (AuthorizationDeniedException) { throw Error("artifact_processing_access_denied"); }
+        catch (StorageException exception) { throw Error(exception.Code); }
         finally { gate.Release(); }
     }
 
@@ -236,6 +240,8 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             catch (RegexMatchTimeoutException) { throw Error("artifact_processing_regex_timeout"); }
         }
         catch (ArtifactValidationException exception) { throw Error(exception.Code); }
+        catch (AuthorizationDeniedException) { throw Error("artifact_processing_access_denied"); }
+        catch (StorageException exception) { throw Error(exception.Code); }
         finally { gate.Release(); }
     }
 

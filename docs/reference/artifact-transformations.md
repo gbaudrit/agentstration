@@ -10,6 +10,12 @@ to the next outer step and **error** to an error output. Processing may include
 Agents, Tools, child Flows, conditions and mappings. It does not require another
 published Flow or transformation step.
 
+A transformation draft created from a source forwards its incoming successful
+result at the final output, so inserting this step preserves its new Artifact
+manifest. In an existing authored Flow, check the final Output mapping: use
+`"${transition.output}"` to forward the connected step rather than a fixed earlier
+mapping result. Existing authored drafts and publications are not rewritten.
+
 ## Content mode
 
 Use **Content (text or JSON)** for a processor that accepts ordinary values.

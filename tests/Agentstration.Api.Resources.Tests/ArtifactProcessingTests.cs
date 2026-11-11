@@ -121,6 +121,9 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         var foreign = child with { Scope = child.Scope with { WorkspaceId = new(foreignWorkspace) } };
         var rejected = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => processor.ExecuteToolAsync(foreign, "input_read", Element(new { }), default));
         Assert.AreEqual("artifact_processing_scope_invalid", rejected.Code);
+        using var deniedPrincipal = scopes.Push(new RequestContext(Guid.NewGuid(), current.TenantId, current.WorkspaceId));
+        var denied = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => processor.ExecuteToolAsync(child, "input_read", Element(new { }), default));
+        Assert.AreEqual("artifact_processing_access_denied", denied.Code);
     }
 
     private static async Task<(FlowRun Owner, ArtifactTransformFlowStepDefinition Step, FlowRun Child, JsonElement Item)> SetupAsync(

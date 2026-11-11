@@ -26,6 +26,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
     [DataRow("agent", ArtifactProcessingMode.Access)]
     [DataRow("tool", ArtifactProcessingMode.Content)]
     [DataRow("tool", ArtifactProcessingMode.Access)]
+    [DataRow("template-tool", ArtifactProcessingMode.Content)]
     public async Task RealWorkerProcessesAnArtifactWithAnUnchangedAgentAndScopedContentTools(string processor, ArtifactProcessingMode mode)
     {
         var directory = Path.Combine(Path.GetTempPath(), "artifact-agent-execution-" + Guid.NewGuid().ToString("N"));
@@ -72,7 +73,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
                     new("return", "anonymize", "success", "process"), new("agent-error", "anonymize", "error", "error"),
                     new("done", "process", "completed", "completed"), new("failed", "process", "error", "error")]
             };
-            if (processor == "tool")
+            if (processor is "tool" or "template-tool")
             {
                 var generic = new ToolFlowStepDefinition { Name = "anonymize", Tool = new(AgentstrationToolProvider.ToolResourceName("test.anonymizer")),
                     ArgumentsMapping = JsonSerializer.SerializeToElement(mode == ArtifactProcessingMode.Content
@@ -96,11 +97,24 @@ public sealed class ArtifactProcessingAgentExecutionTests
                         .. body.Select(step => new FlowTransitionDefinition("error-" + step.Name, step.Name, "error", "error")),
                         new("done", "process", "completed", "completed"), new("failed", "process", "error", "error")] };
             }
+            if (processor == "template-tool")
+            {
+                var schema = JsonSerializer.SerializeToElement(new { type = "object" });
+                var template = FlowDraftTemplates.CreateTransformation(new(schema, schema));
+                graph = graph with
+                {
+                    InputSchema = template.InputSchema, OutputSchema = template.OutputSchema,
+                    Steps = [template.Steps[0], template.Steps[1], .. graph.Steps.Where(step => step.Name is not ("input" or "completed")), template.Steps[2]],
+                    Transitions = [new("unwrap", "input", "completed", "transform"), new("process-input", "transform", "completed", "process"),
+                        .. graph.Transitions.Where(edge => edge.FromStep != "input")]
+                };
+            }
             var flows = factory.Services.GetRequiredService<FlowService>();
             var flow = await flows.CreateAsync(new WorkspaceId(current.WorkspaceId), new("artifact-agent", null, "1.0.0", true,
                 new DirectFlowDefinition(new(FlowTargetKind.Agent, "sql-expert")), Graph: graph), default);
             await flows.PublishVersionAsync(new WorkspaceId(current.WorkspaceId), flow.Value.Id, "1.0.0", true, default);
             var input = JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = staged.Value.ArtifactId.ToString(), kind = "staged" } } });
+            if (processor == "template-tool") input = JsonSerializer.SerializeToElement(new { value = input, parameters = new { } });
             using var started = await client.PostAsJsonAsync("/api/flows/artifact-agent/runs", new CreateFlowRunRequest(input));
             Assert.IsTrue(started.IsSuccessStatusCode, await started.Content.ReadAsStringAsync());
             using var response = JsonDocument.Parse(await started.Content.ReadAsStringAsync());
@@ -117,6 +131,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
             }
             Assert.AreEqual(FlowRunStatus.Succeeded, run?.Status, JsonSerializer.Serialize(new { run?.Error, run?.Steps }));
             var outputId = run!.Output!.Value.GetProperty("artifacts")[0].GetProperty("artifactId").GetString()!;
+            Assert.AreNotEqual(staged.Value.ArtifactId.ToString(), outputId, "The generated transformation output must follow the inserted Artifact processor.");
             var output = (await artifacts.GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(outputId), default))!.Value;
             var bytes = await factory.Services.GetRequiredService<IArtifactDurableStore>().ReadAsync(new(current.WorkspaceId), output.Receipt.OpaqueReference, 0, 1024, default);
             Assert.AreEqual("PERSON_1", Encoding.UTF8.GetString(bytes.Span));
@@ -128,7 +143,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 Assert.IsLessThan(30_000, model.MaximumMessageCharacters, "The complete 200 KB input must not be put into model input.");
             }
             else Assert.IsEmpty(model.CalledTools);
-            if (processor == "tool")
+            if (processor is "tool" or "template-tool")
             {
                 Assert.AreEqual(1, genericTool.Calls);
                 Assert.AreEqual("Alice", genericTool.LastInput?.GetProperty("text").GetString());
