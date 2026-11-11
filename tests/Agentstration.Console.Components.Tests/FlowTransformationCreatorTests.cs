@@ -24,6 +24,7 @@ public sealed partial class KnowledgeSourceEditorTests
             .Add(value => value.InputSchema, ManifestValueSchema).Add(value => value.OutputSchema, ManifestValueSchema));
         Assert.IsTrue(rendered.FindAll("[role=status]").Any(element => element.TextContent.Contains(empty, StringComparison.Ordinal)));
         Assert.IsTrue(rendered.Find("[data-testid='flow-sequence-add']").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid='flow-sequence-refresh']").HasAttribute("disabled"));
         var button = rendered.Find("[data-testid='flow-sequence-create']");
         Assert.AreEqual(create, button.TextContent);
         Assert.IsFalse(button.HasAttribute("disabled"));

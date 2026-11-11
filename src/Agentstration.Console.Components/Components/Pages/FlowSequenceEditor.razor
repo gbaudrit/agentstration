@@ -27,7 +27,7 @@
     <div class="form-actions">
         <button type="button" class="button-secondary" disabled="@(ReadOnly || loading || options.Count == 0 || Value.Count >= 32)" @onclick="AddAsync" data-testid="flow-sequence-add">@T("SequenceAdd")</button>
         <button type="button" class="button-secondary" disabled="@(ReadOnly || loading || loadFailed || CreationInput is null || CreationOutput is null)" @onclick="OpenCreator" data-testid="flow-sequence-create">@T("SequenceCreate")</button>
-        <button type="button" class="text-button" disabled="loading" @onclick="LoadAsync" data-testid="flow-sequence-refresh">@T("SequenceRefresh")</button>
+        <button type="button" class="text-button" disabled="@loading" @onclick="LoadAsync" data-testid="flow-sequence-refresh">@T("SequenceRefresh")</button>
     </div>
     @if (showCreator && creation is { } contract)
     {
