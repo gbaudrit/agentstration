@@ -2,11 +2,67 @@ using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Resources;
+using Agentstration.Infrastructure.Runtime;
+using Agentstration.Runtime.Abstractions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Application.Tests;
 
 public sealed partial class FlowTests
 {
+    [TestMethod]
+    [DataRow(65_537, true)]
+    [DataRow(1_048_576, true)]
+    [DataRow(1_048_577, false)]
+    public void CompositionValuesHaveAnIndependentBoundedPayloadBudget(int length, bool accepted)
+    {
+        using var document = JsonDocument.Parse("{\"value\":\"" + new string('x', length - 12) + "\"}");
+        Assert.AreEqual(length, document.RootElement.GetRawText().Length);
+        var schema = JsonSerializer.SerializeToElement(new { type = "object" });
+        if (accepted) FlowCompositionSchema.ValidateValue(schema, document.RootElement);
+        else
+        {
+            var error = Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(schema, document.RootElement));
+            Assert.AreEqual("flow_composition_value_too_large", error.Code);
+        }
+    }
+
+    [TestMethod]
+    public async Task CompositionParametersKeepTheirSmallerLiteralBudget()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        await CreatePublishedGraphAsync(fixture, "bounded-parameters-child", CompositionChild());
+        var parent = await CreatePublishedGraphAsync(fixture, "bounded-parameters-parent", CompositionTemplate());
+        var template = (await fixture.Service.GetVersionAsync(TestScope.WorkspaceId, parent.Value.Id, "1.0.0", default))!.Value;
+        var error = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => new FlowCompositionService(fixture.Service).ResolveAsync(template,
+            new Dictionary<string, IReadOnlyList<FlowCompositionCall>>
+            {
+                ["prepare"] = [new() { Flow = new("bounded-parameters-child"), Parameters = JsonSerializer.SerializeToElement(new { label = new string('x', 65_536) }) }]
+            }, TestScope.AccessScopeRef, default));
+        Assert.AreEqual("flow_composition_parameters_invalid", error.Code);
+    }
+
+    [TestMethod]
+    public async Task ChildValidationRejectionsRemainGovernedFailuresAndAllowAValidRetry()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        await CreatePublishedGraphAsync(fixture, "child", ChildGraph());
+        var parent = await CreatePublishedGraphAsync(fixture, "parent", ParentGraph());
+        var runs = Service(fixture, new TestFlowRunQueue());
+        var input = JsonSerializer.SerializeToElement(new { article = "valid" });
+        var root = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "validation", input, TestScope, default);
+        var gateway = new RuntimeWorkerOperationGateway(null!, null!, null!, null!, null!, null!, null!, null!, runs,
+            TimeProvider.System, null!, NullLogger<RuntimeWorkerOperationGateway>.Instance);
+        var error = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => gateway.CreateOrGetChildFlowAsync(
+            TestScope.ScopeRef, TestScope.WorkspaceId, root.Value.Id, "analyze", JsonSerializer.SerializeToElement(new { article = 42 }), "flowCall", null, default));
+        Assert.AreEqual("flow_input_type_invalid", error.Code);
+        Assert.IsInstanceOfType<FlowValidationException>(error.InnerException);
+        Assert.HasCount(1, (await runs.ListAsync(null, null, 0, 20, TestScope, default)).Items);
+        var child = await gateway.CreateOrGetChildFlowAsync(TestScope.ScopeRef, TestScope.WorkspaceId, root.Value.Id, "analyze", input, "flowCall", null, default);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(child.RunId));
+        Assert.HasCount(2, (await runs.ListAsync(null, null, 0, 20, TestScope, default)).Items);
+    }
+
     [TestMethod]
     public async Task CompositionTranslatesOutsideScopeReferencesIntoValidationFailures()
     {

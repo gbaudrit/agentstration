@@ -6,6 +6,9 @@ namespace Agentstration.Flows.Application;
 /// <summary>Conservative compatibility for the bounded JSON contracts used by sequential composition.</summary>
 public static class FlowCompositionSchema
 {
+    public const int MaximumParametersLength = 65_536;
+    public const int MaximumValueLength = 1_048_576;
+
     public static bool IsAssignable(JsonElement output, JsonElement input, int depth = 0)
     {
         if (depth > 12 || !IsSupported(output) || !IsSupported(input)) return false;
@@ -43,7 +46,9 @@ public static class FlowCompositionSchema
     }
     public static void ValidateValue(JsonElement schema, JsonElement value, int depth = 0)
     {
-        if (depth > 12 || value.ValueKind == JsonValueKind.Undefined || value.GetRawText().Length > 65536 || !IsSupported(schema)) throw Invalid();
+        if (depth > 12 || value.ValueKind == JsonValueKind.Undefined || !IsSupported(schema)) throw Invalid();
+        if (value.GetRawText().Length > MaximumValueLength)
+            throw new FlowValidationException("flow_composition_value_too_large", $"A composition value cannot exceed {MaximumValueLength} JSON characters.");
         if (schema.ValueKind != JsonValueKind.Object || !schema.TryGetProperty("type", out var type)) throw Invalid();
         var valid = type.GetString() switch
         {
