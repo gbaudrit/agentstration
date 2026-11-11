@@ -4,6 +4,7 @@ import { withCollectionAssertions } from '../src/journeys/inspect-collections.jo
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { inspectFlowObservability } from '../src/journeys/inspect-flow-observability.journey.js';
 import { CollectionContractPage } from '../src/pages/collection-contract.page.js';
+import { createPackProject } from '../src/journeys/create-pack-project.journey.js';
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
 
 // The existing observability/Workplace journeys use the seeded Development topology.
@@ -43,5 +44,14 @@ test('Workplace populated entry, conversation, task, activity and notifications 
   await pages.workplace.openNotifications(product.workplaceUrl, workspace.workspaceName);
   observations.push(await collections.inspect('en-US'));
   await pages.workplace.markFirstNotificationRead();
+  await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });
+});
+
+test('populated collection contract: Pack resource selection and build history @collections @smoke', async ({ page, product }, testInfo) => {
+  const observations = await withCollectionAssertions(
+    { ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, createPackProject,
+    { publisher: 'playwright', name: 'collection-contract', version: '1.0.0', displayName: 'Collection contract' },
+  );
+  expect(observations.length).toBeGreaterThan(0);
   await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });
 });

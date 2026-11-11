@@ -26,7 +26,7 @@ export const collectionSurfaces = [...collectionManifest.frames, ...collectionMa
   contract: surface.renderer === 'CollectionView' ? 'shared-frame' : 'native-applicable',
   pageObject: 'src/pages/collection-contract.page.ts',
   specification: 'tests/collection-contract.spec.ts',
-  populatedSpecification: surface.host === 'workplace' ? 'tests/collection-workplace.spec.ts' : 'tests/collection-workflows.spec.ts',
+  populatedSpecification: surface.host === 'workplace' || /PackProject/.test(surface.source) ? 'tests/collection-seeded-workflows.spec.ts' : 'tests/collection-workflows.spec.ts',
   identitySpecification: 'tests/collection-long-identities.spec.ts',
   domainSpecifications: [...new Set(applicationSurfaces.filter(routeSurface =>
     routeSurface.coverage !== 'planned' && routeSurface.host === surface.host && (routeSurface.source === surface.source

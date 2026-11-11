@@ -8,7 +8,6 @@ import { exerciseOperationalTriggers } from '../src/journeys/exercise-operationa
 import { inspectConsoleAdministration } from '../src/journeys/inspect-console-administration.journey.js';
 import { exerciseSchemaAdministration } from '../src/journeys/exercise-schema-administration.journey.js';
 import { exerciseModelAdministration } from '../src/journeys/exercise-model-administration.journey.js';
-import { createPackProject } from '../src/journeys/create-pack-project.journey.js';
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
 
 test.use({ authenticationMode: 'Local' });
@@ -29,9 +28,7 @@ const cases: ReadonlyArray<{ name: string; run: Journey<Record<string, never>> }
     profileName: 'collection-model', profileDisplayName: 'Collection model',
     runtimeName: 'collection-runtime', runtimeDisplayName: 'Collection runtime',
   }) },
-  { name: 'Pack resource selection and build history', run: context => createPackProject(context, {
-    publisher: 'playwright', name: 'collection-contract', version: '1.0.0', displayName: 'Collection contract',
-  }) },
+
 ];
 
 for (const scenario of cases) {
