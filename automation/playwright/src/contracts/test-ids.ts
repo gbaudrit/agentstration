@@ -1,5 +1,15 @@
 export const TestIds = {
   collections: { modelProfileOverview: 'model-profile-overview' },
+  formAdapters: {
+    requirement: 'model-provider-value-requirement',
+    bindingKind: 'model-provider-binding-kind',
+    bindingCreate: 'model-provider-binding-create',
+    parameterDialog: 'contextual-parameter-creator',
+    parameterValue: 'contextual-parameter-value',
+    parameterCreate: 'contextual-parameter-create',
+    secretDialog: 'contextual-secret-creator',
+    secretValue: 'contextual-secret-value',
+  },
   common: {
     iconPicker: 'icon-picker',
     schemaInputEditor: 'schema-input-editor',

@@ -310,3 +310,9 @@ export const CollectionVersionTextByLocale = {
   'en-US': { version: 'Version', active: 'Active version', draft: 'Draft version', generation: 'Generation' },
   'fr-FR': { version: 'Version', active: 'Version active', draft: 'Version du brouillon', generation: 'Génération' },
 } as const;
+
+/** Independent field expectations; do not import product resource files. */
+export const SharedFormTextByLocale = {
+  'en-US': { clear: 'Clear', selectionRequired: 'Select a value' },
+  'fr-FR': { clear: 'Vider', selectionRequired: 'Sélectionnez une valeur' },
+} as const;

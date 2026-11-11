@@ -1,5 +1,16 @@
 export const Checkpoints = {
   collections: { contract: 'collections-contract-verified' },
+  sharedForms: {
+    editorCleared: 'shared-form-editor-cleared',
+    requiredSelection: 'shared-form-required-selection-invalid',
+    workplaceCleared: 'shared-form-workplace-cleared',
+    nativeBootstrap: 'shared-form-native-bootstrap',
+    nativeAccount: 'shared-form-native-account',
+    administration: 'shared-form-administration',
+    contextual: 'shared-form-contextual-values',
+    inspector: 'shared-form-flow-inspector',
+    dynamic: 'shared-form-dynamic-values',
+  },
   organizationStructure: {
     instance: 'organization-structure-instance',
     tenantCreated: 'organization-structure-tenant-created',
