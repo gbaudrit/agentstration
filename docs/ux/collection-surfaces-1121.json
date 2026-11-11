@@ -5614,17 +5614,16 @@
       "routes": [],
       "renderer": "native-specialized",
       "adaptation": "Native message author/content/time semantics remain; no invented state, namespace or command.",
-      "validation": "source-adopted-and-regression-mapped",
+      "validation": "reviewed-unmounted-legacy",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "native applicable semantics; preserve family interaction",
         "domainSpecifications": [],
-        "sharedHostSpecifications": [
-          "tests/workplace.spec.ts"
-        ],
+        "sharedHostSpecifications": [],
         "routeEvidence": [],
-        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+        "interpretation": "Retained legacy library renderer with no production call site at this baseline. This is source-review evidence, not a mounted list screen or a browser-coverage claim."
+      },
+      "mounting": "unmounted-legacy"
     },
     {
       "id": "task-timeline-task-activities",
@@ -5633,17 +5632,16 @@
       "routes": [],
       "renderer": "native-specialized",
       "adaptation": "Native chronological activity list retains existing business content; read-only items gain no invented actions.",
-      "validation": "source-adopted-and-regression-mapped",
+      "validation": "reviewed-unmounted-legacy",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "native applicable semantics; preserve family interaction",
         "domainSpecifications": [],
-        "sharedHostSpecifications": [
-          "tests/workplace.spec.ts"
-        ],
+        "sharedHostSpecifications": [],
         "routeEvidence": [],
-        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+        "interpretation": "Retained legacy library renderer with no production call site at this baseline. This is source-review evidence, not a mounted list screen or a browser-coverage claim."
+      },
+      "mounting": "unmounted-legacy"
     },
     {
       "id": "task-progress-timeline-functional-progress",
@@ -5721,7 +5719,7 @@
         "sharedContract": "native applicable semantics; preserve family interaction",
         "domainSpecifications": [],
         "sharedHostSpecifications": [
-          "tests/console-administration.spec.ts"
+          "tests/flow-observability.spec.ts"
         ],
         "routeEvidence": [],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
@@ -5759,7 +5757,8 @@
         "sharedContract": "native applicable semantics; preserve family interaction",
         "domainSpecifications": [],
         "sharedHostSpecifications": [
-          "tests/console-administration.spec.ts"
+          "tests/hierarchical-context.spec.ts",
+          "tests/create-workspace.spec.ts"
         ],
         "routeEvidence": [],
         "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
@@ -7372,17 +7371,16 @@
       "routes": [],
       "renderer": "native-specialized",
       "adaptation": "Keep chronological history, accessible title/time/detail and domain tonal marker; no invented resource route, owner, state label or command.",
-      "validation": "source-adopted-and-regression-mapped",
+      "validation": "reviewed-unmounted-legacy",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "native applicable semantics; preserve family interaction",
         "domainSpecifications": [],
-        "sharedHostSpecifications": [
-          "tests/console-administration.spec.ts"
-        ],
+        "sharedHostSpecifications": [],
         "routeEvidence": [],
-        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
-      }
+        "interpretation": "Retained legacy library renderer with no production call site at this baseline. This is source-review evidence, not a mounted list screen or a browser-coverage claim."
+      },
+      "mounting": "unmounted-legacy"
     },
     {
       "id": "labels-summary-metadata-labels",
@@ -7936,12 +7934,12 @@
     {
       "source": "src/Agentstration.Workplace.Components/TaskTimeline.razor",
       "classification": "inventoried",
-      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+      "reason": "Retained legacy list renderer with no production call site at this baseline; explicitly recorded as unmounted rather than claiming host-page browser coverage."
     },
     {
       "source": "src/Agentstration.Workplace.Components/ConversationPanel.razor",
       "classification": "inventoried",
-      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+      "reason": "Retained legacy list renderer with no production call site at this baseline; explicitly recorded as unmounted rather than claiming host-page browser coverage."
     },
     {
       "source": "src/Agentstration.Web.Components/SecretReferencePicker.razor",
@@ -7951,7 +7949,7 @@
     {
       "source": "src/Agentstration.Web.Components/ExecutionTimeline.razor",
       "classification": "inventoried",
-      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+      "reason": "Retained legacy list renderer with no production call site at this baseline; explicitly recorded as unmounted rather than claiming host-page browser coverage."
     },
     {
       "source": "src/Agentstration.Web.Components/LabelsSummary.razor",
