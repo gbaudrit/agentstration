@@ -22,6 +22,7 @@ public static class AwpProtocol
     public const string StreamModelPath = BasePath + "/assignments/model/stream";
     public const string InvokeToolPath = BasePath + "/assignments/tools/invoke";
     public const string InvokeFlowToolPath = BasePath + "/assignments/flow-tools/invoke";
+    public const string ProcessArtifactPath = BasePath + "/assignments/artifact-processing";
     public const string CaptureFlowArtifactPath = BasePath + "/assignments/flow-artifacts/capture";
     public const string CleanupFlowArtifactPath = BasePath + "/assignments/flow-artifacts/cleanup";
     public const string StoreArtifactPath = BasePath + "/assignments/artifacts";

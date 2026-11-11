@@ -156,4 +156,22 @@
   <data name="CompositionAllowEmpty" xml:space="preserve"><value>Autoriser une séquence vide (identité)</value></data>
   <data name="CompositionHelp" xml:space="preserve"><value>La ressource utilisatrice choisit ici une séquence ordonnée de Flows publiés. Chaque Flow reçoit value et ses paramètres enregistrés.</value></data>
   <data name="InvalidJson" xml:space="preserve"><value>Saisissez un JSON valide.</value></data>
+  <data name="Step.artifactTransform" xml:space="preserve"><value>Transformer les artefacts</value></data>
+  <data name="ArtifactProcessingHelp" xml:space="preserve"><value>Reliez process aux étapes de votre traitement, puis leur résultat à cette étape. completed poursuit avec le manifeste des artefacts produits ; error gère un échec du traitement.</value></data>
+  <data name="ArtifactProcessingMode" xml:space="preserve"><value>Transmettre l’entrée sous forme de</value></data>
+  <data name="ArtifactProcessingMode.Content" xml:space="preserve"><value>Contenu (texte ou JSON)</value></data>
+  <data name="ArtifactProcessingMode.Access" xml:space="preserve"><value>Accès limités à l’entrée et à la sortie</value></data>
+  <data name="ArtifactContentHelp" xml:space="preserve"><value>Lit le texte UTF-8 ou le JSON dans la limite configurée et capture le résultat choisi. Un contenu trop volumineux est refusé ; l’extraction des fichiers binaires doit être explicite.</value></data>
+  <data name="ArtifactAccessHelp" xml:space="preserve"><value>Les Agents reçoivent des Tools temporaires input_read/search_regex et output_write/read/search_regex/complete. Le traitement choisit comment lire et vérifier le contenu. La sortie reste isolée jusqu’à la réussite du traitement.</value></data>
+  <data name="ArtifactMaximumCount" xml:space="preserve"><value>Nombre maximal d’artefacts</value></data>
+  <data name="ArtifactMaximumInput" xml:space="preserve"><value>Taille maximale de l’entrée en octets en mode contenu</value></data>
+  <data name="ArtifactMaximumOutput" xml:space="preserve"><value>Taille maximale de chaque sortie en octets</value></data>
+  <data name="ArtifactOutputName" xml:space="preserve"><value>Nom du fichier de sortie (vide : conserver le nom d’entrée)</value></data>
+  <data name="ArtifactOutputMediaType" xml:space="preserve"><value>Type de média de sortie (vide : conserver le type d’entrée)</value></data>
+  <data name="ArtifactManifestMapping" xml:space="preserve"><value>Mapping de la liste ou du manifeste d’artefacts (JSON)</value></data>
+  <data name="ArtifactProcessingInputMapping" xml:space="preserve"><value>Mapping de l’entrée du traitement (JSON, facultatif)</value></data>
+  <data name="ArtifactProcessingInputHelp" xml:space="preserve"><value>Le mapping peut référencer input.content, input.artifact, input.inputAccess, input.outputAccess et input.parameters. Pour un Tool générique, affectez le contenu à son paramètre existant. Vide : transmettre cette enveloppe.</value></data>
+  <data name="ArtifactResultMapping" xml:space="preserve"><value>Mapping du résultat du traitement (JSON, facultatif)</value></data>
+  <data name="ArtifactResultHelp" xml:space="preserve"><value>En mode contenu, input et transition.output désignent le résultat du traitement à capturer. En mode accès, terminez le brouillon avec output_complete ; le retour du traitement permet à cette étape de le finaliser.</value></data>
+  <data name="ArtifactProcessingResultPort" xml:space="preserve"><value>Résultat du traitement</value></data>
 </root>

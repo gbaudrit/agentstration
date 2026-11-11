@@ -333,6 +333,21 @@ internal sealed class AwpAssignmentExecutor(
                         output = JsonSerializer.SerializeToElement(conditionResult);
                         eventName = conditionResult ? "true" : "false";
                         break;
+                    case ArtifactTransformFlowStepDefinition processing:
+                        try
+                        {
+                            output = await ProcessArtifactsAsync(session, material, processing, context, step,
+                                childRunIds, childExecutions, cancellationToken);
+                        }
+                        catch (Exception exception) when (exception is not OperationCanceledException)
+                        {
+                            output = JsonSerializer.SerializeToElement(new { error = exception.Message });
+                            eventName = "error";
+                            errorCode = exception switch { AwpExecutionNotSupportedException unsupported => unsupported.Code,
+                                AwpClientException authority => authority.Code, _ => "artifact_processing_failed" };
+                            errorMessage = exception.Message;
+                        }
+                        break;
                     case TransformFlowStepDefinition transform:
                         output = transform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)
                             ? await EvaluateExpressionAsync(transform.Expression!, context, cancellationToken)
@@ -628,6 +643,65 @@ internal sealed class AwpAssignmentExecutor(
             return new(child.RunId, child.Material.FlowId, child.Material.FlowNamespace,
                 child.Material.FlowVersion, result);
         }
+    }
+
+    private async Task<JsonElement> ProcessArtifactsAsync(AwpAssignmentSession session,
+        AwpRootFlowExecutionMaterial material, ArtifactTransformFlowStepDefinition definition,
+        FlowExecutionContext context, AwpFlowStepLocation step, List<string> childRunIds,
+        List<AwpChildExecutionResult> childExecutions, CancellationToken cancellationToken)
+    {
+        var input = definition.ArtifactsMapping is { } mapping
+            ? await ResolveJsonAsync(mapping, context, cancellationToken)
+            : context.TransitionOutput ?? JsonSerializer.SerializeToElement<object?>(null);
+        var items = input.ValueKind == JsonValueKind.Array ? input
+            : input.ValueKind == JsonValueKind.Object && input.TryGetProperty("artifacts", out var artifacts) ? artifacts
+            : throw new AwpExecutionNotSupportedException("artifact_processing_manifest_required", "Artifact processing requires an Artifact array or manifest.");
+        if (items.ValueKind != JsonValueKind.Array || items.GetArrayLength() > definition.MaximumArtifacts)
+            throw new AwpExecutionNotSupportedException("artifact_processing_manifest_invalid", "Artifact processing requires a bounded ordered list.");
+        var results = new List<JsonElement>();
+        var index = 0;
+        foreach (var item in items.EnumerateArray())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var opened = (await session.Client.ProcessArtifactAsync(new(session.Context,
+                    step.StepExecutionId, index, "open", item), cancellationToken)).Result;
+                var processingContext = context with { Input = JsonSerializer.SerializeToElement(new {
+                    artifact = opened.GetProperty("artifact"), content = opened.GetProperty("content"),
+                    inputAccess = opened.GetProperty("inputAccess"), outputAccess = opened.GetProperty("outputAccess"),
+                    parameters = material.Input.ValueKind == JsonValueKind.Object && material.Input.TryGetProperty("parameters", out var savedParameters) ? savedParameters : JsonSerializer.SerializeToElement(new { }) }), TransitionOutput = opened };
+                var processingInput = definition.ProcessingInputMapping is { } inputMapping
+                    ? await ResolveJsonAsync(inputMapping, processingContext, cancellationToken) : processingContext.Input;
+                var child = await ExecuteChildFlowAsync(session, step, processingInput, "artifactProcessing", index, cancellationToken);
+                childRunIds.Add(child.RunId);
+                childExecutions.Add(child);
+                if (child.Result.Outcome == "error")
+                    throw new AwpExecutionNotSupportedException(child.Result.ErrorCode ?? "artifact_processing_failed",
+                        child.Result.ErrorMessage ?? "Artifact processing failed.");
+                var resultContext = context with { Input = child.Result.Output ?? JsonSerializer.SerializeToElement<object?>(null),
+                    TransitionOutput = child.Result.Output };
+                var output = definition.ResultMapping is { } resultMapping
+                    ? await ResolveJsonAsync(resultMapping, resultContext, cancellationToken)
+                    : child.Result.Output ?? JsonSerializer.SerializeToElement<object?>(null);
+                await session.Client.ProcessArtifactAsync(new(session.Context,
+                    step.StepExecutionId, index, "prepare", output), cancellationToken);
+            }
+            catch
+            {
+                try { await session.Client.ProcessArtifactAsync(new(session.Context, step.StepExecutionId,
+                    index, "abort", JsonSerializer.SerializeToElement(new { })), CancellationToken.None); }
+                catch (Exception cleanupError) when (cleanupError is not OutOfMemoryException)
+                { logger.LogWarning("Artifact processing draft cleanup was deferred: {ErrorType}", cleanupError.GetType().Name); }
+                throw;
+            }
+            index++;
+        }
+        // No retained output Artifact is registered until every processing region has succeeded.
+        for (var outputIndex = 0; outputIndex < index; outputIndex++)
+            results.Add((await session.Client.ProcessArtifactAsync(new(session.Context,
+                step.StepExecutionId, outputIndex, "finish", JsonSerializer.SerializeToElement(new { })), cancellationToken)).Result);
+        return JsonSerializer.SerializeToElement(new { artifacts = results });
     }
 
     private async Task<AgentExecutionResult> ExecuteFlowAgentAsync(AwpAssignmentSession session,

@@ -32,6 +32,7 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(RouterFlowStepDefinition), "router")]
 [JsonDerivedType(typeof(ConditionFlowStepDefinition), "condition")]
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
+[JsonDerivedType(typeof(ArtifactTransformFlowStepDefinition), "artifactTransform")]
 [JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
 [JsonDerivedType(typeof(FlowCompositionPointStepDefinition), "composition")]
 [JsonDerivedType(typeof(RepeatFlowStepDefinition), "repeat")]
@@ -305,6 +306,7 @@ public static class FlowStepDefinitionExtensions
         RouterFlowStepDefinition => "router",
         ConditionFlowStepDefinition => "condition",
         TransformFlowStepDefinition => "transform",
+        ArtifactTransformFlowStepDefinition => "artifactTransform",
         FlowCallStepDefinition => "flow",
         FlowCompositionPointStepDefinition => "composition",
         RepeatFlowStepDefinition => "repeat",
@@ -321,6 +323,7 @@ public static class FlowStepDefinitionExtensions
         RouterFlowStepDefinition => ["selected", "failed"],
         ConditionFlowStepDefinition => ["true", "false"],
         TransformFlowStepDefinition => ["completed"],
+        ArtifactTransformFlowStepDefinition => ["process", "completed", "error"],
         FlowCompositionPointStepDefinition => ["completed"],
         ToolFlowStepDefinition => ["success", "error"],
         ToolRouteFlowStepDefinition => ["success", "error"],

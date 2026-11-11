@@ -159,6 +159,13 @@ public sealed class RuntimeExecutionMaterialResolver(
                 || binding.RevisionUid != Guid.Empty && material.RevisionUid != binding.RevisionUid
                 || binding.DefinitionHash is not null && !string.Equals(material.DefinitionHash, binding.DefinitionHash, StringComparison.Ordinal)))
                 throw new RuntimeExecutionMaterialException("execution_material_drift", $"Participant '{binding.ParticipantId}' no longer resolves to its pinned revision.");
+            if (run.ArtifactProcessing is { ContentAccess: true })
+            {
+                var scopedTools = RuntimeArtifactProcessingTools.Create();
+                if (material.Tools.Any(tool => scopedTools.Any(scoped => scoped.Id == tool.Id || scoped.Name == tool.Name)))
+                    throw new RuntimeExecutionMaterialException("artifact_processing_tool_collision", "An Agent Tool conflicts with an execution-bound content Tool.");
+                material = material with { Tools = [.. material.Tools, .. scopedTools] };
+            }
             resolvedAgents.Add(material);
         }
 

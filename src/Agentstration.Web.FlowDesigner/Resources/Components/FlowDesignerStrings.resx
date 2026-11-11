@@ -161,4 +161,22 @@
   <data name="CompositionAllowEmpty" xml:space="preserve"><value>Allow an empty sequence (identity)</value></data>
   <data name="CompositionHelp" xml:space="preserve"><value>The consuming resource selects an ordered sequence of published Flows here. Each Flow receives value and its saved parameters.</value></data>
   <data name="InvalidJson" xml:space="preserve"><value>Enter valid JSON.</value></data>
+  <data name="Step.artifactTransform" xml:space="preserve"><value>Transform artifact(s)</value></data>
+  <data name="ArtifactProcessingHelp" xml:space="preserve"><value>Connect process to any processing steps, then connect their result back to this step. completed continues with the output Artifact manifest; error handles processing failure.</value></data>
+  <data name="ArtifactProcessingMode" xml:space="preserve"><value>Provide input as</value></data>
+  <data name="ArtifactProcessingMode.Content" xml:space="preserve"><value>Content (text or JSON)</value></data>
+  <data name="ArtifactProcessingMode.Access" xml:space="preserve"><value>Scoped input/output access</value></data>
+  <data name="ArtifactContentHelp" xml:space="preserve"><value>Reads bounded UTF-8 text or JSON and captures the selected processing result. Oversized content is refused; binary extraction must be explicit.</value></data>
+  <data name="ArtifactAccessHelp" xml:space="preserve"><value>Agents receive temporary input_read/search_regex and output_write/read/search_regex/complete Tools. The processing decides how to read and verify content. Output stays isolated until successful completion.</value></data>
+  <data name="ArtifactMaximumCount" xml:space="preserve"><value>Maximum Artifacts</value></data>
+  <data name="ArtifactMaximumInput" xml:space="preserve"><value>Maximum input bytes in content mode</value></data>
+  <data name="ArtifactMaximumOutput" xml:space="preserve"><value>Maximum output bytes per Artifact</value></data>
+  <data name="ArtifactOutputName" xml:space="preserve"><value>Output file name (empty: preserve input name)</value></data>
+  <data name="ArtifactOutputMediaType" xml:space="preserve"><value>Output media type (empty: preserve input type)</value></data>
+  <data name="ArtifactManifestMapping" xml:space="preserve"><value>Input Artifact list or manifest mapping (JSON)</value></data>
+  <data name="ArtifactProcessingInputMapping" xml:space="preserve"><value>Processing input mapping (JSON, optional)</value></data>
+  <data name="ArtifactProcessingInputHelp" xml:space="preserve"><value>The mapping can reference input.content, input.artifact, input.inputAccess, input.outputAccess and input.parameters. For a generic Tool, map content to its existing parameter. Empty passes this envelope.</value></data>
+  <data name="ArtifactResultMapping" xml:space="preserve"><value>Processing result mapping (JSON, optional)</value></data>
+  <data name="ArtifactResultHelp" xml:space="preserve"><value>In content mode, input and transition.output reference the processing result to capture. In access mode, complete the output draft using output_complete; returning from processing allows this step to finalize it.</value></data>
+  <data name="ArtifactProcessingResultPort" xml:space="preserve"><value>Processing result</value></data>
 </root>

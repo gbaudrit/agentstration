@@ -34,6 +34,19 @@ public sealed partial class FlowRunService
         var step = parent.Value.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
             string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
             ?? throw new FlowValidationException("child_flow_step_invalid", "The assigned StepDefinition was not found.");
+        if (purpose == "artifactProcessing" && step is ArtifactTransformFlowStepDefinition processing
+            && iteration is >= 0 && iteration < processing.MaximumArtifacts)
+        {
+            var body = FlowArtifactProcessingGraph.Extract(parent.Value.DefinitionSnapshot.Graph!, processing);
+            var version = parent.Value.DefinitionSnapshot with { Graph = body, DefinitionHash = FlowDefinitionHash.Compute(body) };
+            var inlineCall = new FlowCallStepDefinition { Name = step.Name,
+                Flow = new(parent.Value.FlowId.Value, FlowCallVersionStrategy.Exact, parent.Value.FlowVersion,
+                    parent.Value.FlowId.Namespace, version.ScopeRef) };
+            var processingAttempt = Math.Max(1, parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
+            var childId = ChildFlowRunId(parent.Value, stepDefinitionId + "-artifact", processingAttempt, iteration);
+            return await EnsureChildFlowRunAsync(parent.Value, inlineCall, input, childId, cancellationToken, version,
+                new(parent.Value.Id, processing.Name, processingAttempt, iteration.Value, processing.Mode == ArtifactProcessingMode.Access));
+        }
         var call = purpose switch
         {
             "flowCall" when step is FlowCallStepDefinition flowCall && iteration is null => flowCall,
@@ -118,12 +131,17 @@ public sealed partial class FlowRunService
         FlowCallStepDefinition call,
         JsonElement input,
         string childRunId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        FlowVersion? inlineVersion = null,
+        FlowArtifactProcessingContext? processingContext = null)
     {
         var existing = await repository.GetRunExactAsync(parent.Scope.ScopeRef, childRunId, cancellationToken);
         if (existing is not null)
         {
             ValidateChildIdentity(parent, call, existing.Value, childRunId);
+            if (inlineVersion is not null && (existing.Value.DefinitionHash != inlineVersion.DefinitionHash
+                || existing.Value.ArtifactProcessing != processingContext || !JsonElement.DeepEquals(existing.Value.Input, input)))
+                throw new FlowValidationException("artifact_processing_child_conflict", "The accepted Artifact processing child cannot change its graph, context or input.");
             return existing;
         }
 
@@ -136,7 +154,7 @@ public sealed partial class FlowRunService
 
         var targetId = call.Flow.Resolve(parent.FlowId.Namespace);
         var requestedVersion = call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? call.Flow.Version : null;
-        var resolved = await ResolveVersionAsync(parent.Scope.AccessScopeRef, targetId, requestedVersion,
+        var resolved = inlineVersion ?? await ResolveVersionAsync(parent.Scope.AccessScopeRef, targetId, requestedVersion,
             call.Flow.ScopeRef, cancellationToken);
         if (call.CompositionPoint is not null && flowDefinitions is not null)
             await flowDefinitions.ValidateUseAsync(resolved.ScopeRef, targetId, resolved.Version, parent.Scope.AccessScopeRef, call.Flow.ResourceUid, cancellationToken);
@@ -161,6 +179,8 @@ public sealed partial class FlowRunService
             FlowVersion = resolved.Version,
             Composition = composed.Receipt,
             TransientPayloads = parent.TransientPayloads,
+            ArtifactProcessing = processingContext ?? parent.ArtifactProcessing,
+            RuntimeBindings = inlineVersion is null ? [] : parent.RuntimeBindings,
             DefinitionState = FlowDefinitionState.Published,
             DefinitionHash = resolved.DefinitionHash,
             DefinitionScopeRef = resolved.ScopeRef,

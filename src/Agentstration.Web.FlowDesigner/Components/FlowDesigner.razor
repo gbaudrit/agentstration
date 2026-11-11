@@ -220,6 +220,10 @@ else
                                                 UpdateTransformMappingAsync="UpdateTransformMappingAsync" UpdateTransformSchemaBindingAsync="UpdateTransformSchemaBindingAsync"
                                                 ValidateSchemaDefinitionAsync="ValidateSchemaDefinitionAsync" ValidateSchemaInstanceAsync="ValidateSchemaInstanceAsync" />
                                         }
+                                        else if (SelectedStep is ArtifactTransformFlowStepDefinition artifactTransform)
+                                        {
+                                            <FlowArtifactTransformInspector Step="artifactTransform" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" />
+                                        }
                                         else if (SelectedStep is FlowCompositionPointStepDefinition point)
                                         {
                                             <FlowCompositionInspector Step="point" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" />

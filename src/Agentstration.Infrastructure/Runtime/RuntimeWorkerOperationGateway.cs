@@ -27,9 +27,21 @@ public sealed class RuntimeWorkerOperationGateway(
     FlowRunService flowRuns,
     TimeProvider timeProvider,
     IRequestContextScopeFactory requestScopes,
-    ILogger<RuntimeWorkerOperationGateway> logger) : IRuntimeWorkerOperationGateway
+    ILogger<RuntimeWorkerOperationGateway> logger,
+    Agentstration.Infrastructure.Artifacts.ArtifactProcessingService? artifactProcessing = null) : IRuntimeWorkerOperationGateway
 {
     private const string ArtifactRuntimeType = "awp-artifact-v1";
+
+    public async Task<JsonElement> ProcessArtifactAsync(ResourceScopeRef executionScopeRef, Agentstration.Resources.WorkspaceId workspaceId,
+        string flowRunId, string stepDefinitionId, int index, string action, JsonElement arguments, CancellationToken cancellationToken)
+    {
+        var (run, step) = await GetFlowStepAsync(executionScopeRef, flowRunId, stepDefinitionId, cancellationToken);
+        if (run.WorkspaceId != workspaceId || run.TransientPayloads || step is not ArtifactTransformFlowStepDefinition processing)
+            throw new RuntimeGovernedOperationException("artifact_processing_scope_invalid", "Artifact processing requires its retained owning Flow step.");
+        using var requestScope = EnterScope(run.Scope);
+        return await (artifactProcessing ?? throw new RuntimeGovernedOperationException("artifact_processing_unavailable", "Artifact processing is unavailable."))
+            .ExecuteOwnerAsync(run, processing, index, action, arguments, cancellationToken);
+    }
 
     public async Task<RuntimeGovernedModelResponse> InvokeModelAsync(
         RuntimeGovernedModelRequest request,
@@ -88,6 +100,14 @@ public sealed class RuntimeWorkerOperationGateway(
             : EnterScope(request.ExecutionScopeRef, request.TenantId, request.PrincipalId);
         try
         {
+            if (request.Tool.ProviderId == RuntimeArtifactProcessingTools.Provider)
+            {
+                var run = (await flowRunRepository.GetRunExactAsync(request.ExecutionScopeRef, request.RunId, cancellationToken))?.Value
+                    ?? throw new RuntimeGovernedOperationException("artifact_processing_scope_invalid", "The processing Flow is unavailable.");
+                using var artifactScope = EnterScope(run.Scope);
+                return await (artifactProcessing ?? throw new RuntimeGovernedOperationException("artifact_processing_unavailable", "Artifact processing is unavailable."))
+                    .ExecuteToolAsync(run, request.Tool.ExternalId!, request.Arguments ?? JsonSerializer.SerializeToElement(new { }), cancellationToken);
+            }
             return await toolExecution.ExecuteAsync(new ToolExecutionContext
             {
                 OwnerKind = request.StepExecutionId is null ? ToolExecutionOwnerKind.RuntimeRun : ToolExecutionOwnerKind.FlowRun,

@@ -59,6 +59,10 @@ public static class AwpRuntimeWorkerEndpoints
         awp.MapPost("/assignments/flow-tools/invoke", InvokeFlowToolAsync)
             .Produces<AwpEnvelope<AwpInvokeFlowToolResponse>>()
             .WithSummary("Invoke the Tool declared by an assigned Flow step through governance and audit hooks");
+        awp.MapPost("/assignments/artifact-processing", ProcessArtifactAsync)
+            .Produces<AwpEnvelope<AwpProcessArtifactResponse>>()
+            .WithName("AwpProcessArtifact")
+            .WithSummary("Prepare, finalize or abort content processing for an assigned Artifact transformation step");
         awp.MapPost("/assignments/flow-artifacts/capture", CaptureFlowArtifactAsync)
             .Produces<AwpEnvelope<AwpCaptureFlowArtifactResponse>>()
             .WithSummary("Capture a governed Artifact declared by an assigned Flow step");
@@ -430,6 +434,21 @@ public static class AwpRuntimeWorkerEndpoints
                 result.Route.ToolSetVersion,
                 result.Route.Capability,
                 result.Route.Route)));
+    }, principal);
+
+    private static async Task<IResult> ProcessArtifactAsync(
+        AwpEnvelope<AwpProcessArtifactRequest> envelope, ClaimsPrincipal principal,
+        RuntimeWorkerDispatchService dispatch, RuntimeWorkerExecutionService execution,
+        TimeProvider timeProvider, CancellationToken cancellationToken) => await ExecuteAsync(async identity =>
+    {
+        ValidateEnvelope(envelope.ProtocolVersion, envelope.MessageId);
+        var request = envelope.Payload
+            ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The Artifact processing request is required.");
+        ValidateCommand(identity, request.Context, dispatch);
+        var result = await execution.ProcessArtifactAsync(ToProof(request.Context), request.StepExecutionId.Value,
+            request.Index, request.Action, request.Arguments, cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        return Envelope(envelope.MessageId, now, new AwpProcessArtifactResponse(now, result));
     }, principal);
 
     private static async Task<IResult> CaptureFlowArtifactAsync(

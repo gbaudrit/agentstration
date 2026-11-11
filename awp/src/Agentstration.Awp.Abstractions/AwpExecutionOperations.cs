@@ -280,6 +280,10 @@ public sealed record AwpInvokeFlowToolResponse(
     string ExternalToolId,
     AwpFlowToolRoute? Route);
 
+public sealed record AwpProcessArtifactRequest(AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId, int Index, string Action, JsonElement Arguments);
+public sealed record AwpProcessArtifactResponse(DateTimeOffset ServerTime, JsonElement Result);
+
 public sealed record AwpCaptureFlowArtifactRequest(
     AwpAssignmentCommandContext Context,
     AwpStepExecutionId StepExecutionId,

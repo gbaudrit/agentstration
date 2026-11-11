@@ -30,6 +30,8 @@ public partial class FlowDesigner
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
             "composition" => new FlowCompositionPointStepDefinition { Name = name, Point = name, DisplayName = T("Step.composition"), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
+            "artifactTransform" => new ArtifactTransformFlowStepDefinition { Name = name, DisplayName = T("Step.artifactTransform"),
+                ArtifactsMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
             "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported Flow step type.")
@@ -42,7 +44,7 @@ public partial class FlowDesigner
         }
         var errorEvent = step switch
         {
-            AgentFlowStepDefinition or ToolFlowStepDefinition => "error",
+            AgentFlowStepDefinition or ToolFlowStepDefinition or ArtifactTransformFlowStepDefinition => "error",
             FlowCallStepDefinition selectedCall => ResolveFlowVersion(selectedCall, callVersions ?? [])?.NamedOutputs
                 .FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error)?.Name,
             _ => null

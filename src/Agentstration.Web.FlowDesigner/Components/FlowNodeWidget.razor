@@ -6,6 +6,12 @@
     <span class="flow-port-handle input @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@Localizer["InputConnectionHandle"]" aria-label="@Localizer["InputConnectionHandle"]">
         <PortRenderer Port="Node.Input" />
     </span>
+    @if (Node.ProcessingResult is { } processingResult)
+    {
+        <span class="flow-port-handle processing-result @(Node.Locked ? "locked" : null)" style="left: 50%; top: 100%" title="@Localizer["ArtifactProcessingResultPort"]" aria-label="@Localizer["ArtifactProcessingResultPort"]">
+            <PortRenderer Port="processingResult" />
+        </span>
+    }
     <span class="flow-node-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(Node.Source.Type)" /></span>
     <span class="flow-node-copy"><strong title="@Node.Source.DisplayName">@Node.Source.DisplayName</strong><small>@Node.Source.Type</small></span>
     @if (Node.Source.Resource is not null) { <code title="@Node.Source.Resource">@Short(Node.Source.Resource)</code> }

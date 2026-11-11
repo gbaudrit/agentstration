@@ -22,12 +22,18 @@ public sealed class FlowDiagramNode : NodeModel
                 source.OutputOutcomes.TryGetValue(eventName, out var outcome) ? outcome : null))
             .ToArray();
         AddPort(Input);
+        if (source.Type == "artifactTransform")
+        {
+            ProcessingResult = new FlowDiagramPort(this, PortAlignment.Bottom, FlowDiagramPortDirection.Input, "result");
+            AddPort(ProcessingResult);
+        }
         foreach (var output in Outputs)
             AddPort(output);
     }
 
     public FlowDesignerNode Source { get; }
     public FlowDiagramPort Input { get; }
+    public FlowDiagramPort? ProcessingResult { get; }
     public IReadOnlyList<FlowDiagramPort> Outputs { get; }
 }
 
@@ -78,10 +84,25 @@ public static class FlowDiagramMapper
             if (output is null)
                 continue;
 
-            var model = new LinkModel(link.Id, output, byName[link.To].Input);
+            var target = byName[link.To];
+            var resultConnection = target.ProcessingResult is not null && ProcessingContains(document, target.Source.Name, link.From);
+            var model = new LinkModel(link.Id, output, resultConnection ? target.ProcessingResult! : target.Input);
             model.AddLabel(link.Event, offset: new Point(0, -14));
             links.Add(model);
         }
         return new(nodes, links, byName);
+    }
+
+    private static bool ProcessingContains(FlowDesignerDocument document, string owner, string source)
+    {
+        var queue = new Queue<string>(document.Links.Where(link => link.From == owner && link.Event == "process").Select(link => link.To));
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (queue.TryDequeue(out var name))
+        {
+            if (name == owner || !visited.Add(name)) continue;
+            if (name == source) return true;
+            foreach (var link in document.Links.Where(link => link.From == name)) queue.Enqueue(link.To);
+        }
+        return false;
     }
 }

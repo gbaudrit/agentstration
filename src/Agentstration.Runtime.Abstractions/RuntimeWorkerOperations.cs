@@ -115,6 +115,10 @@ public sealed class RuntimeGovernedOperationException(string code, string messag
 
 public interface IRuntimeWorkerOperationGateway
 {
+    Task<JsonElement> ProcessArtifactAsync(ResourceScopeRef executionScopeRef, WorkspaceId workspaceId,
+        string flowRunId, string stepDefinitionId, int index, string action, JsonElement arguments,
+        CancellationToken cancellationToken) => Task.FromException<JsonElement>(
+            new RuntimeGovernedOperationException("artifact_processing_unavailable", "Artifact processing is unavailable."));
     Task<RuntimeGovernedModelResponse> InvokeModelAsync(RuntimeGovernedModelRequest request, CancellationToken cancellationToken);
     IAsyncEnumerable<RuntimeGovernedModelUpdate> StreamModelAsync(
         RuntimeGovernedModelRequest request,

@@ -43,6 +43,18 @@ else if (artifact is not null)
                     <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)">@artifact.ProducerFlowRunId</a></dd>
                     @if (!string.IsNullOrEmpty(artifact.ProducerFlowStepId)) { <dt>@T("FlowStep")</dt><dd><code>@artifact.ProducerFlowStepId</code></dd> }
                     @if (artifact.SourceArtifactId is { } stagedSource) { <dt>@T("SourceArtifact")</dt><dd><a class="text-button" href="@StagedUrl(stagedSource)">@stagedSource</a></dd> }
+                    @if (artifact.Receipt.Provenance.TryGetValue("inputArtifactId", out var inputId))
+                    {
+                        <dt>@T("TransformationInputArtifact")</dt><dd>
+                            @if (Guid.TryParseExact(inputId, "N", out _) && artifact.Receipt.Provenance.GetValueOrDefault("inputArtifactKind") is "staged" or "durable")
+                            { <a class="text-button" data-testid="artifact-transformation-input" href="@($"/artifacts/{artifact.Receipt.Provenance["inputArtifactKind"]}/{Uri.EscapeDataString(inputId)}")">@inputId</a> }
+                            else { <code>@inputId</code> }
+                        </dd>
+                    }
+                    @if (artifact.Receipt.Provenance.TryGetValue("processingRunId", out var processingId))
+                    { <dt>@T("TransformationProcessingRun")</dt><dd><a class="text-button" data-testid="artifact-processing-run" href="@FlowRunUrl(processingId)">@processingId</a></dd> }
+                    @if (artifact.Receipt.Provenance.TryGetValue("inputSha256", out var inputDigest))
+                    { <dt>@T("TransformationInputDigest")</dt><dd><code>@inputDigest</code></dd> }
                     @if (artifact.ProducerResource is { } producer)
                     {
                         <dt>@T("ProducerResource")</dt><dd><a class="text-button" data-testid="artifact-producer-resource" href="@ArtifactResourceLinks.Producer(producer)">@producer.Name</a><small>@producer.ScopeRef · @producer.Namespace @if (artifact.ProducerResourceGeneration is { } generation) { <span>· g@(generation) · @artifact.ProducerResourceUid</span> }</small></dd>

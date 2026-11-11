@@ -1,4 +1,9 @@
 export const TestIds = {
+  artifactProcessing: {
+    inputArtifact: 'artifact-transformation-input', processingRun: 'artifact-processing-run',
+    palette: 'flow-palette-artifactTransform', mode: 'artifact-processing-mode',
+    manifestMapping: 'artifact-manifest-mapping', inputMapping: 'artifact-input-mapping', resultMapping: 'artifact-result-mapping',
+  },
   sourcePolicies: {
     pointName: 'composition-point-name', configureStep: 'configure-selected-step', datasetError: 'dataset-error-code',
     definitionFields: 'dataset-definition-fields', service: 'dataset-service', operation: 'dataset-operation',

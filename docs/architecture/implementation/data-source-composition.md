@@ -362,3 +362,24 @@ retirement. Local providers remove exact content; remote ASP providers may use a
 verified conditional empty replacement when supported, otherwise cleanup remains
 pending. Immutable Snapshots and Artifact provenance remain visible after their
 bytes retire. See [ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).
+
+
+## Artifact content processing
+
+[ADR-0213](../../decisions/0213-artifact-transformations-own-scoped-content-processing.md)
+adds a distinct `artifactTransform` step to Artifact-manifest transformations. Its
+private process/return region can contain ordinary Agents, Tools, mappings and
+child Flow calls without another published processor. Invocation adaptation belongs
+to the step, not reusable Tool definitions. Content mode supplies bounded UTF-8
+text or JSON; access mode supplies execution-bound input reads/searches and a
+revisioned output draft that can be reread, corrected and completed. The Agent
+chooses its reading strategy. The authority materializes outputs only after all
+processing regions succeed. Exact input lineage and the real producer/Storage
+remain visible in Artifact receipts. Native dataset sequences still receive JSON
+values; this step requires an explicit Artifact manifest rather than silently
+interpreting an arbitrary dataset object as a file.
+
+See the [authoring and content-access reference](../../reference/artifact-transformations.md)
+for mappings, operation contracts, publication behavior and current bounds. The
+reusable browser scenario is tracked separately by #1145, pending UX validation
+and implementation merge.

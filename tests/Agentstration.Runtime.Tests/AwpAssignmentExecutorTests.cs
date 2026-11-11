@@ -16,6 +16,50 @@ public sealed class AwpAssignmentExecutorTests
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [TestMethod]
+    public async Task ArtifactTransformationAdaptsGenericToolInputAndPreparesAllResultsBeforePublishing()
+    {
+        var processing = new ArtifactTransformFlowStepDefinition { Name = "process",
+            ArtifactsMapping = JsonSerializer.SerializeToElement("${input}"),
+            ProcessingInputMapping = JsonSerializer.SerializeToElement(new { text = "${input.content}", language = "fr" }),
+            ResultMapping = JsonSerializer.SerializeToElement("${input.answer}") };
+        var graph = new FlowGraphDefinition { EntryStep = "process", Steps = [processing,
+            new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }],
+            Transitions = [new("done", "process", "completed", "completed")] };
+        var handler = new GraphHandler(TestNow) { ChildGraph = new()
+        {
+            EntryStep = "generic",
+            Steps = [new ToolFlowStepDefinition { Name = "generic", Tool = new("existing-generic-tool"),
+                ArgumentsMapping = JsonSerializer.SerializeToElement("${input}") },
+                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success,
+                    OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }],
+            Transitions = [new("tool-done", "generic", "success", "completed")]
+        } };
+        var (result, _) = await ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = "first" }, new { artifactId = "second" } } }), handler);
+        CollectionAssert.AreEqual(new[] { "open", "prepare", "open", "prepare", "finish", "finish" }, handler.ArtifactProcessingRequests.Select(request => request.Action).ToArray());
+        Assert.AreEqual("source-0", handler.ChildRequests[0].Input.GetProperty("text").GetString());
+        Assert.AreEqual("fr", handler.ChildRequests[0].Input.GetProperty("language").GetString());
+        Assert.AreEqual("artifactProcessing", handler.ChildRequests[0].Purpose);
+        Assert.AreEqual("found", handler.ArtifactProcessingRequests[1].Arguments.GetString());
+        Assert.AreEqual("source-0", handler.FlowToolRequests[0].Arguments.GetProperty("text").GetString());
+        Assert.AreEqual("fr", handler.FlowToolRequests[0].Arguments.GetProperty("language").GetString());
+        Assert.AreEqual(2, result.Output?.GetProperty("artifacts").GetArrayLength());
+    }
+
+    [TestMethod]
+    public async Task ArtifactProcessingFailureCannotPublishAPartialResult()
+    {
+        var graph = new FlowGraphDefinition { EntryStep = "process", Steps = [new ArtifactTransformFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input}") },
+            new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
+            Transitions = [new("failed", "process", "error", "failure")] };
+        var handler = new GraphHandler(TestNow) { ChildOutcome = "error" };
+        var (result, _) = await ExecuteGraphAsync(graph,
+            JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = "first" } } }), handler);
+        Assert.AreEqual("error", result.Outcome);
+        CollectionAssert.AreEqual(new[] { "open", "abort" }, handler.ArtifactProcessingRequests.Select(request => request.Action).ToArray());
+    }
+
+    [TestMethod]
     [DataRow(FlowOutputOutcome.Success, "completed", "success")]
     [DataRow(FlowOutputOutcome.Error, "rejected", "error")]
     public async Task NamedOutputPreservesItsPublicIdentityAndOutcome(
@@ -1372,6 +1416,7 @@ public sealed class AwpAssignmentExecutorTests
     {
         public List<AwpExecutionEvent> Events { get; } = [];
         public List<AwpCreateChildFlowRequest> ChildRequests { get; } = [];
+        public List<AwpProcessArtifactRequest> ArtifactProcessingRequests { get; } = [];
         public List<AwpCleanupFlowArtifactRequest> CleanupRequests { get; } = [];
         public List<AwpInvokeModelRequest> ModelRequests { get; } = [];
         public Func<AwpInvokeModelRequest, IReadOnlyList<AwpModelContent>>? ModelResponseFactory { get; init; }
@@ -1430,6 +1475,7 @@ public sealed class AwpAssignmentExecutorTests
                 AwpProtocol.InvokeToolPath => new AwpInvokeToolResponse(now,
                     AgentToolResultFactory!(Payload<AwpInvokeToolRequest>(bytes))),
                 AwpProtocol.InvokeFlowToolPath => InvokeFlowTool(bytes),
+                AwpProtocol.ProcessArtifactPath => ProcessArtifact(bytes),
                 AwpProtocol.CaptureFlowArtifactPath => Capture(bytes),
                 AwpProtocol.CleanupFlowArtifactPath => Cleanup(bytes),
                 AwpProtocol.CreateChildFlowPath => CreateChild(bytes),
@@ -1545,6 +1591,16 @@ public sealed class AwpAssignmentExecutorTests
         {
             CleanupRequests.Add(Payload<AwpCleanupFlowArtifactRequest>(bytes));
             return new(now);
+        }
+
+        private AwpProcessArtifactResponse ProcessArtifact(byte[] bytes)
+        {
+            var request = Payload<AwpProcessArtifactRequest>(bytes);
+            ArtifactProcessingRequests.Add(request);
+            return new(now, request.Action == "open"
+                ? JsonSerializer.SerializeToElement(new { artifact = new { artifactId = request.Arguments.GetProperty("artifactId").GetString() },
+                    content = "source-" + request.Index, inputAccess = new { reference = "bound-input" }, outputAccess = new { reference = "bound-output" } })
+                : JsonSerializer.SerializeToElement(new { artifactId = "output-" + request.Index, kind = "durable", disposition = "publishable" }));
         }
 
         private AwpChildFlowResponse CreateChild(byte[] bytes)

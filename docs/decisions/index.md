@@ -242,3 +242,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 211. [ADR-0211 — Resources bind ordered Flows to typed composition points](0211-resource-bound-flow-composition-points.md)
 
 212. [ADR-0212 — Source content has independent freshness and retention policies](0212-source-content-lifecycle-and-ephemeral-handoff.md)
+
+213. [ADR-0213 — Artifact transformations own scoped content processing](0213-artifact-transformations-own-scoped-content-processing.md)

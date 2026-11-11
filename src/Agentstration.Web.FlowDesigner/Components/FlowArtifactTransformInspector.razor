@@ -1,0 +1,58 @@
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <p class="muted">@T("ArtifactProcessingHelp")</p>
+    <label>@T("ArtifactProcessingMode")
+        <select data-testid="artifact-processing-mode" disabled="@ReadOnly" value="@Step.Mode" @onchange="ModeChangedAsync">
+            <option value="Content">@T("ArtifactProcessingMode.Content")</option>
+            <option value="Access">@T("ArtifactProcessingMode.Access")</option>
+        </select>
+    </label>
+    <p class="muted">@T(Step.Mode == ArtifactProcessingMode.Content ? "ArtifactContentHelp" : "ArtifactAccessHelp")</p>
+    <label>@T("ArtifactMaximumCount")<input type="number" min="1" max="128" disabled="@ReadOnly" value="@Step.MaximumArtifacts" @onchange="e => LimitChangedAsync(e, true)" /></label>
+    <label>@T("ArtifactMaximumInput")<input type="number" min="1" max="1048576" disabled="@ReadOnly" value="@Step.MaximumContentBytes" @onchange="e => LimitChangedAsync(e, false)" /></label>
+    <label>@T("ArtifactMaximumOutput")<input type="number" min="1" max="16777216" disabled="@ReadOnly" value="@Step.MaximumOutputBytes" @onchange="OutputLimitChangedAsync" /></label>
+    <label>@T("ArtifactOutputName")<input disabled="@ReadOnly" value="@Step.OutputFileName" @onchange="e => Changed.InvokeAsync(Step with { OutputFileName = Optional(e) })" /></label>
+    <label>@T("ArtifactOutputMediaType")<input disabled="@ReadOnly" value="@Step.OutputMediaType" @onchange="e => Changed.InvokeAsync(Step with { OutputMediaType = Optional(e) })" /></label>
+}
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <label>@T("ArtifactManifestMapping")<textarea data-testid="artifact-manifest-mapping" disabled="@ReadOnly" value="@(Step.ArtifactsMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 0)"></textarea></label>
+    <label>@T("ArtifactProcessingInputMapping")<textarea data-testid="artifact-input-mapping" disabled="@ReadOnly" value="@(Step.ProcessingInputMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 1)"></textarea></label>
+    <p class="muted">@T("ArtifactProcessingInputHelp")</p>
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <label>@T("ArtifactResultMapping")<textarea data-testid="artifact-result-mapping" disabled="@ReadOnly" value="@(Step.ResultMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 2)"></textarea></label>
+    <p class="muted">@T("ArtifactResultHelp")</p>
+}
+@if (invalidJson) { <p class="validation-error" role="alert">@T("InvalidJson")</p> }
+
+@code {
+    [Parameter, EditorRequired] public ArtifactTransformFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
+    private bool invalidJson;
+    private string T(string key) => Localizer[key].Value;
+    private static string? Optional(ChangeEventArgs args) => string.IsNullOrWhiteSpace(args.Value?.ToString()) ? null : args.Value.ToString();
+    private Task ModeChangedAsync(ChangeEventArgs args) => Enum.TryParse<ArtifactProcessingMode>(args.Value?.ToString(), out var mode)
+        ? Changed.InvokeAsync(Step with { Mode = mode }) : Task.CompletedTask;
+    private Task LimitChangedAsync(ChangeEventArgs args, bool count) => int.TryParse(args.Value?.ToString(), out var limit)
+        ? Changed.InvokeAsync(count ? Step with { MaximumArtifacts = limit } : Step with { MaximumContentBytes = limit }) : Task.CompletedTask;
+    private Task OutputLimitChangedAsync(ChangeEventArgs args) => int.TryParse(args.Value?.ToString(), out var limit)
+        ? Changed.InvokeAsync(Step with { MaximumOutputBytes = limit }) : Task.CompletedTask;
+    private async Task MappingChangedAsync(ChangeEventArgs args, int field)
+    {
+        try
+        {
+            var value = JsonSerializer.Deserialize<JsonElement>(args.Value?.ToString() ?? "null");
+            JsonElement? mapping = value.ValueKind == JsonValueKind.Null ? null : value;
+            invalidJson = false;
+            await Changed.InvokeAsync(field switch { 0 => Step with { ArtifactsMapping = mapping },
+                1 => Step with { ProcessingInputMapping = mapping }, _ => Step with { ResultMapping = mapping } });
+        }
+        catch (JsonException) { invalidJson = true; }
+    }
+}

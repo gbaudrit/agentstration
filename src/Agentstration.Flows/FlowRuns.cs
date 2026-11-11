@@ -145,6 +145,7 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    public FlowArtifactProcessingContext? ArtifactProcessing { get; init; }
     public bool TransientPayloads { get; init; }
     public string? TransientPayloadTicket { get; init; }
     [JsonIgnore] public bool TransientPayloadsAvailable { get; init; } = true;
