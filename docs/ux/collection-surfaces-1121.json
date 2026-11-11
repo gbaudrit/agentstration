@@ -1,6 +1,6 @@
 {
   "scope": "All current Console and Workplace functional collections; aliases are not counted as separate surfaces. Fixed navigation and form/enum fields are not list screens. Specialized renderers retain domain semantics.",
-  "baseline": "35eadf47c7980eb4f905e91502744c5567636eac + first-wave PR #1123",
+  "baseline": "a60d76e335dce1853e2d8fbd81a6ea3ef25d9018 (#1129) + #1121 collection and version/action implementation; earlier route captures retain their recorded checkpoint",
   "frames": [
     {
       "id": "run-grid-flow-run",
