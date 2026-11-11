@@ -14,10 +14,11 @@ const routes = [
   '/triggers', '/data-sources', '/knowledge-sources', '/sourceproviders',
   '/settings/source-registries', '/settings/source-registries/discovery', '/settings/sources',
   '/packs', '/extensions?tab=catalog', '/extensions?tab=enrollments',
-  '/agent-runs', '/agent-instances', '/flow-runs', '/run-events', '/tasks', '/conversations',
+  '/agent-runs', '/agent-instances', '/deployments', '/flow-runs', '/run-events', '/tasks', '/work', '/conversations',
   '/artifacts', '/resource-plans', '/cleanup', '/settings/bootstrap', '/settings/resource-scopes',
-  '/settings/runtime-workers', '/settings/organization/access', '/settings/organization/members',
-  '/settings/organization/security-audit', '/settings/organization/structure', '/settings', '/account/pat',
+  '/settings/runtime-workers', '/settings/organization', '/settings/organization/access', '/settings/organization/members',
+  '/settings/organization/security-audit', '/settings/organization/structure', '/settings/organization/workspaces',
+  '/workspaces', '/settings', '/account/pat',
 ] as const;
 
 for (const variant of [
