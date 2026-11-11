@@ -76,3 +76,38 @@ test('detaching a collection stops resize calls to a disposed .NET reference', (
   assert.equal(browser.listeners.size, 0);
   module.releaseCollection(root);
 });
+
+test('repeated action initialization binds one keyboard handler and does not skip the first command', () => {
+  const document = Object.assign(new EventTarget(), { activeElement: null as unknown });
+  globalThis.document = document as unknown as Document;
+  globalThis.innerWidth = 390;
+  globalThis.innerHeight = 844;
+  const first = { getClientRects: () => [{}], focus: () => { document.activeElement = first; } };
+  const second = { getClientRects: () => [{}], focus: () => { document.activeElement = second; } };
+  const trigger = {
+    focus: () => { document.activeElement = trigger; },
+    getBoundingClientRect: () => ({ left: 8, bottom: 32 }),
+    setAttribute: () => {},
+  };
+  const panel = { style: {}, offsetWidth: 180, offsetHeight: 80, showPopover: () => {}, hidePopover: () => {} };
+  const root = Object.assign(new EventTarget(), {
+    isConnected: true, open: false,
+    querySelector: (selector: string) => selector === 'summary' ? trigger : panel,
+    querySelectorAll: () => [first, second],
+    contains: () => true,
+  });
+  const arrow = () => root.dispatchEvent(Object.assign(new Event('keydown', { cancelable: true }), { key: 'ArrowDown' }));
+  module.attachActions(root);
+  module.attachActions(root);
+  trigger.focus();
+  arrow();
+  assert.equal(document.activeElement, first, 'A repeated Blazor render must not advance focus twice.');
+  arrow();
+  assert.equal(document.activeElement, second);
+  module.releaseActions(root);
+  module.attachActions(root);
+  trigger.focus();
+  arrow();
+  assert.equal(document.activeElement, first, 'Released menus can be initialized again.');
+  module.releaseActions(root);
+});
