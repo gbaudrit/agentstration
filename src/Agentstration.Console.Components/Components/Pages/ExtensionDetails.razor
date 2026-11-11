@@ -59,12 +59,12 @@ else
             {
                 <EditForm Model="form" OnValidSubmit="SaveAsync">
                     <DataAnnotationsValidator /><ValidationSummary />
-                    <div class="form-grid">
+                    <FormGrid>
                         <ResourceIdentityFields @bind-DisplayName="form.DisplayName" TechnicalName="@registration.Value.Name" IsNew="false" />
-                        <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" /></label>
-                        <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /></label>
-                        <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
-                    </div>
+                        <FormField Label="@T("AepEndpoint")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.Endpoint" /></ChildContent></FormField>
+                        <FormField Label="@T("ExpectedExtensionId")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.ExpectedExtensionId" /></ChildContent></FormField>
+                        <label class="checkbox-field"><FormCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
+                    </FormGrid>
                     <div class="panel-actions"><button class="button-primary" type="submit" disabled="@saving">@T("SaveChanges")</button><button class="button-secondary" type="button" @onclick="() => editing = false" disabled="@saving">@T("Cancel")</button></div>
                 </EditForm>
             }

@@ -70,27 +70,25 @@ else
         </StateComparison>
         @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
         {
-            <section class="panel form-section" data-testid="agent-active-toolsets">
-                <div class="panel-header"><div><p class="eyebrow">@T("ActiveRevision")</p><h2>@T("PinnedToolSetAssignments")</h2><p>@T("PinnedToolSetAssignmentsHelp")</p></div><code>@activeRevision.Metadata.Name</code></div>
+            <FormSection Title="@T("PinnedToolSetAssignments")" Eyebrow="@T("ActiveRevision")" Description="@T("PinnedToolSetAssignmentsHelp")" TestId="agent-active-toolsets"><Actions><code>@activeRevision.Metadata.Name</code></Actions><ChildContent>
                 <div class="table-shell"><table class="resource-table"><thead><tr><th>@T("ToolSet")</th><th>@T("Version")</th><th>@T("DefinitionHash")</th><th>@T("EffectiveMembers")</th></tr></thead><tbody>
                 @foreach (var assignment in activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal))
                 {
                     <tr><td><code>@assignment.ToolSetNamespace/@assignment.ToolSetName</code></td><td><code>@assignment.Version</code></td><td><code>@assignment.DefinitionHash</code></td><td>@string.Join(", ", assignment.Members)</td></tr>
                 }
                 </tbody></table></div>
-            </section>
+            </ChildContent></FormSection>
         }
         <FormSection Title="@T("Behavior")"><dl class="resource-details">
             <dt>@T("Handler")</dt><dd>@savedResource.Definition.Handler</dd>
             <dt>@T("Instructions")</dt><dd class="resource-text">@savedResource.Definition.Instructions</dd>
         </dl></FormSection>
-            <section class="panel form-section">
-                <div class="panel-header"><div><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
+            <FormSection Title="@T("DeclaredAndResolved")"><Actions>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</Actions><ChildContent>
                 <div class="declaration-resolution-grid">
                     <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@if (agentModel is not null) { <a class="resource-name-link" href="@ProfileUrl(agentModel)">@(agentModel.Declared.ModelProfile.DisplayName ?? savedResource.Definition.ModelProfile.Name)</a> } else { @savedResource.Definition.ModelProfile.Name }</dd><dt>@T("Name")</dt><dd><code>@savedResource.Definition.ModelProfile.Name</code></dd></dl></article>
                     <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@if (agentModel.Resolved.Provider is { } provider) { <a class="resource-name-link" href="@ProviderUrl(agentModel)">@(provider.DisplayName ?? provider.Name)</a> } else { @T("NotResolved") }</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>}</article>
                 </div>
-            </section>
+            </ChildContent></FormSection>
 
 
         <FormSection Title="@T("Tags")"><LabelsSummary Values="@savedResource.Metadata.Tags" /></FormSection>
@@ -102,16 +100,15 @@ else
     }
     else if (sourceMode)
     {
-        <section class="panel form-section" data-testid="agent-yaml-editor">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("AgentYaml")</h2><p>@T("AgentYamlHelp")</p></div></div>
+        <FormSection Title="@T("AgentYaml")" Eyebrow="@T("RawResource")" Description="@T("AgentYamlHelp")" TestId="agent-yaml-editor"><ChildContent>
             @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
             @if (invalidInput || rawUsesSavedDefinition)
             {
                 <div class="form-alert form-alert-info" role="status" data-testid="agent-yaml-form-warning"><span>@T("YamlFormInvalid")</span><button type="button" class="text-button" @onclick="ShowDefinition">@Shared["Edit"]</button></div>
             }
-            <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanEditRaw)" disabled="@saving"></textarea></label>
+            <FormField Label="@T("ResourceManifest")" Class="agent-yaml-field"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="28" @bind-Value="rawYaml" ReadOnly="@(!CanEditRaw)" Disabled="@saving"></ClearableText></ChildContent></FormField>
             @if (CanManage) { <FormActions Busy="@saving"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@(saving || !CanEditRaw)">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@(saving || !CanEditRaw)">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></FormActions> }
-        </section>
+        </ChildContent></FormSection>
 
     }
     @if (definitionVisited || toolsVisited || contractsVisited)
@@ -132,8 +129,7 @@ else
         @if (contractsVisited)
         {
             <div class="resource-editor-view" hidden="@(!contractsMode)">
-            <section class="panel form-section" data-testid="agent-contracts-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Contracts")</p><h2>@T("InvocationContracts")</h2><p>@T("InvocationContractsHelp")</p></div></div>
+            <FormSection Title="@T("InvocationContracts")" Eyebrow="@T("Contracts")" Description="@T("InvocationContractsHelp")" TestId="agent-contracts-section"><ChildContent>
                 <ContractDirectionTabs Label="@T("InvocationContracts")" InputLabel="@T("InputContract")"
                     OutputLabel="@T("OutputContract")" TestId="agent-contract">
                     <InputContent>
@@ -145,7 +141,7 @@ else
                             Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
                     </OutputContent>
                 </ContractDirectionTabs>
-            </section>
+            </ChildContent></FormSection>
             </div>
         }
         @if (definitionVisited)

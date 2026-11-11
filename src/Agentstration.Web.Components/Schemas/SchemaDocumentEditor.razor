@@ -34,7 +34,7 @@
             </div>
             <div class="schema-visual-workbench">
                 <aside class="schema-tree-panel">
-                    <label class="schema-additional-properties"><input type="checkbox" checked="@AdditionalProperties" disabled="@EditorDisabled" @onchange="ChangeAdditionalPropertiesAsync" /> <span>@Localizer["AdditionalProperties"]</span></label>
+                    <label class="schema-additional-properties"><FormCheckbox Value="@AdditionalProperties" disabled="@EditorDisabled" ValueChanged="changed => ChangeAdditionalPropertiesAsync(new ChangeEventArgs { Value = changed })" /> <span>@Localizer["AdditionalProperties"]</span></label>
                     @if (Properties.Count == 0)
                     {
                         <p class="muted schema-tree-empty">@Localizer["EmptyProperties"]</p>
@@ -78,7 +78,7 @@
             <h3>@Localizer["InstancePreview"]</h3>
             <p class="muted">@Localizer["InstancePreviewHelp"]</p>
             <JsonSchemaInputEditor Schema="Value" Value="previewValue" ValueChanged="value => previewValue = value" Disabled="Disabled" />
-            <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" @onclick="ValidateInstanceAsync">@Localizer["ValidateInstance"]</button></div>
+            <FormActions><button type="button" class="button-secondary" disabled="@Disabled" @onclick="ValidateInstanceAsync">@Localizer["ValidateInstance"]</button></FormActions>
             @if (instanceValidation is not null)
             {
                 @ValidationResult(instanceValidation, Localizer["InstanceValid"], Localizer["InstanceInvalid"])
@@ -92,7 +92,7 @@
             <SchemaSourceEditor Value="@source" ValueChanged="value => source = value" ReadOnly="EditorDisabled" />
             @if (!ReadOnly)
             {
-                <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-apply-source" @onclick="ApplySourceAsync">@Localizer["ApplySource"]</button></div>
+                <FormActions><button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-apply-source" @onclick="ApplySourceAsync">@Localizer["ApplySource"]</button></FormActions>
             }
         </div>
     }

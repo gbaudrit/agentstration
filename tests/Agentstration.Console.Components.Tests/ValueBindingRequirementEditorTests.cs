@@ -118,16 +118,16 @@ public sealed partial class ModelProviderNavigationTests
                 .Add(value => value.AllowedSources, [ValueBindingSourceKind.Caller])
                 .Add(value => value.Selection, new(ValueBindingSourceKind.Caller))));
 
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         var editor = rendered.FindComponent<ValueBindingRequirementEditor>();
         editor.Render(parameters => parameters.Add(value => value.AllowedSources, [ValueBindingSourceKind.Parameter]));
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.AreEqual("Caller", ((IHtmlSelectElement)rendered.Find("[data-testid$='binding-kind']")).Value);
         Assert.IsTrue(rendered.Find("option[value='Caller']").HasAttribute("disabled"));
         Assert.HasCount(0, rendered.FindAll("[data-testid$='binding-target'], [data-testid$='binding-literal'], [data-testid$='binding-create']"));
 
         editor.Render(parameters => parameters.Add(value => value.AllowedSources, [ValueBindingSourceKind.Caller]));
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.IsFalse(rendered.Find("option[value='Caller']").HasAttribute("disabled"));
     }
 
@@ -312,11 +312,11 @@ public sealed partial class ModelProviderNavigationTests
                 .Add(value => value.AllowedSources, [ValueBindingSourceKind.Literal])
                 .Add(value => value.Selection, new(ValueBindingSourceKind.Literal))));
 
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.Find("[data-testid$='binding-literal']").Change("not-an-integer");
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.Find("[data-testid$='binding-literal']").Change("5");
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]

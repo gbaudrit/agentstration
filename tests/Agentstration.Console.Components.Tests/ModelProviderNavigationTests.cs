@@ -73,7 +73,7 @@ public sealed partial class ModelProviderNavigationTests
                 "/modelprofiles/new?namespace=shared.models&provider=ollama%2Flocal&providerNamespace=shared.models&model=qwen3",
                 discoveredModelLink.GetAttribute("href"));
             Assert.AreEqual(
-                "/models/ollama-local.qwen3-deadbeef?namespace=shared.models",
+                "/models/ollama-local.qwen3-deadbeef?namespace=shared.models&context=%2Finstance",
                 rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
             CollectionAssert.AreEqual(new[] { "Overview", "Configuration", "Access" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
             Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
@@ -567,6 +567,7 @@ public sealed partial class ModelProviderNavigationTests
         IReadOnlyList<ExtensionResponse>? extensions = null)
     {
         var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         providers = new StubModelProvidersClient();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProvidersClient>(providers);

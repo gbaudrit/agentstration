@@ -95,7 +95,7 @@ public sealed class JsonSchemaInputEditorTests
         StringAssert.Contains(prompt.QuerySelector(".metric-help")?.GetAttribute("aria-label"), "16");
         Assert.HasCount(1, rendered.Find("[data-schema-path='$.test']").QuerySelectorAll("input[type=text]"));
         var patternHelp = rendered.Find("[data-schema-path='$.reference'] .metric-help");
-        StringAssert.Contains(patternHelp.ClassName, "metric-help-start");
+        Assert.AreEqual("tooltip", patternHelp.QuerySelector("[role=tooltip]")?.GetAttribute("role"));
         StringAssert.Contains(patternHelp.GetAttribute("aria-label"), "^[A-Z]{3}-[0-9]{4}$");
     }
 

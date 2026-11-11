@@ -26,7 +26,7 @@ else if (structure is not null)
         <section class="panel structure-inventory" aria-labelledby="structure-heading">
             <div class="inventory-header">
                 <div><h2 id="structure-heading">@T("TenantsAndWorkspaces")</h2><p>@T("Structure.Counts", structure.Tenants.Count, structure.Tenants.Sum(value => value.Workspaces.Count))</p></div>
-                <label class="structure-search"><span>@T("SearchStructure")</span><input @ref="searchInput" type="search" @bind="search" @bind:event="oninput" placeholder="@T("SearchStructure.Placeholder")" /></label>
+                <FormField Label="@T("SearchStructure")" Class="structure-search"><ChildContent><ClearableText @ref="searchInput" Type="search" @bind-Value="search" placeholder="@T("SearchStructure.Placeholder")" /></ChildContent></FormField>
             </div>
             @if (structure.Tenants.Count == 0)
             {
@@ -131,7 +131,7 @@ else if (structure is not null)
     private bool focusCreation;
     private int identityVersion;
     private ElementReference creationHeading;
-    private ElementReference searchInput;
+    private ClearableText searchInput = null!;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string ContextName => ContextState.Current?.SelectedKind switch
     {

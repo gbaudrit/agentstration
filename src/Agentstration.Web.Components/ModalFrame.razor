@@ -21,27 +21,51 @@
     private IJSObjectReference? module;
     private IJSObjectReference? registration;
     private bool opened;
+    private bool opening;
+    private bool disposed;
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (IsOpen && !opened)
+        if (IsOpen && !opened && !opening)
         {
-            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/dialog.js");
-            registration = await module.InvokeAsync<IJSObjectReference>("openDialog", dialog);
-            opened = true;
+            // Async child initialization can render again while the module is
+            // loading. Keep a single registration so its focus-restoration
+            // handle cannot be overwritten by a second openDialog call.
+            opening = true;
+            try
+            {
+                module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/dialog.js");
+                if (disposed) { await module.DisposeAsync(); module = null; return; }
+                if (!IsOpen) return;
+                var next = await module.InvokeAsync<IJSObjectReference>("openDialog", dialog);
+                if (disposed || !IsOpen) { await ReleaseAsync(next); return; }
+                registration = next;
+                opened = true;
+            }
+            catch (Exception exception) when (disposed && exception is JSException or TaskCanceledException or ObjectDisposedException) { }
+            finally { opening = false; }
         }
         else if (!IsOpen && opened && module is not null)
         {
-            if (registration is not null) { await registration.InvokeVoidAsync("dispose"); await registration.DisposeAsync(); registration = null; }
+            var previous = registration; registration = null;
+            await ReleaseAsync(previous);
             opened = false;
         }
     }
     private Task CloseAsync() => Busy ? Task.CompletedTask : OnClose.InvokeAsync();
+    private static async ValueTask ReleaseAsync(IJSObjectReference? value)
+    {
+        if (value is null) return;
+        await value.InvokeVoidAsync("dispose");
+        await value.DisposeAsync();
+    }
     public async ValueTask DisposeAsync()
     {
+        disposed = true;
         if (module is null) return;
         try
         {
-            if (registration is not null) { await registration.InvokeVoidAsync("dispose"); await registration.DisposeAsync(); }
+            var previous = registration; registration = null;
+            await ReleaseAsync(previous);
             await module.DisposeAsync();
         }
         catch (JSDisconnectedException) { }

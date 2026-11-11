@@ -32,17 +32,19 @@ else
 
     <article class="panel composer-metadata">
         <div class="panel-header"><div><p class="eyebrow">@T("PackIdentity")</p><h2>@T("ProjectMetadata")</h2></div></div>
+        <CascadingValue Value="MetadataContext"><FormDraftMonitor InvalidInputChanged="value => invalidMetadata = value" /><ValidationSummary />
         <div class="composer-fields">
-            <label><span>@T("Publisher")</span><input @bind="publisher" autocomplete="off" spellcheck="false" data-testid="pack-project-publisher" /></label>
+            <FormField Label="@T("Publisher")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="publisher" autocomplete="off" spellcheck="false" data-testid="pack-project-publisher" /></ChildContent></FormField>
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" Policy="ResourceNamePolicy.Pack" IsNew="true" DisplayNameTestId="pack-project-display-name" TechnicalNameTestId="pack-project-name" />
-            <label><span>@T("Version")</span><input @bind="version" autocomplete="off" spellcheck="false" data-testid="pack-project-version" /></label>
-            <label><span>@T("Audience")</span><select @bind="audience"><option value="@PackAudience.Universal">@T("Audience.Universal")</option><option value="@PackAudience.Personal">@T("Audience.Personal")</option><option value="@PackAudience.Professional">@T("Audience.Professional")</option></select></label>
-            <label><span>@T("Purpose")</span><select @bind="purpose"><option value="@PackPurpose.Standard">@T("Purpose.Standard")</option><option value="@PackPurpose.Sample">@T("Purpose.Sample")</option><option value="@PackPurpose.Template">@T("Purpose.Template")</option></select></label>
+            <FormField Label="@T("Version")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="version" autocomplete="off" spellcheck="false" data-testid="pack-project-version" /></ChildContent></FormField>
+            <FormField Label="@T("Audience")"><ChildContent><ClearableSelect @bind-Value="audience"><option value="@PackAudience.Universal">@T("Audience.Universal")</option><option value="@PackAudience.Personal">@T("Audience.Personal")</option><option value="@PackAudience.Professional">@T("Audience.Professional")</option></ClearableSelect></ChildContent></FormField>
+            <FormField Label="@T("Purpose")"><ChildContent><ClearableSelect @bind-Value="purpose"><option value="@PackPurpose.Standard">@T("Purpose.Standard")</option><option value="@PackPurpose.Sample">@T("Purpose.Sample")</option><option value="@PackPurpose.Template">@T("Purpose.Template")</option></ClearableSelect></ChildContent></FormField>
             <ResourceScopeFormField ResourceKind="@PackAuthoringKinds.PackProject" @bind-Value="selectedScope" />
-            <label><span>@T("Categories")</span><input @bind="categories" placeholder="automation, support" /></label>
-            <label><span>@T("Tags")</span><input @bind="tags" placeholder="local, experimental" /></label>
-            <label class="wide"><span>@T("Description")</span><textarea rows="3" @bind="description"></textarea></label>
+            <FormField Label="@T("Categories")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="categories" placeholder="automation, support" /></ChildContent></FormField>
+            <FormField Label="@T("Tags")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="tags" placeholder="local, experimental" /></ChildContent></FormField>
+            <FormField Label="@T("Description")" Class="wide"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="3" @bind-Value="description"></ClearableText></ChildContent></FormField>
         </div>
+        </CascadingValue>
     </article>
 
     <section class="composer-transfer" aria-label="@T("PackResourceComposition")">
@@ -52,9 +54,9 @@ else
                 <span>@T("ResultCount", AvailableResources.Count)</span>
             </div>
             <div class="composer-filters">
-                <label><span>@T("Search")</span><input type="search" @bind="search" @bind:event="oninput" placeholder="@T("NameOrDescription")" /></label>
-                <label><span>@T("Kind")</span><select @bind="kindFilter"><option value="">@T("AllKinds")</option>@foreach (var kind in Kinds) { <option value="@kind">@kind</option> }</select></label>
-                <label><span>@T("Availability")</span><select @bind="availabilityFilter"><option value="">@T("AllResources")</option><option value="selectable">@T("Selectable")</option><option value="binding">@T("BindingOnly")</option><option value="unsupported">@T("NotSupported")</option></select></label>
+                <FormField Label="@T("Search")"><ChildContent><ClearableText Type="search" @bind-Value="search" placeholder="@T("NameOrDescription")" /></ChildContent></FormField>
+                <FormField Label="@T("Kind")"><ChildContent><ClearableSelect @bind-Value="kindFilter"><option value="">@T("AllKinds")</option>@foreach (var kind in Kinds) { <option value="@kind">@kind</option> }</ClearableSelect></ChildContent></FormField>
+                <FormField Label="@T("Availability")"><ChildContent><ClearableSelect @bind-Value="availabilityFilter"><option value="">@T("AllResources")</option><option value="selectable">@T("Selectable")</option><option value="binding">@T("BindingOnly")</option><option value="unsupported">@T("NotSupported")</option></ClearableSelect></ChildContent></FormField>
             </div>
             @if (AvailableResources.Count == 0)
             {
@@ -198,6 +200,9 @@ else
     private string? description;
     private string categories = string.Empty;
     private string tags = string.Empty;
+    private EditContext? metadataContext;
+    private EditContext MetadataContext => metadataContext ??= new(this);
+    private bool invalidMetadata;
     private PackAudience audience = PackAudience.Universal;
     private PackPurpose purpose = PackPurpose.Standard;
     private bool loading = true;
@@ -220,7 +225,7 @@ else
     private IReadOnlyList<PackCompositionPreviewResource> ExplicitPackResources => DisplayedPackResources.Where(item => item.ExplicitlySelected).ToArray();
     private IReadOnlyList<PackCompositionPreviewResource> AutomaticPackResources => DisplayedPackResources.Where(item => !item.ExplicitlySelected).ToArray();
     private int SelectedCount => selected.Count;
-    private bool CanCreate => preview?.CanCreate == true && !reviewing && !creating && !string.IsNullOrWhiteSpace(publisher) && !string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(version);
+    private bool CanCreate => !invalidMetadata && preview?.CanCreate == true && !reviewing && !creating && !string.IsNullOrWhiteSpace(publisher) && !string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(version);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string ValidationLabel => reviewing ? T("Reviewing") : preview is null ? T("Empty") : preview.CanCreate ? T("Ready") : T("Blocked");
     private string ValidationDetail => reviewing ? T("UpdatingDependencies") : preview is null ? T("AddResource") : preview.Issues.Count == 0 ? T("NoIssue") : T("IssueCount", preview.Issues.Count);

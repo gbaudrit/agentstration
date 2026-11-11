@@ -21,10 +21,10 @@
 .missing-provider .tool-category-provider-icon { color: var(--color-warning); }
 .tool-category-member { position: relative; display: flex; align-items: center; gap: 11px; min-height: 82px; padding: 12px 40px 12px 12px; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); border-radius: 11px; background: var(--surface); box-shadow: 0 2px 7px color-mix(in srgb, var(--text) 3%, transparent); transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast); }
 .tool-category-member:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); background: color-mix(in srgb, var(--primary-soft) 32%, var(--surface)); box-shadow: 0 7px 18px color-mix(in srgb, var(--primary) 9%, transparent); transform: translateY(-1px); }
-.tool-category-member:has(input:checked) { border-color: color-mix(in srgb, var(--primary) 62%, var(--border)); background: color-mix(in srgb, var(--primary-soft) 58%, var(--surface)); box-shadow: inset 3px 0 var(--primary), 0 6px 16px color-mix(in srgb, var(--primary) 9%, transparent); }
-.tool-category-member:has(input:disabled) { opacity: .62; }
+.tool-category-member:has(::deep input:checked) { border-color: color-mix(in srgb, var(--primary) 62%, var(--border)); background: color-mix(in srgb, var(--primary-soft) 58%, var(--surface)); box-shadow: inset 3px 0 var(--primary), 0 6px 16px color-mix(in srgb, var(--primary) 9%, transparent); }
+.tool-category-member:has(::deep input:disabled) { opacity: .62; }
 .tool-category-member.unavailable { border-style: dashed; }
-.tool-category-member > input { position: absolute; top: 12px; right: 12px; width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
+.tool-category-member > ::deep input { position: absolute; top: 12px; right: 12px; width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
 .tool-category-member-icon { display: inline-grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--primary-soft) 70%, var(--surface)); color: var(--primary); cursor: pointer; }
 .tool-category-member-copy { display: grid; min-width: 0; gap: 6px; }
 .tool-category-member-copy strong { display: flex; align-items: center; min-width: 0; gap: 4px; font-size: .82rem; line-height: 1.25; }

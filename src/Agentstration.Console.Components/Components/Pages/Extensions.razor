@@ -72,18 +72,18 @@
         </div>
         @if (enrollmentSettings is not null)
         {
-            <div class="form-grid">
+            <FormGrid>
                 <label class="checkbox-field">
-                    <input type="checkbox" @bind="pairingCodeEnabled" disabled="@(!enrollmentSettings.PairingCodeConfigurable || savingEnrollmentSettings)" />
+                    <FormCheckbox @bind-Value="pairingCodeEnabled" disabled="@(!enrollmentSettings.PairingCodeConfigurable || savingEnrollmentSettings)" />
                     @T("PairingCodeMode")
                     <small>@(enrollmentSettings.PairingCodeConfigurable ? T("PairingCodeMode.Help") : T("ModeDisabledByConfiguration"))</small>
                 </label>
                 <label class="checkbox-field">
-                    <input type="checkbox" @bind="sharedKeyFileEnabled" disabled="@(!enrollmentSettings.SharedKeyFileConfigurable || savingEnrollmentSettings)" />
+                    <FormCheckbox @bind-Value="sharedKeyFileEnabled" disabled="@(!enrollmentSettings.SharedKeyFileConfigurable || savingEnrollmentSettings)" />
                     @T("SharedKeyFileMode")
                     <small>@(enrollmentSettings.SharedKeyFileConfigurable ? T("SharedKeyFileMode.Help") : T("ModeDisabledByConfiguration"))</small>
                 </label>
-            </div>
+            </FormGrid>
             <div class="panel-actions">
                 <button class="button-primary" @onclick="SaveEnrollmentSettingsAsync" disabled="@savingEnrollmentSettings">@(savingEnrollmentSettings ? T("Saving") : T("SaveEnrollmentModes"))</button>
             </div>
@@ -178,21 +178,21 @@
     <EditForm Model="form" OnValidSubmit="SaveAsync">
         <DataAnnotationsValidator />
         <ValidationSummary />
-        <div class="form-grid">
+        <FormGrid>
             <ResourceIdentityFields @bind-DisplayName="form.DisplayName" @bind-TechnicalName="form.Name" IsNew="true" />
-            <label>@T("Namespace")<InputText @bind-Value="form.Namespace" /></label>
+            <FormField Label="@T("Namespace")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.Namespace" /></ChildContent></FormField>
             <ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" />
-            <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
-            <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
-            <label>@T("AuthenticationMode")<InputSelect @bind-Value="form.AuthenticationMode"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></InputSelect></label>
+            <FormField Label="@T("AepEndpoint")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></ChildContent></FormField>
+            <FormField Label="@T("ExpectedExtensionId")"><HelpContent>@T("ExpectedExtensionId.Help")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.ExpectedExtensionId" /></ChildContent></FormField>
+            <FormField Label="@T("AuthenticationMode")"><ChildContent><ClearableSelect @bind-Value="form.AuthenticationMode"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></ClearableSelect></ChildContent></FormField>
             @if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer)
             {
-                <label>@T("CredentialName")<InputText @bind-Value="form.CredentialName" /></label>
-                <label>@T("CredentialNamespace")<InputText @bind-Value="form.CredentialNamespace" /></label>
-                <label>@T("CredentialScopeRef")<InputText @bind-Value="form.CredentialScopeRef" /><small>@T("CredentialScopeRef.Help")</small></label>
+                <FormField Label="@T("CredentialName")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.CredentialName" /></ChildContent></FormField>
+                <FormField Label="@T("CredentialNamespace")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.CredentialNamespace" /></ChildContent></FormField>
+                <FormField Label="@T("CredentialScopeRef")"><HelpContent>@T("CredentialScopeRef.Help")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.CredentialScopeRef" /></ChildContent></FormField>
             }
-            <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
-        </div>
+            <label class="checkbox-field"><FormCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
+        </FormGrid>
         <div class="panel-actions">
             <button class="button-primary" type="submit" disabled="@saving">@T("CreateRegistration")</button>
             <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">@T("Cancel")</button>
@@ -211,9 +211,9 @@
         </div>
         <ResourceToolbar Label="@T("InventoryFilters")">
             <SearchBox @bind-Value="search" Placeholder="@T("SearchExtensions")" />
-            <select aria-label="@T("Availability")" @bind="availabilityFilter"><option value="">@T("AllAvailability")</option>@foreach (var status in AvailabilityFilters) { <option value="@status">@StatusLabel(status)</option> }</select>
-            <select aria-label="@T("Enrollment")" @bind="enrollmentFilter"><option value="">@T("AllEnrollments")</option>@foreach (var status in EnrollmentFilters) { <option value="@status">@EnrollmentStatusLabel(status)</option> }</select>
-            <select aria-label="@T("Origin")" @bind="sourceFilter"><option value="">@T("AllOrigins")</option>@foreach (var source in SourceFilters) { <option value="@source">@SourceLabel(source)</option> }</select>
+            <ClearableSelect aria-label="@T("Availability")" @bind-Value="availabilityFilter"><option value="">@T("AllAvailability")</option>@foreach (var status in AvailabilityFilters) { <option value="@status">@StatusLabel(status)</option> }</ClearableSelect>
+            <ClearableSelect aria-label="@T("Enrollment")" @bind-Value="enrollmentFilter"><option value="">@T("AllEnrollments")</option>@foreach (var status in EnrollmentFilters) { <option value="@status">@EnrollmentStatusLabel(status)</option> }</ClearableSelect>
+            <ClearableSelect aria-label="@T("Origin")" @bind-Value="sourceFilter"><option value="">@T("AllOrigins")</option>@foreach (var source in SourceFilters) { <option value="@source">@SourceLabel(source)</option> }</ClearableSelect>
         </ResourceToolbar>
     @if (loading && inventory is null)
     {

@@ -17,12 +17,12 @@
 }
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
-    <label>@T("OutputOutcome")<select data-testid="output-outcome" disabled="@ReadOnly" value="@(Step.Outcome ?? FlowOutputOutcome.Success)" @onchange="UpdateOutputOutcomeAsync"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></select></label>
+    <FormField Label="@T("OutputOutcome")"><ChildContent><ClearableSelect TValue="string" data-testid="output-outcome" disabled="@ReadOnly" Value="@Convert.ToString(Step.Outcome ?? FlowOutputOutcome.Success, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateOutputOutcomeAsync.InvokeAsync(new ChangeEventArgs { Value = changed })"><option value="@FlowOutputOutcome.Success">@T("OutputOutcome.Success")</option><option value="@FlowOutputOutcome.Error">@T("OutputOutcome.Error")</option></ClearableSelect></ChildContent></FormField>
     @if ((Step.Outcome ?? FlowOutputOutcome.Success) == FlowOutputOutcome.Error)
     {
-        <label>@T("ErrorCode")<input data-testid="output-error-code" disabled="@ReadOnly" value="@Step.Code" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Code = EmptyToNull(Text(e)) })" /></label>
-        <label>@T("Message")<textarea data-testid="output-error-message" disabled="@ReadOnly" value="@Step.Message" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Message = EmptyToNull(Text(e)) })"></textarea></label>
-        <label>@T("ErrorDetailsExpression")<input data-testid="output-error-details" disabled="@ReadOnly" value="@Step.DetailsExpression" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { DetailsExpression = EmptyToNull(Text(e)) })" /></label>
+        <FormField Label="@T("ErrorCode")"><ChildContent><ClearableText UpdateOnInput="false" data-testid="output-error-code" Disabled="@ReadOnly" Value="@Step.Code" ValueChanged="changed => UpdateSelectedAsync.InvokeAsync(Step with { Code = EmptyToNull(Text(new ChangeEventArgs { Value = changed })) })" /></ChildContent></FormField>
+        <FormField Label="@T("Message")"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" data-testid="output-error-message" Disabled="@ReadOnly" Value="@Step.Message" ValueChanged="changed => UpdateSelectedAsync.InvokeAsync(Step with { Message = EmptyToNull(Text(new ChangeEventArgs { Value = changed })) })"></ClearableText></ChildContent></FormField>
+        <FormField Label="@T("ErrorDetailsExpression")"><ChildContent><ClearableText UpdateOnInput="false" data-testid="output-error-details" Disabled="@ReadOnly" Value="@Step.DetailsExpression" ValueChanged="changed => UpdateSelectedAsync.InvokeAsync(Step with { DetailsExpression = EmptyToNull(Text(new ChangeEventArgs { Value = changed })) })" /></ChildContent></FormField>
     }
 }
 @if (ActiveTab == FlowStepSettingsTab.Output)

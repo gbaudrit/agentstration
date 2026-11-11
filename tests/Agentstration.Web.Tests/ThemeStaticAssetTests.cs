@@ -39,7 +39,7 @@ public sealed class ThemeStaticAssetTests
         var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "design-tokens.css"));
 
         var appShellStart = css.IndexOf(".app-shell {", StringComparison.Ordinal);
-        var darkThemeStart = css.IndexOf(".app-shell.theme-dark {", StringComparison.Ordinal);
+        var darkThemeStart = css.IndexOf(".app-shell.theme-dark, :root[data-theme=\"dark\"] {", StringComparison.Ordinal);
         Assert.IsGreaterThanOrEqualTo(0, appShellStart);
         Assert.IsGreaterThan(appShellStart, darkThemeStart);
 
