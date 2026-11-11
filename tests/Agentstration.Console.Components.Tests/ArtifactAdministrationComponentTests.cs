@@ -23,7 +23,7 @@ public sealed class ArtifactAdministrationComponentTests
             .Add(value => value.Href, "/artifacts/staged/" + identifier));
         Assert.AreEqual(identifier, rendered.Find(".copyable-value code").TextContent);
         Assert.HasCount(0, rendered.FindAll("a .copy-value"));
-        Assert.IsNotNull(rendered.Find(".resource-icon"));
+        Assert.IsNotNull(rendered.Find(".resource-icon svg path"));
         Assert.AreEqual("/artifacts/staged/" + identifier, rendered.Find("a").GetAttribute("href"));
     }
 
