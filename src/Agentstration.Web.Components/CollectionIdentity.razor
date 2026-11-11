@@ -10,6 +10,10 @@
         {
             <div class="collection-qualified-name">@if (Namespace is not null) { <UiIcon Name="folder" /> }<CopyableValue Value="@(Namespace is null ? Name : $"{Namespace}/{Name}")" /></div>
         }
+        @if (Versions is not null)
+        {
+            <div class="collection-identity-versions">@Versions</div>
+        }
         @Badges
     </div>
 </div>
@@ -23,5 +27,6 @@
     [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? LinkAttributes { get; set; }
     [Parameter] public string IconName { get; set; } = "layers";
     [Parameter] public string Domain { get; set; } = "neutral";
+    [Parameter] public RenderFragment? Versions { get; set; }
     [Parameter] public RenderFragment? Badges { get; set; }
 }

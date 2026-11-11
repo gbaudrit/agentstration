@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
+import { CollectionVersionTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 
 type DistributionMarker = keyof Pick<typeof TestIds.distribution,
   'extensions' | 'extensionDetails' | 'sourceProviders' | 'sourceProviderDetails' |
@@ -17,6 +18,7 @@ export interface PackProjectDefinition {
 }
 
 export class DistributionPage {
+  private referenceContext: string | null = null;
   public constructor(private readonly page: Page) {}
 
   public async open(consoleUrl: string, path: string, marker: DistributionMarker): Promise<void> {
@@ -25,9 +27,80 @@ export class DistributionPage {
     await this.page.getByTestId(TestIds.distribution[marker]).waitFor({ state: 'visible' });
   }
 
+  public async inspectVersionPlacement(consoleUrl: string, route: string, locale: SupportedTestLocale): Promise<void> {
+    const response = await this.page.goto(`${consoleUrl}${route}`, { waitUntil: 'domcontentloaded' });
+    expect(response?.ok()).toBe(true);
+    const frame = this.page.locator('.resource-collection').first();
+    await expect(frame).toBeVisible();
+    const labels = CollectionVersionTextByLocale[locale];
+    const expected = route.startsWith('/data-source-profiles') ? [labels.active, labels.draft]
+      : route.startsWith('/agents') ? [labels.generation] : [labels.version];
+    const assertIdentity = async () => {
+      const identity = frame.locator('.collection-identity').first();
+      await expect(identity.locator('.collection-version-label')).toHaveText(expected);
+      await expect.poll(async () => {
+        const text = await identity.locator('.collection-identity-text').boundingBox();
+        const version = await identity.locator('.collection-identity-versions').boundingBox();
+        return text && version ? Math.abs(text.x - version.x) : Infinity;
+      }, { message: 'Versions align with identity text rather than the family icon after interactive rendering' }).toBeLessThan(1);
+      await expect(identity.locator('.collection-qualified-name code')).toBeVisible();
+      expect(await identity.locator('.collection-qualified-name code').textContent()).not.toMatch(/\s\/|\/\s/);
+      expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    };
+    await assertIdentity();
+    await frame.locator('.collection-view-switch button').first().click();
+    for (const label of expected) await expect(frame.getByRole('columnheader', { name: label, exact: true })).toHaveCount(0);
+    await assertIdentity();
+    await frame.locator('.collection-view-switch button').nth(1).click();
+    await assertIdentity();
+  }
+
+  public async showCollectionTable(): Promise<void> {
+    const frame = this.page.locator('.resource-collection').first();
+    await frame.locator('.collection-view-switch button').first().click();
+    await expect(frame.locator('table')).toBeVisible();
+  }
+
+  public async inspectDirectEnrollmentActions(consoleUrl: string): Promise<void> {
+    await this.open(consoleUrl, '/extensions?tab=enrollments&context=%2Finstance', 'extensions');
+    await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.distribution.extensionEnrollmentsTab).click();
+    const primary = this.page.locator('.enrollment-actions .collection-primary-actions button').first();
+    await expect(primary).toBeVisible();
+    await expect(primary.locator('xpath=ancestor::details')).toHaveCount(0);
+    await primary.focus(); await expect(primary).toBeFocused();
+    const menu = this.page.locator('.enrollment-actions .collection-actions-menu').first();
+    if (await menu.count()) {
+      const trigger = menu.locator('summary');
+      await trigger.focus(); await trigger.press('ArrowDown');
+      await expect(menu.locator('.collection-actions-panel button').first()).toBeFocused();
+      await this.page.keyboard.press('Escape');
+      await expect(trigger).toBeFocused();
+      await expect(menu).not.toHaveAttribute('open', '');
+    }
+    const identity = this.page.locator('.enrollment-identity .collection-identity').first();
+    await expect(identity.locator('.collection-version')).toBeVisible();
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+
+  public async inspectDirectProfileChoice(consoleUrl: string): Promise<void> {
+    await this.page.goto(`${consoleUrl}/agents/new?context=${encodeURIComponent(this.referenceContext ?? '/instance')}`, { waitUntil: 'domcontentloaded' });
+    await expect(this.page.getByTestId(TestIds.agentEditor.form)).toHaveAttribute('data-interactive', 'true');
+    const toggle = this.page.getByTestId(TestIds.agentEditor.modelProfileToggle);
+    await expect(toggle).toBeVisible();
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const choice = this.page.getByTestId(TestIds.agentEditor.modelProfileChoice).first();
+    await expect(choice).toBeVisible();
+    await expect(choice.locator('xpath=ancestor::details')).toHaveCount(0);
+    await choice.scrollIntoViewIfNeeded();
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+
   public async openFirstExtensionDetails(consoleUrl: string): Promise<void> {
     await this.open(consoleUrl, '/extensions', 'extensions');
     await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    this.referenceContext = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope');
     await this.page.getByTestId(TestIds.distribution.extensionCatalogTab).click();
     const detail = this.page.locator('#extensions-panel-catalog a.resource-name-link[href^="/extensions/"]').first();
     await detail.waitFor({ state: 'visible' });

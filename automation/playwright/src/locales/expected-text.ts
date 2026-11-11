@@ -299,3 +299,8 @@ export const OrganizationStructureTextByLocale = {
     openWorkspace: (name: string) => `Ouvrir l’espace de travail ${name}`,
   },
 } as const;
+
+export const CollectionVersionTextByLocale = {
+  'en-US': { version: 'Version', active: 'Active version', draft: 'Draft version', generation: 'Generation' },
+  'fr-FR': { version: 'Version', active: 'Version active', draft: 'Version du brouillon', generation: 'Génération' },
+} as const;

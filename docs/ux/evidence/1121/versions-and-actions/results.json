@@ -1,0 +1,98 @@
+{
+  "description": "Actual executable application, version placement and configurable primary/secondary action follow-up. Source and captures are committed together.",
+  "statistics": {
+    "startTime": "2026-11-11T10:43:11.567Z",
+    "duration": 383675.527,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "title": "local AEP extensions expose inventory and detail states @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 68739,
+      "captures": []
+    },
+    {
+      "title": "governed extension inventory en-US desktop @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 62330,
+      "captures": [
+        "enrollment-primary-actions-en-US-desktop-dark.png",
+        "enrollment-primary-actions-en-US-desktop-light.png"
+      ]
+    },
+    {
+      "title": "governed extension inventory en-US mobile @responsive @smoke",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 55176,
+      "captures": [
+        "enrollment-primary-actions-en-US-mobile-dark.png",
+        "enrollment-primary-actions-en-US-mobile-light.png"
+      ]
+    },
+    {
+      "title": "governed extension inventory fr-FR mobile @responsive @smoke",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 55659,
+      "captures": [
+        "enrollment-primary-actions-fr-FR-mobile-dark.png",
+        "enrollment-primary-actions-fr-FR-mobile-light.png"
+      ]
+    },
+    {
+      "title": "governed extension inventory fr-FR desktop @locale @smoke",
+      "project": "locale-contracts",
+      "status": "passed",
+      "durationMs": 57781,
+      "captures": [
+        "enrollment-primary-actions-fr-FR-desktop-dark.png",
+        "enrollment-primary-actions-fr-FR-desktop-light.png"
+      ]
+    }
+  ],
+  "captures": [
+    "agents-en-US-dark.png",
+    "agents-en-US-light.png",
+    "agents-fr-FR-dark.png",
+    "agents-fr-FR-light.png",
+    "agents-table-en-US-dark.png",
+    "agents-table-en-US-light.png",
+    "data-source-profiles-en-US-dark.png",
+    "data-source-profiles-en-US-light.png",
+    "data-source-profiles-fr-FR-dark.png",
+    "data-source-profiles-fr-FR-light.png",
+    "data-source-profiles-table-en-US-dark.png",
+    "data-source-profiles-table-en-US-light.png",
+    "enrollment-primary-actions-en-US-desktop-dark.png",
+    "enrollment-primary-actions-en-US-desktop-light.png",
+    "enrollment-primary-actions-en-US-mobile-dark.png",
+    "enrollment-primary-actions-en-US-mobile-light.png",
+    "enrollment-primary-actions-fr-FR-desktop-dark.png",
+    "enrollment-primary-actions-fr-FR-desktop-light.png",
+    "enrollment-primary-actions-fr-FR-mobile-dark.png",
+    "enrollment-primary-actions-fr-FR-mobile-light.png",
+    "extensions-en-US-dark.png",
+    "extensions-en-US-light.png",
+    "extensions-fr-FR-dark.png",
+    "extensions-fr-FR-light.png",
+    "extensions-table-en-US-dark.png",
+    "extensions-table-en-US-light.png",
+    "flows-en-US-dark.png",
+    "flows-en-US-light.png",
+    "flows-fr-FR-dark.png",
+    "flows-fr-FR-light.png",
+    "flows-table-en-US-dark.png",
+    "flows-table-en-US-light.png",
+    "profile-primary-choice-en-US-dark.png",
+    "profile-primary-choice-en-US-light.png",
+    "profile-primary-choice-fr-FR-dark.png",
+    "profile-primary-choice-fr-FR-light.png"
+  ]
+}

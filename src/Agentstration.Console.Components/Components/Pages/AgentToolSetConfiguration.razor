@@ -14,7 +14,7 @@
             var assignment = Assignment(version);
             <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version" data-scope="@version.ScopeRef?.Value">
                 <header class="agent-toolset-header">
-                    <CollectionIdentity DisplayName="@version.ToolSetName" HeadingLevel="3" Namespace="@version.Namespace.Value" Name="@version.ToolSetName" Href="@ToolSetUrl(version)" IconName="layers" /><ResourceScopeBadge ScopeRef="version.ScopeRef" /><code>@version.Version</code>
+                    <CollectionIdentity DisplayName="@version.ToolSetName" HeadingLevel="3" Namespace="@version.Namespace.Value" Name="@version.ToolSetName" Href="@ToolSetUrl(version)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(version.Version)" /></Versions></CollectionIdentity><ResourceScopeBadge ScopeRef="version.ScopeRef" />
 
                 </header>
                 <div class="agent-toolset-assignment">

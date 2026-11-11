@@ -521,6 +521,7 @@ export const TestIds = {
   distribution: {
     extensions: 'distribution-extensions',
     extensionCatalogTab: 'extensions-tab-catalog',
+    extensionEnrollmentsTab: 'extensions-tab-enrollments',
     extensionDetails: 'distribution-extension-details',
     sourceProviders: 'distribution-source-providers',
     sourceProviderDetails: 'distribution-source-provider-details',

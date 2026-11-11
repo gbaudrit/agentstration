@@ -65,6 +65,10 @@
 .collection-identity { display: flex; gap: .65rem; align-items: flex-start; min-width: 0; }
 .collection-identity .resource-icon { flex: 0 0 auto; width: 2rem; height: 2rem; }
 .collection-identity-text { min-width: 0; flex: 1; }
+.collection-identity-versions { display: grid; gap: .2rem; margin-top: .3rem; }
+.collection-version { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .45rem; font-size: .8rem; line-height: 1.4; min-width: 0; }
+.collection-version-label { color: var(--muted); }
+.collection-version code { padding: 0; background: transparent; color: inherit; font-size: inherit; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 .collection-identity .resource-name-link { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
 .collection-qualified-name { display: flex; align-items: center; gap: .3rem; color: var(--muted); min-width: 0; margin-top: .2rem; }
 .collection-qualified-name > .ui-icon { flex: 0 0 auto; }
@@ -78,6 +82,8 @@
 .collection-value dt { color: var(--muted); font-size: .8rem; }
 .collection-value dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
 .collection-card .collection-actions { margin-top: auto; align-self: flex-end; }
+.collection-action-group, .collection-primary-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.collection-primary-actions > :is(button, a), .collection-action-group > .collection-actions-menu > summary { white-space: normal; }
 .collection-actions-menu { display: inline-block; }
 .collection-actions-menu > summary { list-style: none; cursor: pointer; }
 .collection-actions-menu > summary::-webkit-details-marker { display: none; }

@@ -14,8 +14,8 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (items.Count == 0) { <EmptyState Title="@T("Profiles")" Message="@T("EmptyProfiles")"><a class="button-primary" href="/data-source-profiles/new">@T("Create")</a></EmptyState> }
 else
 {
-    <CollectionView TItem="DataSourceProfileResource" Items="items" InformationLabels="@(new[] { ExtensionLocalizer["ManagingExtension"].Value, T("ActiveVersion"), T("DraftVersion") })">
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database" Domain="data"><Badges><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
+    <CollectionView TItem="DataSourceProfileResource" Items="items" InformationLabels="@(new[] { ExtensionLocalizer["ManagingExtension"].Value })">
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database" Domain="data"><Versions><CollectionVersion Label="@T("ActiveVersion")" Value="@(item.ActiveVersion)" /><CollectionVersion Label="@T("DraftVersion")" Value="@item.Definition.Version" /></Versions><Badges><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
         <Scope Context="item"><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" /></Scope>
         <Information Context="item">
             <CollectionValue Label="@ExtensionLocalizer["ManagingExtension"]">@if (Owner(item) is { } owner) {
@@ -25,8 +25,6 @@ else
             } else if (item.Governance.Origin.Kind == ResourceOriginKind.Extension) {
                 <span>@item.Governance.Origin.Reference · @item.Governance.Origin.Version</span>
             } else { <span>—</span> }</CollectionValue>
-            <CollectionValue Label="@T("ActiveVersion")"><code>@(item.ActiveVersion ?? "—")</code></CollectionValue>
-            <CollectionValue Label="@T("DraftVersion")"><code>@item.Definition.Version</code></CollectionValue>
         </Information>
         <Actions Context="item"><CollectionActions ResourceName="@($"{item.Definition.DisplayName} ({item.Namespace}/{item.Name}, {item.ScopeRef})")"><a href="@Url(item)">@T("Open")</a></CollectionActions></Actions>
     </CollectionView>

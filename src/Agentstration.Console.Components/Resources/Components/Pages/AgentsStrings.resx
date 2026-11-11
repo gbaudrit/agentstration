@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?><root><resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
-<data name="GenerationHeader" xml:space="preserve"><value>Gen</value></data>
+<data name="GenerationHeader" xml:space="preserve"><value>Generation</value></data>
 <data name="DeployedCount" xml:space="preserve"><value>{0} deployed</value></data>
 <data name="StatusDeployed" xml:space="preserve"><value>Deployed</value></data>
 <data name="Scope" xml:space="preserve"><value>Scope</value></data>
