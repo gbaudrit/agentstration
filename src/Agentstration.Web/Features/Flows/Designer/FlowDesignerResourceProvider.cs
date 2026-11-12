@@ -72,7 +72,7 @@ public sealed class FlowDesignerResourceProvider(
             tool.Definition.DisplayName,
             tool.Metadata.Namespace,
             tool.Definition.Schema!.Input.Clone(),
-            tool.Definition.Schema.Output?.Clone(),
+            InvocationOutputSchema(tool, providers),
             tool.Definition.Enabled,
             tool.Definition.Discovery?.Available == true,
             tool.Definition.RequiresApproval,
