@@ -1,10 +1,10 @@
 {
   "date": "2026-11-12",
-  "productSourceCommit": "d8de2fa",
+  "productSourceCommit": "1402ee2",
   "fixture": "governedInventoryFixture with Local authentication and explicit Instance context; seeded resources are disposable QA data",
   "stats": {
-    "startTime": "2026-11-12T16:15:22.467Z",
-    "duration": 141907.859,
+    "startTime": "2026-11-12T21:04:55.863Z",
+    "duration": 177533.924,
     "expected": 4,
     "skipped": 0,
     "unexpected": 0,
@@ -20,7 +20,7 @@
         "height": 1000
       },
       "view": "cards",
-      "sha256": "1f9a04bc547baa4bd797275acb3bc5113b529df480c07e99d5ba7f9d5e378296"
+      "sha256": "25fd5a0bc7c43ad75d283c8e7455326a6bcdb09c1409024354e1eed68772a771"
     },
     {
       "file": "flows-cards-desktop-en-light.png",
@@ -31,7 +31,7 @@
         "height": 1000
       },
       "view": "cards",
-      "sha256": "a437a93e72cea581f09cfde1350acd837f81b9a286a4f1cc7dc46bb40b8f9a12"
+      "sha256": "6afe34c09f294c74a3ed3635c06edb5ba129e10f42aaefdd4d9bc5989beeb3c5"
     },
     {
       "file": "flows-cards-mobile-fr-dark.png",
@@ -42,7 +42,7 @@
         "height": 844
       },
       "view": "cards",
-      "sha256": "e5c20d22fb7f023ecde34aae504b57c696c54cd28ed807c3b635c8f5e87669b6"
+      "sha256": "88177206e98d2d49ad82e2157d4ce1eb2c0b94aeca974f11efce8e5e34123d48"
     },
     {
       "file": "flows-cards-mobile-fr-light.png",
@@ -53,7 +53,51 @@
         "height": 844
       },
       "view": "cards",
-      "sha256": "9592dde9d6daf8db889d63ad07d39dd57fc16395131a13ef260330dc309b19f1"
+      "sha256": "8cebc48cad08f983f8bff397646e9a0422a1bd22439fbcbba679c7f55bb1a0ca"
+    },
+    {
+      "file": "flows-inherited-desktop-en-dark.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "inherited",
+      "sha256": "b065c3c9da0e9ddb8f58400f68ba3182ec11ff50956333c6f82360f0970c6fe7"
+    },
+    {
+      "file": "flows-inherited-desktop-en-light.png",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "inherited",
+      "sha256": "4685afe85cb5ed7274c7ad22651974e76571b0e8c29bcf808ab6f39c7c07b8d7"
+    },
+    {
+      "file": "flows-inherited-mobile-fr-dark.png",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "inherited",
+      "sha256": "4dd639b7ee4e1d2d1788c2b7f6cd9182bc0064588210f412b83d28be4a4ac0cf"
+    },
+    {
+      "file": "flows-inherited-mobile-fr-light.png",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "inherited",
+      "sha256": "7feb5573a7d3c48c7650ec9682eb92679f661c3665e61fc4e92f14de56d55487"
     },
     {
       "file": "flows-managed-desktop-en-dark.png",
@@ -64,7 +108,7 @@
         "height": 1000
       },
       "view": "managed",
-      "sha256": "1b8310c3870ba3442d914cd2427a8b9841030d53d7398a3243b7d48890ac26ed"
+      "sha256": "dfa1c1a4ec081f7f511f969f347ee92fb13bc9be379d911d5355230b37aaaaa9"
     },
     {
       "file": "flows-managed-desktop-en-light.png",
@@ -75,7 +119,7 @@
         "height": 1000
       },
       "view": "managed",
-      "sha256": "c1d46606f8010c6d0da8a56a4449527824faf2cc10290ffec8dddc6e83878815"
+      "sha256": "851390875303e7574ce1192fb19317c6bc26d66e30a5759027d96c7ec1936430"
     },
     {
       "file": "flows-managed-mobile-fr-dark.png",
@@ -86,7 +130,7 @@
         "height": 844
       },
       "view": "managed",
-      "sha256": "525db55177483811eebe70c018c806005dfa9c5c58a352f03342daa1db7f5e51"
+      "sha256": "14e23a067dad53987eb2cbed8cdfd295920eec6ebfd4760638db78a49c866a62"
     },
     {
       "file": "flows-managed-mobile-fr-light.png",
@@ -97,7 +141,7 @@
         "height": 844
       },
       "view": "managed",
-      "sha256": "34c7ca944c17aae72265d06bbb577a5e1dc47b1a90e234021c818f90401ccabe"
+      "sha256": "5b201cebdcf47457caed3ed99d711de127d6192487b77e7cbb421933c106e127"
     },
     {
       "file": "flows-table-desktop-en-dark.png",
@@ -108,7 +152,7 @@
         "height": 1000
       },
       "view": "table",
-      "sha256": "333c77f04a9935b35ae338ef50df0f494f575f7e3c3689e528304d7e639dd0f1"
+      "sha256": "93ac5bb051b765e1915e440112a72db247969d22bcfe406e8aee7dff6b33845c"
     },
     {
       "file": "flows-table-desktop-en-light.png",
@@ -119,7 +163,7 @@
         "height": 1000
       },
       "view": "table",
-      "sha256": "b42797bfca26f5873bcd77e0951dcddfd5229014f1b3f0ff327b3b7f4d57be73"
+      "sha256": "89706f1a7a8442a2f59ac6a8e4d5c0200ea4ec3f17a3654903ec79de40b426c5"
     }
   ]
 }
