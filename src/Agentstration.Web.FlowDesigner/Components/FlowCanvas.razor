@@ -9,6 +9,7 @@
         <button type="button" @onclick="ZoomIn" aria-label="@Localizer["ZoomIn"]">+</button>
         <button type="button" @onclick="Center">@Localizer["Fit"]</button>
     </div>
+    @if (previewProblem is not null) { <div class="flow-connection-feedback" role="status">@previewProblem</div> }
     <CascadingValue Value="diagram" IsFixed="true">
         <CascadingValue Value="nodeInteractions" IsFixed="true">
             <DiagramCanvas />
@@ -63,8 +64,13 @@
     protected override void OnInitialized()
     {
         nodeInteractions = new(RequestStepSettingsAsync, (step, port) => InspectPortAsync?.Invoke(step, port) ?? Task.CompletedTask,
-            (step, port) => DescribePort?.Invoke(step, port) ?? port);
+            (step, port) => DescribePort?.Invoke(step, port) ?? port, step => DescribeResource?.Invoke(step));
         diagram.RegisterComponent<FlowDiagramNode, FlowNodeWidget>();
+        diagram.PointerEnter += PreviewEnter;
+        diagram.PointerLeave += PreviewLeave;
+        diagram.PointerMove += RefreshPreview;
+        diagram.PointerUp += PreviewEnd;
+        diagram.KeyDown += PreviewKeyDown;
         diagram.ContainerChanged += OnContainerChanged;
         diagram.ZoomChanged += OnZoomChanged;
         diagram.SelectionChanged += OnSelectionChanged;
@@ -165,6 +171,7 @@
 
     private void Rebuild()
     {
+        ClearPreview(); hoveredPort = null;
         rebuilding = true;
         foreach (var node in diagram.Nodes.OfType<FlowDiagramNode>())
         {
@@ -193,6 +200,7 @@
             AttachExistingLink(link);
             diagram.Links.Add(link);
         }
+        RefreshCompatibility();
         rebuilding = false;
     }
 
@@ -345,6 +353,12 @@
 
     public async ValueTask DisposeAsync()
     {
+        diagram.PointerEnter -= PreviewEnter;
+        diagram.PointerLeave -= PreviewLeave;
+        diagram.PointerMove -= RefreshPreview;
+        diagram.PointerUp -= PreviewEnd;
+        diagram.KeyDown -= PreviewKeyDown;
+        ClearPreview();
         diagram.ContainerChanged -= OnContainerChanged;
         diagram.ZoomChanged -= OnZoomChanged;
         diagram.SelectionChanged -= OnSelectionChanged;

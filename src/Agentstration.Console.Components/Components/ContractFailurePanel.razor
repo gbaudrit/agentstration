@@ -3,33 +3,39 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
 @if (Failure is not null || IsContractCode(Code))
 {
-    <section class="contract-failure-details" role="note">
-        <strong class="contract-failure-title">@Localizer[TitleKey]</strong>
+    <section class="contract-failure-details @(Compact ? "is-compact" : null)" role="note">
+        <header class="contract-failure-heading">
+            <span class="contract-failure-icon"><UiIcon Name="alert-triangle" /></span>
+            <div><strong class="contract-failure-title">@Localizer[TitleKey]</strong>
+                @if (Failure is { } boundaryFailure) { <span class="contract-boundary">@Localizer[BoundaryKey(boundaryFailure.Boundary)]</span> }
+            </div>
+        </header>
         <p class="contract-failure-summary">@Localizer[SummaryKey]</p>
         @if (Failure is { } failure)
         {
+            @if (!Compact)
+            {
+                <dl class="contract-format-comparison">
+                    <div><dt>@Localizer["ContractExpected"]</dt><dd>@ExpectedText @if (ExpectedContract?.MediaType is { } mime) { <code class="contract-mime">@mime</code> }</dd></div>
+                    <div><dt>@Localizer["ContractActual"]</dt><dd>@ActualText</dd></div>
+                </dl>
+            }
             <dl class="contract-failure-readable">
-                <div><dt>@Localizer["ContractLevel"]</dt><dd>@Localizer[BoundaryKey(failure.Boundary)]</dd></div>
-                <div><dt>@Localizer["ContractProducedBy"]</dt><dd>
+                <div class="contract-location"><dt><UiIcon Name="arrow-up-right" />@Localizer["ContractProducedBy"]</dt><dd>
                     @if (failure.FlowRunId is { } producerId)
-                    { <a href="@LocationUrl(producerId, failure.StepName)">@LocationLabel(producerId, failure.StepName)</a> }
+                    { <a href="@LocationUrl(producerId, failure.StepName)"><span>@LocationFlowLabel(producerId)</span>@if (failure.StepName is { } step) { <strong>@LocationStepLabel(producerId, step)</strong> }</a> }
                     else if (Run is not null) { <span>@FlowRunInspection.FlowLabel(Run)</span> }
                     else { <span>@Localizer["ContractLocationUnavailable"]</span> }
                 </dd></div>
-                @if (!Compact)
-                {
-                    <div><dt>@Localizer["ContractExpected"]</dt><dd>@ExpectedText</dd></div>
-                    <div><dt>@Localizer["ContractActual"]</dt><dd>@ActualText</dd></div>
-                    <div><dt>@Localizer["ContractPath"]</dt><dd>@(failure.Path == "$" ? Localizer["ContractWholeValue"].Value : failure.Path)</dd></div>
-                }
                 @if (FlowRunInspection.ContractOwner(failure.Origin) is { } owner)
-                { <div><dt>@Localizer["ContractRequiredBy"]</dt><dd><a href="@LocationUrl(owner.RunId, owner.StepName)">@LocationLabel(owner.RunId, owner.StepName)</a></dd></div> }
+                { <div class="contract-location"><dt><UiIcon Name="shield-check" />@Localizer["ContractRequiredBy"]</dt><dd><a href="@LocationUrl(owner.RunId, owner.StepName)"><span>@LocationFlowLabel(owner.RunId)</span><strong>@LocationStepLabel(owner.RunId, owner.StepName)</strong></a></dd></div> }
                 else if (!Compact)
-                { <div><dt>@Localizer["ContractRequiredBy"]</dt><dd>@Localizer[failure.Origin.StartsWith("agent:", StringComparison.Ordinal) ? "ContractAgentDeclaration" : "ContractInvocationDeclaration"]</dd></div> }
+                { <div class="contract-location"><dt><UiIcon Name="shield-check" />@Localizer["ContractRequiredBy"]</dt><dd>@Localizer[failure.Origin.StartsWith("agent:", StringComparison.Ordinal) ? "ContractAgentDeclaration" : "ContractInvocationDeclaration"]</dd></div> }
             </dl>
             @if (!Compact)
             {
-                <p class="contract-failure-advice">@Localizer[AdviceKey]</p>
+                <p class="contract-data-path"><span>@Localizer["ContractPath"]</span> @(failure.Path == "$" ? Localizer["ContractWholeValue"].Value : failure.Path)</p>
+                <aside class="contract-failure-advice"><strong><UiIcon Name="bulb" />@Localizer["ContractCorrectionTitle"]</strong><p>@Localizer[AdviceKey]</p></aside>
                 <details class="contract-failure-technical">
                     <summary>@Localizer["ContractTechnicalDetails"]</summary>
                     <dl class="details-list">
@@ -43,7 +49,7 @@
                         <dt>@Localizer["ContractOrigin"]</dt><dd><code>@failure.Origin</code></dd>
                     </dl>
                     @if (ExpectedContract is { } contract)
-                    { <pre>@JsonSerializer.Serialize(contract, new JsonSerializerOptions { WriteIndented = true })</pre> }
+                    { <pre>@JsonSerializer.Serialize(contract, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })</pre> }
                 </details>
             }
         }
@@ -77,7 +83,7 @@
         ?? (Run?.Id == Failure?.FlowRunId ? Run : null);
     private ResolvedDataContract? ExpectedContract => Producer?.Steps.FirstOrDefault(step => step.StepName == Failure?.StepName)?.Contracts?.ExpectedOutput
         ?? Producer?.ContractContext?.ExpectedOutput;
-    private string ExpectedText => IsJson ? Localizer["ContractValue.Json"].Value + (ExpectedContract?.MediaType is { } mime ? $" ({mime})" : string.Empty)
+    private string ExpectedText => IsJson ? Localizer["ContractValue.Json"].Value
         : HumanValue(Failure?.Expected);
     private string ActualText => IsJson ? Localizer["ContractValue.InvalidJson"].Value : HumanValue(Failure?.Actual);
     private string HumanValue(string? value) => value switch
@@ -101,12 +107,9 @@
         "artifact-publication" => "ContractLevel.Publication", "transform-output" => "ContractLevel.TransformOutput",
         _ => "ContractLevel.Resolution"
     };
-    private string LocationLabel(string id, string? step)
-    {
-        var context = RelatedRuns.FirstOrDefault(value => value.Id == id) ?? (Run?.Id == id ? Run : null);
-        var flow = context is null ? id : FlowRunInspection.FlowLabel(context);
-        return step is null ? flow : flow + " · " + (context is null ? step : FlowRunInspection.StepLabel(context, step));
-    }
+    private FlowRun? LocationRun(string id) => RelatedRuns.FirstOrDefault(value => value.Id == id) ?? (Run?.Id == id ? Run : null);
+    private string LocationFlowLabel(string id) => LocationRun(id) is { } context ? FlowRunInspection.FlowLabel(context) : id;
+    private string LocationStepLabel(string id, string step) => LocationRun(id) is { } context ? FlowRunInspection.StepLabel(context, step) : step;
     private string LocationUrl(string id, string? step) => FlowRunInspection.RunUrl(id,
         Run?.ExecutionScopeRef ?? ScopeRef ?? ResourceScopeRef.Instance, Run?.Scope.LogicalScopeRef, step);
 }

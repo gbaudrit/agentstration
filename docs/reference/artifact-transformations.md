@@ -304,3 +304,27 @@ expected/received formats and correction guidance remain readable, while raw
 codes, origins, rules, contracts and step payloads can be expanded separately.
 Knowledge projection errors use the same localized explanation and retain links
 to the causal execution when its details are accessible.
+
+The Designer separates **data sent to the Agent** from the read-only input
+contract. Its editable combo offers the incoming value, the current Flow input,
+preceding results and, inside a valid Artifact processing region, content or
+scoped input/output access. Unexecuted branches may not have a result at runtime.
+Free expressions and literal text are supported; **Custom JSON** builds a
+structured input without changing the Agent contract.
+
+New Agent steps default to **Call an Agent**. Their title describes the step's
+role independently of the selected resource, whose name appears on a separate
+line. Changing the called Agent preserves an authored step title.
+
+Port information controls appear on hover or keyboard focus, adjacent to the
+actual anchors. A known contract incompatibility colors the connection and
+receiving anchor red while dragging and after reopening the Flow. The same
+mapping-aware check powers the diagnostic message. The connection remains
+editable so its mapping can be corrected; unresolved compatibility remains
+neutral and runtime validation remains authoritative. Published definitions are
+inspected without rewriting their graph.
+
+Execution progress uses a compact header, elapsed time, root-step counts and
+separate current Flow/step labels. Error cards share a responsive expected/received
+comparison, producer and contract-source locations, correction guidance and
+collapsed technical details across projection feedback and Flow Run inspection.

@@ -238,8 +238,8 @@
   <data name="ContractSummary.Schema" xml:space="preserve"><value>La valeur produite ne respecte pas le schéma de données attendu.</value></data>
   <data name="ContractAdvice.Json" xml:space="preserve"><value>Demandez du JSON sans balises Markdown ni explications autour. Si du texte est voulu, vérifiez le type MIME de sortie et le mapping du résultat.</value></data>
   <data name="ContractLevel" xml:space="preserve"><value>Niveau de l’incompatibilité</value></data>
-  <data name="ContractProducedBy" xml:space="preserve"><value>Valeur produite par</value></data>
-  <data name="ContractRequiredBy" xml:space="preserve"><value>Contrat imposé par</value></data>
+  <data name="ContractProducedBy" xml:space="preserve"><value>Résultat produit par</value></data>
+  <data name="ContractRequiredBy" xml:space="preserve"><value>Contrat défini par</value></data>
   <data name="ContractWholeValue" xml:space="preserve"><value>Résultat entier</value></data>
   <data name="ContractLocationUnavailable" xml:space="preserve"><value>Information indisponible</value></data>
   <data name="ContractTechnicalDetails" xml:space="preserve"><value>Détails techniques</value></data>
@@ -273,4 +273,5 @@
   <data name="ContractLevel.Publication" xml:space="preserve"><value>Publication de l’artefact</value></data>
   <data name="ContractLevel.TransformOutput" xml:space="preserve"><value>Sortie de la transformation</value></data>
   <data name="ContractLevel.Resolution" xml:space="preserve"><value>Résolution du contrat</value></data>
+  <data name="ContractCorrectionTitle" xml:space="preserve"><value>Comment corriger</value></data>
 </root>

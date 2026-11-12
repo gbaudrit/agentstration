@@ -1,4 +1,5 @@
 export const TestIds = {
+  flowMapping: { editor: 'flow-data-mapping', value: 'agent-input-mapping', json: 'agent-input-mapping-json' },
   artifactProcessing: {
     outputMediaType: 'artifact-output-media-type',
     inputArtifact: 'artifact-transformation-input', processingRun: 'artifact-processing-run',
@@ -450,7 +451,7 @@ export const TestIds = {
     designerPublish: 'flow-designer-publish',
     designerPublicationSuccess: 'flow-designer-publication-success',
     designerPublicationError: 'flow-designer-publication-error',
-    stepSettingsConfigurationTab: 'step-settings-tab-configuration',
+    stepSettingsConfigurationTab: 'step-settings-tab-configuration', stepSettingsInputTab: 'step-settings-tab-input',
     paletteOutput: 'flow-palette-output',
     paletteTransform: 'flow-palette-transform',
     selectedTransitionEditor: 'selected-transition-editor',

@@ -49,6 +49,7 @@ public sealed class FlowDiagramPort(
     public FlowDiagramPortDirection Direction { get; } = direction;
     public string? EventName { get; } = eventName;
     public FlowOutputOutcome? Outcome { get; } = outcome;
+    public string? ContractProblem { get; set; }
 
     public override bool CanAttachTo(Blazor.Diagrams.Core.Models.Base.ILinkable other)
     {
@@ -85,7 +86,7 @@ public static class FlowDiagramMapper
                 continue;
 
             var target = byName[link.To];
-            var resultConnection = target.ProcessingResult is not null && ProcessingContains(document, target.Source.Name, link.From);
+            var resultConnection = target.ProcessingResult is not null && IsProcessingReturn(document, target.Source.Name, link.From);
             var model = new LinkModel(link.Id, output, resultConnection ? target.ProcessingResult! : target.Input);
             model.AddLabel(link.Event, offset: new Point(0, -14));
             links.Add(model);
@@ -93,7 +94,7 @@ public static class FlowDiagramMapper
         return new(nodes, links, byName);
     }
 
-    private static bool ProcessingContains(FlowDesignerDocument document, string owner, string source)
+    public static bool IsProcessingReturn(FlowDesignerDocument document, string owner, string source)
     {
         var queue = new Queue<string>(document.Links.Where(link => link.From == owner && link.Event == "process").Select(link => link.To));
         var visited = new HashSet<string>(StringComparer.Ordinal);

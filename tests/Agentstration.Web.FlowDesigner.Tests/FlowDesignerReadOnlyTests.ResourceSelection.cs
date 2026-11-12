@@ -116,7 +116,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         rendered.Find("[data-testid='configure-selected-step']").Click();
 
         var store = context.Services.GetRequiredService<FlowEditorStore>();
-        rendered.WaitForAssertion(() => Assert.AreEqual("Welcome Agent", store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single().DisplayName));
+        rendered.WaitForAssertion(() => Assert.AreEqual("Call an Agent", store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single().DisplayName));
         var step = store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single();
         Assert.AreEqual("welcome-agent", step.Agent.ResourceId);
         StringAssert.Contains(rendered.Find(".inspector-details-group").TextContent, "Step ID");
@@ -127,7 +127,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         StringAssert.Contains(rendered.Find(".inspector-resource-id").TextContent, "Agent ID");
 
         rendered.Find(".flow-inspector select").Change($"{TestScope.Value}|pack.demo|packed-agent");
-        rendered.WaitForAssertion(() => Assert.AreEqual("Pack Agent", store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single().DisplayName));
+        rendered.WaitForAssertion(() => Assert.AreEqual("Call an Agent", store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single().DisplayName));
         step = store.State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single();
         Assert.AreEqual("packed-agent", step.Agent.ResourceId);
         Assert.AreEqual(new ResourceNamespace("pack.demo"), step.Agent.Namespace);
@@ -347,7 +347,7 @@ public sealed partial class FlowDesignerReadOnlyTests
     }
 
     [TestMethod]
-    public async Task SelectingLegacyGenericAgentLabelUsesCurrentResourceName()
+    public async Task SelectingAnExistingAgentStepKeepsItsAuthoredLabel()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext();
@@ -378,7 +378,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.SelectedStepChanged.InvokeAsync("agent"));
 
         var step = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps.OfType<AgentFlowStepDefinition>().Single();
-        Assert.AreEqual("Welcome Agent", step.DisplayName);
+        Assert.AreEqual("Agent", step.DisplayName);
         Assert.AreEqual("welcome-agent", step.Agent.ResourceId);
     }
 

@@ -8,28 +8,29 @@ public partial class FlowDesigner
     private IReadOnlyList<string> ConnectionWarnings()
     {
         if (Editor.State.Resource is not { } resource) return [];
-        var warnings = new List<string>();
-        foreach (var edge in resource.Definition.Transitions)
+        return resource.Definition.Transitions.Select(edge => ConnectionProblem(edge.FromStep, edge.Event, edge.ToStep, Agentstration.Web.FlowDesigner.Diagramming.FlowDiagramMapper.IsProcessingReturn(Editor.State.Diagram, edge.ToStep, edge.FromStep) ? "result" : "input"))
+            .OfType<string>().ToArray();
+    }
+
+    private string? ConnectionProblem(string from, string eventName, string to, string inputPort)
+    {
+        if (Editor.State.Resource?.Definition is not { } graph) return null;
+        var source = graph.Steps.FirstOrDefault(step => step.Name == from);
+        var target = graph.Steps.FirstOrDefault(step => step.Name == to);
+        if (source is null || target is null || PortSchema(source, eventName) is not { } output || PortSchema(target, inputPort) is not { } input) return null;
+        if (target is ToolFlowStepDefinition { ArgumentsMapping: null }) return null;
+        if (target is ArtifactTransformFlowStepDefinition { Mode: ArtifactProcessingMode.Access } && inputPort == "result") return null;
+        var mapping = target switch
         {
-            var source = resource.Definition.Steps.FirstOrDefault(step => step.Name == edge.FromStep);
-            var target = resource.Definition.Steps.FirstOrDefault(step => step.Name == edge.ToStep);
-            if (source is null || target is null || PortSchema(source, edge.Event) is not { } output || PortSchema(target, "input") is not { } input) continue;
-            // Process/result carry content and private access envelopes, not the manifest returned by completed.
-            if (source is ArtifactTransformFlowStepDefinition || target is ArtifactTransformFlowStepDefinition) continue;
-            if (target is ToolFlowStepDefinition { ArgumentsMapping: null }) continue;
-            var mapping = target switch
-            {
-                AgentFlowStepDefinition agent => agent.InputMapping,
-                ToolFlowStepDefinition tool => tool.ArgumentsMapping,
-                FlowCallStepDefinition call => call.InputMapping,
-                OutputFlowStepDefinition result => result.OutputMapping,
-                _ => null
-            };
-            if (MappedSchema(mapping, output) is not { } mapped || !FlowSchemaCompatibility.IsSupported(mapped) || !FlowSchemaCompatibility.IsSupported(input)) continue;
-            if (!FlowSchemaCompatibility.IsAssignable(mapped, input))
-                warnings.Add(T("ConnectionContractMismatch", source.DisplayName ?? source.Name, target.DisplayName ?? target.Name));
-        }
-        return warnings;
+            AgentFlowStepDefinition agent => agent.InputMapping,
+            ToolFlowStepDefinition tool => tool.ArgumentsMapping,
+            FlowCallStepDefinition call => call.InputMapping,
+            ArtifactTransformFlowStepDefinition artifact => inputPort == "result" ? artifact.ResultMapping : artifact.ArtifactsMapping,
+            OutputFlowStepDefinition result => result.OutputMapping,
+            _ => null
+        };
+        if (MappedSchema(mapping, output) is not { } mapped || !FlowSchemaCompatibility.IsSupported(mapped) || !FlowSchemaCompatibility.IsSupported(input)) return null;
+        return FlowSchemaCompatibility.IsAssignable(mapped, input) ? null : T("ConnectionContractMismatch", source.DisplayName ?? source.Name, target.DisplayName ?? target.Name);
     }
 
     // Only infer mappings whose shape is statically known. Runtime expressions remain unresolved.

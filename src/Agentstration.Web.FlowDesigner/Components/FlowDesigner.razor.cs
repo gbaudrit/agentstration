@@ -227,10 +227,6 @@ public partial class FlowDesigner
         }
         toolSearch = string.Empty;
         toolPickerRevision++;
-        if (!ReadOnly && SelectedStep is AgentFlowStepDefinition agent
-            && (string.IsNullOrWhiteSpace(agent.DisplayName) || agent.DisplayName == "Agent")
-            && SelectedAgent is { } selectedAgent)
-            await UpdateSelectedAsync(agent with { DisplayName = selectedAgent.DisplayName });
         if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call);
     }
     private async Task OpenStepSettingsAsync(string name)

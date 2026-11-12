@@ -35,11 +35,12 @@
 @if (ActiveTab == FlowStepSettingsTab.Input)
 {
     <section class="step-contract-section">
+        <FlowDataMappingEditor @key="Step.Name" Value="Step.InputMapping" ValueChanged="value => Changed.InvokeAsync(Step with { InputMapping = value })" Options="MappingOptions" ReadOnly="ReadOnly" />
+        <div class="agent-contract-reference">
         <ContractHeading Direction="Input" Source="@T("ContractSource.CalledAgent")" />
-        <label>@T("AgentInputMapping")<textarea disabled="@ReadOnly" data-testid="agent-input-mapping" value="@(Step.InputMapping?.GetRawText() ?? "null")" @onchange="MappingChangedAsync"></textarea></label>
         @if (EffectiveInput is { } schema) { <SchemaDocumentEditor Value="schema" ReadOnly="true" /> }
         else { <p class="muted">@T("AgentInputContractAbsent")</p> }
-        @if (invalidMapping) { <p class="validation-error" role="alert">@T("InvalidJson")</p> }
+        </div>
     </section>
 }
 @if (ActiveTab == FlowStepSettingsTab.Output)
@@ -65,16 +66,6 @@
     [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
     private JsonElement? EffectiveInput => Step.Agent.InputSchema ?? (ReadOnly ? null : SelectedAgent?.InputSchema);
     private JsonElement? EffectiveOutput => Step.Agent.OutputSchema ?? Step.Agent.OutputContract?.Schema ?? (ReadOnly ? null : SelectedAgent?.OutputSchema ?? SelectedAgent?.OutputContract?.Schema);
-    private bool invalidMapping;
-    private async Task MappingChangedAsync(ChangeEventArgs args)
-    {
-        try
-        {
-            var value = JsonSerializer.Deserialize<JsonElement>(args.Value?.ToString() ?? "null");
-            invalidMapping = false;
-            await Changed.InvokeAsync(Step with { InputMapping = value.ValueKind == JsonValueKind.Null ? null : value });
-        }
-        catch (JsonException) { invalidMapping = true; }
-    }
+    [Parameter] public IReadOnlyList<FlowMappingOption> MappingOptions { get; set; } = [];
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 }

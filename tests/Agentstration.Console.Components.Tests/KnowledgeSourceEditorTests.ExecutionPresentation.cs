@@ -16,6 +16,24 @@ namespace Agentstration.Web.Tests;
 public sealed partial class KnowledgeSourceEditorTests
 {
     [TestMethod]
+    [DataRow("en-US", "Transformation before publication · 1")]
+    [DataRow("fr-FR", "Transformation avant publication · 1")]
+    public void ProgressUsesReadableStageNamesAndReportsRootStepCounts(string locale, string expected)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = CreateContext(new KnowledgeClientStub());
+        var run = PresentationRun("root", "orchestration", [new() { StepName = "cp-post", StepType = "transform", Status = FlowStepRunStatus.Running }]);
+        run = run with { DefinitionSnapshot = run.DefinitionSnapshot with { Graph = new() { EntryStep = "cp-post", Steps = [new TransformFlowStepDefinition { Name = "cp-post", DisplayName = "postAggregate 1" }] } } };
+        var rendered = context.Render<ExecutionProgress>(parameters => parameters.Add(value => value.Label, "Working").Add(value => value.Runs, [run])
+            .Add(value => value.CompletedSteps, 3).Add(value => value.TotalSteps, 6).Add(value => value.Elapsed, TimeSpan.FromSeconds(3)));
+        Assert.Contains(expected, rendered.Find(".execution-progress-location").TextContent);
+        Assert.DoesNotContain("postAggregate", rendered.Markup);
+        Assert.AreEqual("3", rendered.Find("progress").GetAttribute("value"));
+        Assert.AreEqual("6", rendered.Find("progress").GetAttribute("max"));
+        Assert.Contains("00:00:03", rendered.Find(".execution-progress-elapsed").TextContent);
+    }
+
+    [TestMethod]
     public async Task ProgressReadsTheActiveDescendantInTheExactExecutionScopeAndDisplaysItsStep()
     {
         using var context = CreateContext(new KnowledgeClientStub());

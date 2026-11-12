@@ -17,7 +17,7 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (source is not null && readiness is not null)
 {
     @if (projectionFailureCode is not null)
-    { <div class="form-alert form-alert-danger" role="status"><ContractFailurePanel ErrorCode="@projectionFailureCode" Details="@projectionFailureDetails" Run="projectionFailureRun" RelatedRuns="projectionFailureOrigins" Compact="true" /></div> }
+    { <div class="knowledge-projection-failure" role="status"><ContractFailurePanel ErrorCode="@projectionFailureCode" Details="@projectionFailureDetails" Run="projectionFailureRun" RelatedRuns="projectionFailureOrigins" Compact="true" /></div> }
     else if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div> }
     <InheritedResourceNotice OwnerScopeRef="@(source.ScopeRef ?? ResourceScopeRef.Instance)" />
     <ResourceTabs Label="@T("DetailsSections")">

@@ -24,7 +24,7 @@ public partial class FlowDesigner
         FlowStepDefinition step = type switch
         {
             "input" => new InputFlowStepDefinition { Name = name, DisplayName = "Input" },
-            "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = defaultAgent?.DisplayName ?? T("Step.agent"), Agent = defaultAgent is null ? new(UnconfiguredAgent) : AgentReference(defaultAgent), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
+            "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = T("CallAgent"), Agent = defaultAgent is null ? new(UnconfiguredAgent) : AgentReference(defaultAgent), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "flow" => new FlowCallStepDefinition { Name = name, DisplayName = "Flow", Flow = DefaultFlowReference(), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "tool" => new ToolFlowStepDefinition { Name = name, DisplayName = T("Step.tool"), Tool = DefaultToolReference(), ArgumentsMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
@@ -103,10 +103,10 @@ public partial class FlowDesigner
         if (SelectedStep is not AgentFlowStepDefinition step) return Task.CompletedTask;
         var value = Text(e);
         if (value == "${steps.route-request.output.selectedAgent}")
-            return UpdateSelectedAsync(step with { Agent = new(value), DisplayName = T("RouterOutput") });
+            return UpdateSelectedAsync(step with { Agent = new(value) });
         if (!TryParseFlowKey(value, out var target)) return Task.CompletedTask;
         var selected = agents.FirstOrDefault(agent => ResourceKey(agent.ScopeRef, agent.Namespace, agent.Name) == ResourceKey(target.ScopeRef, target.Namespace, target.Name));
-        return selected is null ? Task.CompletedTask : UpdateSelectedAsync(step with { Agent = AgentReference(selected), DisplayName = selected.DisplayName });
+        return selected is null ? Task.CompletedTask : UpdateSelectedAsync(step with { Agent = AgentReference(selected) });
     }
     private async Task UpdateFlowTargetAsync(ChangeEventArgs e)
     {

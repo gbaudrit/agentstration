@@ -1,12 +1,15 @@
-.contract-failure-details { min-width: 0; color: var(--text); }
-.contract-failure-title { color: var(--color-danger); display: block; }
-.contract-failure-summary { margin: .5rem 0 .75rem; }
-.contract-failure-readable { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .75rem 1rem; margin: .75rem 0; }
-.contract-failure-readable > div { min-width: 0; }
-dt { color: var(--muted); font-size: .85rem; }
-dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
-a, code { overflow-wrap: anywhere; }
-.contract-failure-advice { margin: .75rem 0; }
-.contract-failure-technical { margin-top: .75rem; }
-.contract-failure-technical dl { margin-top: .75rem; }
-.contract-failure-technical pre { max-height: 16rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.contract-failure-details{container:contract-error / inline-size;min-width:0;color:var(--text);display:grid;gap:14px;border-left:3px solid var(--color-danger);padding-left:18px}
+.contract-failure-details.is-compact{padding:16px 18px;border:1px solid color-mix(in srgb,var(--color-danger) 25%,var(--border));border-left:3px solid var(--color-danger);border-radius:10px;background:var(--surface)}
+.contract-failure-heading{display:flex;gap:12px;align-items:center}.contract-failure-heading>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.contract-failure-icon{flex:0 0 36px;display:grid;place-items:center;width:36px;height:36px;color:var(--color-danger);background:color-mix(in srgb,var(--color-danger) 9%,var(--surface));border-radius:10px}.contract-failure-icon .ui-icon{width:20px;height:20px}
+.contract-failure-title{color:var(--color-danger);font-size:1rem}.contract-boundary{display:inline-flex;padding:3px 8px;border-radius:5px;background:var(--surface-2);color:var(--muted);font-size:.75rem}
+.contract-failure-summary{margin:0;line-height:1.55}.contract-format-comparison,.contract-failure-readable{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0}
+.contract-format-comparison>div{padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;min-width:0}
+dt{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.8rem}dt .ui-icon{width:15px;height:15px}dd{margin:6px 0 0;overflow-wrap:anywhere;line-height:1.45}
+.contract-mime{display:inline-flex;padding:2px 6px;background:var(--surface);border:1px solid var(--border);border-radius:5px;font-size:.75rem;overflow-wrap:anywhere}
+.contract-location{padding:10px 0;min-width:0}.contract-location a{display:grid;gap:4px;text-decoration:none;overflow-wrap:anywhere}.contract-location a:hover strong{text-decoration:underline}.contract-location a span{font-size:.8rem;color:var(--muted)}.contract-location a strong{font-weight:600;color:var(--primary)}
+.contract-data-path{margin:0;font-size:.85rem;overflow-wrap:anywhere}.contract-data-path span{color:var(--muted);margin-right:8px}
+.contract-failure-advice{padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)}.contract-failure-advice>strong{display:flex;gap:8px;align-items:center;font-size:.85rem}.contract-failure-advice .ui-icon{width:16px;height:16px;color:var(--primary)}.contract-failure-advice p{margin:6px 0 0;line-height:1.5;font-size:.85rem}
+.contract-failure-technical{border-top:1px solid var(--border);padding-top:12px;font-size:.85rem}.contract-failure-technical summary{cursor:pointer;color:var(--muted)}.contract-failure-technical dl{display:grid;grid-template-columns:minmax(100px,auto) minmax(0,1fr);gap:8px 14px;margin:14px 0}.contract-failure-technical dd{margin:0;min-width:0}.contract-failure-technical code{white-space:pre-wrap;overflow-wrap:anywhere}.contract-failure-technical pre{padding:14px;max-height:18rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);font-size:.78rem;line-height:1.5}
+@container contract-error (max-width:540px){.contract-format-comparison,.contract-failure-readable{grid-template-columns:minmax(0,1fr)}.contract-failure-heading>div{align-items:flex-start;flex-direction:column;gap:5px}.contract-location{padding:8px 0}}
+@media(max-width:600px){.contract-failure-details{padding-left:12px}.contract-failure-details.is-compact{padding:12px}.contract-failure-technical dl{grid-template-columns:minmax(0,1fr);gap:4px}.contract-failure-technical dd{margin-bottom:8px}}

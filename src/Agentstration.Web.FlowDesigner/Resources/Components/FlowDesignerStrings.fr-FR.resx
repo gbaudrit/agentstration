@@ -194,9 +194,29 @@
   <data name="ContractSource.CalledAgent" xml:space="preserve"><value>Fourni par l’Agent appelé</value></data>
   <data name="ContractSource.ArtifactEnvelope" xml:space="preserve"><value>Références d’artefacts (contenu décrit séparément)</value></data>
   <data name="AgentInputMapping" xml:space="preserve"><value>Mapping d’entrée (JSON)</value></data>
-  <data name="AgentInputContractAbsent" xml:space="preserve"><value>Aucun contrat d’entrée déclaré. L’Agent reçoit la valeur du mapping en une seule entrée.</value></data>
+  <data name="AgentInputContractAbsent" xml:space="preserve"><value>Aucun contrat d’entrée n’est déclaré par cet Agent.</value></data>
   <data name="ArtifactInputContentContract" xml:space="preserve"><value>Chaque artefact d’entrée porte son propre contrat de contenu et son type MIME lorsqu’ils sont disponibles ; ils sont résolus à l’exécution.</value></data>
   <data name="ArtifactOutputContentContract" xml:space="preserve"><value>Les contrats de contenu s’appliquent à chaque artefact produit. Un contrat de sortie explicite du traitement est prioritaire.</value></data>
   <data name="BeforePublication" xml:space="preserve"><value>Transformer avant publication</value></data>
   <data name="ConnectionContractMismatch" xml:space="preserve"><value>Contrats incompatibles : {0} → {1}. La sortie après mapping ne satisfait pas le contrat d’entrée de la cible. Vérifiez le mapping ou les contrats.</value></data>
+  <data name="CallAgent" xml:space="preserve"><value>Appeler un Agent</value></data>
+  <data name="CalledAgentNode" xml:space="preserve"><value>Agent : {0}</value></data>
+  <data name="MappingDataTitle" xml:space="preserve"><value>Données transmises à l’Agent</value></data>
+  <data name="MappingDataHelp" xml:space="preserve"><value>Choisissez une valeur ou composez un mapping indépendamment du contrat attendu.</value></data>
+  <data name="MappingValue" xml:space="preserve"><value>Valeur ou expression</value></data>
+  <data name="MappingPlaceholder" xml:space="preserve"><value>Choisir une suggestion ou saisir une valeur</value></data>
+  <data name="MappingFreeValue" xml:space="preserve"><value>Les expressions et le texte libre sont acceptés. Vide : transmettre la valeur reçue.</value></data>
+  <data name="MappingJson" xml:space="preserve"><value>JSON personnalisé</value></data>
+  <data name="MappingSimple" xml:space="preserve"><value>Valeur simple</value></data>
+  <data name="MappingPrevious" xml:space="preserve"><value>Résultat de l’étape précédente</value></data>
+  <data name="MappingFlowInput" xml:space="preserve"><value>Entrée reçue par ce Flow</value></data>
+  <data name="MappingArtifactContent" xml:space="preserve"><value>Contenu de l’artefact d’entrée</value></data>
+  <data name="MappingArtifactMetadata" xml:space="preserve"><value>Métadonnées de l’artefact d’entrée</value></data>
+  <data name="MappingArtifactInputAccess" xml:space="preserve"><value>Accès limité à l’entrée</value></data>
+  <data name="MappingArtifactOutputAccess" xml:space="preserve"><value>Accès limité à la sortie</value></data>
+  <data name="MappingParameters" xml:space="preserve"><value>Paramètres du traitement</value></data>
+  <data name="MappingStepOutput" xml:space="preserve"><value>Résultat de « {0} » (si exécutée)</value></data>
+  <data name="MappingStepProperty" xml:space="preserve"><value>Résultat de « {0} » · {1}</value></data>
+  <data name="MappingShowValues" xml:space="preserve"><value>Valeurs disponibles</value></data>
+  <data name="MappingNoOptions" xml:space="preserve"><value>Aucune suggestion correspondante. Vous pouvez saisir une valeur libre.</value></data>
 </root>

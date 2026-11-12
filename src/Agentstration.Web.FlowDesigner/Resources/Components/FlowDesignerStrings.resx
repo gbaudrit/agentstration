@@ -199,9 +199,29 @@
   <data name="ContractSource.CalledAgent" xml:space="preserve"><value>Provided by the called Agent</value></data>
   <data name="ContractSource.ArtifactEnvelope" xml:space="preserve"><value>Artifact references (content described separately)</value></data>
   <data name="AgentInputMapping" xml:space="preserve"><value>Input mapping (JSON)</value></data>
-  <data name="AgentInputContractAbsent" xml:space="preserve"><value>No declared input contract. The Agent receives the mapped value as a single input.</value></data>
+  <data name="AgentInputContractAbsent" xml:space="preserve"><value>No input contract is declared by this Agent.</value></data>
   <data name="ArtifactInputContentContract" xml:space="preserve"><value>Each input Artifact carries its own content contract and MIME type when available; these are resolved during execution.</value></data>
   <data name="ArtifactOutputContentContract" xml:space="preserve"><value>Content contracts apply to each produced Artifact. An explicit producer output contract takes precedence.</value></data>
   <data name="BeforePublication" xml:space="preserve"><value>Transform before publication</value></data>
   <data name="ConnectionContractMismatch" xml:space="preserve"><value>Incompatible contracts: {0} → {1}. The mapped output does not satisfy the target input contract. Review the mapping or the contracts.</value></data>
+  <data name="CallAgent" xml:space="preserve"><value>Call an Agent</value></data>
+  <data name="CalledAgentNode" xml:space="preserve"><value>Agent: {0}</value></data>
+  <data name="MappingDataTitle" xml:space="preserve"><value>Data sent to the Agent</value></data>
+  <data name="MappingDataHelp" xml:space="preserve"><value>Choose a value or author a mapping independently of the expected contract.</value></data>
+  <data name="MappingValue" xml:space="preserve"><value>Value or expression</value></data>
+  <data name="MappingPlaceholder" xml:space="preserve"><value>Select a suggestion or enter a value</value></data>
+  <data name="MappingFreeValue" xml:space="preserve"><value>Expressions and literal text are accepted. Empty: forward the incoming value.</value></data>
+  <data name="MappingJson" xml:space="preserve"><value>Custom JSON</value></data>
+  <data name="MappingSimple" xml:space="preserve"><value>Single value</value></data>
+  <data name="MappingPrevious" xml:space="preserve"><value>Previous step result</value></data>
+  <data name="MappingFlowInput" xml:space="preserve"><value>Input received by this Flow</value></data>
+  <data name="MappingArtifactContent" xml:space="preserve"><value>Input Artifact content</value></data>
+  <data name="MappingArtifactMetadata" xml:space="preserve"><value>Input Artifact metadata</value></data>
+  <data name="MappingArtifactInputAccess" xml:space="preserve"><value>Scoped input access</value></data>
+  <data name="MappingArtifactOutputAccess" xml:space="preserve"><value>Scoped output access</value></data>
+  <data name="MappingParameters" xml:space="preserve"><value>Processing parameters</value></data>
+  <data name="MappingStepOutput" xml:space="preserve"><value>Result of “{0}” (if executed)</value></data>
+  <data name="MappingStepProperty" xml:space="preserve"><value>“{0}” result · {1}</value></data>
+  <data name="MappingShowValues" xml:space="preserve"><value>Available values</value></data>
+  <data name="MappingNoOptions" xml:space="preserve"><value>No matching suggestion. You can enter a free value.</value></data>
 </root>

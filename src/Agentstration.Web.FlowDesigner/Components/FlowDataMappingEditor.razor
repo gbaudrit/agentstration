@@ -1,0 +1,90 @@
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+<div class="flow-data-mapping" data-testid="flow-data-mapping">
+    <div class="mapping-heading"><div><h3>@Localizer["MappingDataTitle"]</h3><p>@Localizer["MappingDataHelp"]</p></div>
+        <button type="button" class="text-button" aria-pressed="@custom" @onclick="ToggleMode">@Localizer[custom ? "MappingSimple" : "MappingJson"]</button>
+    </div>
+    @if (custom)
+    {
+        <label>@Localizer["MappingJson"]<textarea data-testid="agent-input-mapping-json" disabled="@ReadOnly" value="@raw" @onchange="JsonChangedAsync"></textarea></label>
+    }
+    else
+    {
+        <label for="@inputId">@Localizer["MappingValue"]</label>
+        <div class="mapping-picker">
+            <div class="mapping-picker-control">
+                <input id="@inputId" role="combobox" aria-autocomplete="list" aria-expanded="@open" aria-controls="@listId" aria-activedescendant="@(open && active >= 0 ? listId + "-" + active : null)"
+                    data-testid="agent-input-mapping" disabled="@ReadOnly" value="@draft" @onfocus="Open" @onblur="Close" @oninput="Filter" @onchange="ExpressionChangedAsync" @onkeydown="KeyDownAsync" @onkeydown:stopPropagation="true" placeholder="@Localizer["MappingPlaceholder"]" />
+                <button type="button" class="mapping-picker-toggle" disabled="@ReadOnly" aria-label="@Localizer["MappingShowValues"]" aria-expanded="@open" @onmousedown:preventDefault="true" @onclick="ToggleOptions"><UiIcon Name="chevron-down" /></button>
+            </div>
+            @if (open && !ReadOnly)
+            {
+                <ul id="@listId" role="listbox" aria-label="@Localizer["MappingShowValues"]" class="mapping-picker-options">
+                    @for (var index = 0; index < VisibleOptions.Count; index++)
+                    {
+                        var position = index; var option = VisibleOptions[index];
+                        <li role="none"><button type="button" tabindex="-1" id="@(listId + "-" + index)" role="option" aria-selected="@(active == index)"
+                            @onmousedown:preventDefault="true" @onclick="() => SelectAsync(option)"><strong>@option.Label</strong><code>@option.Expression</code></button></li>
+                    }
+                    @if (VisibleOptions.Count == 0) { <li role="presentation" class="mapping-no-options">@Localizer["MappingNoOptions"]</li> }
+                </ul>
+            }
+        </div>
+        <small>@Localizer["MappingFreeValue"]</small>
+    }
+    @if (invalid) { <p class="validation-error" role="alert">@Localizer["InvalidJson"]</p> }
+</div>
+@code {
+    [Parameter] public JsonElement? Value { get; set; }
+    [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public IReadOnlyList<FlowMappingOption> Options { get; set; } = [];
+    private readonly string listId = "mapping-options-" + Guid.NewGuid().ToString("N");
+    private bool custom, invalid, open;
+    private int active = -1;
+    private string draft = string.Empty, filter = string.Empty;
+    private readonly string inputId = "mapping-input-" + Guid.NewGuid().ToString("N");
+    private IReadOnlyList<FlowMappingOption> VisibleOptions => Options.Where(option => option.Expression.Contains(filter, StringComparison.OrdinalIgnoreCase) || option.Label.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
+    private string raw = "null", signature = string.Empty;
+    private string Expression => Value is { ValueKind: JsonValueKind.String } value ? value.GetString() ?? string.Empty : string.Empty;
+    protected override void OnParametersSet()
+    {
+        var next = Value?.GetRawText() ?? "null";
+        if (signature == next) return;
+        signature = next; raw = next; draft = Expression; invalid = false;
+        custom = Value is { ValueKind: not (JsonValueKind.String or JsonValueKind.Null) };
+    }
+    private void ToggleMode() { custom = !custom; raw = Value?.GetRawText() ?? "null"; invalid = false; open = false; }
+    private void Open() { if (!ReadOnly) { open = true; filter = string.Empty; active = -1; } }
+    private void Close() { open = false; active = -1; }
+    private void ToggleOptions() { if (open) Close(); else Open(); }
+    private void Filter(ChangeEventArgs args) { draft = args.Value?.ToString() ?? string.Empty; filter = draft; active = -1; open = true; }
+    private Task ExpressionChangedAsync(ChangeEventArgs args) => ReadOnly ? Task.CompletedTask
+        : ValueChanged.InvokeAsync(string.IsNullOrEmpty(args.Value?.ToString()) ? null : JsonSerializer.SerializeToElement(args.Value!.ToString()));
+    private async Task SelectAsync(FlowMappingOption option)
+    {
+        if (ReadOnly) return;
+        draft = option.Expression; Close(); await ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(option.Expression));
+    }
+    private async Task KeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") { Close(); return; }
+        if (args.Key is "ArrowDown" or "ArrowUp")
+        {
+            if (!open) Open();
+            if (VisibleOptions.Count > 0) active = active < 0 ? args.Key == "ArrowDown" ? 0 : VisibleOptions.Count - 1
+                : (active + (args.Key == "ArrowDown" ? 1 : VisibleOptions.Count - 1)) % VisibleOptions.Count;
+        }
+        if (args.Key == "Enter" && open && active >= 0 && active < VisibleOptions.Count) await SelectAsync(VisibleOptions[active]);
+    }
+    private async Task JsonChangedAsync(ChangeEventArgs args)
+    {
+        if (ReadOnly) return;
+        raw = args.Value?.ToString() ?? "null";
+        try
+        {
+            var value = JsonSerializer.Deserialize<JsonElement>(raw); invalid = false;
+            await ValueChanged.InvokeAsync(value.ValueKind == JsonValueKind.Null ? null : value);
+        }
+        catch (JsonException) { invalid = true; }
+    }
+}

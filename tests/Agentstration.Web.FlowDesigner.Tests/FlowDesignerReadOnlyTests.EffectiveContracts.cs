@@ -44,16 +44,19 @@ public sealed partial class FlowDesignerReadOnlyTests
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" },
             new ToolFlowStepDefinition { Name = "clock", Tool = new("datetime.get") { OutputSchema = output } },
             new AgentFlowStepDefinition { Name = "agent", Agent = new("redactor") { InputSchema = input }, InputMapping = JsonSerializer.SerializeToElement("${transition.output}") }],
-            Transitions = [new("clock-agent", "clock", "completed", "agent")] };
+            Transitions = [new("clock-agent", "clock", "success", "agent")] };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(false, graph));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
         context.Services.AddSingleton<FlowEditorStore>();
         var rendered = context.Render<Agentstration.Web.FlowDesigner.Components.FlowDesigner>(parameters => parameters.Add(value => value.ResourceId, "parent"));
         Assert.AreEqual(mismatch ? 1 : 0, rendered.FindAll("[data-testid='flow-connection-contract-warning']").Count);
+        var diagram = GetDiagram(rendered.FindComponent<FlowCanvas>().Instance);
+        Assert.AreEqual(mismatch, ((Blazor.Diagrams.Core.Models.LinkModel)diagram.Links.Single()).Color == "var(--color-danger)");
         // An explicit mapping satisfies field1 even though the original tool output has another shape.
         var store = context.Services.GetRequiredService<FlowEditorStore>();
         var mapped = (AgentFlowStepDefinition)graph.Steps[2];
         rendered.InvokeAsync(async () => await store.DispatchAsync(new UpdateStepCommand(mapped with { InputMapping = JsonSerializer.Deserialize<JsonElement>("""{"field1":"${transition.output.utc}"}""") }), default)).GetAwaiter().GetResult();
         rendered.WaitForAssertion(() => Assert.HasCount(0, rendered.FindAll("[data-testid='flow-connection-contract-warning']")));
+        Assert.AreNotEqual("var(--color-danger)", ((Blazor.Diagrams.Core.Models.LinkModel)diagram.Links.Single()).Color);
     }
 }

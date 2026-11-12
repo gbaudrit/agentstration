@@ -1,23 +1,21 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
 <div class="execution-progress" role="status" aria-live="polite" data-testid="@TestId">
     <div class="execution-progress-overview">
-        <progress aria-label="@Label"></progress>
-        <strong>@Label</strong>
-        @if (CompletedSteps is { } completed && TotalSteps is > 0)
-        { <span>@Localizer["ExecutionProgress.Steps", completed, TotalSteps.Value]</span> }
-        @if (Elapsed is { } elapsed)
-        { <span>@Localizer["ExecutionProgress.Elapsed", elapsed.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture)]</span> }
-        @if (RunUrl is not null)
-        { <a href="@RunUrl" target="_blank" rel="noopener" aria-label="@Localizer["ExecutionProgress.OpenRun"]">@Localizer["ExecutionProgress.Run"]</a> }
+        <span class="execution-progress-spinner" aria-hidden="true"></span><strong>@Label</strong>
+        @if (Elapsed is { } elapsed) { <span class="execution-progress-elapsed"><UiIcon Name="clock" />@elapsed.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture)</span> }
+        @if (RunUrl is not null) { <a class="execution-progress-link" href="@RunUrl" target="_blank" rel="noopener" aria-label="@Localizer["ExecutionProgress.OpenRun"]">@Localizer["ExecutionProgress.Run"] <UiIcon Name="external-link" /></a> }
     </div>
+    @if (CompletedSteps is { } completed && TotalSteps is > 0)
+    {
+        <div class="execution-progress-count"><span>@Localizer["ExecutionProgress.Steps", completed, TotalSteps.Value]</span><progress aria-label="@Localizer["ExecutionProgress.Steps", completed, TotalSteps.Value]" value="@completed" max="@TotalSteps.Value"></progress></div>
+    }
+    else { <progress class="execution-progress-indeterminate" aria-label="@Label"></progress> }
     @foreach (var location in FlowRunInspection.ActiveLocations(Runs))
     {
-        <div class="execution-progress-location">
-            <span>@Localizer["ExecutionProgress.CurrentFlow"]</span>
-            <a href="@FlowRunInspection.RunUrl(location.Run.Id, location.Run.ExecutionScopeRef, location.Run.Scope.LogicalScopeRef, location.Step?.StepName)" target="_blank" rel="noopener">@FlowRunInspection.FlowLabel(location.Run)</a>
-            <span>@Localizer["ExecutionProgress.CurrentStep"]</span>
-            <strong>@(location.Step is null ? Localizer["ExecutionProgress.WaitingStep"].Value : FlowRunInspection.StepLabel(location.Run, location.Step.StepName))</strong>
-        </div>
+        <dl class="execution-progress-location">
+            <div><dt>@Localizer["ExecutionProgress.CurrentFlow"]</dt><dd><a href="@FlowRunInspection.RunUrl(location.Run.Id, location.Run.ExecutionScopeRef, location.Run.Scope.LogicalScopeRef, location.Step?.StepName)" target="_blank" rel="noopener">@FlowRunInspection.FlowLabel(location.Run)</a></dd></div>
+            <div><dt>@Localizer["ExecutionProgress.CurrentStep"]</dt><dd><strong>@(location.Step is null ? Localizer["ExecutionProgress.WaitingStep"].Value : StepLabel(location.Run, location.Step.StepName))</strong></dd></div>
+        </dl>
     }
 </div>
 @code {
@@ -28,4 +26,15 @@
     [Parameter] public int? TotalSteps { get; set; }
     [Parameter] public IReadOnlyList<FlowRun> Runs { get; set; } = [];
     [Parameter] public string? TestId { get; set; }
+    private string StepLabel(FlowRun run, string step)
+    {
+        var label = FlowRunInspection.StepLabel(run, step);
+        foreach (var prefix in new[] { "postAggregate", "Transform before publication" })
+        {
+            if (label == prefix) return Localizer["ExecutionProgress.BeforePublication"];
+            if (label.StartsWith(prefix + " ", StringComparison.Ordinal) && int.TryParse(label[(prefix.Length + 1)..], out var index))
+                return Localizer["ExecutionProgress.BeforePublication"].Value + " · " + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return label;
+    }
 }
