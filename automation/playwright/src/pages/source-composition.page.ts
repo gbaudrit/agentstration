@@ -126,6 +126,7 @@ export class SourceCompositionPage {
     await expect(this.evidence).toContainText('input-1');
     await expect(this.evidence).toContainText('input-2');
     await editor.openKnowledge(base, knowledge);
+    await global.getByTestId(TestIds.sourcePolicies.flow).selectOption(`/instance|default|${failChild}`);
     await global.getByTestId(TestIds.sourcePolicies.target).selectOption(`/instance|default|${failChild}|1.0.0`);
     await global.locator('[data-schema-path="$.tag"] input').fill('reject-publication');
     await editor.saveKnowledge(knowledge, api);

@@ -365,6 +365,7 @@ else if (source is not null && readiness is not null)
     private async Task RunActionAsync(Func<Task> action, string success)
     {
         if (busy) return;
+        projectionFailureCode = null; projectionFailureDetails = null; projectionFailureRun = null; projectionFailureOrigins = [];
         busy = true; failed = false; message = null;
         try { await action(); message = T(success); await ReloadChildrenAsync(); }
         catch (AgentstrationApiException exception) when (exception.ProblemType?.Contains("/storage_", StringComparison.Ordinal) == true
