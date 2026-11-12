@@ -286,9 +286,15 @@
   <data name="CausalFailurePropagated" xml:space="preserve"><value>Failure propagated from</value></data>
   <data name="OutputPreviewTruncated" xml:space="preserve"><value>Preview limited to {0} characters. Open the execution to inspect its complete output.</value></data>
   <data name="ContractTitle.Mapping" xml:space="preserve"><value>Unavailable mapping reference</value></data>
-  <data name="ContractSummary.Mapping" xml:space="preserve"><value>The mapping reads the output of a step that does not exist or has not executed.</value></data>
+  <data name="ContractSummary.Mapping" xml:space="preserve"><value>The mapping references a step that does not exist in this execution graph.</value></data>
   <data name="ContractAdvice.Mapping" xml:space="preserve"><value>Check the referenced step identifier. To forward the connected result, use ${transition.output}, or choose an available step output.</value></data>
   <data name="ContractValue.AvailableStep" xml:space="preserve"><value>Available step output</value></data>
-  <data name="ContractValue.UnavailableStep" xml:space="preserve"><value>Missing or unexecuted step</value></data>
+  <data name="ContractValue.UnavailableStep" xml:space="preserve"><value>Step missing from the execution graph</value></data>
   <data name="ContractLevel.Mapping" xml:space="preserve"><value>Output mapping</value></data>
+  <data name="FailureTitle.Storage" xml:space="preserve"><value>Artifact storage failed</value></data>
+  <data name="FailureSummary.Storage" xml:space="preserve"><value>The Artifact storage or local copy operation failed. Expand the details to see the cause.</value></data>
+  <data name="FailureTitle.ToolContract" xml:space="preserve"><value>Tool contract unavailable</value></data>
+  <data name="FailureTitle.Execution" xml:space="preserve"><value>Flow execution failed</value></data>
+  <data name="FailureShowDetails" xml:space="preserve"><value>Show error details</value></data>
+  <data name="FailureHideDetails" xml:space="preserve"><value>Hide error details</value></data>
 </root>

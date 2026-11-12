@@ -34,12 +34,10 @@ else
             <button id="@TabId(tab)" data-testid="@(tab == RunTab.Worker ? "flow-run-worker-tab" : null)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="flow-run-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button>
         }
     </nav>
-    @if (run.Error is not null && (!IsContractFailure(run.Error) || activeTab == RunTab.Summary))
+    @if (run.Error is not null && activeTab == RunTab.Summary)
     {
         <article class="panel run-error" data-testid="flow-run-error">
-            @if (IsContractFailure(run.Error))
-            { <ContractFailurePanel Details="@run.Error.Details" ErrorCode="@run.Error.Code" Run="run" RelatedRuns="contractOrigins" Collapsible="true" /> }
-            else { <strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> } }
+            <ContractFailurePanel Details="@(IsContractFailure(run.Error) ? run.Error.Details : RunErrorDetail(run.Error))" ErrorCode="@run.Error.Code" Message="@RunErrorMessage(run.Error)" Run="run" RelatedRuns="contractOrigins" Collapsible="true" />
         </article>
     }
     @if (pendingInput is not null)
@@ -150,7 +148,7 @@ else
                             { <details><summary>@T("ContractPayloadDetails")</summary>                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre></details> }
                             else
                             {                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
-                                @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@RunErrorMessage(selected.Error)</p></div> }
+                                @if (selected.Error is not null) { <ContractFailurePanel ErrorCode="@selected.Error.Code" Message="@RunErrorMessage(selected.Error)" Details="@RunErrorDetail(selected.Error)" Collapsible="true" /> }
                             }
                         }
                     </article>

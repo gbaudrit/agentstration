@@ -286,9 +286,15 @@
   <data name="CausalFailurePropagated" xml:space="preserve"><value>Erreur propagée depuis</value></data>
   <data name="OutputPreviewTruncated" xml:space="preserve"><value>Aperçu limité à {0} caractères. Ouvrez l’exécution pour consulter sa sortie complète.</value></data>
   <data name="ContractTitle.Mapping" xml:space="preserve"><value>Référence de mapping indisponible</value></data>
-  <data name="ContractSummary.Mapping" xml:space="preserve"><value>Le mapping lit la sortie d’une étape absente ou qui n’a pas été exécutée.</value></data>
+  <data name="ContractSummary.Mapping" xml:space="preserve"><value>Le mapping référence une étape absente du graphe de cette exécution.</value></data>
   <data name="ContractAdvice.Mapping" xml:space="preserve"><value>Vérifiez l’identifiant de l’étape référencée. Pour transmettre le résultat connecté, utilisez ${transition.output}, ou choisissez la sortie d’une étape disponible.</value></data>
   <data name="ContractValue.AvailableStep" xml:space="preserve"><value>Sortie d’étape disponible</value></data>
-  <data name="ContractValue.UnavailableStep" xml:space="preserve"><value>Étape absente ou non exécutée</value></data>
+  <data name="ContractValue.UnavailableStep" xml:space="preserve"><value>Étape absente du graphe d’exécution</value></data>
   <data name="ContractLevel.Mapping" xml:space="preserve"><value>Mapping de sortie</value></data>
+  <data name="FailureTitle.Storage" xml:space="preserve"><value>Échec du stockage de l’artefact</value></data>
+  <data name="FailureSummary.Storage" xml:space="preserve"><value>L’opération de stockage ou de copie locale de l’artefact a échoué. Dépliez les détails pour consulter la cause.</value></data>
+  <data name="FailureTitle.ToolContract" xml:space="preserve"><value>Contrat du Tool indisponible</value></data>
+  <data name="FailureTitle.Execution" xml:space="preserve"><value>Échec de l’exécution du Flow</value></data>
+  <data name="FailureShowDetails" xml:space="preserve"><value>Afficher les détails de l’erreur</value></data>
+  <data name="FailureHideDetails" xml:space="preserve"><value>Masquer les détails de l’erreur</value></data>
 </root>

@@ -1,7 +1,7 @@
 @using Agentstration.Schemas
 @using Agentstration.Web.Components.Pages
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
-@if (Failure is not null || IsContractCode(Code))
+@if (Failure is not null || IsContractCode(Code) || Message is not null)
 {
     <section class="contract-failure-details @(Compact ? "is-compact" : null)" role="note">
         <header class="contract-failure-heading">
@@ -10,10 +10,10 @@
                 @if (Failure is { } boundaryFailure) { <span class="contract-boundary">@Localizer[BoundaryKey(boundaryFailure.Boundary)]</span> }
             </div>
         </header>
-        <p class="contract-failure-summary">@Localizer[SummaryKey]</p>
-        @if (Collapsible && Failure is not null)
+        <p class="contract-failure-summary">@(IsContract ? Localizer[SummaryKey].Value : Code == "artifact_storage_failed" ? Localizer["FailureSummary.Storage"].Value : Message)</p>
+        @if (Collapsible && (Failure is not null || !IsContract))
         {
-            <button type="button" class="contract-failure-toggle" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@bodyId" @onclick="() => expanded = !expanded">@Localizer[expanded ? "ContractHideDetails" : "ContractShowDetails"] <UiIcon Name="chevron-down" /></button>
+            <button type="button" class="contract-failure-toggle" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@bodyId" @onclick="() => expanded = !expanded">@Localizer[IsContract ? (expanded ? "ContractHideDetails" : "ContractShowDetails") : (expanded ? "FailureHideDetails" : "FailureShowDetails")] <UiIcon Name="chevron-down" /></button>
         }
         @if (!Collapsible || expanded)
         {
@@ -60,6 +60,13 @@
                 </details>
             }
         }
+        else if (!IsContract)
+        {
+            <div class="contract-failure-technical">
+                <dl class="details-list"><dt>@Localizer["ContractCode"]</dt><dd><code>@Code</code></dd></dl>
+                @if (!string.IsNullOrWhiteSpace(Details)) { <pre>@Details</pre> }
+            </div>
+        }
         </div>
         }
     </section>
@@ -67,6 +74,7 @@
 @code {
     [Parameter] public string? Details { get; set; }
     [Parameter] public string? ErrorCode { get; set; }
+    [Parameter] public string? Message { get; set; }
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     [Parameter] public FlowRun? Run { get; set; }
     [Parameter] public IReadOnlyList<FlowRun> RelatedRuns { get; set; } = [];
@@ -81,7 +89,8 @@
             or "tool_argument_type_invalid" or "tool_argument_required" or "tool_argument_unknown"
             or "artifact_processing_json_invalid" or "artifact_processing_input_json_invalid";
     private bool IsJson => Code is "data_contract_json_invalid" or "artifact_processing_json_invalid" or "artifact_processing_input_json_invalid";
-    private string TitleKey => Code == "data_contract_mapping_unavailable" ? "ContractTitle.Mapping" : IsJson || Code is "data_contract_encoding_invalid" or "data_contract_media_mismatch" ? "ContractTitle.Format" : "ContractTitle.Schema";
+    private bool IsContract => Failure is not null || IsContractCode(Code);
+    private string TitleKey => !IsContract ? Code switch { "artifact_storage_failed" => "FailureTitle.Storage", "tool_contract_required" or "tool_contract_stale" => "FailureTitle.ToolContract", _ => "FailureTitle.Execution" } : Code == "data_contract_mapping_unavailable" ? "ContractTitle.Mapping" : IsJson || Code is "data_contract_encoding_invalid" or "data_contract_media_mismatch" ? "ContractTitle.Format" : "ContractTitle.Schema";
     private string SummaryKey => Code == "artifact_processing_input_json_invalid" ? "Error.ArtifactInputJsonInvalid" : Code == "artifact_processing_json_invalid" ? "Error.ArtifactOutputJsonInvalid" : IsJson ? "ContractSummary.Json" : Code switch
     {
         "data_contract_mapping_unavailable" => "ContractSummary.Mapping",

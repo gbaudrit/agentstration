@@ -6,6 +6,8 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
+using Agentstration.Bootstrap.Contracts;
+using Agentstration.Infrastructure;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
@@ -331,7 +333,9 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
     }
 
     [TestMethod]
-    public async Task StorageToolsPersistIdempotentlyAndMaterializeThroughStandardFlows()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task StorageToolsPersistIdempotentlyAndMaterializeThroughStandardFlows(bool upgradeLegacyInstance)
     {
         await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
@@ -340,6 +344,41 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
         var source = await service.CreateStagedAsync(new("report.txt", "text/plain",
             new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "producer", FlowRunId = "producer-run", FlowStepId = "render" }), default);
+        if (upgradeLegacyInstance)
+        {
+            // Reproduce an already-Ready v3 instance, whose persisted Tools predate output contracts.
+            var store = factory.Services.GetRequiredService<IResourceStore>();
+            using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            using (factory.Services.GetRequiredService<IResourceGovernanceContext>()
+                .Push(ResourceGovernance.Core("tools.internal-mcp")))
+            foreach (var name in new[] { ArtifactStorageReadMcpTool.Name, ArtifactStorageWriteMcpTool.Name })
+            {
+                var address = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                    ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(name));
+                var tool = (await store.GetExactAsync<ToolResource>(address, default))!;
+                _ = await store.PutExactAsync(ResourceScopeRef.Instance, tool.Value with
+                {
+                    Generation = checked(tool.Value.Generation + 1),
+                    Definition = tool.Value.Definition with { Schema = tool.Value.Definition.Schema! with { Output = null } }
+                }, tool.ETag, false, default);
+            }
+            var initializationAddress = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                BootstrapKinds.InstanceInitialization, "platform-bootstrap");
+            var initialization = (await store.GetExactAsync<InstanceInitializationResource>(initializationAddress, default))!;
+            _ = await store.PutExactAsync(ResourceScopeRef.Instance, initialization.Value with
+            {
+                Generation = checked(initialization.Value.Generation + 1),
+                Definition = initialization.Value.Definition with { TargetVersion = 3, Status = InstanceInitializationStatus.Ready }
+            }, initialization.ETag, false, default);
+            var storageFlows = factory.Services.GetRequiredService<FlowService>();
+            var published = await storageFlows.GetVersionExactAsync(ResourceScopeRef.Instance,
+                new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), "1.0.0", default);
+            await factory.Services.GetRequiredService<IInstanceInitializationCoordinator>().RunAsync(
+                token => factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token), default);
+            var after = await storageFlows.GetVersionExactAsync(ResourceScopeRef.Instance,
+                new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), "1.0.0", default);
+            Assert.AreEqual(JsonSerializer.Serialize(published), JsonSerializer.Serialize(after), "Published storage Flows stay immutable during Tool reconciliation.");
+        }
         const string durableText = "abcé😀{\"records\":[1,2]}";
         var bytes = Encoding.UTF8.GetBytes(durableText);
         _ = await service.WriteAsync(source.Value.ArtifactId, 0, bytes, default);

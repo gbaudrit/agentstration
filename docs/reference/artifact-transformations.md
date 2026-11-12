@@ -346,8 +346,8 @@ The Output inspector labels explicit mappings separately from incoming-value
 forwarding and exposes an editable expression/JSON control in drafts. Output
 validation rejects references to missing step identifiers. At runtime, a direct
 value reference to an unavailable step produces `data_contract_mapping_unavailable`
-with the producing run, consuming step and reference path. An available step whose
-value is actually JSON `null` remains distinct and follows its declared schema.
+with the producing run, consuming step and reference path. A declared but unselected branch retains its nullable result; an actual JSON `null`
+also remains distinct from a deleted reference and follows the declared schema.
 An invalid named success Output does not emit that success name to its parent;
 the original child contract failure propagates instead of a later null-manifest
 failure in the orchestration.
@@ -361,3 +361,13 @@ Artifact links through the existing output view, and distinguish empty text,
 returned null, absent output and expired/unavailable payloads. Causal value
 previews are limited to 16,384 characters; the run's Input/output tab remains
 available for complete retained values.
+
+
+Existing instances reconcile internal Tool schemas during initialization version
+4, including the fixed output schemas required by the built-in Artifact storage
+read/write Flows. This updates the managed Tool resources without rewriting
+published Flow versions. After upgrading, restart the authoritative host before
+starting a new local-copy operation; historical failed runs remain unchanged.
+Storage failures and other execution failures use the same Summary-only error
+card as contract failures, with a localized heading, a short explanation and
+collapsed diagnostic details. They remain identifiable by their original code.

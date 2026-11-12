@@ -29,6 +29,8 @@ public sealed class FlowDetailsDesignerTests
     [DataRow("fr-FR", "artifact_processing_json_invalid", "text/plain")]
     [DataRow("en-US", "artifact_processing_input_json_invalid", "input Artifact")]
     [DataRow("fr-FR", "artifact_processing_input_json_invalid", "artefact d’entrée")]
+    [DataRow("en-US", "artifact_storage_failed", "local copy")]
+    [DataRow("fr-FR", "artifact_storage_failed", "copie locale")]
     public void ArtifactJsonErrorsExplainTheCorrectSideAndRemedy(string language, string code, string explanation)
     {
         using var culture = new TestCultureScope(language);
@@ -41,7 +43,7 @@ public sealed class FlowDetailsDesignerTests
             Id = "invalid-json-run", WorkspaceId = workspace, FlowId = new("anonymization"), FlowVersion = "1.0.0",
             Status = FlowRunStatus.Failed, Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
             Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = FlowClientStub.Now,
-            Error = new(code, "Old generic error"),
+            Error = new(code, "Old generic error", "Tool storage.local.read requires explicit input and output schemas."),
             DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, new("anonymization"), "1.0.0", null, definition,
                 new Dictionary<string, string>(), FlowClientStub.Now)
         };
@@ -52,6 +54,15 @@ public sealed class FlowDetailsDesignerTests
         Assert.Contains(explanation, rendered.Find("[data-testid='flow-run-error']").TextContent);
         Assert.DoesNotContain("Old generic error", rendered.Find("[data-testid='flow-run-error']").TextContent);
         Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error'] .contract-failure-body"));
+        if (code == "artifact_storage_failed")
+        {
+            Assert.HasCount(1, rendered.FindAll(".contract-failure-heading .contract-failure-icon"));
+            Assert.DoesNotContain("requires explicit input", rendered.Markup);
+            rendered.Find(".contract-failure-toggle").Click();
+            Assert.Contains("requires explicit input", rendered.Find(".contract-failure-body").TextContent);
+            Assert.Contains(code, rendered.Find(".contract-failure-body").TextContent);
+            rendered.Find(".contract-failure-toggle").Click();
+        }
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
         foreach (var tab in new[] { "Causality", "Activity", "RawEvents" })
         {
@@ -197,7 +208,12 @@ public sealed class FlowDetailsDesignerTests
         StringAssert.Contains(error.TextContent, strings[resourceKey].Value);
         var taskStrings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<TaskFlowRunDetailsStrings>>();
         Assert.AreEqual(strings[resourceKey].Value, taskStrings[resourceKey].Value);
-        if (errorCode == "agent_model_profile_unavailable") StringAssert.Contains(error.TextContent, diagnostic);
+        if (errorCode == "agent_model_profile_unavailable")
+        {
+            Assert.DoesNotContain(diagnostic, error.TextContent);
+            rendered.Find(".run-error .contract-failure-toggle").Click();
+            StringAssert.Contains(rendered.Find(".run-error").TextContent, diagnostic);
+        }
     }
 
     [TestMethod]
@@ -233,7 +249,9 @@ public sealed class FlowDetailsDesignerTests
 
         var error = rendered.Find(".run-error");
         StringAssert.Contains(error.TextContent, message);
-        StringAssert.Contains(error.TextContent, detail);
+        Assert.DoesNotContain(detail, error.TextContent);
+        rendered.Find(".run-error .contract-failure-toggle").Click();
+        StringAssert.Contains(rendered.Find(".run-error").TextContent, detail);
         Assert.IsFalse(error.TextContent.Contains("agent_model_profile_unavailable", StringComparison.Ordinal));
     }
 

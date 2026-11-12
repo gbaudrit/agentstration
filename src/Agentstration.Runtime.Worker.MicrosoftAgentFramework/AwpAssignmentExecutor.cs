@@ -259,7 +259,8 @@ internal sealed partial class AwpAssignmentExecutor(
     private async Task<AwpAssignmentExecutionResult> ExecuteGraphAsync(AwpAssignmentSession session,
         AwpRootFlowExecutionMaterial material, FlowGraphDefinition graph, CancellationToken cancellationToken)
     {
-        var outputs = new Dictionary<string, JsonElement?>(StringComparer.Ordinal);
+        // Keep declared, unselected branches nullable; only references outside this graph are invalid.
+        var outputs = graph.Steps.ToDictionary(step => step.Name, _ => (JsonElement?)null, StringComparer.Ordinal);
         var current = graph.EntryStep;
         var visited = new HashSet<string>(StringComparer.Ordinal);
         JsonElement? transitionOutput = null;

@@ -85,6 +85,26 @@ public sealed partial class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task UnselectedDeclaredBranchRemainsNullableInAnExplicitOutputMapping()
+    {
+        var graph = new FlowGraphDefinition { EntryStep = "branch", Steps = [
+            new ConditionFlowStepDefinition { Name = "branch", Left = "${input.route}", Operator = "equals", Right = "left" },
+            new TransformFlowStepDefinition { Name = "left", Mapping = JsonSerializer.SerializeToElement(new { route = "left" }) },
+            new TransformFlowStepDefinition { Name = "right", Mapping = JsonSerializer.SerializeToElement(new { route = "right" }) },
+            new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success,
+                Schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new {
+                    left = new { type = new[] { "object", "null" } }, right = new { type = new[] { "object", "null" } } } }),
+                OutputMapping = JsonSerializer.SerializeToElement(new { left = "${steps.left.output}", right = "${steps.right.output}" }) }],
+            Transitions = [new("branch-left", "branch", "true", "left"), new("branch-right", "branch", "false", "right"),
+                new("left-done", "left", "completed", "completed"), new("right-done", "right", "completed", "completed")] };
+        var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { route = "right" }));
+        Assert.AreEqual("success", result.Outcome);
+        Assert.AreEqual(JsonValueKind.Null, result.Output!.Value.GetProperty("left").ValueKind);
+        Assert.AreEqual("right", result.Output.Value.GetProperty("right").GetProperty("route").GetString());
+        Assert.IsFalse(handler.Events.Any(item => item.Kind == AwpExecutionEventKind.StepStarted && item.Location.FlowStep?.StepDefinitionId == "left"));
+    }
+
+    [TestMethod]
     public async Task AvailableStepWithAnExplicitNullOutputRemainsValidForANullableContract()
     {
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
