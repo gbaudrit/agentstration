@@ -19,6 +19,9 @@ export class FlowCollectionPage {
     await expect(row.locator('.flow-versions .collection-version-compact').first()).toBeVisible();
     await expect(row.locator('.collection-qualified-name > svg')).toHaveCount(0);
     await expect(row.locator('.resource-owner-icon button')).toHaveAccessibleName(/.+/);
+    const scopeIcon = await row.locator('.resource-owner-icon svg').boundingBox();
+    expect(scopeIcon!.width).toBeGreaterThanOrEqual(24);
+    expect(scopeIcon!.height).toBeGreaterThanOrEqual(24);
     await expect(row.locator('.status-icon-only button')).toHaveAccessibleName(/.+/);
     await expect(row.locator('.collection-identity-versions')).toHaveCount(0);
     const qualified = await row.locator('.collection-qualified-name code').textContent();
@@ -59,7 +62,52 @@ export class FlowCollectionPage {
     }
     const published = await this.page.request.post(`${consoleUrl}/api/flows/${ids[0]}/publish`, { headers: this.headers(), data: { version: '1.0.0', activate: true } });
     expect(published.status(), await published.text()).toBe(201);
+    const draft = await this.page.request.get(`${consoleUrl}/api/flows/${ids[0]}/draft`, { headers: this.headers() });
+    expect(draft.ok()).toBe(true);
+    expect((await draft.json() as { value: { revision: number } }).value.revision).toBe(1);
     return ids;
+  }
+
+  public async inspectInheritedFlow(consoleUrl: string, id: string, locale: SupportedTestLocale): Promise<void> {
+    const identity = await this.page.request.get(`${consoleUrl}/api/identity/context`);
+    expect(identity.ok()).toBe(true);
+    const workspaces = (await identity.json() as { availableWorkspaces: { id: string; name: string }[] }).availableWorkspaces;
+    const workspace = workspaces.find(value => value.name === 'default');
+    expect(workspace, 'The existing default Workspace is available to the fixture administrator.').toBeTruthy();
+    const scope = `/workspaces/${workspace!.id}`;
+    const inventory = await this.page.request.get(`${consoleUrl}/api/resource-scopes`, { headers: this.headers() });
+    expect(inventory.ok()).toBe(true);
+    const body = await inventory.json() as { scopes: { scopeRef: string; resources: { uid: string; namespace: string; kind: string; name: string }[] }[] };
+    const resource = body.scopes.find(value => value.scopeRef === '/instance')?.resources.find(value => value.kind === 'Flow' && value.namespace === 'default' && value.name === id);
+    expect(resource).toBeTruthy();
+    const policyUrl = `${consoleUrl}/api/resource-access-policies/${resource!.uid}`;
+    const current = await this.page.request.get(policyUrl, { headers: this.headers() });
+    expect([200, 404]).toContain(current.status());
+    const grants = current.status() === 200 ? (await current.json() as { grants: { targetScopeRef: string; actions: string[]; includeDescendants: boolean }[] }).grants : [];
+    const policy = await this.page.request.put(policyUrl, {
+      headers: { ...this.headers(), ...(current.headers()['etag'] ? { 'If-Match': current.headers()['etag']! } : {}) }, data: {
+        resource: { uid: resource!.uid, ownerScopeRef: '/instance', namespace: 'default', kind: 'Flow' },
+        grants: [...grants.filter(value => value.targetScopeRef !== scope), { targetScopeRef: scope, actions: ['discover', 'use'], includeDescendants: false }],
+      },
+    });
+    expect(policy.status(), await policy.text()).toBe(200);
+    const visible = await this.page.request.get(`${consoleUrl}/api/flows?allNamespaces=true&top=20`, { headers: { 'X-Agentstration-Context': scope } });
+    expect(visible.ok(), await visible.text()).toBe(true);
+    expect((await visible.json() as { value: { id: string; scopeRef: string }[] }).value).toContainEqual(expect.objectContaining({ id, scopeRef: '/instance' }));
+    const destination = `${consoleUrl}/flows?context=${encodeURIComponent(scope)}`;
+    await this.page.goto(destination, { waitUntil: 'domcontentloaded' });
+    await this.assertCompactStructure(locale);
+    const row = this.rows().filter({ has: this.page.locator(`a.resource-name-link[href*="/${id}?"]`) });
+    await expect(row).toHaveCount(1);
+    const lock = row.locator('.managed-icon-only button');
+    await expect(lock).toHaveAccessibleName(FlowCollectionTextByLocale[locale].inheritedReadOnly);
+    await lock.focus();
+    await expect(row.locator('.managed-icon-only [role=tooltip]')).toBeVisible();
+    await lock.press('Escape');
+    await row.locator('a.resource-name-link').click();
+    await expect(this.page.getByTestId(TestIds.common.inheritedResourceNotice)).toBeVisible();
+    await this.page.goto(destination, { waitUntil: 'domcontentloaded' });
+    await this.assertCompactStructure(locale);
   }
 
   public async remove(consoleUrl: string, ids: string[]): Promise<void> {
@@ -101,6 +149,7 @@ export class FlowCollectionPage {
   public async assertVersionAlignmentAndDisclosure(id: string, locale: SupportedTestLocale, touch = false): Promise<void> {
     const row = this.rows().filter({ has: this.page.locator(`a.resource-name-link[href*="/${id}?"]`) });
     await expect(row).toHaveCount(1);
+    await expect(row.locator('.managed-icon-only')).toHaveCount(0);
     const versions = row.locator('.collection-version-compact');
     await expect(versions).toHaveCount(2);
     await expect(versions.nth(0).locator('code')).toHaveText('1.0.0');

@@ -49,6 +49,10 @@ for (const variant of [
       const path = testInfo.outputPath(`${Checkpoints.flowCollection.cards}.png`);
       await flows.capture(path);
       await testInfo.attach(Checkpoints.flowCollection.cards, { path, contentType: 'image/png' });
+      await flows.inspectInheritedFlow(product.consoleUrl, ids[0], variant.locale);
+      const inheritedPath = testInfo.outputPath(`${Checkpoints.flowCollection.inherited}.png`);
+      await flows.capture(inheritedPath);
+      await testInfo.attach(Checkpoints.flowCollection.inherited, { path: inheritedPath, contentType: 'image/png' });
     } finally {
       await flows.remove(product.consoleUrl, ids);
       await pages.consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
