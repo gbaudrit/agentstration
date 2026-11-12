@@ -408,6 +408,8 @@ The authenticated server dynamically publishes enabled Workspace Tool Definition
 
 ## Runtime and MAF observability
 
+General incoming and outgoing HTTP diagnostics can also be configured independently of GenAI, including opt-in bounded request/response JSON content and correlated Aspire trace events. See [HTTP diagnostics](http-diagnostics.md) for configuration, supported host boundaries and streaming behavior.
+
 GenAI observability is enabled by default without capturing prompts or responses. A Runtime Run produces correlated OpenTelemetry spans for the Runtime lifecycle, the Microsoft Agent Framework invocation, the effective `IChatClient` request, and the outbound HTTP call. Structured Runtime logs carry the same Run and agent correlation scope.
 
 Run through Aspire to inspect traces, metrics, and logs in the local dashboard:

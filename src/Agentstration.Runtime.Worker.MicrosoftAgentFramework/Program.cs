@@ -1,3 +1,4 @@
+using Agentstration.Http.Diagnostics;
 using Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OpenTelemetry.Logs;
@@ -6,6 +7,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddAgentstrationHttpDiagnostics();
 var serviceName = builder.Configuration["OTEL_SERVICE_NAME"]
     ?? "Agentstration.Runtime.Worker.MicrosoftAgentFramework";
 var configuredWorkerId = builder.Configuration.GetValue<Guid?>(
@@ -35,6 +37,7 @@ builder.Services.AddOpenTelemetry()
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddSource(
+                HttpDiagnosticsExtensions.ActivitySourceName,
                 AwpRuntimeWorkerService.ActivitySource.Name,
                 Agentstration.Runtime.MicrosoftAgentFramework.AgentFrameworkRuntimeFactory.TelemetrySourceName,
                 Agentstration.ModelProviders.GenAiObservabilityOptions.ChatClientSourceName);
@@ -55,6 +58,8 @@ builder.Services.AddOptions<RuntimeWorkerOptions>()
     .Validate(options => options.Validate(), "The Runtime Worker configuration is invalid.")
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHttpClient("agentstration-awp");
+builder.Services.AddHttpClient("agentstration-awp-enrollment");
 builder.Services.AddSingleton<RuntimeWorkerReadiness>();
 builder.Services.AddSingleton<AwpWorkerCredentialProvider>();
 builder.Services.AddSingleton<AwpAssignmentExecutor>();
@@ -65,6 +70,7 @@ builder.Services.AddHealthChecks()
     .AddCheck<RuntimeWorkerReadinessCheck>("runtime-worker-ready", tags: ["ready"]);
 
 var app = builder.Build();
+app.UseAgentstrationHttpDiagnostics();
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {

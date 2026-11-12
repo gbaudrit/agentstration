@@ -13,6 +13,7 @@ internal sealed class AwpRuntimeWorkerService(
     AwpAssignmentRunner assignmentRunner,
     RuntimeWorkerReadiness readiness,
     TimeProvider timeProvider,
+    IHttpClientFactory httpClientFactory,
     ILogger<AwpRuntimeWorkerService> logger) : BackgroundService
 {
     public static readonly ActivitySource ActivitySource = new("Agentstration.Runtime.Worker.MicrosoftAgentFramework");
@@ -26,7 +27,7 @@ internal sealed class AwpRuntimeWorkerService(
         using var credential = await credentials.LoadAsync(stoppingToken);
         var sessionId = new AwpWorkerSessionId(Guid.NewGuid());
         using var client = new AwpClient(new Uri(configured.AuthorityUrl, UriKind.Absolute), credential, sessionId,
-            timeProvider, configured.TransientRetryCount);
+            timeProvider, configured.TransientRetryCount, httpClientFactory.CreateClient("agentstration-awp"));
 
         while (!stoppingToken.IsCancellationRequested)
         {

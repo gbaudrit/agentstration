@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Http.Diagnostics/Agentstration.Http.Diagnostics.csproj" />
     <ProjectReference Include="../../awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />

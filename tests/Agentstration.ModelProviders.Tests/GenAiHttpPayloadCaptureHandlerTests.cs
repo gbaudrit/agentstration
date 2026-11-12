@@ -106,6 +106,33 @@ public sealed class GenAiHttpPayloadCaptureHandlerTests
     }
 
     [TestMethod]
+    public async Task GeneralHttpDiagnosticsOwnsCaptureWhenBothFeaturesAreEnabled()
+    {
+        var logger = new RecordingLogger();
+        using var handler = new GenAiHttpPayloadCaptureHandler(new GenAiObservabilityOptions
+        {
+            HttpPayloadCapture = new HttpPayloadCaptureOptions { Enabled = true, CaptureResponse = true }
+        }, logger)
+        {
+            InnerHandler = new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { content = "response" })
+            }))
+        };
+        using var client = new HttpClient(handler);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://localhost/api/chat")
+        {
+            Content = JsonContent.Create(new { content = "request" })
+        };
+        request.Options.Set(new HttpRequestOptionsKey<bool>("Agentstration.Http.Diagnostics.Active"), true);
+
+        using var response = await client.SendAsync(request);
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.IsEmpty(logger.Messages);
+    }
+
+    [TestMethod]
     public void OptionsRejectPayloadCaptureOutsideDevelopmentAndInvalidLimits()
     {
         var enabled = new GenAiObservabilityOptions

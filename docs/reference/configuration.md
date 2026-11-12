@@ -6,6 +6,8 @@ Configuration follows ASP.NET Core providers, so environment variables use `__` 
 
 Do not commit API keys. HTTP payload capture is disabled by default, and sensitive prompts, documents, credentials, and agent output must not be logged by default.
 
+See [HTTP diagnostics](http-diagnostics.md) for `Observability:Http`, including independent request/response capture, filtering, limits and Aspire trace inspection.
+
 ## Declarative bootstrap
 
 `Agentstration:Bootstrap:Path` optionally points to a directory of initial-state YAML declarations. The setting has no default and an absent directory is a no-op. Tenant, Workspace, Platform administrator, and default context are explicit resources rather than hidden initial-topology settings. Referenced secrets use ordinary configuration keys, so `Agentstration:Bootstrap:Secrets:AdminPassword` can be supplied as `Agentstration__Bootstrap__Secrets__AdminPassword` without placing it in YAML. See [Declarative bootstrap](declarative-bootstrap.md).
