@@ -69,7 +69,7 @@ export interface ExpectedText {
     runTool: string;
     input: string;
   };
-  acquisitionFailure: { errorLegend: string };
+  acquisitionFailure: { errorLegend: string; showErrorDetails: string };
   governedKnowledge: {
     deleteToolSet: string; confirmToolSetDelete: string; draftSaved: string; publishExposure: string; openToolSet: string; pinnedHelp: string; activeHelp: string;
     newExpiration: string; extendRetention: string; cancel: string; confirmDelete: string;
@@ -103,6 +103,7 @@ export interface ExpectedText {
   };
   flowDiagnostics: {
     modelProfileUnavailable: string;
+    showErrorDetails: string;
   };
 }
 
@@ -158,7 +159,7 @@ export const ExpectedTextByLocale = {
       runTool: 'Run this tool',
       input: 'Input',
     },
-    acquisitionFailure: { errorLegend: 'Error' },
+    acquisitionFailure: { errorLegend: 'Error', showErrorDetails: 'Show error details' },
     governedKnowledge: { deleteToolSet: 'Delete', confirmToolSetDelete: 'Delete ToolSet', draftSaved: 'saved without changing the active deployment.', publishExposure: 'Publish Tool exposure', openToolSet: 'Open ToolSet', pinnedHelp: 'Version 1.0.0 will be pinned; later additions do not extend a published Agent revision.', activeHelp: 'This immutable evidence controls the Tools available to the active Agent revision.', newExpiration: 'New expiration', extendRetention: 'Extend retention', cancel: 'Cancel', confirmDelete: 'Delete permanently' },
     sourceLifecycle: { displayName: 'Display name', technicalName: 'Technical name', acquisitionFlow: 'Acquisition Flow', configurationSchema: 'Configuration schema (JSON)', save: 'Save', yaml: 'YAML', revisions: 'Revisions', definition: 'Definition', version: 'Version', publish: 'Publish', activate: 'Activate', enabled: 'Enabled', requiredInput: 'Required input', addDataSource: 'Add a Data Source', notReady: 'Not ready', updateDependencies: 'Update dependencies', confirmDependencyUpdate: 'Save and update', dependencyUpdateHelp: 'Published Snapshots keep their original references.', cancel: 'Cancel' },
     schemaDrivenSources: {
@@ -183,6 +184,7 @@ export const ExpectedTextByLocale = {
       changeScope: 'Change scope',
     },
     flowDiagnostics: {
+      showErrorDetails: 'Show error details',
       modelProfileUnavailable: 'An Agent model profile required by this Flow is unavailable in the execution context. Check its access policy and republish the Agent if its pinned revision changed.',
     },
   },
@@ -237,7 +239,7 @@ export const ExpectedTextByLocale = {
       runTool: 'Exécuter cet outil',
       input: 'Entrées',
     },
-    acquisitionFailure: { errorLegend: 'Erreur' },
+    acquisitionFailure: { errorLegend: 'Erreur', showErrorDetails: 'Afficher les détails de l’erreur' },
     governedKnowledge: { deleteToolSet: 'Supprimer', confirmToolSetDelete: 'Supprimer le ToolSet', draftSaved: 'enregistrée sans modifier le déploiement actif.', publishExposure: 'Publier l’exposition des Tools', openToolSet: 'Ouvrir le ToolSet', pinnedHelp: 'La version 1.0.0 sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.', activeHelp: 'Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.', newExpiration: 'Nouvelle expiration', extendRetention: 'Prolonger la rétention', cancel: 'Annuler', confirmDelete: 'Supprimer définitivement' },
     sourceLifecycle: { displayName: 'Nom d’affichage', technicalName: 'Nom technique', acquisitionFlow: 'Flow d’acquisition', configurationSchema: 'Schéma de configuration (JSON)', save: 'Enregistrer', yaml: 'YAML', revisions: 'Révisions', definition: 'Définition', version: 'Version', publish: 'Publier', activate: 'Activer', enabled: 'Activée', requiredInput: 'Entrée requise', addDataSource: 'Ajouter une source de données', notReady: 'Non prête', updateDependencies: 'Mettre à jour les dépendances', confirmDependencyUpdate: 'Enregistrer et mettre à jour', dependencyUpdateHelp: 'Les Snapshots déjà publiés conservent leurs références d’origine.', cancel: 'Annuler' },
     schemaDrivenSources: {
@@ -262,6 +264,7 @@ export const ExpectedTextByLocale = {
       changeScope: 'Changer de p\u00e9rim\u00e8tre',
     },
     flowDiagnostics: {
+      showErrorDetails: 'Afficher les détails de l’erreur',
       modelProfileUnavailable: 'Un profil de mod\u00e8le requis par un agent de ce Flow est indisponible dans le p\u00e9rim\u00e8tre d\u2019ex\u00e9cution. V\u00e9rifiez sa politique d\u2019acc\u00e8s et republiez l\u2019agent si sa r\u00e9vision \u00e9pingl\u00e9e a chang\u00e9.',
     },
   },
