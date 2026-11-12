@@ -24,11 +24,22 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         => await GetFlowsCoreAsync(contextScope, cancellationToken);
 
     private async Task<IReadOnlyList<FlowSummary>> GetFlowsCoreAsync(ResourceScopeRef? contextScope, CancellationToken cancellationToken)
+        => (await GetFlowsPageCoreAsync(contextScope, 0, 100, cancellationToken)).Items;
+
+    public Task<FlowSummaryPage> GetFlowsPageAsync(int skip, int take, CancellationToken cancellationToken) =>
+        GetFlowsPageCoreAsync(null, skip, take, cancellationToken);
+
+    private async Task<FlowSummaryPage> GetFlowsPageCoreAsync(ResourceScopeRef? contextScope, int skip, int take, CancellationToken cancellationToken)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(take, 200);
+        var path = skip == 0 && take == 100 ? "api/flows?allNamespaces=true&top=100" : $"api/flows?allNamespaces=true&skip={skip}&top={take}";
         var page = contextScope is { } scope
-            ? await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", scope, cancellationToken)
-            : await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", cancellationToken);
-        return page.Value.Select(item => new FlowSummary(item.Id, item.DisplayName ?? item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace, ScopeRef = item.ScopeRef, IsManaged = item.Governance.IsManaged, ActiveVersion = item.ActiveVersion }).ToArray();
+            ? await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, path, scope, cancellationToken)
+            : await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, path, cancellationToken);
+        var items = page.Value.Select(item => new FlowSummary(item.Id, item.DisplayName ?? item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace, ScopeRef = item.ScopeRef, IsManaged = item.Governance.IsManaged, ActiveVersion = item.ActiveVersion, DraftRevision = item.DraftRevision }).ToArray();
+        return new(items, !string.IsNullOrWhiteSpace(page.NextLink));
     }
 
     public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>

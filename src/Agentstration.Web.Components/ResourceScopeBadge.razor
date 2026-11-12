@@ -6,11 +6,18 @@
 
 @if (EffectiveKind is { } kind)
 {
-    <span class="resource-owner-scope">
+    <span class="resource-owner-scope @(IconOnly ? "resource-owner-icon" : null)">
+        @if (IconOnly)
+        {
+            <ValueDisclosure Value="@(ReadableName is { } name ? $"{Localizer[$"ResourceScope.{kind}"].Value} — {name}" : Localizer[$"ResourceScope.{kind}"].Value)" IconName="@(kind switch { ResourceScopeKind.Instance => "server", ResourceScopeKind.Tenant => "building-community", _ => "layout-dashboard" })" />
+        }
+        else
+        {
         <span class="resource-scope-badge @(Compact ? "resource-scope-badge-compact" : null)" title="@ScopeRef?.Value">@Localizer[$"ResourceScope.{kind}"].Value</span>
         @if (ShowName && ReadableName is { } name)
         {
             <ValueDisclosure Value="@name" />
+        }
         }
     </span>
 }
@@ -20,6 +27,7 @@
     [Parameter] public ResourceScopeKind? Kind { get; set; }
     [Parameter] public bool Compact { get; set; }
     [Parameter] public bool ShowName { get; set; } = true;
+    [Parameter] public bool IconOnly { get; set; }
     [Parameter] public string? DisplayName { get; set; }
     private ConsoleContextState? context;
     private ResourceScopeKind? EffectiveKind => ScopeRef?.Kind ?? Kind;

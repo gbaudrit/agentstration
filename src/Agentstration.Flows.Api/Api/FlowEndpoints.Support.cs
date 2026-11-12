@@ -47,7 +47,7 @@ public static partial class FlowEndpoints
 
     private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt, value.Graph) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName, Governance = value.Governance };
 
-    private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName, Governance = value.Governance };
+    private static FlowSummaryResponse ToSummary(FlowResource value, long? draftRevision = null) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName, Governance = value.Governance, DraftRevision = draftRevision };
 
     private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Definition, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes, value.SchemaBindings) { Namespace = value.FlowId.Namespace, ScopeRef = value.ScopeRef, Governance = value.Governance };
 

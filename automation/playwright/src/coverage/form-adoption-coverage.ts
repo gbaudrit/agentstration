@@ -9,6 +9,7 @@ export interface FormAdoptionCoverage {
   specifications: readonly string[];
 }
 export const formAdoptionCoverage: readonly FormAdoptionCoverage[] = [
+  { source: 'src/Agentstration.Console.Components/Components/Pages/Flows.razor', kind: 'shared-field', specifications: ['tests/flow-collection.spec.ts'] },
   { source: 'src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor', kind: 'shared-field', specifications: ['tests/shared-forms.spec.ts'] },
   { source: 'src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor', kind: 'family-regression', specifications: ['tests/create-agent.spec.ts', 'tests/agent-instance-observability.spec.ts'] },
   { source: 'src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor', kind: 'family-regression', specifications: ['tests/distribution.spec.ts'] },

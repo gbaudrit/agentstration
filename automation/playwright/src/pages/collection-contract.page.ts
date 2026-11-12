@@ -1,3 +1,4 @@
+import { FlowCollectionPage } from './flow-collection.page.js';
 import { ExecutionScopesPage } from './execution-scopes.page.js';
 import { randomUUID } from 'node:crypto';
 import { expect, type Locator, type Page } from '@playwright/test';
@@ -34,6 +35,7 @@ export class CollectionContractPage {
 
   public async inspect(locale: SupportedTestLocale, interactions = true): Promise<CollectionObservation> {
     const text = CollectionTextByLocale[locale];
+    if (new URL(this.page.url()).pathname === '/flows') await new FlowCollectionPage(this.page).assertCompactStructure(locale);
     const frames = this.page.locator('.resource-collection:visible');
     const identities = this.page.locator('.collection-identity:visible');
     const menus = this.page.locator('.collection-actions-menu:visible');
@@ -89,6 +91,14 @@ export class CollectionContractPage {
       if ((await state.textContent())?.trim() === text.unknown) await expect(state).toHaveClass(/status-neutral/);
     }
     for (const scope of await scopes.all()) {
+      if ((await scope.getAttribute('class'))?.split(/\s+/).includes('resource-owner-icon')) {
+        const button = scope.getByRole('button');
+        const name = await button.getAttribute('aria-label');
+        expect(text.scopeTypes.some(type => name === type || name?.startsWith(`${type} — `))).toBe(true);
+        await expect(button).toHaveAccessibleName(name!);
+        await expect(scope.locator('[role=tooltip]')).toHaveText(name!);
+        continue;
+      }
       const kind = scope.locator('.resource-scope-badge');
       await expect(kind).toBeVisible();
       expect(text.scopeTypes).toContain((await kind.textContent())?.trim());

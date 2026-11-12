@@ -53,6 +53,10 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
     public Task<StoredFlowDraft?> GetAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken) => repository.GetDraftAsync(workspaceId, flowId, cancellationToken);
     public Task<StoredFlowDraft?> GetExactAsync(WorkspaceId workspaceId, ResourceScopeRef ownerScopeRef, FlowId flowId, CancellationToken cancellationToken) => repository.GetDraftExactAsync(workspaceId, ownerScopeRef, flowId, cancellationToken);
 
+    public Task<IReadOnlyDictionary<(ResourceScopeRef ScopeRef, FlowId FlowId), long>> ListRevisionsAsync(
+        WorkspaceId workspaceId, IReadOnlyCollection<FlowResource> visibleFlows, CancellationToken cancellationToken) =>
+        repository.ListDraftRevisionsAsync(workspaceId, visibleFlows.Select(flow => (flow.ScopeRef, flow.Id)).ToArray(), cancellationToken);
+
     public async Task<StoredFlowDraft> SaveAsync(WorkspaceId workspaceId, FlowId flowId, UpdateFlowDraftCommand command, string expectedETag, CancellationToken cancellationToken)
         => await SaveExactAsync(workspaceId, ResourceScopeRef.Workspace(workspaceId.Value), flowId, command, expectedETag, cancellationToken);
 

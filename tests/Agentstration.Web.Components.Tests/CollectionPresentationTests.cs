@@ -231,6 +231,21 @@ public sealed class CollectionPresentationTests
         Assert.IsEmpty(cut.FindAll(".collection-primary-actions"));
     }
 
+    [TestMethod]
+    public void CompactVersionReservesTheTrailingMarkerAndKeepsFullAccessibleDraftMeaning()
+    {
+        using var context = Context();
+        var current = context.Render<CollectionVersion>(parameters => parameters.Add(value => value.Label, "Active version").Add(value => value.Value, "12.100.0").Add(value => value.Compact, true));
+        Assert.AreEqual("12.100.0", current.Find("code").TextContent);
+        Assert.IsNotNull(current.Find(".collection-version-indicator"));
+        Assert.IsEmpty(current.FindAll(".disclosure-trigger"));
+        var draft = context.Render<CollectionVersion>(parameters => parameters.Add(value => value.Label, "Draft, revision 17").Add(value => value.Value, "r17").Add(value => value.Compact, true).Add(value => value.IsDraft, true));
+        Assert.AreEqual("r17", draft.Find("code").TextContent);
+        Assert.AreEqual("Draft, revision 17", draft.Find("button").GetAttribute("aria-label"));
+        Assert.AreEqual("Draft, revision 17", draft.Find("[role=tooltip]").TextContent);
+        Assert.IsEmpty(draft.FindAll(".collection-version-label"));
+    }
+
     private static BunitContext Context()
     {
         var context = new BunitContext();

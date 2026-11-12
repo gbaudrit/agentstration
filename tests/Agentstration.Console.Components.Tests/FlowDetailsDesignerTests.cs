@@ -22,7 +22,7 @@ namespace Agentstration.Web.Tests;
 
 [TestClass]
 [DoNotParallelize]
-public sealed class FlowDetailsDesignerTests
+public sealed partial class FlowDetailsDesignerTests
 {
     [TestMethod]
     [DataRow("/instance")]
@@ -232,7 +232,7 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
-    public void FlowListUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
+    public void FlowListKeepsTheClickableNameAndMovesStateIntoCompactIdentity()
     {
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -253,7 +253,9 @@ public sealed class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings>>();
 
         var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
-        Assert.AreEqual(context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings>>()["CollectionState"].Value, headers[2]);
+        Assert.HasCount(4, headers);
+        Assert.AreEqual(strings["Updated"].Value, headers[2]);
+        Assert.AreEqual("Active", rendered.Find("tbody .status-icon-only button").GetAttribute("aria-label"));
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("Multi-agent review", link.TextContent.Trim());
         Assert.AreEqual("/namespaces/samples/flows/review", link.GetAttribute("href"));
@@ -724,6 +726,9 @@ public sealed class FlowDetailsDesignerTests
         public bool SimulateDraftConflict { get; init; }
         public CreateFlowRunRequest? LastRunRequest { get; private set; }
         public IReadOnlyList<FlowSummary> FlowSummaries { get; init; } = [];
+        public Func<int, int, Task<FlowSummaryPage>>? PageLoader { get; init; }
+        public Task<FlowSummaryPage> GetFlowsPageAsync(int skip, int take, CancellationToken cancellationToken) =>
+            PageLoader?.Invoke(skip, take) ?? Task.FromResult(new FlowSummaryPage(FlowSummaries.Skip(skip).Take(take).ToArray(), FlowSummaries.Count > skip + take));
 
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {

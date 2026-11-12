@@ -93,6 +93,13 @@
       "family": "operations"
     },
     {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
+      "routes": [
+        "/flows"
+      ],
+      "family": "collection navigation"
+    },
+    {
       "path": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
       "routes": [
         "/knowledge-sources/{Name}"

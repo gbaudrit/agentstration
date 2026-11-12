@@ -60,6 +60,7 @@ public interface IFlowRepository
         DeleteRunExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, expectedETag, cancellationToken);
     Task<StoredFlowDraft> CreateDraftAsync(FlowDraft draft, CancellationToken cancellationToken);
     Task<StoredFlowDraft?> GetDraftExactAsync(WorkspaceId workspaceId, ResourceScopeRef ownerScopeRef, FlowId flowId, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<(ResourceScopeRef ScopeRef, FlowId FlowId), long>> ListDraftRevisionsAsync(WorkspaceId workspaceId, IReadOnlyCollection<(ResourceScopeRef ScopeRef, FlowId FlowId)> flows, CancellationToken cancellationToken);
     Task<StoredFlowDraft?> GetDraftAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken) =>
         GetDraftExactAsync(workspaceId, ResourceScopeRef.Workspace(workspaceId.Value), flowId, cancellationToken);
     Task<StoredFlowDraft> UpdateDraftAsync(FlowDraft draft, string expectedETag, CancellationToken cancellationToken);
