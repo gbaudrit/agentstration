@@ -187,7 +187,7 @@ else
                                         }
                                         else if (SelectedStep is AgentFlowStepDefinition agent)
                                         {
-                                            <FlowAgentInspector Step="agent" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" SelectedAgent="SelectedAgent"
+                                            <FlowAgentInspector Step="agent" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" SelectedAgent="SelectedAgent" Changed="UpdateSelectedAsync"
                                                 Agents="agents" SelectionValue="@AgentSelectionValue(agent.Agent)" Namespace="Namespace" UpdateAgentAsync="UpdateAgentAsync" />
                                         }
                                         else if (SelectedStep is FlowCallStepDefinition flowCall)
@@ -242,11 +242,11 @@ else
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="adjustments" /><h3>@T("NoStepConfiguration")</h3><p class="muted">@T("NoStepConfigurationHelp")</p></div>
                                         }
-                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition and not OutputFlowStepDefinition)
+                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition and not AgentFlowStepDefinition and not ArtifactTransformFlowStepDefinition and not OutputFlowStepDefinition)
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="arrow-bar-to-right" /><h3>@T("NoInputContract")</h3><p class="muted">@T("NoInputContractHelp")</p></div>
                                         }
-                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Output && SelectedStep is not InputFlowStepDefinition and not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition)
+                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Output && SelectedStep is not InputFlowStepDefinition and not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition and not AgentFlowStepDefinition and not ArtifactTransformFlowStepDefinition)
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="arrow-bar-left" /><h3>@T("NoOutputContract")</h3><p class="muted">@T("NoOutputContractHelp")</p></div>
                                         }
@@ -302,9 +302,10 @@ else
             {
                 <button type="button" class="button-secondary validation-run" data-testid="flow-designer-validation-run" @onclick="ValidateAsync"><UiIcon Name="check" /><span>@T("RunValidation")</span></button>
             }
-            <span class="validation-count">@T(Editor.State.Issues.Count == 1 ? "IssueCount.One" : "IssueCount.Many", Editor.State.Issues.Count)</span>
+            <span class="validation-count">@T(Editor.State.Issues.Count + ConnectionWarnings().Count == 1 ? "IssueCount.One" : "IssueCount.Many", Editor.State.Issues.Count + ConnectionWarnings().Count)</span>
             <button type="button" class="validation-toggle" aria-label="@T(validationExpanded ? "HideValidationDetails" : "ShowValidationDetails")" aria-expanded="@validationExpanded" @onclick="ToggleValidation"><UiIcon Name="chevron-down" /></button>
         </header>
+        @foreach (var warning in ConnectionWarnings()) { <p class="connection-contract-warning" role="alert" data-testid="flow-connection-contract-warning">@warning</p> }
         @if (validationExpanded)
         {
             @if (Editor.State.Issues.Count == 0) { <p class="muted">@(ReadOnly ? T("PublishedDefinitionHelp") : T("ValidationHelp"))</p> }

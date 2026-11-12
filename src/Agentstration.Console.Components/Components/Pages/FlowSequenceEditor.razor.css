@@ -1,0 +1,6 @@
+.flow-sequence-selection { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: .75rem 1rem; }
+.flow-sequence-selection label { min-width: 0; }
+.flow-sequence-selection label:first-child { grid-column: 1 / -1; }
+.flow-sequence-selection select, .flow-sequence-selection input { width: 100%; max-width: 100%; min-width: 0; }
+.flow-sequence-selection a { grid-column: 1 / -1; overflow-wrap: anywhere; }
+@media(max-width:600px) { .flow-sequence-selection { grid-template-columns: minmax(0, 1fr); } }

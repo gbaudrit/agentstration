@@ -16,7 +16,7 @@ export const TestIds = {
     knowledgeDefinitionFields: 'knowledge-source-definition-fields', fallback: 'knowledge-binding-fallback',
     fallbackAge: 'knowledge-binding-fallback-age', expiredFallback: 'knowledge-expired-fallback',
     composition: 'source-flow-composition', root: 'source-orchestration', sequence: 'flow-sequence-editor',
-    call: 'flow-sequence-call', target: 'flow-sequence-target', up: 'flow-sequence-up', down: 'flow-sequence-down',
+    call: 'flow-sequence-call', flow: 'flow-sequence-flow', search: 'flow-sequence-search', openVersion: 'flow-sequence-open', target: 'flow-sequence-target', up: 'flow-sequence-up', down: 'flow-sequence-down',
     remove: 'flow-sequence-remove', add: 'flow-sequence-add', createTransformation: 'flow-sequence-create', refreshFlows: 'flow-sequence-refresh',
     transformationCreator: 'flow-transformation-creator', transformationDisplayName: 'flow-transformation-display-name',
     transformationName: 'flow-transformation-name', transformationCreate: 'flow-transformation-create', transformationDesigner: 'flow-transformation-designer',

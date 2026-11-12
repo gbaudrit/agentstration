@@ -29,6 +29,7 @@ public partial class FlowDesigner
     private IReadOnlyList<FlowDesignerAgent> routerAgents = [];
     private IReadOnlyList<FlowDesignerFlow> flows = [];
     private IReadOnlyList<FlowDesignerFlowVersion> flowVersions = [];
+    private readonly Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>> flowVersionCatalog = new(StringComparer.Ordinal);
     private IReadOnlyList<FlowDesignerTool> tools = [];
     private bool loadingResources = true;
     private IReadOnlyList<FlowDesignerSchemaVersion> schemaVersions = [];
@@ -66,6 +67,7 @@ public partial class FlowDesigner
         .FirstOrDefault(transition => transition.Id == Editor.State.Selection.TransitionId);
 
     [Parameter, EditorRequired] public string ResourceId { get; set; } = string.Empty;
+    [Parameter] public string? PublishedVersion { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
 
@@ -86,7 +88,7 @@ public partial class FlowDesigner
         : null;
     private FlowDesignerFlowVersion? SelectedFlowVersion => SelectedStep is FlowCallStepDefinition call ? FlowVersion(call) : null;
     private FlowDesignerFlowVersion? FlowVersion(FlowCallStepDefinition call)
-        => flowVersions.FirstOrDefault(version => version.Version == (call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact
+        => flowVersionCatalog.GetValueOrDefault(FlowKey(call.Flow), []).FirstOrDefault(version => version.Version == (call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact
             ? call.Flow.Version
             : flows.FirstOrDefault(flow => ResourceKey(flow.ScopeRef, flow.Namespace, flow.Name) == FlowKey(call.Flow))?.ActiveVersion));
     private FlowDesignerTool? SelectedTool => SelectedStep is ToolFlowStepDefinition tool
@@ -137,21 +139,21 @@ public partial class FlowDesigner
     private string SaveText => T($"SaveState.{Editor.State.SaveState}");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
-    private FlowDesignerTarget Target => new(Namespace, ResourceId, ScopeRef);
+    private FlowDesignerTarget Target => new(Namespace, ResourceId, ScopeRef, PublishedVersion);
     private ResourceScopeRef OwnerScope => Editor.State.Resource?.ScopeRef ?? ScopeRef
         ?? throw new InvalidOperationException("The Flow owner scope is unavailable.");
     private bool ReadOnly => IsReadOnly || Editor.State.IsReadOnly;
 
     protected override async Task OnParametersSetAsync()
     {
-        var targetKey = $"{ScopeRef?.Value}/{Namespace.Value}/{ResourceId}";
+        var targetKey = $"{ScopeRef?.Value}/{Namespace.Value}/{ResourceId}/{PublishedVersion}";
         if (loadedResource == targetKey) return;
         loadedResource = targetKey;
         loadingResources = true;
         Editor.StateChanged += EditorChanged;
         try
         {
-            error = null;
+            error = null; flowVersionCatalog.Clear();
             var loaded = await Backend.LoadAsync(Target, cancellation.Token);
             sourceText = loaded.Source;
             Editor.Load(loaded, Target);
@@ -401,6 +403,7 @@ public partial class FlowDesigner
     private async Task LoadFlowVersionsAsync(FlowCallStepDefinition call)
     {
         flowVersions = await Resources.GetFlowVersionsAsync(ResolveFlowScope(call.Flow), call.Flow.Namespace ?? Namespace, call.Flow.ResourceId, cancellation.Token);
+        flowVersionCatalog[FlowKey(call.Flow)] = flowVersions;
         await SyncFlowCallOutputsAsync(call, flowVersions);
     }
     private async Task RefreshFlowCallOutputsAsync(FlowGraphDefinition definition)
@@ -416,6 +419,7 @@ public partial class FlowDesigner
             {
                 versions = await Resources.GetFlowVersionsAsync(targetScope, targetNamespace, call.Flow.ResourceId, cancellation.Token);
                 versionsByTarget[key] = versions;
+                flowVersionCatalog[key] = versions;
             }
             if (ResolveFlowVersion(call, versions) is { NamedOutputs.Count: > 0 } selected)
                 resolved[call.Name] = selected.NamedOutputs;
@@ -477,11 +481,12 @@ public partial class FlowDesigner
         {
             InputFlowStepDefinition input => ResolveSchema(input.SchemaBinding, input.Schema)
                 ?? ResolveSchema(resource.Definition.InputSchemaBinding, resource.Definition.InputSchema),
+            ArtifactTransformFlowStepDefinition => ArtifactTransformContracts.Manifest,
             AgentFlowStepDefinition agent => agent.Agent.OutputSchema ?? (ReadOnly ? null : ResolveAgent(agent.Agent)?.OutputSchema),
             FlowCompositionPointStepDefinition point => point.OutputSchema,
             TransformFlowStepDefinition transform => ResolveSchema(transform.SchemaBinding, transform.Schema),
             ToolFlowStepDefinition tool => tool.Tool.OutputSchema ?? (ReadOnly ? null : tools.FirstOrDefault(candidate => ToolKey(candidate) == ToolKey(tool.Tool))?.OutputSchema),
-            FlowCallStepDefinition call => call.Flow.OutputSchema ?? (SelectedStep?.Name == call.Name ? FlowVersion(call)?.OutputSchema : null),
+            FlowCallStepDefinition call => call.Flow.OutputSchema ?? FlowVersion(call)?.OutputSchema,
             _ => null
         };
     }

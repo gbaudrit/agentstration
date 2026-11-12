@@ -228,4 +228,49 @@
   <data name="AdditionalArtifactContracts" xml:space="preserve"><value>Les autres contrats de contenu distincts sont disponibles sur les artefacts liés. Les métadonnées d’inspection sont limitées à 256 Kio.</value></data>
   <data name="ContractCode" xml:space="preserve"><value>Code de l’erreur d’origine</value></data>
   <data name="Error.ContractEncodingInvalid" xml:space="preserve"><value>Le contenu de sortie n’est pas du UTF-8 valide. Encodez le texte ou le JSON en UTF-8 avant de publier l’artefact.</value></data>
+  <data name="ContractTitle.Format" xml:space="preserve"><value>Incompatibilité de format</value></data>
+  <data name="ContractTitle.Schema" xml:space="preserve"><value>Incompatibilité de contrat de données</value></data>
+  <data name="ContractSummary.Json" xml:space="preserve"><value>Un résultat JSON valide est attendu, mais le contenu produit ne peut pas être interprété en JSON.</value></data>
+  <data name="ContractSummary.Encoding" xml:space="preserve"><value>Le contenu produit n’est pas du texte UTF-8 valide.</value></data>
+  <data name="ContractSummary.Media" xml:space="preserve"><value>Le type de média produit ne correspond pas au type attendu.</value></data>
+  <data name="ContractSummary.Unresolved" xml:space="preserve"><value>Le contrat dynamique ne peut pas être résolu depuis l’entrée ou le parent sélectionné.</value></data>
+  <data name="ContractSummary.Conflict" xml:space="preserve"><value>Le contrat demandé par la transformation est incompatible avec le contrat de sortie déclaré par le producteur.</value></data>
+  <data name="ContractSummary.Schema" xml:space="preserve"><value>La valeur produite ne respecte pas le schéma de données attendu.</value></data>
+  <data name="ContractAdvice.Json" xml:space="preserve"><value>Demandez du JSON sans balises Markdown ni explications autour. Si du texte est voulu, vérifiez le type MIME de sortie et le mapping du résultat.</value></data>
+  <data name="ContractLevel" xml:space="preserve"><value>Niveau de l’incompatibilité</value></data>
+  <data name="ContractProducedBy" xml:space="preserve"><value>Valeur produite par</value></data>
+  <data name="ContractRequiredBy" xml:space="preserve"><value>Contrat imposé par</value></data>
+  <data name="ContractWholeValue" xml:space="preserve"><value>Résultat entier</value></data>
+  <data name="ContractLocationUnavailable" xml:space="preserve"><value>Information indisponible</value></data>
+  <data name="ContractTechnicalDetails" xml:space="preserve"><value>Détails techniques</value></data>
+  <data name="ContractParentCode" xml:space="preserve"><value>Code de l’erreur du Flow parent</value></data>
+  <data name="ContractAgentDeclaration" xml:space="preserve"><value>Le contrat de sortie déclaré sur l’Agent</value></data>
+  <data name="ContractInvocationDeclaration" xml:space="preserve"><value>Le contrat effectif de cette invocation</value></data>
+  <data name="ContractPayloadDetails" xml:space="preserve"><value>Entrée, sortie et journaux</value></data>
+  <data name="ContractValue.Json" xml:space="preserve"><value>JSON valide</value></data>
+  <data name="ContractValue.InvalidJson" xml:space="preserve"><value>Contenu non interprétable en JSON</value></data>
+  <data name="ContractValue.String" xml:space="preserve"><value>Valeur texte</value></data>
+  <data name="ContractValue.Object" xml:space="preserve"><value>Objet JSON</value></data>
+  <data name="ContractValue.Array" xml:space="preserve"><value>Tableau JSON</value></data>
+  <data name="ContractValue.Integer" xml:space="preserve"><value>Nombre entier</value></data>
+  <data name="ContractValue.Number" xml:space="preserve"><value>Nombre</value></data>
+  <data name="ContractValue.Boolean" xml:space="preserve"><value>Booléen</value></data>
+  <data name="ContractValue.Null" xml:space="preserve"><value>Valeur nulle</value></data>
+  <data name="ContractValue.Absent" xml:space="preserve"><value>Valeur absente</value></data>
+  <data name="ContractValue.Required" xml:space="preserve"><value>Propriété obligatoire</value></data>
+  <data name="ContractValue.DeclaredProperties" xml:space="preserve"><value>Uniquement les propriétés déclarées</value></data>
+  <data name="ContractValue.ExtraProperty" xml:space="preserve"><value>Propriété non déclarée</value></data>
+  <data name="ContractValue.Utf8" xml:space="preserve"><value>Texte UTF-8 valide</value></data>
+  <data name="ContractValue.InvalidUtf8" xml:space="preserve"><value>Encodage UTF-8 invalide</value></data>
+  <data name="ContractLevel.AgentInput" xml:space="preserve"><value>Entrée de l’Agent</value></data>
+  <data name="ContractLevel.AgentOutput" xml:space="preserve"><value>Sortie de l’Agent</value></data>
+  <data name="ContractLevel.ToolInput" xml:space="preserve"><value>Entrée du Tool</value></data>
+  <data name="ContractLevel.ToolOutput" xml:space="preserve"><value>Sortie du Tool</value></data>
+  <data name="ContractLevel.FlowInput" xml:space="preserve"><value>Entrée du Flow enfant</value></data>
+  <data name="ContractLevel.FlowOutput" xml:space="preserve"><value>Sortie du Flow</value></data>
+  <data name="ContractLevel.ArtifactInput" xml:space="preserve"><value>Contenu de l’artefact d’entrée</value></data>
+  <data name="ContractLevel.ArtifactOutput" xml:space="preserve"><value>Contenu de l’artefact de sortie</value></data>
+  <data name="ContractLevel.Publication" xml:space="preserve"><value>Publication de l’artefact</value></data>
+  <data name="ContractLevel.TransformOutput" xml:space="preserve"><value>Sortie de la transformation</value></data>
+  <data name="ContractLevel.Resolution" xml:space="preserve"><value>Résolution du contrat</value></data>
 </root>

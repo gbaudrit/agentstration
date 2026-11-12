@@ -516,6 +516,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
             nodes.Add(new FlowCompositionPointStepDefinition
             {
                 Name = sequence,
+                DisplayName = sequence == "postAggregate" ? "Transform before publication" : "Transformations",
                 Point = sequence,
                 AllowEmpty = true,
                 InputSchema = result,

@@ -31,6 +31,27 @@
     </div>
 }
 
+
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Input" Source="@T("ContractSource.CalledAgent")" />
+        <label>@T("AgentInputMapping")<textarea disabled="@ReadOnly" data-testid="agent-input-mapping" value="@(Step.InputMapping?.GetRawText() ?? "null")" @onchange="MappingChangedAsync"></textarea></label>
+        @if (EffectiveInput is { } schema) { <SchemaDocumentEditor Value="schema" ReadOnly="true" /> }
+        else { <p class="muted">@T("AgentInputContractAbsent")</p> }
+        @if (invalidMapping) { <p class="validation-error" role="alert">@T("InvalidJson")</p> }
+    </section>
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <section class="step-contract-section">
+        <ContractHeading Direction="Output" Source="@T("ContractSource.CalledAgent")" />
+        @if (EffectiveOutput is { } schema) { <SchemaDocumentEditor Value="schema" ReadOnly="true" /> }
+        else if ((Step.Agent.OutputContract ?? (ReadOnly ? null : SelectedAgent?.OutputContract)) is { Mode: DataContractMode.Dynamic }) { <p class="muted">@T("DataContractMode.Dynamic")</p> }
+        else { <p class="muted">@T("NoOutputContract")</p> }
+    </section>
+}
+
 @code {
     [Parameter, EditorRequired] public AgentFlowStepDefinition Step { get; set; } = default!;
     [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
@@ -41,5 +62,19 @@
     [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
     [Parameter] public EventCallback<ChangeEventArgs> UpdateAgentAsync { get; set; }
 
+    [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
+    private JsonElement? EffectiveInput => Step.Agent.InputSchema ?? (ReadOnly ? null : SelectedAgent?.InputSchema);
+    private JsonElement? EffectiveOutput => Step.Agent.OutputSchema ?? Step.Agent.OutputContract?.Schema ?? (ReadOnly ? null : SelectedAgent?.OutputSchema ?? SelectedAgent?.OutputContract?.Schema);
+    private bool invalidMapping;
+    private async Task MappingChangedAsync(ChangeEventArgs args)
+    {
+        try
+        {
+            var value = JsonSerializer.Deserialize<JsonElement>(args.Value?.ToString() ?? "null");
+            invalidMapping = false;
+            await Changed.InvokeAsync(Step with { InputMapping = value.ValueKind == JsonValueKind.Null ? null : value });
+        }
+        catch (JsonException) { invalidMapping = true; }
+    }
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 }

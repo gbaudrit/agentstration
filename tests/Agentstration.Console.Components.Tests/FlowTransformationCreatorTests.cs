@@ -39,7 +39,13 @@ public sealed partial class KnowledgeSourceEditorTests
             var rendered = context.Render<FlowSequenceEditor>(parameters => parameters.Add(value => value.Value, [call]));
             var selected = rendered.Find("[data-testid=flow-sequence-target] option[selected]");
             Assert.EndsWith("|2.0.0", selected.GetAttribute("value"));
-            Assert.Contains(":2.0.0", selected.TextContent);
+            Assert.AreEqual("2.0.0", selected.TextContent);
+            Assert.HasCount(1, rendered.FindAll("[data-testid=flow-sequence-flow] option"));
+            var link = rendered.Find("[data-testid=flow-sequence-open]");
+            Assert.AreEqual("_blank", link.GetAttribute("target"));
+            Assert.Contains("/designer?version=2.0.0&scopeRef=%2Fworkspaces%2F", link.GetAttribute("href")!);
+            rendered.Find("[data-testid=flow-sequence-search]").Input("missing name");
+            Assert.HasCount(1, rendered.FindAll("[data-testid=flow-sequence-flow] option"));
             rendered.Find("[data-testid=flow-sequence-refresh]").Click();
             Assert.EndsWith("|2.0.0", rendered.Find("[data-testid=flow-sequence-target] option[selected]").GetAttribute("value"));
             rendered.Dispose();
@@ -80,7 +86,7 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.IsFalse(rendered.Find("[data-testid='flow-sequence-add']").HasAttribute("disabled"));
         rendered.Find("[data-testid='flow-sequence-add']").Click();
         rendered.Render(parameters => parameters.Add(value => value.Value, calls));
-        StringAssert.Contains(rendered.Find("[data-testid='flow-sequence-target']").TextContent, "artifact-transform-builtin");
+        StringAssert.Contains(rendered.Find("[data-testid='flow-sequence-flow']").TextContent, "artifact-transform-builtin");
     }
 
     [TestMethod]

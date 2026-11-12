@@ -1,0 +1,12 @@
+.contract-failure-details { min-width: 0; color: var(--text); }
+.contract-failure-title { color: var(--color-danger); display: block; }
+.contract-failure-summary { margin: .5rem 0 .75rem; }
+.contract-failure-readable { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .75rem 1rem; margin: .75rem 0; }
+.contract-failure-readable > div { min-width: 0; }
+dt { color: var(--muted); font-size: .85rem; }
+dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+a, code { overflow-wrap: anywhere; }
+.contract-failure-advice { margin: .75rem 0; }
+.contract-failure-technical { margin-top: .75rem; }
+.contract-failure-technical dl { margin-top: .75rem; }
+.contract-failure-technical pre { max-height: 16rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }

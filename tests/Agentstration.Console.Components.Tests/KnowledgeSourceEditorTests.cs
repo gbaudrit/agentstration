@@ -684,14 +684,14 @@ public sealed partial class KnowledgeSourceEditorTests
         });
     }
 
-    private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null)
+    private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null, IFlowApiClient? flows = null)
     {
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(knowledge);
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton(dataSourcesClient ?? new DataSourcesClientStub());
-        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
+        context.Services.AddSingleton<IFlowApiClient>(flows ?? new FlowClientStub());
         return context;
     }
 
@@ -938,6 +938,10 @@ public sealed partial class KnowledgeSourceEditorTests
 
     private sealed class FlowClientStub : IFlowApiClient
     {
+        public Dictionary<string, FlowRun> Runs { get; } = [];
+        public List<(string Id, ResourceScopeRef Scope)> RunReads { get; } = [];
+        public Task<FlowRun> GetFlowRunAsync(string id, ResourceScopeRef scope, CancellationToken token)
+        { RunReads.Add((id, scope)); return Task.FromResult(Runs.TryGetValue(id, out var run) ? run : throw new NotSupportedException()); }
         public FlowGraphDefinition? SequenceGraph { get; init; }
         public IReadOnlyList<string> TransformationVersions { get; init; } = ["1.0.0"];
         public CreateFlowDraftRequest? CreatedTransformation { get; private set; }

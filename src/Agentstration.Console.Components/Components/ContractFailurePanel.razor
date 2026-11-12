@@ -1,25 +1,112 @@
 @using Agentstration.Schemas
 @using Agentstration.Web.Components.Pages
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
-@if (Failure is { } failure)
+@if (Failure is not null || IsContractCode(Code))
 {
-    <div class="contract-failure-details" role="note">
-        <p>@Localizer[Failure.Code == "data_contract_encoding_invalid" ? "Error.ContractEncodingInvalid" : Failure.Code == "data_contract_json_invalid" ? "Error.ContractJsonInvalid" : Failure.Code == "data_contract_unresolved" ? "Error.ContractUnresolved" : "ContractFailureHelp"]</p>
-        <dl class="details-list">
-            <dt>@Localizer["ContractCode"]</dt><dd><code>@failure.Code</code></dd>
-            <dt>@Localizer["ContractBoundary"]</dt><dd><code>@failure.Boundary</code></dd>
-            <dt>@Localizer["ContractPath"]</dt><dd><code>@failure.Path</code></dd>
-            <dt>@Localizer["ContractExpected"]</dt><dd><code>@failure.Expected</code></dd>
-            <dt>@Localizer["ContractActual"]</dt><dd><code>@failure.Actual</code></dd>
-            <dt>@Localizer["ContractRule"]</dt><dd><code>@failure.Rule</code></dd>
-            <dt>@Localizer["ContractOrigin"]</dt><dd><code>@failure.Origin</code></dd>
-            @if (failure.FlowRunId is { } origin)
-            { <dt>@Localizer["ContractSourceRun"]</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(origin)}?scopeRef={Uri.EscapeDataString(ScopeRef?.Value ?? string.Empty)}&step={Uri.EscapeDataString(failure.StepName ?? string.Empty)}")">@origin</a> · @failure.StepName</dd> }
-        </dl>
-    </div>
+    <section class="contract-failure-details" role="note">
+        <strong class="contract-failure-title">@Localizer[TitleKey]</strong>
+        <p class="contract-failure-summary">@Localizer[SummaryKey]</p>
+        @if (Failure is { } failure)
+        {
+            <dl class="contract-failure-readable">
+                <div><dt>@Localizer["ContractLevel"]</dt><dd>@Localizer[BoundaryKey(failure.Boundary)]</dd></div>
+                <div><dt>@Localizer["ContractProducedBy"]</dt><dd>
+                    @if (failure.FlowRunId is { } producerId)
+                    { <a href="@LocationUrl(producerId, failure.StepName)">@LocationLabel(producerId, failure.StepName)</a> }
+                    else if (Run is not null) { <span>@FlowRunInspection.FlowLabel(Run)</span> }
+                    else { <span>@Localizer["ContractLocationUnavailable"]</span> }
+                </dd></div>
+                @if (!Compact)
+                {
+                    <div><dt>@Localizer["ContractExpected"]</dt><dd>@ExpectedText</dd></div>
+                    <div><dt>@Localizer["ContractActual"]</dt><dd>@ActualText</dd></div>
+                    <div><dt>@Localizer["ContractPath"]</dt><dd>@(failure.Path == "$" ? Localizer["ContractWholeValue"].Value : failure.Path)</dd></div>
+                }
+                @if (FlowRunInspection.ContractOwner(failure.Origin) is { } owner)
+                { <div><dt>@Localizer["ContractRequiredBy"]</dt><dd><a href="@LocationUrl(owner.RunId, owner.StepName)">@LocationLabel(owner.RunId, owner.StepName)</a></dd></div> }
+                else if (!Compact)
+                { <div><dt>@Localizer["ContractRequiredBy"]</dt><dd>@Localizer[failure.Origin.StartsWith("agent:", StringComparison.Ordinal) ? "ContractAgentDeclaration" : "ContractInvocationDeclaration"]</dd></div> }
+            </dl>
+            @if (!Compact)
+            {
+                <p class="contract-failure-advice">@Localizer[AdviceKey]</p>
+                <details class="contract-failure-technical">
+                    <summary>@Localizer["ContractTechnicalDetails"]</summary>
+                    <dl class="details-list">
+                        <dt>@Localizer["ContractCode"]</dt><dd><code>@Code</code></dd>
+                        @if (ErrorCode is not null && ErrorCode != Code) { <dt>@Localizer["ContractParentCode"]</dt><dd><code>@ErrorCode</code></dd> }
+                        <dt>@Localizer["ContractBoundary"]</dt><dd><code>@failure.Boundary</code></dd>
+                        <dt>@Localizer["ContractPath"]</dt><dd><code>@failure.Path</code></dd>
+                        <dt>@Localizer["ContractExpected"]</dt><dd><code>@failure.Expected</code></dd>
+                        <dt>@Localizer["ContractActual"]</dt><dd><code>@failure.Actual</code></dd>
+                        <dt>@Localizer["ContractRule"]</dt><dd><code>@failure.Rule</code></dd>
+                        <dt>@Localizer["ContractOrigin"]</dt><dd><code>@failure.Origin</code></dd>
+                    </dl>
+                    @if (ExpectedContract is { } contract)
+                    { <pre>@JsonSerializer.Serialize(contract, new JsonSerializerOptions { WriteIndented = true })</pre> }
+                </details>
+            }
+        }
+    </section>
 }
 @code {
     [Parameter] public string? Details { get; set; }
+    [Parameter] public string? ErrorCode { get; set; }
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public FlowRun? Run { get; set; }
+    [Parameter] public IReadOnlyList<FlowRun> RelatedRuns { get; set; } = [];
+    [Parameter] public bool Compact { get; set; }
     private DataContractFailure? Failure => DataContracts.ParseFailure(Details);
+    private string? Code => Failure?.Code ?? ErrorCode;
+    public static bool IsContractCode(string? code) => code?.StartsWith("data_contract_", StringComparison.Ordinal) == true
+        || code is "flow_input_invalid" or "flow_input_required" or "flow_input_type_invalid" or "flow_composition_value_invalid"
+            or "tool_argument_type_invalid" or "tool_argument_required" or "tool_argument_unknown"
+            or "artifact_processing_json_invalid" or "artifact_processing_input_json_invalid";
+    private bool IsJson => Code is "data_contract_json_invalid" or "artifact_processing_json_invalid" or "artifact_processing_input_json_invalid";
+    private string TitleKey => IsJson || Code is "data_contract_encoding_invalid" or "data_contract_media_mismatch" ? "ContractTitle.Format" : "ContractTitle.Schema";
+    private string SummaryKey => Code == "artifact_processing_input_json_invalid" ? "Error.ArtifactInputJsonInvalid" : Code == "artifact_processing_json_invalid" ? "Error.ArtifactOutputJsonInvalid" : IsJson ? "ContractSummary.Json" : Code switch
+    {
+        "data_contract_encoding_invalid" => "ContractSummary.Encoding",
+        "data_contract_media_mismatch" => "ContractSummary.Media",
+        "data_contract_unresolved" => "ContractSummary.Unresolved",
+        "data_contract_conflict" => "ContractSummary.Conflict",
+        _ => "ContractSummary.Schema"
+    };
+    private string AdviceKey => IsJson ? "ContractAdvice.Json" : Code == "data_contract_unresolved" ? "Error.ContractUnresolved" : "ContractFailureHelp";
+    private FlowRun? Producer => RelatedRuns.FirstOrDefault(value => value.Id == Failure?.FlowRunId)
+        ?? (Run?.Id == Failure?.FlowRunId ? Run : null);
+    private ResolvedDataContract? ExpectedContract => Producer?.Steps.FirstOrDefault(step => step.StepName == Failure?.StepName)?.Contracts?.ExpectedOutput
+        ?? Producer?.ContractContext?.ExpectedOutput;
+    private string ExpectedText => IsJson ? Localizer["ContractValue.Json"].Value + (ExpectedContract?.MediaType is { } mime ? $" ({mime})" : string.Empty)
+        : HumanValue(Failure?.Expected);
+    private string ActualText => IsJson ? Localizer["ContractValue.InvalidJson"].Value : HumanValue(Failure?.Actual);
+    private string HumanValue(string? value) => value switch
+    {
+        "string" => Localizer["ContractValue.String"], "object" => Localizer["ContractValue.Object"],
+        "array" => Localizer["ContractValue.Array"], "integer" => Localizer["ContractValue.Integer"],
+        "number" => Localizer["ContractValue.Number"], "true" or "false" or "boolean" => Localizer["ContractValue.Boolean"],
+        "null" => Localizer["ContractValue.Null"], "undefined" or "absent" => Localizer["ContractValue.Absent"],
+        "required property" => Localizer["ContractValue.Required"],
+        "only declared properties" => Localizer["ContractValue.DeclaredProperties"],
+        "undeclared property (name withheld)" => Localizer["ContractValue.ExtraProperty"],
+        "valid UTF-8 content" => Localizer["ContractValue.Utf8"], "invalid UTF-8 bytes" => Localizer["ContractValue.InvalidUtf8"],
+        _ => value ?? Localizer["ContractLocationUnavailable"].Value
+    };
+    private static string BoundaryKey(string boundary) => boundary switch
+    {
+        "agent-input" => "ContractLevel.AgentInput", "agent-output" => "ContractLevel.AgentOutput",
+        "tool-input" => "ContractLevel.ToolInput", "tool-output" => "ContractLevel.ToolOutput",
+        "flow-input" => "ContractLevel.FlowInput", "flow-output" => "ContractLevel.FlowOutput",
+        "artifact-input" => "ContractLevel.ArtifactInput", "artifact-output" => "ContractLevel.ArtifactOutput",
+        "artifact-publication" => "ContractLevel.Publication", "transform-output" => "ContractLevel.TransformOutput",
+        _ => "ContractLevel.Resolution"
+    };
+    private string LocationLabel(string id, string? step)
+    {
+        var context = RelatedRuns.FirstOrDefault(value => value.Id == id) ?? (Run?.Id == id ? Run : null);
+        var flow = context is null ? id : FlowRunInspection.FlowLabel(context);
+        return step is null ? flow : flow + " · " + (context is null ? step : FlowRunInspection.StepLabel(context, step));
+    }
+    private string LocationUrl(string id, string? step) => FlowRunInspection.RunUrl(id,
+        Run?.ExecutionScopeRef ?? ScopeRef ?? ResourceScopeRef.Instance, Run?.Scope.LogicalScopeRef, step);
 }

@@ -12,8 +12,7 @@ public partial class FlowDesigner
     private string DescribePort(string name, string port)
     {
         var step = Editor.State.Resource?.Definition.Steps.FirstOrDefault(value => value.Name == name);
-        var schema = step is ArtifactTransformFlowStepDefinition artifactStep && port is "result" or "process"
-            ? artifactStep.OutputContract?.Schema : PortSchema(step, port);
+        var schema = PortSchema(step, port);
         var mode = PortMode(step, port, schema);
         var summary = schema?.GetRawText() ?? T("PortContractUnresolved");
         if (summary.Length > 320) summary = summary[..320] + "…";
@@ -24,7 +23,7 @@ public partial class FlowDesigner
         if (port == "input" || port is "error" or "failed") return schema is null ? "Absent" : "Fixed";
         var definition = step switch
         {
-            ArtifactTransformFlowStepDefinition artifact when port is "result" or "process" => artifact.OutputContract,
+            ArtifactTransformFlowStepDefinition artifact when port == "result" => artifact.OutputContract,
             AgentFlowStepDefinition agent when port == "success" => agent.Agent.OutputContract ?? (ReadOnly ? null : ResolveAgent(agent.Agent)?.OutputContract),
             _ => null
         };
@@ -32,13 +31,23 @@ public partial class FlowDesigner
     }
     private JsonElement? PortSchema(FlowStepDefinition? step, string port)
     {
+        if (step is ArtifactTransformFlowStepDefinition artifact)
+            return port switch
+            {
+                "input" => ArtifactTransformContracts.Input,
+                "completed" => ArtifactTransformContracts.Manifest,
+                "process" => MappedSchema(artifact.ProcessingInputMapping, ArtifactTransformContracts.ProcessingInput),
+                "result" => artifact.OutputContract?.Schema,
+                _ => null
+            };
         if (port is "error" or "failed" || Editor.State.Diagram.Nodes.FirstOrDefault(node => node.Name == step?.Name)?.OutputOutcomes.GetValueOrDefault(port) == FlowOutputOutcome.Error) return null;
         return port == "input" ? step switch
     {
         InputFlowStepDefinition => EffectiveInputSchema,
+        ArtifactTransformFlowStepDefinition => ArtifactTransformContracts.Input,
         AgentFlowStepDefinition agent => agent.Agent.InputSchema ?? (ReadOnly ? null : ResolveAgent(agent.Agent)?.InputSchema),
         ToolFlowStepDefinition tool => tool.Tool.InputSchema ?? (ReadOnly ? null : ResolveTool(tool.Tool)?.InputSchema),
-        FlowCallStepDefinition call => call.Flow.InputSchema ?? (SelectedStep?.Name == call.Name ? FlowVersion(call)?.InputSchema : null),
+        FlowCallStepDefinition call => call.Flow.InputSchema ?? FlowVersion(call)?.InputSchema,
         OutputFlowStepDefinition output => output.Schema,
         _ => null
     } : ResolveStepOutputSchema(step);
@@ -65,8 +74,9 @@ public partial class FlowDesigner
             reference = step switch { AgentFlowStepDefinition agent => JsonSerializer.SerializeToElement(agent.Agent),
                 ToolFlowStepDefinition tool => JsonSerializer.SerializeToElement(tool.Tool), FlowCallStepDefinition flow => JsonSerializer.SerializeToElement(flow.Flow), _ => (JsonElement?)null },
             envelopeSchema = schema,
-            artifactDataContract = artifact?.OutputContract,
-            mediaType = artifact?.OutputMediaType,
+            artifactDataContract = artifact is not null && port != "input" ? artifact.OutputContract : null,
+            artifactContent = artifact is null ? null : port is "input" or "process" ? T("ArtifactInputContentContract") : T("ArtifactOutputContentContract"),
+            mediaType = artifact is not null && port is "result" or "completed" ? artifact.OutputMediaType : null,
             maximumArtifacts = artifact?.MaximumArtifacts,
             maximumContentBytes = artifact?.MaximumContentBytes,
             maximumOutputBytes = artifact?.MaximumOutputBytes,

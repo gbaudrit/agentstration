@@ -85,7 +85,7 @@
                             <foreignObject x="8" y="8" width="156" height="62">
                                 <div class="node-content">
                                     <span class="node-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(node.Node.Type)" /></span>
-                                    <span class="node-copy"><strong>@Trim(node.Node.Label, 22)</strong><small>@node.Node.Type</small></span>
+                                    <span class="node-copy"><strong>@Trim(FlowInspectorPresentation.StepDisplayLabel(Localizer, node.Node.Label), 22)</strong><small>@node.Node.Type</small></span>
                                     <span class="turn-badge">@(node.Node.TurnCount == 0 ? null : T(node.Node.TurnCount == 1 ? "TurnCount.One" : "TurnCount.Many", node.Node.TurnCount))</span>
                                     <small class="node-subtitle">@(node.Node.Subtitle is null ? null : Trim(node.Node.Subtitle, 28))</small>
                                 </div>
@@ -211,7 +211,7 @@
 
     private string NodeDescription(FlowTopologyNode node)
     {
-        var parts = new List<string> { node.Label, node.Type };
+        var parts = new List<string> { FlowInspectorPresentation.StepDisplayLabel(Localizer, node.Label), node.Type };
         if (node.IsInitial) parts.Add(T("InitialParticipant"));
         if (node.Status is not null) parts.Add(node.Status);
         if (node.TurnCount > 0) parts.Add(T(node.TurnCount == 1 ? "TurnCount.One" : "TurnCount.Many", node.TurnCount));

@@ -16,7 +16,9 @@
 else if (error is not null) { <ErrorState Message="@error" /> }
 else if (source is not null && readiness is not null)
 {
-    @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div> }
+    @if (projectionFailureCode is not null)
+    { <div class="form-alert form-alert-danger" role="status"><ContractFailurePanel ErrorCode="@projectionFailureCode" Details="@projectionFailureDetails" Run="projectionFailureRun" RelatedRuns="projectionFailureOrigins" Compact="true" /></div> }
+    else if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div> }
     <InheritedResourceNotice OwnerScopeRef="@(source.ScopeRef ?? ResourceScopeRef.Instance)" />
     <ResourceTabs Label="@T("DetailsSections")">
         @foreach (var tab in VisibleTabs)
@@ -61,16 +63,10 @@ else if (source is not null && readiness is not null)
             <div class="panel-header"><div><p class="eyebrow">@T("Projection")</p><h2>@T("ProjectionHistory")</h2><p>@T("ProjectionHelp")</p></div><button class="button-primary" type="button" disabled="@(!CanStartProjection)" data-testid="knowledge-start-projection" @onclick="StartProjectionAsync">@T(projectionStarting || HasActiveProjection ? "ProjectionRunning" : "StartProjection")</button></div>
             @if (projectionStarting || HasActiveProjection)
             {
-                <div class="form-alert" role="status" aria-live="polite" data-testid="knowledge-projection-progress">
-                    <progress aria-label="@T("ProjectionRunning")"></progress>
-                    <strong>@ProjectionProgressLabel</strong>
-                    @if (projectionRun is { } liveRun)
-                    {
-                        <span>@T("ProjectionStepProgress", liveRun.Steps.Count(step => step.Status == FlowStepRunStatus.Succeeded), liveRun.Steps.Count)</span>
-                        <a href="@FlowRunUrl(liveRun.Id, liveRun.ExecutionScopeRef, liveRun.Scope.LogicalScopeRef)" target="_blank" rel="noopener" aria-label="@T("FlowRunNewTab", liveRun.Id)">@T("FlowRun")</a>
-                    }
-                    @if (projectionStartedAt is { } started) { <span>@T("ProjectionElapsed", (Clock.GetUtcNow() - started).ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture))</span> }
-                </div>
+                <ExecutionProgress Label="@ProjectionProgressLabel" TestId="knowledge-projection-progress"
+                    Runs="activeProjectionRuns" CompletedSteps="@(projectionRun?.Steps.Count(step => step.Status == FlowStepRunStatus.Succeeded))" TotalSteps="@(projectionRun?.Steps.Count)"
+                    RunUrl="@(projectionRun is { } progressRun ? FlowRunUrl(progressRun.Id, progressRun.ExecutionScopeRef, progressRun.Scope.LogicalScopeRef) : null)"
+                    Elapsed="@(projectionStartedAt is { } started ? Clock.GetUtcNow() - started : null)" />
             }
             @if (projectionRefreshError is not null) { <p class="inline-warning" role="status">@projectionRefreshError</p> }
             <div class="form-actions"><button class="button-secondary" type="button" disabled="@(!interactive || refreshingProjections)" @onclick="RefreshProjectionsManuallyAsync" data-testid="knowledge-projection-refresh">@T("Refresh")</button></div>
@@ -178,7 +174,9 @@ else if (source is not null && readiness is not null)
     private bool projectionStarting, refreshingProjections;
     private string? projectionRequestId, projectionRefreshError;
     private DateTimeOffset? projectionStartedAt;
-    private FlowRun? projectionRun;
+    private FlowRun? projectionRun, projectionFailureRun;
+    private IReadOnlyList<FlowRun> activeProjectionRuns = [], projectionFailureOrigins = [];
+    private string? projectionFailureCode, projectionFailureDetails;
     private KnowledgeProjectionResource? LiveProjection => projections.FirstOrDefault(value => value.IdempotencyKey == projectionRequestId && projectionRequestId is not null)
         ?? projections.FirstOrDefault(value => IsActiveProjection(value.State));
     private bool HasActiveProjection => projections.Any(value => IsActiveProjection(value.State));
@@ -230,6 +228,7 @@ else if (source is not null && readiness is not null)
     protected override async Task OnParametersSetAsync()
     {
         sourceRevision++;
+        activeProjectionRuns = []; projectionFailureCode = null; projectionFailureDetails = null; projectionFailureRun = null; projectionFailureOrigins = [];
         projectionRun = null;
         projectionRefreshError = null;
         loading = true;
@@ -403,18 +402,22 @@ else if (source is not null && readiness is not null)
             projections = history.OrderByDescending(value => value.CreatedAt).ToArray();
             selectedProjection = projections.FirstOrDefault(value => value.Name == selectedName) ?? LiveProjection ?? projections.FirstOrDefault();
             projectionStartedAt = LiveProjection?.CreatedAt ?? projectionStartedAt;
-            projectionRun = null;
+            projectionRun = null; activeProjectionRuns = [];
             if (LiveProjection is { Inputs.Count: > 0 } active)
             {
                 try
                 {
                     var liveRun = await Flows.GetFlowRunAsync(active.ProjectionFlowRunId, ResourceScopeRef.Workspace(active.WorkspaceId), cancellation.Token);
                     if (revision != sourceRevision || cancellation.IsCancellationRequested) return;
-                    projectionRun = liveRun;
+                    var activeRuns = await FlowRunInspection.ReadActiveAsync(Flows, liveRun, cancellation.Token);
+                    if (revision != sourceRevision || cancellation.IsCancellationRequested) return;
+                    projectionRun = liveRun; activeProjectionRuns = activeRuns;
                 }
                 catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { }
                 catch (NotSupportedException) { }
             }
+            if ((hadActive || projectionStarting) && !HasActiveProjection && selectedProjection is { State: KnowledgeProjectionState.Failed } failedProjection)
+                await ReadProjectionFailureAsync(failedProjection, revision);
             if (includeSnapshots || hadActive && !HasActiveProjection)
             {
                 var latestSnapshots = await Client.GetSnapshotsAsync(requestedNamespace, requestedName, cancellation.Token);
@@ -443,6 +446,7 @@ else if (source is not null && readiness is not null)
         busy = true; projectionStarting = true; failed = false; message = null; projectionRefreshError = null;
         projectionStartedAt = Clock.GetUtcNow();
         projectionRequestId = Guid.NewGuid().ToString("N");
+        projectionFailureCode = null; projectionFailureDetails = null; projectionFailureRun = null; projectionFailureOrigins = []; activeProjectionRuns = [];
         projectionRun = null;
         try
         {
@@ -452,6 +456,7 @@ else if (source is not null && readiness is not null)
             projections = projections.Where(value => value.Name != started.Value.Name).Prepend(started.Value).OrderByDescending(value => value.CreatedAt).ToArray();
             selectedProjection = started.Value;
             failed = started.Value.State is KnowledgeProjectionState.Failed or KnowledgeProjectionState.Cancelled or KnowledgeProjectionState.TimedOut;
+            if (started.Value.State == KnowledgeProjectionState.Failed) await ReadProjectionFailureAsync(started.Value, revision);
             message = failed ? T("ProjectionFailed", started.Value.ErrorMessage ?? started.Value.ErrorCode ?? T($"ProjectionState.{started.Value.State}"))
                 : T(started.Value.State == KnowledgeProjectionState.Succeeded ? "ProjectionCompleted" : "ProjectionAccepted");
         }
@@ -467,6 +472,26 @@ else if (source is not null && readiness is not null)
             try { if (!cancellation.IsCancellationRequested && revision == sourceRevision) await RefreshProjectionStatusAsync(true); }
             finally { busy = false; projectionStarting = false; projectionRequestId = null; }
         }
+    }
+    private async Task ReadProjectionFailureAsync(KnowledgeProjectionResource projection, int revision)
+    {
+        FlowRun? failedRun = null; IReadOnlyList<FlowRun> origins = [];
+        if (projection.Inputs.Count > 0)
+        {
+            try
+            {
+                failedRun = await Flows.GetFlowRunAsync(projection.ProjectionFlowRunId, ResourceScopeRef.Workspace(projection.WorkspaceId), cancellation.Token);
+                origins = await FlowRunInspection.ReadErrorOriginsAsync(Flows, failedRun, cancellation.Token);
+            }
+            catch (AgentstrationApiException) { }
+            catch (NotSupportedException) { }
+            catch (HttpRequestException) { }
+        }
+        if (revision != sourceRevision || cancellation.IsCancellationRequested) return;
+        var diagnostic = Agentstration.Schemas.DataContracts.ParseFailure(failedRun?.Error?.Details);
+        if (diagnostic is null && !ContractFailurePanel.IsContractCode(projection.ErrorCode)) return;
+        projectionFailureCode = diagnostic?.Code ?? projection.ErrorCode; projectionFailureDetails = failedRun?.Error?.Details;
+        projectionFailureRun = failedRun; projectionFailureOrigins = origins;
     }
     private Task SelectSnapshotAsync(KnowledgeSnapshotView value) => RunActionAsync(async () => { await Client.SelectActiveSnapshotAsync(SourceNamespace, Name, value.Snapshot.Name, cancellation.Token); }, "SnapshotActivated");
     private Task ToggleEnabledAsync() => RunActionAsync(async () =>

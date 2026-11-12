@@ -177,4 +177,10 @@
   <data name="SequenceCreated" xml:space="preserve"><value>Draft created. After publishing it in the Designer, refresh the Flows to add it to the sequence.</value></data>
   <data name="SequenceCreateFailed" xml:space="preserve"><value>The draft could not be created. Check the name, context and Flow creation permissions, then try again.</value></data>
   <data name="SequenceClose" xml:space="preserve"><value>Close</value></data>
+  <data name="SequenceSearchFlow" xml:space="preserve"><value>Search Flows</value></data>
+  <data name="SequenceResource" xml:space="preserve"><value>Flow</value></data>
+  <data name="SequenceVersion" xml:space="preserve"><value>Published version</value></data>
+  <data name="SequenceOpenVersion" xml:space="preserve"><value>Open this Flow version</value></data>
+  <data name="BeforePublicationTitle" xml:space="preserve"><value>Transformations before publication</value></data>
+  <data name="BeforePublicationHelp" xml:space="preserve"><value>These transformations process the results gathered from all input sources before the Snapshot is created and published.</value></data>
 </root>

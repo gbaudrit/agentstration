@@ -23,6 +23,10 @@ public sealed class ContractFailurePanelTests
             .Add(component => component.Details, JsonSerializer.Serialize(new { contractFailure = failure, details = "custom boundary" }))
             .Add(component => component.ScopeRef, ResourceScopeRef.Instance));
         Assert.Contains(explanation, rendered.Markup);
+        Assert.HasCount(1, rendered.FindAll(".contract-failure-summary"));
+        Assert.HasCount(1, rendered.FindAll(".contract-failure-technical"));
+        Assert.IsFalse(rendered.Find(".contract-failure-technical").HasAttribute("open"));
+        Assert.DoesNotContain("Contract artifact-output failed", rendered.Markup);
         Assert.Contains("artifact-output", rendered.Markup);
         Assert.Contains("data_contract_json_invalid", rendered.Markup);
         Assert.AreEqual("/flow-runs/child-run?scopeRef=%2Finstance&step=anonymize", rendered.Find("a").GetAttribute("href"));

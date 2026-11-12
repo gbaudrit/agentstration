@@ -79,7 +79,7 @@ public sealed class FlowNodeWidgetTests
             .AddChildContent<FlowNodeWidget>(child => child.Add(component => component.Node, node)));
         Assert.HasCount(2, rendered.FindAll(".flow-port-handle"));
         Assert.AreEqual("fixed input", rendered.Find(".flow-port-handle.input").GetAttribute("title"));
-        rendered.Find(".flow-port-information button").Click();
+        rendered.Find(".flow-port-inspect.input").Click();
         Assert.AreEqual("analyze:input", requested);
     }
 

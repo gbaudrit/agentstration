@@ -36,7 +36,11 @@ else
     </nav>
     @if (run.Error is not null)
     {
-        <article class="panel run-error" data-testid="flow-run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p><ContractFailurePanel Details="@run.Error.Details" ScopeRef="run.ExecutionScopeRef" />@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
+        <article class="panel run-error" data-testid="flow-run-error">
+            @if (IsContractFailure(run.Error))
+            { <ContractFailurePanel Details="@run.Error.Details" ErrorCode="@run.Error.Code" Run="run" RelatedRuns="contractOrigins" /> }
+            else { <strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> } }
+        </article>
     }
     @if (pendingInput is not null)
     {
@@ -136,12 +140,18 @@ else
                         else
                         {
                             <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("ChildFlowRun")</dt><dd>@if (selected.ChildFlowRunId is { } childRunId) { <a href="@($"/flow-runs/{Uri.EscapeDataString(childRunId)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")"><code>@childRunId</code></a> } else { <span>—</span> }</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
+                            @if (IsContractFailure(selected.Error))
+                            { <ContractFailurePanel Details="@selected.Error!.Details" ErrorCode="@selected.Error.Code" Run="run" RelatedRuns="contractOrigins" /> }
                             <details><summary>@T("EffectiveContracts")</summary><p>@T("EffectiveContractsHelp")</p><pre>@Pretty(selected.Contracts is null ? null : JsonSerializer.SerializeToElement(selected.Contracts))</pre>
                                 @foreach (var contracts in selected.ArtifactContracts) { <pre>@Pretty(JsonSerializer.SerializeToElement(contracts))</pre> }
                                 @if (selected.MoreArtifactContracts) { <p>@T("AdditionalArtifactContracts")</p> }
                             </details>
-                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
-                            @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@RunErrorMessage(selected.Error)</p><ContractFailurePanel Details="@selected.Error.Details" ScopeRef="run.ExecutionScopeRef" /></div> }
+                            @if (IsContractFailure(selected.Error))
+                            { <details><summary>@T("ContractPayloadDetails")</summary>                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre></details> }
+                            else
+                            {                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
+                                @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@RunErrorMessage(selected.Error)</p></div> }
+                            }
                         }
                     </article>
                     }
@@ -299,6 +309,8 @@ else
             : $"/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(participant.Id)}";
     }
 
+    private IReadOnlyList<FlowRun> contractOrigins = [];
+    private static bool IsContractFailure(FlowRunError? error) => error is not null && (ContractFailurePanel.IsContractCode(error.Code) || Agentstration.Schemas.DataContracts.ParseFailure(error.Details) is not null);
     protected override async Task OnParametersSetAsync()
     {
         replayCancellation?.Cancel();
@@ -325,6 +337,7 @@ else
         }
         await RefreshInputAsync();
         await RefreshCausalityAsync();
+        contractOrigins = await FlowRunInspection.ReadErrorOriginsAsync(Client, run!, cancellation.Token);
         if (!IsHandoffRun && activeTab == RunTab.Handoffs) activeTab = RunTab.Summary;
         selected = run.Steps.FirstOrDefault(step => step.StepName == FocusStep) ?? run.Steps.FirstOrDefault();
         if (!string.IsNullOrEmpty(FocusStep)) { activeTab = RunTab.Summary; inspectorVisible = true; }
@@ -400,6 +413,7 @@ else
         await RefreshInputAsync();
         if (selected is not null) selected = run.Steps.FirstOrDefault(value => value.StepName == selected.StepName);
         await RefreshCausalityAsync();
+        contractOrigins = await FlowRunInspection.ReadErrorOriginsAsync(Client, run!, cancellation.Token);
     }
 
     private async Task RefreshCausalityAsync()

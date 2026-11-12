@@ -10,9 +10,39 @@ namespace Agentstration.Web.FlowDesigner.Tests;
 public sealed partial class FlowDesignerReadOnlyTests
 {
     [TestMethod]
+    public async Task ArtifactPortInspectionSeparatesReferenceEnvelopesFromContentContractsAndMimeTypes()
+    {
+        using var context = CreateContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Blazor.Diagrams.Core.Geometry.Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new(0, 0, 1024, 768));
+        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" },
+            new ArtifactTransformFlowStepDefinition { Name = "transform", OutputMediaType = "text/plain", OutputContract = new() { Schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"string"}""") } }] };
+        context.Services.AddSingleton<Agentstration.Web.FlowDesigner.Backend.IFlowDesignerBackend>(new BackendStub(true, graph));
+        context.Services.AddSingleton<Agentstration.Web.FlowDesigner.Backend.IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<Agentstration.Web.FlowDesigner.State.FlowEditorStore>();
+        var rendered = context.Render<Agentstration.Web.FlowDesigner.Components.FlowDesigner>(parameters => parameters.Add(value => value.ResourceId, "example"));
+        var canvas = rendered.FindComponent<FlowCanvas>().Instance;
+        await rendered.InvokeAsync(() => canvas.InspectPortAsync!("transform", "input"));
+        var input = JsonSerializer.Deserialize<JsonElement>(rendered.Find(".port-contract-dialog pre").TextContent);
+        Assert.IsTrue(input.GetProperty("envelopeSchema").TryGetProperty("anyOf", out _));
+        Assert.AreEqual(JsonValueKind.Null, input.GetProperty("mediaType").ValueKind);
+        Assert.AreEqual(JsonValueKind.Null, input.GetProperty("artifactDataContract").ValueKind);
+        await rendered.InvokeAsync(() => canvas.InspectPortAsync!("transform", "process"));
+        var process = JsonSerializer.Deserialize<JsonElement>(rendered.Find(".port-contract-dialog pre").TextContent);
+        Assert.IsTrue(process.GetProperty("envelopeSchema").GetProperty("properties").TryGetProperty("content", out _));
+        Assert.AreEqual(JsonValueKind.Null, process.GetProperty("mediaType").ValueKind);
+        await rendered.InvokeAsync(() => canvas.InspectPortAsync!("transform", "result"));
+        var result = JsonSerializer.Deserialize<JsonElement>(rendered.Find(".port-contract-dialog pre").TextContent);
+        Assert.AreEqual("string", result.GetProperty("envelopeSchema").GetProperty("type").GetString());
+        Assert.AreEqual("text/plain", result.GetProperty("mediaType").GetString());
+    }
+
+    [TestMethod]
     public async Task PortInspectionRefreshesItsParentWithoutMutatingAPublishedDefinition()
     {
         using var context = CreateContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         var backend = new BackendStub();
         context.Services.AddSingleton<Agentstration.Web.FlowDesigner.Backend.IFlowDesignerBackend>(backend);
         context.Services.AddSingleton<Agentstration.Web.FlowDesigner.Backend.IFlowDesignerResourceProvider>(new ResourceProviderStub());
@@ -36,6 +66,7 @@ public sealed partial class FlowDesignerReadOnlyTests
     {
         using var culture = new CultureScope(language);
         using var context = CreateContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         ArtifactTransformFlowStepDefinition? changed = null;
         var step = new ArtifactTransformFlowStepDefinition { Name = "anonymize" };
@@ -44,7 +75,7 @@ public sealed partial class FlowDesignerReadOnlyTests
             .Add(component => component.ActiveTab, FlowStepSettingsTab.Output)
             .Add(component => component.Changed, value => changed = (ArtifactTransformFlowStepDefinition)value));
         Assert.Contains(label, rendered.Markup);
-        rendered.Find("select").Change("Dynamic");
+        rendered.FindAll("select").Single(select => select.QuerySelector("option[value=Dynamic]") is not null).Change("Dynamic");
         Assert.AreEqual(DataContractMode.Dynamic, changed?.OutputContract?.Mode);
         Assert.IsNull(changed?.OutputContract?.Schema);
         rendered.Render(parameters => parameters.Add(component => component.Step, changed!).Add(component => component.ReadOnly, true));
@@ -58,6 +89,7 @@ public sealed partial class FlowDesignerReadOnlyTests
     {
         using var culture = new CultureScope(language);
         using var context = CreateContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         ArtifactTransformFlowStepDefinition? changed = null;
         var step = new ArtifactTransformFlowStepDefinition { Name = "anonymize" };
@@ -83,6 +115,7 @@ public sealed partial class FlowDesignerReadOnlyTests
     {
         using var culture = new CultureScope(language);
         using var context = CreateContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         ArtifactTransformFlowStepDefinition? changed = null;
         var rendered = context.Render<FlowArtifactTransformInspector>(parameters => parameters

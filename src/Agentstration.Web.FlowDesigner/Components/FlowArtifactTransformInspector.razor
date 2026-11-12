@@ -20,12 +20,17 @@
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
 {
+    <ContractHeading Direction="Input" Source="@T("ContractSource.ArtifactEnvelope")" />
+    <SchemaDocumentEditor Value="ArtifactTransformContracts.Input" ReadOnly="true" />
+    <p class="muted">@T("ArtifactInputContentContract")</p>
     <label>@T("ArtifactManifestMapping")<textarea data-testid="artifact-manifest-mapping" disabled="@ReadOnly" value="@(Step.ArtifactsMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 0)"></textarea></label>
     <label>@T("ArtifactProcessingInputMapping")<textarea data-testid="artifact-input-mapping" disabled="@ReadOnly" value="@(Step.ProcessingInputMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 1)"></textarea></label>
     <p class="muted">@T("ArtifactProcessingInputHelp")</p>
 }
 @if (ActiveTab == FlowStepSettingsTab.Output)
 {
+    <ContractHeading Direction="Output" Source="@T("ContractSource.ArtifactEnvelope")" />
+    <SchemaDocumentEditor Value="ArtifactTransformContracts.Manifest" ReadOnly="true" />
     <label>@T("ArtifactResultMapping")<textarea data-testid="artifact-result-mapping" disabled="@ReadOnly" value="@(Step.ResultMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 2)"></textarea></label>
     <p class="muted">@T("ArtifactResultHelp")</p>
     <label>@T("DataContractMode")

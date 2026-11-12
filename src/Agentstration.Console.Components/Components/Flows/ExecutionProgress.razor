@@ -1,0 +1,31 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
+<div class="execution-progress" role="status" aria-live="polite" data-testid="@TestId">
+    <div class="execution-progress-overview">
+        <progress aria-label="@Label"></progress>
+        <strong>@Label</strong>
+        @if (CompletedSteps is { } completed && TotalSteps is > 0)
+        { <span>@Localizer["ExecutionProgress.Steps", completed, TotalSteps.Value]</span> }
+        @if (Elapsed is { } elapsed)
+        { <span>@Localizer["ExecutionProgress.Elapsed", elapsed.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture)]</span> }
+        @if (RunUrl is not null)
+        { <a href="@RunUrl" target="_blank" rel="noopener" aria-label="@Localizer["ExecutionProgress.OpenRun"]">@Localizer["ExecutionProgress.Run"]</a> }
+    </div>
+    @foreach (var location in FlowRunInspection.ActiveLocations(Runs))
+    {
+        <div class="execution-progress-location">
+            <span>@Localizer["ExecutionProgress.CurrentFlow"]</span>
+            <a href="@FlowRunInspection.RunUrl(location.Run.Id, location.Run.ExecutionScopeRef, location.Run.Scope.LogicalScopeRef, location.Step?.StepName)" target="_blank" rel="noopener">@FlowRunInspection.FlowLabel(location.Run)</a>
+            <span>@Localizer["ExecutionProgress.CurrentStep"]</span>
+            <strong>@(location.Step is null ? Localizer["ExecutionProgress.WaitingStep"].Value : FlowRunInspection.StepLabel(location.Run, location.Step.StepName))</strong>
+        </div>
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public string? RunUrl { get; set; }
+    [Parameter] public TimeSpan? Elapsed { get; set; }
+    [Parameter] public int? CompletedSteps { get; set; }
+    [Parameter] public int? TotalSteps { get; set; }
+    [Parameter] public IReadOnlyList<FlowRun> Runs { get; set; } = [];
+    [Parameter] public string? TestId { get; set; }
+}

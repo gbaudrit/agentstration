@@ -269,3 +269,38 @@ External MCP/AEP Tool output schemas remain provider-owned and describe
 wraps the business schema under `structuredContent` and validation checks that
 nested content. Internal Tools keep their ordinary result shape. The platform
 does not rewrite external Tool declarations or unwrap their execution results.
+
+The `artifactTransform` input port describes the reference envelope: an Artifact
+list, an `{ artifacts: [...] }` manifest, or the composition `{ value, parameters }`
+wrapper. Its completed port returns a manifest. These structural contracts are
+separate from each Artifact's content schema and MIME type; heterogeneous input
+Artifacts keep their individual metadata, resolved at execution time. The output
+MIME setting does not describe the incoming Artifacts.
+
+Agent step settings show the same effective input and output schemas as their
+ports. In a published Flow these are the pinned schemas, displayed read-only.
+The Designer checks supported structural schemas after statically resolvable
+mappings and flags connections whose compatibility is not guaranteed. Optional
+fields and additional properties retain JSON Schema semantics. Dynamic contracts,
+unsupported schemas and runtime-only expressions still require execution-time
+validation; an absent warning is not proof that arbitrary output will validate.
+
+Source transformation selection separates the Flow from its published version.
+Versions appear by newest publication first, and reopening or refreshing the
+catalog keeps the saved pin. Opening a selected version starts a read-only
+Designer in another tab without replacing the source form or creating a
+draft. The standard `postAggregate` point is presented as **Transformations
+before publication**: it processes the gathered input results before Snapshot
+creation. Its technical point name stays stable for existing references.
+
+The shared execution-progress view shows completed root steps, elapsed time and
+the active child Flow/step, with a link to that execution. Descendant inspection
+is bounded and uses the root execution scope; unavailable child details leave the
+parent visible. It does not start or retry work.
+
+Contract failure panels distinguish the producing Flow/step from the Flow/step
+that supplied the expected contract. The summary explains the mismatch once;
+expected/received formats and correction guidance remain readable, while raw
+codes, origins, rules, contracts and step payloads can be expanded separately.
+Knowledge projection errors use the same localized explanation and retain links
+to the causal execution when its details are accessible.

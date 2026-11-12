@@ -228,4 +228,49 @@
   <data name="AdditionalArtifactContracts" xml:space="preserve"><value>Additional distinct content contracts are available on the linked Artifacts. Inspection metadata is bounded to 256 KiB.</value></data>
   <data name="ContractCode" xml:space="preserve"><value>Originating error code</value></data>
   <data name="Error.ContractEncodingInvalid" xml:space="preserve"><value>The output content is not valid UTF-8. Encode the text or JSON as UTF-8 before publishing the Artifact.</value></data>
+  <data name="ContractTitle.Format" xml:space="preserve"><value>Format incompatibility</value></data>
+  <data name="ContractTitle.Schema" xml:space="preserve"><value>Data contract incompatibility</value></data>
+  <data name="ContractSummary.Json" xml:space="preserve"><value>A valid JSON result was expected, but the produced content cannot be parsed as JSON.</value></data>
+  <data name="ContractSummary.Encoding" xml:space="preserve"><value>The produced content is not valid UTF-8 text.</value></data>
+  <data name="ContractSummary.Media" xml:space="preserve"><value>The produced media type differs from the expected media type.</value></data>
+  <data name="ContractSummary.Unresolved" xml:space="preserve"><value>The dynamic data contract could not be resolved from the selected input or parent.</value></data>
+  <data name="ContractSummary.Conflict" xml:space="preserve"><value>The transformation expectation conflicts with the producer’s declared output contract.</value></data>
+  <data name="ContractSummary.Schema" xml:space="preserve"><value>The produced value does not satisfy the expected data schema.</value></data>
+  <data name="ContractAdvice.Json" xml:space="preserve"><value>Request JSON without Markdown fences or surrounding explanation. If text is intended, check the output MIME type and result mapping.</value></data>
+  <data name="ContractLevel" xml:space="preserve"><value>Where the incompatibility occurs</value></data>
+  <data name="ContractProducedBy" xml:space="preserve"><value>Value produced by</value></data>
+  <data name="ContractRequiredBy" xml:space="preserve"><value>Contract required by</value></data>
+  <data name="ContractWholeValue" xml:space="preserve"><value>Entire result</value></data>
+  <data name="ContractLocationUnavailable" xml:space="preserve"><value>Information unavailable</value></data>
+  <data name="ContractTechnicalDetails" xml:space="preserve"><value>Technical details</value></data>
+  <data name="ContractParentCode" xml:space="preserve"><value>Parent Flow error code</value></data>
+  <data name="ContractAgentDeclaration" xml:space="preserve"><value>The Agent’s declared output contract</value></data>
+  <data name="ContractInvocationDeclaration" xml:space="preserve"><value>The effective contract for this invocation</value></data>
+  <data name="ContractPayloadDetails" xml:space="preserve"><value>Input, output and logs</value></data>
+  <data name="ContractValue.Json" xml:space="preserve"><value>Valid JSON</value></data>
+  <data name="ContractValue.InvalidJson" xml:space="preserve"><value>Content that cannot be parsed as JSON</value></data>
+  <data name="ContractValue.String" xml:space="preserve"><value>Text value</value></data>
+  <data name="ContractValue.Object" xml:space="preserve"><value>JSON object</value></data>
+  <data name="ContractValue.Array" xml:space="preserve"><value>JSON array</value></data>
+  <data name="ContractValue.Integer" xml:space="preserve"><value>Integer</value></data>
+  <data name="ContractValue.Number" xml:space="preserve"><value>Number</value></data>
+  <data name="ContractValue.Boolean" xml:space="preserve"><value>Boolean</value></data>
+  <data name="ContractValue.Null" xml:space="preserve"><value>Null value</value></data>
+  <data name="ContractValue.Absent" xml:space="preserve"><value>Missing value</value></data>
+  <data name="ContractValue.Required" xml:space="preserve"><value>Required property</value></data>
+  <data name="ContractValue.DeclaredProperties" xml:space="preserve"><value>Declared properties only</value></data>
+  <data name="ContractValue.ExtraProperty" xml:space="preserve"><value>Undeclared property</value></data>
+  <data name="ContractValue.Utf8" xml:space="preserve"><value>Valid UTF-8 text</value></data>
+  <data name="ContractValue.InvalidUtf8" xml:space="preserve"><value>Invalid UTF-8 encoding</value></data>
+  <data name="ContractLevel.AgentInput" xml:space="preserve"><value>Agent input</value></data>
+  <data name="ContractLevel.AgentOutput" xml:space="preserve"><value>Agent output</value></data>
+  <data name="ContractLevel.ToolInput" xml:space="preserve"><value>Tool input</value></data>
+  <data name="ContractLevel.ToolOutput" xml:space="preserve"><value>Tool output</value></data>
+  <data name="ContractLevel.FlowInput" xml:space="preserve"><value>Child Flow input</value></data>
+  <data name="ContractLevel.FlowOutput" xml:space="preserve"><value>Flow output</value></data>
+  <data name="ContractLevel.ArtifactInput" xml:space="preserve"><value>Input Artifact content</value></data>
+  <data name="ContractLevel.ArtifactOutput" xml:space="preserve"><value>Output Artifact content</value></data>
+  <data name="ContractLevel.Publication" xml:space="preserve"><value>Artifact publication</value></data>
+  <data name="ContractLevel.TransformOutput" xml:space="preserve"><value>Transformation output</value></data>
+  <data name="ContractLevel.Resolution" xml:space="preserve"><value>Contract resolution</value></data>
 </root>

@@ -117,18 +117,6 @@
     min-width: 0;
 }
 
-[data-testid="knowledge-projection-progress"] {
-    flex-wrap: wrap;
-    min-width: 0;
-    background: var(--primary-soft);
-}
-
-[data-testid="knowledge-projection-progress"] progress {
-    width: 8rem;
-    max-width: 100%;
-    accent-color: var(--primary);
-}
-
 .knowledge-projection-provenance {
     min-width: 0;
 }

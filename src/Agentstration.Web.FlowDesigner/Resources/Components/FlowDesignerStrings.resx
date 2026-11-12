@@ -196,4 +196,12 @@
   <data name="ContractSource.Input" xml:space="preserve"><value>Input Artifact data contract</value></data>
   <data name="ContractSource.Parent" xml:space="preserve"><value>Parent invocation expectation</value></data>
   <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="ContractSource.CalledAgent" xml:space="preserve"><value>Provided by the called Agent</value></data>
+  <data name="ContractSource.ArtifactEnvelope" xml:space="preserve"><value>Artifact references (content described separately)</value></data>
+  <data name="AgentInputMapping" xml:space="preserve"><value>Input mapping (JSON)</value></data>
+  <data name="AgentInputContractAbsent" xml:space="preserve"><value>No declared input contract. The Agent receives the mapped value as a single input.</value></data>
+  <data name="ArtifactInputContentContract" xml:space="preserve"><value>Each input Artifact carries its own content contract and MIME type when available; these are resolved during execution.</value></data>
+  <data name="ArtifactOutputContentContract" xml:space="preserve"><value>Content contracts apply to each produced Artifact. An explicit producer output contract takes precedence.</value></data>
+  <data name="BeforePublication" xml:space="preserve"><value>Transform before publication</value></data>
+  <data name="ConnectionContractMismatch" xml:space="preserve"><value>Incompatible contracts: {0} → {1}. The mapped output does not satisfy the target input contract. Review the mapping or the contracts.</value></data>
 </root>

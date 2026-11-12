@@ -12,4 +12,11 @@
   <data name="InheritedResource.ReadOnlyTitle" xml:space="preserve"><value>Consultation uniquement</value></data>
   <data name="InheritedResource.ReadOnlyMessage" xml:space="preserve"><value>Pour modifier cette ressource, accédez à son périmètre propriétaire.</value></data>
   <data name="InheritedResource.SwitchToOwner" xml:space="preserve"><value>Changer de périmètre</value></data>
+  <data name="ExecutionProgress.Steps" xml:space="preserve"><value>{0} étape(s) terminée(s) sur {1}.</value></data>
+  <data name="ExecutionProgress.Elapsed" xml:space="preserve"><value>Durée : {0}</value></data>
+  <data name="ExecutionProgress.Run" xml:space="preserve"><value>Flow Run</value></data>
+  <data name="ExecutionProgress.OpenRun" xml:space="preserve"><value>Ouvrir le Flow Run dans un nouvel onglet.</value></data>
+  <data name="ExecutionProgress.CurrentFlow" xml:space="preserve"><value>Flow en cours :</value></data>
+  <data name="ExecutionProgress.CurrentStep" xml:space="preserve"><value>Étape en cours :</value></data>
+  <data name="ExecutionProgress.WaitingStep" xml:space="preserve"><value>En attente de l’étape suivante</value></data>
 </root>

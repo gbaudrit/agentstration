@@ -14,7 +14,8 @@
     {
         @if (!DeclaredPointNames.Contains(point, StringComparer.Ordinal))
         { <p role="status">@T("CompositionOrphanHelp") <button type="button" class="text-button" disabled="@ReadOnly" @onclick="() => RemovePointAsync(point)">@T("CompositionRemovePoint")</button></p> }
-        <FlowSequenceEditor @key="point" Title="@point" Value="@(Value.GetValueOrDefault(point) ?? [])" ValueChanged="value => SetPointAsync(point, value)" InputSchema="@DeclaredPoint(point)?.InputSchema" OutputSchema="@DeclaredPoint(point)?.OutputSchema" ReadOnly="ReadOnly" />
+        @if (point == "postAggregate") { <p>@T("BeforePublicationHelp")</p> }
+        <FlowSequenceEditor @key="point" Title="@(point == "postAggregate" ? T("BeforePublicationTitle") : point)" Value="@(Value.GetValueOrDefault(point) ?? [])" ValueChanged="value => SetPointAsync(point, value)" InputSchema="@DeclaredPoint(point)?.InputSchema" OutputSchema="@DeclaredPoint(point)?.OutputSchema" ReadOnly="ReadOnly" />
     }
 </section>
 @code {
