@@ -552,7 +552,7 @@ public sealed class ManagedFlowToolExecutor(
         var schema = tool.Definition.Schema?.Input
             ?? throw Error("tool_schema_missing", $"Tool resource '{tool.Address}' has no input schema.");
         var outputSchema = tool.Definition.Schema?.Output
-            ?? throw Error("tool_contract_required", "A Tool called directly by a Flow requires explicit input and output schemas.");
+            ?? throw Error("tool_contract_required", $"Tool '{tool.Address}' called directly by a Flow requires explicit input and output schemas.");
         var inputContract = Agentstration.Schemas.DataContracts.Declared(schema, $"tool:{tool.Address}/input");
         var businessOutputContract = Agentstration.Schemas.DataContracts.Declared(outputSchema, $"tool:{tool.Address}/structured-output");
         var invocationOutputSchema = ToolInvocationContracts.OutputSchema(outputSchema, provider.Value.Definition)!.Value;

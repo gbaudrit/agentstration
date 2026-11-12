@@ -372,7 +372,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 properties = new { contentReference = new { type = "string" } },
                 required = new[] { "contentReference" },
                 additionalProperties = false
-            }), Schema(new { type = "object" }));
+            }), Schema(new { type = "boolean" }));
 
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
