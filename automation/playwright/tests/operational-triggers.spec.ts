@@ -1,3 +1,4 @@
+import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
 import { exerciseOperationalTriggers } from '../src/journeys/exercise-operational-triggers.journey.js';
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
@@ -13,7 +14,7 @@ test('Instance Trigger targets an Instance Flow through its internal operational
 
 test('Instance Trigger journey remains usable at mobile width @responsive @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
-  await pages.login.signIn(product.consoleUrl);
+  await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
   const execution = await pages.executionScopes.ensureFixture(product.consoleUrl);
   const fixture = pages.operationalTriggers.fixture(execution);
   await pages.operationalTriggers.openCreate(product.consoleUrl, fixture);
