@@ -26,6 +26,10 @@ public sealed partial class FlowDesignerReadOnlyTests
         await rendered.InvokeAsync(() => canvas.InspectPortAsync!("transform", "input"));
         var input = JsonSerializer.Deserialize<JsonElement>(rendered.Find(".port-contract-dialog pre").TextContent);
         Assert.IsTrue(input.GetProperty("envelopeSchema").TryGetProperty("anyOf", out _));
+        // Input envelopes may include provenance, while completed returns the bounded manifest alone.
+        var withProvenance = JsonSerializer.Deserialize<JsonElement>("""{"artifacts":[{"artifactId":"fixture"}],"provenance":{"source":"fixture"}}""");
+        DataContracts.Validate(DataContracts.Declared(ArtifactTransformContracts.Input, "port"), withProvenance, "artifact-input");
+        Assert.ThrowsExactly<DataContractException>(() => DataContracts.Validate(DataContracts.Declared(ArtifactTransformContracts.Manifest, "port"), withProvenance, "artifact-output"));
         Assert.AreEqual(JsonValueKind.Null, input.GetProperty("mediaType").ValueKind);
         Assert.AreEqual(JsonValueKind.Null, input.GetProperty("artifactDataContract").ValueKind);
         await rendered.InvokeAsync(() => canvas.InspectPortAsync!("transform", "process"));
