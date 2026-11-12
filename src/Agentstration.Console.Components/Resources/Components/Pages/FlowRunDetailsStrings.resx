@@ -274,4 +274,21 @@
   <data name="ContractLevel.TransformOutput" xml:space="preserve"><value>Transformation output</value></data>
   <data name="ContractLevel.Resolution" xml:space="preserve"><value>Contract resolution</value></data>
   <data name="ContractCorrectionTitle" xml:space="preserve"><value>How to correct it</value></data>
+  <data name="ContractShowDetails" xml:space="preserve"><value>Show incompatibility details</value></data>
+  <data name="ContractHideDetails" xml:space="preserve"><value>Hide incompatibility details</value></data>
+  <data name="OpenExecution" xml:space="preserve"><value>Open execution</value></data>
+  <data name="CausalOutput" xml:space="preserve"><value>Returned value and Artifacts</value></data>
+  <data name="CausalOutputLoading" xml:space="preserve"><value>Loading execution output…</value></data>
+  <data name="CausalOutputUnavailable" xml:space="preserve"><value>This execution output is unavailable in the current scope.</value></data>
+  <data name="OutputNullValue" xml:space="preserve"><value>The returned value is explicitly null.</value></data>
+  <data name="OutputEmptyText" xml:space="preserve"><value>The returned text is empty.</value></data>
+  <data name="CausalFailureOrigin" xml:space="preserve"><value>Original failure</value></data>
+  <data name="CausalFailurePropagated" xml:space="preserve"><value>Failure propagated from</value></data>
+  <data name="OutputPreviewTruncated" xml:space="preserve"><value>Preview limited to {0} characters. Open the execution to inspect its complete output.</value></data>
+  <data name="ContractTitle.Mapping" xml:space="preserve"><value>Unavailable mapping reference</value></data>
+  <data name="ContractSummary.Mapping" xml:space="preserve"><value>The mapping reads the output of a step that does not exist or has not executed.</value></data>
+  <data name="ContractAdvice.Mapping" xml:space="preserve"><value>Check the referenced step identifier. To forward the connected result, use ${transition.output}, or choose an available step output.</value></data>
+  <data name="ContractValue.AvailableStep" xml:space="preserve"><value>Available step output</value></data>
+  <data name="ContractValue.UnavailableStep" xml:space="preserve"><value>Missing or unexecuted step</value></data>
+  <data name="ContractLevel.Mapping" xml:space="preserve"><value>Output mapping</value></data>
 </root>

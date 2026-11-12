@@ -51,6 +51,16 @@ public sealed class FlowDetailsDesignerTests
         var rendered = context.Render<FlowRunDetails>(p => p.Add(c => c.RunId, run.Id));
         Assert.Contains(explanation, rendered.Find("[data-testid='flow-run-error']").TextContent);
         Assert.DoesNotContain("Old generic error", rendered.Find("[data-testid='flow-run-error']").TextContent);
+        Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error'] .contract-failure-body"));
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
+        foreach (var tab in new[] { "Causality", "Activity", "RawEvents" })
+        {
+            rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings[tab].Value).Click();
+            Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error']"));
+        }
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Summary"].Value).Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid='flow-run-error']"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error'] .contract-failure-body"));
     }
 
     [TestMethod]

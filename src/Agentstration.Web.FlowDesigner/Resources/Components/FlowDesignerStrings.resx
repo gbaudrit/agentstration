@@ -224,4 +224,12 @@
   <data name="MappingStepProperty" xml:space="preserve"><value>“{0}” result · {1}</value></data>
   <data name="MappingShowValues" xml:space="preserve"><value>Available values</value></data>
   <data name="MappingNoOptions" xml:space="preserve"><value>No matching suggestion. You can enter a free value.</value></data>
+  <data name="OpenDraft" xml:space="preserve"><value>Open draft</value></data>
+  <data name="ExplicitOutputMapping" xml:space="preserve"><value>Explicit output mapping</value></data>
+  <data name="ExplicitOutputMappingHelp" xml:space="preserve"><value>This output reads a specific mapping, which can differ from the incoming transition.</value></data>
+  <data name="OutputDataTitle" xml:space="preserve"><value>Value returned by the Flow</value></data>
+  <data name="OutputDataHelp" xml:space="preserve"><value>Choose the incoming result or enter an explicit mapping. An empty mapping forwards the incoming result.</value></data>
+  <data name="UseIncomingTransition" xml:space="preserve"><value>Use the incoming transition</value></data>
+  <data name="PublishedMappingReadOnly" xml:space="preserve"><value>Published version: this mapping is read-only. Open the draft to edit it.</value></data>
+  <data name="OutputMappingReferenceUnavailable" xml:space="preserve"><value>Output {0} references an unavailable step in its mapping. Check the referenced step or use the incoming transition.</value></data>
 </root>

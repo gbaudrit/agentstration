@@ -7,10 +7,14 @@
     <div class="panel-header"><h2>@T("Output")</h2><button class="button-secondary" type="button" disabled="@loading" @onclick="LoadAsync" data-testid="flow-run-output-refresh">@T("OutputRefresh")</button></div>
     @if (Run.TransientPayloads && !Run.TransientPayloadsAvailable)
     { <p class="inline-warning" role="status" data-testid="flow-run-output-expired">@T("TransientOutputUnavailable")</p> }
-    else if (Run.Output is not { ValueKind: not JsonValueKind.Null and not JsonValueKind.Undefined })
+    else if (Run.Output is { ValueKind: JsonValueKind.Null } || Run.Output is null && Run.Status == FlowRunStatus.Succeeded && Run.Steps.Any(step => step.StepType == "output" && step.Status == FlowStepRunStatus.Succeeded))
+    { <p class="muted">@T("OutputNullValue")</p><pre>null</pre> }
+    else if (Run.Output is { ValueKind: JsonValueKind.String } text && text.GetString() == string.Empty)
+    { <p class="muted">@T("OutputEmptyText")</p><pre>""</pre> }
+    else if (Run.Output is not { ValueKind: not JsonValueKind.Undefined })
     { <p class="muted" data-testid="flow-run-output-empty">@T("NoReturnedOutput")</p><small>@T("NoReturnedOutputHelp")</small> }
     else
-    { <pre>@JsonSerializer.Serialize(Run.Output, new JsonSerializerOptions { WriteIndented = true })</pre> }
+    { <pre>@OutputPreview</pre>@if (PreviewTruncated) { <small>@T("OutputPreviewTruncated", MaximumPreviewCharacters!.Value)</small> } }
     <h3>@T("ProducedArtifacts")</h3>
     @if (loading) { <p role="status">@T("ProducedArtifactsLoading")</p> }
     @if (error is not null) { <p class="inline-warning" role="status">@error</p> }
@@ -28,6 +32,10 @@
 
 @code {
     [Parameter, EditorRequired] public FlowRun Run { get; set; } = default!;
+    [Parameter] public int? MaximumPreviewCharacters { get; set; }
+    private string FullOutput => JsonSerializer.Serialize(Run.Output, new JsonSerializerOptions { WriteIndented = true });
+    private bool PreviewTruncated => MaximumPreviewCharacters is > 0 && FullOutput.Length > MaximumPreviewCharacters;
+    private string OutputPreview => PreviewTruncated ? FullOutput[..MaximumPreviewCharacters!.Value] + "…" : FullOutput;
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<FlowRunArtifactResource> outputs = [];
     private string? loadedId, error;

@@ -353,7 +353,7 @@ internal sealed partial class AwpAssignmentExecutor(
                         {
                             output = JsonSerializer.SerializeToElement(new { error = exception.Message });
                             eventName = "error";
-                            errorCode = exception switch { AwpExecutionNotSupportedException unsupported => unsupported.Code,
+                            errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code,
                                 AwpClientException authority => authority.Code, _ => "artifact_processing_failed" };
                             errorMessage = exception.Message;
                             errorDetails = FailureDetails(exception);
@@ -483,7 +483,7 @@ internal sealed partial class AwpAssignmentExecutor(
                     errorCode = exception.Code; errorMessage = exception.Message; errorDetails = FailureDetails(exception);
                     output = JsonSerializer.SerializeToElement(new { error = errorMessage });
                     eventName = stepDefinition is FlowCallStepDefinition or RepeatFlowStepDefinition ? "failed" : "error";
-                    if (stepDefinition is OutputFlowStepDefinition) final = new(null, stepDefinition.Name, "error", errorCode, errorMessage, errorDetails);
+                    if (stepDefinition is OutputFlowStepDefinition) final = new(null, null, "error", errorCode, errorMessage, errorDetails);
                 }
                 catch (AwpClientException exception)
                 {
@@ -1022,6 +1022,19 @@ internal sealed partial class AwpAssignmentExecutor(
         if (value.ValueKind == JsonValueKind.String)
         {
             var text = value.GetString()!;
+            if (text.StartsWith("${steps.", StringComparison.Ordinal) && text.EndsWith('}')
+                && !text.Contains("==", StringComparison.Ordinal) && !text.Contains("!=", StringComparison.Ordinal)
+                && !text.Contains('<') && !text.Contains('>'))
+            {
+                var parser = new FlowExpressionParser();
+                var parsed = parser.Parse(text);
+                if (parsed.Expression is { } expression && !parser.Validate(expression, new(context.StepOutputs.Keys.ToArray())).IsValid)
+                    throw new DataContractException("data_contract_mapping_unavailable", new("output-mapping",
+                        $"flow:{context.Execution?.FlowRunId}/step:{context.Execution?.StepName}/mapping",
+                        expression.Body[..Math.Min(expression.Body.Length, 2048)], "step_output_reference",
+                        "available step output", "unavailable step output", context.Execution?.FlowRunId,
+                        context.Execution?.StepName, "data_contract_mapping_unavailable"));
+            }
             return text.StartsWith("${", StringComparison.Ordinal) && text.EndsWith('}')
                 ? (await EvaluateExpressionAsync(text, context, cancellationToken))?.Clone()
                     ?? JsonSerializer.SerializeToElement<object?>(null)

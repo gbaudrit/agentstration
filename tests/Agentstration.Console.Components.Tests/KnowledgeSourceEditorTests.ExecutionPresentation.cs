@@ -117,4 +117,63 @@ public sealed partial class KnowledgeSourceEditorTests
         Status = FlowRunStatus.Running, Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = DateTimeOffset.UnixEpoch, Steps = steps,
         DefinitionSnapshot = new(FlowClientStub.WorkspaceScope, new(flow), "1.0.0", null, new WorkflowFlowDefinition("input", [], [], []), new Dictionary<string, string>(), DateTimeOffset.UnixEpoch)
     };
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void CollapsedContractFailureKeepsTheSummaryAndRevealsDetailsOnDemand(string language)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = CreateContext(new KnowledgeClientStub());
+        var failure = new DataContractFailure("output-mapping", "flow:child/step:completed/mapping", "steps.transform.output",
+            "step_output_reference", "available step output", "unavailable step output", "child", "completed", "data_contract_mapping_unavailable");
+        var rendered = context.Render<ContractFailurePanel>(parameters => parameters.Add(value => value.Details, JsonSerializer.Serialize(failure))
+            .Add(value => value.Collapsible, true));
+        Assert.HasCount(1, rendered.FindAll(".contract-failure-summary"));
+        Assert.HasCount(0, rendered.FindAll(".contract-failure-body"));
+        Assert.AreEqual("false", rendered.Find(".contract-failure-toggle").GetAttribute("aria-expanded"));
+        rendered.Find(".contract-failure-toggle").Click();
+        Assert.AreEqual("true", rendered.Find(".contract-failure-toggle").GetAttribute("aria-expanded"));
+        Assert.HasCount(1, rendered.FindAll(".contract-failure-body"));
+        Assert.Contains("steps.transform.output", rendered.Markup);
+        rendered.Find(".contract-failure-toggle").Click();
+        Assert.HasCount(0, rendered.FindAll(".contract-failure-body"));
+    }
+
+    [TestMethod]
+    [DataRow("null", "explicitly null")]
+    [DataRow("\"\"", "text is empty")]
+    [DataRow("{\"artifacts\":[]}", "artifacts")]
+    public void CausalOutputsAreReadOnlyOnExpansionAndInTheExactScope(string output, string expected)
+    {
+        var client = new FlowClientStub();
+        using var context = CreateContext(new KnowledgeClientStub(), flows: client);
+        context.Services.AddSingleton<Agentstration.Web.Console.IArtifactsClient>(new ArtifactAdministrationComponentTests.ArtifactClient("fixture"));
+        var root = PresentationRun("root", "root-flow", []);
+        var child = PresentationRun("child", "child-flow", []) with { Status = FlowRunStatus.Succeeded, Output = JsonSerializer.Deserialize<JsonElement>(output) };
+        client.Runs[child.Id] = child;
+        var rendered = context.Render<FlowRunCausalityOutput>(parameters => parameters.Add(value => value.RunId, child.Id)
+            .Add(value => value.Root, root).Add(value => value.Scope, root.ExecutionScopeRef).Add(value => value.Status, child.Status));
+        Assert.HasCount(0, client.RunReads);
+        rendered.Find("button").Click();
+        rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Markup));
+        Assert.AreEqual((child.Id, root.ExecutionScopeRef), client.RunReads.Single());
+        rendered.Find(".causal-output-toggle").Click();
+        rendered.Find(".causal-output-toggle").Click();
+        Assert.HasCount(1, client.RunReads);
+    }
+
+    [TestMethod]
+    public void CausalOutputDoesNotRenderAResponseFromAnotherExecutionScope()
+    {
+        var client = new FlowClientStub();
+        using var context = CreateContext(new KnowledgeClientStub(), flows: client);
+        var root = PresentationRun("root", "root-flow", []);
+        var child = PresentationRun("child", "child-flow", []) with { Scope = new(Guid.Empty, WorkspaceId.New(), Guid.Empty), Output = JsonSerializer.SerializeToElement("withheld fixture") };
+        client.Runs[child.Id] = child;
+        var rendered = context.Render<FlowRunCausalityOutput>(parameters => parameters.Add(value => value.RunId, child.Id)
+            .Add(value => value.Root, root).Add(value => value.Scope, root.ExecutionScopeRef));
+        rendered.Find("button").Click();
+        rendered.WaitForAssertion(() => Assert.Contains("unavailable", rendered.Markup));
+        Assert.DoesNotContain("withheld fixture", rendered.Markup);
+    }
 }

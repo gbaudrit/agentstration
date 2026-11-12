@@ -138,11 +138,13 @@ public partial class FlowDesigner
             || item.Namespace.Value.Contains(toolSearch, StringComparison.OrdinalIgnoreCase));
     private string SaveText => T($"SaveState.{Editor.State.SaveState}");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string IssueMessage(FlowValidationIssue issue) => issue.Code == "expression_step_unavailable" ? T("OutputMappingReferenceUnavailable", issue.StepId ?? string.Empty) : issue.Message;
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     private FlowDesignerTarget Target => new(Namespace, ResourceId, ScopeRef, PublishedVersion);
     private ResourceScopeRef OwnerScope => Editor.State.Resource?.ScopeRef ?? ScopeRef
         ?? throw new InvalidOperationException("The Flow owner scope is unavailable.");
     private bool ReadOnly => IsReadOnly || Editor.State.IsReadOnly;
+    private string DraftUrl => Navigation.GetUriWithQueryParameter("version", (string?)null);
 
     protected override async Task OnParametersSetAsync()
     {

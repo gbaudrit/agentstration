@@ -11,6 +11,13 @@
             </div>
         </header>
         <p class="contract-failure-summary">@Localizer[SummaryKey]</p>
+        @if (Collapsible && Failure is not null)
+        {
+            <button type="button" class="contract-failure-toggle" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@bodyId" @onclick="() => expanded = !expanded">@Localizer[expanded ? "ContractHideDetails" : "ContractShowDetails"] <UiIcon Name="chevron-down" /></button>
+        }
+        @if (!Collapsible || expanded)
+        {
+        <div id="@bodyId" class="contract-failure-body">
         @if (Failure is { } failure)
         {
             @if (!Compact)
@@ -53,6 +60,8 @@
                 </details>
             }
         }
+        </div>
+        }
     </section>
 }
 @code {
@@ -62,6 +71,9 @@
     [Parameter] public FlowRun? Run { get; set; }
     [Parameter] public IReadOnlyList<FlowRun> RelatedRuns { get; set; } = [];
     [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool Collapsible { get; set; }
+    private bool expanded;
+    private readonly string bodyId = "contract-failure-" + Guid.NewGuid().ToString("N");
     private DataContractFailure? Failure => DataContracts.ParseFailure(Details);
     private string? Code => Failure?.Code ?? ErrorCode;
     public static bool IsContractCode(string? code) => code?.StartsWith("data_contract_", StringComparison.Ordinal) == true
@@ -69,16 +81,17 @@
             or "tool_argument_type_invalid" or "tool_argument_required" or "tool_argument_unknown"
             or "artifact_processing_json_invalid" or "artifact_processing_input_json_invalid";
     private bool IsJson => Code is "data_contract_json_invalid" or "artifact_processing_json_invalid" or "artifact_processing_input_json_invalid";
-    private string TitleKey => IsJson || Code is "data_contract_encoding_invalid" or "data_contract_media_mismatch" ? "ContractTitle.Format" : "ContractTitle.Schema";
+    private string TitleKey => Code == "data_contract_mapping_unavailable" ? "ContractTitle.Mapping" : IsJson || Code is "data_contract_encoding_invalid" or "data_contract_media_mismatch" ? "ContractTitle.Format" : "ContractTitle.Schema";
     private string SummaryKey => Code == "artifact_processing_input_json_invalid" ? "Error.ArtifactInputJsonInvalid" : Code == "artifact_processing_json_invalid" ? "Error.ArtifactOutputJsonInvalid" : IsJson ? "ContractSummary.Json" : Code switch
     {
+        "data_contract_mapping_unavailable" => "ContractSummary.Mapping",
         "data_contract_encoding_invalid" => "ContractSummary.Encoding",
         "data_contract_media_mismatch" => "ContractSummary.Media",
         "data_contract_unresolved" => "ContractSummary.Unresolved",
         "data_contract_conflict" => "ContractSummary.Conflict",
         _ => "ContractSummary.Schema"
     };
-    private string AdviceKey => IsJson ? "ContractAdvice.Json" : Code == "data_contract_unresolved" ? "Error.ContractUnresolved" : "ContractFailureHelp";
+    private string AdviceKey => Code == "data_contract_mapping_unavailable" ? "ContractAdvice.Mapping" : IsJson ? "ContractAdvice.Json" : Code == "data_contract_unresolved" ? "Error.ContractUnresolved" : "ContractFailureHelp";
     private FlowRun? Producer => RelatedRuns.FirstOrDefault(value => value.Id == Failure?.FlowRunId)
         ?? (Run?.Id == Failure?.FlowRunId ? Run : null);
     private ResolvedDataContract? ExpectedContract => Producer?.Steps.FirstOrDefault(step => step.StepName == Failure?.StepName)?.Contracts?.ExpectedOutput
@@ -95,6 +108,8 @@
         "required property" => Localizer["ContractValue.Required"],
         "only declared properties" => Localizer["ContractValue.DeclaredProperties"],
         "undeclared property (name withheld)" => Localizer["ContractValue.ExtraProperty"],
+        "available step output" => Localizer["ContractValue.AvailableStep"],
+        "unavailable step output" => Localizer["ContractValue.UnavailableStep"],
         "valid UTF-8 content" => Localizer["ContractValue.Utf8"], "invalid UTF-8 bytes" => Localizer["ContractValue.InvalidUtf8"],
         _ => value ?? Localizer["ContractLocationUnavailable"].Value
     };
@@ -104,7 +119,7 @@
         "tool-input" => "ContractLevel.ToolInput", "tool-output" => "ContractLevel.ToolOutput",
         "flow-input" => "ContractLevel.FlowInput", "flow-output" => "ContractLevel.FlowOutput",
         "artifact-input" => "ContractLevel.ArtifactInput", "artifact-output" => "ContractLevel.ArtifactOutput",
-        "artifact-publication" => "ContractLevel.Publication", "transform-output" => "ContractLevel.TransformOutput",
+        "output-mapping" => "ContractLevel.Mapping", "artifact-publication" => "ContractLevel.Publication", "transform-output" => "ContractLevel.TransformOutput",
         _ => "ContractLevel.Resolution"
     };
     private FlowRun? LocationRun(string id) => RelatedRuns.FirstOrDefault(value => value.Id == id) ?? (Run?.Id == id ? Run : null);

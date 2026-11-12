@@ -274,4 +274,21 @@
   <data name="ContractLevel.TransformOutput" xml:space="preserve"><value>Sortie de la transformation</value></data>
   <data name="ContractLevel.Resolution" xml:space="preserve"><value>Résolution du contrat</value></data>
   <data name="ContractCorrectionTitle" xml:space="preserve"><value>Comment corriger</value></data>
+  <data name="ContractShowDetails" xml:space="preserve"><value>Afficher les détails de l’incompatibilité</value></data>
+  <data name="ContractHideDetails" xml:space="preserve"><value>Masquer les détails de l’incompatibilité</value></data>
+  <data name="OpenExecution" xml:space="preserve"><value>Ouvrir l’exécution</value></data>
+  <data name="CausalOutput" xml:space="preserve"><value>Valeur retournée et artefacts</value></data>
+  <data name="CausalOutputLoading" xml:space="preserve"><value>Chargement de la sortie de l’exécution…</value></data>
+  <data name="CausalOutputUnavailable" xml:space="preserve"><value>La sortie de cette exécution est indisponible dans le périmètre courant.</value></data>
+  <data name="OutputNullValue" xml:space="preserve"><value>La valeur retournée est explicitement null.</value></data>
+  <data name="OutputEmptyText" xml:space="preserve"><value>Le texte retourné est vide.</value></data>
+  <data name="CausalFailureOrigin" xml:space="preserve"><value>Erreur d’origine</value></data>
+  <data name="CausalFailurePropagated" xml:space="preserve"><value>Erreur propagée depuis</value></data>
+  <data name="OutputPreviewTruncated" xml:space="preserve"><value>Aperçu limité à {0} caractères. Ouvrez l’exécution pour consulter sa sortie complète.</value></data>
+  <data name="ContractTitle.Mapping" xml:space="preserve"><value>Référence de mapping indisponible</value></data>
+  <data name="ContractSummary.Mapping" xml:space="preserve"><value>Le mapping lit la sortie d’une étape absente ou qui n’a pas été exécutée.</value></data>
+  <data name="ContractAdvice.Mapping" xml:space="preserve"><value>Vérifiez l’identifiant de l’étape référencée. Pour transmettre le résultat connecté, utilisez ${transition.output}, ou choisissez la sortie d’une étape disponible.</value></data>
+  <data name="ContractValue.AvailableStep" xml:space="preserve"><value>Sortie d’étape disponible</value></data>
+  <data name="ContractValue.UnavailableStep" xml:space="preserve"><value>Étape absente ou non exécutée</value></data>
+  <data name="ContractLevel.Mapping" xml:space="preserve"><value>Mapping de sortie</value></data>
 </root>

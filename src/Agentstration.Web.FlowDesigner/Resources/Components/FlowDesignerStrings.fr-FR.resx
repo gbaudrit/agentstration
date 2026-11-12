@@ -219,4 +219,12 @@
   <data name="MappingStepProperty" xml:space="preserve"><value>Résultat de « {0} » · {1}</value></data>
   <data name="MappingShowValues" xml:space="preserve"><value>Valeurs disponibles</value></data>
   <data name="MappingNoOptions" xml:space="preserve"><value>Aucune suggestion correspondante. Vous pouvez saisir une valeur libre.</value></data>
+  <data name="OpenDraft" xml:space="preserve"><value>Ouvrir le brouillon</value></data>
+  <data name="ExplicitOutputMapping" xml:space="preserve"><value>Mapping de sortie explicite</value></data>
+  <data name="ExplicitOutputMappingHelp" xml:space="preserve"><value>Cette sortie utilise un mapping spécifique, qui peut différer de la transition entrante.</value></data>
+  <data name="OutputDataTitle" xml:space="preserve"><value>Valeur retournée par le Flow</value></data>
+  <data name="OutputDataHelp" xml:space="preserve"><value>Choisissez le résultat entrant ou renseignez un mapping explicite. Un mapping vide transmet le résultat entrant.</value></data>
+  <data name="UseIncomingTransition" xml:space="preserve"><value>Utiliser la transition entrante</value></data>
+  <data name="PublishedMappingReadOnly" xml:space="preserve"><value>Version publiée : ce mapping est en lecture seule. Ouvrez le brouillon pour le modifier.</value></data>
+  <data name="OutputMappingReferenceUnavailable" xml:space="preserve"><value>La sortie {0} référence une étape indisponible dans son mapping. Vérifiez l’étape référencée ou utilisez la transition entrante.</value></data>
 </root>

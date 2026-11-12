@@ -34,11 +34,11 @@ else
             <button id="@TabId(tab)" data-testid="@(tab == RunTab.Worker ? "flow-run-worker-tab" : null)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="flow-run-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button>
         }
     </nav>
-    @if (run.Error is not null)
+    @if (run.Error is not null && (!IsContractFailure(run.Error) || activeTab == RunTab.Summary))
     {
         <article class="panel run-error" data-testid="flow-run-error">
             @if (IsContractFailure(run.Error))
-            { <ContractFailurePanel Details="@run.Error.Details" ErrorCode="@run.Error.Code" Run="run" RelatedRuns="contractOrigins" /> }
+            { <ContractFailurePanel Details="@run.Error.Details" ErrorCode="@run.Error.Code" Run="run" RelatedRuns="contractOrigins" Collapsible="true" /> }
             else { <strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> } }
         </article>
     }
@@ -174,14 +174,15 @@ else
                     <ol class="causality-tree">
                         @foreach (var node in causality.Value)
                         {
-                            <li style="--causality-depth:@node.NestingDepth">
+                            <li @key="node.FlowRunId" style="--causality-depth:@node.NestingDepth">
                                 <article class="panel causality-node">
-                                    <div class="panel-header"><h2><a href="@ConsoleResourceUrls.Flow(node.FlowId)">@node.FlowId.Value · @node.FlowVersion</a></h2><StatusBadge Text="@StatusLabel(node.Status)" Status="@PlatformDashboardService.ToStatus(node.Status.ToString())" /></div>
-                                    <div class="causality-meta"><code>@node.FlowRunId</code><span>@(node.ResolvedFromActiveReference ? T("ResolvedFromActive") : T("ExactReference"))</span>@if (node.ParentStepName is { } parentStep) { <span>@T("CalledByStep", parentStep)</span> }</div>
+                                    <div class="panel-header"><h2><a href="@CausalRunUrl(node.FlowRunId)">@node.FlowId.Value · @node.FlowVersion</a></h2><StatusBadge Text="@StatusLabel(node.Status)" Status="@PlatformDashboardService.ToStatus(node.Status.ToString())" /></div>
+                                    <div class="causality-meta"><a href="@CausalRunUrl(node.FlowRunId)"><code>@node.FlowRunId</code></a><a href="@CausalRunUrl(node.FlowRunId)">@T("OpenExecution") ↗</a><span>@(node.ResolvedFromActiveReference ? T("ResolvedFromActive") : T("ExactReference"))</span>@if (node.ParentStepName is { } parentStep) { <a href="@CausalRunUrl(node.ParentFlowRunId ?? run.Id, parentStep)">@T("CalledByStep", parentStep)</a> }</div>
+                                    <FlowRunCausalityOutput RunId="@node.FlowRunId" Scope="run.ExecutionScopeRef" LogicalScope="run.Scope.LogicalScopeRef" Status="node.Status" Root="run" />
                                     @if (node.AgentExecutions.Count > 0)
                                     {
                                         <h3>@T("AgentExecutions")</h3>
-                                        <ul class="causality-details">@foreach (var agent in node.AgentExecutions) { <li><strong>@agent.StepName</strong><span>@agent.AgentResourceId @if (agent.AgentVersion is { } version) { <text>· v@version</text> }</span><span>@StepStatusLabel(agent.Status) · @(agent.Provider ?? "—")</span></li> }</ul>
+                                        <ul class="causality-details">@foreach (var agent in node.AgentExecutions) { <li><strong>@agent.StepName</strong><span>@agent.AgentResourceId @if (agent.AgentVersion is { } version) { <text>· v@(version)</text> }</span><span>@StepStatusLabel(agent.Status) · @(agent.Provider ?? "—")</span></li> }</ul>
                                     }
                                     @if (node.ToolCalls.Count > 0)
                                     {
@@ -240,6 +241,7 @@ else
     private readonly FlowRunEventBuffer eventBuffer = new();
     private FlowRun? run;
     private FlowRunCausalityPageResponse? causality;
+    private string CausalRunUrl(string id, string? step = null) => FlowRunInspection.RunUrl(id, run!.ExecutionScopeRef, run.Scope.LogicalScopeRef, step);
     private string? causalityError;
     private InputRequest? pendingInput;
     private FlowStepRun? selected;

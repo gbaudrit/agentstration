@@ -1,20 +1,20 @@
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
 <div class="flow-data-mapping" data-testid="flow-data-mapping">
-    <div class="mapping-heading"><div><h3>@Localizer["MappingDataTitle"]</h3><p>@Localizer["MappingDataHelp"]</p></div>
-        <button type="button" class="text-button" aria-pressed="@custom" @onclick="ToggleMode">@Localizer[custom ? "MappingSimple" : "MappingJson"]</button>
+    <div class="mapping-heading"><div><h3>@(Title ?? Localizer["MappingDataTitle"].Value)</h3><p>@(Description ?? Localizer["MappingDataHelp"].Value)</p></div>
+        <button type="button" class="text-button" aria-pressed="@(custom ? "true" : "false")" @onclick="ToggleMode">@Localizer[custom ? "MappingSimple" : "MappingJson"]</button>
     </div>
     @if (custom)
     {
-        <label>@Localizer["MappingJson"]<textarea data-testid="agent-input-mapping-json" disabled="@ReadOnly" value="@raw" @onchange="JsonChangedAsync"></textarea></label>
+        <label>@Localizer["MappingJson"]<textarea data-testid="@(TestId + "-json")" disabled="@ReadOnly" value="@raw" @onchange="JsonChangedAsync"></textarea></label>
     }
     else
     {
         <label for="@inputId">@Localizer["MappingValue"]</label>
         <div class="mapping-picker">
             <div class="mapping-picker-control">
-                <input id="@inputId" role="combobox" aria-autocomplete="list" aria-expanded="@open" aria-controls="@listId" aria-activedescendant="@(open && active >= 0 ? listId + "-" + active : null)"
-                    data-testid="agent-input-mapping" disabled="@ReadOnly" value="@draft" @onfocus="Open" @onblur="Close" @oninput="Filter" @onchange="ExpressionChangedAsync" @onkeydown="KeyDownAsync" @onkeydown:stopPropagation="true" placeholder="@Localizer["MappingPlaceholder"]" />
-                <button type="button" class="mapping-picker-toggle" disabled="@ReadOnly" aria-label="@Localizer["MappingShowValues"]" aria-expanded="@open" @onmousedown:preventDefault="true" @onclick="ToggleOptions"><UiIcon Name="chevron-down" /></button>
+                <input id="@inputId" role="combobox" aria-autocomplete="list" aria-expanded="@(open ? "true" : "false")" aria-controls="@listId" aria-activedescendant="@(open && active >= 0 ? listId + "-" + active : null)"
+                    data-testid="@TestId" disabled="@ReadOnly" value="@draft" @onfocus="Open" @onblur="Close" @oninput="Filter" @onchange="ExpressionChangedAsync" @onkeydown="KeyDownAsync" @onkeydown:stopPropagation="true" placeholder="@Localizer["MappingPlaceholder"]" />
+                <button type="button" class="mapping-picker-toggle" disabled="@ReadOnly" aria-label="@Localizer["MappingShowValues"]" aria-expanded="@(open ? "true" : "false")" @onmousedown:preventDefault="true" @onclick="ToggleOptions"><UiIcon Name="chevron-down" /></button>
             </div>
             @if (open && !ReadOnly)
             {
@@ -22,7 +22,7 @@
                     @for (var index = 0; index < VisibleOptions.Count; index++)
                     {
                         var position = index; var option = VisibleOptions[index];
-                        <li role="none"><button type="button" tabindex="-1" id="@(listId + "-" + index)" role="option" aria-selected="@(active == index)"
+                        <li role="none"><button type="button" tabindex="-1" id="@(listId + "-" + index)" role="option" aria-selected="@(active == index ? "true" : "false")"
                             @onmousedown:preventDefault="true" @onclick="() => SelectAsync(option)"><strong>@option.Label</strong><code>@option.Expression</code></button></li>
                     }
                     @if (VisibleOptions.Count == 0) { <li role="presentation" class="mapping-no-options">@Localizer["MappingNoOptions"]</li> }
@@ -34,6 +34,9 @@
     @if (invalid) { <p class="validation-error" role="alert">@Localizer["InvalidJson"]</p> }
 </div>
 @code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string TestId { get; set; } = "agent-input-mapping";
     [Parameter] public JsonElement? Value { get; set; }
     [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }

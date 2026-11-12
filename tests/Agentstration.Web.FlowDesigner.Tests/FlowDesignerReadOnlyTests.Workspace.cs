@@ -53,6 +53,14 @@ public sealed partial class FlowDesignerReadOnlyTests
         StringAssert.Contains(rendered.Markup, "Read only");
         StringAssert.Contains(rendered.Markup, "pack.sample");
         StringAssert.Contains(rendered.Markup, "Published version 2.1.0");
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo("/namespaces/pack.sample/flows/sample/designer?version=2.1.0&scopeRef=%2Finstance&context=%2Finstance");
+        rendered.Render();
+        var draftUrl = rendered.Find("[data-testid=flow-designer-open-draft]").GetAttribute("href")!;
+        Assert.DoesNotContain("version=", draftUrl);
+        Assert.Contains("/namespaces/pack.sample/flows/sample/designer", draftUrl);
+        Assert.Contains("scopeRef=%2Finstance", draftUrl);
+        Assert.Contains("context=%2Finstance", draftUrl);
         Assert.AreEqual(@namespace, backend.LoadedTarget?.Namespace);
         Assert.AreEqual("Steps", rendered.Find("#palette-steps-heading").TextContent);
         Assert.AreEqual("View", rendered.Find("#palette-view-heading").TextContent);

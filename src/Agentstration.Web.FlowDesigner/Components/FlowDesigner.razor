@@ -30,6 +30,8 @@ else
             {
                 <span class="draft-revision">@T("PublishedVersion", Editor.State.PublishedVersion ?? string.Empty)</span>
                 <span class="read-only-badge">@T("ReadOnly")</span>
+                @if (Editor.State.PublishedVersion is not null)
+                { <a class="button-secondary open-flow-draft" data-testid="flow-designer-open-draft" href="@DraftUrl">@T("OpenDraft")</a> }
             }
         </div>
         <div class="designer-modes">
@@ -234,7 +236,7 @@ else
                                         }
                                         else if (SelectedStep is OutputFlowStepDefinition output)
                                         {
-                                            <FlowOutputInspector Step="output" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" EffectiveIncomingSchema="EffectiveIncomingSchema"
+                                            <FlowOutputInspector Step="output" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" MappingOptions="MappingOptions()" EffectiveIncomingSchema="EffectiveIncomingSchema"
                                                 LegacyOutputSchema="ResolveSchema(output.SchemaBinding, output.Schema)" IncomingContractUnavailableText="@IncomingContractUnavailableText()"
                                                 UpdateOutputOutcomeAsync="UpdateOutputOutcomeAsync" UpdateSelectedAsync="UpdateSelectedAsync" />
                                         }
@@ -309,7 +311,7 @@ else
         @if (validationExpanded)
         {
             @if (Editor.State.Issues.Count == 0) { <p class="muted">@(ReadOnly ? T("PublishedDefinitionHelp") : T("ValidationHelp"))</p> }
-            else { <ul>@foreach (var issue in Editor.State.Issues) { <li class="@issue.Severity.ToString().ToLowerInvariant()"><button @onclick="() => SelectIssue(issue)"><strong>@issue.Severity</strong> @issue.Message <code>@issue.Code</code></button></li> }</ul> }
+            else { <ul>@foreach (var issue in Editor.State.Issues) { <li class="@issue.Severity.ToString().ToLowerInvariant()"><button @onclick="() => SelectIssue(issue)"><strong>@issue.Severity</strong> @IssueMessage(issue) <code>@issue.Code</code></button></li> }</ul> }
         }
     </section>
 

@@ -1,5 +1,5 @@
 export const TestIds = {
-  flowMapping: { editor: 'flow-data-mapping', value: 'agent-input-mapping', json: 'agent-input-mapping-json' },
+  flowMapping: { editor: 'flow-data-mapping', value: 'agent-input-mapping', json: 'agent-input-mapping-json', outputValue: 'output-value-mapping', outputJson: 'output-value-mapping-json', useIncoming: 'output-use-transition' },
   artifactProcessing: {
     outputMediaType: 'artifact-output-media-type',
     inputArtifact: 'artifact-transformation-input', processingRun: 'artifact-processing-run',
@@ -448,10 +448,10 @@ export const TestIds = {
     designer: 'flow-observability-designer',
     designerSave: 'flow-designer-save',
     designerValidate: 'flow-designer-validation-run',
-    designerPublish: 'flow-designer-publish',
+    designerPublish: 'flow-designer-publish', designerOpenDraft: 'flow-designer-open-draft', causalOutputToggle: 'flow-causality-output-toggle',
     designerPublicationSuccess: 'flow-designer-publication-success',
     designerPublicationError: 'flow-designer-publication-error',
-    stepSettingsConfigurationTab: 'step-settings-tab-configuration', stepSettingsInputTab: 'step-settings-tab-input',
+    stepSettingsConfigurationTab: 'step-settings-tab-configuration', stepSettingsInputTab: 'step-settings-tab-input', stepSettingsOutputTab: 'step-settings-tab-output',
     paletteOutput: 'flow-palette-output',
     paletteTransform: 'flow-palette-transform',
     selectedTransitionEditor: 'selected-transition-editor',

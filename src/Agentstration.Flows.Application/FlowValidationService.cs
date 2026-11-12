@@ -141,6 +141,14 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                     property: "transitions"));
         }
 
+        var expressionParser = new FlowExpressionParser();
+        foreach (var output in definition.Steps.OfType<OutputFlowStepDefinition>())
+            if (output.OutputMapping is { } mapping)
+                foreach (var text in EnumerateStrings(mapping))
+                    if (expressionParser.Parse(text).Expression is { } expression
+                        && expressionParser.Validate(expression, new(steps.Keys.ToArray())) is { IsValid: false } validation)
+                        issues.Add(Error("expression_step_unavailable", validation.Error!, output.Name, property: "outputMapping"));
+
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
         if (definition.Steps.Count(step => step is InputFlowStepDefinition) != 1) issues.Add(Error("input_step_required", "A Flow requires exactly one Input step."));
         if (!definition.Steps.Any(step => step is OutputFlowStepDefinition)) issues.Add(Error("terminal_step_required", "A Flow requires at least one named output."));

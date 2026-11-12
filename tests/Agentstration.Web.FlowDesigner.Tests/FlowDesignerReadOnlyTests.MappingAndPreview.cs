@@ -85,4 +85,25 @@ public sealed partial class FlowDesignerReadOnlyTests
         Assert.IsTrue(diagram.Links.Single().Locked);
         Assert.AreEqual("route", document.Links.Single().Id);
     }
+    [TestMethod]
+    public void OutputMappingCanBeResetToTheIncomingTransitionWithoutChangingTheContract()
+    {
+        using var context = CreateContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var schema = JsonSerializer.SerializeToElement(new { type = "object" });
+        var output = new Agentstration.Flows.OutputFlowStepDefinition { Name = "completed", Schema = schema,
+            OutputMapping = JsonSerializer.SerializeToElement("${steps.transform.output}") };
+        Agentstration.Flows.OutputFlowStepDefinition? changed = null;
+        var rendered = context.Render<FlowOutputInspector>(parameters => parameters.Add(component => component.Step, output)
+            .Add(component => component.ActiveTab, FlowStepSettingsTab.Output)
+            .Add(component => component.UpdateSelectedAsync, value => changed = (Agentstration.Flows.OutputFlowStepDefinition)value));
+        Assert.Contains("Explicit output mapping", rendered.Markup);
+        Assert.HasCount(1, rendered.FindAll("[data-testid=output-value-mapping]"));
+        rendered.Find("[data-testid=output-use-transition]").Click();
+        Assert.AreEqual("${transition.output}", changed!.OutputMapping!.Value.GetString());
+        Assert.IsTrue(JsonElement.DeepEquals(schema, changed.Schema!.Value));
+        rendered.Render(parameters => parameters.Add(component => component.ReadOnly, true));
+        Assert.HasCount(0, rendered.FindAll("[data-testid=output-value-mapping]"));
+        Assert.Contains("read-only", rendered.Markup);
+    }
 }

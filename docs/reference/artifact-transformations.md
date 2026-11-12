@@ -329,3 +329,35 @@ separate current Flow/step labels. Full and sidebar error cards share a responsi
 expected/received comparison, producer and contract-source locations, correction
 guidance and collapsed technical details. Compact projection feedback retains the
 explanation and source links.
+
+
+### Repairing an output mapping
+
+New transformation templates and Output steps forward `${transition.output}`.
+Existing authored mappings remain intact. A mapping such as
+`${steps.transform.output}` still reads the step named `transform`, even after
+its incoming connection changes. If that step has been replaced by
+`artifactTransform`, open the draft's Output settings and select **Use the
+incoming transition**, or edit the explicit mapping. Published versions stay
+immutable; **Open draft** preserves the namespace, owner scope and navigation
+context while leaving the published view.
+
+The Output inspector labels explicit mappings separately from incoming-value
+forwarding and exposes an editable expression/JSON control in drafts. Output
+validation rejects references to missing step identifiers. At runtime, a direct
+value reference to an unavailable step produces `data_contract_mapping_unavailable`
+with the producing run, consuming step and reference path. An available step whose
+value is actually JSON `null` remains distinct and follows its declared schema.
+An invalid named success Output does not emit that success name to its parent;
+the original child contract failure propagates instead of a later null-manifest
+failure in the orchestration.
+
+The full incompatibility panel appears only in **Summary**. Its short explanation
+remains visible, with structured details collapsed initially. Step-local errors
+remain available in their inspector. **Causality** links execution identifiers,
+Flow headings and calling steps to their exact scoped runs. Output disclosures
+load an authorized run only when expanded, show returned values and produced
+Artifact links through the existing output view, and distinguish empty text,
+returned null, absent output and expired/unavailable payloads. Causal value
+previews are limited to 16,384 characters; the run's Input/output tab remains
+available for complete retained values.

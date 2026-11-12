@@ -46,4 +46,55 @@ public sealed partial class AwpAssignmentExecutorTests
         Assert.IsTrue(handler.Events.Any(item => item.Kind == AwpExecutionEventKind.StepCompleted
             && item.Payload?.GetProperty("errorCode").GetString() == "data_contract_json_invalid"));
     }
+    [TestMethod]
+    public async Task InvalidNamedSuccessOutputCannotRouteAParentThroughItsSuccessTransition()
+    {
+        var schema = JsonSerializer.SerializeToElement(new { type = "object" });
+        var child = new FlowGraphDefinition { EntryStep = "completed", Steps = [new OutputFlowStepDefinition {
+            Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = schema,
+            OutputMapping = JsonSerializer.SerializeToElement("${input.missing}") }] };
+        var graph = new FlowGraphDefinition { EntryStep = "child", Steps = [
+            new FlowCallStepDefinition { Name = "child", Flow = new("child") },
+            new TransformFlowStepDefinition { Name = "postAggregate", Schema = schema,
+                Mapping = JsonSerializer.SerializeToElement("${steps.child.output}") },
+            new OutputFlowStepDefinition { Name = "done", Outcome = FlowOutputOutcome.Success }],
+            Transitions = [new("child-success", "child", "completed", "postAggregate"), new("done", "postAggregate", "completed", "done")] };
+        var handler = new GraphHandler(TestNow) { ChildGraph = child };
+        var error = await Assert.ThrowsAsync<Agentstration.Runtime.Worker.MicrosoftAgentFramework.AwpExecutionNotSupportedException>(
+            () => ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler));
+        Assert.AreEqual("data_contract_violation", error.Code);
+        var failure = DataContracts.ParseFailure(error.Details)!;
+        Assert.AreEqual("completed", failure.StepName);
+        Assert.AreEqual("flow-output", failure.Boundary);
+        Assert.IsFalse(handler.Events.Any(item => item.Kind == AwpExecutionEventKind.StepStarted && item.Location.FlowStep?.StepDefinitionId == "postAggregate"));
+    }
+
+    [TestMethod]
+    public async Task DanglingOutputMappingIdentifiesTheReferenceInsteadOfReportingANullSchemaViolation()
+    {
+        var graph = new FlowGraphDefinition { EntryStep = "completed", Steps = [new OutputFlowStepDefinition {
+            Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = JsonSerializer.SerializeToElement(new { type = "object" }),
+            OutputMapping = JsonSerializer.SerializeToElement("${steps.transform.output}") }] };
+        var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }));
+        Assert.AreEqual("data_contract_mapping_unavailable", result.ErrorCode);
+        var failure = DataContracts.ParseFailure(result.ErrorDetails)!;
+        Assert.AreEqual("steps.transform.output", failure.Path);
+        Assert.AreEqual("completed", failure.StepName);
+        Assert.AreEqual("output-mapping", failure.Boundary);
+        Assert.IsNull(result.OutputName);
+    }
+
+    [TestMethod]
+    public async Task AvailableStepWithAnExplicitNullOutputRemainsValidForANullableContract()
+    {
+        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
+            new InputFlowStepDefinition { Name = "input" },
+            new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success,
+                Schema = JsonSerializer.SerializeToElement(new { type = new[] { "object", "null" } }),
+                OutputMapping = JsonSerializer.SerializeToElement("${steps.input.output}") }],
+            Transitions = [new("done", "input", "completed", "completed")] };
+        var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement<object?>(null));
+        Assert.AreEqual("success", result.Outcome);
+        Assert.AreEqual(JsonValueKind.Null, result.Output!.Value.ValueKind);
+    }
 }
