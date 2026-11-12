@@ -29,7 +29,7 @@ public sealed class HttpDiagnosticsTests
     {
         using var traces = new Traces();
         var logs = new Logs();
-        var builder = Builder(logs, request: true, response: true,
+        var builder = Builder(logs,
             settingsFile: Path.Combine(AppContext.BaseDirectory, "TestAssets", host + ".json"));
         builder.Services.AddHealthChecks();
         await using var app = builder.Build();
@@ -55,7 +55,7 @@ public sealed class HttpDiagnosticsTests
     public async Task OutgoingHealthSupportsStandardTextWithoutEnablingArbitraryTextCapture(string path, string value, bool captured)
     {
         var logs = new Logs();
-        var builder = Builder(logs, response: true);
+        var builder = Builder(logs);
         builder.Services.AddHttpClient("probe").ConfigurePrimaryHttpMessageHandler(() => new Stub((_, _) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(value) })));
         await using var app = builder.Build();
@@ -66,23 +66,20 @@ public sealed class HttpDiagnosticsTests
     }
 
     [TestMethod]
-    [DataRow("Off", false, false, false)]
-    [DataRow("Metadata", true, false, false)]
-    [DataRow("RequestBody", true, true, false)]
-    [DataRow("ResponseBody", true, false, true)]
-    [DataRow("Bodies", true, true, true)]
-    public async Task CategoryPresetOverridesGlobalCapture(string level, bool metadata, bool requestBody, bool responseBody)
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task CategoryBooleanControlsBothBodies(bool enabled)
     {
         var logs = new Logs();
-        var builder = Builder(logs, request: true, response: true, extra: new() { ["Categories:Api"] = level });
+        var builder = Builder(logs, extra: new() { ["Categories:Api"] = enabled.ToString() });
         AddProbe(builder);
         await using var app = builder.Build();
         using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
         using var response = await client.PostAsync("http://localhost/api/workspaces/probe", Json(RequestJson));
         _ = await response.Content.ReadAsStringAsync();
-        Assert.AreEqual(metadata, logs.Text.Contains("HTTP outgoing", StringComparison.Ordinal));
-        Assert.AreEqual(requestBody, logs.Text.Contains("diagnostic-request", StringComparison.Ordinal));
-        Assert.AreEqual(responseBody, logs.Text.Contains("diagnostic-response", StringComparison.Ordinal));
+        Assert.AreEqual(enabled, logs.Text.Contains("HTTP outgoing", StringComparison.Ordinal));
+        Assert.AreEqual(enabled, logs.Text.Contains("diagnostic-request", StringComparison.Ordinal));
+        Assert.AreEqual(enabled, logs.Text.Contains("diagnostic-response", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -97,7 +94,10 @@ public sealed class HttpDiagnosticsTests
     {
         using var traces = new Traces();
         var logs = new Logs();
-        var builder = Builder(logs, extra: new() { ["Categories:" + category] = "ResponseBody" });
+        var categories = Enum.GetValues<HttpDiagnosticCategory>().ToDictionary(
+            value => "Categories:" + value, _ => (string?)"false");
+        categories["Categories:" + category] = "true";
+        var builder = Builder(logs, extra: categories);
         AddProbe(builder);
         await using var app = builder.Build();
         using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
@@ -109,13 +109,12 @@ public sealed class HttpDiagnosticsTests
     }
 
     [TestMethod]
-    [DataRow("Off", false)]
-    [DataRow("Metadata", false)]
-    [DataRow("ResponseBody", true)]
-    public async Task IncomingCategoryPresetControlsPayloads(string level, bool captured)
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task IncomingCategoryBooleanControlsPayloads(bool enabled)
     {
         var logs = new Logs();
-        var builder = Builder(logs, response: true, extra: new() { ["Categories:Api"] = level });
+        var builder = Builder(logs, extra: new() { ["Categories:Api"] = enabled.ToString() });
         await using var app = builder.Build();
         app.UseAgentstrationHttpDiagnostics();
         app.MapGet("/api/probe", async context =>
@@ -127,8 +126,8 @@ public sealed class HttpDiagnosticsTests
         using var client = app.GetTestClient();
         using var response = await client.GetAsync("/api/probe");
         Assert.AreEqual(ResponseJson, await response.Content.ReadAsStringAsync());
-        Assert.AreEqual(captured, logs.Text.Contains("diagnostic-response", StringComparison.Ordinal));
-        Assert.AreEqual(level != "Off", !logs.Items.IsEmpty);
+        Assert.AreEqual(enabled, logs.Text.Contains("diagnostic-response", StringComparison.Ordinal));
+        Assert.AreEqual(enabled, !logs.Items.IsEmpty);
     }
 
     [TestMethod]
@@ -139,7 +138,7 @@ public sealed class HttpDiagnosticsTests
         var options = configuration.GetSection(HttpDiagnosticsOptions.SectionName).Get<HttpDiagnosticsOptions>()!;
         Assert.IsFalse(options.Enabled);
         Assert.AreEqual(Enum.GetValues<HttpDiagnosticCategory>().Length, options.Categories.Count);
-        Assert.IsTrue(options.Categories.Values.All(level => level == HttpCaptureLevel.Off));
+        Assert.IsTrue(options.Categories.Values.All(enabled => !enabled));
     }
 
     [TestMethod]
@@ -147,7 +146,7 @@ public sealed class HttpDiagnosticsTests
     {
         using var traces = new Traces();
         var logs = new Logs();
-        var builder = Builder(logs, request: true, response: true);
+        var builder = Builder(logs);
         await using var app = builder.Build();
         app.UseAgentstrationHttpDiagnostics();
         string? received = null;
@@ -178,7 +177,7 @@ public sealed class HttpDiagnosticsTests
     public async Task IncomingPipeWriterPreservesBufferedOutputAndDuplicateJsonPropertiesAreSafe()
     {
         var logs = new Logs();
-        var builder = Builder(logs, response: true);
+        var builder = Builder(logs);
         await using var app = builder.Build();
         app.UseAgentstrationHttpDiagnostics();
         const string value = "{\"token\":\"response-secret\",\"token\":\"response-secret\",\"output\":\"diagnostic-response\"}";
@@ -202,7 +201,7 @@ public sealed class HttpDiagnosticsTests
     public async Task IncomingResponseFlushesBeforeEndpointFinishes()
     {
         var logs = new Logs();
-        var builder = Builder(logs, response: true);
+        var builder = Builder(logs);
         await using var app = builder.Build();
         app.UseAgentstrationHttpDiagnostics();
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -235,7 +234,7 @@ public sealed class HttpDiagnosticsTests
     {
         using var traces = new Traces();
         var logs = new Logs();
-        var builder = Builder(logs, request: true, response: true);
+        var builder = Builder(logs);
         string? received = null;
         builder.Services.AddHttpClient("probe").ConfigurePrimaryHttpMessageHandler(() => new Stub(async (request, ct) =>
         {
@@ -258,22 +257,21 @@ public sealed class HttpDiagnosticsTests
     }
 
     [TestMethod]
-    [DataRow(false, false)]
-    [DataRow(true, false)]
-    [DataRow(false, true)]
-    public async Task BodySwitchesAreIndependent(bool request, bool response)
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task MasterSwitchControlsBothBodies(bool enabled)
     {
         var logs = new Logs();
-        var builder = Builder(logs, request, response);
+        var builder = Builder(logs, enabled: enabled);
         AddProbe(builder);
         await using var app = builder.Build();
         using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
         using var result = await client.PostAsync("http://localhost/probe", Json(RequestJson));
         _ = await result.Content.ReadAsStringAsync();
-        Assert.AreEqual(request, logs.Text.Contains("diagnostic-request", StringComparison.Ordinal));
-        Assert.AreEqual(response, logs.Text.Contains("diagnostic-response", StringComparison.Ordinal));
-        Assert.AreEqual(request || response, logs.Items.Any(item => item.Contains("payload", StringComparison.Ordinal)));
-        StringAssert.Contains(logs.Text, "HTTP outgoing");
+        Assert.AreEqual(enabled, logs.Text.Contains("diagnostic-request", StringComparison.Ordinal));
+        Assert.AreEqual(enabled, logs.Text.Contains("diagnostic-response", StringComparison.Ordinal));
+        Assert.AreEqual(enabled, logs.Items.Any(item => item.Contains("payload", StringComparison.Ordinal)));
+        Assert.AreEqual(enabled, logs.Text.Contains("HTTP outgoing", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -297,13 +295,13 @@ public sealed class HttpDiagnosticsTests
     public async Task MetadataCanBeDisabledWithoutDisablingBodies()
     {
         var logs = new Logs();
-        var builder = Builder(logs, response: true, metadata: false);
+        var builder = Builder(logs, metadata: false);
         AddProbe(builder);
         await using var app = builder.Build();
         using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
         using var response = await client.GetAsync("http://localhost/probe");
         _ = await response.Content.ReadAsStringAsync();
-        Assert.HasCount(1, logs.Items);
+        Assert.HasCount(2, logs.Items);
         StringAssert.Contains(logs.Text, "diagnostic-response");
     }
 
@@ -312,7 +310,7 @@ public sealed class HttpDiagnosticsTests
     {
         var logs = new Logs();
         var stream = new CountingStream(Encoding.UTF8.GetBytes(ResponseJson));
-        var builder = Builder(logs, response: true);
+        var builder = Builder(logs);
         builder.Services.AddHttpClient("probe").ConfigurePrimaryHttpMessageHandler(() => new Stub((_, _) =>
         {
             var content = new StreamContent(stream);
@@ -339,7 +337,7 @@ public sealed class HttpDiagnosticsTests
     {
         var logs = new Logs();
         var stream = new CountingStream(Encoding.UTF8.GetBytes(ResponseJson));
-        var builder = Builder(logs, response: true);
+        var builder = Builder(logs);
         builder.Services.AddHttpClient("probe").ConfigurePrimaryHttpMessageHandler(() => new Stub((_, _) =>
         {
             var content = new StreamContent(stream);
@@ -368,7 +366,7 @@ public sealed class HttpDiagnosticsTests
     public async Task UnsupportedInvalidAndEncodedBodiesAreOmitted(string contentType, string value, bool encoded)
     {
         var logs = new Logs();
-        var builder = Builder(logs, response: true);
+        var builder = Builder(logs);
         builder.Services.AddHttpClient("probe").ConfigurePrimaryHttpMessageHandler(() => new Stub((_, _) =>
         {
             var content = new StringContent(value, Encoding.UTF8, contentType);
@@ -389,7 +387,7 @@ public sealed class HttpDiagnosticsTests
     public async Task OversizedJsonIsOmittedWithoutLeakingUnredactedPrefix(char character, int count)
     {
         var logs = new Logs();
-        var builder = Builder(logs, response: true, extra: new() { ["MaximumBodyBytes"] = "256" });
+        var builder = Builder(logs, extra: new() { ["MaximumBodyBytes"] = "256" });
         var value = "{\"token\":\"response-secret\",\"content\":\"" + new string(character, count) + "\"}";
         AddProbe(builder, value);
         await using var app = builder.Build();
@@ -410,7 +408,7 @@ public sealed class HttpDiagnosticsTests
     public async Task FiltersAndProtectedRoutesDoNotLeakPayloads(string uri, bool metadataExpected)
     {
         var logs = new Logs();
-        var builder = Builder(logs, request: true, response: true, extra: new()
+        var builder = Builder(logs, extra: new()
         {
             ["IncludedPaths:0"] = "/probe",
             ["ExcludedPaths:0"] = "/probe/ignored",
@@ -430,7 +428,7 @@ public sealed class HttpDiagnosticsTests
     public async Task ExcludedPathsComeFromConfigurationWithoutImplicitArrayEntries()
     {
         var logs = new Logs();
-        var builder = Builder(logs, response: true, extra: new() { ["ExcludedPaths:0"] = "/unused" });
+        var builder = Builder(logs, extra: new() { ["ExcludedPaths:0"] = "/unused" });
         AddProbe(builder);
         await using var app = builder.Build();
         using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
@@ -455,23 +453,23 @@ public sealed class HttpDiagnosticsTests
     }
 
     [TestMethod]
-    [DataRow("Production", "CaptureResponseBody", "true")]
-    [DataRow("Production", "CaptureRequestBody", "true")]
+    [DataRow("Production", "Enabled", "true")]
     [DataRow("Development", "MaximumBodyBytes", "1")]
     [DataRow("Development", "MaximumBodyBytes", "1048577")]
     [DataRow("Development", "IncludedPaths:0", "relative")]
     [DataRow("Development", "IncludedHosts:0", "https://localhost")]
-    [DataRow("Development", "Categories:Invalid", "Metadata")]
+    [DataRow("Development", "Categories:Invalid", "true")]
     [DataRow("Development", "Categories:Health", "Invalid")]
+    [DataRow("Development", "Categories:Health", "Off")]
+    [DataRow("Development", "Categories:Health", "Bodies")]
     [DataRow("Development", "Categories:Health", "100")]
-    [DataRow("Production", "Categories:Health", "ResponseBody")]
+    [DataRow("Production", "Categories:Health", "true")]
     public void InvalidConfigurationFailsAtStartup(string environment, string key, string value)
     {
         Assert.ThrowsExactly<InvalidOperationException>(() => Builder(new Logs(), environment: environment, extra: new() { [key] = value }));
     }
 
-    private static WebApplicationBuilder Builder(Logs logs, bool request = false, bool response = false,
-        bool enabled = true, bool metadata = true, string environment = "Development", Dictionary<string, string?>? extra = null,
+    private static WebApplicationBuilder Builder(Logs logs, bool enabled = true, bool metadata = true, string environment = "Development", Dictionary<string, string?>? extra = null,
         string? settingsFile = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
@@ -482,8 +480,6 @@ public sealed class HttpDiagnosticsTests
         var configuration = new Dictionary<string, string?>
         {
             ["Enabled"] = enabled.ToString(),
-            ["CaptureRequestBody"] = request.ToString(),
-            ["CaptureResponseBody"] = response.ToString(),
             ["LogMetadata"] = metadata.ToString()
         };
         if (extra is not null) foreach (var entry in extra) configuration[entry.Key] = entry.Value;

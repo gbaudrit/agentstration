@@ -17,8 +17,8 @@ public static class HttpDiagnosticsExtensions
         var section = builder.Configuration.GetSection(HttpDiagnosticsOptions.SectionName);
         foreach (var category in section.GetSection(nameof(HttpDiagnosticsOptions.Categories)).GetChildren())
             if (!Enum.TryParse<HttpDiagnosticCategory>(category.Key, ignoreCase: true, out var name) || !Enum.IsDefined(name) ||
-                !Enum.TryParse<HttpCaptureLevel>(category.Value, ignoreCase: true, out var level) || !Enum.IsDefined(level))
-                throw new InvalidOperationException("Observability:Http:Categories requires known HTTP categories and capture levels.");
+                !bool.TryParse(category.Value, out _))
+                throw new InvalidOperationException("Observability:Http:Categories requires known HTTP categories and boolean values.");
         var options = section.Get<HttpDiagnosticsOptions>(binding => binding.ErrorOnUnknownConfiguration = true) ?? new();
         options.Validate(builder.Environment.IsDevelopment());
         builder.Services.AddSingleton(options);

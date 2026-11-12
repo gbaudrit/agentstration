@@ -220,3 +220,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 192. [ADR-0192 — Model Provider bindings support typed literals](0192-typed-literal-model-provider-bindings.md)
 193. [ADR-0193 — General HTTP diagnostics observe bounded streams](0193-http-diagnostics-observe-bounded-streams.md)
 194. [ADR-0194 — HTTP diagnostics use explicit category capture policies](0194-http-diagnostics-use-category-policies.md)
+195. [ADR-0195 — HTTP category switches always enable both payload directions](0195-http-categories-enable-both-bodies.md)

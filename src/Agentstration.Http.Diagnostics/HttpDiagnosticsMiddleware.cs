@@ -24,8 +24,8 @@ internal sealed class HttpDiagnosticsMiddleware(RequestDelegate next, HttpDiagno
         activity?.SetTag("url.path", target);
         var originalRequest = context.Request.Body;
         var originalResponse = context.Features.GetRequiredFeature<IHttpResponseBodyFeature>();
-        var requestCapture = policy.CaptureRequestBody && !sensitive ? new BodyCapture(options.MaximumBodyBytes) : null;
-        var responseCapture = policy.CaptureResponseBody && !sensitive ? new BodyCapture(options.MaximumBodyBytes) : null;
+        var requestCapture = !sensitive ? new BodyCapture(options.MaximumBodyBytes) : null;
+        var responseCapture = !sensitive ? new BodyCapture(options.MaximumBodyBytes) : null;
         using var requestStream = requestCapture is null ? null : new CaptureStream(originalRequest, requestCapture);
         if (requestStream is not null) context.Request.Body = requestStream;
         if (responseCapture is not null) context.Features.Set<IHttpResponseBodyFeature>(new CaptureResponseBodyFeature(originalResponse, responseCapture));
@@ -58,7 +58,7 @@ internal sealed class HttpDiagnosticsMiddleware(RequestDelegate next, HttpDiagno
             if (responseCapture is not null)
                 HttpDiagnosticsTelemetry.Payload(logger, activity, "response", responseCapture.Finish(context.Response.ContentType,
                     context.Response.Headers.ContentEncoding.Count > 0, complete, BodyCapture.IsHealthPath(path)), context.Response.ContentType, parentContext, category);
-            if (policy.LogMetadata)
+            if (options.LogMetadata)
                 HttpDiagnosticsTelemetry.Metadata(logger, "incoming", context.Request.Method, target,
                     errorType is null ? context.Response.StatusCode : null, Stopwatch.GetElapsedTime(started).TotalMilliseconds,
                     errorType, (activity ?? Activity.Current)?.TraceId.ToString(), (activity ?? Activity.Current)?.SpanId.ToString(), category);

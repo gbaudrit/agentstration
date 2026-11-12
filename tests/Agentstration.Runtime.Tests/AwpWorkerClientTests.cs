@@ -22,9 +22,7 @@ public sealed class AwpWorkerClientTests
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = Environments.Development });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Observability:Http:Enabled"] = "true",
-            ["Observability:Http:CaptureRequestBody"] = "true",
-            ["Observability:Http:CaptureResponseBody"] = "true"
+            ["Observability:Http:Enabled"] = "true"
         });
         builder.AddAgentstrationHttpDiagnostics();
         var secret = Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes");

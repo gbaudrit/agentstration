@@ -22,14 +22,14 @@ internal sealed class HttpDiagnosticsHandler(HttpDiagnosticsOptions options, ILo
         var target = uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.UriEscaped) + (sensitive ? "/[sensitive route]" : uri.AbsolutePath);
         activity?.SetTag("http.request.method", request.Method.Method);
         activity?.SetTag("url.full", target);
-        if (policy.CaptureRequestBody && request.Content is { } content && !sensitive)
+        if (request.Content is { } content && !sensitive)
         {
             request.Content = DiagnosticHttpContent.Wrap(content, options.MaximumBodyBytes,
                 (capture, complete) => HttpDiagnosticsTelemetry.Payload(logger, activity, "request",
                     capture.Finish(content.Headers.ContentType?.ToString(), content.Headers.ContentEncoding.Count > 0, complete),
                     content.Headers.ContentType?.MediaType, parentContext, category), reading: false);
         }
-        else if (policy.CaptureRequestBody && request.Content is null && !sensitive)
+        else if (request.Content is null && !sensitive)
             HttpDiagnosticsTelemetry.Payload(logger, activity, "request", new("[empty body]", false), null, parentContext, category);
 
         var started = Stopwatch.GetTimestamp();
@@ -40,7 +40,7 @@ internal sealed class HttpDiagnosticsHandler(HttpDiagnosticsOptions options, ILo
             response = await base.SendAsync(request, cancellationToken);
             activity?.SetTag("http.response.status_code", (int)response.StatusCode);
             if (!response.IsSuccessStatusCode) activity?.SetStatus(ActivityStatusCode.Error);
-            if (policy.CaptureResponseBody && !sensitive)
+            if (!sensitive)
             {
                 var responseContent = response.Content;
                 response.Content = DiagnosticHttpContent.Wrap(responseContent, options.MaximumBodyBytes, (capture, complete) =>
@@ -66,7 +66,7 @@ internal sealed class HttpDiagnosticsHandler(HttpDiagnosticsOptions options, ILo
         }
         finally
         {
-            if (policy.LogMetadata)
+            if (options.LogMetadata)
                 HttpDiagnosticsTelemetry.Metadata(logger, "outgoing", request.Method.Method, target,
                     response is null ? null : (int)response.StatusCode, Stopwatch.GetElapsedTime(started).TotalMilliseconds,
                     errorType, (activity ?? Activity.Current)?.TraceId.ToString(), (activity ?? Activity.Current)?.SpanId.ToString(), category);
