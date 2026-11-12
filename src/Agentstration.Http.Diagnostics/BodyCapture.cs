@@ -30,10 +30,18 @@ internal sealed class BodyCapture(int maximumBytes)
 
     internal void Invalidate() => nonSequential = true;
 
-    internal CapturedBody Finish(string? contentType, bool encoded, bool complete)
+    internal CapturedBody Finish(string? contentType, bool encoded, bool complete, bool isHealthResponse = false)
     {
         if (oversized) return new("[body omitted: size limit exceeded]", true);
         if (!complete || nonSequential) return new("[body omitted: incomplete or non-sequential stream]", false);
+        if (buffer.Length == 0) return new("[empty body]", false);
+        if (!encoded && isHealthResponse &&
+            string.Equals(contentType?.Split(';', 2)[0].Trim(), "text/plain", StringComparison.OrdinalIgnoreCase))
+        {
+            var health = System.Text.Encoding.UTF8.GetString(buffer.ToArray());
+            return health is "Healthy" or "Degraded" or "Unhealthy"
+                ? new(health, false) : new("[body omitted: unrecognized health response]", false);
+        }
         if (encoded || !IsJson(contentType)) return new("[body omitted: unsupported content type or encoding]", false);
         try
         {
@@ -57,6 +65,9 @@ internal sealed class BodyCapture(int maximumBytes)
         return mediaType is not null && (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
             mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase));
     }
+
+    internal static bool IsHealthPath(string path) => path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("/health/", StringComparison.OrdinalIgnoreCase);
 
     internal static bool IsSensitivePath(string path)
     {

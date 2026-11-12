@@ -16,7 +16,7 @@ Add the following to the participating process's `appsettings.Development.json`,
       "CaptureResponseBody": true,
       "MaximumBodyBytes": 16384,
       "IncludedPaths": ["/api/workspaces"],
-      "ExcludedPaths": ["/health", "/_blazor", "/hubs"],
+      "ExcludedPaths": ["/_blazor", "/hubs"],
       "IncludedHosts": [],
       "ExcludedHosts": []
     }
@@ -32,7 +32,7 @@ Add the following to the participating process's `appsettings.Development.json`,
 | `CaptureResponseBody` | `false` | Captures supported response bodies as they are produced/consumed. |
 | `MaximumBodyBytes` | `16384` | Per-body capture and exported-value limit; valid range 256–1048576 bytes. |
 | `IncludedPaths` | `[]` | Empty means all paths; otherwise include matching path prefixes. |
-| `ExcludedPaths` | `["/health", "/_blazor", "/hubs"]` in application settings | Excluded prefixes take precedence over included paths. The reusable registration has no implicit path exclusions. |
+| `ExcludedPaths` | `["/_blazor", "/hubs"]` in application settings | Excluded prefixes take precedence over included paths. The reusable registration has no implicit path exclusions. |
 | `IncludedHosts` / `ExcludedHosts` | `[]` | Outgoing calls only; case-insensitive exact hosts, without scheme, port or wildcard. Exclusions take precedence. |
 
 Paths match complete segments: `/api/workspaces` includes its descendants, but not `/api/workspaces-other`. Matching ignores case. To replace array defaults with an empty collection through configuration, note that .NET providers merge arrays by index; use an explicit configuration provider appropriate to the deployment or supply replacement entries. Options are validated at startup and changes require a process restart. Metadata can be enabled in any environment; body capture is permitted only in `Development`.
@@ -47,7 +47,44 @@ dotnet run --project src/Agentstration.Web --launch-profile http-NoBootstrap
 
 Configure each process that owns the boundary you need to inspect. Web observes incoming API calls; Console/Workplace observe their incoming requests and outgoing API clients; the Runtime Worker observes its outgoing authority clients. An exchange can therefore appear on both the caller and server resources. Manually created `HttpClient` instances, synchronous `Send` calls, browser network traffic and extension-to-provider HTTP calls are outside this integration. Extension-host instrumentation remains separate (#457).
 
-For Aspire, the same section can be added to **`src/Agentstration.AppHost/appsettings.Development.json`**. Explicitly configured `Observability:Http` values are forwarded to the Web resource (`agentstration-console`), Workplace and every Runtime Worker. With no AppHost override, each child uses its own configuration. The separated Console is configured in its own host when launched independently. This adds no collector or external-service requirement to standalone startup.
+For Aspire, the section is present and disabled in **`src/Agentstration.AppHost/appsettings.json`**; it can be overridden in `appsettings.Development.json`. Explicitly configured `Observability:Http` values are forwarded to the Web resource (`agentstration-console`), Workplace and every Runtime Worker. The committed AppHost defaults deliberately disable diagnostics in its children until the operator enables the master switch and selected categories. The separated Console is configured in its own host when launched independently. This adds no collector or external-service requirement to standalone startup.
+
+## Categories and AppHost defaults
+
+The AppHost's committed `appsettings.json` includes the full block with `Enabled: false` and every category set to `Off`. The AppHost forwards this configuration to its participating processes. To inspect only health responses in Development, change it to:
+
+```json
+{
+  "Observability": {
+    "Http": {
+      "Enabled": true,
+      "Categories": {
+        "Health": "ResponseBody",
+        "Api": "Off",
+        "Awp": "Off",
+        "Aep": "Off",
+        "Bff": "Off",
+        "Other": "Off"
+      }
+    }
+  }
+}
+```
+
+| Category | Matching paths, in precedence order |
+| --- | --- |
+| `Health` | `/health` and its descendants, including `/health/live` and `/health/ready` |
+| `Awp` | `/api/awp` and its descendants |
+| `Aep` | `/aep`, `/api/aep` and their descendants; `/.well-known/aep` |
+| `Bff` | `/bff` and its descendants |
+| `Api` | Remaining `/api` routes |
+| `Other` | Remaining routes |
+
+Each category accepts `Off`, `Metadata`, `RequestBody`, `ResponseBody` or `Bodies`. Every non-Off level includes metadata; the last three additionally capture the selected body direction(s). An explicit category overrides the global `LogMetadata` / `CaptureRequestBody` / `CaptureResponseBody` flags. Omitted categories inherit those flags. `Enabled` is the master switch, and path/host exclusions and sensitive-route protection always take precedence. Invalid category names and levels fail startup.
+
+The same policy applies to incoming and outgoing traffic. `agentstration.http.category` is added to diagnostic spans (including deferred response spans); structured logs carry a `Category` field. `Off` suppresses this feature's additional diagnostics, while the pre-existing standard HTTP spans remain independent. GenAI's non-HTTP instrumentation remains controlled by `Observability:GenAI`.
+
+`/health` is no longer excluded by application defaults. A `GET /health` normally has no request body; capture reports `[empty body]` instead of inventing a payload. The Web health response is JSON. Standard ASP.NET Core health responses are text: exactly `Healthy`, `Degraded` and `Unhealthy` are supported on `/health` and its descendants. Other text content remains omitted. Open a diagnostic span's payload events to see the body; the trace list itself displays span names, not event content.
 
 ## Logs and Aspire traces
 
@@ -60,7 +97,7 @@ Aspire versions may expose events in a separate span-detail area. The matching s
 ## Capture boundaries and sensitive content
 
 - Bodies remain disabled by default. Opt-in capture can contain user content even after credential redaction; use narrowly selected diagnostic routes and treat telemetry storage accordingly.
-- Only complete, valid `application/json` and `+json` bodies are emitted. Unsupported media types (including binary, form data and SSE), content-encoded bodies and invalid JSON are omitted. Responses still reach callers unchanged.
+- Complete, valid `application/json` and `+json` bodies are emitted, along with the three standard plain-text health status values described above. Unsupported media types (including binary, form data and SSE), content-encoded bodies and invalid JSON are omitted. Responses still reach callers unchanged.
 - Common credential properties are recursively redacted, including `api_key`, `access_token`, `password`, `client_secret`, `secretCapability`, `secretValueBase64`, cookies, pairing codes and private keys. This is a field-name rule, not a detector of arbitrary sensitive text.
 - Account, identity, authentication, login/logout, bootstrap, pairing/enrollment, Secret/credential and redemption route segments suppress **all body capture**, even when explicitly included. Their diagnostic target is replaced with `/[sensitive route]`. Add exclusions for any other application-specific sensitive routes or destinations.
 - This feature never records HTTP headers, query strings, URI user information or exception messages. Ordinary path values remain visible; exclude routes whose path segments contain sensitive values. Existing framework/client logs and standard HTTP spans have their own configuration and redaction behavior.
@@ -68,4 +105,4 @@ Aspire versions may expose events in a separate span-detail area. The matching s
 - Unread/partially read response streams, seeked streams and send-file output produce omission markers. Capture cannot force a caller or endpoint to consume a body. Outgoing content that is never consumed or disposed does not produce a completed payload event.
 - For matching outgoing calls, general HTTP diagnostics take precedence over `Observability:GenAI:HttpPayloadCapture` using a request-local marker. The GenAI handler then passes through, including when only general metadata logging is selected. Existing GenAI-only behavior is unchanged for calls outside the general filters or when general diagnostics are disabled. This avoids duplicate capture and the legacy response buffering on exchanges owned by general diagnostics.
 
-See [ADR-0193](../decisions/0193-http-diagnostics-observe-bounded-streams.md) for ownership and transport decisions.
+See [ADR-0193](../decisions/0193-http-diagnostics-observe-bounded-streams.md) for ownership and transport decisions and [ADR-0194](../decisions/0194-http-diagnostics-use-category-policies.md) for category controls and health status capture.

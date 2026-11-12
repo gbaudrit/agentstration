@@ -219,3 +219,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 191. [ADR-0191 — OpenAPI discovery and invocation remain an AEP extension](0191-openapi-discovery-and-invocation-remain-an-aep-extension.md)
 192. [ADR-0192 — Model Provider bindings support typed literals](0192-typed-literal-model-provider-bindings.md)
 193. [ADR-0193 — General HTTP diagnostics observe bounded streams](0193-http-diagnostics-observe-bounded-streams.md)
+194. [ADR-0194 — HTTP diagnostics use explicit category capture policies](0194-http-diagnostics-use-category-policies.md)

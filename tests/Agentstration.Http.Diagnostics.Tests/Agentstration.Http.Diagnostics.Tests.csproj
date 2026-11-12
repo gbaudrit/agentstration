@@ -3,4 +3,11 @@
     <ProjectReference Include="../../src/Agentstration.Http.Diagnostics/Agentstration.Http.Diagnostics.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../../src/Agentstration.Web/appsettings.json" Link="TestAssets/Agentstration.Web.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.Console.Web/appsettings.json" Link="TestAssets/Agentstration.Console.Web.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.Workplace.Web/appsettings.json" Link="TestAssets/Agentstration.Workplace.Web.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/appsettings.json" Link="TestAssets/Agentstration.Runtime.Worker.MicrosoftAgentFramework.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.AppHost/appsettings.json" Link="TestAssets/Agentstration.AppHost.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -21,6 +21,128 @@ public sealed class HttpDiagnosticsTests
     private const string ResponseJson = "{\"output\":\"diagnostic-response\",\"access_token\":\"response-secret\"}";
 
     [TestMethod]
+    [DataRow("Agentstration.Web")]
+    [DataRow("Agentstration.Console.Web")]
+    [DataRow("Agentstration.Workplace.Web")]
+    [DataRow("Agentstration.Runtime.Worker.MicrosoftAgentFramework")]
+    public async Task HostDefaultsCaptureHealthAndDescribeEmptyGetRequest(string host)
+    {
+        using var traces = new Traces();
+        var logs = new Logs();
+        var builder = Builder(logs, request: true, response: true,
+            settingsFile: Path.Combine(AppContext.BaseDirectory, "TestAssets", host + ".json"));
+        builder.Services.AddHealthChecks();
+        await using var app = builder.Build();
+        app.UseAgentstrationHttpDiagnostics();
+        app.MapHealthChecks("/health");
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        using var response = await client.GetAsync("/health");
+        Assert.AreEqual("Healthy", await response.Content.ReadAsStringAsync());
+        StringAssert.Contains(logs.Text, "[empty body]");
+        StringAssert.Contains(logs.Text, "Healthy");
+        var activity = traces.Items.Single();
+        Assert.AreEqual("Health", activity.GetTagItem("agentstration.http.category"));
+        Assert.HasCount(2, activity.Events);
+    }
+
+    [TestMethod]
+    [DataRow("/health", "Healthy", true)]
+    [DataRow("/health/live", "Degraded", true)]
+    [DataRow("/health/ready", "Unhealthy", true)]
+    [DataRow("/health-other", "Healthy", false)]
+    [DataRow("/health", "private-health-detail", false)]
+    public async Task OutgoingHealthSupportsStandardTextWithoutEnablingArbitraryTextCapture(string path, string value, bool captured)
+    {
+        var logs = new Logs();
+        var builder = Builder(logs, response: true);
+        builder.Services.AddHttpClient("probe").ConfigurePrimaryHttpMessageHandler(() => new Stub((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(value) })));
+        await using var app = builder.Build();
+        using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
+        using var response = await client.GetAsync("http://localhost" + path);
+        Assert.AreEqual(value, await response.Content.ReadAsStringAsync());
+        Assert.AreEqual(captured, logs.Text.Contains(value, StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DataRow("Off", false, false, false)]
+    [DataRow("Metadata", true, false, false)]
+    [DataRow("RequestBody", true, true, false)]
+    [DataRow("ResponseBody", true, false, true)]
+    [DataRow("Bodies", true, true, true)]
+    public async Task CategoryPresetOverridesGlobalCapture(string level, bool metadata, bool requestBody, bool responseBody)
+    {
+        var logs = new Logs();
+        var builder = Builder(logs, request: true, response: true, extra: new() { ["Categories:Api"] = level });
+        AddProbe(builder);
+        await using var app = builder.Build();
+        using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
+        using var response = await client.PostAsync("http://localhost/api/workspaces/probe", Json(RequestJson));
+        _ = await response.Content.ReadAsStringAsync();
+        Assert.AreEqual(metadata, logs.Text.Contains("HTTP outgoing", StringComparison.Ordinal));
+        Assert.AreEqual(requestBody, logs.Text.Contains("diagnostic-request", StringComparison.Ordinal));
+        Assert.AreEqual(responseBody, logs.Text.Contains("diagnostic-response", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DataRow("Health", "/health")]
+    [DataRow("Awp", "/api/awp/v1/register")]
+    [DataRow("Aep", "/aep/model-providers/probe/chat")]
+    [DataRow("Aep", "/.well-known/aep")]
+    [DataRow("Bff", "/bff/probe")]
+    [DataRow("Api", "/api/workspaces/probe")]
+    [DataRow("Other", "/probe")]
+    public async Task CategoriesSelectOnlyTheirOwnRoutes(string category, string path)
+    {
+        using var traces = new Traces();
+        var logs = new Logs();
+        var builder = Builder(logs, extra: new() { ["Categories:" + category] = "ResponseBody" });
+        AddProbe(builder);
+        await using var app = builder.Build();
+        using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
+        using var response = await client.GetAsync("http://localhost" + path);
+        _ = await response.Content.ReadAsStringAsync();
+        StringAssert.Contains(logs.Text, "diagnostic-response");
+        StringAssert.Contains(logs.Text, "Category=" + category);
+        Assert.IsTrue(traces.Items.All(activity => Equals(category, activity.GetTagItem("agentstration.http.category"))));
+    }
+
+    [TestMethod]
+    [DataRow("Off", false)]
+    [DataRow("Metadata", false)]
+    [DataRow("ResponseBody", true)]
+    public async Task IncomingCategoryPresetControlsPayloads(string level, bool captured)
+    {
+        var logs = new Logs();
+        var builder = Builder(logs, response: true, extra: new() { ["Categories:Api"] = level });
+        await using var app = builder.Build();
+        app.UseAgentstrationHttpDiagnostics();
+        app.MapGet("/api/probe", async context =>
+        {
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync(ResponseJson);
+        });
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        using var response = await client.GetAsync("/api/probe");
+        Assert.AreEqual(ResponseJson, await response.Content.ReadAsStringAsync());
+        Assert.AreEqual(captured, logs.Text.Contains("diagnostic-response", StringComparison.Ordinal));
+        Assert.AreEqual(level != "Off", !logs.Items.IsEmpty);
+    }
+
+    [TestMethod]
+    public void AppHostDefaultsDisableEveryCategory()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "TestAssets", "Agentstration.AppHost.json")).Build();
+        var options = configuration.GetSection(HttpDiagnosticsOptions.SectionName).Get<HttpDiagnosticsOptions>()!;
+        Assert.IsFalse(options.Enabled);
+        Assert.AreEqual(Enum.GetValues<HttpDiagnosticCategory>().Length, options.Categories.Count);
+        Assert.IsTrue(options.Categories.Values.All(level => level == HttpCaptureLevel.Off));
+    }
+
+    [TestMethod]
     public async Task IncomingCapturePreservesBytesRedactsSecretsAndAttachesPayloadsToTrace()
     {
         using var traces = new Traces();
@@ -339,18 +461,24 @@ public sealed class HttpDiagnosticsTests
     [DataRow("Development", "MaximumBodyBytes", "1048577")]
     [DataRow("Development", "IncludedPaths:0", "relative")]
     [DataRow("Development", "IncludedHosts:0", "https://localhost")]
+    [DataRow("Development", "Categories:Invalid", "Metadata")]
+    [DataRow("Development", "Categories:Health", "Invalid")]
+    [DataRow("Development", "Categories:Health", "100")]
+    [DataRow("Production", "Categories:Health", "ResponseBody")]
     public void InvalidConfigurationFailsAtStartup(string environment, string key, string value)
     {
         Assert.ThrowsExactly<InvalidOperationException>(() => Builder(new Logs(), environment: environment, extra: new() { [key] = value }));
     }
 
     private static WebApplicationBuilder Builder(Logs logs, bool request = false, bool response = false,
-        bool enabled = true, bool metadata = true, string environment = "Development", Dictionary<string, string?>? extra = null)
+        bool enabled = true, bool metadata = true, string environment = "Development", Dictionary<string, string?>? extra = null,
+        string? settingsFile = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
         builder.WebHost.UseTestServer();
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
+        if (settingsFile is not null) builder.Configuration.AddJsonFile(settingsFile);
         var configuration = new Dictionary<string, string?>
         {
             ["Enabled"] = enabled.ToString(),
