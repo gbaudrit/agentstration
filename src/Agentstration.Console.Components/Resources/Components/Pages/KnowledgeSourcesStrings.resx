@@ -134,4 +134,10 @@
   <data name="DirectInput" xml:space="preserve"><value>Direct input</value></data>
   <data name="InputFallbackUsed" xml:space="preserve"><value>Older acquisition used</value></data>
   <data name="InputRefreshFailed" xml:space="preserve"><value>Refresh failed:</value></data>
+  <data name="StructuredOutputCollection" xml:space="preserve"><value>Structured output collection</value></data>
+  <data name="StructuredOutputNone" xml:space="preserve"><value>Content output (no structured collection)</value></data>
+  <data name="StructuredOutputHelp" xml:space="preserve"><value>Select a collection allowing immutable publication. Each projected JSON object becomes a canonical document in an exact retained Snapshot.</value></data>
+  <data name="Operation.StructuredQuery" xml:space="preserve"><value>Query structured documents</value></data>
+  <data name="StructuredQueryPayload" xml:space="preserve"><value>Structured query (JSON)</value></data>
+  <data name="StructuredQueryHelp" xml:space="preserve"><value>Requires a compatible document Storage and query profile. For OData, use options such as {"$filter":"status eq 'degraded'"}. Historical Snapshots retain their original Storage and model.</value></data>
 </root>

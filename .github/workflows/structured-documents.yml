@@ -1,0 +1,54 @@
+name: Structured documents conformance
+on:
+  pull_request:
+    paths:
+      - 'asp/**'
+      - 'aep/**'
+      - 'src/Agentstration.Storage*/**'
+      - 'src/Agentstration.Knowledge*/**'
+      - 'src/Agentstration.Infrastructure/**'
+      - 'src/Agentstration.Extensions.PostgreSql/**'
+      - 'tests/Agentstration.Extensions.PostgreSql.Tests/**'
+      - 'tests/Agentstration.Api.Resources.Tests/**'
+      - 'Directory.*.props'
+      - '.github/workflows/structured-documents.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: structured-documents-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  local-postgresql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: asp_structured_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d asp_structured_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Disposable loopback-only CI database; no production credentials or data.
+      AGENTSTRATION_TEST_ASP_POSTGRES: Host=127.0.0.1;Port=55432;Database=asp_structured_test;Username=postgres;SslMode=Disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: V1 contracts and real JSONB provider
+        run: dotnet test --project tests/Agentstration.Extensions.PostgreSql.Tests --configuration Release --minimum-expected-tests 19
+      - name: V2 and V3 through product AEP, MCP, Tools and Snapshots
+        run: dotnet test --project tests/Agentstration.Api.Resources.Tests --configuration Release --filter 'FullyQualifiedName~TwoAgentRelaysUseLateBoundExports|FullyQualifiedName~AcquiredJsonProjectsToImmutableStructuredKnowledge' --minimum-expected-tests 4
+      - name: Publish independent provider
+        run: dotnet publish src/Agentstration.Extensions.PostgreSql --configuration Release --output artifacts/postgresql-documents
+      - uses: actions/upload-artifact@v7
+        with:
+          name: postgresql-documents-linux
+          path: artifacts/postgresql-documents
+          if-no-files-found: error

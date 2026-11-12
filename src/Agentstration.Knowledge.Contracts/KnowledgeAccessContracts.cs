@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Knowledge.Contracts;
 
@@ -23,6 +25,16 @@ public sealed record KnowledgeRegexRequest
     public string? PreparationId { get; init; }
     public int Limit { get; init; } = 20;
     public int ContextCharacters { get; init; } = 160;
+}
+
+public sealed record KnowledgeDocumentQueryRequest
+{
+    public string? SnapshotId { get; init; }
+    public string? Cursor { get; init; }
+    public string? PreparationId { get; init; }
+    public StorageQueryProfilePin? Profile { get; init; }
+    public JsonElement? Query { get; init; }
+    public int? PageSize { get; init; }
 }
 
 public sealed record KnowledgeStatusRequest(string? SnapshotId = null);
@@ -52,6 +64,8 @@ public sealed record KnowledgeAccessResult
     public string? NextCursor { get; init; }
     public DateTimeOffset? CursorExpiresAt { get; init; }
     public bool EndOfSelection { get; init; }
+    public StorageDocumentPage? DocumentPage { get; init; }
+    public StorageQueryProfilePin? QueryProfile { get; init; }
 }
 
 public sealed record KnowledgeAccessStatus

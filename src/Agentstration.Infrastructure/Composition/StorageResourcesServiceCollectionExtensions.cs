@@ -23,8 +23,13 @@ internal static class StorageResourcesServiceCollectionExtensions
         services.AddSingleton<LocalStorageObjectProvider>();
         services.AddSingleton<IStorageDefinitionValidator, LocalStorageDefinitionValidator>();
         services.AddSingleton<StorageAspRemoteAdapter>();
+        services.AddSingleton<IStorageDocumentGateway, StorageDocumentGateway>();
+        services.AddSingleton<StorageDocumentService>();
+        services.AddSingleton<IStorageDocumentToolExposure, StorageDocumentToolExposure>();
+        services.AddSingleton<IStorageUsageProvider, StorageDocumentToolUsageProvider>();
         services.AddSingleton<IStorageContentGateway, StorageContentGateway>();
-        services.AddSingleton<IStoragePublicationGateway, LocalStoragePublicationGateway>();
+        services.AddSingleton<LocalStoragePublicationGateway>();
+        services.AddSingleton<IStoragePublicationGateway, StoragePublicationGateway>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepStorageTypeProvisioner>();
         return services;
     }

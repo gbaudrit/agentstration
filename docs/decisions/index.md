@@ -242,3 +242,15 @@ Use **Proposed** when implementation or repository evidence does not establish a
 211. [ADR-0211 — Resources bind ordered Flows to typed composition points](0211-resource-bound-flow-composition-points.md)
 
 212. [ADR-0212 — Source content has independent freshness and retention policies](0212-source-content-lifecycle-and-ephemeral-handoff.md)
+
+213. [ADR-0213 — ASP documents use additive capabilities and open query profiles](0213-asp-document-capabilities-and-open-query-profiles.md)
+
+214. [ADR-0214 — Structured queries start with a bounded OData profile](0214-bounded-standard-odata-query-profile.md)
+
+215. [ADR-0215 — Logical document collections remain governed Storage configuration](0215-logical-document-collections-remain-storage-configuration.md)
+
+216. [ADR-0216 — PostgreSQL JSONB uses an autonomous provider-owned layout](0216-postgresql-jsonb-is-an-autonomous-asp-provider.md)
+
+217. [ADR-0217 — Structured Snapshots pin immutable document publications](0217-structured-snapshots-pin-immutable-document-publications.md)
+
+218. [ADR-0218 — Structured storage does not define agent Memory policy](0218-structured-storage-does-not-define-memory-policy.md)

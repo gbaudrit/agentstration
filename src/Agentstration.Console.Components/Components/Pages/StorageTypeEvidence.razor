@@ -14,7 +14,12 @@
         {
             <dt>@T("Contribution")</dt><dd><code>@proof.Provider · @proof.ProviderUid · @proof.ProviderGeneration · @proof.ContributionId · @proof.Version · @proof.Digest</code></dd>
         }
-        <dt>@T("Capabilities")</dt><dd data-testid="storage-capabilities">@string.Join(" · ", Capabilities(choice.Version.Capabilities))</dd>
+        @if (choice.Version.Documents is { } documents)
+        {
+            <dt>@T("Documents.Capabilities")</dt><dd>@string.Join(" · ", DocumentCapabilities(documents))</dd>
+            <dt>@T("Documents.Profiles")</dt><dd>@foreach (var profile in documents.QueryProfiles) { <p><code>@profile.Id / @profile.Version · @profile.Encoding</code></p> }</dd>
+        }
+        else { <dt>@T("Capabilities")</dt><dd data-testid="storage-capabilities">@string.Join(" · ", Capabilities(choice.Version.Capabilities))</dd> }
         <dt>@T("Limits")</dt><dd>@T("LimitsValue", choice.Version.Limits.MaximumPageSize, choice.Version.Limits.MaximumReadBytes, choice.Version.Limits.MaximumWriteBytes)</dd>
         <dt>@T("Deprecated")</dt><dd>@T(choice.Version.Deprecated ? "Yes" : "No")</dd>
     </dl>
@@ -22,6 +27,11 @@
 @code {
     [Parameter] public StorageTypeChoice? Choice { get; set; }
     private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private IEnumerable<string> DocumentCapabilities(StorageDocumentCapabilities value)
+    {
+        var flags = new (string Name, bool Supported)[] { ("Get", value.Get), ("Put", value.Put), ("Delete", value.Delete), ("Query", value.Query), ("Publish", value.ImmutablePublications) };
+        return flags.Where(f => f.Supported).Select(f => T("Documents." + f.Name));
+    }
     private IEnumerable<string> Capabilities(StorageCapabilities value)
     {
         var flags = new (string Name, bool Supported)[] { ("List", value.List), ("Stat", value.Stat), ("Read", value.Read), ("Write", value.Write), ("Delete", value.Delete), ("StableVersions", value.StableVersions), ("DurableRetention", value.DurableRetention) };

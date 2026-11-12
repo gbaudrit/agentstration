@@ -5,18 +5,18 @@ using Agentstration.Flows;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Knowledge;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Storage.Sqlite;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Agentstration.Infrastructure.Storage;
-using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -169,6 +169,32 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(KnowledgeSnapshotLifecycleState.Retiring, protectedSnapshot.LifecycleState);
         var continuation = await access.ReadAsync(id, new() { Cursor = page.NextCursor }, default);
         Assert.AreEqual(first.Value.SnapshotName, continuation.SnapshotId);
+        // Retired metadata at the head of a bounded cleanup batch must not starve later publications (#1137).
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context))
+        {
+            var resources = factory.Services.GetRequiredService<IResourceStore>();
+            var retiredHead = new Dictionary<Guid, DateTimeOffset>();
+            for (var index = 0; index < 16; index++)
+            {
+                var old = await resources.CreateImmutableAsync(protectedSnapshot.Snapshot with
+                {
+                    Uid = Guid.NewGuid(),
+                    Generation = 1,
+                    Metadata = new() { Name = "retired-fixture-" + index },
+                    PublishedAt = protectedSnapshot.Snapshot.PublishedAt.AddDays(-1 - index),
+                    Artifacts = []
+                }, default);
+                retiredHead.Add(old.Value.Uid, clock.Now);
+            }
+            var address = new ScopedResourceAddress(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId), knowledge.Value.Namespace,
+                KnowledgeResourceKinds.KnowledgeSnapshotObservedState, "snapshot-state-" + knowledge.Value.Uid.ToString("N"));
+            var state = (await resources.GetExactAsync<KnowledgeSnapshotObservedResource>(address, default))!;
+            await resources.PutExactAsync(address.ScopeRef, state.Value with
+            {
+                Generation = state.Value.Generation + 1,
+                RetiredSnapshots = state.Value.RetiredSnapshots.Concat(retiredHead).ToDictionary(pair => pair.Key, pair => pair.Value)
+            }, state.ETag, false, default);
+        }
         clock.Now += KnowledgeAccessService.SessionLifetime;
         await history.MaintainAsync(knowledge.Value, default);
         Assert.AreEqual(KnowledgeSnapshotLifecycleState.Retired, (await snapshots.GetAsync(new(first.Value.SnapshotName!), default)).LifecycleState);

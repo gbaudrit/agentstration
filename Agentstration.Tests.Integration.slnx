@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/tests/structured/">
+    <Project Path="tests/Agentstration.Extensions.PostgreSql.Tests/Agentstration.Extensions.PostgreSql.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/integration/">
     <Project Path="asp/tests/Agentstration.Asp.Tests/Agentstration.Asp.Tests.csproj" />
     <Project Path="tests/Agentstration.ResourcePlanning.Tests/Agentstration.ResourcePlanning.Tests.csproj" />

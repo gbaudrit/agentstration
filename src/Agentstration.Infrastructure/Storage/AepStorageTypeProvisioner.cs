@@ -78,6 +78,8 @@ public sealed class AepStorageTypeProvisioner(StorageTypeManagementService types
             Asp = new(version.Asp.Profile, version.Asp.McpServer, version.Asp.ToolPrefix, version.Asp.ProviderId,
             version.Asp.ProviderVersion, version.Asp.BindingPath),
             Contribution = new(provider, providerUid, generation, contributionId, version.Version, AepStorageProtocol.Digest(version)),
-            Deprecated = version.Deprecated
+            Deprecated = version.Deprecated,
+            Documents = version.Documents is { } documents ? new(documents.Get, documents.Put, documents.Delete, documents.Query,
+                documents.ImmutablePublications, documents.QueryProfiles.Select(p => new StorageQueryProfile(p.Id, p.Version, p.Encoding)).ToArray()) : null
         };
 }

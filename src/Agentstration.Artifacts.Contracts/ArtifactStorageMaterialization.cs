@@ -23,7 +23,10 @@ public static class ArtifactStorageReferences
     private const string Prefix = "artifact-storage-v2.";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public static string PublicationIdentity(StoragePublicationReference reference) =>
-        "publication:" + reference.Target.Storage.StorageUid.ToString("N") + ":" + reference.Key;
+        reference.Document is { } document
+            ? "document-publication:" + reference.Target.Storage.StorageUid.ToString("N") + ":" + document.Publication.Target.CollectionUid.ToString("N")
+                + ":" + document.Publication.Publication.Id + ":" + document.DocumentId
+            : "publication:" + reference.Target.Storage.StorageUid.ToString("N") + ":" + reference.Key;
     public static FlowRunArtifactId Identity(WorkspaceId workspaceId, string identity)
     {
         var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{workspaceId.Value:N}:{identity}"));

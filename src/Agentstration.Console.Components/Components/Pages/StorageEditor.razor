@@ -68,6 +68,10 @@ else
                 <section class="panel form-section" data-testid="storage-envelope"><div class="panel-header"><h2>@T("Envelope")</h2></div><p>@T("Envelope.Help")</p><JsonSchemaInputEditor @key="TypeKey" Schema="current.Version.EnvelopeSchema" Value="model.Envelope" ValueChanged="value => model.Envelope = value" ValidationChanged="value => envelopeValid = value.IsValid" Disabled="busy" /></section>
             }
             else if (!IsNew) { <p role="status">@T("SavedTypeUnavailable")</p> }
+            @if (SelectedType?.Version.Documents is { } documentCapabilities)
+            {
+                <StorageCollectionsEditor Value="model.Collections" ValueChanged="value => model.Collections = value.ToList()" Capabilities="documentCapabilities" ValidationChanged="value => collectionsValid = value" />
+            }
             <DescendantUseGrantEditor OwnerScopeRef="ownerScope" Targets="scopeTargets" Grants="model.UseGrants" />
         </fieldset>
         @if (validationFailed) { <p class="field-validation-error" role="alert">@T("Validation.Required")</p> }
@@ -94,7 +98,7 @@ else
     private ResourceScopeRef? ownerScope;
     private ResourceNamespace resourceNamespace = ResourceNamespace.Default;
     private string? etag, loadedKey;
-    private bool loading = true, busy, configurationValid = true, envelopeValid = true, validationFailed, confirmRebind, servicesUnavailable;
+    private bool loading = true, busy, configurationValid = true, envelopeValid = true, collectionsValid = true, validationFailed, confirmRebind, servicesUnavailable;
     private Exception? error;
     private bool IsNew => string.IsNullOrEmpty(Name) && EmbeddedAddress is null;
     private bool CanWrite => Context.HasPermission("resources/write") && ownerScope?.Value == Context.Current?.SelectedScopeRef && original?.Governance.IsManaged != true;
@@ -103,7 +107,7 @@ else
     private StorageTypeChoice? SelectedType => variants.FirstOrDefault(value => value.Matches(model.Type));
     private ConnectedServiceResource? SelectedService => services.FirstOrDefault(value => Key(value) == ServiceKey && value.Definition.Type == model.ConnectedServiceType);
     private bool BindingChanged => original is null || model.Type is not null && StorageDigests.Binding(original.Definition) != StorageDigests.Binding(model.Properties());
-    private bool CanSave => !loading && !busy && CanWrite && model.Type is not null && configurationValid && envelopeValid && (!BindingChanged || ValidBinding);
+    private bool CanSave => !loading && !busy && CanWrite && model.Type is not null && configurationValid && envelopeValid && collectionsValid && (!BindingChanged || ValidBinding);
     private bool ValidBinding => SelectedType is { } choice && Available(choice) && (!choice.Version.RequiresConnectedService || SelectedService is { } service && ServiceAvailable(service)) && choice.Version.Requirements.Where(value => value.Required).All(requirement => model.Bindings.Any(binding => binding.RequirementId == requirement.Id && Exports.Contains(binding.Export) && Compatible(requirement, binding.Export)));
     private IReadOnlyList<ConnectedServiceExportDescriptor> Exports => SelectedService is not { } service ? [] : serviceTypes.Where(type => type.Uid == service.Definition.Type.TypeUid && type.Name == service.Definition.Type.Type.Name && type.ScopeRef == service.Definition.Type.Type.ScopeRef && type.Namespace == (service.Definition.Type.Type.Namespace ?? service.Namespace)).SelectMany(type => type.Definition.Versions.Where(version => version.Version == service.Definition.Type.Version && version.SchemaDigest == service.Definition.Type.SchemaDigest)).SelectMany(version => version.Exports).ToArray();
     private string BackUrl => original is null ? "/storages" : StorageLinks.Details(original);

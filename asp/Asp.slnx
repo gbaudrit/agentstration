@@ -1,11 +1,14 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Asp.OData/Agentstration.Asp.OData.csproj" />
     <Project Path="src/Agentstration.Asp.Server/Agentstration.Asp.Server.csproj" />
     <Project Path="src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
     <Project Path="src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
   </Folder>
-  <Folder Name="/samples/"><Project Path="samples/LocalStorage/LocalStorage.csproj" /></Folder>
+  <Folder Name="/samples/"><Project Path="samples/LocalStorage/LocalStorage.csproj" />
+    <Project Path="samples/StructuredDocuments/StructuredDocuments.csproj" />
+  </Folder>
   <Folder Name="/tests/"><Project Path="tests/Agentstration.Asp.Tests/Agentstration.Asp.Tests.csproj" /></Folder>
   <Project Path="../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
   <Project Path="../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />

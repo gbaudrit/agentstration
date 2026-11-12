@@ -7,6 +7,7 @@ using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Knowledge;
 
@@ -35,7 +36,7 @@ public sealed partial class KnowledgeAccessService(
     KnowledgeSourceManagementService sources, KnowledgeSnapshotService snapshots, KnowledgeProjectionService projections,
     IResourceStore resources, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
     IAuthorizationService authorization, IKnowledgeSnapshotContentReader content,
-    IKnowledgeAccessTokenProtector protector, TimeProvider clock, IKnowledgeAccessLifetime? lifetime = null, ISecurityAuditWriter? audit = null)
+    IKnowledgeAccessTokenProtector protector, TimeProvider clock, IKnowledgeAccessLifetime? lifetime = null, ISecurityAuditWriter? audit = null, IStorageDocumentGateway? documents = null)
 {
     public const string SessionKind = "KnowledgeReadSession";
     public const int MaximumCharacters = 32_768;
@@ -69,6 +70,7 @@ public sealed partial class KnowledgeAccessService(
         public int ContextCharacters { get; init; }
         public string? RequestKey { get; init; }
         public long SourceGeneration { get; init; }
+        public StorageDocumentQuery? DocumentQuery { get; init; }
     }
 
     private RequestContext Context() => KnowledgeOperationalRead.AdministrativeContext(current)

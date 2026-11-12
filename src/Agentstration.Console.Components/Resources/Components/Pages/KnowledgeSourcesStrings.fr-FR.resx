@@ -134,4 +134,10 @@
   <data name="DirectInput" xml:space="preserve"><value>Entrée directe</value></data>
   <data name="InputFallbackUsed" xml:space="preserve"><value>Ancienne acquisition utilisée</value></data>
   <data name="InputRefreshFailed" xml:space="preserve"><value>Échec du rafraîchissement :</value></data>
+  <data name="StructuredOutputCollection" xml:space="preserve"><value>Collection de sortie structurée</value></data>
+  <data name="StructuredOutputNone" xml:space="preserve"><value>Sortie de contenu (sans collection structurée)</value></data>
+  <data name="StructuredOutputHelp" xml:space="preserve"><value>Sélectionnez une collection autorisant la publication immuable. Chaque objet JSON projeté devient un document canonique dans un Snapshot exact conservé.</value></data>
+  <data name="Operation.StructuredQuery" xml:space="preserve"><value>Interroger les documents structurés</value></data>
+  <data name="StructuredQueryPayload" xml:space="preserve"><value>Requête structurée (JSON)</value></data>
+  <data name="StructuredQueryHelp" xml:space="preserve"><value>Nécessite un Storage documentaire et un profil de requête compatibles. Pour OData, utilisez par exemple {"$filter":"status eq 'degraded'"}. Les Snapshots historiques conservent leur Storage et leur modèle d’origine.</value></data>
 </root>

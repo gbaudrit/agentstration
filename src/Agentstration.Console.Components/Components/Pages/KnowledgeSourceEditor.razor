@@ -33,11 +33,15 @@ else
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
             <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
             @if (HasNativeDatasetInput && savedOutput is null && string.IsNullOrEmpty(outputStorageKey)) { <p class="form-alert form-alert-info form-span-2" role="status">@T("NativeDatasetDraftHelp")</p> }
-            <label class="form-field-wide"><span>@T("OutputStorage")</span><select @bind="outputStorageKey" data-testid="knowledge-output-storage">
+            <label class="form-field-wide"><span>@T("OutputStorage")</span><select @bind="outputStorageKey" @bind:after="() => outputCollectionUid = Guid.Empty" data-testid="knowledge-output-storage">
                 <option value="">@T("ArtifactOutputDefault")</option>
                 @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef</option> }
                 @if (savedOutput is not null && !storages.Any(value => StorageKey(value) == outputStorageKey)) { <option value="@outputStorageKey">@T("PinnedOutputStorage")</option> }
             </select><small>@T("OutputStorageHelp")</small></label>
+            @if (SelectedOutputStorage is { Definition.Collections.Count: > 0 } structuredStorage)
+            {
+                <label class="form-field-wide"><span>@T("StructuredOutputCollection")</span><select @bind="outputCollectionUid" data-testid="knowledge-output-collection"><option value="@Guid.Empty">@T("StructuredOutputNone")</option>@foreach (var collection in structuredStorage.Definition.Collections.Where(c => c.Enabled && c.Policy.Publish)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</select><small>@T("StructuredOutputHelp")</small></label>
+            }
             <label class="form-field-wide"><span>@T("OutputPrefix")</span><input @bind="outputPrefix" data-testid="knowledge-output-prefix" /><small>@T("OutputPrefixHelp")</small></label>
             <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <label><span>@T("NativeLegacyRetrieval")</span><select @bind="retrievalFlowKey" data-testid="knowledge-source-retrieval-flow"><option value="">@T("NativeNoRetrieval")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select><small>@T("NativeLegacyRetrievalHelp")</small></label>
@@ -91,14 +95,16 @@ else
     private KnowledgeOutputStorage? savedOutput;
     private string outputStorageKey = string.Empty, outputPrefix = string.Empty;
     private static string StorageKey(StorageResource value) => $"{value.Uid}:{value.Generation}:{StorageDigests.Binding(value.Definition)}";
+    private Guid outputCollectionUid;
+    private StorageResource? SelectedOutputStorage => storages.FirstOrDefault(s => StorageKey(s) == outputStorageKey);
     private KnowledgeOutputStorage? OutputSelection()
     {
         if (string.IsNullOrEmpty(outputStorageKey)) return null;
         if (savedOutput is not null && outputStorageKey == $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}")
-            return savedOutput with { Rule = savedOutput.Rule with { Prefix = outputPrefix } };
+            return savedOutput with { Rule = savedOutput.Rule with { Prefix = outputPrefix }, DocumentCollectionUid = outputCollectionUid == Guid.Empty ? null : outputCollectionUid };
         var selected = storages.Single(value => StorageKey(value) == outputStorageKey);
         return new(new(new(selected.ScopeRef!.Value, selected.Namespace, selected.Kind, selected.Name), selected.Uid,
-            selected.Generation, StorageDigests.Binding(selected.Definition)), new(Write: true, Prefix: outputPrefix));
+            selected.Generation, StorageDigests.Binding(selected.Definition)), new(Write: true, Prefix: outputPrefix)) { DocumentCollectionUid = outputCollectionUid == Guid.Empty ? null : outputCollectionUid };
     }
     private readonly Dictionary<string, IReadOnlyList<DataSourceAcquisitionTargetView>> acquisitionTargets = new(StringComparer.Ordinal);
     private IReadOnlyList<FlowOption> projectionFlows = [], retrievalFlows = [], transformationFlows = [];
@@ -154,6 +160,7 @@ else
                 if (snapshot.Value.Definition.Transformations.Count > 0) compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(compositionPoints) { ["postAggregate"] = snapshot.Value.Definition.Transformations };
                 automaticParameters = snapshot.Value.Definition.ProjectionParameters.Clone();
                 savedOutput = snapshot.Value.Definition.Output;
+                outputCollectionUid = savedOutput?.DocumentCollectionUid ?? Guid.Empty;
                 outputStorageKey = savedOutput is null ? string.Empty : $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}";
                 outputPrefix = savedOutput?.Rule.Prefix ?? string.Empty;
                 projectionFlowKey = TargetKey(snapshot.Value.Definition.ProjectionFlow, snapshot.Value.Namespace);

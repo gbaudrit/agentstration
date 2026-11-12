@@ -900,8 +900,12 @@ public sealed class AepEnrollmentTests
     }
 
     [TestMethod]
-    public async Task SharedKeyAnnouncementProvesPossessionAndCreatesTheRegistration()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task SharedKeyAnnouncementProvesPossessionAndCreatesTheRegistration(bool provisionContributions)
     {
+        var recorder = new RecordingResourceProvisioner();
+        var handler = new EnrollmentLifecycleHandler("extension.shared-key");
         var path = Path.GetTempFileName();
         var sharedKey = new string('s', 43);
         await File.WriteAllTextAsync(path, sharedKey + "\n");
@@ -911,7 +915,16 @@ public sealed class AepEnrollmentTests
             {
                 builder.UseSetting("Agentstration:Extensions:extension.shared-key:EnrollmentMode", "SharedKeyFile");
                 builder.UseSetting("Agentstration:Extensions:extension.shared-key:SharedKeyFile:Path", path);
-                builder.ConfigureServices(services => services.RemoveAll<IAepEnrollmentResourceProvisioner>());
+                builder.ConfigureServices(services =>
+                {
+                    services.RemoveAll<IAepEnrollmentResourceProvisioner>();
+                    if (provisionContributions)
+                    {
+                        services.AddSingleton<IAepEnrollmentResourceProvisioner>(recorder);
+                        services.RemoveAll<IHttpClientFactory>();
+                        services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+                    }
+                });
             });
             var context = await GetBootstrapContextAsync(factory);
             var service = factory.Services.GetRequiredService<AepEnrollmentService>();
@@ -932,6 +945,12 @@ public sealed class AepEnrollmentTests
             var enrollment = (await service.ListAsync(context, default)).Single(value => value.Definition.InstanceId == announcement.InstanceId);
             Assert.AreEqual(AepEnrollmentState.Available, enrollment.Definition.State);
             Assert.AreEqual(AepEnrollmentMode.SharedKeyFile, enrollment.Definition.EnrollmentMode);
+            if (provisionContributions)
+            {
+                Assert.IsNotNull(recorder.Manifest);
+                Assert.AreEqual("extension.shared-key", recorder.Manifest.Extension.Id);
+                Assert.AreEqual(targetScope, recorder.Registration!.ScopeRef);
+            }
             Assert.AreEqual("extension-shared-key", enrollment.Definition.RegistrationName);
             using var systemScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
             var registration = await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>().GetExactAsync(

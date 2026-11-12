@@ -4,6 +4,7 @@ using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
 
 namespace Agentstration.Knowledge;
@@ -22,8 +23,9 @@ public sealed class KnowledgeSourceToolExposureService(
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes,
     ISecurityAuditWriter audit,
-    IKnowledgeAccessToolResolver? nativeTools = null)
+    IKnowledgeAccessToolResolver? nativeTools = null, IStorageDocumentGateway? documents = null)
 {
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private const string KnowledgeSourceUidAnnotation = "agentstration.io/knowledge-source-uid";
     private static readonly KnowledgeSourceOperation[] Operations =
         [KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus];
@@ -57,6 +59,17 @@ public sealed class KnowledgeSourceToolExposureService(
         if (!readiness.Ready)
             throw new KnowledgeSourceValidationException("knowledge_source_not_ready", "Only a ready KnowledgeSource can be exposed as Tools.");
         var supportedOperations = Operations;
+        StorageQueryProfilePin? queryProfile = null;
+        if (source.Value.Definition.Output is { DocumentCollectionUid: { } collection } output)
+        {
+            if (documents is null) throw new KnowledgeSourceValidationException("knowledge_documents_unavailable", "Document capability discovery is unavailable.");
+            var description = await documents.DescribeAsync(new(output.Storage, new(scopeRef, source.Value.Address), collection,
+                new(QueryProfiles: null)), cancellationToken);
+            if (description.Policy.Query && description.Capabilities.ImmutablePublications)
+                queryProfile = description.QueryProfiles.FirstOrDefault();
+            supportedOperations = description.Policy.Get ? Operations : [KnowledgeSourceOperation.GetStatus];
+            if (queryProfile is not null) supportedOperations = [.. supportedOperations, KnowledgeSourceOperation.StructuredQuery];
+        }
         var toolSetName = source.Value.Name + ".access";
         var existingToolSet = await toolSets.GetExactAsync(scopeRef,
             source.Value.Namespace, toolSetName, cancellationToken);
@@ -106,6 +119,7 @@ public sealed class KnowledgeSourceToolExposureService(
                     DisplayName = $"{source.Value.Definition.DisplayName} {route}",
                     Description = operation switch
                     {
+                        KnowledgeSourceOperation.StructuredQuery => "Query structured documents in an exact immutable Snapshot. The relay fixes the query profile and model. Initial requests provide query; continuations provide cursor only. No document writes, SQL or physical destination selection. Profile: " + queryProfile!.Id + "/" + queryProfile.Version,
                         KnowledgeSourceOperation.Read => "Read Unicode character chunks. Without a Snapshot or cursor, prepare current data if necessary. Continue with cursor only; a cursor stays on the same Snapshot. Reuse search_regex snapshotId, documentId and readRange as range.",
                         KnowledgeSourceOperation.SearchRegex => "Search a Snapshot using a bounded .NET non-backtracking regular expression. May be called before read; prepares data if necessary. Returns Unicode matchRange and readRange for read. Continue with cursor only. Unsupported lookarounds and backreferences are rejected.",
                         _ => "Inspect active and latest published Snapshots, compare a snapshotId and inspect input freshness and processing without starting acquisition or projection. Freshness is evidence from recorded inputs, not a guarantee about the remote origin."
@@ -120,7 +134,9 @@ public sealed class KnowledgeSourceToolExposureService(
                             name = source.Value.Name, @namespace = source.Value.Namespace.Value,
                             scopeRef = source.Value.ScopeRef!.Value.Value, uid = source.Value.Uid
                         })
-                    }]
+                    }, .. operation == KnowledgeSourceOperation.StructuredQuery
+                        ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = "/request/profile", Value = JsonSerializer.SerializeToElement(queryProfile, Json) } }
+                        : []]
                 }
             }, current?.ETag, current is null, cancellationToken);
 

@@ -5,11 +5,13 @@ namespace Agentstration.Knowledge.Contracts;
 
 public static class KnowledgeAccessSchemas
 {
+    public const string DocumentQueryTool = "knowledge.documents.query";
     public const string ReadTool = "knowledge.content.read";
     public const string RegexTool = "knowledge.content.search-regex";
     public const string StatusTool = "knowledge.content.get-status";
     public static string Route(KnowledgeSourceOperation operation) => operation switch
     {
+        KnowledgeSourceOperation.StructuredQuery => "query_documents",
         KnowledgeSourceOperation.Read => "read",
         KnowledgeSourceOperation.SearchRegex => "search_regex",
         KnowledgeSourceOperation.GetStatus => "get_status",
@@ -17,6 +19,7 @@ public static class KnowledgeAccessSchemas
     };
     public static string ToolName(KnowledgeSourceOperation operation) => operation switch
     {
+        KnowledgeSourceOperation.StructuredQuery => DocumentQueryTool,
         KnowledgeSourceOperation.Read => ReadTool,
         KnowledgeSourceOperation.SearchRegex => RegexTool,
         KnowledgeSourceOperation.GetStatus => StatusTool,
@@ -52,6 +55,12 @@ public static class KnowledgeAccessSchemas
             properties["ignoreCase"] = new JsonObject { ["type"] = "boolean" };
             properties["limit"] = Integer(1, 100);
             properties["contextCharacters"] = Integer(0, 1000);
+        }
+        if (operation == KnowledgeSourceOperation.StructuredQuery)
+        {
+            properties["query"] = new JsonObject();
+            properties["pageSize"] = Integer(1, 100);
+            properties["profile"] = JsonNode.Parse("""{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"string"},"encoding":{"type":"string"},"modelDigest":{"type":"string"}},"required":["id","version","encoding","modelDigest"],"additionalProperties":false}""");
         }
         return JsonSerializer.SerializeToElement(new JsonObject
         {

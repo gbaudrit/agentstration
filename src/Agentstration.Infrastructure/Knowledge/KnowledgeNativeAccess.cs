@@ -117,6 +117,7 @@ public abstract class KnowledgeAccessMcpTool(KnowledgeAccessService access, Know
             var request = invocation.Arguments.GetProperty("request");
             object result = Operation switch
             {
+                KnowledgeSourceOperation.StructuredQuery => await access.QueryDocumentsAsync(id, request.Deserialize<KnowledgeDocumentQueryRequest>(Json)!, cancellationToken),
                 KnowledgeSourceOperation.Read => await access.ReadAsync(id, request.Deserialize<KnowledgeReadRequest>(Json)!, cancellationToken),
                 KnowledgeSourceOperation.SearchRegex => await access.SearchRegexAsync(id, request.Deserialize<KnowledgeRegexRequest>(Json)!, cancellationToken),
                 _ => await access.GetStatusAsync(id, request.Deserialize<KnowledgeStatusRequest>(Json)!, cancellationToken)
@@ -141,3 +142,7 @@ public sealed class KnowledgeContentRegexMcpTool(KnowledgeAccessService access, 
 public sealed class KnowledgeContentStatusMcpTool(KnowledgeAccessService access, KnowledgeSourceManagementService sources,
     ICurrentRequestContext current) : KnowledgeAccessMcpTool(access, sources, current)
 { protected override KnowledgeSourceOperation Operation => KnowledgeSourceOperation.GetStatus; }
+
+public sealed class KnowledgeDocumentQueryMcpTool(KnowledgeAccessService access, KnowledgeSourceManagementService sources,
+    ICurrentRequestContext current) : KnowledgeAccessMcpTool(access, sources, current)
+{ protected override KnowledgeSourceOperation Operation => KnowledgeSourceOperation.StructuredQuery; }

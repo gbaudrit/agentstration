@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
@@ -11,7 +12,7 @@ namespace Agentstration.Infrastructure.Knowledge;
 
 public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publications, IResourceStore resources,
     IArtifactDurableStore durable, IAuthorizationService authorization, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
-    IStoredArtifactRegistrar artifacts) : IKnowledgeOutputPublisher
+    IStoredArtifactRegistrar artifacts, IStorageDocumentGateway? documents = null, IStorageResolver? storages = null, TimeProvider? clock = null) : IKnowledgeOutputPublisher
 {
     public async Task<IReadOnlyList<KnowledgeSnapshotArtifact>> PublishAsync(KnowledgeSourceResource source,
         KnowledgeProjectionResource projection, KnowledgeProjectionManifest manifest, CancellationToken cancellationToken)
@@ -25,6 +26,8 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
         };
         var target = new StorageContentRequest(output.Storage, new(consumer, source.Address),
             output.Rule with { Prefix = output.Rule.Prefix + "knowledge/" + source.Uid.ToString("N") + "/" });
+        var structured = new List<StorageDocumentValue>();
+        var canonical = new Dictionary<string, byte[]>();
         var result = new List<KnowledgeSnapshotArtifact>();
         foreach (var item in manifest.Artifacts)
         {
@@ -56,7 +59,22 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
             var digest = Convert.ToHexStringLower(SHA256.HashData(bytes.Span));
             if (item.Digest is { } expected && !string.Equals(expected.Replace("sha256:", "", StringComparison.OrdinalIgnoreCase), digest, StringComparison.OrdinalIgnoreCase))
                 throw new KnowledgeProjectionException("knowledge_output_integrity", "The output digest differs from the declared content.");
-            var reference = await publications.PrepareAsync(target, projection.Name + ":" + item.ArtifactId, bytes, cancellationToken);
+            var sourceDigest = digest;
+            StoragePublicationReference? reference = null;
+            if (output.DocumentCollectionUid is not null)
+            {
+                using var json = JsonDocument.Parse(bytes);
+                if (json.RootElement.ValueKind != JsonValueKind.Object)
+                    throw new KnowledgeProjectionException("knowledge_output_document_invalid", "Structured output requires JSON objects.");
+                var id = Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(item.ArtifactId)));
+                var encoded = StorageDocumentEncoding.Encode(json.RootElement);
+                canonical.Add(id, encoded);
+                structured.Add(new(id, string.Empty, json.RootElement.Clone()));
+                bytes = encoded;
+                digest = Convert.ToHexStringLower(SHA256.HashData(encoded));
+                mediaType = "application/json";
+            }
+            else reference = await publications.PrepareAsync(target, projection.Name + ":" + item.ArtifactId, bytes, cancellationToken);
             result.Add(new()
             {
                 ArtifactId = item.ArtifactId,
@@ -67,13 +85,56 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                 ProducerFlowRunId = projection.ProjectionFlowRunId,
                 ProducerFlowStepId = string.Empty,
                 StorageFlowRunId = string.Empty,
-                Provenance = new Dictionary<string, string> { ["publication"] = projection.Name }
+                Provenance = output.DocumentCollectionUid is null
+                    ? new Dictionary<string, string> { ["publication"] = projection.Name }
+                    : new Dictionary<string, string>
+                    {
+                        ["publication"] = projection.Name,
+                        ["sourceArtifactId"] = item.ArtifactId,
+                        ["sourceSha256"] = sourceDigest,
+                        ["canonicalization"] = "invariant-json/1"
+                    }
             });
+        }
+        if (output.DocumentCollectionUid is { } collection)
+        {
+            if (structured.Count is < 1 or > 100)
+                throw new KnowledgeProjectionException("knowledge_output_document_limit", "A structured publication contains between one and one hundred documents.");
+            if (documents is null || storages is null) throw new KnowledgeProjectionException("knowledge_documents_unavailable", "The structured publication services are unavailable.");
+            var resolved = await storages.ResolveAsync(output.Storage, target.Consumer, cancellationToken);
+            var declaration = resolved.Collections.SingleOrDefault(c => c.Uid == collection && c.Enabled)
+                ?? throw new KnowledgeProjectionException("knowledge_output_collection_unavailable", "The exact output collection is unavailable.");
+            var documentTarget = new StorageDocumentTarget(output.Storage, target.Consumer, collection, declaration.Policy);
+            var publicationId = "knowledge-" + projection.Uid.ToString("N");
+            var publication = await documents.PrepareAsync(documentTarget, publicationId, structured, Guid.NewGuid().ToString("N"),
+                (clock ?? TimeProvider.System).GetUtcNow().AddMinutes(4), cancellationToken);
+            var binding = new StoragePublicationBinding(resolved.Type, resolved.ConnectedService,
+                resolved.ConnectedServiceType, StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Bindings)),
+                StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Documents)), "asp.document-publication/1");
+            for (var index = 0; index < result.Count; index++)
+            {
+                var document = structured[index];
+                var bytes = canonical[document.Id];
+                result[index] = result[index] with
+                {
+                    Content = new StoragePublicationReference(target with { DocumentCollectionUid = collection }, document.Id,
+                        publication.Publication.Digest, bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)))
+                    {
+                        Binding = binding,
+                        Document = new(publication, document.Id, publication.Publication.Digest)
+                    }
+                };
+            }
         }
         // Validate and prepare the complete set before sealing any newly written output.
         try
         {
-            foreach (var item in result) await publications.SealAsync(item.Content!, cancellationToken);
+            var sealedPublications = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in result)
+            {
+                var identity = item.Content!.Document?.Publication.Publication.Id ?? item.Content.Key;
+                if (sealedPublications.Add(identity)) await publications.SealAsync(item.Content, cancellationToken);
+            }
         }
         catch (Agentstration.Storage.StorageException exception) when (exception.Code == "storage_publication_unavailable")
         {

@@ -44,6 +44,7 @@ else
             </section>
             <section class="panel form-section"><div class="panel-header"><h2>@T("Configuration")</h2></div><JsonSchemaInputEditor Schema="typeChoice?.Version.ConfigurationSchema" Value="resource.Definition.Configuration" ReadOnly /></section>
             <section class="panel form-section"><div class="panel-header"><h2>@T("Envelope")</h2></div><p>@T("Envelope.Help")</p><JsonSchemaInputEditor Schema="typeChoice?.Version.EnvelopeSchema" Value="resource.Definition.Envelope" ReadOnly /></section>
+            @if (typeChoice?.Version.Documents is not null) { <StorageDocuments @key="resource.Generation" Resource="resource" /> }
             <section class="panel form-section"><div class="panel-header"><h2>@T("Diagnostics")</h2></div>
                 @if (resource.ObservedState is { } state) { <p>@T("ObservedAt"): @state.ObservedAt.ToLocalTime().ToString("g")</p>@foreach (var diagnostic in state.Diagnostics.Take(16)) { <p><code>@diagnostic.Code</code> · @T(StorageErrorKey.For(new AgentstrationApiException(string.Empty, string.Empty, problemTitle: diagnostic.Code)))</p> } }
                 else { <p>@T("NotObserved")</p> }

@@ -192,3 +192,9 @@ content port delegates to these methods without exposing a backend to the Agent.
 Every continuation and status/cleanup call rechecks the current binding and grant.
 See the [ASP protocol](https://github.com/gbaudrit/agentstration/blob/integration/fr-1032/asp/docs/protocol.md) and
 [ADR-0205](../decisions/0205-asp-uses-scoped-progressive-content-sessions.md).
+
+## Structured documents
+
+The additive [document/query vertical](structured-documents.md) uses the same MCP,
+AEP, Connected Service and exact Storage resolution boundaries. Its separate
+`asp.documents/1` mapping does not change the content sessions described above.

@@ -5,12 +5,16 @@
     <div class="panel-header"><div><h2>@T("NativeAccessTitle")</h2><p>@T("NativeAccessHelp")</p></div></div>
     <fieldset class="resource-definition-fields" disabled="@(!interactive || busy)" data-testid="knowledge-native-access-fields" data-interactive="@(interactive ? "true" : "false")">
     <div class="form-grid">
-        <label><span>@T("Operation")</span><select @bind="operation" @bind:after="Reset" data-testid="knowledge-retrieval-operation"><option value="read">@T("Operation.Read")</option><option value="search_regex">@T("Operation.SearchRegex")</option><option value="get_status">@T("Operation.GetStatus")</option></select></label>
+        <label><span>@T("Operation")</span><select @bind="operation" @bind:after="Reset" data-testid="knowledge-retrieval-operation"><option value="read">@T("Operation.Read")</option><option value="search_regex">@T("Operation.SearchRegex")</option>@if (SupportsStructured) { <option value="query_documents">@T("Operation.StructuredQuery")</option> }<option value="get_status">@T("Operation.GetStatus")</option></select></label>
         <label><span>@T("SnapshotOptional")</span><select @bind="snapshotId" @bind:after="Reset" data-testid="knowledge-retrieval-snapshot"><option value="">@T("NativeAutomaticSnapshot")</option>@foreach (var view in Snapshots) { <option value="@view.Snapshot.Name">@view.Snapshot.Name</option> }</select></label>
         @if (operation == "search_regex")
         {
             <label><span>@T("NativePattern")</span><input @bind="pattern" @bind:event="oninput" @bind:after="Reset" maxlength="512" data-testid="knowledge-retrieval-text" /><small>@T("NativePatternHelp")</small></label>
             <label><span>@T("NativeMatchLimit")</span><input type="number" min="1" max="100" @bind="limit" /></label>
+        }
+        @if (operation == "query_documents")
+        {
+            <label class="form-span-2"><span>@T("StructuredQueryPayload")</span><textarea class="form-code-editor" rows="8" @bind="queryPayload" @bind:after="Reset" maxlength="8192"></textarea><small>@T("StructuredQueryHelp")</small></label>
         }
         @if (operation == "read") { <label><span>@T("NativeChunkSize")</span><input type="number" min="1" max="32768" @bind="maxCharacters" data-testid="knowledge-read-size" /></label> }
     </div>
@@ -33,6 +37,7 @@
             {
                 <article><p><code>@match.DocumentId</code> · @T("NativeRange", match.MatchRange.Start, match.MatchRange.End)</p><pre>@match.Excerpt</pre><button class="button-secondary" type="button" disabled="@busy" data-testid="knowledge-read-match" @onclick="() => ReadMatchAsync(match)">@T("NativeReadMatch")</button></article>
             }
+            @if (result.DocumentPage is { } page) { <p><code>@result.QueryProfile?.Id / @result.QueryProfile?.Version · @result.QueryProfile?.ModelDigest</code></p><pre data-testid="knowledge-document-query-result">@JsonSerializer.Serialize(page)</pre> }
             @if (result.EndOfSelection) { <p>@T("NativeEnd")</p> }
             @if (result.CursorExpiresAt is { } expires && result.NextCursor is not null) { <small>@T("NativeCursorExpiry", expires.ToLocalTime().ToString("g"))</small> }
         </section>
@@ -52,10 +57,12 @@
 </section>
 @code {
     [Parameter, EditorRequired] public string SourceName { get; set; } = string.Empty;
+    [Parameter] public bool SupportsStructured { get; set; }
     [Parameter] public ResourceNamespace SourceNamespace { get; set; } = ResourceNamespace.Default;
     [Parameter] public IReadOnlyList<KnowledgeSnapshotView> Snapshots { get; set; } = [];
     private readonly CancellationTokenSource cancellation = new();
     private string operation = "read", snapshotId = string.Empty, pattern = string.Empty;
+    private string queryPayload = "{}";
     private int maxCharacters = 4000, limit = 20;
     private bool busy, error, interactive;
     protected override Task OnAfterRenderAsync(bool firstRender)
@@ -77,13 +84,23 @@
             status = await Client.GetContentStatusAsync(SourceNamespace, SourceName, new(SelectedSnapshot), cancellation.Token);
             result = null;
         }
+        else if (operation == "query_documents")
+        {
+            var description = await Client.DescribeDocumentsAsync(SourceNamespace, SourceName, SelectedSnapshot, cancellation.Token);
+            var profile = description.QueryProfiles.FirstOrDefault() ?? throw new InvalidOperationException();
+            using var query = JsonDocument.Parse(queryPayload);
+            result = await Client.QueryDocumentsAsync(SourceNamespace, SourceName, new() { SnapshotId = SelectedSnapshot,
+                PreparationId = result?.PreparationId, Profile = profile, Query = query.RootElement.Clone(), PageSize = Math.Min(50, description.Policy.MaximumPageSize) }, cancellation.Token);
+        }
         else if (operation == "read")
             result = await Client.ReadContentAsync(SourceNamespace, SourceName, new() { SnapshotId = SelectedSnapshot,
                 PreparationId = result?.PreparationId, DocumentId = selectedDocument, Range = selectedRange, MaxCharacters = maxCharacters }, cancellation.Token);
         else result = await Client.SearchRegexAsync(SourceNamespace, SourceName, new() { Pattern = pattern,
             SnapshotId = SelectedSnapshot, PreparationId = result?.PreparationId, Limit = limit }, cancellation.Token);
     });
-    private Task NextAsync() => ExecuteAsync(async () => result = operation == "read"
+    private Task NextAsync() => ExecuteAsync(async () => result = operation == "query_documents"
+        ? await Client.QueryDocumentsAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor }, cancellation.Token)
+        : operation == "read"
         ? await Client.ReadContentAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor, MaxCharacters = maxCharacters }, cancellation.Token)
         : await Client.SearchRegexAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor, Limit = limit }, cancellation.Token));
     private Task ReadMatchAsync(KnowledgeRegexMatch match)
