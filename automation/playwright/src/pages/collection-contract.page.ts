@@ -35,7 +35,13 @@ export class CollectionContractPage {
 
   public async inspect(locale: SupportedTestLocale, interactions = true): Promise<CollectionObservation> {
     const text = CollectionTextByLocale[locale];
-    if (new URL(this.page.url()).pathname === '/flows') await new FlowCollectionPage(this.page).assertCompactStructure(locale);
+    if (new URL(this.page.url()).pathname === '/flows') {
+      const root = this.page.getByTestId(TestIds.flowObservability.flows);
+      await expect(root).toHaveAttribute('data-interactive', 'true');
+      await expect(root).toHaveAttribute('aria-busy', 'false');
+      if (await root.locator('.collection-identity').count()) await new FlowCollectionPage(this.page).assertCompactStructure(locale);
+      else await expect(root.locator('.state-panel')).toBeVisible();
+    }
     const frames = this.page.locator('.resource-collection:visible');
     const identities = this.page.locator('.collection-identity:visible');
     const menus = this.page.locator('.collection-actions-menu:visible');

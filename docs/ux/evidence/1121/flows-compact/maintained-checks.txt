@@ -1,0 +1,6 @@
+Four unchanged companion version/primary-choice cases from the earlier successful 8-case run; final compact Flow cases use the governed fixture and are recorded in results.json.
+
+  ✓  1 [desktop-chromium] › tests/distribution.spec.ts:23:3 › collection version identity and primary choice en-US dark desktop @smoke (20.8s)
+  ✓  2 [desktop-chromium] › tests/distribution.spec.ts:23:3 › collection version identity and primary choice en-US light desktop @smoke (16.7s)
+  ✓  5 [mobile-chromium] › tests/distribution.spec.ts:23:3 › collection version identity and primary choice fr-FR dark mobile @responsive @smoke (20.2s)
+  ✓  6 [mobile-chromium] › tests/distribution.spec.ts:23:3 › collection version identity and primary choice fr-FR light mobile @responsive @smoke (18.9s)

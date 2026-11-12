@@ -32,6 +32,7 @@ public sealed partial class FlowDetailsDesignerTests
         Assert.IsEmpty(cut.FindAll(".collection-qualified-name > svg"));
         StringAssert.Contains(cut.Find("a.resource-name-link").GetAttribute("href")!, "scopeRef=");
         Assert.AreEqual("team/flow-1", cut.Find(".collection-qualified-name code").TextContent);
+        Assert.AreEqual("Managed / read-only", cut.Find(".managed-icon-only button").GetAttribute("aria-label"));
         Assert.HasCount(2, cut.FindAll("tbody tr")[1].QuerySelectorAll(".collection-version-compact"));
         Assert.AreEqual("r17", cut.Find(".collection-version-draft code").TextContent);
         Assert.AreEqual("Draft, revision 17", cut.Find(".collection-version-draft .disclosure-trigger").GetAttribute("aria-label"));

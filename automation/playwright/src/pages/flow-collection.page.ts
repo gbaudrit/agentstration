@@ -4,11 +4,14 @@ import { TestIds } from '../contracts/test-ids.js';
 import { FlowCollectionTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 
 export class FlowCollectionPage {
+  private contextScope: string | null = null;
   public constructor(private readonly page: Page) {}
+  private headers(): Record<string, string> { return this.contextScope ? { 'X-Agentstration-Context': this.contextScope } : {}; }
   private root() { return this.page.getByTestId(TestIds.flowObservability.flows); }
   private rows() { return this.root().locator('tbody tr, .collection-card'); }
 
   public async assertCompactStructure(locale: SupportedTestLocale): Promise<void> {
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await expect(this.root()).toHaveAttribute('data-interactive', 'true');
     await expect(this.root()).toHaveAttribute('aria-busy', 'false');
     const row = this.rows().first();
@@ -31,23 +34,29 @@ export class FlowCollectionPage {
     expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   }
 
+  public async assertManagedPreview(): Promise<void> {
+    await expect(this.root().locator('.managed-icon-only button').first()).toBeVisible();
+    await expect(this.root().locator('.managed-icon-only button').first()).toHaveAccessibleName(/.+/);
+  }
+
   public async seed(consoleUrl: string): Promise<string[]> {
+    this.contextScope = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope');
     const prefix = `000-compact-${randomUUID().slice(0, 8)}`;
     const ids: string[] = [];
     for (let index = 0; index < 22; index++) {
       const id = `${prefix}-${String(index).padStart(2, '0')}`;
-      const response = await this.page.request.post(`${consoleUrl}/api/flows/drafts`, { data: { name: id, displayName: index === 0 ? 'Compact published Flow with draft' : `Compact Flow ${index}`, template: 'Empty' } });
+      const response = await this.page.request.post(`${consoleUrl}/api/flows/drafts`, { headers: this.headers(), data: { name: id, displayName: index === 0 ? 'Compact published Flow with draft' : `Compact Flow ${index}`, template: 'Empty' } });
       expect(response.status(), await response.text()).toBe(201);
       ids.push(id);
     }
-    const published = await this.page.request.post(`${consoleUrl}/api/flows/${ids[0]}/publish`, { data: { version: '1.0.0', activate: true } });
+    const published = await this.page.request.post(`${consoleUrl}/api/flows/${ids[0]}/publish`, { headers: this.headers(), data: { version: '1.0.0', activate: true } });
     expect(published.status(), await published.text()).toBe(201);
     return ids;
   }
 
   public async remove(consoleUrl: string, ids: string[]): Promise<void> {
     for (const id of ids) {
-      const response = await this.page.request.delete(`${consoleUrl}/api/flows/${id}`);
+      const response = await this.page.request.delete(`${consoleUrl}/api/flows/${id}${this.contextScope ? `?scopeRef=${encodeURIComponent(this.contextScope)}` : ''}`, { headers: this.headers() });
       expect(response.status(), await response.text()).toBe(204);
     }
   }
@@ -55,25 +64,33 @@ export class FlowCollectionPage {
   public async exercisePagination(consoleUrl: string, locale: SupportedTestLocale): Promise<void> {
     const text = FlowCollectionTextByLocale[locale];
     const expected = async (skip: number, top: number) => {
-      const response = await this.page.request.get(`${consoleUrl}/api/flows?allNamespaces=true&skip=${skip}&top=${top}`);
+      const response = await this.page.request.get(`${consoleUrl}/api/flows?allNamespaces=true&skip=${skip}&top=${top}`, { headers: this.headers() });
       expect(response.ok()).toBe(true);
       const body = await response.json() as { value: { namespace: string; id: string }[]; nextLink: string | null };
-      return body.value.map(item => `${item.namespace}/${item.id}`);
+      return { identities: body.value.map(item => `${item.namespace}/${item.id}`), hasMore: Boolean(body.nextLink) };
     };
     await this.assertCompactStructure(locale);
-    await expect(this.rows().locator('.collection-qualified-name code')).toHaveText(await expected(0, 20));
+    const first = await expected(0, 20);
+    await expect(this.rows().locator('.collection-qualified-name code')).toHaveText(first.identities);
+    expect(first.hasMore).toBe(true);
     const pager = this.root().locator('.collection-pager');
     await expect(pager.getByRole('button', { name: text.previous, exact: true })).toBeDisabled();
     await pager.getByRole('button', { name: text.next, exact: true }).click();
     await expect(pager.getByText(text.pageTwo, { exact: true })).toBeVisible();
-    await expect(this.rows().locator('.collection-qualified-name code')).toHaveText(await expected(20, 20));
+    const second = await expected(20, 20);
+    await expect(this.rows().locator('.collection-qualified-name code')).toHaveText(second.identities);
+    if (second.hasMore) await expect(pager.getByRole('button', { name: text.next, exact: true })).toBeEnabled();
+    else await expect(pager.getByRole('button', { name: text.next, exact: true })).toBeDisabled();
     await this.root().getByLabel(text.pageSize, { exact: true }).selectOption('50');
     await expect(pager.getByText(text.pageOne, { exact: true })).toBeVisible();
-    await expect(this.rows().locator('.collection-qualified-name code')).toHaveText(await expected(0, 50));
+    const larger = await expected(0, 50);
+    await expect(this.rows().locator('.collection-qualified-name code')).toHaveText(larger.identities);
+    if (larger.hasMore) await expect(pager.getByRole('button', { name: text.next, exact: true })).toBeEnabled();
+    else await expect(pager.getByRole('button', { name: text.next, exact: true })).toBeDisabled();
     await expect(pager.locator('[role=status]')).toHaveCount(0);
   }
 
-  public async assertVersionAlignmentAndDisclosure(id: string, locale: SupportedTestLocale): Promise<void> {
+  public async assertVersionAlignmentAndDisclosure(id: string, locale: SupportedTestLocale, touch = false): Promise<void> {
     const row = this.rows().filter({ has: this.page.locator(`a.resource-name-link[href*="/${id}?"]`) });
     await expect(row).toHaveCount(1);
     const versions = row.locator('.collection-version-compact');
@@ -85,16 +102,19 @@ export class FlowCollectionPage {
     const pencil = versions.nth(1).getByRole('button', { name: FlowCollectionTextByLocale[locale].draft, exact: true });
     const number = await versions.nth(1).locator('code').boundingBox();
     const marker = await pencil.boundingBox();
-    expect(marker!.x).toBeGreaterThan(number!.x);
+    expect(marker!.x).toBeGreaterThanOrEqual(number!.x + number!.width);
     await pencil.focus();
     await expect(versions.nth(1).getByRole('tooltip')).toBeVisible();
     await pencil.press('Escape');
     await expect(versions.nth(1).getByRole('tooltip')).toBeHidden();
     const scope = row.locator('.resource-owner-icon button');
+    await scope.hover();
+    await expect(row.locator('.resource-owner-icon [role=tooltip]')).toBeVisible();
+    await this.page.mouse.move(0, 0);
     await scope.focus();
     await expect(row.locator('.resource-owner-icon [role=tooltip]')).toBeVisible();
     await scope.press('Escape');
-    await scope.click();
+    if (touch) await scope.tap(); else await scope.click();
     await expect(row.locator('.resource-owner-icon [role=tooltip]')).toBeVisible();
     await scope.press('Escape');
     const before = this.page.url();
