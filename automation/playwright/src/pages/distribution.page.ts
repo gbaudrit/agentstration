@@ -1,3 +1,4 @@
+import { FlowCollectionPage } from './flow-collection.page.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
@@ -32,6 +33,15 @@ export class DistributionPage {
     expect(response?.ok()).toBe(true);
     const frame = this.page.locator('.resource-collection').first();
     await expect(frame).toBeVisible();
+    if (route === '/flows') {
+      const flows = new FlowCollectionPage(this.page);
+      await flows.assertCompactStructure(locale);
+      await flows.table();
+      await flows.assertCompactStructure(locale);
+      await flows.cards();
+      await flows.assertCompactStructure(locale);
+      return;
+    }
     const labels = CollectionVersionTextByLocale[locale];
     const expected = route.startsWith('/data-source-profiles') ? [labels.active, labels.draft]
       : route.startsWith('/agents') ? [labels.generation] : [labels.version];

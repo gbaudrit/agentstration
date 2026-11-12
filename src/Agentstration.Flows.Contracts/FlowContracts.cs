@@ -25,6 +25,7 @@ public sealed record FlowResponse(string Id, string Name, string? Description, s
 }
 public sealed record FlowSummaryResponse(string Id, string Name, string? Description, FlowKind FlowKind, string Version, bool Enabled, string? ActiveVersion, DateTimeOffset UpdatedAt)
 {
+    public long? DraftRevision { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }

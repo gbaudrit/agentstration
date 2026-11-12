@@ -322,6 +322,21 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         return document is null ? null : ToDraft(document);
     }
 
+    public async Task<IReadOnlyDictionary<(ResourceScopeRef ScopeRef, FlowId FlowId), long>> ListDraftRevisionsAsync(
+        WorkspaceId workspaceId, IReadOnlyCollection<(ResourceScopeRef ScopeRef, FlowId FlowId)> flows, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(flows.Count, 200);
+        if (flows.Count == 0) return new Dictionary<(ResourceScopeRef, FlowId), long>();
+        var keys = flows.Select(flow => DraftKey(workspaceId, flow.ScopeRef, flow.FlowId)).Distinct().ToArray();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Documents.AsNoTracking()
+            .Where(value => value.Kind == DraftKind && keys.Contains(value.Key))
+            .ToArrayAsync(cancellationToken);
+        return documents.Select(ToDraft).Select(stored => stored.Value)
+            .Where(draft => draft.WorkspaceId == workspaceId)
+            .ToDictionary(draft => (DraftOwnerScope(draft), draft.FlowId), draft => draft.Revision);
+    }
+
     public async Task<StoredFlowDraft> UpdateDraftAsync(FlowDraft draft, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);

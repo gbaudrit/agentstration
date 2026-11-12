@@ -1,11 +1,12 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 <span class="value-disclosure" @ref="root" @onclick:stopPropagation="true">
-    <button type="button" class="disclosure-trigger" title="@Value" aria-expanded="false" aria-controls="@panelId">@Value</button>
+    <button type="button" class="disclosure-trigger @(IconName is null ? null : "disclosure-icon")" title="@Value" aria-label="@(IconName is null ? null : Value)" aria-expanded="false" aria-controls="@panelId">@if (IconName is { } icon) { <UiIcon Name="@icon" /> } else { @Value }</button>
     <span id="@panelId" class="full-value-panel" popover="manual" role="tooltip">@Value</span>
 </span>
 @code {
     [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? IconName { get; set; }
     private readonly string panelId = $"full-value-{Guid.NewGuid():N}";
     private ElementReference root;
     private IJSObjectReference? module;

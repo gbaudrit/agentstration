@@ -1196,7 +1196,7 @@
     {
       "id": "flows-flow-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
-      "line": 16,
+      "line": 24,
       "host": "console",
       "routes": [
         "/flows"
@@ -1208,7 +1208,7 @@
       "state": true,
       "actions": true,
       "informationKeys": [
-        "Kind",
+        "Version",
         "Updated"
       ],
       "validation": "source-adopted-and-regression-mapped",
@@ -1216,7 +1216,8 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "domainSpecifications": [
-          "tests/flow-observability.spec.ts"
+          "tests/flow-observability.spec.ts",
+          "tests/flow-collection.spec.ts"
         ],
         "sharedHostSpecifications": [],
         "routeEvidence": [
@@ -1253,11 +1254,18 @@
             "screenshot": null
           }
         ],
-        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering."
+        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering. Earlier route captures retain their original checkpoint. The compact Flow prototype is independently exercised by flow-collection.spec.ts."
       },
-      "identityVersionKeys": [
-        "Version"
-      ]
+      "identityVersionKeys": [],
+      "presentation": {
+        "mode": "compact-flow-prototype",
+        "scopePlacement": "identity indicators",
+        "statePlacement": "identity indicators",
+        "kindPlacement": "name suffix",
+        "versionPlacement": "dedicated column; active or definition version and existing workspace draft revision",
+        "pagination": "server skip/top; 20/50/100 rows; nextLink-backed hasMore; total unknown",
+        "validation": "awaiting maintainer UX validation before wider adoption"
+      }
     },
     {
       "id": "organization-access-access-row",

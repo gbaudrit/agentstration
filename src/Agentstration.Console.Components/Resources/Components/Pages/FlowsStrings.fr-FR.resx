@@ -28,4 +28,18 @@
   <data name="Status.Failed" xml:space="preserve"><value>Échec</value></data>
 <data name="Status.Disabled" xml:space="preserve"><value>Désactivé</value></data>
 <data name="Status.Unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="PageSize" xml:space="preserve"><value>Lignes par page</value></data>
+  <data name="LoadError" xml:space="preserve"><value>Impossible de charger les définitions de Flows.</value></data>
+  <data name="Retry" xml:space="preserve"><value>Réessayer</value></data>
+  <data name="VersionHelp" xml:space="preserve"><value>Première ligne : version active, ou version de définition pour une définition historique. Le crayon signale la révision d’un brouillon existant (rN) ; sa version de publication est choisie lors de la publication. Un tiret indique l’absence de version active.</value></data>
+  <data name="ActiveVersion" xml:space="preserve"><value>Version active</value></data>
+  <data name="NoActiveVersion" xml:space="preserve"><value>Aucune version active</value></data>
+  <data name="DefinitionVersion" xml:space="preserve"><value>Version de définition</value></data>
+  <data name="DraftRevision" xml:space="preserve"><value>Brouillon, révision {0}</value></data>
+  <data name="RevisionShort" xml:space="preserve"><value>r{0}</value></data>
+  <data name="Kind.Direct" xml:space="preserve"><value>Direct</value></data>
+  <data name="Kind.Routing" xml:space="preserve"><value>Routage</value></data>
+  <data name="Kind.Workflow" xml:space="preserve"><value>Workflow</value></data>
+  <data name="Kind.Orchestration" xml:space="preserve"><value>Orchestration</value></data>
+  <data name="Kind.Composite" xml:space="preserve"><value>Composite</value></data>
 </root>

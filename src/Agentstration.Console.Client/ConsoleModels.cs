@@ -39,12 +39,15 @@ public sealed record DeploymentSummary(
 public sealed record WorkSummary(Guid Id, string Title, string Type, string Status, string Priority, string Owner, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 public sealed record FlowSummary(string Id, string Name, string Kind, string Version, string Status, int Steps, int ActiveExecutions, DateTimeOffset UpdatedAt)
 {
+    public long? DraftRevision { get; init; }
     public bool IsManaged { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public string? ActiveVersion { get; init; }
     public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace), ScopeRef);
 }
+
+public sealed record FlowSummaryPage(IReadOnlyList<FlowSummary> Items, bool HasMore);
 
 public static class ConsoleResourceUrls
 {

@@ -310,3 +310,8 @@ export const SharedFormTextByLocale = {
   'en-US': { clear: 'Clear', selectionRequired: 'Select a value' },
   'fr-FR': { clear: 'Vider', selectionRequired: 'Sélectionnez une valeur' },
 } as const;
+
+export const FlowCollectionTextByLocale = {
+  'en-US': { resource: 'Resource', version: 'Version', updated: 'Updated', actions: 'Actions', pageSize: 'Rows per page', previous: 'Previous', next: 'Next', pageOne: 'Page 1', pageTwo: 'Page 2', draft: 'Draft, revision 1' },
+  'fr-FR': { resource: 'Ressource', version: 'Version', updated: 'Mis à jour', actions: 'Actions', pageSize: 'Lignes par page', previous: 'Précédent', next: 'Suivant', pageOne: 'Page 1', pageTwo: 'Page 2', draft: 'Brouillon, révision 1' },
+} as const;

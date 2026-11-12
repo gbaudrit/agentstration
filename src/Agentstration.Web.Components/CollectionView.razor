@@ -2,10 +2,13 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
-<div class="resource-collection" @ref="root">
+<div class="resource-collection @(Compact ? "collection-compact" : null)" @ref="root">
+    <div class="@(Toolbar is null ? null : "collection-toolbar")">
+    @Toolbar
     <div class="collection-view-switch" role="group" aria-label="@Shared["CollectionView"]">
         <button type="button" class="button-secondary" aria-pressed="@((!cards).ToString().ToLowerInvariant())" @onclick="() => SelectView(false)"><UiIcon Name="table" /> @Shared["TableView"]</button>
         <button type="button" class="button-secondary" aria-pressed="@(cards.ToString().ToLowerInvariant())" @onclick="() => SelectView(true)"><UiIcon Name="list" /> @Shared["CardView"]</button>
+    </div>
     </div>
     @if (cards)
     {
@@ -30,7 +33,7 @@
     else
     {
         <DataGrid TItem="TItem" Items="Items">
-            <Header><tr><th scope="col">@(IdentityLabel ?? Shared["CollectionResource"])</th>@if (Scope is not null) { <th scope="col">@(ScopeLabel ?? Shared["Scope"])</th> }@if (State is not null) { <th scope="col">@(StateLabel ?? Shared["CollectionState"])</th> }@foreach (var heading in InformationLabels) { <th scope="col">@heading</th> }@if (Actions is not null) { <th scope="col">@Shared["CollectionActions"]</th> }</tr></Header>
+            <Header><tr><th scope="col">@(IdentityLabel ?? Shared["CollectionResource"])</th>@if (Scope is not null) { <th scope="col">@(ScopeLabel ?? Shared["Scope"])</th> }@if (State is not null) { <th scope="col">@(StateLabel ?? Shared["CollectionState"])</th> }@if (InformationHeader is not null) { @InformationHeader } else { @foreach (var heading in InformationLabels) { <th scope="col">@heading</th> } }@if (Actions is not null) { <th scope="col">@Shared["CollectionActions"]</th> }</tr></Header>
             <Row Context="item"><tr data-testid="@RowTestId" @attributes="Attributes(item, false)">
                 <td class="collection-identity-cell">@Identity(item)</td>
                 @if (Scope is not null) { <td>@Scope(item)</td> }
@@ -61,6 +64,9 @@
     [Parameter, EditorRequired] public string[] InformationLabels { get; set; } = [];
     [Parameter, EditorRequired] public RenderFragment<TItem> Information { get; set; } = null!;
     [Parameter] public RenderFragment<TItem>? Actions { get; set; }
+    [Parameter] public RenderFragment? InformationHeader { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public RenderFragment? Toolbar { get; set; }
     private ElementReference root;
     private bool cards;
     private bool selectedView;

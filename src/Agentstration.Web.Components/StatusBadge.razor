@@ -1,8 +1,9 @@
-<span class="status-badge status-@Status.ToString().ToLowerInvariant()"><UiIcon Name="@Icon" />@Text</span>
+<span class="status-badge status-@Status.ToString().ToLowerInvariant() @(IconOnly ? "status-icon-only" : null)">@if (IconOnly) { <ValueDisclosure Value="@Text" IconName="@Icon" /> } else { <UiIcon Name="@Icon" />@Text }</span>
 
 @code {
     [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
     [Parameter] public UiStatus Status { get; set; }
+    [Parameter] public bool IconOnly { get; set; }
     private string Icon => Status switch { UiStatus.Success => "circle-check", UiStatus.Warning => "alert-triangle", UiStatus.Danger => "circle-x", UiStatus.Info => "info-circle", _ => "circle-minus" };
 }
 
