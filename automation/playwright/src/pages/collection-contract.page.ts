@@ -119,6 +119,8 @@ export class CollectionContractPage {
       if (await copy.count()) {
         const value = await copy.locator('xpath=..').locator('code').textContent();
         const before = this.page.url();
+        await copy.focus();
+        await expect(copy).toBeFocused();
         await copy.click();
         await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(value);
         expect(this.page.url()).toBe(before);
