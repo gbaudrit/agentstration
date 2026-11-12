@@ -107,10 +107,10 @@
 .status-icon-only .disclosure-trigger { color: inherit; }
 .managed-icon-only { margin: 0; }
 .managed-icon-only .disclosure-trigger { color: var(--muted); }
-.collection-version-compact { display: grid; grid-template-columns: minmax(0, 1fr) 1.75rem; gap: .25rem; align-items: center; width: 100%; font-variant-numeric: tabular-nums; }
+.collection-version-compact { display: grid; grid-template-columns: minmax(0, max-content) 1.5rem; gap: .2rem; align-items: center; width: max-content; max-width: 100%; font-variant-numeric: tabular-nums; }
 .collection-version-compact > code { grid-column: 1; grid-row: 1; white-space: nowrap; font-weight: 650; }
-.collection-version-compact .collection-version-indicator { grid-column: 2; grid-row: 1; width: 1.75rem; min-height: 1.5rem; }
-.collection-version-indicator .disclosure-icon { width: 1.75rem; height: 1.5rem; }
+.collection-version-compact .collection-version-indicator { grid-column: 2; grid-row: 1; width: 1.5rem; min-height: 1.5rem; }
+.collection-version-indicator .disclosure-icon { width: 1.5rem; height: 1.5rem; }
 .collection-version-draft { color: var(--muted); }
 .collection-version-draft > code { font-weight: 400; }
 .flow-compact-list .collection-compact .data-grid { table-layout: fixed; min-width: 43rem; }
@@ -122,8 +122,6 @@
 .flow-compact-list .collection-identity-cell .collection-identity { width: 100%; }
 .flow-compact-list .collection-identity { align-items: center; gap: .4rem; }
 .flow-compact-list .collection-identity-indicators { display: flex; align-items: center; gap: .15rem; flex: 0 0 auto; }
-.flow-state-markers { display: flex; flex-direction: column; align-items: center; }
-.flow-state-markers .disclosure-icon { width: 1.5rem; height: 1.5rem; }
 .flow-compact-list .collection-name-heading { display: flex; align-items: baseline; gap: .5rem; min-width: 0; }
 .flow-compact-list .resource-name-link { flex: 1 1 auto; min-width: 0; }
 .flow-kind { font-size: .7rem; color: var(--muted); white-space: nowrap; }
@@ -146,3 +144,22 @@
 .flow-list-controls .form-field-heading { white-space: nowrap; }
 .flow-list-controls .clearable-field { flex: 0 0 auto; width: auto; }
 .collection-version-compact > code { overflow: hidden; text-overflow: ellipsis; }
+
+/* Flow prototype: corner markers and adjacent controls, preserving touch/keyboard access. */
+.collection-family-icon { display: inline-flex; position: relative; flex: 0 0 auto; }
+.flow-compact-list .collection-family-icon { margin-inline-end: .5rem; }
+.flow-icon-badges { position: absolute; inset: 0; pointer-events: none; }
+.flow-icon-badges > :is(.status-icon-only, .managed-icon-only) { position: absolute; inset-inline-end: -.75rem; width: 1.5rem; height: 1.5rem; margin: 0; background: transparent; pointer-events: auto; }
+.flow-icon-badges > .status-icon-only { top: -.75rem; }
+.flow-icon-badges > .managed-icon-only { bottom: -.75rem; }
+.flow-icon-badges .disclosure-icon { width: 1.5rem; height: 1.5rem; padding: .25rem; }
+.flow-icon-badges .status-icon-only svg { width: 1rem; height: 1rem; background: currentColor; stroke: var(--surface); border: 2px solid var(--surface); border-radius: 50%; }
+.flow-icon-badges .status-icon-only svg circle { display: none; }
+.flow-icon-badges .managed-icon-only svg { width: .9rem; height: .9rem; background: var(--surface); border-radius: .15rem; box-shadow: 0 0 0 2px var(--surface); }
+.flow-compact-list .collection-qualified-name .copyable-value { flex: 0 1 auto; gap: .2rem; }
+.flow-compact-list .collection-qualified-name code { flex: 0 1 auto; }
+.flow-compact-list .collection-qualified-name .copy-value { width: 1.5rem; min-width: 1.5rem; height: 1.5rem; padding: .2rem; }
+@media (hover: hover) and (pointer: fine) {
+  .flow-compact-list .copy-value { opacity: 0; pointer-events: none; }
+  .flow-compact-list :is(tbody tr, .collection-card):is(:hover, :focus-within) .copy-value { opacity: 1; pointer-events: auto; }
+}

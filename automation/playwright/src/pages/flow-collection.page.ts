@@ -37,6 +37,14 @@ export class FlowCollectionPage {
   public async assertManagedPreview(): Promise<void> {
     await expect(this.root().locator('.managed-icon-only button').first()).toBeVisible();
     await expect(this.root().locator('.managed-icon-only button').first()).toHaveAccessibleName(/.+/);
+    const row = this.rows().filter({ has: this.page.locator('.managed-icon-only') }).first();
+    const icon = await row.locator('.collection-family-icon > .resource-icon').boundingBox();
+    const state = await row.locator('.status-icon-only svg').boundingBox();
+    const lock = await row.locator('.managed-icon-only svg').boundingBox();
+    expect(Math.abs(state!.x + state!.width / 2 - (icon!.x + icon!.width))).toBeLessThan(1);
+    expect(Math.abs(state!.y + state!.height / 2 - icon!.y)).toBeLessThan(1);
+    expect(Math.abs(lock!.x + lock!.width / 2 - (icon!.x + icon!.width))).toBeLessThan(1);
+    expect(Math.abs(lock!.y + lock!.height / 2 - (icon!.y + icon!.height))).toBeLessThan(1);
   }
 
   public async seed(consoleUrl: string): Promise<string[]> {
@@ -103,6 +111,7 @@ export class FlowCollectionPage {
     const number = await versions.nth(1).locator('code').boundingBox();
     const marker = await pencil.boundingBox();
     expect(marker!.x).toBeGreaterThanOrEqual(number!.x + number!.width);
+    expect(marker!.x - number!.x - number!.width).toBeLessThan(4);
     await pencil.focus();
     await expect(versions.nth(1).getByRole('tooltip')).toBeVisible();
     await pencil.press('Escape');
@@ -118,7 +127,21 @@ export class FlowCollectionPage {
     await expect(row.locator('.resource-owner-icon [role=tooltip]')).toBeVisible();
     await scope.press('Escape');
     const before = this.page.url();
-    await row.locator('.copy-value').click();
+    const copy = row.locator('.copy-value');
+    const qualified = row.locator('.collection-qualified-name code');
+    await this.root().getByLabel(FlowCollectionTextByLocale[locale].pageSize, { exact: true }).focus();
+    await this.page.mouse.move(0, 0);
+    await expect(copy).toHaveCSS('opacity', touch ? '1' : '0');
+    await row.hover();
+    await expect(copy).toHaveCSS('opacity', '1');
+    const identity = await qualified.boundingBox();
+    const copyBox = await copy.boundingBox();
+    expect(copyBox!.x - identity!.x - identity!.width).toBeGreaterThanOrEqual(0);
+    expect(copyBox!.x - identity!.x - identity!.width).toBeLessThan(4);
+    await this.page.mouse.move(0, 0);
+    await qualified.focus();
+    await expect(copy).toHaveCSS('opacity', '1');
+    await copy.click();
     await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(`default/${id}`);
     expect(this.page.url()).toBe(before);
     const menu = row.locator('.collection-actions-menu summary');
@@ -145,5 +168,8 @@ export class FlowCollectionPage {
     await this.root().locator('.collection-view-switch button').nth(1).click();
     await expect(this.root().locator('.collection-card').first()).toBeVisible();
   }
-  public async capture(path: string): Promise<void> { await this.page.screenshot({ path, fullPage: false }); }
+  public async capture(path: string): Promise<void> {
+    await this.page.mouse.move(0, 0);
+    await this.page.screenshot({ path, fullPage: false });
+  }
 }
