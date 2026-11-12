@@ -1,5 +1,9 @@
 <div class="collection-identity">
-    <ResourceIcon IconName="@IconName" Domain="@Domain" />
+    @if (IconBadges is not null)
+    {
+        <span class="collection-family-icon"><ResourceIcon IconName="@IconName" Domain="@Domain" />@IconBadges</span>
+    }
+    else { <ResourceIcon IconName="@IconName" Domain="@Domain" /> }
     @if (Indicators is not null) { <div class="collection-identity-indicators">@Indicators</div> }
     <div class="collection-identity-text">
         <div class="collection-name-heading" role="@(HeadingLevel is null ? null : "heading")" aria-level="@HeadingLevel">
@@ -34,4 +38,5 @@
     [Parameter] public bool ShowNamespaceIcon { get; set; } = true;
     [Parameter] public RenderFragment? Indicators { get; set; }
     [Parameter] public RenderFragment? NameSuffix { get; set; }
+    [Parameter] public RenderFragment? IconBadges { get; set; }
 }
