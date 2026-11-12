@@ -198,7 +198,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
             await client.ActivateSessionAsync(default);
             _ = await client.RegisterAsync(new([AwpProtocol.Version], new(client.WorkerId, client.SessionId,
                 "bootstrap-test", 1,
-                [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0"])])), default);
+                [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"])])), default);
             return worker;
         }
 
