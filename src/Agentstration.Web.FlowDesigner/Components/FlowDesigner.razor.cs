@@ -146,36 +146,53 @@ public partial class FlowDesigner
     private bool ReadOnly => IsReadOnly || Editor.State.IsReadOnly;
     private string DraftUrl => Navigation.GetUriWithQueryParameter("version", (string?)null);
 
+    private int resourceLoadRevision;
+    protected override void OnInitialized() => Editor.StateChanged += EditorChanged;
+
     protected override async Task OnParametersSetAsync()
     {
-        var targetKey = $"{ScopeRef?.Value}/{Namespace.Value}/{ResourceId}/{PublishedVersion}";
+        var target = Target;
+        var targetKey = $"{target.ScopeRef?.Value}/{target.Namespace.Value}/{target.ResourceId}/{target.PublishedVersion}";
         if (loadedResource == targetKey) return;
         loadedResource = targetKey;
+        var revision = ++resourceLoadRevision;
         loadingResources = true;
-        Editor.StateChanged += EditorChanged;
         try
         {
             error = null; flowVersionCatalog.Clear();
-            var loaded = await Backend.LoadAsync(Target, cancellation.Token);
+            var loaded = await Backend.LoadAsync(target, cancellation.Token);
+            if (revision != resourceLoadRevision) return;
+            var ownerScope = loaded.Resource.ScopeRef ?? target.ScopeRef
+                ?? throw new InvalidOperationException("The Flow owner scope is unavailable.");
+            var loadedAgents = await Resources.GetAgentsAsync(ownerScope, cancellation.Token);
+            if (revision != resourceLoadRevision) return;
+            var loadedFlows = await Resources.GetFlowsAsync(ownerScope, cancellation.Token);
+            if (revision != resourceLoadRevision) return;
+            var loadedTools = await Resources.GetToolsAsync(ownerScope, cancellation.Token);
+            if (revision != resourceLoadRevision) return;
+            var loadedSchemas = await Resources.GetSchemaVersionsAsync(cancellation.Token);
+            if (revision != resourceLoadRevision) return;
             sourceText = loaded.Source;
-            Editor.Load(loaded, Target);
-            agents = routerAgents = await Resources.GetAgentsAsync(OwnerScope, cancellation.Token);
-            flows = await Resources.GetFlowsAsync(OwnerScope, cancellation.Token);
-            tools = await Resources.GetToolsAsync(OwnerScope, cancellation.Token);
-            schemaVersions = await Resources.GetSchemaVersionsAsync(cancellation.Token);
-            await RefreshFlowCallOutputsAsync(loaded.Resource.Definition);
+            Editor.Load(loaded, target);
+            agents = routerAgents = loadedAgents; flows = loadedFlows; tools = loadedTools; schemaVersions = loadedSchemas;
+            await RefreshFlowCallOutputsAsync(loaded.Resource.Definition, revision);
+            if (revision != resourceLoadRevision) return;
             if (!ReadOnly)
-                publishVersion = SuggestedPublishVersion(await Resources.GetFlowVersionsAsync(OwnerScope, Namespace, ResourceId, cancellation.Token));
+            {
+                var versions = await Resources.GetFlowVersionsAsync(ownerScope, target.Namespace, target.ResourceId, cancellation.Token);
+                if (revision != resourceLoadRevision) return;
+                publishVersion = SuggestedPublishVersion(versions);
+            }
             transitionFrom = loaded.Resource.Definition.EntryStep;
             transitionTo = loaded.Resource.Definition.Steps.Skip(1).FirstOrDefault()?.Name ?? transitionFrom;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            error = exception.Message;
+            if (revision == resourceLoadRevision) error = exception.Message;
         }
         finally
         {
-            loadingResources = false;
+            if (revision == resourceLoadRevision) loadingResources = false;
         }
     }
 
@@ -366,7 +383,7 @@ public partial class FlowDesigner
             var canonical = await Backend.GetSourceAsync(Target, cancellation.Token);
             sourceText = canonical.Source;
             Editor.MarkSaved(saved, canonical.Source);
-            await RefreshFlowCallOutputsAsync(saved.Value.Definition);
+            await RefreshFlowCallOutputsAsync(saved.Value.Definition, resourceLoadRevision);
         }
         catch (Exception exception)
         {
@@ -404,7 +421,7 @@ public partial class FlowDesigner
         flowVersionCatalog[FlowKey(call.Flow)] = flowVersions;
         await SyncFlowCallOutputsAsync(call, flowVersions);
     }
-    private async Task RefreshFlowCallOutputsAsync(FlowGraphDefinition definition)
+    private async Task RefreshFlowCallOutputsAsync(FlowGraphDefinition definition, int loadRevision)
     {
         var resolved = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal);
         var versionsByTarget = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal);
@@ -416,17 +433,20 @@ public partial class FlowDesigner
             if (!versionsByTarget.TryGetValue(key, out var versions))
             {
                 versions = await Resources.GetFlowVersionsAsync(targetScope, targetNamespace, call.Flow.ResourceId, cancellation.Token);
+                if (loadRevision != resourceLoadRevision) return;
                 versionsByTarget[key] = versions;
                 flowVersionCatalog[key] = versions;
             }
             if (ResolveFlowVersion(call, versions) is { NamedOutputs.Count: > 0 } selected)
                 resolved[call.Name] = selected.NamedOutputs;
         }
+        if (loadRevision != resourceLoadRevision) return;
         if (Editor.SetFlowCallOutputs(resolved)) flowCallRenderRevision++;
         if (!ReadOnly)
         {
             var revision = Editor.State.LocalRevision;
             await Editor.DispatchAsync(new ReconcileFlowCallTransitionsCommand(resolved), cancellation.Token);
+            if (loadRevision != resourceLoadRevision) return;
             if (Editor.State.LocalRevision != revision) ScheduleAutosave();
         }
     }
@@ -572,6 +592,7 @@ public partial class FlowDesigner
     public async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
+        resourceLoadRevision++;
         Editor.StateChanged -= EditorChanged;
         autosave?.Cancel(); autosave?.Dispose(); cancellation.Cancel(); cancellation.Dispose();
         try
