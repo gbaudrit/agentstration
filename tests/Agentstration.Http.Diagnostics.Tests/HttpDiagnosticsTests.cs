@@ -290,7 +290,9 @@ public sealed class HttpDiagnosticsTests
         var logs = new Logs();
         var builder = Builder(logs, request: true, response: true, extra: new()
         {
-            ["IncludedPaths:0"] = "/probe", ["ExcludedPaths:0"] = "/probe/ignored", ["IncludedHosts:0"] = "localhost"
+            ["IncludedPaths:0"] = "/probe",
+            ["ExcludedPaths:0"] = "/probe/ignored",
+            ["IncludedHosts:0"] = "localhost"
         });
         AddProbe(builder);
         await using var app = builder.Build();
@@ -351,8 +353,10 @@ public sealed class HttpDiagnosticsTests
         builder.Logging.AddProvider(logs);
         var configuration = new Dictionary<string, string?>
         {
-            ["Enabled"] = enabled.ToString(), ["CaptureRequestBody"] = request.ToString(),
-            ["CaptureResponseBody"] = response.ToString(), ["LogMetadata"] = metadata.ToString()
+            ["Enabled"] = enabled.ToString(),
+            ["CaptureRequestBody"] = request.ToString(),
+            ["CaptureResponseBody"] = response.ToString(),
+            ["LogMetadata"] = metadata.ToString()
         };
         if (extra is not null) foreach (var entry in extra) configuration[entry.Key] = entry.Value;
         builder.Configuration.AddInMemoryCollection(configuration.Select(entry =>
