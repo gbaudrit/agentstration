@@ -80,13 +80,20 @@ export class FlowCollectionPage {
     const body = await inventory.json() as { scopes: { scopeRef: string; resources: { uid: string; namespace: string; kind: string; name: string }[] }[] };
     const resource = body.scopes.find(value => value.scopeRef === '/instance')?.resources.find(value => value.kind === 'Flow' && value.namespace === 'default' && value.name === id);
     expect(resource).toBeTruthy();
-    const policy = await this.page.request.put(`${consoleUrl}/api/resource-access-policies/${resource!.uid}`, {
-      headers: this.headers(), data: {
+    const policyUrl = `${consoleUrl}/api/resource-access-policies/${resource!.uid}`;
+    const current = await this.page.request.get(policyUrl, { headers: this.headers() });
+    expect([200, 404]).toContain(current.status());
+    const grants = current.status() === 200 ? (await current.json() as { grants: { targetScopeRef: string; actions: string[]; includeDescendants: boolean }[] }).grants : [];
+    const policy = await this.page.request.put(policyUrl, {
+      headers: { ...this.headers(), ...(current.headers()['etag'] ? { 'If-Match': current.headers()['etag']! } : {}) }, data: {
         resource: { uid: resource!.uid, ownerScopeRef: '/instance', namespace: 'default', kind: 'Flow' },
-        grants: [{ targetScopeRef: scope, actions: ['discover', 'use'], includeDescendants: false }],
+        grants: [...grants.filter(value => value.targetScopeRef !== scope), { targetScopeRef: scope, actions: ['discover', 'use'], includeDescendants: false }],
       },
     });
     expect(policy.status(), await policy.text()).toBe(200);
+    const visible = await this.page.request.get(`${consoleUrl}/api/flows?allNamespaces=true&top=20`, { headers: { 'X-Agentstration-Context': scope } });
+    expect(visible.ok(), await visible.text()).toBe(true);
+    expect((await visible.json() as { value: { id: string; scopeRef: string }[] }).value).toContainEqual(expect.objectContaining({ id, scopeRef: '/instance' }));
     const destination = `${consoleUrl}/flows?context=${encodeURIComponent(scope)}`;
     await this.page.goto(destination, { waitUntil: 'domcontentloaded' });
     await this.assertCompactStructure(locale);

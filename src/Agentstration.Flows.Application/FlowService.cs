@@ -129,7 +129,8 @@ public sealed class FlowService(
             var offset = 0;
             while (values.Count(value => value.Value.ScopeRef == scopeRef) < targetCount)
             {
-                var pageSize = Math.Min(200, targetCount - offset);
+                // The offset includes hidden records; only discovered records fill the visible page.
+                var pageSize = Math.Min(200, targetCount - values.Count(value => value.Value.ScopeRef == scopeRef));
                 var page = @namespace is null
                     ? await repository.ListExactAsync(scopeRef, offset, pageSize, cancellationToken)
                     : await repository.ListExactAsync(scopeRef, @namespace.Value, offset, pageSize, cancellationToken);
