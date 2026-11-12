@@ -1,0 +1,125 @@
+{
+  "date": "2026-11-12",
+  "productSourceCommit": "e78ea22",
+  "fixture": "governedInventoryFixture with Local authentication and explicit Instance context; seeded resources are disposable QA data",
+  "stats": {
+    "startTime": "2026-11-12T15:20:41.182Z",
+    "duration": 106301.144,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "captures": [
+    {
+      "file": "flows-cards-desktop-en-dark.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "cards",
+      "sha256": "cf4e1e2b980a7c3a0152a2a70a84e31fdfff9b4554193252ad1e866532e69756"
+    },
+    {
+      "file": "flows-cards-desktop-en-light.png",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "cards",
+      "sha256": "0cfb55b992c123c7a377e565e35534a9cf7807f10a19a238256596dd80e41cce"
+    },
+    {
+      "file": "flows-cards-mobile-fr-dark.png",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "cards",
+      "sha256": "53d5e30ab79b066975a7935c9589bd59727db09298c6b6a3073c87f0a0f1044f"
+    },
+    {
+      "file": "flows-cards-mobile-fr-light.png",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "cards",
+      "sha256": "c801a06145198084c1b1f6531d6ee87200111bcede13243f2f8f6b6854041900"
+    },
+    {
+      "file": "flows-managed-desktop-en-dark.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "managed",
+      "sha256": "ec9fb28aaf208186603123b2b3b944a55503bbfce7c533bf064531c6e6ebfe43"
+    },
+    {
+      "file": "flows-managed-desktop-en-light.png",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "managed",
+      "sha256": "e0f7d819adfbab33d149bc5feb2ab8ff4070211200959b976ebdd1e70d921305"
+    },
+    {
+      "file": "flows-managed-mobile-fr-dark.png",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "managed",
+      "sha256": "314871a512684027f3ea86b2de916674685934a8c341faf2c8b7ef6f432b6f3d"
+    },
+    {
+      "file": "flows-managed-mobile-fr-light.png",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "managed",
+      "sha256": "98eb90658df20eaa33f47f621d183d442bddd9d7e6880c8aa98822f7742a9385"
+    },
+    {
+      "file": "flows-table-desktop-en-dark.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "table",
+      "sha256": "3655c0ebffe865992ea4ce3ec70d88fdf173ddad30298712721f5e386b209ea9"
+    },
+    {
+      "file": "flows-table-desktop-en-light.png",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "table",
+      "sha256": "831dda1c8f97c0b18c8091002f6b3cd7f228caf568316f8067c70814261efd9a"
+    }
+  ]
+}

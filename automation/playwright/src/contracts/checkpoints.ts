@@ -1,5 +1,5 @@
 export const Checkpoints = {
-  flowCollection: { table: 'flows-compact-table', cards: 'flows-compact-cards' },
+  flowCollection: { table: 'flows-compact-table', cards: 'flows-compact-cards', managed: 'flows-compact-managed' },
   sharedForms: {
     editorCleared: 'shared-form-editor-cleared',
     requiredSelection: 'shared-form-required-selection-invalid',

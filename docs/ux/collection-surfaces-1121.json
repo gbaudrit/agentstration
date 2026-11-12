@@ -1196,7 +1196,7 @@
     {
       "id": "flows-flow-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
-      "line": 24,
+      "line": 18,
       "host": "console",
       "routes": [
         "/flows"

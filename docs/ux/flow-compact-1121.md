@@ -17,7 +17,10 @@ Pagination requests only the selected 20/50/100 rows. Previous/Next derives cont
 - Focused Flow API/storage checks: 2 passed, including one-query batch bounds and workspace/owner/namespace isolation.
 - Component regressions cover sparse/draft versions, authorized long-owner disclosure, exact links, 20/50 pagination, retained card view, unknown total and failed-request retry.
 - TypeScript, six collection JavaScript lifecycle tests, five host fixture tests and four form/application catalog checks passed.
-- Full integration, current-head browser checks and actual-application screenshots are recorded in the delivery updates on draft PR #1123 and stacked draft #1132.
+- Required Integration lane: 1,012 passed, 12 optional external integrations skipped, zero failures.
+- Four final compact Flow appearance cases passed with the governed inventory/Local authentication fixture, including real touch activation and exact Instance scope. Four maintained version/primary-choice cases also passed in the companion run.
+- [Ten unedited real-application screenshots and structured results](evidence/1121/flows-compact/README.md) show managed/read-only resources and active/draft-revision table/card presentations.
+- The implementation browser campaign now has 367 cases and uses two desktop, two mobile and one locale shard. The prior mobile job took 22m26s before these additions; the existing 25-minute job limit, one worker, retry policy and per-test timeouts are retained. Stacked coverage has 482 cases across three desktop, three mobile and one locale shard. Current-head CI status is tracked in draft PR #1123 and stacked draft #1132.
 
 ## Adoption boundary
 
