@@ -354,7 +354,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                     Name = "persist",
                     DisplayName = "Persist acquired content",
                     Flow = new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName,
-                        FlowCallVersionStrategy.Exact, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion,
+                        FlowCallVersionStrategy.Exact, ArtifactPlatformResourceProvisioner.StorageFlowVersion,
                         ScopeRef: scope),
                     InputMapping = JsonSerializer.SerializeToElement(new
                     {

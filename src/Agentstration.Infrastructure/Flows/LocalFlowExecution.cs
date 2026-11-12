@@ -625,6 +625,14 @@ public sealed class ManagedFlowToolExecutor(
         {
             throw Error(exception.Code, exception.Message, exception);
         }
+        catch (Agentstration.Artifacts.Contracts.ArtifactValidationException exception)
+        {
+            throw Error(exception.Code, exception.Message, exception);
+        }
+        catch (ToolSetValidationException exception)
+        {
+            throw Error(exception.Code, $"{exception.Code}: {exception.Message}", exception);
+        }
     }
 
     private async Task<StoredResource<T>?> GetForExecutionAsync<T>(

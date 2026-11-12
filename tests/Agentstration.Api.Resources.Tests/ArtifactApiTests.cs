@@ -333,9 +333,10 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public async Task StorageToolsPersistIdempotentlyAndMaterializeThroughStandardFlows(bool upgradeLegacyInstance)
+    [DataRow(false, false)]
+    [DataRow(true, false)]
+    [DataRow(true, true)]
+    public async Task StorageToolsPersistIdempotentlyAndMaterializeThroughStandardFlows(bool upgradeLegacyInstance, bool staleStagingMember)
     {
         await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
@@ -344,41 +345,6 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
         var service = factory.Services.GetRequiredService<ArtifactManagementService>();
         var source = await service.CreateStagedAsync(new("report.txt", "text/plain",
             new ArtifactProducer { Kind = ArtifactProducerKind.FlowRun, Id = "producer", FlowRunId = "producer-run", FlowStepId = "render" }), default);
-        if (upgradeLegacyInstance)
-        {
-            // Reproduce an already-Ready v3 instance, whose persisted Tools predate output contracts.
-            var store = factory.Services.GetRequiredService<IResourceStore>();
-            using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
-            using (factory.Services.GetRequiredService<IResourceGovernanceContext>()
-                .Push(ResourceGovernance.Core("tools.internal-mcp")))
-            foreach (var name in new[] { ArtifactStorageReadMcpTool.Name, ArtifactStorageWriteMcpTool.Name })
-            {
-                var address = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
-                    ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(name));
-                var tool = (await store.GetExactAsync<ToolResource>(address, default))!;
-                _ = await store.PutExactAsync(ResourceScopeRef.Instance, tool.Value with
-                {
-                    Generation = checked(tool.Value.Generation + 1),
-                    Definition = tool.Value.Definition with { Schema = tool.Value.Definition.Schema! with { Output = null } }
-                }, tool.ETag, false, default);
-            }
-            var initializationAddress = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
-                BootstrapKinds.InstanceInitialization, "platform-bootstrap");
-            var initialization = (await store.GetExactAsync<InstanceInitializationResource>(initializationAddress, default))!;
-            _ = await store.PutExactAsync(ResourceScopeRef.Instance, initialization.Value with
-            {
-                Generation = checked(initialization.Value.Generation + 1),
-                Definition = initialization.Value.Definition with { TargetVersion = 3, Status = InstanceInitializationStatus.Ready }
-            }, initialization.ETag, false, default);
-            var storageFlows = factory.Services.GetRequiredService<FlowService>();
-            var published = await storageFlows.GetVersionExactAsync(ResourceScopeRef.Instance,
-                new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), "1.0.0", default);
-            await factory.Services.GetRequiredService<IInstanceInitializationCoordinator>().RunAsync(
-                token => factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token), default);
-            var after = await storageFlows.GetVersionExactAsync(ResourceScopeRef.Instance,
-                new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), "1.0.0", default);
-            Assert.AreEqual(JsonSerializer.Serialize(published), JsonSerializer.Serialize(after), "Published storage Flows stay immutable during Tool reconciliation.");
-        }
         const string durableText = "abcé😀{\"records\":[1,2]}";
         var bytes = Encoding.UTF8.GetBytes(durableText);
         _ = await service.WriteAsync(source.Value.ArtifactId, 0, bytes, default);
@@ -399,6 +365,8 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
             ResourceScopeRef.Workspace(context.WorkspaceId), ResourceNamespace.Default, LocalStorageDefaultsProvisioner.DefaultName, default));
         Assert.IsFalse(first.Value.GetProperty("receipt").GetProperty("OpaqueReference").GetString()!.StartsWith("storage-v1.", StringComparison.Ordinal));
 
+        if (upgradeLegacyInstance) await UpgradeLegacyArtifactResourcesAsync(factory.Services, context);
+
         var reader = factory.Services.GetRequiredService<ArtifactStorageReadMcpTool>();
         var materialized = await reader.ExecuteAsync(Invocation(context, JsonSerializer.SerializeToElement(new
         {
@@ -412,6 +380,21 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
 
         using var client = factory.CreateClient();
         var durableId = FlowRunArtifactId.Parse(first.Value.GetProperty("flowRunArtifactId").GetString()!);
+        if (staleStagingMember)
+        {
+            var store = factory.Services.GetRequiredService<IResourceStore>();
+            using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            using var authority = factory.Services.GetRequiredService<IResourceGovernanceContext>()
+                .Push(ResourceGovernance.Core("tools.internal-mcp"));
+            var address = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(ArtifactCapabilities.Create));
+            var tool = (await store.GetExactAsync<ToolResource>(address, default))!;
+            _ = await store.PutExactAsync(ResourceScopeRef.Instance, tool.Value with
+            {
+                Generation = checked(tool.Value.Generation + 1),
+                Definition = tool.Value.Definition with { Description = "Changed after publication" }
+            }, tool.ETag, false, default);
+        }
         var restricted = context with
         {
             Restriction = new AuthorizationRestriction(Guid.NewGuid(), context.WorkspaceId,
@@ -445,6 +428,25 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
             Assert.IsNotNull(completed);
         }
         Assert.IsNotNull(completed);
+        if (staleStagingMember)
+        {
+            Assert.AreEqual(FlowRunStatus.Failed.ToString(), completed.Status);
+            var failed = await client.GetFromJsonAsync<JsonElement>($"/api/flowRuns/{started.FlowRunId}");
+            Assert.AreEqual("artifact_storage_failed", failed.GetProperty("error").GetProperty("code").GetString());
+            var detail = failed.GetProperty("error").GetProperty("details").GetString()!;
+            StringAssert.Contains(detail, "tool_set_member_stale");
+            StringAssert.Contains(detail, ArtifactPlatformResourceProvisioner.DefaultBindingName);
+            StringAssert.Contains(detail, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion);
+            StringAssert.Contains(detail, AgentstrationToolProvider.ToolResourceName(ArtifactCapabilities.Create));
+            Assert.DoesNotContain("An error occurred", detail);
+            var storageStep = failed.GetProperty("steps").EnumerateArray().Single(value => value.GetProperty("stepName").GetString() == "storage");
+            Assert.AreEqual("tool_set_member_stale", storageStep.GetProperty("error").GetProperty("code").GetString());
+            using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            var drift = await Assert.ThrowsAsync<InvalidOperationException>(() => factory.Services.GetRequiredService<ArtifactPlatformResourceProvisioner>()
+                .EnsureAsync(ResourceScopeRef.Instance, default));
+            StringAssert.Contains(drift.Message, "new built-in ToolSet version");
+            return;
+        }
         Assert.AreEqual(FlowRunStatus.Succeeded.ToString(), completed.Status, completed.ErrorMessage);
         Assert.IsNotNull(completed.StagedArtifactId);
         Assert.IsTrue(completed.StagedArtifactAvailable);
@@ -645,8 +647,8 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
             new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default);
         var read = await flows.GetExactAsync(ResourceScopeRef.Instance,
             new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), default);
-        Assert.AreEqual(ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, write?.Value.ActiveVersion);
-        Assert.AreEqual(ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, read?.Value.ActiveVersion);
+        Assert.AreEqual(ArtifactPlatformResourceProvisioner.StorageFlowVersion, write?.Value.ActiveVersion);
+        Assert.AreEqual(ArtifactPlatformResourceProvisioner.StorageFlowVersion, read?.Value.ActiveVersion);
         Assert.IsNull(await flows.GetExactAsync(ResourceScopeRef.Workspace(workspaceId),
             new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName), default));
         Assert.IsNull(await flows.GetExactAsync(ResourceScopeRef.Workspace(workspaceId),
@@ -943,6 +945,92 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
         using (requestScopes.PushSystem())
             _ = await Assert.ThrowsAsync<OperationCanceledException>(async () =>
                 await service.ExpireAndPurgeAsync(10, cancellation.Token));
+    }
+
+    private static async Task UpgradeLegacyArtifactResourcesAsync(IServiceProvider services, RequestContext context)
+    {
+        var store = services.GetRequiredService<IResourceStore>();
+        var toolSets = services.GetRequiredService<ToolSetService>();
+        var flows = services.GetRequiredService<FlowService>();
+        using var system = services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var current = (await toolSets.GetVersionExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default,
+            ArtifactPlatformResourceProvisioner.DefaultToolSetName, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, default))!;
+        using (services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("tools.internal-mcp")))
+        foreach (var name in ArtifactCapabilities.All.Concat([ArtifactStorageReadMcpTool.Name, ArtifactStorageWriteMcpTool.Name]))
+        {
+            var address = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(name));
+            var tool = (await store.GetExactAsync<ToolResource>(address, default))!;
+            _ = await store.PutExactAsync(ResourceScopeRef.Instance, tool.Value with
+            {
+                Generation = checked(tool.Value.Generation + 1),
+                Definition = tool.Value.Definition with { Schema = tool.Value.Definition.Schema! with { Output = null } }
+            }, tool.ETag, false, default);
+        }
+        // Build the pre-upgrade persisted state: published v1.0.0 pins the old staging Tools.
+        using (services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("artifacts.platform")))
+        {
+            var setAddress = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                ToolResourceKinds.ToolSet, ArtifactPlatformResourceProvisioner.DefaultToolSetName);
+            var toolSet = (await store.GetExactAsync<ToolSetResource>(setAddress, default))!;
+            var legacySet = await store.PutExactAsync(ResourceScopeRef.Instance, toolSet.Value with
+            {
+                Generation = checked(toolSet.Value.Generation + 1),
+                Definition = toolSet.Value.Definition with { Version = "1.0.0" }
+            }, toolSet.ETag, false, default);
+            var members = new List<PublishedToolSetMember>();
+            foreach (var member in current.Value.Members)
+            {
+                var tool = (await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(member.ToolScopeRef,
+                    member.ToolNamespace, ToolResourceKinds.Tool, member.ToolName), default))!;
+                members.Add(member with { ToolGeneration = tool.Value.Generation, OutputSchema = null });
+            }
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                ToolResourceKinds.ToolSetVersion, current.Value.Name), current.ETag, default);
+            var suffix = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("1.0.0")))[..16];
+            _ = await store.PutExactAsync(ResourceScopeRef.Instance, current.Value with
+            {
+                Uid = Guid.Empty, Generation = 1,
+                Metadata = current.Value.Metadata with { Name = $"{current.Value.ToolSetName}--{suffix}" },
+                Version = "1.0.0", ToolSetGeneration = legacySet.Value.Generation, Members = members,
+                DefinitionHash = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(members)))
+            }, null, true, default);
+            var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+            var bindingAddress = ScopedResourceAddress.Create(scope, ResourceNamespace.Default,
+                ArtifactResourceKinds.ArtifactStagingBinding, ArtifactPlatformResourceProvisioner.DefaultBindingName);
+            var binding = (await store.GetExactAsync<ArtifactStagingBindingResource>(bindingAddress, default))!;
+            _ = await store.PutExactAsync(scope, binding.Value with
+            {
+                Generation = checked(binding.Value.Generation + 1),
+                Definition = binding.Value.Definition with { ToolSetVersion = "1.0.0" }
+            }, binding.ETag, false, default);
+        }
+        var initializationAddress = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
+            BootstrapKinds.InstanceInitialization, "platform-bootstrap");
+        var initialization = (await store.GetExactAsync<InstanceInitializationResource>(initializationAddress, default))!;
+        _ = await store.PutExactAsync(ResourceScopeRef.Instance, initialization.Value with
+        {
+            Generation = checked(initialization.Value.Generation + 1),
+            Definition = initialization.Value.Definition with { TargetVersion = 4, Status = InstanceInitializationStatus.Ready }
+        }, initialization.ETag, false, default);
+        var historical = await toolSets.GetVersionExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default,
+            ArtifactPlatformResourceProvisioner.DefaultToolSetName, "1.0.0", default);
+        var flowBefore = await flows.GetVersionExactAsync(ResourceScopeRef.Instance,
+            new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), ArtifactPlatformResourceProvisioner.StorageFlowVersion, default);
+        await services.GetRequiredService<IInstanceInitializationCoordinator>().RunAsync(
+            token => services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token), default);
+        Assert.AreEqual(JsonSerializer.Serialize(historical), JsonSerializer.Serialize(await toolSets.GetVersionExactAsync(
+            ResourceScopeRef.Instance, ResourceNamespace.Default, ArtifactPlatformResourceProvisioner.DefaultToolSetName, "1.0.0", default)));
+        Assert.AreEqual(JsonSerializer.Serialize(flowBefore), JsonSerializer.Serialize(await flows.GetVersionExactAsync(ResourceScopeRef.Instance,
+            new(ArtifactPlatformResourceProvisioner.StorageReadFlowName), ArtifactPlatformResourceProvisioner.StorageFlowVersion, default)));
+        var oldPin = await Assert.ThrowsAsync<ToolSetValidationException>(() => toolSets.ResolveRouteExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, ArtifactPlatformResourceProvisioner.DefaultToolSetName, "1.0.0", ArtifactCapabilities.Create, "default", default));
+        Assert.AreEqual("tool_set_member_stale", oldPin.Code);
+        var version = await toolSets.GetVersionExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default,
+            ArtifactPlatformResourceProvisioner.DefaultToolSetName, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, default);
+        await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
+        Assert.AreEqual(JsonSerializer.Serialize(version), JsonSerializer.Serialize(await toolSets.GetVersionExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, ArtifactPlatformResourceProvisioner.DefaultToolSetName, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, default)));
     }
 
     private static InternalMcpToolInvocation Invocation(RequestContext context, JsonElement arguments, string runId) => new(

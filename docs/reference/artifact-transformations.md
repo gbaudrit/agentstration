@@ -364,10 +364,30 @@ available for complete retained values.
 
 
 Existing instances reconcile internal Tool schemas during initialization version
-4, including the fixed output schemas required by the built-in Artifact storage
+5, including the fixed output schemas required by the built-in Artifact storage
 read/write Flows. This updates the managed Tool resources without rewriting
 published Flow versions. After upgrading, restart the authoritative host before
 starting a new local-copy operation; historical failed runs remain unchanged.
 Storage failures and other execution failures use the same Summary-only error
 card as contract failures, with a localized heading, a short explanation and
 collapsed diagnostic details. They remain identifiable by their original code.
+
+
+Initialization version 5 publishes the current built-in staging and broker
+ToolSets as `1.0.1`, pinning the reconciled Tool/provider generations, and selects
+that staging version in the managed default binding. Storage Flow versions remain
+`1.0.0`. Existing published ToolSet/Flow versions and execution history are
+preserved; explicit callers of an older, stale broker version must deliberately
+publish their callers against the new version. Fresh instances retain the
+original broker publication for the built-in bundles that pin it.
+
+Historical staged objects keep their recorded backend version. A changed binding
+or stale historical Tool pin is reported explicitly; obtain a new staged copy
+from the durable Artifact when needed. During reconciliation, drift in the current built-in publication fails
+initialization with an explicit diagnostic. A release that changes these
+contracts must advance both the initialization target and the current ToolSet
+publication.
+
+Staging route failures retain their original code, binding, capability, ToolSet
+version and Tool identity through the governed Worker HTTP boundary and the Flow
+Run error details, rather than becoming a generic server-error message.
