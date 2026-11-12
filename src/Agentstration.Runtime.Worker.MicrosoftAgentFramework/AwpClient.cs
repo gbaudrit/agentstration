@@ -287,15 +287,17 @@ internal sealed class AwpClient : IDisposable
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         string? code = null;
         string? message = null;
+        string? details = null;
         try
         {
             using var document = JsonDocument.Parse(body);
             if (document.RootElement.TryGetProperty("code", out var codeValue)) code = codeValue.GetString();
             if (document.RootElement.TryGetProperty("title", out var title)) message = title.GetString();
+            if (document.RootElement.TryGetProperty("contractFailure", out var failure) && failure.ValueKind == JsonValueKind.Object && failure.GetRawText().Length <= 8192) details = failure.GetRawText();
         }
         catch (JsonException) { }
         return new AwpClientException(code ?? "http_error",
-            message ?? $"The AWP authority returned HTTP {(int)response.StatusCode}.", response.StatusCode);
+            message ?? $"The AWP authority returned HTTP {(int)response.StatusCode}.", response.StatusCode) { Details = details };
     }
 
     public void Dispose() => http.Dispose();
@@ -357,6 +359,7 @@ internal sealed class AwpClient : IDisposable
 
 internal sealed class AwpClientException(string code, string message, HttpStatusCode statusCode) : Exception(message)
 {
+    public string? Details { get; init; }
     public string Code { get; } = code;
     public HttpStatusCode StatusCode { get; } = statusCode;
 }

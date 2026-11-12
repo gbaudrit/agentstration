@@ -143,7 +143,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
             {
                 EntryStep = "input",
                 Steps = [new InputFlowStepDefinition { Name = "input" },
-                    new ArtifactTransformFlowStepDefinition { Name = "process", Mode = mode },
+                    new ArtifactTransformFlowStepDefinition { Name = "process", Mode = mode, OutputContract = new() { Schema = JsonSerializer.SerializeToElement(new { type = "string" }), MediaType = "text/plain" } },
                     new AgentFlowStepDefinition { Name = "anonymize", Agent = new(processingAgent, ScopeRef: ownerScope),
                         InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
                     new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success,
@@ -272,6 +272,11 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 Assert.AreEqual(inputId, output.Receipt.Provenance["inputArtifactId"]);
                 Assert.AreEqual(runId, output.ProducerFlowRunId);
             }
+            if (processor == "agent")
+            {
+                StringAssert.Contains(model.LastInstructions!, "Output data contract for this invocation");
+                if (mode == ArtifactProcessingMode.Access) StringAssert.Contains(model.LastInstructions!, "final chat message is separate");
+            }
             if (mode == ArtifactProcessingMode.Access && processor == "agent")
             {
                 CollectionAssert.AreEqual(new[] { "input_read", "output_write", "output_read", "output_search_regex", "output_complete" }, model.CalledTools.ToArray());
@@ -299,7 +304,8 @@ public sealed class ArtifactProcessingAgentExecutionTests
         public int Calls { get; private set; }
         public JsonElement? LastInput { get; private set; }
         public InternalMcpToolDefinition Definition { get; } = new("test.anonymizer", "Synthetic anonymizer", "Generic text transformation fixture.",
-            JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"text":{"type":"string"},"language":{"type":"string"}},"required":["text","language"],"additionalProperties":false}"""));
+            JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"text":{"type":"string"},"language":{"type":"string"}},"required":["text","language"],"additionalProperties":false}"""),
+            JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"redacted":{"type":"string"}},"required":["redacted"],"additionalProperties":false}"""));
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
             Calls++;
@@ -312,9 +318,11 @@ public sealed class ArtifactProcessingAgentExecutionTests
     {
         public List<string> CalledTools { get; } = [];
         public int MaximumMessageCharacters { get; private set; }
+        public string? LastInstructions { get; private set; }
         public ValueTask<IChatClient> ResolveAsync(string name, CancellationToken cancellationToken = default) => ValueTask.FromResult<IChatClient>(this);
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
+            LastInstructions = options?.Instructions;
             var history = messages.ToArray();
             MaximumMessageCharacters = Math.Max(MaximumMessageCharacters, history.Sum(message => message.Text.Length));
             var calls = history.SelectMany(message => message.Contents).OfType<FunctionCallContent>().ToArray();

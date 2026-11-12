@@ -146,3 +146,12 @@ Storage supports exact retirement; supported remote ASP stores use a conditional
 empty replacement, while unsupported/revoked providers remain pending. Provider
 backups and object version history have their own retention settings. Existing
 resources without lifecycle keep legacy binding freshness rules.
+
+
+## Artifact data-contract evidence
+
+A manifest entry may include `dataContract` for the content it references. This is
+separate from the Flow's manifest schema. Dataset acquisitions retain their exact
+validated output schema. Artifact processing and Snapshot publication preserve
+concrete evidence after validating content. See
+[effective data contracts](artifact-transformations.md#effective-data-contracts).

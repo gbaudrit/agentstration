@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Awp.Abstractions;
@@ -10,7 +11,7 @@ using Agentstration.Runtime.MicrosoftAgentFramework;
 
 namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 
-internal sealed class AwpAssignmentExecutor(
+internal sealed partial class AwpAssignmentExecutor(
     ILoggerFactory loggerFactory,
     ILogger<AwpAssignmentExecutor> logger)
 {
@@ -35,6 +36,7 @@ internal sealed class AwpAssignmentExecutor(
         var toolPipeline = new AwpToolExecutionPipeline(session, material.Agent, turn);
         var factory = new AgentFrameworkRuntimeFactory(new AwpChatClientResolver(chatClient), loggerFactory,
             new GenAiObservabilityOptions { Enabled = true });
+        var responseContract = AgentDeclaredOutput(material.Agent, null);
         var definition = new ExecutableAgentDefinition
         {
             AgentId = material.Agent.AgentId,
@@ -43,6 +45,8 @@ internal sealed class AwpAssignmentExecutor(
             Description = material.Agent.Description,
             AgentVersion = material.Agent.Generation,
             EffectiveInstructions = material.Agent.Instructions,
+            InputSchema = material.Agent.InputSchema,
+            OutputSchema = material.Agent.OutputSchema,
             ModelProfileName = material.Agent.ModelProfileName,
             ModelProfileNamespace = ResourceNamespace.Parse(material.Agent.ModelProfileNamespace),
             RuntimeProfileName = material.Agent.RuntimeProfileName,
@@ -87,7 +91,7 @@ internal sealed class AwpAssignmentExecutor(
                 totalTokens = result.Usage?.TotalTokens
             }), null, cancellationToken);
         EnsureFinalResponse(result, chatClient);
-        return JsonSerializer.SerializeToElement(result.Output);
+        return AgentResultValue(material.Agent, result.Output ?? string.Empty, responseContract, material.RunId, material.Agent.ParticipantId);
     }
 
     private async Task<AwpAssignmentExecutionResult> ExecuteFlowAsync(AwpAssignmentSession session,
@@ -231,7 +235,7 @@ internal sealed class AwpAssignmentExecutor(
         await session.AppendEventAsync(AwpExecutionEventKind.StepStarted,
             new(material.RunId, FlowStep: step), null, null, cancellationToken);
         var execution = await ExecuteFlowAgentAsync(session, material, agent, step, material.Input, cancellationToken);
-        var output = JsonSerializer.SerializeToElement(execution.Output);
+        var output = AgentResultValue(agent, execution.Output, AgentDeclaredOutput(agent, Contracts(material)) ?? Contracts(material)?.ExpectedOutput, material.RunId, "Agent");
         await session.AppendEventAsync(AwpExecutionEventKind.StepCompleted,
             new(material.RunId, FlowStep: step), JsonSerializer.SerializeToElement(new
             {
@@ -284,6 +288,10 @@ internal sealed class AwpAssignmentExecutor(
                 int? repeatIteration = null;
                 string? errorCode = null;
                 string? errorMessage = null;
+                string? errorDetails = null;
+                var artifactContracts = new List<InvocationDataContracts>();
+                try
+                {
                 switch (stepDefinition)
                 {
                     case InputFlowStepDefinition:
@@ -296,21 +304,22 @@ internal sealed class AwpAssignmentExecutor(
                             ?? material.Agents.SingleOrDefault(value => value.AgentName == agentResourceId)
                             ?? throw new AwpExecutionNotSupportedException("flow_agent_material_missing", $"Agent for step '{agentStep.Name}' is absent from the execution material.");
                         var agentInput = agentStep.InputMapping is null
-                            ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
+                            ? transitionOutput?.Clone() ?? material.Input.Clone()
                             : await ResolveJsonAsync(agentStep.InputMapping.Value, context, cancellationToken);
                         try
                         {
+                            var expected = ExpectedAgentOutput(graph, agentStep, material, executedAgent);
                             executedAgentResult = await ExecuteFlowAgentAsync(session, material, executedAgent, step,
-                                agentInput, cancellationToken);
-                            output = JsonSerializer.SerializeToElement(executedAgentResult.Output);
+                                agentInput, cancellationToken, expected);
+                            output = AgentResultValue(executedAgent, executedAgentResult.Output, expected, material.RunId, stepDefinition.Name);
                             eventName = "success";
                         }
                         catch (Exception exception) when (exception is not OperationCanceledException)
                         {
                             output = JsonSerializer.SerializeToElement(new { error = exception.Message });
                             eventName = "error";
-                            errorCode = exception is AwpExecutionNotSupportedException unsupported
-                                ? unsupported.Code : "agent_step_failed";
+                            errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code, _ => "agent_step_failed" };
+                            errorDetails = FailureDetails(exception);
                             errorMessage = exception.Message;
                         }
                         break;
@@ -338,7 +347,7 @@ internal sealed class AwpAssignmentExecutor(
                         try
                         {
                             output = await ProcessArtifactsAsync(session, material, processing, context, step,
-                                childRunIds, childExecutions, cancellationToken);
+                                childRunIds, childExecutions, artifactContracts, cancellationToken);
                         }
                         catch (Exception exception) when (exception is not OperationCanceledException)
                         {
@@ -347,6 +356,7 @@ internal sealed class AwpAssignmentExecutor(
                             errorCode = exception switch { AwpExecutionNotSupportedException unsupported => unsupported.Code,
                                 AwpClientException authority => authority.Code, _ => "artifact_processing_failed" };
                             errorMessage = exception.Message;
+                            errorDetails = FailureDetails(exception);
                         }
                         break;
                     case TransformFlowStepDefinition transform:
@@ -355,6 +365,8 @@ internal sealed class AwpAssignmentExecutor(
                             : transform.Mapping is null
                                 ? JsonSerializer.SerializeToElement(new { })
                                 : await ResolveJsonAsync(transform.Mapping.Value, context, cancellationToken);
+                        DataContracts.Validate(DataContracts.Declared(transform.Schema, $"flow:{material.RunId}/step:{transform.Name}/output"),
+                            output ?? JsonSerializer.SerializeToElement<object?>(null), "transform-output", material.RunId, transform.Name);
                         break;
                     case ToolFlowStepDefinition:
                     case ToolRouteFlowStepDefinition:
@@ -365,13 +377,13 @@ internal sealed class AwpAssignmentExecutor(
                             _ => null
                         };
                         var arguments = mapping is null
-                            ? JsonSerializer.SerializeToElement(new { })
+                            ? DefaultToolArguments(stepDefinition, transitionOutput ?? material.Input)
                             : await ResolveJsonAsync(mapping.Value, context, cancellationToken);
                         try
                         {
                             executedTool = await session.Client.InvokeFlowToolAsync(new(session.Context,
                                 step.StepExecutionId, arguments), cancellationToken);
-                            output = executedTool.Result?.Clone();
+                            output = executedTool.Result?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
                             eventName = "success";
                         }
                         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -382,11 +394,12 @@ internal sealed class AwpAssignmentExecutor(
                                 : stepDefinition is ToolRouteFlowStepDefinition
                                     ? "tool_route_step_failed" : "tool_step_failed";
                             errorMessage = exception.Message;
+                            errorDetails = FailureDetails(exception);
                         }
                         break;
                     case FlowCallStepDefinition flowCall:
                         var childInput = flowCall.InputMapping is null
-                            ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
+                            ? transitionOutput?.Clone() ?? material.Input.Clone()
                             : await ResolveJsonAsync(flowCall.InputMapping.Value, context, cancellationToken);
                         if (flowCall.CompositionParameters is { } literalParameters)
                             childInput = JsonSerializer.SerializeToElement(new { value = childInput, parameters = literalParameters });
@@ -394,19 +407,20 @@ internal sealed class AwpAssignmentExecutor(
                             "flowCall", null, cancellationToken);
                         childExecutions.Add(child);
                         childRunIds.Add(child.RunId);
-                        output = child.Result.Output?.Clone();
+                        output = child.Result.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
                         eventName = child.Result.OutputName
                             ?? (child.Result.ErrorCode == "flow_run_timed_out" ? "timedOut"
                                 : child.Result.Outcome == "error" ? "failed" : "completed");
                         if (child.Result.Outcome == "error")
                         {
+                            errorDetails = child.Result.ErrorDetails;
                             errorCode = child.Result.ErrorCode ?? "child_flow_failed";
                             errorMessage = child.Result.ErrorMessage ?? "The child Flow failed.";
                         }
                         break;
                     case RepeatFlowStepDefinition repeat:
                         var repeatInput = repeat.InputMapping is null
-                            ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
+                            ? transitionOutput?.Clone() ?? material.Input.Clone()
                             : await ResolveJsonAsync(repeat.InputMapping.Value, context, cancellationToken);
                         output = null;
                         for (var iteration = 1; iteration <= repeat.MaximumIterations; iteration++)
@@ -416,10 +430,11 @@ internal sealed class AwpAssignmentExecutor(
                                 "repeat", iteration, cancellationToken);
                             childExecutions.Add(repeated);
                             childRunIds.Add(repeated.RunId);
-                            output = repeated.Result.Output?.Clone();
+                            output = repeated.Result.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
                             if (repeated.Result.Outcome == "error")
                             {
                                 eventName = repeated.Result.OutputName ?? "failed";
+                                errorDetails = repeated.Result.ErrorDetails;
                                 errorCode = repeated.Result.ErrorCode ?? "child_flow_failed";
                                 errorMessage = repeated.Result.ErrorMessage ?? "The repeated child Flow failed.";
                                 break;
@@ -442,7 +457,7 @@ internal sealed class AwpAssignmentExecutor(
                         break;
                     case OutputFlowStepDefinition outputStep:
                         output = outputStep.OutputMapping is null
-                            ? transitionOutput?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
+                            ? transitionOutput?.Clone() ?? material.Input.Clone()
                             : await ResolveJsonAsync(outputStep.OutputMapping.Value, context, cancellationToken);
                         var outcome = outputStep.Outcome ?? FlowOutputOutcome.Success;
                         eventName = outputStep.Outcome.HasValue ? outputStep.Name : "completed";
@@ -451,15 +466,31 @@ internal sealed class AwpAssignmentExecutor(
                             errorCode = outputStep.Code ?? transitionFailure?.Code ?? "FLOW_FAILED";
                             errorMessage = outputStep.Message ?? transitionFailure?.Message ?? "Flow execution failed.";
                         }
+                        DataContracts.Validate(DataContracts.Declared(graph.ResolveOutputSchema(outputStep, out _), $"flow:{material.RunId}/output:{outputStep.Name}"), output ?? JsonSerializer.SerializeToElement<object?>(null), "flow-output", material.RunId, outputStep.Name);
                         final = new(output, outputStep.Outcome.HasValue ? outputStep.Name : null,
                             outcome == FlowOutputOutcome.Error ? "error" : "success",
                             errorCode, errorMessage,
-                            outputStep.DetailsExpression is null ? null
-                                : await ResolveFailureDetailsAsync(outputStep.DetailsExpression, context, cancellationToken));
+                            outputStep.DetailsExpression is null ? transitionFailure?.Details
+                                : PreserveContractFailure(transitionFailure?.Details, await ResolveFailureDetailsAsync(outputStep.DetailsExpression, context, cancellationToken)));
                         break;
                     default:
                         throw new AwpExecutionNotSupportedException("flow_step_type_unsupported",
                             $"Step '{stepDefinition.Name}' of type '{stepDefinition.Type()}' is not yet supported by the external Worker.");
+                }
+                }
+                catch (DataContractException exception)
+                {
+                    errorCode = exception.Code; errorMessage = exception.Message; errorDetails = FailureDetails(exception);
+                    output = JsonSerializer.SerializeToElement(new { error = errorMessage });
+                    eventName = stepDefinition is FlowCallStepDefinition or RepeatFlowStepDefinition ? "failed" : "error";
+                    if (stepDefinition is OutputFlowStepDefinition) final = new(null, stepDefinition.Name, "error", errorCode, errorMessage, errorDetails);
+                }
+                catch (AwpClientException exception)
+                {
+                    errorCode = exception.Code; errorDetails = FailureDetails(exception);
+                    errorMessage = $"Child Flow call at step '{stepDefinition.Name}' of run '{material.RunId}' failed: {exception.Message}";
+                    output = JsonSerializer.SerializeToElement(new { error = errorMessage });
+                    eventName = stepDefinition is FlowCallStepDefinition or RepeatFlowStepDefinition ? "failed" : "error";
                 }
                 outputs[current] = output?.Clone();
                 if (errorCode is null && stepDefinition.ArtifactOutput is { } artifactOutput)
@@ -524,11 +555,15 @@ internal sealed class AwpAssignmentExecutor(
                         break;
                     }
                 }
+                var inspectedContracts = BoundedArtifactContracts(artifactContracts);
                 await session.AppendEventAsync(AwpExecutionEventKind.StepCompleted, location,
                     JsonSerializer.SerializeToElement(new
                     {
                         status = errorCode is null ? "succeeded" : "failed",
                         output,
+                        contracts = StepContracts(material, graph, stepDefinition, errorCode is null),
+                        artifactContracts = inspectedContracts,
+                        moreArtifactContracts = inspectedContracts.Count < artifactContracts.Count,
                         selectedTransition = transition?.Id,
                         agentResourceId = executedAgent?.AgentName,
                         agentVersion = executedAgent?.Generation,
@@ -557,15 +592,16 @@ internal sealed class AwpAssignmentExecutor(
                         repeatIteration,
                         artifacts = stepArtifacts,
                         errorCode,
+                        errorDetails,
                         error = errorMessage
                     }), null, cancellationToken);
                 if (stepDefinition is OutputFlowStepDefinition) break;
                 if (transition is null && errorCode is not null)
-                    throw new AwpExecutionNotSupportedException(errorCode, errorMessage ?? "The Flow step failed.");
+                    throw new AwpExecutionNotSupportedException(errorCode, errorMessage ?? "The Flow step failed.") { Details = errorDetails };
                 if (transition is null)
                     throw new AwpExecutionNotSupportedException("flow_transition_missing",
                         $"No '{eventName}' transition leaves step '{current}'.");
-                transitionFailure = errorCode is not null ? new(errorCode, errorMessage ?? "The Flow step failed.")
+                transitionFailure = errorCode is not null ? new(errorCode, errorMessage ?? "The Flow step failed.", errorDetails)
                     : stepDefinition is TransformFlowStepDefinition or ConditionFlowStepDefinition ? transitionFailure : null;
                 current = transition.ToStep;
                 transitionOutput = output?.Clone();
@@ -634,14 +670,15 @@ internal sealed class AwpAssignmentExecutor(
                 AwpClientException client => client.Code,
                 _ => "child_flow_execution_failed"
             };
-            var result = new AwpAssignmentExecutionResult(null, null, "error", code, exception.Message);
+            var result = new AwpAssignmentExecutionResult(null, null, "error", code, exception.Message, FailureDetails(exception));
             await session.AppendEventAsync(AwpExecutionEventKind.RunCompleted,
                 new(child.RunId), JsonSerializer.SerializeToElement(new
                 {
                     status = code == "flow_run_timed_out" ? "timedOut" : "failed",
                     outcome = "error",
                     errorCode = code,
-                    error = exception.Message
+                    error = exception.Message,
+                    errorDetails = result.ErrorDetails
                 }), null, cancellationToken);
             return new(child.RunId, child.Material.FlowId, child.Material.FlowNamespace,
                 child.Material.FlowVersion, result);
@@ -651,7 +688,7 @@ internal sealed class AwpAssignmentExecutor(
     private async Task<JsonElement> ProcessArtifactsAsync(AwpAssignmentSession session,
         AwpRootFlowExecutionMaterial material, ArtifactTransformFlowStepDefinition definition,
         FlowExecutionContext context, AwpFlowStepLocation step, List<string> childRunIds,
-        List<AwpChildExecutionResult> childExecutions, CancellationToken cancellationToken)
+        List<AwpChildExecutionResult> childExecutions, List<InvocationDataContracts> artifactContracts, CancellationToken cancellationToken)
     {
         var input = definition.ArtifactsMapping is { } mapping
             ? await ResolveJsonAsync(mapping, context, cancellationToken)
@@ -676,6 +713,10 @@ internal sealed class AwpAssignmentExecutor(
             {
                 var opened = (await session.Client.ProcessArtifactAsync(new(session.Context,
                     step.StepExecutionId, index, "open", item), cancellationToken)).Result;
+                if (opened.TryGetProperty("contractContext", out var metadata) && metadata.ValueKind == JsonValueKind.Object
+                    && metadata.Deserialize<InvocationDataContracts>(JsonOptions) is { } contracts
+                    && !artifactContracts.Any(existing => existing.Input?.Digest == contracts.Input?.Digest && existing.ExpectedOutput?.Digest == contracts.ExpectedOutput?.Digest))
+                    artifactContracts.Add(contracts);
                 var processingContext = context with { Input = JsonSerializer.SerializeToElement(new {
                     artifact = opened.GetProperty("artifact"), content = opened.GetProperty("content"),
                     inputAccess = opened.GetProperty("inputAccess"), outputAccess = opened.GetProperty("outputAccess"),
@@ -687,7 +728,7 @@ internal sealed class AwpAssignmentExecutor(
                 childExecutions.Add(child);
                 if (child.Result.Outcome == "error")
                     throw new AwpExecutionNotSupportedException(child.Result.ErrorCode ?? "artifact_processing_failed",
-                        child.Result.ErrorMessage ?? "Artifact processing failed.");
+                        child.Result.ErrorMessage ?? "Artifact processing failed.") { Details = child.Result.ErrorDetails };
                 var resultContext = context with { Input = child.Result.Output ?? JsonSerializer.SerializeToElement<object?>(null),
                     TransitionOutput = child.Result.Output };
                 var output = definition.ResultMapping is { } resultMapping
@@ -710,12 +751,15 @@ internal sealed class AwpAssignmentExecutor(
         for (var outputIndex = 0; outputIndex < index; outputIndex++)
             results.Add((await session.Client.ProcessArtifactAsync(new(session.Context,
                 step.StepExecutionId, outputIndex, "finish", JsonSerializer.SerializeToElement(new { })), cancellationToken)).Result);
+        for (var contractIndex = 0; contractIndex < artifactContracts.Count; contractIndex++)
+            if (artifactContracts[contractIndex].ExpectedOutput is { } validated)
+                artifactContracts[contractIndex] = artifactContracts[contractIndex] with { ExpectedOutput = validated with { Validated = true } };
         return JsonSerializer.SerializeToElement(new { artifacts = results });
     }
 
     private async Task<AgentExecutionResult> ExecuteFlowAgentAsync(AwpAssignmentSession session,
         AwpRootFlowExecutionMaterial material, AwpExecutionAgentMaterial agent,
-        AwpFlowStepLocation step, JsonElement input, CancellationToken cancellationToken)
+        AwpFlowStepLocation step, JsonElement input, CancellationToken cancellationToken, ResolvedDataContract? expected = null)
     {
         var turn = (await session.Client.OpenTurnAsync(new(session.Context, material.RunId, step, agent.ParticipantId),
             Guid.NewGuid(), cancellationToken)).Turn;
@@ -726,7 +770,11 @@ internal sealed class AwpAssignmentExecutor(
         var toolPipeline = new AwpToolExecutionPipeline(session, agent, turn);
         var factory = new AgentFrameworkRuntimeFactory(new AwpChatClientResolver(chatClient), loggerFactory,
             new GenAiObservabilityOptions { Enabled = true });
-        var runtime = await factory.CreateAsync(ToDefinition(agent), agent.RevisionId,
+        DataContracts.Validate(DataContracts.Declared(agent.InputSchema, $"agent:{agent.AgentName}@{agent.Generation}/input"), input, "agent-input", material.RunId, agent.ParticipantId);
+        var contracts = Contracts(material);
+        var responseContract = expected ?? AgentDeclaredOutput(agent, contracts);
+        var instructions = agent.Instructions;
+        var runtime = await factory.CreateAsync(ToDefinition(agent) with { EffectiveInstructions = instructions }, agent.RevisionId,
             new AgentRuntimeContext(new AwpToolCatalog(agent.Tools), toolPipeline), cancellationToken);
         var result = await runtime.ExecuteAsync(new AgentExecutionRequest(input.GetRawText(), material.RunId,
             Execution: new AgentExecutionOptions { Streaming = RuntimeStreamingMode.Disabled },
@@ -1004,6 +1052,8 @@ internal sealed class AwpAssignmentExecutor(
         Description = agent.Description,
         AgentVersion = agent.Generation,
         EffectiveInstructions = agent.Instructions,
+        InputSchema = agent.InputSchema,
+        OutputSchema = agent.OutputSchema,
         ModelProfileName = agent.ModelProfileName,
         ModelProfileNamespace = ResourceNamespace.Parse(agent.ModelProfileNamespace),
         RuntimeProfileName = agent.RuntimeProfileName,
@@ -1055,6 +1105,7 @@ internal sealed class AwpAssignmentExecutor(
 internal class AwpExecutionNotSupportedException(string code, string message) : Exception(message)
 {
     public string Code { get; } = code;
+    public string? Details { get; init; }
 }
 
 internal sealed class AwpExecutionTimedOutException()

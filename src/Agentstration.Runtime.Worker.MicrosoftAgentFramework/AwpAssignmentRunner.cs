@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Diagnostics;
 using System.Text.Json;
 using Agentstration.Awp.Abstractions;
@@ -101,6 +102,7 @@ internal sealed class AwpAssignmentRunner(
         {
             var code = exception switch
             {
+                DataContractException contract => contract.Code,
                 AwpExecutionNotSupportedException unsupported => unsupported.Code,
                 AwpClientException authorityFailure => authorityFailure.Code,
                 _ => "worker_execution_failed"
@@ -109,7 +111,10 @@ internal sealed class AwpAssignmentRunner(
             activity?.SetTag("error.type", exception.GetType().FullName);
             logger.LogError(exception, "Assignment {AssignmentId} execution failed with code {ErrorCode}",
                 assignment.AssignmentId.Value, code);
-            await TryFailAsync(session, AwpExecutionFailureKind.Execution, code, exception.Message, stoppingToken);
+            await TryFailAsync(session, AwpExecutionFailureKind.Execution, code, exception.Message, stoppingToken,
+                exception is DataContractException violation ? JsonSerializer.SerializeToElement(violation.Failure)
+                    : exception is AwpExecutionNotSupportedException { Details: { Length: > 0 } details } ? JsonSerializer.Deserialize<JsonElement>(details)
+                    : exception is AwpClientException { Details: { Length: > 0 } authorityDetails } ? JsonSerializer.Deserialize<JsonElement>(authorityDetails) : null);
         }
         catch (Exception exception)
         {
@@ -161,12 +166,12 @@ internal sealed class AwpAssignmentRunner(
     }
 
     private static async Task TryFailAsync(AwpAssignmentSession session, AwpExecutionFailureKind kind,
-        string code, string message, CancellationToken cancellationToken)
+        string code, string message, CancellationToken cancellationToken, JsonElement? details = null)
     {
         try
         {
             session.EnsureCanStartMutation();
-            await session.Client.FailAsync(new(session.Context, new(Guid.NewGuid()), new(kind, code, message)), cancellationToken);
+            await session.Client.FailAsync(new(session.Context, new(Guid.NewGuid()), new(kind, code, message, details)), cancellationToken);
         }
         catch (Exception exception) when (exception is AwpClientException or AwpLeaseUnsafeException or OperationCanceledException) { }
     }

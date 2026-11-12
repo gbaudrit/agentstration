@@ -26,6 +26,7 @@ public sealed record RuntimeAssignmentAttempt
     public Guid? TerminalEventId { get; init; }
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
+    public string? ErrorDetails { get; init; }
 }
 
 public sealed record RuntimeWorkerAssignment
@@ -171,7 +172,8 @@ public sealed record RuntimeAssignmentTerminalCommand(
     Guid EventId,
     string? Response = null,
     string? Error = null,
-    string? ErrorCode = null);
+    string? ErrorCode = null,
+    string? ErrorDetails = null);
 
 public static class RuntimeAssignmentErrorCodes
 {

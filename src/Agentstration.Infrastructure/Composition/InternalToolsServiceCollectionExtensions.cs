@@ -80,7 +80,7 @@ internal static class InternalToolsServiceCollectionExtensions
         : IInternalMcpToolDefinitionProvider
     {
         public InternalMcpToolDefinition Definition { get; } = new("artifact.processing." + operation.ExternalId,
-            operation.Name, operation.Description, operation.InputSchema,
+            operation.Name, operation.Description, operation.InputSchema, operation.OutputSchema,
             InitialCategory: new("artifact-processing", "Artifact processing", "Content operations restricted to the current Artifact processing execution."),
             ExposeThroughMcp: false);
     }

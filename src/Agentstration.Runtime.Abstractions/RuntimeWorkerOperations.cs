@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Resources;
 
@@ -111,6 +112,7 @@ public sealed class RuntimeGovernedOperationException(string code, string messag
     : Exception(message, innerException)
 {
     public string Code { get; } = code;
+    public DataContractFailure? ContractFailure { get; init; }
 }
 
 public interface IRuntimeWorkerOperationGateway

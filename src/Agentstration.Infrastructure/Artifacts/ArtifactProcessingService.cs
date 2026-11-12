@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -29,12 +30,23 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
     private readonly SemaphoreSlim[] gates = Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
     public void Dispose() { foreach (var gate in gates) gate.Dispose(); }
 
-    private sealed record Input(string Id, string Kind, string Name, string MediaType, long Length, string Sha256, string? Reference = null, string? DirectContent = null);
+    private sealed record Input(string Id, string Kind, string Name, string MediaType, long Length, string Sha256, string? Reference = null, string? DirectContent = null, ResolvedDataContract? Contract = null);
     private sealed record WriteReceipt(string Id, string Digest, int Revision);
     private sealed record Session(Input Input, string OutputId, string OutputName, string MediaType,
         int Revision, int? CompletedRevision, DateTimeOffset ExpiresAt, IReadOnlyList<WriteReceipt> Writes,
-        string? DurableReference = null, JsonElement? Result = null, string? DirectOutput = null);
+        string? DurableReference = null, JsonElement? Result = null, string? DirectOutput = null, ResolvedDataContract? Contract = null);
     private sealed record Cursor(string Session, string Side, int Revision, int Offset);
+
+    public async Task<InvocationDataContracts> ContractsAsync(FlowRun owner, ArtifactTransformFlowStepDefinition step, int index, CancellationToken token)
+    {
+        await EnsureExecutionAccessAsync(owner, token);
+        using var operational = scopes.Push(current.Current);
+        var attempt = Math.Max(1, owner.Steps.Single(value => value.StepName == step.Name).Attempt);
+        var session = await LoadAsync(owner, Key(owner, step.Name, attempt, index), token)
+            ?? throw Error("artifact_processing_context_missing");
+        EnsureLive(session);
+        return new(session.Input.Contract, session.Contract, step.Mode == ArtifactProcessingMode.Access, step.ResultMapping is not null);
+    }
 
     public async Task<JsonElement> ExecuteOwnerAsync(FlowRun owner, ArtifactTransformFlowStepDefinition step,
         int index, string action, JsonElement arguments, CancellationToken token)
@@ -57,16 +69,50 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                     var input = await ResolveInputAsync(arguments, owner, key, token);
                     if (input.Length > MaximumInputBytes || step.Mode == ArtifactProcessingMode.Content && input.Length > step.MaximumContentBytes)
                         throw Error("artifact_processing_content_too_large");
+                    var body = step.Mode == ArtifactProcessingMode.Content && step.ResultMapping is null
+                        && owner.DefinitionSnapshot.Graph!.Transitions.Any(edge => edge.FromStep == step.Name && edge.Event == "process")
+                        ? FlowArtifactProcessingGraph.Extract(owner.DefinitionSnapshot.Graph!, step) : null;
+                    var producedSchema = body?.ResolveSingleSuccessOutputSchema(out _);
+                    var producedMedia = body is null ? null : FlowDataContracts.OutputMediaType(body);
+                    var contract = producedSchema is not null
+                        ? DataContracts.Declared(producedSchema, $"flow:{owner.Id}/step:{step.Name}/process-output", producedMedia ?? step.OutputMediaType)
+                        : DataContracts.Resolve(step.OutputContract, input.Contract, owner.ContractContext?.ExpectedOutput,
+                            $"flow:{owner.Id}/step:{step.Name}/output");
+                    if (producedMedia is not null && contract is null)
+                        contract = DataContracts.Declared(null, $"flow:{owner.Id}/step:{step.Name}/process-output", producedMedia);
+                    if (producedMedia is not null && step.OutputContract is { Mode: DataContractMode.Fixed, MediaType: { } configuredMedia }
+                        && !string.Equals(producedMedia, configuredMedia, StringComparison.OrdinalIgnoreCase))
+                        throw DataContracts.Failure("data_contract_media_mismatch", "artifact-output", contract!.Origin, "$", "fixed_producer", producedMedia, configuredMedia, owner.Id, step.Name);
+                    if (producedMedia is not null && producedSchema is null && contract is not null)
+                    {
+                        if (contract.MediaType is { } requestedMedia && !string.Equals(producedMedia, requestedMedia, StringComparison.OrdinalIgnoreCase))
+                            throw DataContracts.Failure("data_contract_media_mismatch", "artifact-output", contract.Origin, "$", "fixed_producer", producedMedia, requestedMedia, owner.Id, step.Name);
+                        contract = DataContracts.Declared(contract.Schema, contract.Origin, producedMedia)! with { DeclaredMode = contract.DeclaredMode };
+                    }
+                    if (producedSchema is not null && step.OutputContract is { Mode: DataContractMode.Fixed, Schema: { } requested }
+                        && !JsonElement.DeepEquals(producedSchema.Value, requested))
+                        throw DataContracts.Failure("data_contract_conflict", "artifact-output", contract!.Origin, "$", "fixed_producer", "producer's explicit output schema", "different transformation expectation", owner.Id, step.Name);
+                    if (contract?.MediaType is { } expectedMedia && step.OutputMediaType is { } declaredMedia
+                        && !string.Equals(expectedMedia, declaredMedia, StringComparison.OrdinalIgnoreCase))
+                        throw DataContracts.Failure("data_contract_media_mismatch", "artifact-output", contract.Origin, "$", "media_type", expectedMedia, declaredMedia, owner.Id, step.Name);
+                    var mediaType = step.OutputMediaType ?? contract?.MediaType
+                        ?? (contract?.Schema is { ValueKind: JsonValueKind.Object } dataSchema
+                            ? dataSchema.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "string" ? "text/plain" : "application/json"
+                            : input.MediaType);
+                    contract ??= DataContracts.Declared(null, $"flow:{owner.Id}/step:{step.Name}/output-media", mediaType);
+                    if (contract is not null && contract.MediaType is null)
+                        contract = DataContracts.Declared(contract.Schema, contract.Origin, mediaType)! with { DeclaredMode = contract.DeclaredMode };
                     if (owner.TransientPayloads)
-                        session = new(input, "direct-" + key, step.OutputFileName ?? input.Name, step.OutputMediaType ?? input.MediaType,
+                        session = new(input, "direct-" + key, step.OutputFileName ?? input.Name, mediaType,
                             0, null, owner.CreatedAt + DirectExecutionPayloadPersistence.Lifetime, [], DirectOutput: string.Empty);
                     else
                     {
                         var output = await StageAsync(owner, step, key + ":0", step.OutputFileName ?? input.Name,
-                            step.OutputMediaType ?? input.MediaType, ReadOnlyMemory<byte>.Empty, input, token);
+                            mediaType, ReadOnlyMemory<byte>.Empty, input, token);
                         session = new(input, output.ArtifactId.ToString(), output.FileName, output.MediaType, 0, null,
                             clock.GetUtcNow() + TimeSpan.FromHours(1), []);
                     }
+                    session = session with { Contract = contract };
                     await SaveAsync(owner, key, session, token);
                 }
                 else if (session.Input.Id != Text(arguments, "artifactId")) throw Error("artifact_processing_input_changed");
@@ -78,13 +124,18 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                     if (IsJson(session.Input.MediaType))
                     {
                         try { content = JsonSerializer.Deserialize<JsonElement>(text); }
-                        catch (JsonException) { throw Error("artifact_processing_input_json_invalid"); }
+                        catch (JsonException)
+                        {
+                            var error = Error("artifact_processing_input_json_invalid");
+                            throw new RuntimeGovernedOperationException(error.Code, error.Message)
+                            { ContractFailure = new("artifact-input", $"flow:{owner.Id}/step:{step.Name}/input", "$", "json_syntax", "valid JSON", "invalid JSON text", owner.Id, step.Name, error.Code) };
+                        }
                     }
                     else content = text;
                 }
                 return Element(new { artifact = new { artifactId = session.Input.Id, name = session.Input.Name,
-                    mediaType = session.Input.MediaType, sizeBytes = session.Input.Length, sha256 = session.Input.Sha256 },
-                    content, inputAccess = new { reference = key, access = "read" },
+                    mediaType = session.Input.MediaType, sizeBytes = session.Input.Length, sha256 = session.Input.Sha256, dataContract = session.Input.Contract },
+                    content, contractContext = new InvocationDataContracts(session.Input.Contract, session.Contract, step.Mode == ArtifactProcessingMode.Access, step.ResultMapping is not null), inputAccess = new { reference = key, access = "read" },
                     outputAccess = new { reference = key, access = "readWrite" }, revision = session.Revision });
             }
             if (session is null) throw Error("artifact_processing_context_missing");
@@ -102,13 +153,21 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             {
                 var outputText = arguments.ValueKind == JsonValueKind.String ? arguments.GetString()! : arguments.GetRawText();
                 // A text-producing Agent can return JSON text, which must be valid for JSON output.
-                ValidateContent(session.MediaType, outputText);
+                if (session.Contract is { } contentContract)
+                    _ = DataContracts.ReadText(contentContract, outputText, "artifact-output", owner.Id, step.Name);
+                else ValidateContent(session.MediaType, outputText);
                 session = await WriteAsync(owner, step, key, session, Element(new { content = outputText,
                     expectedRevision = 0, requestId = "capture-result", offset = 0, deleteLength = 0 }), token);
                 session = session with { CompletedRevision = session.Revision };
                 await SaveAsync(owner, key, session, token);
             }
             if (session.CompletedRevision != session.Revision) throw Error("artifact_processing_output_incomplete");
+            if (session.Contract is { } expectedContract)
+            {
+                _ = DataContracts.ReadText(expectedContract, await OutputTextAsync(session, token), "artifact-output", owner.Id, step.Name);
+                session = session with { Contract = expectedContract with { Validated = true } };
+                await SaveAsync(owner, key, session, token);
+            }
             if (action == "prepare") return Element(new { prepared = true, revision = session.Revision });
             if (owner.TransientPayloads)
             {
@@ -116,7 +175,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                 // The existing Knowledge inline publication contract is bounded to 64 KiB.
                 if (bytes.Length > 65536) throw Error("artifact_processing_direct_output_too_large");
                 var manifest = Element(new { artifactId = session.OutputId, kind = "inline", disposition = "publishable",
-                    name = session.OutputName, mediaType = session.MediaType, digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                    name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
                     contentBase64 = Convert.ToBase64String(bytes) });
                 await SaveAsync(owner, key, session with { Result = manifest }, token);
                 return manifest;
@@ -151,12 +210,12 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             var materialization = await selectableStorage.DescribeReferenceAsync(owner.WorkspaceId, reference, token);
             var registered = await artifacts.CompleteFlowRunArtifactAsync(outputStage.ArtifactId, new(owner.Id, step.Name,
                 new() { StorageFlowRunId = string.Empty, OpaqueReference = reference,
-                    Materialization = materialization, MediaType = session.MediaType, Length = stat.Length, Sha256 = stat.Sha256,
+                    Materialization = materialization, DataContract = session.Contract, MediaType = session.MediaType, Length = stat.Length, Sha256 = stat.Sha256,
                     Provenance = new Dictionary<string, string> { ["fileName"] = session.OutputName,
                         ["inputArtifactId"] = session.Input.Id, ["inputArtifactKind"] = session.Input.Kind, ["inputSha256"] = session.Input.Sha256,
                         ["processingRunId"] = ProcessingRunId(owner, step, attempt, index), ["provider"] = "artifact-processing" } }), token);
             var manifestItem = Element(new { artifactId = registered.Value.ArtifactId.ToString(), kind = "durable",
-                disposition = "publishable", name = session.OutputName, mediaType = session.MediaType, digest = "sha256:" + stat.Sha256 });
+                disposition = "publishable", name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, digest = "sha256:" + stat.Sha256 });
             await SaveAsync(owner, key, session with { Result = manifestItem }, token);
             return manifestItem;
         }
@@ -201,7 +260,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                     mediaType = side == "input" ? session.Input.MediaType : session.MediaType,
                     sizeBytes = side == "input" ? session.Input.Length : session.DirectOutput is { } directOutput ? Utf8.GetByteCount(directOutput) : (await OutputStageAsync(session, token)).Length,
                     revision = side == "input" ? 0 : session.Revision, completed = side == "output" && session.CompletedRevision == session.Revision,
-                    rangeUnit = "utf16Characters" });
+                    dataContract = side == "input" ? session.Input.Contract : session.Contract, rangeUnit = "utf16Characters" });
             if (action == "output_write")
             {
                 session = await WriteAsync(owner, step, key, session, arguments, token);
@@ -210,7 +269,8 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             if (action == "output_complete")
             {
                 if (Integer(arguments, "expectedRevision", -1) != session.Revision) throw Error("artifact_processing_revision_conflict");
-                ValidateContent(session.MediaType, await OutputTextAsync(session, token));
+                if (session.Contract is { } required) _ = DataContracts.ReadText(required, await OutputTextAsync(session, token), "artifact-output", owner.Id, step.Name);
+                else ValidateContent(session.MediaType, await OutputTextAsync(session, token));
                 await SaveAsync(owner, key, session with { CompletedRevision = session.Revision }, token);
                 return Element(new { revision = session.Revision, completed = true });
             }
@@ -322,6 +382,19 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             catch (FormatException) { throw Error("artifact_processing_content_invalid"); }
             var input = new Input(id, "inline", OptionalText(value, "name") ?? "input.txt",
                 OptionalText(value, "mediaType") ?? "text/plain", bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+            if (value.TryGetProperty("dataContract", out var metadata) && metadata.ValueKind == JsonValueKind.Object)
+            {
+                var declared = metadata.Deserialize<ResolvedDataContract>(Json);
+                if (declared is not null)
+                {
+                    var concrete = DataContracts.Declared(declared.Schema, declared.Origin, declared.MediaType);
+                    if (concrete is not null)
+                    {
+                        _ = DataContracts.ReadText(concrete, Utf8.GetString(bytes), "artifact-input", owner.Id);
+                        input = input with { Contract = concrete with { Validated = true } };
+                    }
+                }
+            }
             if (owner.TransientPayloads) return input with { DirectContent = encoded };
             var staged = await StageAsync(owner, new() { Name = "input" }, key + ":input", input.Name, input.MediaType, bytes, input, token);
             return input with { Reference = staged.ArtifactId.ToString() };
@@ -338,7 +411,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         var artifact = (await artifacts.GetFlowRunArtifactForContentReadAsync(FlowRunArtifactId.Parse(id), true, token))?.Value
             ?? throw Error("artifact_processing_input_unavailable");
         return new(id, kind, artifact.Receipt.Provenance.GetValueOrDefault("fileName") ?? "input.txt", artifact.Receipt.MediaType,
-            artifact.Receipt.Length, artifact.Receipt.Sha256, artifact.Receipt.OpaqueReference);
+            artifact.Receipt.Length, artifact.Receipt.Sha256, artifact.Receipt.OpaqueReference, Contract: artifact.Receipt.DataContract);
     }
 
     private async Task<string> InputTextAsync(FlowRun owner, Input input, CancellationToken token)
@@ -452,7 +525,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
     private static int Integer(JsonElement value, string name, int fallback) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var field)
         ? field.ValueKind == JsonValueKind.Number && field.TryGetInt32(out var number) ? number : throw Error("artifact_processing_arguments_invalid") : fallback;
     private static bool SplitsScalar(string text, int offset) => offset > 0 && offset < text.Length && char.IsHighSurrogate(text[offset - 1]) && char.IsLowSurrogate(text[offset]);
-    private static bool IsJson(string media) => media.Equals("application/json", StringComparison.OrdinalIgnoreCase) || media.EndsWith("+json", StringComparison.OrdinalIgnoreCase);
+    private static bool IsJson(string media) => DataContracts.IsJsonMediaType(media);
     private static bool IsText(string media) => media.StartsWith("text/", StringComparison.OrdinalIgnoreCase) || IsJson(media);
     private static void ValidateContent(string media, string content)
     {

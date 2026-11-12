@@ -263,3 +263,11 @@
 }
 
 .flow-port-handle.processing-start,.flow-port-handle.processing-result{top:100%;transform:translate(-50%,-50%)}.flow-port-handle.processing-start{left:30%}.flow-port-handle.processing-result{left:70%}.flow-port-handle.processing-result .diagram-port{background:var(--surface);border-color:var(--primary)}
+
+.flow-port-information { position: absolute; left: .4rem; right: .4rem; bottom: .25rem; display: flex; overflow-x: auto; white-space: nowrap; gap: .25rem; justify-content: center; }
+.flow-port-information button { flex: 0 0 auto; border: 0; background: transparent; color: var(--text-muted, #60708b); font-size: .6rem; padding: .1rem .2rem; cursor: pointer; }
+.flow-port-information button:focus-visible { outline: 2px solid var(--primary, #3676ff); }
+.port-contract-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 55vh; overflow: auto; font-size: .8rem; }
+
+.flow-diagram-canvas .flow-node:has(.flow-port-information) { padding-bottom: 32px; }
+.flow-port-information button { min-height: 14px; height: 14px; line-height: 1.2; }

@@ -181,4 +181,19 @@
   <data name="ArtifactProcessingResultPort" xml:space="preserve"><value>Processing result</value></data>
   <data name="ArtifactProcessingStartPort" xml:space="preserve"><value>Processing</value></data>
   <data name="ArtifactOutputMediaTypeHelp" xml:space="preserve"><value>Choose a suggested MIME type or enter your own. Match the type to the produced content; leave empty to keep the input type.</value></data>
+  <data name="InspectPortNamed" xml:space="preserve"><value>Inspect port {0}</value></data>
+  <data name="PortContractTitle" xml:space="preserve"><value>Port {1} · {0}</value></data>
+  <data name="PortContractDesignHelp" xml:space="preserve"><value>Declared contracts and mappings for this definition. Dynamic contracts are resolved for each execution. Artifact data contracts describe the content, separately from the reference envelope.</value></data>
+  <data name="PortContractSummary" xml:space="preserve"><value>{0}: {1} · {2}</value></data>
+  <data name="PortContractUnresolved" xml:space="preserve"><value>No concrete schema available here</value></data>
+  <data name="DataContractMode" xml:space="preserve"><value>Contract mode</value></data>
+  <data name="DataContractMode.Absent" xml:space="preserve"><value>Undeclared</value></data>
+  <data name="DataContractMode.Fixed" xml:space="preserve"><value>Explicit fixed contract</value></data>
+  <data name="DataContractMode.Dynamic" xml:space="preserve"><value>Explicit dynamic contract</value></data>
+  <data name="ArtifactDataSchema" xml:space="preserve"><value>Artifact content schema (JSON Schema)</value></data>
+  <data name="ArtifactContractHelp" xml:space="preserve"><value>The final selected processing result must satisfy this contract. An explicit producer output contract takes precedence. Access mode validates the completed draft; the final chat message is separate.</value></data>
+  <data name="ContractSource" xml:space="preserve"><value>Resolve contract from</value></data>
+  <data name="ContractSource.Input" xml:space="preserve"><value>Input Artifact data contract</value></data>
+  <data name="ContractSource.Parent" xml:space="preserve"><value>Parent invocation expectation</value></data>
+  <data name="Close" xml:space="preserve"><value>Close</value></data>
 </root>

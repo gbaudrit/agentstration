@@ -1,0 +1,25 @@
+@using Agentstration.Schemas
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
+@if (Failure is { } failure)
+{
+    <div class="contract-failure-details" role="note">
+        <p>@Localizer[Failure.Code == "data_contract_encoding_invalid" ? "Error.ContractEncodingInvalid" : Failure.Code == "data_contract_json_invalid" ? "Error.ContractJsonInvalid" : Failure.Code == "data_contract_unresolved" ? "Error.ContractUnresolved" : "ContractFailureHelp"]</p>
+        <dl class="details-list">
+            <dt>@Localizer["ContractCode"]</dt><dd><code>@failure.Code</code></dd>
+            <dt>@Localizer["ContractBoundary"]</dt><dd><code>@failure.Boundary</code></dd>
+            <dt>@Localizer["ContractPath"]</dt><dd><code>@failure.Path</code></dd>
+            <dt>@Localizer["ContractExpected"]</dt><dd><code>@failure.Expected</code></dd>
+            <dt>@Localizer["ContractActual"]</dt><dd><code>@failure.Actual</code></dd>
+            <dt>@Localizer["ContractRule"]</dt><dd><code>@failure.Rule</code></dd>
+            <dt>@Localizer["ContractOrigin"]</dt><dd><code>@failure.Origin</code></dd>
+            @if (failure.FlowRunId is { } origin)
+            { <dt>@Localizer["ContractSourceRun"]</dt><dd><a href="@($"/flow-runs/{Uri.EscapeDataString(origin)}?scopeRef={Uri.EscapeDataString(ScopeRef?.Value ?? string.Empty)}&step={Uri.EscapeDataString(failure.StepName ?? string.Empty)}")">@origin</a> · @failure.StepName</dd> }
+        </dl>
+    </div>
+}
+@code {
+    [Parameter] public string? Details { get; set; }
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    private DataContractFailure? Failure => DataContracts.ParseFailure(Details);
+}

@@ -383,3 +383,12 @@ See the [authoring and content-access reference](../../reference/artifact-transf
 for mappings, operation contracts, publication behavior and current bounds. The
 reusable browser scenario is tracked separately by #1145, pending UX validation
 and implementation merge.
+
+
+Effective processing contracts follow [ADR-0214](../../decisions/0214-effective-data-contracts-follow-flow-invocations.md).
+The authority derives invocation instructions from accepted contracts before the
+model gateway; Worker-local ChatOptions do not override authoritative Agent
+instructions. The existing Schemas handler validates bounded nullable types and
+compositions as well as ordinary object contracts. Retained Artifact receipts and
+direct handoffs keep concrete content evidence; Flow Run diagnostics preserve
+causal contract failures across child executions.

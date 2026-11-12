@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -701,7 +702,8 @@ public sealed class KnowledgeProjectionService(
                 Name = Optional(entry, "name"),
                 MediaType = Optional(entry, "mediaType"),
                 Digest = Optional(entry, "digest"),
-                ContentBase64 = Optional(entry, "contentBase64")
+                ContentBase64 = Optional(entry, "contentBase64"),
+                DataContract = entry.TryGetProperty("dataContract", out var contract) && contract.ValueKind == JsonValueKind.Object ? contract.Deserialize<ResolvedDataContract>(FlowContractJsonOptions) : null
             });
         }
         if (result.Select(value => value.ArtifactId).Distinct(StringComparer.Ordinal).Count() != result.Count)

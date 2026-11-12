@@ -26,6 +26,6 @@ public static class RuntimeArtifactProcessingTools
     {
         using var parsed = JsonDocument.Parse(properties);
         var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = parsed.RootElement.Clone(), required, additionalProperties = false });
-        return new(Prefix + name, ResourceNamespace.Default, name, description, schema, null, false, Provider, null, name);
+        return new(Prefix + name, ResourceNamespace.Default, name, description, schema, JsonSerializer.SerializeToElement(new { type = "object" }), false, Provider, null, name);
     }
 }

@@ -56,3 +56,22 @@ The remaining AWP v1 operations are deliberately narrow:
 Every operation revalidates the Workspace, Worker session, AssignmentAttempt, opaque token, lease and fencing generation at the authoritative boundary. New governed side effects are rejected during the configured lease safety margin; an operation already in progress is cancelled before lease expiry. Read-only and durable mutation operations never expose a generic Management or storage API.
 
 The authority bounds streaming responses by event count, per-event size, total bytes, and Tool-argument size. The Worker validates UTF-8, envelope identity, stream identity, exact ordering, Tool-call lifecycle and terminal completion before accepting a stream. Lease renewal and revocation remain active for the full enumeration lifetime; a disconnected consumer cancels the in-flight provider call instead of transferring or extending ownership.
+
+
+### Effective data-contract context
+
+Agent execution material carries optional `inputSchema`, `outputSchema` and
+`outputContract` metadata. Root/child Flow material can carry `contractContext`
+with a concrete input contract, final output expectation, `artifactDraft` and
+`finalResultMapped` flags. The authority derives this context from the accepted
+Artifact processing session; workers cannot select another session's contract.
+It is separate from business input and never changes the Agent revision.
+
+`StepCompleted` can include concrete `contracts` evidence. Safe contract failures
+include structured `errorDetails`; failed assignment requests can carry the same
+structure in `failure.details`. The authority returns a bounded `contractFailure`
+Problem Details extension for HTTP 422 contract errors. Preserve this cause across
+child execution and root completion; do not replace it with only `FLOW_FAILED`.
+The extension contains types, schema paths and execution coordinates, never data
+values. Existing consumers can omit optional metadata; current workers enforce
+contracts supplied for an invocation.

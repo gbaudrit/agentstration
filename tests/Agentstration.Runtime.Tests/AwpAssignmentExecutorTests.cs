@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Agentstration.Runtime.Tests;
 
 [TestClass]
-public sealed class AwpAssignmentExecutorTests
+public sealed partial class AwpAssignmentExecutorTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 

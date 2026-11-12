@@ -12,7 +12,7 @@ public sealed class ArtifactProcessingContentTool(RuntimeExecutionToolMaterial o
     IFlowRepository runs, ICurrentRequestContext current) : IInternalMcpToolHandler
 {
     public InternalMcpToolDefinition Definition { get; } = new("artifact.processing." + operation.ExternalId,
-        operation.Name, operation.Description, operation.InputSchema,
+        operation.Name, operation.Description, operation.InputSchema, operation.OutputSchema ?? JsonSerializer.SerializeToElement(new { type = "object" }),
         InitialCategory: new("artifact-processing", "Artifact processing", "Content operations restricted to the current Artifact processing execution."),
         ExposeThroughMcp: false);
 

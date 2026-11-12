@@ -100,7 +100,7 @@ public sealed partial class FlowRunService
             : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved,
                 new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), scope.AccessScopeRef, cancellationToken);
         resolved = composed.Definition;
-        ValidateInput(resolved.Graph?.InputSchema, input);
+        ValidateInput(resolved.Graph?.ResolveInputSchema(), input);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {

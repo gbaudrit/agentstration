@@ -17,6 +17,7 @@ public sealed class AwpAssignmentProjection(
     IFlowInputRequestSink? inputRequestSink = null,
     FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null) : IRuntimeAssignmentProjection
 {
+    private static readonly JsonSerializerOptions ContractJson = new(JsonSerializerDefaults.Web);
     private readonly FlowRunTokenUsageConsolidator tokenUsageConsolidator =
         configuredTokenUsageConsolidator ?? new(flowRuns);
 
@@ -84,7 +85,8 @@ public sealed class AwpAssignmentProjection(
                 cancelled ? "The Flow Run was cancelled."
                 : functionalFailure ? StringProperty(terminalPayload, "error") ?? "Flow execution failed."
                 : SafeAssignmentFailureMessage(errorCode, result.ErrorMessage),
-                functionalFailure ? StringProperty(terminalPayload, "errorDetails") : null),
+                functionalFailure ? StringProperty(terminalPayload, "errorDetails")
+                    : stored.Value.Steps.LastOrDefault(value => value.Error?.Details is not null)?.Error?.Details ?? assignment.CurrentAttempt?.ErrorDetails),
             CompletedAt = now,
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null,
@@ -191,6 +193,9 @@ public sealed class AwpAssignmentProjection(
                     Status = failed ? FlowStepRunStatus.Failed : FlowStepRunStatus.Succeeded,
                     CompletedAt = executionEvent.OccurredAt,
                     Output = Property(executionEvent.Payload, "output"),
+                    Contracts = Property(executionEvent.Payload, "contracts")?.Deserialize<Agentstration.Schemas.InvocationDataContracts>(ContractJson),
+                    ArtifactContracts = Property(executionEvent.Payload, "artifactContracts")?.Deserialize<Agentstration.Schemas.InvocationDataContracts[]>(ContractJson) ?? [],
+                    MoreArtifactContracts = Property(executionEvent.Payload, "moreArtifactContracts") is { ValueKind: JsonValueKind.True },
                     SelectedTransition = StringProperty(executionEvent.Payload, "selectedTransition"),
                     AgentResourceId = StringProperty(executionEvent.Payload, "agentResourceId") ?? current.AgentResourceId,
                     AgentVersion = LongProperty(executionEvent.Payload, "agentVersion") ?? current.AgentVersion,
@@ -208,7 +213,7 @@ public sealed class AwpAssignmentProjection(
                     Artifacts = artifacts.Count > 0 ? artifacts : current.Artifacts,
                     ArtifactStorageFlowRunId = artifactStorageFlowRunId ?? current.ArtifactStorageFlowRunId,
                     Error = failed ? new FlowRunError(StringProperty(executionEvent.Payload, "errorCode") ?? "flow_step_failed",
-                        StringProperty(executionEvent.Payload, "error") ?? "The Flow step failed.") : null
+                        StringProperty(executionEvent.Payload, "error") ?? "The Flow step failed.", StringProperty(executionEvent.Payload, "errorDetails")) : null
                 }, failed ? FlowRunEventType.StepRunFailed : FlowRunEventType.StepRunCompleted,
                     executionEvent.Payload, executionEvent.OccurredAt, cancellationToken);
                 break;
@@ -342,7 +347,9 @@ public sealed class AwpAssignmentProjection(
             && string.Equals(value.RunId, runId, StringComparison.Ordinal))?.Payload;
 
     private static string SafeAssignmentFailureMessage(string errorCode, string? errorMessage) =>
-        errorCode == "agent_model_profile_unavailable" && !string.IsNullOrWhiteSpace(errorMessage)
+        (errorCode == "agent_model_profile_unavailable" || errorCode.StartsWith("data_contract_", StringComparison.Ordinal)
+            || errorCode.StartsWith("flow_input_", StringComparison.Ordinal) || errorCode.StartsWith("flow_composition_", StringComparison.Ordinal))
+            && !string.IsNullOrWhiteSpace(errorMessage)
             ? errorMessage
             : "The Runtime Worker could not complete the Flow Run.";
 

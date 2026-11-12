@@ -28,6 +28,22 @@
 {
     <label>@T("ArtifactResultMapping")<textarea data-testid="artifact-result-mapping" disabled="@ReadOnly" value="@(Step.ResultMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 2)"></textarea></label>
     <p class="muted">@T("ArtifactResultHelp")</p>
+    <label>@T("DataContractMode")
+        <select disabled="@ReadOnly" value="@(Step.OutputContract?.Mode ?? DataContractMode.Absent)" @onchange="ContractModeChangedAsync">
+            @foreach (var mode in Enum.GetValues<DataContractMode>()) { <option value="@mode">@T($"DataContractMode.{mode}")</option> }
+        </select>
+    </label>
+    <p class="muted">@T("ArtifactContractHelp")</p>
+    @if (Step.OutputContract is { Mode: DataContractMode.Fixed } fixedContract)
+    {
+        <label>@T("ArtifactDataSchema")<textarea disabled="@ReadOnly" value="@(fixedContract.Schema?.GetRawText() ?? "{}")" @onchange="ContractSchemaChangedAsync"></textarea></label>
+    }
+    @if (Step.OutputContract is { Mode: DataContractMode.Dynamic } dynamicContract)
+    {
+        <label>@T("ContractSource")<select disabled="@ReadOnly" value="@dynamicContract.Source" @onchange="ContractSourceChangedAsync">
+            <option value="input">@T("ContractSource.Input")</option><option value="parent">@T("ContractSource.Parent")</option>
+        </select></label>
+    }
 }
 @if (invalidJson) { <p class="validation-error" role="alert">@T("InvalidJson")</p> }
 
@@ -36,6 +52,21 @@
     [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
+    private Task ContractSourceChangedAsync(ChangeEventArgs args) => Changed.InvokeAsync(Step with { OutputContract = Step.OutputContract! with { Source = args.Value?.ToString() ?? "input" } });
+    private Task ContractModeChangedAsync(ChangeEventArgs args) => Enum.TryParse<DataContractMode>(args.Value?.ToString(), out var mode)
+        ? Changed.InvokeAsync(Step with { OutputContract = mode == DataContractMode.Absent ? null : new() { Mode = mode,
+            Schema = mode == DataContractMode.Fixed ? JsonSerializer.SerializeToElement(new { }) : null } }) : Task.CompletedTask;
+    private async Task ContractSchemaChangedAsync(ChangeEventArgs args)
+    {
+        try
+        {
+            var schema = JsonSerializer.Deserialize<JsonElement>(args.Value?.ToString() ?? "{}");
+            DataContracts.ValidateDefinition(new() { Schema = schema }, "artifact-output");
+            invalidJson = false;
+            await Changed.InvokeAsync(Step with { OutputContract = new() { Schema = schema } });
+        }
+        catch (Exception exception) when (exception is JsonException or DataContractException) { invalidJson = true; }
+    }
     private bool invalidJson;
     private readonly string mediaTypesId = "artifact-media-types-" + Guid.NewGuid().ToString("N");
     private static readonly string[] SuggestedMediaTypes = ["text/plain", "application/json", "text/markdown", "text/csv", "text/html", "text/xml", "application/ld+json", "application/geo+json"];

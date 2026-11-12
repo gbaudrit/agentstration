@@ -1,5 +1,6 @@
 using Agentstration.Flows;
 using Agentstration.Resources;
+using Agentstration.Tools;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Console;
@@ -21,7 +22,9 @@ public sealed class FlowDesignerResourceProvider(
             .Select(agent => new FlowDesignerAgent(agent.Id, agent.Name, agent.ScopeRef!.Value)
             {
                 Namespace = agent.Namespace,
+                OutputContract = agent.OutputContract,
                 InputSchema = agent.InputSchema?.Clone(),
+                OutputSchema = agent.OutputSchema?.Clone(),
                 InputSchemaReference = agent.InputSchemaReference
             }).ToArray();
     }
@@ -58,7 +61,9 @@ public sealed class FlowDesignerResourceProvider(
     {
         var toolsTask = toolsClient.GetToolsAsync(contextScope, cancellationToken: cancellationToken);
         var definitionsTask = toolDefinitionsClient.GetAsync(cancellationToken);
-        await Task.WhenAll(toolsTask, definitionsTask);
+        var providersTask = toolsClient.GetProvidersAsync(cancellationToken);
+        await Task.WhenAll(toolsTask, definitionsTask, providersTask);
+        var providers = await providersTask;
         var tools = await toolsTask;
         var definitions = (await definitionsTask).ToDictionary(
             definition => (definition.Namespace, definition.Name));
@@ -75,6 +80,15 @@ public sealed class FlowDesignerResourceProvider(
         {
             InputSchemaReference = ToolInputSchemaReference(tool, definitions)
         }).ToArray();
+    }
+
+    private static System.Text.Json.JsonElement? InvocationOutputSchema(ToolResource tool, IReadOnlyList<ToolProviderResource> providers)
+    {
+        var reference = tool.Definition.Provider;
+        var matching = providers.Where(provider => provider.Name == reference?.Name
+            && provider.Namespace == (reference?.Namespace ?? tool.Namespace)
+            && (reference?.ScopeRef is null || provider.ScopeRef == reference.ScopeRef)).ToArray();
+        return matching.Length == 1 ? ToolInvocationContracts.OutputSchema(tool.Definition.Schema?.Output, matching[0].Definition) : null;
     }
 
     private static SchemaVersionReference? ToolInputSchemaReference(

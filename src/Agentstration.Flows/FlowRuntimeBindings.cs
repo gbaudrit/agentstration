@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
@@ -64,6 +65,11 @@ public sealed record FlowTargetReference(
     Guid? RevisionUid = null,
     string? DefinitionHash = null)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? InputSchema { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? OutputSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public DataContractDefinition? OutputContract { get; init; }
     public ResourceAddress Resolve(ResourceNamespace ownerNamespace) =>
         ResourceAddress.Create(Namespace ?? ownerNamespace, Kind == FlowTargetKind.Agent ? "Agent" : "Flow", Id);
 }

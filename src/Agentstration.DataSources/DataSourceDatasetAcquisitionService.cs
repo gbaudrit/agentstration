@@ -246,7 +246,8 @@ public sealed class DataSourceDatasetAcquisitionService(
                         "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
                         new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
                         acquisition.Name, "application/json", materialization, ProducerUid: acquisition.DataSourceUid,
-                        ProducerGeneration: acquisition.DataSourceGeneration), cancellationToken));
+                        ProducerGeneration: acquisition.DataSourceGeneration, DataContract: Agentstration.Schemas.DataContracts.Declared(acquisition.Dataset!.OutputSchema,
+                            $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output", "application/json")), cancellationToken));
                     manifest = new()
                     {
                         Artifacts = [new() { ArtifactId = artifact.ArtifactId.ToString(),
@@ -437,7 +438,8 @@ public sealed class DataSourceDatasetAcquisitionService(
             "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
             new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
             acquisition.Name, "application/json", materialization, ProducerUid: acquisition.DataSourceUid,
-            ProducerGeneration: acquisition.DataSourceGeneration), cancellationToken));
+            ProducerGeneration: acquisition.DataSourceGeneration, DataContract: Agentstration.Schemas.DataContracts.Declared(acquisition.Dataset!.OutputSchema,
+                            $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output", "application/json")), cancellationToken));
         var updated = acquisition with
         {
             Generation = checked(acquisition.Generation + 1),

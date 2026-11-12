@@ -244,3 +244,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 212. [ADR-0212 — Source content has independent freshness and retention policies](0212-source-content-lifecycle-and-ephemeral-handoff.md)
 
 213. [ADR-0213 — Artifact transformations own scoped content processing](0213-artifact-transformations-own-scoped-content-processing.md)
+
+214. [ADR-0214 — Effective data contracts follow Flow invocations](0214-effective-data-contracts-follow-flow-invocations.md)

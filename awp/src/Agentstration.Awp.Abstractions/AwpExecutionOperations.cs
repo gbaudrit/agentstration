@@ -36,6 +36,9 @@ public sealed record AwpExecutionAgentMaterial(
     string ModelProfileNamespace,
     IReadOnlyList<AwpExecutionToolMaterial> Tools)
 {
+    public JsonElement? InputSchema { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public JsonElement? OutputContract { get; init; }
     public string AgentNamespace { get; init; } = "default";
     public string? ModelProfileScopeRef { get; init; }
     public string RuntimeProfileName { get; init; } = string.Empty;
@@ -83,6 +86,7 @@ public sealed record AwpRootFlowExecutionMaterial(
     : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId)
 {
     public string? FlowScopeRef { get; init; }
+    public JsonElement? ContractContext { get; init; }
 }
 
 public sealed record AwpFlowResumeMaterial(

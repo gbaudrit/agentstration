@@ -15,6 +15,8 @@ public sealed record AgentSummary(string Id, string Name, string Type, string Ve
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ModelProfileScopeRef { get; init; }
     public string? DeploymentId { get; init; }
+    public Agentstration.Schemas.DataContractDefinition? OutputContract { get; init; }
+    public JsonElement? OutputSchema { get; init; }
     public JsonElement? InputSchema { get; init; }
     public SchemaVersionReference? InputSchemaReference { get; init; }
     public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, ModelResourceKinds.ModelProfile, ModelProfile);

@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Agents;
 using Agentstration.Flows;
@@ -93,6 +94,9 @@ public sealed class RuntimeExecutionMaterialResolver(
         await runtimeScopes.ValidateAsync(stored.Value.Scope, cancellationToken);
         using var scope = runtimeScopes.Enter(stored.Value.Scope);
         var agent = await ResolveAgentAsync("agent", stored.Value.Properties.Agent, cancellationToken);
+        var directOutput = FlowDataContracts.AgentOutput(null, agent.ParticipantId, assignment.TargetRunId,
+            $"agent:{agent.AgentNamespace}/{agent.AgentName}@{agent.Generation}/output", agent.OutputSchema, agent.OutputContract, null, agent.InputSchema);
+        agent = agent with { Instructions = FlowDataContracts.AgentInstructions(agent.Instructions, agent.InputSchema, directOutput, null) };
         return new RuntimeDirectAgentExecutionMaterial(
             assignment.ExecutionMaterialId,
             assignment.ExecutionMaterialVersion,
@@ -166,6 +170,12 @@ public sealed class RuntimeExecutionMaterialResolver(
                     throw new RuntimeExecutionMaterialException("artifact_processing_tool_collision", "An Agent Tool conflicts with an execution-bound content Tool.");
                 material = material with { Tools = [.. material.Tools, .. scopedTools] };
             }
+            ResolvedDataContract? responseContract = null;
+            try { responseContract = FlowDataContracts.AgentOutput(run.DefinitionSnapshot.Graph, reference.ParticipantId, run.Id,
+                $"agent:{material.AgentNamespace}/{material.AgentName}@{material.Generation}/output", material.OutputSchema, material.OutputContract, run.ContractContext, material.InputSchema); }
+            catch (DataContractException exception) when (exception.Code == "data_contract_unresolved")
+            { /* Resolve/fail at the selected Agent step, not while loading inactive branches. */ }
+            material = material with { Instructions = FlowDataContracts.AgentInstructions(material.Instructions, material.InputSchema, responseContract, run.ContractContext) };
             resolvedAgents.Add(material);
         }
 
@@ -205,7 +215,8 @@ public sealed class RuntimeExecutionMaterialResolver(
         {
             ScopeRef = run.ExecutionScopeRef,
             LogicalScopeRef = run.Scope.LogicalScopeRef,
-            FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value
+            FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value,
+            ContractContext = run.ContractContext
         };
     }
 
@@ -395,6 +406,9 @@ public sealed class RuntimeExecutionMaterialResolver(
             AgentScopeRef = resolved.AgentScopeRef,
             ModelProfileScopeRef = resolved.ModelProfileScopeRef,
             RevisionUid = resolved.RevisionUid,
+            InputSchema = resolved.Definition.InputSchema,
+            OutputSchema = resolved.Definition.OutputSchema,
+            OutputContract = resolved.Definition.OutputContract,
             RuntimeProfileName = resolved.RuntimeProfileName,
             RuntimeProfileNamespace = resolved.RuntimeProfileNamespace
         };

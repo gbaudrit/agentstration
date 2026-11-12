@@ -335,7 +335,7 @@ public sealed class StorageManagementTests
     public async Task UnsupportedSchemaKeywordsFailRatherThanBeingIgnored()
     {
         var f = new StorageFixture();
-        var schema = JsonSerializer.SerializeToElement(new { type = "object", allOf = new[] { new { type = "object" } } });
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", unevaluatedProperties = false });
         var version = StorageFixture.Version() with { ConfigurationSchema = schema, SchemaDigest = StorageDigests.Schema(schema) };
         await Failure("storage_schema_invalid", () => f.Types.CreateAsync(new()
         {

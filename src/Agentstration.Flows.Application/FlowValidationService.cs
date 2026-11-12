@@ -18,6 +18,7 @@ public sealed record ResolvedFlowCall(
     JsonElement? OutputSchema,
     IReadOnlyList<FlowOutputDefinition>? Outputs = null)
 {
+    public string? OutputMediaType { get; init; }
     public ResourceScopeRef? ScopeRef { get; init; }
 }
 
@@ -237,6 +238,11 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 if (processing.MaximumArtifacts is < 1 or > 128 || processing.MaximumContentBytes is < 1 or > 1_048_576
                     || processing.MaximumOutputBytes is < 1 or > 16_777_216 || !Enum.IsDefined(processing.Mode))
                     issues.Add(Error("artifact_processing_limits_invalid", "Artifact processing limits are outside their supported bounds.", step.Name));
+                if (processing.OutputContract is { } outputContract)
+                {
+                    try { Agentstration.Schemas.DataContracts.ValidateDefinition(outputContract, "artifact-output"); }
+                    catch (Agentstration.Schemas.DataContractException exception) { issues.Add(Error(exception.Code, exception.Message, step.Name, property: "outputContract")); }
+                }
                 ValidateJsonExpressions(processing.ArtifactsMapping, issues, step.Name, "artifactsMapping");
                 ValidateJsonExpressions(processing.ProcessingInputMapping, issues, step.Name, "processingInputMapping");
                 ValidateJsonExpressions(processing.ResultMapping, issues, step.Name, "resultMapping");
@@ -556,11 +562,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
     private static bool ValidContractSchema(JsonElement? schema)
     {
-        if (schema is null) return true;
-        if (schema.Value.ValueKind != JsonValueKind.Object) return false;
-        if (schema.Value.TryGetProperty("type", out var type)
-            && (type.ValueKind != JsonValueKind.String || !string.Equals(type.GetString(), "object", StringComparison.Ordinal))) return false;
-        return !schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind == JsonValueKind.Object;
+        try { _ = Agentstration.Schemas.DataContracts.Declared(schema, "flow-definition"); return true; }
+        catch (Agentstration.Schemas.DataContractException) { return false; }
     }
 
     private static void ValidateSchemaContract(JsonElement? legacy, SchemaBinding? binding,

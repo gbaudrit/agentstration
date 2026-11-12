@@ -477,10 +477,11 @@ public partial class FlowDesigner
         {
             InputFlowStepDefinition input => ResolveSchema(input.SchemaBinding, input.Schema)
                 ?? ResolveSchema(resource.Definition.InputSchemaBinding, resource.Definition.InputSchema),
+            AgentFlowStepDefinition agent => agent.Agent.OutputSchema ?? (ReadOnly ? null : ResolveAgent(agent.Agent)?.OutputSchema),
             FlowCompositionPointStepDefinition point => point.OutputSchema,
             TransformFlowStepDefinition transform => ResolveSchema(transform.SchemaBinding, transform.Schema),
-            ToolFlowStepDefinition tool => tools.FirstOrDefault(candidate => ToolKey(candidate) == ToolKey(tool.Tool))?.OutputSchema,
-            FlowCallStepDefinition call => FlowVersion(call)?.OutputSchema,
+            ToolFlowStepDefinition tool => tool.Tool.OutputSchema ?? (ReadOnly ? null : tools.FirstOrDefault(candidate => ToolKey(candidate) == ToolKey(tool.Tool))?.OutputSchema),
+            FlowCallStepDefinition call => call.Flow.OutputSchema ?? (SelectedStep?.Name == call.Name ? FlowVersion(call)?.OutputSchema : null),
             _ => null
         };
     }

@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
@@ -120,6 +121,9 @@ public sealed record FlowStepRun
     public required string StepName { get; init; }
     public required string StepType { get; init; }
     public FlowStepRunStatus Status { get; init; } = FlowStepRunStatus.NotStarted;
+    public InvocationDataContracts? Contracts { get; init; }
+    public IReadOnlyList<InvocationDataContracts> ArtifactContracts { get; init; } = [];
+    public bool MoreArtifactContracts { get; init; }
     public JsonElement? DeclaredInput { get; init; }
     public JsonElement? ResolvedInput { get; init; }
     public JsonElement? Output { get; init; }
@@ -178,6 +182,7 @@ public sealed record FlowRun
     public string? InteractionId { get; init; }
     public string? WorkTaskId { get; init; }
     public string? TriggerMessageId { get; init; }
+    public InvocationDataContracts? ContractContext { get; init; }
     public required FlowRunScope Scope { get; init; }
     public ResourceScopeRef ExecutionScopeRef => Scope.ScopeRef;
     public required JsonElement Input { get; init; }

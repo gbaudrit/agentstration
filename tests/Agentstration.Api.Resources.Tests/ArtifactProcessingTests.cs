@@ -1,4 +1,5 @@
 using System.Text;
+using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
@@ -16,6 +17,7 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
 {
+    private static readonly JsonSerializerOptions ContractJson = new(JsonSerializerDefaults.Web);
     private static JsonElement Element<T>(T value) => JsonSerializer.SerializeToElement(value);
 
     [TestMethod]
@@ -229,10 +231,12 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         var (owner, step, _, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Content,
             "{}", "application/json", transient);
         await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
-        var error = await Assert.ThrowsAsync<RuntimeGovernedOperationException>(() =>
+        var error = await Assert.ThrowsAsync<DataContractException>(() =>
             processor.ExecuteOwnerAsync(owner, step, 0, "prepare", Element("private-output-text"), default));
-        Assert.AreEqual("artifact_processing_json_invalid", error.Code);
-        Assert.Contains("output is not valid JSON", error.Message);
+        Assert.AreEqual("data_contract_json_invalid", error.Code);
+        Assert.AreEqual("artifact-output", error.Failure.Boundary);
+        Assert.AreEqual(step.Name, error.Failure.StepName);
+        Assert.Contains("valid JSON", error.Message);
         Assert.Contains("text/plain", error.Message);
         Assert.DoesNotContain("private-output-text", error.Message);
         // A valid replacement can be retried without re-acquiring or publishing partial content.
@@ -255,8 +259,58 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         Assert.DoesNotContain("private-invalid-input", error.Message);
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task SelectedContentContractIsValidatedAndRetainedAcrossArtifactProcessing(bool transient)
+    {
+        await using var factory = Factory();
+        var current = await GetBootstrapContextAsync(factory);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
+        var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
+        var schema = Element(new { type = "object", required = new[] { "masked" }, properties = new { masked = new { type = "boolean" } }, additionalProperties = false });
+        var (owner, step, _, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Content,
+            "{}", "application/json", transient, contract: new() { Schema = schema, MediaType = "application/json" });
+        await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
+        var invalid = await Assert.ThrowsExactlyAsync<DataContractException>(() => processor.ExecuteOwnerAsync(owner, step, 0,
+            "prepare", Element(new { masked = "synthetic-private-value" }), default));
+        Assert.AreEqual("$.masked", invalid.Failure.Path);
+        Assert.DoesNotContain("synthetic-private-value", invalid.Message);
+        await processor.ExecuteOwnerAsync(owner, step, 0, "prepare", Element(new { masked = true }), default);
+        var manifest = await processor.ExecuteOwnerAsync(owner, step, 0, "finish", Element(new { }), default);
+        var metadata = manifest.GetProperty("dataContract").Deserialize<ResolvedDataContract>(ContractJson)!;
+        Assert.IsTrue(metadata.Validated);
+        Assert.IsTrue(JsonElement.DeepEquals(schema, metadata.Schema!.Value));
+        var (nextOwner, nextStep, _, _) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Content,
+            "{}", "application/json", transient, contract: new() { Mode = DataContractMode.Dynamic, Source = "input" });
+        await processor.ExecuteOwnerAsync(nextOwner, nextStep, 0, "open", manifest, default);
+        var context = await processor.ContractsAsync(nextOwner, nextStep, 0, default);
+        Assert.AreEqual(metadata.Digest, context.ExpectedOutput?.Digest);
+        Assert.AreEqual(DataContractMode.Dynamic, context.ExpectedOutput?.DeclaredMode);
+    }
+
+    [TestMethod]
+    public async Task AccessContractValidatesCompletedDraftSeparatelyFromChatAcknowledgement()
+    {
+        await using var factory = Factory();
+        var current = await GetBootstrapContextAsync(factory);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
+        var processor = factory.Services.GetRequiredService<ArtifactProcessingService>();
+        var (owner, step, child, item) = await SetupAsync(factory.Services, current, ArtifactProcessingMode.Access,
+            "{}", "application/json", transient: true, contract: new() { Schema = Element(new { type = "object" }) });
+        await processor.ExecuteOwnerAsync(owner, step, 0, "open", item, default);
+        await processor.ExecuteToolAsync(child, "output_write", Element(new { content = "not JSON", expectedRevision = 0, requestId = "invalid" }), default);
+        var failure = await Assert.ThrowsExactlyAsync<DataContractException>(() => processor.ExecuteToolAsync(child, "output_complete", Element(new { expectedRevision = 1 }), default));
+        Assert.AreEqual("data_contract_json_invalid", failure.Code);
+        await processor.ExecuteToolAsync(child, "output_write", Element(new { content = "{}", expectedRevision = 1, requestId = "correct", offset = 0, deleteLength = 8 }), default);
+        await processor.ExecuteToolAsync(child, "output_complete", Element(new { expectedRevision = 2 }), default);
+        await processor.ExecuteOwnerAsync(owner, step, 0, "prepare", Element("Draft completed."), default);
+        var result = await processor.ExecuteOwnerAsync(owner, step, 0, "finish", Element(new { }), default);
+        Assert.IsTrue(result.GetProperty("dataContract").GetProperty("validated").GetBoolean());
+    }
+
     private static async Task<(FlowRun Owner, ArtifactTransformFlowStepDefinition Step, FlowRun Child, JsonElement Item)> SetupAsync(
-        IServiceProvider services, RequestContext current, ArtifactProcessingMode mode, string content, string media = "text/plain", bool transient = false, ResourceScopeRef? logicalScope = null)
+        IServiceProvider services, RequestContext current, ArtifactProcessingMode mode, string content, string media = "text/plain", bool transient = false, ResourceScopeRef? logicalScope = null, DataContractDefinition? contract = null)
     {
         var artifacts = services.GetRequiredService<ArtifactManagementService>();
         JsonElement item;
@@ -271,7 +325,7 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
             await artifacts.SealAsync(staged.Value.ArtifactId, default);
             item = Element(new { artifactId = staged.Value.ArtifactId.ToString(), kind = "staged" });
         }
-        var step = new ArtifactTransformFlowStepDefinition { Name = "anonymize", Mode = mode };
+        var step = new ArtifactTransformFlowStepDefinition { Name = "anonymize", Mode = mode, OutputContract = contract };
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, step] };
         var flowId = new FlowId("artifact-processing-test");
         var version = new FlowVersion(logicalScope ?? ResourceScopeRef.Workspace(current.WorkspaceId), flowId, "1.0.0", null,

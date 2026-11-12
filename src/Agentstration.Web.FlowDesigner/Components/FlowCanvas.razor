@@ -51,6 +51,8 @@
     [Parameter] public bool ShowAllErrorTransitions { get; set; }
     [Parameter] public EventCallback<string?> SelectedStepChanged { get; set; }
     [Parameter] public EventCallback<string> StepSettingsRequested { get; set; }
+    [Parameter] public Func<string, string, Task>? InspectPortAsync { get; set; }
+    [Parameter] public Func<string, string, string>? DescribePort { get; set; }
     [Parameter] public EventCallback<string?> SelectedTransitionChanged { get; set; }
     [Parameter] public EventCallback<MoveStepCommand> StepMoved { get; set; }
     [Parameter] public EventCallback<string> StepRemoved { get; set; }
@@ -60,7 +62,8 @@
 
     protected override void OnInitialized()
     {
-        nodeInteractions = new(RequestStepSettingsAsync);
+        nodeInteractions = new(RequestStepSettingsAsync, (step, port) => InspectPortAsync?.Invoke(step, port) ?? Task.CompletedTask,
+            (step, port) => DescribePort?.Invoke(step, port) ?? port);
         diagram.RegisterComponent<FlowDiagramNode, FlowNodeWidget>();
         diagram.ContainerChanged += OnContainerChanged;
         diagram.ZoomChanged += OnZoomChanged;

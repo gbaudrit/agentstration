@@ -49,7 +49,7 @@ public sealed partial class FlowRunService
         var composed = flowDefinitions is null ? new CompiledFlowComposition(resolved, null)
             : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved, command.Compositions, command.Scope.AccessScopeRef, cancellationToken);
         resolved = composed.Definition;
-        ValidateInput(resolved.Graph?.InputSchema, SecretInputs.ForTypeValidation(command.Input, command.SecretInputs));
+        ValidateInput(resolved.Graph?.ResolveInputSchema(), command.Input, command.SecretInputs);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {

@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -20,6 +21,7 @@ public sealed record ArtifactTransformFlowStepDefinition : FlowStepDefinition
     public int MaximumArtifacts { get; init; } = 32;
     public int MaximumContentBytes { get; init; } = 65_536;
     public int MaximumOutputBytes { get; init; } = 8 * 1024 * 1024;
+    public DataContractDefinition? OutputContract { get; init; }
     public string? OutputMediaType { get; init; }
     public string? OutputFileName { get; init; }
 }

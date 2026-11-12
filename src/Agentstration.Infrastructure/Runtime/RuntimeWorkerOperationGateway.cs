@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Flows;
@@ -222,6 +223,8 @@ public sealed class RuntimeWorkerOperationGateway(
                 resolvedRoute)
             { SecretInputs = run.SecretInputs, TransientPayloads = run.TransientPayloads }, cancellationToken);
         }
+        catch (FlowValidationException exception)
+        { throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception) { ContractFailure = exception.ContractFailure }; }
         catch (ToolDefinitionInvocationException exception)
         {
             logger.LogWarning("Governed Flow Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, FlowRun {FlowRunId}, Step {StepDefinitionId}, Attempt {StepAttempt}",
@@ -333,13 +336,25 @@ public sealed class RuntimeWorkerOperationGateway(
     {
         try
         {
+            InvocationDataContracts? contracts = null;
+            if (purpose == "artifactProcessing" && iteration is { } index)
+            {
+                var (owner, definition) = await GetFlowStepAsync(executionScopeRef, parentRunId, stepDefinitionId, cancellationToken);
+                using var context = EnterScope(owner.Scope);
+                contracts = await artifactProcessing!.ContractsAsync(owner, (ArtifactTransformFlowStepDefinition)definition, index, cancellationToken);
+            }
             var child = await flowRuns.CreateOrGetAssignedChildExactAsync(executionScopeRef, parentRunId,
-                stepDefinitionId, input, purpose, iteration, cancellationToken);
+                stepDefinitionId, input, purpose, iteration, cancellationToken, contracts);
             return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone());
         }
         catch (FlowValidationException exception)
         {
-            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
+            throw new RuntimeGovernedOperationException(exception.Code, $"Child Flow input at step '{stepDefinitionId}' of run '{parentRunId}' was rejected: {exception.Message}", exception)
+            { ContractFailure = exception.ContractFailure is { } failure ? failure with { FlowRunId = parentRunId, StepName = stepDefinitionId } : null };
+        }
+        catch (DataContractException exception)
+        {
+            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception) { ContractFailure = exception.Failure };
         }
     }
 

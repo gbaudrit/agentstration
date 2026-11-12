@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +17,12 @@ public sealed record FlowResourceReference(
     ResourceScopeRef? ScopeRef = null,
     Guid? ResourceUid = null,
     Guid? RevisionUid = null,
-    string? DefinitionHash = null);
+    string? DefinitionHash = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public JsonElement? InputSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public JsonElement? OutputSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public DataContractDefinition? OutputContract { get; init; }
+}
 public sealed record FlowNodePosition(double X, double Y);
 public sealed record FlowViewportMetadata(double X, double Y, double Zoom = 1);
 public sealed record FlowDesignerMetadata
@@ -167,6 +173,9 @@ public sealed record FlowCallReference(
     public string? DefinitionHash { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Guid? ResourceUid { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public JsonElement? InputSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public JsonElement? OutputSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? OutputMediaType { get; init; }
     public FlowId Resolve(ResourceNamespace ownerNamespace) => new(ResourceId, Namespace ?? ownerNamespace);
 }
 
@@ -194,6 +203,10 @@ public sealed record FlowToolReference(
     ResourceNamespace? Namespace = null,
     ResourceScopeRef? ScopeRef = null)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? InputSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? OutputSchema { get; init; }
     public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
 }
 
@@ -383,11 +396,13 @@ public static class FlowGraphDefinitionExtensions
     {
         ambiguous = false;
         if (output.Schema is { } declared) return declared;
+        if (output.Outcome is FlowOutputOutcome.Error) return null;
         if (output.Outcome is not FlowOutputOutcome.Error && definition.OutputSchema is { } legacy) return legacy;
-        if (output.OutputMapping is { } mapping
-            && (mapping.ValueKind != JsonValueKind.String
-                || !string.Equals(mapping.GetString(), "${transition.output}", StringComparison.Ordinal)))
-            return null;
+        var incoming = definition.Transitions.Where(transition => transition.ToStep == output.Name).ToArray();
+        if (output.OutputMapping is { } mapping && (mapping.ValueKind != JsonValueKind.String
+            || mapping.GetString() != "${transition.output}"
+                && (incoming.Select(edge => edge.FromStep).Distinct(StringComparer.Ordinal).Count() != 1
+                    || mapping.GetString() != "${steps." + incoming[0].FromStep + ".output}"))) return null;
 
         var candidates = definition.Transitions
             .Where(transition => transition.ToStep == output.Name)
@@ -396,14 +411,16 @@ public static class FlowGraphDefinitionExtensions
             {
                 InputFlowStepDefinition input => input.Schema ?? definition.InputSchema,
                 TransformFlowStepDefinition transform => transform.Schema,
+                AgentFlowStepDefinition agent => agent.Agent.OutputSchema,
+                ToolFlowStepDefinition tool => tool.Tool.OutputSchema,
+                FlowCallStepDefinition flow => flow.Flow.OutputSchema,
                 _ => null
             })
-            .Where(schema => schema is not null)
-            .Select(schema => schema!.Value)
             .ToArray();
-        var distinct = new List<JsonElement>();
+        var distinct = new List<JsonElement?>();
         foreach (var candidate in candidates)
-            if (!distinct.Any(existing => JsonElement.DeepEquals(existing, candidate))) distinct.Add(candidate);
+            if (!distinct.Any(existing => existing is null && candidate is null
+                || existing is { } left && candidate is { } right && JsonElement.DeepEquals(left, right))) distinct.Add(candidate);
         ambiguous = distinct.Count > 1;
         return distinct.Count == 1 ? distinct[0] : null;
     }

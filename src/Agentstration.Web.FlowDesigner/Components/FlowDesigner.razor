@@ -110,7 +110,7 @@ else
                 <FlowCanvas @ref="canvas" Document="Editor.State.Diagram" Revision="Editor.State.LocalRevision" ResolvedOutputsRevision="flowCallRenderRevision" FitRevision="layoutRevision"
                             IsReadOnly="ReadOnly" EntryStep="@Editor.State.Resource.Definition.EntryStep" SelectedStepName="@Editor.State.Selection.StepName"
                             SelectedTransitionId="@Editor.State.Selection.TransitionId" ShowAllErrorTransitions="showAllErrorTransitions" SelectedStepChanged="SelectStepAsync"
-                            StepSettingsRequested="OpenStepSettingsAsync"
+                            StepSettingsRequested="OpenStepSettingsAsync" InspectPortAsync="InspectPortAsync" DescribePort="DescribePort"
                             SelectedTransitionChanged="SelectTransitionAsync"
                             StepMoved="MoveStepAsync" StepRemoved="RemoveStepAsync" TransitionCreated="CreateTransitionAsync"
                             TransitionReconnected="ReconnectTransitionAsync"
@@ -315,6 +315,18 @@ else
     @if (showRun)
     {
         <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="EffectiveInputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<div class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></div></section></div>
+    }
+    @if (portInspection is { } inspection)
+    {
+        <div class="dialog-backdrop connection-contract-backdrop" @onclick="ClosePortInspection">
+            <section class="dialog connection-contract-dialog port-contract-dialog" role="dialog" aria-modal="true" aria-labelledby="port-contract-title" @onclick:stopPropagation="true" @onkeydown="PortInspectionKeyDown">
+                <h2 id="port-contract-title">@T("PortContractTitle", inspection.Step, inspection.Port)</h2>
+                <p>@T("PortContractDesignHelp")</p>
+                <p><strong>@T("DataContractMode")</strong> @inspection.State</p>
+                <pre tabindex="0">@inspection.Details</pre>
+                <div class="dialog-actions"><button type="button" class="button-secondary" autofocus @onclick="ClosePortInspection">@T("Close")</button></div>
+            </section>
+        </div>
     }
     @if (connectionContractPrompt is { } contractPrompt)
     {

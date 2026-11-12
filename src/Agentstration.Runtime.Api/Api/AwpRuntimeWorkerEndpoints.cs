@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Agentstration.Schemas;
 using System.Security.Claims;
 using Agentstration.Awp.Abstractions;
 using Agentstration.Identity.Contracts;
@@ -10,6 +12,7 @@ namespace Agentstration.Runtime.Api.Api;
 
 public static class AwpRuntimeWorkerEndpoints
 {
+    private static readonly JsonSerializerOptions ContractJson = new(JsonSerializerDefaults.Web);
     public static IEndpointRouteBuilder MapAwpRuntimeWorkerEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var awp = endpoints.MapGroup(AwpProtocol.BasePath)
@@ -330,7 +333,7 @@ public static class AwpRuntimeWorkerEndpoints
         ValidateCommand(identity, request.Context, dispatch);
         var result = await assignments.CompleteAsync(ToProof(request.Context), new RuntimeAssignmentTerminalCommand(
             RuntimeAssignmentTerminalOutcome.Failed, request.CommandId.Value, Error: request.Failure.Message,
-            ErrorCode: request.Failure.Code), cancellationToken);
+            ErrorCode: request.Failure.Code, ErrorDetails: request.Failure.Details is { } details && details.GetRawText().Length <= 8192 ? details.GetRawText() : null), cancellationToken);
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpTerminalResponse(now, ToContract(result.RunState),
             result.Assignment.ExecutionEvents.LastOrDefault()?.AttemptEventSequence ?? 0));
@@ -579,9 +582,13 @@ public static class AwpRuntimeWorkerEndpoints
         {
             return Problem(StatusCodes.Status409Conflict, exception.Code, exception.Message);
         }
+        catch (DataContractException exception)
+        {
+            return Problem(StatusCodes.Status422UnprocessableEntity, exception.Code, exception.Message, exception.Failure);
+        }
         catch (RuntimeGovernedOperationException exception)
         {
-            return Problem(StatusCodes.Status422UnprocessableEntity, exception.Code, exception.Message);
+            return Problem(StatusCodes.Status422UnprocessableEntity, exception.Code, exception.Message, exception.ContractFailure);
         }
     }
 
@@ -762,7 +769,8 @@ public static class AwpRuntimeWorkerEndpoints
             flow.CorrelationId,
             checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds)))
         {
-            FlowScopeRef = flow.FlowScopeRef
+            FlowScopeRef = flow.FlowScopeRef,
+            ContractContext = flow.ContractContext is null ? null : JsonSerializer.SerializeToElement(flow.ContractContext, ContractJson)
         },
         _ => throw new ArgumentOutOfRangeException(nameof(material))
     };
@@ -799,6 +807,9 @@ public static class AwpRuntimeWorkerEndpoints
         }).ToArray())
     {
         AgentNamespace = agent.AgentNamespace.ToString(),
+        InputSchema = agent.InputSchema,
+        OutputSchema = agent.OutputSchema,
+        OutputContract = agent.OutputContract is null ? null : JsonSerializer.SerializeToElement(agent.OutputContract, ContractJson),
         ModelProfileScopeRef = agent.ModelProfileScopeRef?.ToString(),
         RuntimeProfileName = agent.RuntimeProfileName,
         RuntimeProfileNamespace = agent.RuntimeProfileNamespace.ToString()
@@ -842,7 +853,7 @@ public static class AwpRuntimeWorkerEndpoints
         _ => AwpTerminalState.Failed
     };
 
-    private static IResult Problem(int status, string code, string message) =>
+    private static IResult Problem(int status, string code, string message, DataContractFailure? contractFailure = null) =>
         Results.Problem(statusCode: status, title: message,
-            extensions: new Dictionary<string, object?> { ["code"] = code });
+            extensions: new Dictionary<string, object?> { ["code"] = code, ["contractFailure"] = contractFailure });
 }

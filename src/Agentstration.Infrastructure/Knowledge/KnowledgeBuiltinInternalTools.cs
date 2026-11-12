@@ -468,8 +468,8 @@ internal static class KnowledgeBuiltinSchemas
         {
             items = new { type = "array" },
             citations = new { type = "array" },
-            answer = new { type = "string" },
-            continuationToken = new { type = "string" }
+            answer = new { type = new[] { "string", "null" } },
+            continuationToken = new { type = new[] { "string", "null" } }
         },
         required = new[] { "items", "citations" },
         additionalProperties = false

@@ -36,7 +36,7 @@ else
     </nav>
     @if (run.Error is not null)
     {
-        <article class="panel run-error" data-testid="flow-run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
+        <article class="panel run-error" data-testid="flow-run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p><ContractFailurePanel Details="@run.Error.Details" ScopeRef="run.ExecutionScopeRef" />@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
     }
     @if (pendingInput is not null)
     {
@@ -121,7 +121,7 @@ else
                 <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
                                  View="@FlowRunTimeline.TimelineView.Summary" ShowHeader="false" ShowNavigation="false" Embedded="true" ParticipantUrls="@ParticipantUrls" />
                 <section class="designer-layout run-layout flow-run-overview-topology @(inspectorVisible ? null : "inspector-collapsed")">
-                    <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
+                    <FlowTopologyViewer ContractDescription="StepContractDescription" Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
                                         ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible"
                                         ReplayInProgress="replayInProgress" ReplayElapsed="replayElapsed" ReplayRequested="ReplaySequenceAsync"
                                         InitiallyFit="true" />
@@ -136,8 +136,12 @@ else
                         else
                         {
                             <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("ChildFlowRun")</dt><dd>@if (selected.ChildFlowRunId is { } childRunId) { <a href="@($"/flow-runs/{Uri.EscapeDataString(childRunId)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")"><code>@childRunId</code></a> } else { <span>—</span> }</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
+                            <details><summary>@T("EffectiveContracts")</summary><p>@T("EffectiveContractsHelp")</p><pre>@Pretty(selected.Contracts is null ? null : JsonSerializer.SerializeToElement(selected.Contracts))</pre>
+                                @foreach (var contracts in selected.ArtifactContracts) { <pre>@Pretty(JsonSerializer.SerializeToElement(contracts))</pre> }
+                                @if (selected.MoreArtifactContracts) { <p>@T("AdditionalArtifactContracts")</p> }
+                            </details>
                             <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
-                            @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@RunErrorMessage(selected.Error)</p></div> }
+                            @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@RunErrorMessage(selected.Error)</p><ContractFailurePanel Details="@selected.Error.Details" ScopeRef="run.ExecutionScopeRef" /></div> }
                         }
                     </article>
                     }
@@ -210,6 +214,7 @@ else
 </div>
 @code {
     [Parameter] public string RunId { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "step")] public string? FocusStep { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string StatusLabel(FlowRunStatus value) => Localizer[$"Status.{value}"];
@@ -321,7 +326,8 @@ else
         await RefreshInputAsync();
         await RefreshCausalityAsync();
         if (!IsHandoffRun && activeTab == RunTab.Handoffs) activeTab = RunTab.Summary;
-        selected = run.Steps.FirstOrDefault();
+        selected = run.Steps.FirstOrDefault(step => step.StepName == FocusStep) ?? run.Steps.FirstOrDefault();
+        if (!string.IsNullOrEmpty(FocusStep)) { activeTab = RunTab.Summary; inspectorVisible = true; }
         eventBuffer.Clear();
         await ReplayAsync();
         if (!run.Status.IsTerminal()) await ConnectAsync();
@@ -586,8 +592,18 @@ else
     }
 
     private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
+    private string? StepContractDescription(string name) => run?.Steps.FirstOrDefault(step => step.StepName == name)?.Contracts is { } contracts
+        ? T("EffectiveContracts") + ": " + JsonSerializer.Serialize(contracts) : null;
     private string RunErrorMessage(FlowRunError error) => error.Code switch
     {
+        "data_contract_encoding_invalid" => T("Error.ContractEncodingInvalid"),
+        "data_contract_json_invalid" => T("Error.ContractJsonInvalid"),
+        "data_contract_unresolved" => T("Error.ContractUnresolved"),
+        "data_contract_violation" or "flow_composition_value_invalid" => T("Error.ContractViolation"),
+        "data_contract_media_mismatch" => T("Error.ContractMediaMismatch"),
+        "data_contract_conflict" => T("Error.ContractConflict"),
+        "tool_contract_required" => T("Error.ToolContractRequired"),
+        "tool_contract_stale" => T("Error.ToolContractStale"),
         "artifact_processing_json_invalid" => T("Error.ArtifactOutputJsonInvalid"),
         "artifact_processing_input_json_invalid" => T("Error.ArtifactInputJsonInvalid"),
         "agent_model_profile_unavailable" => T("Error.AgentModelProfileUnavailable"),
@@ -596,7 +612,12 @@ else
         _ => error.Message
     };
     private static string? RunErrorDetail(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
-        ? error.Message : error.Details;
+        ? error.Message : DataContracts.ParseFailure(error.Details) is not null ? SelectedFailureDetails(error.Details!) : error.Details;
+    private static string? SelectedFailureDetails(string details)
+    {
+        using var document = JsonDocument.Parse(details);
+        return document.RootElement.TryGetProperty("details", out var selected) && selected.ValueKind == JsonValueKind.String ? selected.GetString() : null;
+    }
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);
     private static string Duration(DateTimeOffset? start, DateTimeOffset? end) { if (start is null) return "—"; var value = (end ?? DateTimeOffset.UtcNow) - start.Value; return value.TotalSeconds >= 1 ? $"{value.TotalSeconds:0.##} s" : $"{value.TotalMilliseconds:0} ms"; }

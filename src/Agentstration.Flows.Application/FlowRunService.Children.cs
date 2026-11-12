@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -27,7 +28,8 @@ public sealed partial class FlowRunService
         JsonElement input,
         string purpose,
         int? iteration,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        InvocationDataContracts? contractContext = null)
     {
         var parent = await repository.GetRunExactAsync(executionScopeRef, parentRunId, cancellationToken)
             ?? throw new FlowRunNotFoundException(parentRunId);
@@ -45,7 +47,7 @@ public sealed partial class FlowRunService
             var processingAttempt = Math.Max(1, parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
             var childId = ChildFlowRunId(parent.Value, stepDefinitionId + "-artifact", processingAttempt, iteration);
             return await EnsureChildFlowRunAsync(parent.Value, inlineCall, input, childId, cancellationToken, version,
-                new(parent.Value.Id, processing.Name, processingAttempt, iteration.Value, processing.Mode == ArtifactProcessingMode.Access));
+                new(parent.Value.Id, processing.Name, processingAttempt, iteration.Value, processing.Mode == ArtifactProcessingMode.Access), contractContext);
         }
         var call = purpose switch
         {
@@ -133,7 +135,8 @@ public sealed partial class FlowRunService
         string childRunId,
         CancellationToken cancellationToken,
         FlowVersion? inlineVersion = null,
-        FlowArtifactProcessingContext? processingContext = null)
+        FlowArtifactProcessingContext? processingContext = null,
+        InvocationDataContracts? contractContext = null)
     {
         var existing = await repository.GetRunExactAsync(parent.Scope.ScopeRef, childRunId, cancellationToken);
         if (existing is not null)
@@ -160,8 +163,11 @@ public sealed partial class FlowRunService
             await flowDefinitions.ValidateUseAsync(resolved.ScopeRef, targetId, resolved.Version, parent.Scope.AccessScopeRef, call.Flow.ResourceUid, cancellationToken);
         if (call.Flow.DefinitionHash is { } expected && expected != resolved.DefinitionHash)
             throw new FlowValidationException("flow_composition_child_changed", "The accepted child Flow no longer matches its exact version.");
+        var outputExpectation = DataContracts.Declared(resolved.Graph?.ResolveSingleSuccessOutputSchema(out _), $"flow:{resolved.FlowId}/output", resolved.Graph is { } outputGraph ? FlowDataContracts.OutputMediaType(outputGraph) : null)
+            ?? contractContext?.ExpectedOutput ?? parent.ContractContext?.ExpectedOutput;
+        input = DataContracts.BindOutputParameter(input, resolved.Graph?.ResolveInputSchema(), outputExpectation, "flow-input", parent.Id, call.Name);
         if (call.CompositionPoint is not null && resolved.Graph?.InputSchema is { } contract)
-            FlowCompositionSchema.ValidateValue(contract, SecretInputs.ForTypeValidation(input, parent.SecretInputs));
+            FlowCompositionSchema.ValidateValue(contract, input, isProtectedString: value => SecretInputs.IsReference(value, parent.SecretInputs));
         if (call.CompositionParameters is { } parameters && (!input.TryGetProperty("parameters", out var actualParameters)
             || !JsonElement.DeepEquals(parameters, actualParameters)))
             throw new FlowValidationException("flow_composition_parameters_changed", "Accepted composition parameters cannot be replaced.");
@@ -169,7 +175,7 @@ public sealed partial class FlowRunService
             : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved,
                 new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), parent.Scope.AccessScopeRef, cancellationToken);
         resolved = composed.Definition;
-        ValidateInput(resolved.Graph?.InputSchema, SecretInputs.ForTypeValidation(input, parent.SecretInputs));
+        ValidateInput(resolved.Graph?.ResolveInputSchema(), input, parent.SecretInputs);
         var now = timeProvider.GetUtcNow();
         var child = new FlowRun
         {
@@ -180,6 +186,7 @@ public sealed partial class FlowRunService
             Composition = composed.Receipt,
             TransientPayloads = parent.TransientPayloads,
             ArtifactProcessing = processingContext ?? parent.ArtifactProcessing,
+            ContractContext = contractContext ?? (resolved.Graph?.ResolveInputSchema() is null ? FlowDataContracts.ChildContext(parent.DefinitionSnapshot.Graph, call.Name, parent.ContractContext) : null),
             RuntimeBindings = inlineVersion is null ? [] : parent.RuntimeBindings,
             DefinitionState = FlowDefinitionState.Published,
             DefinitionHash = resolved.DefinitionHash,

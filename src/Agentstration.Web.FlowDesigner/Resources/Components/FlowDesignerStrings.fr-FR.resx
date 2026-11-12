@@ -176,4 +176,19 @@
   <data name="ArtifactProcessingResultPort" xml:space="preserve"><value>Résultat du traitement</value></data>
   <data name="ArtifactProcessingStartPort" xml:space="preserve"><value>Traitement</value></data>
   <data name="ArtifactOutputMediaTypeHelp" xml:space="preserve"><value>Choisissez un type MIME proposé ou saisissez une valeur libre. Le type doit correspondre au contenu produit ; laissez vide pour conserver le type d’entrée.</value></data>
+  <data name="InspectPortNamed" xml:space="preserve"><value>Inspecter le port {0}</value></data>
+  <data name="PortContractTitle" xml:space="preserve"><value>Port {1} · {0}</value></data>
+  <data name="PortContractDesignHelp" xml:space="preserve"><value>Contrats et mappings déclarés dans cette définition. Les contrats dynamiques sont résolus à chaque exécution. Le contrat de la donnée décrit le contenu de l’artefact, séparément de l’enveloppe de référence.</value></data>
+  <data name="PortContractSummary" xml:space="preserve"><value>{0} : {1} · {2}</value></data>
+  <data name="PortContractUnresolved" xml:space="preserve"><value>Aucun schéma concret disponible ici</value></data>
+  <data name="DataContractMode" xml:space="preserve"><value>Mode du contrat</value></data>
+  <data name="DataContractMode.Absent" xml:space="preserve"><value>Non déclaré</value></data>
+  <data name="DataContractMode.Fixed" xml:space="preserve"><value>Contrat explicite fixe</value></data>
+  <data name="DataContractMode.Dynamic" xml:space="preserve"><value>Contrat dynamique explicite</value></data>
+  <data name="ArtifactDataSchema" xml:space="preserve"><value>Schéma du contenu de l’artefact (JSON Schema)</value></data>
+  <data name="ArtifactContractHelp" xml:space="preserve"><value>Le résultat final sélectionné du traitement doit respecter ce contrat. Le contrat de sortie explicite du producteur est prioritaire. Le mode accès valide le brouillon finalisé ; le message de conversation est séparé.</value></data>
+  <data name="ContractSource" xml:space="preserve"><value>Résoudre le contrat depuis</value></data>
+  <data name="ContractSource.Input" xml:space="preserve"><value>Contrat de la donnée de l’artefact d’entrée</value></data>
+  <data name="ContractSource.Parent" xml:space="preserve"><value>Attente de l’invocation parente</value></data>
+  <data name="Close" xml:space="preserve"><value>Fermer</value></data>
 </root>

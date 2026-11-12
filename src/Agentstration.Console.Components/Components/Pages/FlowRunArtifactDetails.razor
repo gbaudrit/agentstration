@@ -37,6 +37,19 @@ else if (artifact is not null)
                 <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("g")" Detail="@T("Immutable")" />
             </section>
 
+            @if (artifact.Receipt.DataContract is { } contract)
+            {
+                <section class="panel form-section">
+                    <h2>@T("DataContract")</h2>
+                    <p>@T(contract.Validated ? "DataContractValidated" : "DataContractUnvalidated")</p>
+                    <dl class="resource-details durable-artifact-details-grid">
+                        <dt>@T("DataContractOrigin")</dt><dd><code>@contract.Origin</code></dd>
+                        <dt>@T("MediaType")</dt><dd>@contract.MediaType</dd>
+                        <dt>SHA-256</dt><dd><code>@contract.Digest</code></dd>
+                    </dl>
+                    @if (contract.Schema is { } schema) { <pre>@JsonSerializer.Serialize(schema, ContractJson)</pre> }
+                </section>
+            }
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
                 <dl class="resource-details durable-artifact-details-grid">
@@ -110,6 +123,7 @@ else if (artifact is not null)
 }
 
 @code {
+    private static readonly JsonSerializerOptions ContractJson = new() { WriteIndented = true };
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private FlowRunArtifactResource? artifact;

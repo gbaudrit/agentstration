@@ -208,4 +208,24 @@
   <data name="OutputBytes" xml:space="preserve"><value>{0} bytes</value></data>
   <data name="Error.ArtifactOutputJsonInvalid" xml:space="preserve"><value>The transformation produced content that is not valid JSON, while the output media type requires JSON (application/json or +json). Ask the Agent or processing Flow to return valid JSON without Markdown fences or surrounding text. If you want plain text, set the output media type to text/plain, publish the updated transformation Flow and select its new version in the Knowledge Source.</value></data>
   <data name="Error.ArtifactInputJsonInvalid" xml:space="preserve"><value>The input Artifact declares a JSON media type, but its content is not valid JSON. Correct the source content or its media type, then retry the transformation.</value></data>
+  <data name="ContractFailureHelp" xml:space="preserve"><value>The value does not satisfy the contract at this boundary. Correct the output format, mapping or declared schema, then start a new execution.</value></data>
+  <data name="ContractBoundary" xml:space="preserve"><value>Boundary</value></data>
+  <data name="ContractPath" xml:space="preserve"><value>Data path</value></data>
+  <data name="ContractExpected" xml:space="preserve"><value>Expected</value></data>
+  <data name="ContractActual" xml:space="preserve"><value>Received type or format</value></data>
+  <data name="ContractRule" xml:space="preserve"><value>Validation rule</value></data>
+  <data name="ContractOrigin" xml:space="preserve"><value>Contract origin</value></data>
+  <data name="ContractSourceRun" xml:space="preserve"><value>Originating execution / step</value></data>
+  <data name="EffectiveContracts" xml:space="preserve"><value>Effective port contracts</value></data>
+  <data name="EffectiveContractsHelp" xml:space="preserve"><value>Concrete contracts used for this execution. These schemas describe the envelope or final result; Artifact content has its own data contract.</value></data>
+  <data name="Error.ContractJsonInvalid" xml:space="preserve"><value>The result must be valid JSON. Remove Markdown fences and surrounding explanation, or select a text MIME type when text is expected.</value></data>
+  <data name="Error.ContractUnresolved" xml:space="preserve"><value>The dynamic contract could not be resolved: the selected input or parent has no data contract. Declare a fixed contract or provide the missing contract.</value></data>
+  <data name="Error.ContractViolation" xml:space="preserve"><value>The result does not satisfy the expected schema. See the originating step and validation path below.</value></data>
+  <data name="Error.ContractMediaMismatch" xml:space="preserve"><value>The output MIME type differs from the expected contract. Align the transformation and producer declarations.</value></data>
+  <data name="Error.ContractConflict" xml:space="preserve"><value>The transformation expectation conflicts with the producer’s explicit output contract. The producer contract takes precedence.</value></data>
+  <data name="Error.ToolContractRequired" xml:space="preserve"><value>A Tool called directly by a Flow must declare both input and output schemas. Update the Tool, then publish the Flow again.</value></data>
+  <data name="Error.ToolContractStale" xml:space="preserve"><value>The Tool contract changed after publication. Publish a new Flow version to use the new contract.</value></data>
+  <data name="AdditionalArtifactContracts" xml:space="preserve"><value>Additional distinct content contracts are available on the linked Artifacts. Inspection metadata is bounded to 256 KiB.</value></data>
+  <data name="ContractCode" xml:space="preserve"><value>Originating error code</value></data>
+  <data name="Error.ContractEncodingInvalid" xml:space="preserve"><value>The output content is not valid UTF-8. Encode the text or JSON as UTF-8 before publishing the Artifact.</value></data>
 </root>

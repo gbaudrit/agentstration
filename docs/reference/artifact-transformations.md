@@ -184,3 +184,88 @@ orphan outputs; the operation does not promise a distributed transaction.
 
 See [ADR-0213](../decisions/0213-artifact-transformations-own-scoped-content-processing.md)
 and [source composition](../architecture/implementation/data-source-composition.md).
+
+
+## Effective data contracts
+
+`outputContract` describes the final Artifact **content**, separately from the
+manifest/envelope schema. It is optional. Use a fixed declaration to constrain
+selected content, or explicitly request dynamic resolution:
+
+```yaml
+outputContract:
+  mode: Fixed
+  mediaType: application/json
+  schema:
+    type: object
+    required: [masked]
+    additionalProperties: false
+    properties:
+      masked:
+        type: boolean
+```
+
+```yaml
+outputContract:
+  mode: Dynamic
+  source: input # or parent
+```
+
+An absent declaration remains absent. A dynamic declaration with no concrete
+source fails with `data_contract_unresolved`. Unsupported schemas are rejected
+instead of being treated as arbitrary JSON. Broad `{}` is an explicit fixed JSON
+contract. A final processor's explicit output is authoritative; a contradictory
+fixed transformation expectation fails with `data_contract_conflict`.
+
+Content mode validates **after** `resultMapping`. With a mapping, the expectation
+is an instruction about the final selected value; it does not constrain an
+intermediate Agent's raw response. Access mode validates the completed draft,
+including after corrections; the final chat message is not the Artifact body.
+
+Agents can declare an existing fixed `outputSchema` or an explicit dynamic
+`outputContract`. Fixed schemas take precedence. The invocation adds schema/MIME
+instructions without editing the Agent resource, then validates and parses the
+result. JSON must be complete JSON without prose or Markdown fences. For a string
+result, choose a text MIME type. Dynamic mode is selected independently from
+having no schema in the Agent contract editor.
+
+A direct Tool call must declare fixed input and output schemas. The result is
+validated by the authority before a successful step is reported. An undeclared
+Flow/sub-Flow can forward trusted invocation context to its Agent; explicit Flow
+input schemas stop this implicit inheritance. Where a Tool or sub-Flow input
+schema declares an `outputContract` property, the platform can provide the concrete
+`{ schema, mediaType }` parameter. It never adds this property to unrelated inputs.
+An existing conflicting parameter fails rather than silently changing the contract.
+
+Artifact receipts, inline handoffs and Snapshots can retain `dataContract` with
+`schema`, `mediaType`, `origin`, `declaredMode`, `digest` and `validated` evidence.
+Publication verifies actual stored content instead of trusting a manifest's flag.
+Older Artifacts without metadata remain readable and are not guessed to have a
+contract. Dynamic input inheritance requires concrete available metadata.
+
+Hover a Designer port for a summary; its adjacent information control opens the
+schema, mappings, MIME and bounds. This also works on a published definition in
+read-only mode. Flow Run step diagnostics expose the effective execution contracts,
+separately from business input/output. Artifact details expose retained data
+contracts and provenance.
+
+Contract errors identify the boundary, schema path, expected/received type or MIME,
+and originating run/step, with a link to the source execution. They survive nested
+Flows and the main Knowledge orchestration. No document value is included in these
+diagnostics. `data_contract_json_invalid` explicitly explains JSON syntax versus
+text output; `data_contract_violation` reports schema mismatch. Start a new run
+after correcting the declaration, mapping or output format.
+
+See [ADR-0214](../decisions/0214-effective-data-contracts-follow-flow-invocations.md).
+
+An absent schema does not remove the output format constraint: the effective MIME
+type is supplied as invocation context and JSON syntax is checked before capture.
+This is a concrete format expectation, not an implicit dynamic declaration. Runtime
+content-contract inspection deduplicates schemas and is bounded to 256 KiB; other
+contracts remain available on the linked retained Artifacts.
+
+External MCP/AEP Tool output schemas remain provider-owned and describe
+`structuredContent`. A Flow keeps the full MCP result envelope; its port contract
+wraps the business schema under `structuredContent` and validation checks that
+nested content. Internal Tools keep their ordinary result shape. The platform
+does not rewrite external Tool declarations or unwrap their execution results.
