@@ -325,6 +325,7 @@ neutral and runtime validation remains authoritative. Published definitions are
 inspected without rewriting their graph.
 
 Execution progress uses a compact header, elapsed time, root-step counts and
-separate current Flow/step labels. Error cards share a responsive expected/received
-comparison, producer and contract-source locations, correction guidance and
-collapsed technical details across projection feedback and Flow Run inspection.
+separate current Flow/step labels. Full and sidebar error cards share a responsive
+expected/received comparison, producer and contract-source locations, correction
+guidance and collapsed technical details. Compact projection feedback retains the
+explanation and source links.
