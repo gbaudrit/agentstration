@@ -3,7 +3,7 @@
 These fourteen unedited viewport screenshots come from the real Console on product source `1402ee2` (2026-11-12), using disposable local QA data and the existing governed inventory fixture. No mockup or generated image is used. The Local administrator selects the explicit Instance context so managed/inherited visibility is exercised under the actual scope policy. Each inherited capture shows the same user-authored Instance Flow from the existing default Workspace, with an explicit discover/use grant and the same read-only notice on its detail page. The 24px scope glyph is asserted in every variant. Publication retaining revision `r1` is checked through the real API. The draft rows are newly created through the Flow API; the first is published as `1.0.0` and retains its real draft revision `r1`.
 
 | Variant | Existing managed/read-only resources | Version table | Version cards | Inherited Instance Flow in Workspace |
-| --- | --- | --- | --- |
+| --- | --- | --- | --- | --- |
 | Desktop · English · dark | [Managed](flows-managed-desktop-en-dark.png) | [Table](flows-table-desktop-en-dark.png) | [Cards](flows-cards-desktop-en-dark.png) | [Inherited](flows-inherited-desktop-en-dark.png) |
 | Desktop · English · light | [Managed](flows-managed-desktop-en-light.png) | [Table](flows-table-desktop-en-light.png) | [Cards](flows-cards-desktop-en-light.png) | [Inherited](flows-inherited-desktop-en-light.png) |
 | Mobile · French · dark · touch | [Managed](flows-managed-mobile-fr-dark.png) | — | [Cards](flows-cards-mobile-fr-dark.png) | [Inherited](flows-inherited-mobile-fr-dark.png) |
