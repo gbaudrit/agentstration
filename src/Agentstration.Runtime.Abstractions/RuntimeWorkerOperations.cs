@@ -106,7 +106,20 @@ public sealed record RuntimeGovernedChildFlow(
     string RunId,
     string Status,
     JsonElement? Output,
-    RuntimeRootFlowExecutionMaterial? Material = null);
+    RuntimeRootFlowExecutionMaterial? Material = null)
+{
+    public string? FlowId { get; init; }
+    public string? FlowNamespace { get; init; }
+    public string? FlowVersion { get; init; }
+    public string? OutputName { get; init; }
+    public string? Outcome { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string? ErrorDetails { get; init; }
+    public JsonElement? ErrorOrigin { get; init; }
+}
+
+public sealed record RuntimeProcessUnit(string Key, int Ordinal, string? Descriptor = null, int? TotalUnits = null);
 
 public sealed class RuntimeGovernedOperationException(string code, string message, Exception? innerException = null)
     : Exception(message, innerException)
@@ -154,6 +167,12 @@ public interface IRuntimeWorkerOperationGateway
         string name, string contentType, byte[] content, CancellationToken cancellationToken);
     Task<RuntimeGovernedArtifact?> GetArtifactAsync(WorkspaceId workspaceId, RuntimeAssignmentId assignmentId,
         Guid artifactId, CancellationToken cancellationToken);
+    Task CloseProcessAsync(ResourceScopeRef scope, string ownerRunId, string stepName, CancellationToken token) =>
+        Task.FromException(new RuntimeGovernedOperationException("process_unavailable", "Process admission is unavailable."));
+    Task<RuntimeGovernedChildFlow> AdmitProcessUnitAsync(ResourceScopeRef scope, WorkspaceId workspaceId,
+        string parentRunId, string stepName, Guid stepExecutionId, JsonElement input, string purpose,
+        int? iteration, RuntimeProcessUnit? unit, CancellationToken token) =>
+        CreateOrGetChildFlowAsync(scope, workspaceId, parentRunId, stepName, input, purpose, iteration, token);
     Task<RuntimeGovernedChildFlow> CreateOrGetChildFlowAsync(ResourceScopeRef executionScopeRef,
         WorkspaceId workspaceId, string parentRunId,
         string stepDefinitionId, JsonElement input, string purpose, int? iteration,

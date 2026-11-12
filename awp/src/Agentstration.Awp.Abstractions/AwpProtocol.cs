@@ -27,6 +27,7 @@ public static class AwpProtocol
     public const string CleanupFlowArtifactPath = BasePath + "/assignments/flow-artifacts/cleanup";
     public const string StoreArtifactPath = BasePath + "/assignments/artifacts";
     public const string GetArtifactPath = BasePath + "/assignments/artifacts/get";
+    public const string CloseProcessPath = BasePath + "/assignments/process/close";
     public const string CreateChildFlowPath = BasePath + "/assignments/child-flows";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();

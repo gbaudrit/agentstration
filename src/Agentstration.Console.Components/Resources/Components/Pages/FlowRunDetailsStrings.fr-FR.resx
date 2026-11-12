@@ -297,4 +297,24 @@
   <data name="FailureTitle.Execution" xml:space="preserve"><value>Échec de l’exécution du Flow</value></data>
   <data name="FailureShowDetails" xml:space="preserve"><value>Afficher les détails de l’erreur</value></data>
   <data name="FailureHideDetails" xml:space="preserve"><value>Masquer les détails de l’erreur</value></data>
+  <data name="ProcessRun" xml:space="preserve"><value>Process de {0} — Unité {1}</value></data>
+  <data name="SourceFlow" xml:space="preserve"><value>Flow source</value></data>
+  <data name="ProcessRegion" xml:space="preserve"><value>Région de process</value></data>
+  <data name="ProcessOwner" xml:space="preserve"><value>Étape propriétaire</value></data>
+  <data name="ProcessUnits" xml:space="preserve"><value>Unités du process</value></data>
+  <data name="ProcessProgress" xml:space="preserve"><value>{0} terminée(s) · {1} admise(s)</value></data>
+  <data name="ProcessDiscovering" xml:space="preserve"><value>Découverte des unités en cours</value></data>
+  <data name="ProcessClosed" xml:space="preserve"><value>Admission terminée</value></data>
+  <data name="ProcessEmpty" xml:space="preserve"><value>Aucune unité à traiter.</value></data>
+  <data name="ProcessUnit" xml:space="preserve"><value>Unité {0}</value></data>
+  <data name="ProcessAdmitted" xml:space="preserve"><value>Admise</value></data>
+  <data name="ProcessAttempt" xml:space="preserve"><value>Tentative propriétaire {0}</value></data>
+  <data name="FailureOrigin" xml:space="preserve"><value>Erreur d’origine</value></data>
+  <data name="FailurePropagated" xml:space="preserve"><value>Propagée depuis une sous-exécution</value></data>
+  <data name="ProcessDefinition" xml:space="preserve"><value>Définition implicite du process</value></data>
+  <data name="LegacyRunOrigin" xml:space="preserve"><value>Appel de Flow / origine historique</value></data>
+  <data name="Event.ProcessUnitChanged" xml:space="preserve"><value>Unité de process mise à jour</value></data>
+  <data name="EventType.ProcessUnitChanged" xml:space="preserve"><value>Unité de process mise à jour</value></data>
+  <data name="ProcessProgressKnown" xml:space="preserve"><value>{0}/{1} terminée(s) · {2} en cours</value></data>
+  <data name="ProcessActiveStep" xml:space="preserve"><value>Étape en cours</value></data>
 </root>

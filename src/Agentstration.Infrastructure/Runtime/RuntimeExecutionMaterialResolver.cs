@@ -56,6 +56,11 @@ public sealed class RuntimeExecutionMaterialResolver(
         var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
+        if (assignment.ExecutionMaterialVersion == RuntimeExecutionMaterialVersions.V1
+            && run.DefinitionSnapshot.Graph?.Steps.Any(step => step is TransformFlowStepDefinition { Processing: not null }
+                || step is ArtifactTransformFlowStepDefinition { MaximumConcurrency: > 1 }) == true)
+            throw new RuntimeExecutionMaterialException("execution_material_version_unsupported",
+                "This process requires execution material 1.1. Start a new run with an updated Runtime Worker.");
         if (run.TransientPayloads && !run.TransientPayloadsAvailable)
             throw new RuntimeExecutionMaterialException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
         if (run.TransientPayloads && run.DefinitionSnapshot.Graph?.Steps.Any(step => step.ArtifactOutput is not null) == true)
@@ -124,6 +129,11 @@ public sealed class RuntimeExecutionMaterialResolver(
         var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
+        if (assignment.ExecutionMaterialVersion == RuntimeExecutionMaterialVersions.V1
+            && run.DefinitionSnapshot.Graph?.Steps.Any(step => step is TransformFlowStepDefinition { Processing: not null }
+                || step is ArtifactTransformFlowStepDefinition { MaximumConcurrency: > 1 }) == true)
+            throw new RuntimeExecutionMaterialException("execution_material_version_unsupported",
+                "This process requires execution material 1.1. Start a new run with an updated Runtime Worker.");
         if (run.TransientPayloads && !run.TransientPayloadsAvailable)
             throw new RuntimeExecutionMaterialException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
         if (run.TransientPayloads && run.DefinitionSnapshot.Graph?.Steps.Any(step => step.ArtifactOutput is not null) == true)
@@ -216,6 +226,7 @@ public sealed class RuntimeExecutionMaterialResolver(
             ScopeRef = run.ExecutionScopeRef,
             LogicalScopeRef = run.Scope.LogicalScopeRef,
             FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value,
+            ProcessOrigin = run.ProcessOrigin is null ? null : JsonSerializer.SerializeToElement(run.ProcessOrigin, JsonOptions),
             ContractContext = run.ContractContext
         };
     }

@@ -6,7 +6,10 @@ using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows;
 
-public sealed record FlowRunError(string Code, string Message, string? Details = null);
+public sealed record FlowRunError(string Code, string Message, string? Details = null)
+{
+    public FlowFailureOrigin? Origin { get; init; }
+}
 public sealed record FlowRunScope(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] Guid TenantId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] WorkspaceId WorkspaceId,
@@ -118,6 +121,7 @@ public sealed record FlowToolRouteResolution(
     ResourceNamespace ProviderNamespace);
 public sealed record FlowStepRun
 {
+    public FlowProcessAdmission? Process { get; init; }
     public required string StepName { get; init; }
     public required string StepType { get; init; }
     public FlowStepRunStatus Status { get; init; } = FlowStepRunStatus.NotStarted;
@@ -149,6 +153,8 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    public FlowProcessRunOrigin? ProcessOrigin { get; init; }
+    public IReadOnlyList<string>? ReservedDescendantRunIds { get; init; }
     public FlowArtifactProcessingContext? ArtifactProcessing { get; init; }
     public bool TransientPayloads { get; init; }
     public string? TransientPayloadTicket { get; init; }

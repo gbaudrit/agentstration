@@ -541,6 +541,7 @@ public sealed class FlowDetailsDesignerTests
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "analyst"));
         var run = new FlowRun
         {
+            Steps = [new FlowStepRun { StepName = "notify", StepType = "toolRoute", Process = new(1, "process", true, []) }],
             WorkspaceId = workspaceId,
             Id = "flowrun-news",
             FlowId = flowId,
@@ -562,7 +563,8 @@ public sealed class FlowDetailsDesignerTests
             run.Id, flowId, run.FlowVersion, true, FlowDefinitionState.Published, run.Status, null, null, 0,
             run.CreatedAt, run.StartedAt, run.CompletedAt, null, [],
             [new(logicalCallId, "notify", "notification.send", "agentstration", "notification.send", "agentstration.internal", "agentstration", "work.notification.create", "succeeded", run.CorrelationId,
-                [new(invocationId, 1, "succeeded", run.CreatedAt, run.CreatedAt.AddMilliseconds(12), 12, null, null, 1)])]);
+                [new(invocationId, 1, "succeeded", run.CreatedAt, run.CreatedAt.AddMilliseconds(12), 12, null, null, 1)])])
+        { Processes = new Dictionary<string, FlowProcessAdmission> { ["notify"] = new(1, "process", true, []) } };
         var causality = new FlowRunCausalityPageResponse(
             new(run.Id, FlowInvocationOrigin.Trigger, FlowRunTrigger.Event, "news-watcher", "news-item-42", "news-42", Guid.NewGuid().ToString("D")),
             [node], 1, null);
@@ -571,7 +573,12 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddSingleton(TimeProvider.System);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo($"/flow-runs/{run.Id}?step=notify");
         var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+        var ownerHref = rendered.Find(".process-summary summary a").GetAttribute("href")!;
+        Assert.Contains(run.Id, ownerHref);
+        Assert.Contains("step=notify", ownerHref);
+        Assert.DoesNotContain("run.Id", ownerHref);
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Causality"].Value).Click();
 
         rendered.WaitForAssertion(() =>
@@ -579,6 +586,10 @@ public sealed class FlowDetailsDesignerTests
             StringAssert.Contains(rendered.Markup, "news-analysis · 2.0.0");
             StringAssert.Contains(rendered.Markup, strings["ResolvedFromActive"].Value);
             StringAssert.Contains(rendered.Markup, "notification.send");
+            var causalOwner = rendered.Find(".process-summary summary a").GetAttribute("href")!;
+            Assert.Contains(run.Id, causalOwner);
+            Assert.Contains("step=notify", causalOwner);
+            Assert.DoesNotContain("node.FlowRunId", causalOwner);
             var link = rendered.Find(".tool-attempts a");
             StringAssert.Contains(link.GetAttribute("href"), "toolCallId=flow%3Aflowrun-news%3Astep%3Anotify");
             StringAssert.Contains(link.GetAttribute("href"), "invocationId=flow%3Aflowrun-news%3Astep%3Anotify%3Aattempt%3A1");

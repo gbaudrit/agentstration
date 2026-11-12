@@ -144,6 +144,8 @@ public sealed record ConditionFlowStepDefinition : FlowStepDefinition
 
 public sealed record TransformFlowStepDefinition : FlowStepDefinition
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TransformProcessDefinition? Processing { get; init; }
     public string Mode { get; init; } = "Mapping";
     public JsonElement? Mapping { get; init; }
     public string? Expression { get; init; }
@@ -335,6 +337,7 @@ public static class FlowStepDefinitionExtensions
         AgentFlowStepDefinition => ["success", "error"],
         RouterFlowStepDefinition => ["selected", "failed"],
         ConditionFlowStepDefinition => ["true", "false"],
+        TransformFlowStepDefinition { Processing: not null } => ["process", "completed", "error"],
         TransformFlowStepDefinition => ["completed"],
         ArtifactTransformFlowStepDefinition => ["process", "completed", "error"],
         FlowCompositionPointStepDefinition => ["completed"],

@@ -17,7 +17,7 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (source is not null && readiness is not null)
 {
     @if (projectionFailureCode is not null)
-    { <div class="knowledge-projection-failure" role="status"><ContractFailurePanel ErrorCode="@projectionFailureCode" Details="@projectionFailureDetails" Run="projectionFailureRun" RelatedRuns="projectionFailureOrigins" Compact="true" /></div> }
+    { <div class="knowledge-projection-failure" role="status"><ContractFailurePanel ErrorCode="@projectionFailureCode" Details="@projectionFailureDetails" Message="@projectionFailureMessage" Run="projectionFailureRun" RelatedRuns="projectionFailureOrigins" Compact="true" /></div> }
     else if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div> }
     <InheritedResourceNotice OwnerScopeRef="@(source.ScopeRef ?? ResourceScopeRef.Instance)" />
     <ResourceTabs Label="@T("DetailsSections")">
@@ -176,7 +176,7 @@ else if (source is not null && readiness is not null)
     private DateTimeOffset? projectionStartedAt;
     private FlowRun? projectionRun, projectionFailureRun;
     private IReadOnlyList<FlowRun> activeProjectionRuns = [], projectionFailureOrigins = [];
-    private string? projectionFailureCode, projectionFailureDetails;
+    private string? projectionFailureCode, projectionFailureDetails, projectionFailureMessage;
     private KnowledgeProjectionResource? LiveProjection => projections.FirstOrDefault(value => value.IdempotencyKey == projectionRequestId && projectionRequestId is not null)
         ?? projections.FirstOrDefault(value => IsActiveProjection(value.State));
     private bool HasActiveProjection => projections.Any(value => IsActiveProjection(value.State));
@@ -228,7 +228,7 @@ else if (source is not null && readiness is not null)
     protected override async Task OnParametersSetAsync()
     {
         sourceRevision++;
-        activeProjectionRuns = []; projectionFailureCode = null; projectionFailureDetails = null; projectionFailureRun = null; projectionFailureOrigins = [];
+        activeProjectionRuns = []; projectionFailureCode = null; projectionFailureDetails = null; projectionFailureMessage = null; projectionFailureRun = null; projectionFailureOrigins = [];
         projectionRun = null;
         projectionRefreshError = null;
         loading = true;
@@ -365,7 +365,7 @@ else if (source is not null && readiness is not null)
     private async Task RunActionAsync(Func<Task> action, string success)
     {
         if (busy) return;
-        projectionFailureCode = null; projectionFailureDetails = null; projectionFailureRun = null; projectionFailureOrigins = [];
+        projectionFailureCode = null; projectionFailureDetails = null; projectionFailureMessage = null; projectionFailureRun = null; projectionFailureOrigins = [];
         busy = true; failed = false; message = null;
         try { await action(); message = T(success); await ReloadChildrenAsync(); }
         catch (AgentstrationApiException exception) when (exception.ProblemType?.Contains("/storage_", StringComparison.Ordinal) == true
@@ -417,7 +417,7 @@ else if (source is not null && readiness is not null)
                 catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { }
                 catch (NotSupportedException) { }
             }
-            if ((hadActive || projectionStarting) && !HasActiveProjection && selectedProjection is { State: KnowledgeProjectionState.Failed } failedProjection)
+            if (!HasActiveProjection && selectedProjection is { State: KnowledgeProjectionState.Failed } failedProjection)
                 await ReadProjectionFailureAsync(failedProjection, revision);
             if (includeSnapshots || hadActive && !HasActiveProjection)
             {
@@ -447,7 +447,7 @@ else if (source is not null && readiness is not null)
         busy = true; projectionStarting = true; failed = false; message = null; projectionRefreshError = null;
         projectionStartedAt = Clock.GetUtcNow();
         projectionRequestId = Guid.NewGuid().ToString("N");
-        projectionFailureCode = null; projectionFailureDetails = null; projectionFailureRun = null; projectionFailureOrigins = []; activeProjectionRuns = [];
+        projectionFailureCode = null; projectionFailureDetails = null; projectionFailureMessage = null; projectionFailureRun = null; projectionFailureOrigins = []; activeProjectionRuns = [];
         projectionRun = null;
         try
         {
@@ -490,8 +490,11 @@ else if (source is not null && readiness is not null)
         }
         if (revision != sourceRevision || cancellation.IsCancellationRequested) return;
         var diagnostic = Agentstration.Schemas.DataContracts.ParseFailure(failedRun?.Error?.Details);
-        if (diagnostic is null && !ContractFailurePanel.IsContractCode(projection.ErrorCode)) return;
-        projectionFailureCode = diagnostic?.Code ?? projection.ErrorCode; projectionFailureDetails = failedRun?.Error?.Details;
+        projectionFailureCode = diagnostic?.Code ?? failedRun?.Error?.Code ?? projection.ErrorCode ?? "knowledge_projection_failed";
+        projectionFailureDetails = failedRun?.Error?.Details;
+        projectionFailureMessage = projection.ErrorMessage;
+        // Authoritative execution diagnostics replace an earlier launch/transport message.
+        message = null;
         projectionFailureRun = failedRun; projectionFailureOrigins = origins;
     }
     private Task SelectSnapshotAsync(KnowledgeSnapshotView value) => RunActionAsync(async () => { await Client.SelectActiveSnapshotAsync(SourceNamespace, Name, value.Snapshot.Name, cancellation.Token); }, "SnapshotActivated");

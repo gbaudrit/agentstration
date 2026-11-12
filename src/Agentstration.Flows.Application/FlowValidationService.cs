@@ -173,14 +173,14 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             foreach (var step in steps.Keys.Where(name => !reachable.Contains(name)))
                 issues.Add(new FlowValidationIssue("step_unreachable", FlowValidationSeverity.Warning, $"Step '{step}' is unreachable.", step));
             IReadOnlyList<FlowTransitionDefinition> executionTransitions = definition.Transitions;
-            foreach (var processing in definition.Steps.OfType<ArtifactTransformFlowStepDefinition>())
+            foreach (var processing in definition.Steps.Where(step => step.Region() is not null))
             {
                 try
                 {
-                    var region = FlowArtifactProcessingGraph.Extract(definition, processing);
-                    if (HasCycle(region.EntryStep, FlowArtifactProcessingGraph.ExecutionTransitions(region)))
+                    var region = FlowProcessGraph.Extract(definition, processing);
+                    if (HasCycle(region.EntryStep, FlowProcessGraph.ExecutionTransitions(region)))
                         issues.Add(Error("artifact_processing_cycle", "Artifact processing must be acyclic.", processing.Name));
-                    executionTransitions = FlowArtifactProcessingGraph.ExecutionTransitions(definition);
+                    executionTransitions = FlowProcessGraph.ExecutionTransitions(definition);
                 }
                 catch (InvalidOperationException exception)
                 { issues.Add(Error("artifact_processing_connections_invalid", exception.Message, processing.Name)); }
@@ -209,6 +209,10 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         CancellationToken token)
     {
         await ValidateArtifactOutputAsync(step, transitions, context, issues, token);
+        if (step is TransformFlowStepDefinition { Processing: { } process }
+            && (process.MaximumUnits is < 1 or > 128 || process.MaximumConcurrency is < 1 or > 16
+                || process.UnitSize is < 1 or > 65536 || !Enum.IsDefined(process.Partition)))
+            issues.Add(Error("process_limits_invalid", "Process partition limits are outside their supported bounds.", step.Name, property: "processing"));
         switch (step)
         {
             case InputFlowStepDefinition input:
@@ -243,7 +247,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 ValidateSchemaContract(transform.Schema, transform.SchemaBinding, "schema", transform.Name, issues);
                 break;
             case ArtifactTransformFlowStepDefinition processing:
-                if (processing.MaximumArtifacts is < 1 or > 128 || processing.MaximumContentBytes is < 1 or > 1_048_576
+                if (processing.MaximumConcurrency is < 1 or > 16 || processing.MaximumArtifacts is < 1 or > 128 || processing.MaximumContentBytes is < 1 or > 1_048_576
                     || processing.MaximumOutputBytes is < 1 or > 16_777_216 || !Enum.IsDefined(processing.Mode))
                     issues.Add(Error("artifact_processing_limits_invalid", "Artifact processing limits are outside their supported bounds.", step.Name));
                 if (processing.OutputContract is { } outputContract)

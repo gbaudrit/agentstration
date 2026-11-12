@@ -8,7 +8,7 @@
             <button type="button" class="flow-port-inspect input" title="@PortTitle("input")" aria-label="@Localizer["InspectPortNamed", "input"]"
                 @onpointerdown:stopPropagation="true" @onmousedown:stopPropagation="true" @onclick:stopPropagation="true" @onclick='() => InspectPortAsync("input")' aria-disabled="false"><span aria-hidden="true">i</span></button>
     </span>
-    @if (Node.Source.Type == "artifactTransform" && Node.Outputs.FirstOrDefault(port => port.EventName == "process") is { } processingStart)
+    @if (Node.Outputs.FirstOrDefault(port => port.EventName == "process") is { } processingStart)
     {
         <span class="flow-port-handle processing-start @(processingStart.ContractProblem is null ? null : "contract-incompatible") @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" data-testid="artifact-processing-start-port" title="@PortTitle("process")" aria-label="@Localizer["ArtifactProcessingStartPort"]">
             <PortRenderer Port="processingStart" />

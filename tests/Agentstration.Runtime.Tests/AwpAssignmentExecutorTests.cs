@@ -217,7 +217,9 @@ public sealed partial class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
-    public async Task FlowCallArtifactCapturesResolvedChildProvenance()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task FlowCallArtifactCapturesResolvedChildProvenance(bool replay)
     {
         var graph = new FlowGraphDefinition
         {
@@ -245,7 +247,10 @@ public sealed partial class AwpAssignmentExecutorTests
         };
         var handler = new GraphHandler(TestNow)
         {
-            ChildOutput = JsonSerializer.SerializeToElement(new { summary = "new item" })
+            ChildOutput = JsonSerializer.SerializeToElement(new { summary = "new item" }),
+            ChildReplay = replay ? _ => new(TestNow, "flowrun-child-cached", "Succeeded",
+                JsonSerializer.SerializeToElement(new { summary = "new item" }))
+            { FlowId = "child", FlowNamespace = "default", FlowVersion = "1.0", OutputName = "completed", Outcome = "success" } : null
         };
 
         var (result, _) = await ExecuteGraphAsync(graph,
@@ -1453,8 +1458,11 @@ public sealed partial class AwpAssignmentExecutorTests
 
     private sealed class GraphHandler(DateTimeOffset now) : HttpMessageHandler
     {
+        private readonly object protocolGate = new();
         public List<AwpExecutionEvent> Events { get; } = [];
         public List<AwpCreateChildFlowRequest> ChildRequests { get; } = [];
+        public List<AwpCloseProcessRequest> CloseProcessRequests { get; } = [];
+        public Func<AwpCreateChildFlowRequest, AwpChildFlowResponse?>? ChildReplay { get; init; }
         public List<AwpProcessArtifactRequest> ArtifactProcessingRequests { get; } = [];
         public List<AwpCleanupFlowArtifactRequest> CleanupRequests { get; } = [];
         public List<AwpInvokeModelRequest> ModelRequests { get; } = [];
@@ -1504,7 +1512,8 @@ public sealed partial class AwpAssignmentExecutorTests
                         code = FlowToolFailureCode ?? "tool_step_failed"
                     })
                 };
-            object payload = path switch
+            object payload;
+            lock (protocolGate) payload = path switch
             {
                 AwpProtocol.OpenStepExecutionPath => OpenStep(bytes),
                 AwpProtocol.OpenTurnPath => OpenTurn(bytes),
@@ -1518,6 +1527,7 @@ public sealed partial class AwpAssignmentExecutorTests
                 AwpProtocol.CaptureFlowArtifactPath => Capture(bytes),
                 AwpProtocol.CleanupFlowArtifactPath => Cleanup(bytes),
                 AwpProtocol.CreateChildFlowPath => CreateChild(bytes),
+                AwpProtocol.CloseProcessPath => CloseProcess(bytes),
                 _ => throw new AssertFailedException($"Unexpected AWP request '{path}'.")
             };
             var responseType = typeof(AwpEnvelope<>).MakeGenericType(payload.GetType());
@@ -1642,10 +1652,17 @@ public sealed partial class AwpAssignmentExecutorTests
                 : JsonSerializer.SerializeToElement(new { artifactId = "output-" + request.Index, kind = "durable", disposition = "publishable" }));
         }
 
+        private AwpCloseProcessResponse CloseProcess(byte[] bytes)
+        {
+            CloseProcessRequests.Add(Payload<AwpCloseProcessRequest>(bytes));
+            return new(now);
+        }
+
         private AwpChildFlowResponse CreateChild(byte[] bytes)
         {
             var request = Payload<AwpCreateChildFlowRequest>(bytes);
             ChildRequests.Add(request);
+            if (ChildReplay?.Invoke(request) is { } replay) return replay;
             var runId = $"flowrun-child-{request.Iteration}";
             var graph = ChildGraph ?? new FlowGraphDefinition
             {

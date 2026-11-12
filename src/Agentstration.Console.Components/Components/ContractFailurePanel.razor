@@ -10,7 +10,7 @@
                 @if (Failure is { } boundaryFailure) { <span class="contract-boundary">@Localizer[BoundaryKey(boundaryFailure.Boundary)]</span> }
             </div>
         </header>
-        <p class="contract-failure-summary">@(IsContract ? Localizer[SummaryKey].Value : Code == "artifact_storage_failed" ? Localizer["FailureSummary.Storage"].Value : Message)</p>
+        <p class="contract-failure-summary">@(IsContract ? Localizer[SummaryKey].Value : Code == "artifact_storage_failed" ? Localizer["FailureSummary.Storage"].Value : Code == "model_output_token_limit" ? Localizer["Error.ModelOutputTokenLimit"].Value : Code == "model_empty_response" ? Localizer["Error.ModelEmptyResponse"].Value : Message)</p>
         @if (Collapsible && (Failure is not null || !IsContract))
         {
             <button type="button" class="contract-failure-toggle" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@bodyId" @onclick="() => expanded = !expanded">@Localizer[IsContract ? (expanded ? "ContractHideDetails" : "ContractShowDetails") : (expanded ? "FailureHideDetails" : "FailureShowDetails")] <UiIcon Name="chevron-down" /></button>

@@ -11,6 +11,22 @@ namespace Agentstration.Web.Tests;
 public sealed class ContractFailurePanelTests
 {
     [TestMethod]
+    [DataRow("en-US", "generation token limit")]
+    [DataRow("fr-FR", "limite de tokens de génération")]
+    public void ProjectionAndRunPanelsUseTheSameLocalizedModelFailure(string language, string message)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var rendered = context.Render<ContractFailurePanel>(parameters => parameters
+            .Add(component => component.ErrorCode, "model_output_token_limit")
+            .Add(component => component.Message, "The projection could not complete.")
+            .Add(component => component.Compact, true));
+        Assert.Contains(message, rendered.Find(".contract-failure-summary").TextContent);
+        Assert.DoesNotContain("The projection could not complete.", rendered.Find(".contract-failure-summary").TextContent);
+    }
+
+    [TestMethod]
     [DataRow("en-US", "valid JSON")]
     [DataRow("fr-FR", "JSON valide")]
     public void ContractFailureShowsTheCausalBoundaryAndLinksTheExactStep(string language, string explanation)

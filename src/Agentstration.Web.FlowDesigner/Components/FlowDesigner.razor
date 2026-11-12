@@ -217,7 +217,7 @@ else
                                         }
                                         else if (SelectedStep is TransformFlowStepDefinition transform)
                                         {
-                                            <FlowTransformInspector Step="transform" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" EffectiveIncomingSchema="EffectiveIncomingSchema"
+                                            <FlowTransformInspector Step="transform" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" EffectiveIncomingSchema="EffectiveIncomingSchema"
                                                 IncomingContractUnavailableText="@IncomingContractUnavailableText()" SchemaVersions="schemaVersions"
                                                 UpdateTransformMappingAsync="UpdateTransformMappingAsync" UpdateTransformSchemaBindingAsync="UpdateTransformSchemaBindingAsync"
                                                 ValidateSchemaDefinitionAsync="ValidateSchemaDefinitionAsync" ValidateSchemaInstanceAsync="ValidateSchemaInstanceAsync" />

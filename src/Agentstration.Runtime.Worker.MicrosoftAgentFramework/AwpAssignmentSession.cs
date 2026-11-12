@@ -13,10 +13,18 @@ internal sealed class AwpAssignmentSession
     private TimeSpan serverOffset;
     private long eventSequence;
     private AwpExecutionEvent? pendingEvent;
+    private readonly SemaphoreSlim processLanes;
+    private readonly AsyncLocal<int> processDepth = new();
+    public bool IsInsideProcess => processDepth.Value > 0;
+    public int MaximumProcessConcurrency { get; }
 
     public AwpAssignmentSession(AwpClient client, AwpRunAssignment assignment, DateTimeOffset serverTime,
-        TimeProvider timeProvider, TimeSpan safetyMargin)
+        TimeProvider timeProvider, TimeSpan safetyMargin, int maximumProcessConcurrency = 4)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumProcessConcurrency, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maximumProcessConcurrency, 16);
+        MaximumProcessConcurrency = maximumProcessConcurrency;
+        processLanes = new(maximumProcessConcurrency, maximumProcessConcurrency);
         Client = client;
         Assignment = assignment;
         this.timeProvider = timeProvider;
@@ -26,6 +34,15 @@ internal sealed class AwpAssignmentSession
         eventSequence = assignment.InitialEventSequence;
         Context = new(client.WorkerId, client.SessionId, assignment.Scope, assignment.AssignmentId,
             assignment.AttemptId, assignment.Ownership.Token, assignment.Ownership.FencingGeneration);
+    }
+
+    public async Task<T> ExecuteProcessUnitAsync<T>(Func<Task<T>> execute, CancellationToken token)
+    {
+        if (IsInsideProcess) return await execute();
+        await processLanes.WaitAsync(token);
+        processDepth.Value++;
+        try { return await execute(); }
+        finally { processDepth.Value--; processLanes.Release(); }
     }
 
     public AwpRunAssignment Assignment { get; }

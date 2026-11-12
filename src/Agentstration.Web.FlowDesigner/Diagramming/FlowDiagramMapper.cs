@@ -18,11 +18,11 @@ public sealed class FlowDiagramNode : NodeModel
         Size = new Size(RenderedWidth, RenderedHeight);
         Input = new FlowDiagramPort(this, PortAlignment.Left, FlowDiagramPortDirection.Input);
         Outputs = source.OutputEvents
-            .Select(eventName => new FlowDiagramPort(this, source.Type == "artifactTransform" && eventName == "process" ? PortAlignment.Bottom : PortAlignment.Right, FlowDiagramPortDirection.Output, eventName,
+            .Select(eventName => new FlowDiagramPort(this, eventName == "process" ? PortAlignment.Bottom : PortAlignment.Right, FlowDiagramPortDirection.Output, eventName,
                 source.OutputOutcomes.TryGetValue(eventName, out var outcome) ? outcome : null))
             .ToArray();
         AddPort(Input);
-        if (source.Type == "artifactTransform")
+        if (source.OutputEvents.Contains("process", StringComparer.Ordinal))
         {
             ProcessingResult = new FlowDiagramPort(this, PortAlignment.Bottom, FlowDiagramPortDirection.Input, "result");
             AddPort(ProcessingResult);

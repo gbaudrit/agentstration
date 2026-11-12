@@ -8,6 +8,20 @@ namespace Agentstration.Application.Tests;
 [TestClass]
 public sealed class ArtifactProcessingGraphTests
 {
+    private static readonly JsonSerializerOptions LegacyJson = new(JsonSerializerDefaults.Web);
+    [TestMethod]
+    public void AbsentParallelismPreservesLegacyGraphSerializationAndBoundaryIdentity()
+    {
+        var graph = Graph();
+        var owner = graph.Steps.OfType<ArtifactTransformFlowStepDefinition>().Single();
+        var json = JsonSerializer.Serialize<FlowStepDefinition>(owner, LegacyJson);
+        Assert.DoesNotContain("maximumConcurrency", json);
+        var body = FlowArtifactProcessingGraph.Extract(graph, owner);
+        Assert.AreEqual("artifact-processing-start", body.Transitions[0].Id);
+        var restored = JsonSerializer.Deserialize<FlowStepDefinition>(json, LegacyJson);
+        Assert.AreEqual(1, restored!.Region()!.MaximumConcurrency);
+    }
+
     [TestMethod]
     public async Task ProcessingConnectionsCanContainAnAgentToolMappingAndFlowWithoutASeparatePublication()
     {

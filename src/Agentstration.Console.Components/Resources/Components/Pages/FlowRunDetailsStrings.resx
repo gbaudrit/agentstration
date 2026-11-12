@@ -297,4 +297,24 @@
   <data name="FailureTitle.Execution" xml:space="preserve"><value>Flow execution failed</value></data>
   <data name="FailureShowDetails" xml:space="preserve"><value>Show error details</value></data>
   <data name="FailureHideDetails" xml:space="preserve"><value>Hide error details</value></data>
+  <data name="ProcessRun" xml:space="preserve"><value>Process of {0} — Unit {1}</value></data>
+  <data name="SourceFlow" xml:space="preserve"><value>Source Flow</value></data>
+  <data name="ProcessRegion" xml:space="preserve"><value>Process region</value></data>
+  <data name="ProcessOwner" xml:space="preserve"><value>Owning step</value></data>
+  <data name="ProcessUnits" xml:space="preserve"><value>Process units</value></data>
+  <data name="ProcessProgress" xml:space="preserve"><value>{0} completed · {1} admitted</value></data>
+  <data name="ProcessDiscovering" xml:space="preserve"><value>Discovering work units</value></data>
+  <data name="ProcessClosed" xml:space="preserve"><value>Admission closed</value></data>
+  <data name="ProcessEmpty" xml:space="preserve"><value>No work units to process.</value></data>
+  <data name="ProcessUnit" xml:space="preserve"><value>Unit {0}</value></data>
+  <data name="ProcessAdmitted" xml:space="preserve"><value>Admitted</value></data>
+  <data name="ProcessAttempt" xml:space="preserve"><value>Owner attempt {0}</value></data>
+  <data name="FailureOrigin" xml:space="preserve"><value>Original failure</value></data>
+  <data name="FailurePropagated" xml:space="preserve"><value>Propagated from a child execution</value></data>
+  <data name="ProcessDefinition" xml:space="preserve"><value>Implicit process definition</value></data>
+  <data name="LegacyRunOrigin" xml:space="preserve"><value>Flow invocation / historical origin</value></data>
+  <data name="Event.ProcessUnitChanged" xml:space="preserve"><value>Process unit updated</value></data>
+  <data name="EventType.ProcessUnitChanged" xml:space="preserve"><value>Process unit updated</value></data>
+  <data name="ProcessProgressKnown" xml:space="preserve"><value>{0}/{1} completed · {2} running</value></data>
+  <data name="ProcessActiveStep" xml:space="preserve"><value>Current step</value></data>
 </root>

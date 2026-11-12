@@ -28,6 +28,7 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
         services.AddSingleton<DataSourceAcquisitionTargetService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
         services.AddSingleton<KnowledgeProjectionService>();
+        if (enableHostedServices) services.AddHostedService<KnowledgeProjectionWorker>();
         services.AddSingleton<IKnowledgeOutputPublisher, KnowledgeOutputPublisher>();
         services.AddSingleton<Agentstration.Storage.Contracts.IStorageUsageProvider, KnowledgeStorageUsageProvider>();
         services.AddSingleton<KnowledgeRetrievalService>();

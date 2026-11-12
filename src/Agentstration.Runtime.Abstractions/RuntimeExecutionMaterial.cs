@@ -7,6 +7,7 @@ namespace Agentstration.Runtime.Abstractions;
 public static class RuntimeExecutionMaterialVersions
 {
     public const string V1 = "1.0";
+    public const string CoordinatedProcesses = "1.1";
 }
 
 public sealed record RuntimeExecutionToolMaterial(
@@ -109,6 +110,7 @@ public sealed record RuntimeRootFlowExecutionMaterial(
 {
     public string? FlowScopeRef { get; init; }
     public InvocationDataContracts? ContractContext { get; init; }
+    public JsonElement? ProcessOrigin { get; init; }
 }
 
 public sealed record RuntimeFlowResumeMaterial(

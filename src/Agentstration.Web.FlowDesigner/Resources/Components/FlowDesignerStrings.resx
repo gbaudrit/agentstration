@@ -232,4 +232,13 @@
   <data name="UseIncomingTransition" xml:space="preserve"><value>Use the incoming transition</value></data>
   <data name="PublishedMappingReadOnly" xml:space="preserve"><value>Published version: this mapping is read-only. Open the draft to edit it.</value></data>
   <data name="OutputMappingReferenceUnavailable" xml:space="preserve"><value>Output {0} references an unavailable step in its mapping. Check the referenced step or use the incoming transition.</value></data>
+  <data name="ProcessConcurrency" xml:space="preserve"><value>Maximum concurrent process units</value></data>
+  <data name="ProcessConcurrency.Help" xml:space="preserve"><value>Default: sequential. The Worker may apply a lower shared limit; output order is preserved.</value></data>
+  <data name="TransformProcessing" xml:space="preserve"><value>Processing</value></data>
+  <data name="TransformProcessing.None" xml:space="preserve"><value>Single mapping</value></data>
+  <data name="TransformProcessing.Batches" xml:space="preserve"><value>Process array batches</value></data>
+  <data name="TransformProcessing.TextChunks" xml:space="preserve"><value>Process text chunks</value></data>
+  <data name="TransformProcessing.Help" xml:space="preserve"><value>The input mapping selects the value to partition. Connect process to the processing steps and return their result here. The output is an array in unit order.</value></data>
+  <data name="TransformProcessing.UnitSize" xml:space="preserve"><value>Elements per batch / characters per text chunk</value></data>
+  <data name="TransformProcessing.MaximumUnits" xml:space="preserve"><value>Maximum process units</value></data>
 </root>

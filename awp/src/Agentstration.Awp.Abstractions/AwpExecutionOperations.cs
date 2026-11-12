@@ -87,6 +87,7 @@ public sealed record AwpRootFlowExecutionMaterial(
 {
     public string? FlowScopeRef { get; init; }
     public JsonElement? ContractContext { get; init; }
+    public JsonElement? ProcessOrigin { get; init; }
 }
 
 public sealed record AwpFlowResumeMaterial(
@@ -336,11 +337,29 @@ public sealed record AwpCreateChildFlowRequest(
     AwpStepExecutionId StepExecutionId,
     JsonElement Input,
     string Purpose = "flowCall",
-    int? Iteration = null);
+    int? Iteration = null)
+{
+    public AwpProcessUnit? ProcessUnit { get; init; }
+}
+
+public sealed record AwpProcessUnit(string Key, int Ordinal, string? Descriptor = null, int? TotalUnits = null);
+public sealed record AwpCloseProcessRequest(AwpAssignmentCommandContext Context, AwpStepExecutionId StepExecutionId);
+public sealed record AwpCloseProcessResponse(DateTimeOffset ServerTime);
 
 public sealed record AwpChildFlowResponse(
     DateTimeOffset ServerTime,
     string RunId,
     string Status,
     JsonElement? Output,
-    AwpRootFlowExecutionMaterial? Material = null);
+    AwpRootFlowExecutionMaterial? Material = null)
+{
+    public string? FlowId { get; init; }
+    public string? FlowNamespace { get; init; }
+    public string? FlowVersion { get; init; }
+    public string? OutputName { get; init; }
+    public string? Outcome { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string? ErrorDetails { get; init; }
+    public JsonElement? ErrorOrigin { get; init; }
+}

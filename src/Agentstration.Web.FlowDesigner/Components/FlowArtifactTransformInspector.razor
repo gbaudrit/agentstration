@@ -10,6 +10,8 @@
         </select>
     </label>
     <p class="muted">@T(Step.Mode == ArtifactProcessingMode.Content ? "ArtifactContentHelp" : "ArtifactAccessHelp")</p>
+    <label>@T("ProcessConcurrency")<input data-testid="artifact-process-concurrency" type="number" min="1" max="16" disabled="@ReadOnly" value="@(Step.MaximumConcurrency ?? 1)" @onchange="ConcurrencyChangedAsync" /></label>
+    <small>@T("ProcessConcurrency.Help")</small>
     <label>@T("ArtifactMaximumCount")<input type="number" min="1" max="128" disabled="@ReadOnly" value="@Step.MaximumArtifacts" @onchange="e => LimitChangedAsync(e, true)" /></label>
     <label>@T("ArtifactMaximumInput")<input type="number" min="1" max="1048576" disabled="@ReadOnly" value="@Step.MaximumContentBytes" @onchange="e => LimitChangedAsync(e, false)" /></label>
     <label>@T("ArtifactMaximumOutput")<input type="number" min="1" max="16777216" disabled="@ReadOnly" value="@Step.MaximumOutputBytes" @onchange="OutputLimitChangedAsync" /></label>
@@ -81,6 +83,8 @@
         ? Changed.InvokeAsync(Step with { Mode = mode }) : Task.CompletedTask;
     private Task LimitChangedAsync(ChangeEventArgs args, bool count) => int.TryParse(args.Value?.ToString(), out var limit)
         ? Changed.InvokeAsync(count ? Step with { MaximumArtifacts = limit } : Step with { MaximumContentBytes = limit }) : Task.CompletedTask;
+    private Task ConcurrencyChangedAsync(ChangeEventArgs args) => int.TryParse(args.Value?.ToString(), out var value)
+        ? Changed.InvokeAsync(Step with { MaximumConcurrency = value }) : Task.CompletedTask;
     private Task OutputLimitChangedAsync(ChangeEventArgs args) => int.TryParse(args.Value?.ToString(), out var limit)
         ? Changed.InvokeAsync(Step with { MaximumOutputBytes = limit }) : Task.CompletedTask;
     private async Task MappingChangedAsync(ChangeEventArgs args, int field)

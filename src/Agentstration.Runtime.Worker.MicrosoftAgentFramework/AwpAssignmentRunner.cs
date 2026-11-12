@@ -28,7 +28,7 @@ internal sealed class AwpAssignmentRunner(
         });
         activity?.SetTag("agentstration.run.target_kind", assignment.Target.GetType().Name);
         var session = new AwpAssignmentSession(client, assignment, serverTime, timeProvider,
-            TimeSpan.FromSeconds(configured.LeaseSafetyMarginSeconds));
+            TimeSpan.FromSeconds(configured.LeaseSafetyMarginSeconds), configured.MaximumConcurrentProcessRuns);
         using var execution = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         using var heartbeatCancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         var cancellationRequested = false;
@@ -57,7 +57,8 @@ internal sealed class AwpAssignmentRunner(
                     outcome = result.Outcome,
                     errorCode = result.ErrorCode,
                     error = result.ErrorMessage,
-                    errorDetails = result.ErrorDetails
+                    errorDetails = result.ErrorDetails,
+                    errorOrigin = result.ErrorOrigin
                 }), null, execution.Token);
             await session.EnsureCanStartMutationAsync(execution.Token);
             await client.CompleteAsync(new(session.Context, new(Guid.NewGuid()), result.Output), execution.Token);

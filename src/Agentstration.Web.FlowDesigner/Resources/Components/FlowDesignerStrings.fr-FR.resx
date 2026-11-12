@@ -227,4 +227,13 @@
   <data name="UseIncomingTransition" xml:space="preserve"><value>Utiliser la transition entrante</value></data>
   <data name="PublishedMappingReadOnly" xml:space="preserve"><value>Version publiée : ce mapping est en lecture seule. Ouvrez le brouillon pour le modifier.</value></data>
   <data name="OutputMappingReferenceUnavailable" xml:space="preserve"><value>La sortie {0} référence une étape indisponible dans son mapping. Vérifiez l’étape référencée ou utilisez la transition entrante.</value></data>
+  <data name="ProcessConcurrency" xml:space="preserve"><value>Nombre maximal d’unités simultanées</value></data>
+  <data name="ProcessConcurrency.Help" xml:space="preserve"><value>Par défaut : séquentiel. Le Worker peut appliquer une limite partagée plus basse ; l’ordre des sorties est conservé.</value></data>
+  <data name="TransformProcessing" xml:space="preserve"><value>Traitement</value></data>
+  <data name="TransformProcessing.None" xml:space="preserve"><value>Mapping simple</value></data>
+  <data name="TransformProcessing.Batches" xml:space="preserve"><value>Traiter par lots d’éléments</value></data>
+  <data name="TransformProcessing.TextChunks" xml:space="preserve"><value>Traiter par fragments de texte</value></data>
+  <data name="TransformProcessing.Help" xml:space="preserve"><value>Le mapping d’entrée sélectionne la valeur à découper. Reliez process aux étapes de traitement, puis ramenez leur résultat ici. La sortie est un tableau dans l’ordre des unités.</value></data>
+  <data name="TransformProcessing.UnitSize" xml:space="preserve"><value>Éléments par lot / caractères par fragment de texte</value></data>
+  <data name="TransformProcessing.MaximumUnits" xml:space="preserve"><value>Nombre maximal d’unités</value></data>
 </root>

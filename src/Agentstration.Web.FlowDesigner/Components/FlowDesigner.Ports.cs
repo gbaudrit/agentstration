@@ -31,6 +31,13 @@ public partial class FlowDesigner
     }
     private JsonElement? PortSchema(FlowStepDefinition? step, string port)
     {
+        if (step is TransformFlowStepDefinition { Processing: { } process })
+            return port switch
+            {
+                "process" => JsonSerializer.SerializeToElement(new { type = process.Partition == FlowProcessPartition.TextChunks ? "string" : "array" }),
+                "completed" => ResolveStepOutputSchema(step),
+                _ => null
+            };
         if (step is ArtifactTransformFlowStepDefinition artifact)
             return port switch
             {

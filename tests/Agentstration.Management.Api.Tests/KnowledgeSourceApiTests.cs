@@ -372,20 +372,27 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         using var projectionResponse = await client.PostAsJsonAsync(
             $"/api/knowledgesources/{knowledgeSource.Value.Name}/projections",
             new StartKnowledgeProjectionRequest());
-        Assert.AreEqual(HttpStatusCode.Created, projectionResponse.StatusCode,
+        Assert.AreEqual(HttpStatusCode.Accepted, projectionResponse.StatusCode,
             await projectionResponse.Content.ReadAsStringAsync());
         var projection = await projectionResponse.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
         Assert.IsNotNull(projection);
+        Assert.AreEqual(KnowledgeProjectionState.Running, projection.State);
+        var projectionService = factory.Services.GetRequiredService<KnowledgeProjectionService>();
+        // Hosted execution is intentionally disabled in this fixture; drive the same durable recovery use case.
+        await projectionService.RecoverPendingAsync(default);
+        projection = (await projectionService.GetAsync(projection.Name, projection.Namespace, default)).Value;
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.State, projection.ErrorMessage);
         Assert.IsNotNull(projection.SnapshotName);
 
         using var secondProjectionResponse = await client.PostAsJsonAsync(
             $"/api/knowledgesources/{knowledgeSource.Value.Name}/projections",
             new StartKnowledgeProjectionRequest());
-        Assert.AreEqual(HttpStatusCode.Created, secondProjectionResponse.StatusCode,
+        Assert.AreEqual(HttpStatusCode.Accepted, secondProjectionResponse.StatusCode,
             await secondProjectionResponse.Content.ReadAsStringAsync());
         var secondProjection = await secondProjectionResponse.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
         Assert.IsNotNull(secondProjection);
+        await projectionService.RecoverPendingAsync(default);
+        secondProjection = (await projectionService.GetAsync(secondProjection.Name, secondProjection.Namespace, default)).Value;
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, secondProjection.State, secondProjection.ErrorMessage);
         Assert.IsNotNull(secondProjection.SnapshotName);
         Assert.AreNotEqual(projection.Name, secondProjection.Name);

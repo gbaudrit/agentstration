@@ -1,5 +1,6 @@
 using Agentstration.Schemas;
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -109,18 +110,34 @@ public sealed class KnowledgeProjectionService(
     private readonly ConcurrentDictionary<(Guid WorkspaceId, Guid SourceUid), SemaphoreSlim> gates = new();
     private readonly SemaphoreSlim admission = new(32, 32);
 
+    private readonly SemaphoreSlim durableAdmission = new(1, 1);
+    private readonly Channel<bool> pending = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
+    { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
+
+    public async Task WaitForPendingAsync(CancellationToken token) => _ = await pending.Reader.ReadAsync(token);
+
+    public Task<StoredResource<KnowledgeProjectionResource>> AdmitAsync(KnowledgeSourceId sourceId,
+        StartKnowledgeProjectionRequest request, CancellationToken token) => StartCoreAsync(sourceId, request, true, token);
+
     public const int MaximumInputs = 32;
     public const int MaximumArtifacts = 100;
     public const int MaximumParametersBytes = 64 * 1024;
 
-    public async Task<StoredResource<KnowledgeProjectionResource>> StartAsync(
+    public Task<StoredResource<KnowledgeProjectionResource>> StartAsync(
         KnowledgeSourceId sourceId,
         StartKnowledgeProjectionRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) => StartCoreAsync(sourceId, request, false, cancellationToken);
+
+    private async Task<StoredResource<KnowledgeProjectionResource>> StartCoreAsync(
+        KnowledgeSourceId sourceId,
+        StartKnowledgeProjectionRequest request,
+        bool admissionOnly, CancellationToken cancellationToken)
     {
         var context = RequireContext();
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
         ValidateParameters(request.Parameters);
+        if (request.IdempotencyKey is { Length: > 200 })
+            throw Error("knowledge_projection_idempotency_invalid", "The idempotency key exceeds 200 characters.");
         var executionScope = ResourceScopeRef.Workspace(context.WorkspaceId);
         StoredResource<KnowledgeSourceResource> source;
         try { source = await sources.ResolveForUseAsync(sourceId, KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? executionScope, cancellationToken); }
@@ -143,7 +160,22 @@ public sealed class KnowledgeProjectionService(
         var gate = gates.GetOrAdd((context.WorkspaceId, source.Value.Uid), _ => new SemaphoreSlim(1, 1));
         if (!await admission.WaitAsync(0, cancellationToken))
             throw Error("knowledge_projection_capacity", "The projection admission capacity has been reached.");
-        try { await gate.WaitAsync(cancellationToken); }
+        try
+        {
+            if (admissionOnly && !await gate.WaitAsync(0, cancellationToken))
+            {
+                if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+                {
+                    var existingId = "projection-" + Hash(JsonSerializer.SerializeToElement(new { source.Value.Uid, IdempotencyKey = request.IdempotencyKey }))[..32];
+                    var existing = await InWorkspaceAsync(() => store.GetExactAsync<KnowledgeProjectionResource>(new(executionScope, source.Value.Namespace, KnowledgeResourceKinds.KnowledgeProjection, existingId), cancellationToken));
+                    var digest = Hash(JsonSerializer.SerializeToElement(new { source.Value.Uid, source.Value.Generation, request.Parameters, request.AcquisitionIds, context.PrincipalId }));
+                    if (existing?.Value.RequestHash == digest) { admission.Release(); return existing; }
+                    if (existing is not null) throw Error("knowledge_projection_idempotency_conflict", "This request identity belongs to a different projection configuration.");
+                }
+                throw Error("knowledge_projection_capacity", "Another projection is executing for this Source. Follow its persisted status.");
+            }
+            if (!admissionOnly) await gate.WaitAsync(cancellationToken);
+        }
         catch { admission.Release(); throw; }
         var leasedInputs = new List<KnowledgeProjectionInputEvidence>(source.Value.Definition.DataSources.Count);
         try
@@ -156,8 +188,6 @@ public sealed class KnowledgeProjectionService(
                 KnowledgeFlowContracts.Projection, "projection", cancellationToken);
             // Preserve optional historical retrieval provenance without executing it during preparation.
             var retrievalFlow = composition.RetrievalFlow;
-            if (request.IdempotencyKey is { Length: > 200 })
-                throw Error("knowledge_projection_idempotency_invalid", "The idempotency key exceeds 200 characters.");
             var requestHash = Hash(JsonSerializer.SerializeToElement(new
             { source.Value.Uid, source.Value.Generation, request.Parameters, request.AcquisitionIds, context.PrincipalId }));
             var idempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey) ? Guid.NewGuid().ToString("N") : request.IdempotencyKey;
@@ -168,7 +198,7 @@ public sealed class KnowledgeProjectionService(
             {
                 if (previous.Value.RequestHash != requestHash)
                     throw Error("knowledge_projection_idempotency_conflict", "This request identity belongs to a different projection configuration.");
-                if (previous.Value.State != KnowledgeProjectionState.Running) return previous;
+                if (previous.Value.State != KnowledgeProjectionState.Running || admissionOnly) return previous;
             }
             var correlationId = previous?.Value.CorrelationId ?? (string.IsNullOrWhiteSpace(request.CorrelationId) ? projectionId : request.CorrelationId.Trim());
             var resolvedInputs = leasedInputs;
@@ -237,9 +267,9 @@ public sealed class KnowledgeProjectionService(
                 WorkspaceId = context.WorkspaceId,
                 CreatedAt = timeProvider.GetUtcNow()
             };
-            var stored = previous ?? await InWorkspaceAsync(() => scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.RunsExecute,
-                token => store.PutExactAsync(scopeRef, resource, null, true, token), cancellationToken));
+            var stored = previous ?? await PersistAdmissionAsync(resource, scopeRef, admissionOnly, cancellationToken);
             resource = stored.Value;
+            if (admissionOnly) { pending.Writer.TryWrite(true); return stored; }
             StoredResource<KnowledgeSnapshotResource>? published = null;
 
             try
@@ -357,6 +387,30 @@ public sealed class KnowledgeProjectionService(
         }
     }
 
+    private async Task<StoredResource<KnowledgeProjectionResource>> PersistAdmissionAsync(KnowledgeProjectionResource resource,
+        ResourceScopeRef scope, bool admissionOnly, CancellationToken token)
+    {
+        if (admissionOnly) await durableAdmission.WaitAsync(token);
+        try
+        {
+            if (admissionOnly)
+            {
+                var active = 0;
+                for (var skip = 0; ; skip += 200)
+                {
+                    var page = await InWorkspaceAsync(() => store.ListExactAsync<KnowledgeProjectionResource>(scope,
+                        KnowledgeResourceKinds.KnowledgeProjection, skip, 200, token));
+                    active += page.Count(item => item.Value.State == KnowledgeProjectionState.Running);
+                    if (active >= 32) throw Error("knowledge_projection_capacity", "The Workspace already has 32 pending or running projections.");
+                    if (page.Count < 200) break;
+                }
+            }
+            return await InWorkspaceAsync(() => scopeOperations.WriteAsync(resource, scope, AuthorizationPermissions.RunsExecute,
+                write => store.PutExactAsync(scope, resource, null, true, write), token));
+        }
+        finally { if (admissionOnly) durableAdmission.Release(); }
+    }
+
     public async Task RecoverPendingAsync(CancellationToken cancellationToken)
     {
         var pending = await store.ListAllAsync<KnowledgeProjectionResource>(KnowledgeResourceKinds.KnowledgeProjection, cancellationToken);
@@ -364,6 +418,8 @@ public sealed class KnowledgeProjectionService(
                      && value.Value.IdempotencyKey is not null).OrderBy(value => value.Value.CreatedAt).Take(32))
         {
             var value = item.Value;
+            if (gates.TryGetValue((value.WorkspaceId, value.KnowledgeSourceUid), out var activeGate) && activeGate.CurrentCount == 0)
+                continue;
             var caller = new RequestContext(value.CreatedBy, value.TenantId, value.WorkspaceId);
             using var callerScope = value.LogicalScopeRef?.Kind switch
             {
@@ -378,6 +434,8 @@ public sealed class KnowledgeProjectionService(
                 _ = await StartAsync(new(value.KnowledgeSourceName, value.KnowledgeSourceNamespace, value.KnowledgeSourceScopeRef),
                     new()
                     {
+                        ExpectedSourceUid = value.KnowledgeSourceUid,
+                        ExpectedSourceGeneration = value.KnowledgeSourceGeneration,
                         IdempotencyKey = value.IdempotencyKey,
                         AcquisitionIds = value.AcquisitionIds,
                         Parameters = value.Parameters,

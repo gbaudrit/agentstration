@@ -391,3 +391,25 @@ publication.
 Staging route failures retain their original code, binding, capability, ToolSet
 version and Tool identity through the governed Worker HTTP boundary and the Flow
 Run error details, rather than becoming a generic server-error message.
+
+## Parallel processing and process identity
+
+`maximumConcurrency` optionally requests 1–16 concurrent units; omission preserves
+sequential execution and historical definition serialization. A root assignment also
+has a shared Worker process-lane budget (`Agentstration:RuntimeWorker:MaximumConcurrentProcessRuns`,
+default 4, range 1–16). The effective concurrency is the lower limit. Nested process
+regions execute sequentially on their enclosing lane to avoid waiting-parent starvation.
+Each Artifact retains isolated owner/attempt/index access and drafts. Preparation of
+all units precedes publication; completion order never changes manifest order. A failed
+unit fails the owning step without publishing successful siblings as a partial manifest.
+
+Each private child carries `processOrigin`: the source immutable snapshot, owner step,
+region and derived graph hash, plus owner run/attempt/StepExecution, stable unit key and
+ordinal. A named Flow invoked inside the process remains a named invocation even when
+it inherits scoped Artifact capabilities. These fields supplement the existing source
+Flow reference; they do not publish a new resource or rewrite older runs. See ADR-0215.
+
+A terminal process unit is reused on admission replay. Changed input, key, ordinal or
+definition is rejected. Interrupted nonterminal units follow existing assignment recovery;
+external non-idempotent side effects do not acquire an exactly-once guarantee. Cancellation
+propagates through the owning assignment and terminalizes unfinished units.

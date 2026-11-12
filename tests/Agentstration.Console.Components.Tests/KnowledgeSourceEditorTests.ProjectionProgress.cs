@@ -70,7 +70,8 @@ public sealed partial class KnowledgeSourceEditorTests
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
         await rendered.Find("[data-testid='knowledge-start-projection']").ClickAsync(new MouseEventArgs());
         rendered.WaitForAssertion(() => Assert.AreEqual(1, rendered.FindAll("[data-testid='knowledge-projection-row']").Count));
-        Assert.Contains("The projection request failed.", rendered.Markup);
+        Assert.Contains("Processing failed.", rendered.Find(".contract-failure-summary").TextContent);
+        Assert.DoesNotContain("The projection request failed.", rendered.Markup);
         Assert.IsFalse(rendered.Find("[data-testid='knowledge-start-projection']").HasAttribute("disabled"));
         Assert.AreEqual(0, rendered.FindAll("[data-testid='knowledge-projection-progress']").Count);
         Assert.AreEqual(2, client.ProjectionStarts);

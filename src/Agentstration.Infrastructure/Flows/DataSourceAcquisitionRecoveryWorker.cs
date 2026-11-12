@@ -10,7 +10,6 @@ namespace Agentstration.Infrastructure.Flows;
 public sealed class DataSourceAcquisitionRecoveryWorker(
     DataSourceAcquisitionService acquisitions,
     DataSourceDiscoveryService discoveries,
-    KnowledgeProjectionService projections,
     StoredArtifactReconciliationService artifactReconciliation,
     IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
@@ -30,7 +29,6 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
             using var scope = requestScopes.PushSystem();
             await acquisitions.RecoverPendingAsync(cancellationToken);
             await discoveries.RecoverPendingAsync(cancellationToken);
-            await projections.RecoverPendingAsync(cancellationToken);
             await artifactReconciliation.ReconcileAsync(cancellationToken);
             if (history is not null) await history.ReconcileAsync(cancellationToken);
         }

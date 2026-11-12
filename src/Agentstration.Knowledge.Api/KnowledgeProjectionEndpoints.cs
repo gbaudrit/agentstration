@@ -15,7 +15,7 @@ internal static class KnowledgeProjectionEndpoints
     {
         sources.MapPost("/{name}/projections", StartAsync)
             .WithSummary("Project exact Data Source acquisitions into an immutable Knowledge Snapshot")
-            .Produces<KnowledgeProjectionResource>(StatusCodes.Status201Created)
+            .Produces<KnowledgeProjectionResource>(StatusCodes.Status202Accepted)
             .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         sources.MapGet("/{name}/projections", ListAsync)
             .WithSummary("List Knowledge projection history")
@@ -36,10 +36,10 @@ internal static class KnowledgeProjectionEndpoints
         KnowledgeProjectionService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
         {
-            var stored = await service.StartAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body, cancellationToken);
+            var stored = await service.AdmitAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body, cancellationToken);
             response.Headers.Location = Location(stored.Value);
             response.Headers.ETag = stored.ETag;
-            return Results.Json(stored.Value, statusCode: StatusCodes.Status201Created);
+            return Results.Json(stored.Value, statusCode: StatusCodes.Status202Accepted);
         });
 
     private static Task<IResult> ListAsync(

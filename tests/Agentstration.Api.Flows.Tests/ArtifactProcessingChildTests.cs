@@ -33,14 +33,20 @@ public sealed partial class FlowTests
         Assert.AreEqual(parent.Value.Id, child.Value.RootFlowRunId);
         Assert.AreEqual("artifact_processing_input", child.Value.DefinitionSnapshot.Graph!.EntryStep);
         Assert.AreEqual(1, child.Value.NestingDepth);
+        Assert.IsNotNull(child.Value.ProcessOrigin);
+        Assert.AreEqual("process", child.Value.ProcessOrigin.Definition.Region);
+        Assert.AreEqual("unit-0", child.Value.ProcessOrigin.UnitKey);
         Assert.IsNotNull(child.Value.ArtifactProcessing);
         Assert.IsTrue(child.Value.ArtifactProcessing.ContentAccess);
         Assert.AreEqual(0, child.Value.ArtifactProcessing.Index);
         Assert.AreEqual(parent.Value.Id, child.Value.ArtifactProcessing.OwnerRunId);
         Assert.AreNotEqual(parent.Value.DefinitionHash, child.Value.DefinitionHash);
+        // Existing private children retain their historical evidence and can resume without being relabeled.
+        await fixture.Repository.UpdateRunAsync(child.Value with { ProcessOrigin = null }, child.ETag, default);
         var replay = await runs.CreateOrGetAssignedChildExactAsync(TestScope.ScopeRef, parent.Value.Id,
             "artifacts", input, "artifactProcessing", 0, default);
         Assert.AreEqual(child.Value.Id, replay.Value.Id);
+        Assert.IsNull(replay.Value.ProcessOrigin);
         var other = await runs.CreateOrGetAssignedChildExactAsync(TestScope.ScopeRef, parent.Value.Id,
             "artifacts", input, "artifactProcessing", 1, default);
         Assert.AreNotEqual(child.Value.Id, other.Value.Id);

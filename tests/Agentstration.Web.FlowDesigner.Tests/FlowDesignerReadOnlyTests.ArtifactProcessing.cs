@@ -10,6 +10,22 @@ namespace Agentstration.Web.FlowDesigner.Tests;
 public sealed partial class FlowDesignerReadOnlyTests
 {
     [TestMethod]
+    public void TransformProcessCapabilityExposesPrivateProcessAndResultPorts()
+    {
+        var step = new TransformFlowStepDefinition { Name = "partition", Processing = new() { Partition = FlowProcessPartition.TextChunks } };
+        Assert.IsTrue(step.OutputEvents().Contains("process"));
+        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, step,
+            new TransformFlowStepDefinition { Name = "body" }, new OutputFlowStepDefinition { Name = "completed" }],
+            Transitions = [new("start", "input", "completed", "partition"), new("body", "partition", "process", "body"),
+                new("return", "body", "completed", "partition"), new("done", "partition", "completed", "completed")] };
+        var body = FlowProcessGraph.Extract(graph, step);
+        Assert.AreEqual("process_input", body.EntryStep);
+        Assert.AreEqual("process_result", body.Transitions.Single(edge => edge.FromStep == "body").ToStep);
+        var units = FlowProcessRegions.Partition(System.Text.Json.JsonSerializer.SerializeToElement("a😀b"), step.Processing with { UnitSize = 2 });
+        CollectionAssert.AreEqual(new[] { "a😀", "b" }, units.Select(unit => unit.GetString()).ToArray());
+    }
+
+    [TestMethod]
     public async Task ArtifactPortInspectionSeparatesReferenceEnvelopesFromContentContractsAndMimeTypes()
     {
         using var context = CreateContext();

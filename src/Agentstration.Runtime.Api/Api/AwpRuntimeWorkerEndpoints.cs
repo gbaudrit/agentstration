@@ -78,6 +78,9 @@ public static class AwpRuntimeWorkerEndpoints
         awp.MapPost("/assignments/artifacts/get", GetArtifactAsync)
             .Produces<AwpEnvelope<AwpArtifactResponse>>()
             .WithSummary("Read an assignment Artifact through its opaque identity");
+        awp.MapPost("/assignments/process/close", CloseProcessAsync)
+            .Produces<AwpEnvelope<AwpCloseProcessResponse>>()
+            .WithSummary("Close work-unit admission for an assigned process-capable step");
         awp.MapPost("/assignments/child-flows", CreateChildFlowAsync)
             .Produces<AwpEnvelope<AwpChildFlowResponse>>()
             .WithSummary("Create or recover a child Flow declared by the assigned Flow snapshot");
@@ -531,6 +534,18 @@ public static class AwpRuntimeWorkerEndpoints
         return Envelope(envelope.MessageId, now, ToContract(now, artifact));
     }, principal);
 
+    private static async Task<IResult> CloseProcessAsync(AwpEnvelope<AwpCloseProcessRequest> envelope,
+        ClaimsPrincipal principal, RuntimeWorkerDispatchService dispatch, RuntimeWorkerExecutionService execution,
+        TimeProvider timeProvider, CancellationToken cancellationToken) => await ExecuteAsync(async identity =>
+    {
+        ValidateEnvelope(envelope.ProtocolVersion, envelope.MessageId);
+        var request = envelope.Payload ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The process request is required.");
+        ValidateCommand(identity, request.Context, dispatch);
+        await execution.CloseProcessAsync(ToProof(request.Context), request.StepExecutionId.Value, cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        return Envelope(envelope.MessageId, now, new AwpCloseProcessResponse(now));
+    }, principal);
+
     private static async Task<IResult> CreateChildFlowAsync(
         AwpEnvelope<AwpCreateChildFlowRequest> envelope,
         ClaimsPrincipal principal,
@@ -544,10 +559,16 @@ public static class AwpRuntimeWorkerEndpoints
             ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The child Flow request is required.");
         ValidateCommand(identity, request.Context, dispatch);
         var child = await execution.CreateOrGetChildFlowAsync(ToProof(request.Context), request.StepExecutionId.Value,
-            request.Input, request.Purpose, request.Iteration, cancellationToken);
+            request.Input, request.Purpose, request.Iteration, cancellationToken,
+            request.ProcessUnit is { } unit ? new(unit.Key, unit.Ordinal, unit.Descriptor, unit.TotalUnits) : null);
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpChildFlowResponse(now, child.RunId, child.Status, child.Output,
-            child.Material is null ? null : (AwpRootFlowExecutionMaterial)ToContract(child.Material)));
+            child.Material is null ? null : (AwpRootFlowExecutionMaterial)ToContract(child.Material))
+        {
+            FlowId = child.FlowId, FlowNamespace = child.FlowNamespace, FlowVersion = child.FlowVersion,
+            OutputName = child.OutputName, Outcome = child.Outcome, ErrorCode = child.ErrorCode,
+            ErrorMessage = child.ErrorMessage, ErrorDetails = child.ErrorDetails, ErrorOrigin = child.ErrorOrigin
+        });
     }, principal);
 
     private static async Task<IResult> ExecuteAsync<T>(
@@ -770,6 +791,7 @@ public static class AwpRuntimeWorkerEndpoints
             checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds)))
         {
             FlowScopeRef = flow.FlowScopeRef,
+            ProcessOrigin = flow.ProcessOrigin,
             ContractContext = flow.ContractContext is null ? null : JsonSerializer.SerializeToElement(flow.ContractContext, ContractJson)
         },
         _ => throw new ArgumentOutOfRangeException(nameof(material))
