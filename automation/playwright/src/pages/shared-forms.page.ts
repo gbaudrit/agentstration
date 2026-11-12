@@ -17,10 +17,14 @@ export class SharedFormsPage {
   public async openEditor(consoleUrl: string, definition: SharedFormCase, locale: SupportedTestLocale, theme: FormAppearance): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}${definition.path}`, { waitUntil: 'domcontentloaded' });
     expect(response?.ok()).toBe(true);
+    await this.assertConsoleAppearance(locale, theme);
+    await expect(this.editableText().first()).toBeVisible();
+  }
+
+  public async assertConsoleAppearance(locale: SupportedTestLocale, theme: FormAppearance): Promise<void> {
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-theme', theme);
     await expect(this.page.locator('html')).toHaveAttribute('lang', locale);
-    await expect(this.editableText().first()).toBeVisible();
   }
 
   public async assertAssociations(): Promise<void> {
