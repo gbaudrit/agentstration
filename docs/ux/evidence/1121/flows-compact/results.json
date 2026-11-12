@@ -1,10 +1,10 @@
 {
   "date": "2026-11-12",
-  "productSourceCommit": "e78ea22",
+  "productSourceCommit": "d8de2fa",
   "fixture": "governedInventoryFixture with Local authentication and explicit Instance context; seeded resources are disposable QA data",
   "stats": {
-    "startTime": "2026-11-12T15:20:41.182Z",
-    "duration": 106301.144,
+    "startTime": "2026-11-12T16:15:22.467Z",
+    "duration": 141907.859,
     "expected": 4,
     "skipped": 0,
     "unexpected": 0,
@@ -20,7 +20,7 @@
         "height": 1000
       },
       "view": "cards",
-      "sha256": "cf4e1e2b980a7c3a0152a2a70a84e31fdfff9b4554193252ad1e866532e69756"
+      "sha256": "1f9a04bc547baa4bd797275acb3bc5113b529df480c07e99d5ba7f9d5e378296"
     },
     {
       "file": "flows-cards-desktop-en-light.png",
@@ -31,7 +31,7 @@
         "height": 1000
       },
       "view": "cards",
-      "sha256": "0cfb55b992c123c7a377e565e35534a9cf7807f10a19a238256596dd80e41cce"
+      "sha256": "a437a93e72cea581f09cfde1350acd837f81b9a286a4f1cc7dc46bb40b8f9a12"
     },
     {
       "file": "flows-cards-mobile-fr-dark.png",
@@ -42,7 +42,7 @@
         "height": 844
       },
       "view": "cards",
-      "sha256": "53d5e30ab79b066975a7935c9589bd59727db09298c6b6a3073c87f0a0f1044f"
+      "sha256": "e5c20d22fb7f023ecde34aae504b57c696c54cd28ed807c3b635c8f5e87669b6"
     },
     {
       "file": "flows-cards-mobile-fr-light.png",
@@ -53,7 +53,7 @@
         "height": 844
       },
       "view": "cards",
-      "sha256": "c801a06145198084c1b1f6531d6ee87200111bcede13243f2f8f6b6854041900"
+      "sha256": "9592dde9d6daf8db889d63ad07d39dd57fc16395131a13ef260330dc309b19f1"
     },
     {
       "file": "flows-managed-desktop-en-dark.png",
@@ -64,7 +64,7 @@
         "height": 1000
       },
       "view": "managed",
-      "sha256": "ec9fb28aaf208186603123b2b3b944a55503bbfce7c533bf064531c6e6ebfe43"
+      "sha256": "1b8310c3870ba3442d914cd2427a8b9841030d53d7398a3243b7d48890ac26ed"
     },
     {
       "file": "flows-managed-desktop-en-light.png",
@@ -75,7 +75,7 @@
         "height": 1000
       },
       "view": "managed",
-      "sha256": "e0f7d819adfbab33d149bc5feb2ab8ff4070211200959b976ebdd1e70d921305"
+      "sha256": "c1d46606f8010c6d0da8a56a4449527824faf2cc10290ffec8dddc6e83878815"
     },
     {
       "file": "flows-managed-mobile-fr-dark.png",
@@ -86,7 +86,7 @@
         "height": 844
       },
       "view": "managed",
-      "sha256": "314871a512684027f3ea86b2de916674685934a8c341faf2c8b7ef6f432b6f3d"
+      "sha256": "525db55177483811eebe70c018c806005dfa9c5c58a352f03342daa1db7f5e51"
     },
     {
       "file": "flows-managed-mobile-fr-light.png",
@@ -97,7 +97,7 @@
         "height": 844
       },
       "view": "managed",
-      "sha256": "98eb90658df20eaa33f47f621d183d442bddd9d7e6880c8aa98822f7742a9385"
+      "sha256": "34c7ca944c17aae72265d06bbb577a5e1dc47b1a90e234021c818f90401ccabe"
     },
     {
       "file": "flows-table-desktop-en-dark.png",
@@ -108,7 +108,7 @@
         "height": 1000
       },
       "view": "table",
-      "sha256": "3655c0ebffe865992ea4ce3ec70d88fdf173ddad30298712721f5e386b209ea9"
+      "sha256": "333c77f04a9935b35ae338ef50df0f494f575f7e3c3689e528304d7e639dd0f1"
     },
     {
       "file": "flows-table-desktop-en-light.png",
@@ -119,7 +119,7 @@
         "height": 1000
       },
       "view": "table",
-      "sha256": "831dda1c8f97c0b18c8091002f6b3cd7f228caf568316f8067c70814261efd9a"
+      "sha256": "b42797bfca26f5873bcd77e0951dcddfd5229014f1b3f0ff327b3b7f4d57be73"
     }
   ]
 }
