@@ -719,6 +719,8 @@ public sealed partial class FlowTests
         Assert.AreEqual(HttpStatusCode.Created, publishResponse.StatusCode);
         var version = await publishResponse.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions);
         Assert.AreEqual("Initial designer release", version!.ReleaseNotes);
+        var retainedDraft = await client.GetFromJsonAsync<FlowDraftResponse>("/api/flows/designer-api-flow/draft", JsonOptions);
+        Assert.AreEqual(2L, retainedDraft!.Value.Revision, "Publishing preserves the draft revision counter.");
         Assert.IsNotNull(version.Graph);
         Assert.AreNotEqual(replaced.Value.DefinitionHash, version.DefinitionHash,
             "Publishing must hash the graph after Agent references are pinned to immutable generations.");

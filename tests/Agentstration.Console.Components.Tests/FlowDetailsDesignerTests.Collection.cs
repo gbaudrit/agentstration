@@ -1,6 +1,7 @@
 using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +10,38 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class FlowDetailsDesignerTests
 {
+    [TestMethod]
+    [DataRow("/instance", "/instance", false, false)]
+    [DataRow("/instance", "/instance", true, true)]
+    [DataRow("/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "/instance", false, true)]
+    [DataRow("/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "/tenants/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", false, true)]
+    [DataRow("/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", false, false)]
+    public async Task CompactFlowLockMatchesManagedOrInheritedReadOnlyInTableAndCards(string current, string owner, bool managed, bool locked)
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConsoleNavigationContext>(new FlowCollectionNavigation(current));
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { PageLoader = (_, _) =>
+            Task.FromResult(new FlowSummaryPage([new("flow", "Flow", "Workflow", "1.0.0", "Active", 0, 0, FlowClientStub.Now)
+                { ScopeRef = ResourceScopeRef.Parse(owner), IsManaged = managed }], false)) });
+        var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
+        void AssertLock()
+        {
+            Assert.HasCount(locked ? 1 : 0, cut.FindAll(".managed-icon-only"));
+            if (locked) Assert.AreEqual(managed ? "Managed / read-only" : "Read-only in this scope", cut.Find(".managed-icon-only button").GetAttribute("aria-label"));
+        }
+        AssertLock();
+        await cut.FindAll(".collection-view-switch button")[1].ClickAsync(new());
+        AssertLock();
+    }
+
+    private sealed class FlowCollectionNavigation(string scope) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scope;
+        public string AddToUri(string uri) => uri;
+    }
+
     [TestMethod]
     public async Task CompactFlowsKeepExactIdentityAndAlignedVersionSlotsAcrossPagesAndViews()
     {

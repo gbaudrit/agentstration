@@ -122,6 +122,7 @@
 .flow-compact-list .collection-identity-cell .collection-identity { width: 100%; }
 .flow-compact-list .collection-identity { align-items: center; gap: .4rem; }
 .flow-compact-list .collection-identity-indicators { display: flex; align-items: center; gap: .15rem; flex: 0 0 auto; }
+.flow-compact-list .resource-owner-icon .disclosure-icon > .ui-icon { width: 1.5rem; height: 1.5rem; }
 .flow-compact-list .collection-name-heading { display: flex; align-items: baseline; gap: .5rem; min-width: 0; }
 .flow-compact-list .resource-name-link { flex: 1 1 auto; min-width: 0; }
 .flow-kind { font-size: .7rem; color: var(--muted); white-space: nowrap; }

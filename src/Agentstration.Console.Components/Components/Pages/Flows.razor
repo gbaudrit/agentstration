@@ -27,7 +27,7 @@ else
         </Toolbar>
         <Identity Context="item">
             <CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@DetailsUrl(item)" IconName="workflow" Domain="flow" ShowNamespaceIcon="false">
-                <IconBadges><span class="flow-icon-badges"><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IconOnly /></span></IconBadges>
+                <IconBadges><span class="flow-icon-badges"><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></span></IconBadges>
                 <Indicators><ResourceScopeBadge ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /></Indicators>
                 <NameSuffix><span class="flow-kind">@KindLabel(item.Kind)</span></NameSuffix>
             </CollectionIdentity>
