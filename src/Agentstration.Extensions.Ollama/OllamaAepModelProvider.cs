@@ -10,7 +10,7 @@ namespace Agentstration.Extensions.Ollama;
 
 public sealed record OllamaExtensionOptions(Uri Endpoint);
 
-public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClient apiClient) : IAepModelProvider
+public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClient apiClient, OllamaInferenceOptions? inferenceOptions = null) : IAepModelProvider
 {
     public AepModelProviderDescriptor Descriptor { get; } = new(
         "ollama",
@@ -27,9 +27,11 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
     public async Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
     {
         Validate(request);
+        using var deadline = CreateDeadline(cancellationToken);
         try
         {
-            var response = await chatClient.GetResponseAsync(MapMessages(request.Messages), MapOptions(request), cancellationToken);
+            var response = await chatClient.GetResponseAsync(MapMessages(request.Messages), MapOptions(request), deadline.Token);
+            deadline.Token.ThrowIfCancellationRequested();
             return new AepChatResponse(
                 response.Messages.Select(MapMessage).ToArray(),
                 response.ModelId ?? request.Model,
@@ -37,6 +39,12 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
                 response.Usage is null ? null : new AepUsage(response.Usage.InputTokenCount, response.Usage.OutputTokenCount, response.Usage.TotalTokenCount));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException exception) { throw TimedOut(exception); }
+        catch (Exception exception) when (deadline.IsCancellationRequested)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw TimedOut(exception);
+        }
         catch (HttpRequestException exception) { throw new AepServerException("provider_unavailable", "Ollama is unreachable.", innerException: exception); }
         catch (Exception exception) { throw new AepServerException("request_failed", "Ollama rejected the chat request.", innerException: exception); }
     }
@@ -46,11 +54,27 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         Validate(request);
-        IAsyncEnumerable<ChatResponseUpdate> updates;
-        try { updates = chatClient.GetStreamingResponseAsync(MapMessages(request.Messages), MapOptions(request), cancellationToken); }
-        catch (Exception exception) { throw new AepServerException("request_failed", "Ollama rejected the streaming request.", innerException: exception); }
-        await foreach (var update in updates.WithCancellation(cancellationToken))
+        using var deadline = CreateDeadline(cancellationToken);
+        await using var updates = chatClient.GetStreamingResponseAsync(MapMessages(request.Messages), MapOptions(request), deadline.Token)
+            .GetAsyncEnumerator(deadline.Token);
+        while (true)
         {
+            bool hasNext;
+            try
+            {
+                hasNext = await updates.MoveNextAsync();
+                deadline.Token.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (OperationCanceledException exception) { throw TimedOut(exception); }
+            catch (Exception exception) when (deadline.IsCancellationRequested)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                throw TimedOut(exception);
+            }
+            catch (Exception exception) { throw new AepServerException("request_failed", "Ollama rejected the streaming request.", innerException: exception); }
+            if (!hasNext) yield break;
+            var update = updates.Current;
             yield return new AepChatUpdate(
                 MapContents(update.Contents),
                 MapRole(update.Role),
@@ -139,6 +163,19 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception) { return new AepProviderHealth("unavailable", exception.Message); }
     }
+
+    private CancellationTokenSource CreateDeadline(CancellationToken cancellationToken)
+    {
+        var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter((inferenceOptions ?? new()).Timeout);
+        return deadline;
+    }
+
+    private AepServerException TimedOut(Exception exception) => new(
+        "provider_timeout",
+        $"Ollama inference exceeded {(inferenceOptions ?? new()).Timeout}. Configure {OllamaInferenceOptions.SectionName}:Timeout to change this transport budget.",
+        504,
+        exception);
 
     private static void Validate(AepChatRequest request)
     {

@@ -53,6 +53,73 @@ The main verified settings are:
 
 Provider-specific options and persisted model resources are described in [Model providers](../concepts/model-providers.md) and [Model profiles](../concepts/model-profiles.md). Do not store secrets in committed settings files.
 
+## Inference HTTP timeouts
+
+Two independent, finite budgets apply when using the Ollama AEP extension:
+
+| Configuration key | Environment variable | Default | Process |
+| --- | --- | --- | --- |
+| `Agentstration:Aep:Inference:Timeout` | `Agentstration__Aep__Inference__Timeout` | `00:01:30` | Authoritative Agentstration server (AEP client) |
+| `Ollama:Inference:Timeout` | `Ollama__Inference__Timeout` | `00:01:30` | Autonomous Ollama extension (native Ollama client) |
+
+Values use .NET `TimeSpan` format (`[d.]hh:mm:ss[.fffffff]`), from `00:00:00.001`
+through `1.00:00:00` inclusive (1 millisecond to 24 hours). Missing keys retain the
+90-second defaults. Malformed, zero, negative, infinite or out-of-range values fail
+at process startup with the offending configuration key. Restart the affected
+process after changing configuration.
+
+For direct startup, configure each process separately, using its own
+`appsettings.json`, user secrets, environment variables, or command-line settings.
+For example, in two terminals:
+
+```powershell
+# Authoritative server: leave room for the extension's downstream budget.
+$env:Agentstration__Aep__Inference__Timeout = "00:11:00"
+dotnet run --project src/Agentstration.Web
+```
+
+```powershell
+# Autonomous extension; retain the usual AEP enrollment settings as well.
+$env:Ollama__Inference__Timeout = "00:10:00"
+dotnet run --project src/Agentstration.Extensions.Ollama
+```
+
+For Aspire, set both keys on **Agentstration.AppHost**, either in its configuration
+or with the same environment variables before `dotnet run --project
+src/Agentstration.AppHost`. AppHost explicitly forwards the AEP budget to the
+authoritative `agentstration-console` server and the Ollama budget to
+`ollama-extension`. An AppHost `appsettings.json` does not automatically become
+child-process configuration. The external Runtime Worker delegates model calls to
+the authoritative server over AWP, so configure the AEP budget on the server.
+For separately deployed processes or Compose, supply the appropriate variable to
+each service explicitly; there is no cross-process configuration synchronization.
+
+The AEP budget applies to each chat or streaming inference, including its AEP
+manifest discovery and bound-value preparation. The Ollama budget applies to each
+native chat or streaming inference. Both also set the corresponding named
+inference `HttpClient.Timeout` and remain active until the full response/stream is
+consumed, including a stream that sends headers and then stalls. Discovery,
+health, model listing, option migration and other management operations keep their
+existing 90-second HTTP limit on separate clients. Other native provider adapters
+are unchanged; all AEP model-provider contributions share the AEP inference budget.
+There are no automatic inference retries.
+
+The earliest applicable budget wins. Set **both** hops above the expected inference
+duration; allow extra time on the AEP hop for transport and preparation. Increasing
+a token budget does not increase either HTTP budget. Explicit caller cancellation,
+execution deadlines enforced by the Run/Flow path, and worker lease cancellation
+still take precedence. Raising an HTTP budget does not extend or implement an
+execution deadline; direct Run deadline enforcement is tracked separately in
+[#1011](https://github.com/gbaudrit/agentstration/issues/1011).
+
+AEP-hop expiry reports `extension_timeout` with the elapsed budget and AEP
+configuration key. Native Ollama expiry reports `provider_timeout` with the Ollama
+key; a non-streaming AEP call returns HTTP 504. Once an SSE response has started,
+HTTP status cannot change: a native timeout terminates the stream and its provider
+exception is available in the extension's server diagnostics. Caller cancellation
+continues as cancellation and is never relabeled as a transport timeout. These
+diagnostics do not contain prompts, generated content or credentials.
+
 ## External Runtime Worker
 
 `Agentstration.Runtime.Worker.MicrosoftAgentFramework` is always a separate operating-system
