@@ -140,6 +140,7 @@ else
     protected override async Task OnParametersSetAsync()
     {
         activeTab = Tabs.FirstOrDefault(tab => string.Equals(tab, View, StringComparison.OrdinalIgnoreCase)) ?? "Overview";
+        await ContextState.EnsureLoadedAsync(CancellationToken.None);
         await LoadAsync();
     }
     private async Task LoadAsync()
