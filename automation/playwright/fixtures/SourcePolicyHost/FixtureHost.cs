@@ -24,7 +24,8 @@ internal static class FixtureHost
     {
         await using var factory = new PolicyFactory();
         var address = new Uri(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")!);
-        factory.UseKestrel(address.Port);
+        // Configure before Build; UseKestrel(port) mutates addresses after the minimal app can start.
+        factory.UseKestrel(options => options.Listen(IPAddress.Loopback, address.Port));
         factory.StartServer();
         var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var stopping = factory.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping.Register(() => stopped.TrySetResult());

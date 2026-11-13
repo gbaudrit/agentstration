@@ -26,7 +26,8 @@ internal static class FixtureHost
         await using var factory = new InventoryFactory();
         var address = new Uri(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
             ?? throw new InvalidOperationException("The browser fixture requires ASPNETCORE_URLS."));
-        factory.UseKestrel(address.Port);
+        // Configure before Build; UseKestrel(port) mutates addresses after the minimal app can start.
+        factory.UseKestrel(options => options.Listen(IPAddress.Loopback, address.Port));
         factory.StartServer();
         var shutdown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var lifetime = factory.Services.GetRequiredService<IHostApplicationLifetime>();
