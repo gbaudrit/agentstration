@@ -50,6 +50,21 @@ public sealed class ConsoleContextStateTests
     }
 
     [TestMethod]
+    public async Task ExplicitRefreshAfterASynchronousLoadIsNotCached()
+    {
+        var snapshot = new ConsoleContextSnapshot(Guid.NewGuid(), "Alice", Guid.NewGuid(), "acme", "ACME",
+            Guid.NewGuid(), "support", "Support", new HashSet<string>(StringComparer.Ordinal), []);
+        var provider = new StubProvider(snapshot);
+        var state = new ConsoleContextState(provider);
+        await state.LoadAsync(default);
+        await state.LoadAsync(default);
+        await state.EnsureLoadedAsync(default);
+        Assert.AreEqual(2, provider.CallCount);
+        Assert.AreSame(snapshot, state.Current);
+        Assert.IsFalse(state.IsLoading);
+    }
+
+    [TestMethod]
     public async Task NavigationContextFallsBackToTheLoadedSelectionBeforeUrlCanonicalization()
     {
         var snapshot = new ConsoleContextSnapshot(
@@ -95,7 +110,9 @@ public sealed class ConsoleContextStateTests
 
     private sealed class StubProvider(ConsoleContextSnapshot snapshot) : IConsoleContextProvider
     {
-        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(snapshot);
+        public int CallCount { get; private set; }
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken)
+        { CallCount++; return Task.FromResult(snapshot); }
     }
 
     private sealed class DelayedProvider(ConsoleContextSnapshot snapshot) : IConsoleContextProvider
