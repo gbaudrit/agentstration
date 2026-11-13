@@ -115,6 +115,7 @@ public sealed class InferenceTimeoutTests
         using var caller = new CancellationTokenSource();
         var response = ReadAsync(client, streaming, caller.Token);
         await extension.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        if (streaming) await extension.BodyReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
         await caller.CancelAsync();
         await Assert.ThrowsAsync<OperationCanceledException>(() => response);
         await extension.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -181,6 +182,7 @@ public sealed class InferenceTimeoutTests
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource BodyReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int Calls { get; private set; }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -198,7 +200,7 @@ public sealed class InferenceTimeoutTests
                         return new HttpResponseMessage(HttpStatusCode.OK)
                         {
                             Content = delayBody
-                                ? new StreamContent(new DelayedStream("{\"model\":\"test-model\",\"message\":{\"role\":\"assistant\",\"content\":\"partial\"},\"done\":false}\n", body, delay, Cancelled))
+                                ? new StreamContent(new DelayedStream("{\"model\":\"test-model\",\"message\":{\"role\":\"assistant\",\"content\":\"partial\"},\"done\":false}\n", body, delay, Cancelled, BodyReadStarted))
                                 : new StringContent(body, Encoding.UTF8, "application/x-ndjson")
                         };
                     }
@@ -212,7 +214,7 @@ public sealed class InferenceTimeoutTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request, cancellationToken);
     }
 
-    private sealed class DelayedStream(string prefix, string body, TimeSpan delay, TaskCompletionSource cancelled) : MemoryStream(Encoding.UTF8.GetBytes(prefix + body))
+    private sealed class DelayedStream(string prefix, string body, TimeSpan delay, TaskCompletionSource cancelled, TaskCompletionSource bodyReadStarted) : MemoryStream(Encoding.UTF8.GetBytes(prefix + body))
     {
         private readonly CancellationTokenSource disposed = new();
 
@@ -230,6 +232,7 @@ public sealed class InferenceTimeoutTests
             if (Position < prefix.Length)
                 return await base.ReadAsync(buffer[..Math.Min(buffer.Length, prefix.Length - (int)Position)], cancellationToken);
             using var read = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, disposed.Token);
+            bodyReadStarted.TrySetResult();
             try { await Task.Delay(delay, read.Token); }
             catch (OperationCanceledException) { cancelled.TrySetResult(); throw; }
             return await base.ReadAsync(buffer, cancellationToken);
