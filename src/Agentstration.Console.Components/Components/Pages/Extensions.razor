@@ -104,9 +104,9 @@
                     <article class="enrollment-card" data-testid="enrollment-card">
                         <div class="enrollment-card-summary">
                             <div class="enrollment-identity">
-                                <CollectionIdentity DisplayName="@enrollment.Definition.ExtensionName" Name="@enrollment.Definition.ExtensionId" Href="@EnrollmentDetailUrl(enrollment)" IconName="puzzle"><Versions><CollectionVersion Label="@T("Version")" Value="@(enrollment.Definition.ExtensionVersion)" /></Versions><Badges><small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small></Badges></CollectionIdentity>
+                                <CollectionIdentity DisplayName="@enrollment.Definition.ExtensionName" Name="@enrollment.Definition.ExtensionId" Href="@EnrollmentDetailUrl(enrollment)" IconName="puzzle"><Versions><CollectionVersion Label="@T("Version")" Value="@(enrollment.Definition.ExtensionVersion)" /></Versions><IconBadges><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)"  IconOnly /></IconBadges><Badges><small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small></Badges></CollectionIdentity>
                             </div>
-                            <div class="enrollment-status"><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)" />
+                            <div class="enrollment-status">
                                 @if (enrollment.Definition.TargetScopeRef is { } enrollmentScope && enrollment.Definition.State != AepEnrollmentState.Unpaired)
                                 { <ResourceScopeBadge ScopeRef="enrollmentScope" Compact /> }
                                 @if (enrollment.Definition.CodeExpiresAt is { } expires && enrollment.Definition.State == AepEnrollmentState.CodeIssued)
@@ -225,10 +225,7 @@
     {
         <CollectionView TItem="ExtensionInventoryItemResponse" Items="FilteredInventory" InformationLabels="@(new string[] { T("Connection"), T("Enrollment"), T("Contributions") })" IdentityLabel="@T("Extension")" StateLabel="@T("Availability")">
         <Identity Context="item">
-<CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(item.RegistrationName is null ? null : item.RegistrationNamespace)" Name="@(item.RegistrationName ?? item.ExtensionId)" Href="@DetailUrl(item)" IconName="puzzle"><Versions><CollectionVersion Label="@T("Version")" Value="@(item.Version)" /></Versions></CollectionIdentity></Identity>
-        <Scope Context="item"><ResourceScopeBadge ScopeRef="item.RegistrationScopeRef" /></Scope>
-        <State Context="item">
-<StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></State>
+<CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(item.RegistrationName is null ? null : item.RegistrationNamespace)" Name="@(item.RegistrationName ?? item.ExtensionId)" Href="@DetailUrl(item)" IconName="puzzle"><Versions><CollectionVersion Label="@T("Version")" Value="@(item.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="item.RegistrationScopeRef" IconOnly /><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.RegistrationScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="item">
             <CollectionValue Label="@T("Connection")"><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a><br /><small>@SourceLabel(item.RegistrationSource) · @T("ConnectionCount", item.Connections.Count)@if (item.RegistrationName is not null) { <text> · @item.RegistrationNamespace/@item.RegistrationName</text> }</small></CollectionValue>
             <CollectionValue Label="@T("Enrollment")"><div class="enrollment-cell">@if (item.EnrollmentStatus is { } enrollmentState) { <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" /> } else { <span>—</span> }</div></CollectionValue>

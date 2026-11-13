@@ -7,9 +7,7 @@
 <div data-testid="flow-observability-agent-runs">
 @if(items is null){<LoadingState Message="@T("Loading")"/>}else if(items.Count == 0){<EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"/>}else{<CollectionView TItem="ExecutionSummary" Items="items" InformationLabels="@(new string[] { T("Agent"), T("Started"), T("Duration"), T("Outcome") })" IdentityLabel="@T("Run")" StateLabel="@T("Status")">
         <Identity Context="item">
-<CollectionIdentity DisplayName="@item.Id" Name="@item.Id" Href="@($"/runs/{Uri.EscapeDataString(item.Id)}")" IconName="agent" /></Identity>
-        <State Context="item">
-<StatusBadge Text="@T($"RunState.{item.Status}")" Status="@PlatformDashboardService.ToStatus(item.Status)" /></State>
+<CollectionIdentity DisplayName="@item.Id" Name="@item.Id" Href="@($"/runs/{Uri.EscapeDataString(item.Id)}")" IconName="agent" ><IconBadges><StatusBadge Text="@T($"RunState.{item.Status}")" Status="@PlatformDashboardService.ToStatus(item.Status)" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="item">
             <CollectionValue Label="@T("Agent")"><strong>@item.Agent</strong></CollectionValue>
             <CollectionValue Label="@T("Started")">@item.StartedAt.LocalDateTime.ToString("g")</CollectionValue>

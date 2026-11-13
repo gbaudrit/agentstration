@@ -52,7 +52,7 @@ public sealed class ModelProfileCollectionStatusTests
             Assert.HasCount(cases.Length, statuses);
             for (var index = 0; index < cases.Length; index++)
             {
-                Assert.AreEqual(strings[$"Status.{cases[index].Item2}"].Value, statuses[index].TextContent);
+                Assert.AreEqual(strings[$"Status.{cases[index].Item2}"].Value, statuses[index].QuerySelector("button")!.GetAttribute("aria-label"));
                 StringAssert.Contains(statuses[index].ClassName!, $"status-{cases[index].Item3.ToString().ToLowerInvariant()}");
             }
             Assert.AreEqual(2, handler.Calls, "Rendering states must not resolve a resource or scope per row.");

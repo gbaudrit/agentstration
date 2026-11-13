@@ -42,9 +42,7 @@ else
                         @foreach (var conversation in conversations)
                         {
                             <article class="conversation-list-card" role="listitem">
-                                <CollectionIdentity DisplayName="@ConversationTitle(conversation)" Name="@conversation.Id.ToString()" Href="@ConversationUrl(conversation.Id)" IconName="message-chatbot" data-testid="workplace-conversation-card" data-conversation-id="@conversation.Id" />
-                                <ResourceScopeBadge Kind="Agentstration.Resources.ResourceScopeKind.Workspace" DisplayName="@WorkplaceContext.Current?.WorkspaceDisplayName" />
-                                <StatusBadge Text="@ConversationStatus(conversation.Status)" Status="@ConversationTone(conversation.Status)" />
+                                <CollectionIdentity DisplayName="@ConversationTitle(conversation)" Name="@conversation.Id.ToString()" Href="@ConversationUrl(conversation.Id)" IconName="message-chatbot" data-testid="workplace-conversation-card" data-conversation-id="@conversation.Id" ><IconBadges><ResourceScopeBadge Kind="Agentstration.Resources.ResourceScopeKind.Workspace" DisplayName="@WorkplaceContext.Current?.WorkspaceDisplayName" IconOnly /><StatusBadge Text="@ConversationStatus(conversation.Status)" Status="@ConversationTone(conversation.Status)" IconOnly /></IconBadges></CollectionIdentity>
                                 <small>@T("Updated") @conversation.LastActivityAt.LocalDateTime.ToString("g")</small>
                                 <CollectionActions ResourceName="@ConversationTitle(conversation)"><a href="@ConversationUrl(conversation.Id)">@T("Resume")</a></CollectionActions>
                             </article>
@@ -81,8 +79,7 @@ else
                         @foreach (var task in FilteredTasks)
                         {
                             <article class="task-list-card" role="listitem">
-                                <CollectionIdentity DisplayName="@task.Title" Name="@task.Id.ToString()" Href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")" IconName="tasks" data-testid="workplace-task-card" data-task-id="@task.Id" />
-                                <ResourceScopeBadge Kind="Agentstration.Resources.ResourceScopeKind.Workspace" DisplayName="@WorkplaceContext.Current?.WorkspaceDisplayName" />
+                                <CollectionIdentity DisplayName="@task.Title" Name="@task.Id.ToString()" Href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")" IconName="tasks" data-testid="workplace-task-card" data-task-id="@task.Id" ><IconBadges><ResourceScopeBadge Kind="Agentstration.Resources.ResourceScopeKind.Workspace" DisplayName="@WorkplaceContext.Current?.WorkspaceDisplayName" IconOnly /></IconBadges></CollectionIdentity>
                                 <TaskStatusBadge Value="task.Status" />
                                 <small>@T("Updated") @task.UpdatedAt.LocalDateTime.ToString("g")</small>
                                 <CollectionActions ResourceName="@task.Title"><a href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")">@T("Task")</a></CollectionActions>

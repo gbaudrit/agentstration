@@ -124,7 +124,7 @@ internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
                 value.DisplayName,
                 value.Namespace.Value,
                 value.ScopeRef,
-                value.ScopeDisplayName)).ToArray();
+                value.ScopeDisplayName) { IsManaged = value.IsManaged }).ToArray();
             return Results.Ok(new ModelProfileUsagesResponse(values, values.Length));
         });
 }

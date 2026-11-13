@@ -55,9 +55,8 @@ else
         else
         {
             <CollectionView TItem="DataSourceAcquisitionResource" Items="acquisitions" RowTestId="data-source-acquisition-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" InformationLabels="@(new[] { T("Created"), T("FlowRun"), T("Version"), T("AcquiredArtifacts") })" IsExpanded="@(item => previewAcquisition == item.Uid && item.Manifest is { Artifacts.Count: > 0 })">
-                <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" IconName="database" /></Identity>
+                <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" IconName="database" ><IconBadges><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" IconOnly /></IconBadges></CollectionIdentity></Identity>
                 <Scope Context="item"><ResourceScopeBadge ScopeRef="item.ScopeRef" /></Scope>
-                <State Context="item"><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" /></State>
                 <Information Context="item">
                     <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
                     <CollectionValue Label="@T("FlowRun")"><code>@item.FlowRunId</code></CollectionValue>

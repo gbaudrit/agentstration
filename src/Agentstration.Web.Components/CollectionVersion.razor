@@ -1,10 +1,8 @@
-<span class="collection-version @(Compact ? "collection-version-compact" : null) @(IsDraft ? "collection-version-draft" : null)">
+<span class="collection-version @(Compact ? "collection-version-compact" : null)">
     <span class="@(Compact ? "sr-only" : "collection-version-label")">@Label</span><code title="@Value">@(string.IsNullOrWhiteSpace(Value) ? "—" : Value)</code>
-    @if (Compact) { <span class="collection-version-indicator">@if (IsDraft) { <ValueDisclosure Value="@Label" IconName="pencil" /> }</span> }
 </span>
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string? Value { get; set; }
     [Parameter] public bool Compact { get; set; }
-    [Parameter] public bool IsDraft { get; set; }
 }

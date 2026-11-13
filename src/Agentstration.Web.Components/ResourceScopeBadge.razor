@@ -6,10 +6,10 @@
 
 @if (EffectiveKind is { } kind)
 {
-    <span class="resource-owner-scope @(IconOnly ? "resource-owner-icon" : null)">
+    <span class="resource-owner-scope @(IconOnly ? "resource-owner-icon" : null)" data-scope-ref="@ScopeRef?.Value">
         @if (IconOnly)
         {
-            <ValueDisclosure Value="@(ReadableName is { } name ? $"{Localizer[$"ResourceScope.{kind}"].Value} — {name}" : Localizer[$"ResourceScope.{kind}"].Value)" IconName="@(kind switch { ResourceScopeKind.Instance => "server", ResourceScopeKind.Tenant => "building-community", _ => "layout-dashboard" })" />
+            <ValueDisclosure Value="@(ReadableName is { } name ? $"{Localizer[$"ResourceScope.{kind}"].Value} — {name}" : Localizer[$"ResourceScope.{kind}"].Value)" Marker="@(kind switch { ResourceScopeKind.Instance => "I", ResourceScopeKind.Tenant => "T", _ => "W" })" />
         }
         else
         {

@@ -307,8 +307,8 @@ export const CollectionTextByLocale = {
 } as const;
 
 export const CollectionVersionTextByLocale = {
-  'en-US': { version: 'Version', active: 'Active version', draft: 'Draft version', generation: 'Generation' },
-  'fr-FR': { version: 'Version', active: 'Version active', draft: 'Version du brouillon', generation: 'Génération' },
+  'en-US': { version: 'Version', active: 'Published version', draft: 'Draft version', generation: 'Generation' },
+  'fr-FR': { version: 'Version', active: 'Version publiée', draft: 'Version du brouillon', generation: 'Génération' },
 } as const;
 
 /** Independent field expectations; do not import product resource files. */

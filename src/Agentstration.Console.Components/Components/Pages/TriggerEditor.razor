@@ -44,7 +44,7 @@ else
 
         <FormSection Title="@T("PublishedFlow")" Eyebrow="@T("Target")"><ChildContent>
             <FormGrid>
-                <FormField Required="true" Label="@T("Flow")" Class="form-span-2"><ChildContent><ClearableSelect @bind-Value="model.FlowKey" data-testid="trigger-flow"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.ScopeRef · @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</ClearableSelect><small>@T("FlowResolutionHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.FlowKey" /></Validation></FormField>
+                <FormField Required="true" Label="@T("Flow")" Class="form-span-2"><ChildContent><ClearableSelect @bind-Value="model.FlowKey" data-testid="trigger-flow"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.ScopeRef · @flow.Namespace.Value/@flow.Id · @flow.Status · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect><small>@T("FlowResolutionHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.FlowKey" /></Validation></FormField>
             </FormGrid>
         </ChildContent></FormSection>
 

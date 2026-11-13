@@ -2,10 +2,8 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.FlowRunsStrings> Localizer
 <CollectionView TItem="FlowRun" Items="Runs" InformationLabels="@(new string[] { T("Started"), T("Duration"), T("Version"), T("Deployment"), T("Trigger"), T("StartedBy") })" IdentityLabel="@T("Flow")" StateLabel="@T("Status")">
         <Identity Context="run">
-<CollectionIdentity DisplayName="@run.FlowId.Value" Name="@run.Id" Href="@RunUrl(run)" IconName="workflow" /></Identity>
+<CollectionIdentity DisplayName="@run.FlowId.Value" Name="@run.Id" Href="@RunUrl(run)" IconName="workflow" ><IconBadges><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Scope Context="run"><ResourceScopeBadge ScopeRef="run.ExecutionScopeRef" /></Scope>
-        <State Context="run">
-<StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></State>
         <Information Context="run">
             <CollectionValue Label="@T("Started")">@(run.StartedAt?.LocalDateTime.ToString("g") ?? T("Pending"))</CollectionValue>
             <CollectionValue Label="@T("Duration")">@Duration(run)</CollectionValue>

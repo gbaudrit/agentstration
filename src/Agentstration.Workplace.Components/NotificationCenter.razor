@@ -20,9 +20,7 @@
         {
             <article class="notification-row @(item.ReadAt is null ? "unread" : null)" data-testid="workplace-notification" data-notification-id="@item.Id" data-read="@(item.ReadAt is not null ? "true" : "false")">
                 <div>
-                    <CollectionIdentity DisplayName="@NotificationTitle(item)" Name="@item.Id.ToString()" IconName="bell" />
-                    <ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(item.WorkspaceId.Value)" />
-                    <StatusBadge Text="@Localizer[item.ReadAt is null ? "Unread" : "Read"]" Status="@(item.ReadAt is null ? Agentstration.Web.Components.Models.UiStatus.Info : Agentstration.Web.Components.Models.UiStatus.Neutral)" />
+                    <CollectionIdentity DisplayName="@NotificationTitle(item)" Name="@item.Id.ToString()" IconName="bell" ><IconBadges><ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(item.WorkspaceId.Value)" IconOnly /><StatusBadge Text="@Localizer[item.ReadAt is null ? "Unread" : "Read"]" Status="@(item.ReadAt is null ? Agentstration.Web.Components.Models.UiStatus.Info : Agentstration.Web.Components.Models.UiStatus.Neutral)" IconOnly /></IconBadges></CollectionIdentity>
                     <p>@NotificationMessage(item)</p>
                     <time>@item.CreatedAt.LocalDateTime.ToString("g")</time>
                 </div>

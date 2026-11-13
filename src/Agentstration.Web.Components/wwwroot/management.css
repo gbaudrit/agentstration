@@ -100,19 +100,15 @@
 
 .collection-qualified-name code:focus { white-space: normal; overflow-wrap: anywhere; outline: 2px solid var(--primary); }
 
-/* Opt-in dense collection primitives; Flows is the initial UX validation surface. */
+/* Dense collection primitives shared by family-owned adapters. */
 .disclosure-icon { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; padding: .25rem; overflow: visible; flex: 0 0 auto; }
 .disclosure-icon .ui-icon { width: 1.1rem; height: 1.1rem; }
 .status-icon-only { padding: 0; border: 0; border-radius: 50%; }
 .status-icon-only .disclosure-trigger { color: inherit; }
 .managed-icon-only { margin: 0; }
 .managed-icon-only .disclosure-trigger { color: var(--muted); }
-.collection-version-compact { display: grid; grid-template-columns: minmax(0, max-content) 1.5rem; gap: .2rem; align-items: center; width: max-content; max-width: 100%; font-variant-numeric: tabular-nums; }
+.collection-version-compact { display: grid; grid-template-columns: minmax(0, max-content); gap: .2rem; align-items: center; width: max-content; max-width: 100%; font-variant-numeric: tabular-nums; }
 .collection-version-compact > code { grid-column: 1; grid-row: 1; white-space: nowrap; font-weight: 650; }
-.collection-version-compact .collection-version-indicator { grid-column: 2; grid-row: 1; width: 1.5rem; min-height: 1.5rem; }
-.collection-version-indicator .disclosure-icon { width: 1.5rem; height: 1.5rem; }
-.collection-version-draft { color: var(--muted); }
-.collection-version-draft > code { font-weight: 400; }
 .flow-compact-list .collection-compact .data-grid { table-layout: fixed; min-width: 43rem; }
 .flow-compact-list .data-grid th:first-child { width: auto; }
 .flow-compact-list .data-grid th:nth-child(2) { width: 10rem; }
@@ -120,11 +116,11 @@
 .flow-compact-list .data-grid th:last-child { width: 8rem; }
 .flow-compact-list .data-grid td { padding-block: .35rem; vertical-align: top; }
 .flow-compact-list .collection-identity-cell .collection-identity { width: 100%; }
-.flow-compact-list .collection-identity { align-items: center; gap: .4rem; }
+.collection-identity { align-items: center; gap: .4rem; }
 .flow-compact-list .collection-identity-indicators { display: flex; align-items: center; gap: .15rem; flex: 0 0 auto; }
-.flow-compact-list .resource-owner-icon .disclosure-icon > .ui-icon { width: 1.5rem; height: 1.5rem; }
-.flow-compact-list .collection-name-heading { display: flex; align-items: baseline; gap: .5rem; min-width: 0; }
-.flow-compact-list .resource-name-link { flex: 1 1 auto; min-width: 0; }
+
+.collection-name-heading { display: flex; align-items: baseline; gap: .5rem; min-width: 0; }
+.collection-identity .resource-name-link { flex: 1 1 auto; min-width: 0; }
 .flow-kind { font-size: .7rem; color: var(--muted); white-space: nowrap; }
 .flow-versions { display: grid; width: min(100%, 9rem); gap: .1rem; }
 .flow-version-heading { display: inline-flex; align-items: center; gap: .25rem; }
@@ -132,7 +128,7 @@
 .flow-list-controls { display: flex; justify-content: flex-end; align-items: center; gap: .5rem; margin-top: .75rem; font-size: .8rem; }
 .flow-list-controls select { width: auto; min-width: 4.5rem; }
 .flow-list-error { margin: .75rem 0; color: var(--text); }
-.flow-compact-list .collection-card { padding: .75rem; gap: .5rem; }
+.collection-card { padding: .75rem; gap: .5rem; }
 .flow-compact-list .collection-pager { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .75rem; }
 @media (max-width: 760px) { .flow-compact-list .collection-identity .resource-icon { width: 1.75rem; height: 1.75rem; } }
 
@@ -146,21 +142,26 @@
 .flow-list-controls .clearable-field { flex: 0 0 auto; width: auto; }
 .collection-version-compact > code { overflow: hidden; text-overflow: ellipsis; }
 
-/* Flow prototype: corner markers and adjacent controls, preserving touch/keyboard access. */
-.collection-family-icon { display: inline-flex; position: relative; flex: 0 0 auto; }
-.flow-compact-list .collection-family-icon { margin-inline-end: .5rem; }
-.flow-icon-badges { position: absolute; inset: 0; pointer-events: none; }
-.flow-icon-badges > :is(.status-icon-only, .managed-icon-only) { position: absolute; inset-inline-end: -.75rem; width: 1.5rem; height: 1.5rem; margin: 0; background: transparent; pointer-events: auto; }
-.flow-icon-badges > .status-icon-only { top: -.75rem; }
-.flow-icon-badges > .managed-icon-only { bottom: -.75rem; }
-.flow-icon-badges .disclosure-icon { width: 1.5rem; height: 1.5rem; padding: .25rem; }
-.flow-icon-badges .status-icon-only svg { width: 1rem; height: 1rem; background: currentColor; stroke: var(--surface); border: 2px solid var(--surface); border-radius: 50%; }
-.flow-icon-badges .status-icon-only svg circle { display: none; }
-.flow-icon-badges .managed-icon-only svg { width: .9rem; height: .9rem; background: var(--surface); border-radius: .15rem; box-shadow: 0 0 0 2px var(--surface); }
-.flow-compact-list .collection-qualified-name .copyable-value { flex: 0 1 auto; gap: .2rem; }
-.flow-compact-list .collection-qualified-name code { flex: 0 1 auto; }
-.flow-compact-list .collection-qualified-name .copy-value { width: 1.5rem; min-width: 1.5rem; height: 1.5rem; padding: .2rem; }
+/* Corner disclosures keep 24px targets while their visual markers stay discreet. */
+.collection-family-icon { display: inline-flex; position: relative; flex: 0 0 auto; margin: .4rem .5rem .4rem .4rem; }
+.collection-icon-badges { position: absolute; inset: 0; pointer-events: none; }
+.collection-icon-badges :is(.resource-owner-icon, .status-icon-only, .managed-icon-only) { position: absolute; width: 1.5rem; height: 1.5rem; margin: 0; background: transparent; pointer-events: auto; }
+.collection-icon-badges .resource-owner-icon { top: -.75rem; inset-inline-start: -.75rem; }
+.collection-icon-badges .status-icon-only { top: -.75rem; inset-inline-end: -.75rem; }
+.collection-icon-badges .managed-icon-only { bottom: -.75rem; inset-inline-end: -.75rem; }
+.collection-icon-badges .disclosure-icon { width: 1.5rem; height: 1.5rem; padding: .25rem; }
+.scope-letter { display: inline-flex; align-items: center; justify-content: center; width: 11px; height: 11px; border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 2px; background: var(--surface-2); color: var(--muted); font-size: 8px; font-weight: 650; line-height: 1; }
+.collection-icon-badges .status-icon-only svg { width: .75rem; height: .75rem; background: currentColor; stroke: var(--surface); border: 1px solid var(--surface); border-radius: 50%; }
+.collection-icon-badges .status-icon-only svg circle { display: none; }
+.collection-icon-badges .managed-icon-only svg { width: .7rem; height: .7rem; background: var(--surface); border-radius: .15rem; }
+.collection-qualified-name .copyable-value { flex: 0 1 auto; gap: .2rem; }
+.collection-qualified-name code { flex: 0 1 auto; }
+.collection-qualified-name .copy-value { width: 1.5rem; min-width: 1.5rem; height: 1.5rem; padding: .2rem; }
 @media (hover: hover) and (pointer: fine) {
-  .flow-compact-list .copy-value { opacity: 0; pointer-events: none; }
-  .flow-compact-list :is(tbody tr, .collection-card):is(:hover, :focus-within) .copy-value { opacity: 1; pointer-events: auto; }
+  .collection-qualified-name .copy-value { opacity: 0; pointer-events: none; }
+  .collection-identity:is(:hover, :focus-within) .copy-value,
+  :is(tbody tr, .collection-card):is(:hover, :focus-within) .collection-qualified-name .copy-value { opacity: 1; pointer-events: auto; }
 }
+.resource-collection .data-grid td { padding-block: .4rem; }
+
+.collection-name-heading > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

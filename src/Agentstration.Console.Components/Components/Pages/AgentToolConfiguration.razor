@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 
 <section class="panel form-section agent-tools-panel" data-testid="agent-tool-configuration">
@@ -46,7 +47,7 @@
                 <article class="agent-tool-group" data-provider="@group.ProviderName" data-scope="@group.ProviderScopeRef?.Value">
                     <header>
                         <div class="agent-tool-provider-identity">
-                            <div><CollectionIdentity DisplayName="@group.DisplayName" HeadingLevel="3" Namespace="@group.ProviderNamespace.Value" Name="@group.ProviderName" Href="@(group.HasProvider ? ProviderUrl(group) : null)" IconName="server" /><ResourceScopeBadge ScopeRef="group.ProviderScopeRef" /><small>@T("McpProvider")</small></div>
+                            <div><CollectionIdentity DisplayName="@group.DisplayName" HeadingLevel="3" Namespace="@group.ProviderNamespace.Value" Name="@group.ProviderName" Href="@(group.HasProvider ? ProviderUrl(group) : null)" IconName="server" ><IconBadges><ResourceScopeBadge ScopeRef="group.ProviderScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(group.ProviderScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><small>@T("McpProvider")</small></div>
                         </div>
                         <div class="agent-tool-group-actions">
                             <div class="agent-tool-group-summary">
@@ -70,8 +71,7 @@
                             <div class="agent-tool-option @(inherited ? "inherited" : null)">
                                 <FormCheckbox id="@inputId" aria-label="@tool.Definition.DisplayName" Value="@effective" disabled="@(inherited || (!usable && !assigned))" ValueChanged="changed => ToggleAsync(tool.Metadata.Name, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />
                                 <div class="agent-tool-copy">
-                                    <CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench" class="resource-name-link agent-tool-name"><Badges><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" /></Badges></CollectionIdentity>
-                                    <ResourceScopeBadge ScopeRef="tool.ScopeRef" />
+                                    <CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench" class="resource-name-link agent-tool-name"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>
                                     @if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }
                                     @if (inherited)
                                     {

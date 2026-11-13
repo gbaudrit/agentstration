@@ -15,11 +15,7 @@ else
 {
     <CollectionView TItem="KnowledgeSourceResource" Items="sources" InformationLabels="@(new string[] { T("DataSources"), T("ProjectionFlow"), T("RetrievalFlow") })" RowTestId="knowledge-source-row" IdentityLabel="@T("KnowledgeSource")" StateLabel="@T("State")">
         <Identity Context="source">
-<CollectionIdentity DisplayName="@source.Definition.DisplayName" Namespace="@source.Namespace.Value" Name="@source.Name" Href="@DetailsUrl(source)" IconName="database" data-testid="knowledge-source-name-link"><Badges><ManagedResourceBadge IsManaged="@source.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="source">
-<ResourceScopeBadge ScopeRef="source.ScopeRef" ShowName /></Scope>
-        <State Context="source">
-<StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></State>
+<CollectionIdentity DisplayName="@source.Definition.DisplayName" Namespace="@source.Namespace.Value" Name="@source.Name" Href="@DetailsUrl(source)" IconName="database" data-testid="knowledge-source-name-link"><IconBadges><ResourceScopeBadge ScopeRef="source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(source.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="source">
             <CollectionValue Label="@T("DataSources")">@if (source.Definition.DataSources.Count > 0) { <span class="knowledge-source-inputs">@foreach (var binding in source.Definition.DataSources) { <a class="text-button" href="@DataSourceUrl(source, binding.DataSource)" data-testid="knowledge-source-data-source-link">@binding.DataSource.Name</a> }</span> } else { <span>—</span> }</CollectionValue>
             <CollectionValue Label="@T("ProjectionFlow")">@if (source.Definition.ProjectionFlow is { } projection) { <a class="text-button" href="@FlowUrl(source, projection)" data-testid="knowledge-source-projection-flow-link">@Flow(projection)</a> } else { <span>—</span> }</CollectionValue>

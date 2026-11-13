@@ -67,7 +67,9 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("1 total", rendered.FindAll(".entry-catalog-summary span")[0].TextContent.Trim());
         Assert.AreEqual("1 published", rendered.FindAll(".entry-catalog-summary span")[1].TextContent.Trim());
         Assert.IsTrue(rendered.Markup.Contains("Prompt Entry", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("Published v1", StringComparison.Ordinal));
+        Assert.AreEqual("1", rendered.Find(".collection-version code").TextContent);
+        Assert.AreEqual("Published", rendered.Find(".status-icon-only button").GetAttribute("aria-label"));
+        Assert.IsFalse(rendered.Markup.Contains("Draft r", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Configure", StringComparison.Ordinal));
         Assert.AreEqual("/entries/prepare-report", rendered.Find(".entry-card-link").GetAttribute("href"));
     }

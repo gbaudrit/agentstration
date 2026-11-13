@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/schemas"
 @using Agentstration.Schemas
 @inject ISchemasClient Client
@@ -19,8 +20,7 @@ else if (Filtered.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T
 else
 {
     <CollectionView TItem="SchemaResource" Items="Filtered" InformationLabels="@(new string[] { T("Format"), T("Dialect") })" RowTestId="schema-row">
-        <Identity Context="schema"><CollectionIdentity DisplayName="@schema.Definition.DisplayName" Namespace="@schema.Namespace.Value" Name="@schema.Name" Href="@EditUrl(schema)" IconName="schema" Domain="neutral" data-testid="schema-details-link"><Versions><CollectionVersion Label="@T("Generation")" Value="@(schema.Generation.ToString())" /></Versions><Badges><ManagedResourceBadge IsManaged="@schema.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="schema"><ResourceScopeBadge ScopeRef="schema.ScopeRef" ShowName /></Scope>
+        <Identity Context="schema"><CollectionIdentity DisplayName="@schema.Definition.DisplayName" Namespace="@schema.Namespace.Value" Name="@schema.Name" Href="@EditUrl(schema)" IconName="schema" Domain="neutral" data-testid="schema-details-link"><Versions><CollectionVersion Label="@T("Generation")" Value="@(schema.Generation.ToString())" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="schema.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@schema.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(schema.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="schema">
             <CollectionValue Label="@T("Format")"><code>@schema.Definition.Format</code></CollectionValue>
             <CollectionValue Label="@T("Dialect")"><code>@(schema.Definition.Dialect ?? "—")</code></CollectionValue>

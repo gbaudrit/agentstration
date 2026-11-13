@@ -64,11 +64,7 @@ else
         @if (tools.Count == 0) { <EmptyState Title="@T("NoToolsTitle")" Message="@T("NoToolsMessage")" /> }
         else { <CollectionView TItem="ToolResource" Items="tools" InformationLabels="@(new string[] { T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
         <Identity Context="tool">
-<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><Badges><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="tool">
-<ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName /></Scope>
-        <State Context="tool">
-<StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></State>
+<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="tool">
             <CollectionValue Label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</CollectionValue>
         </Information>

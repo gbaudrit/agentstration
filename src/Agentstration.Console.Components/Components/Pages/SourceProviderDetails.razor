@@ -49,7 +49,7 @@ else
 
     @if (!IsNew && usages.Count > 0)
     {
-        <section class="panel resource-section"><div class="panel-header"><h2>@T("Usages")</h2><span>@UsageCount(usages.Count)</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@($"{usage.Publisher}/{usage.SourceName}")" Name="@($"{usage.Publisher}/{usage.SourceName}")" Href="@SourceUrl(usage)" IconName="package" /><ResourceScopeBadge ScopeRef="usage.SourceScopeRef" /><code>@usage.BindingName</code><CollectionActions ResourceName="@($"{usage.Publisher}/{usage.SourceName}")"><a href="@SourceUrl(usage)">@Shared["OpenItem"]</a></CollectionActions></li> }</ul></section>
+        <section class="panel resource-section"><div class="panel-header"><h2>@T("Usages")</h2><span>@UsageCount(usages.Count)</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@($"{usage.Publisher}/{usage.SourceName}")" Name="@($"{usage.Publisher}/{usage.SourceName}")" Href="@SourceUrl(usage)" IconName="package" ><IconBadges><ResourceScopeBadge ScopeRef="usage.SourceScopeRef" IconOnly /></IconBadges></CollectionIdentity><code>@usage.BindingName</code><CollectionActions ResourceName="@($"{usage.Publisher}/{usage.SourceName}")"><a href="@SourceUrl(usage)">@Shared["OpenItem"]</a></CollectionActions></li> }</ul></section>
     }
 }
 

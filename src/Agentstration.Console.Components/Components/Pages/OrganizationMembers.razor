@@ -26,9 +26,7 @@
         {
             <CollectionView TItem="Agentstration.Identity.Contracts.LocalAccountResponse" Items="localAccounts" InformationLabels="@(new string[] { T("Principal"), T("InstanceRole") })" IdentityLabel="@T("Account")" StateLabel="@T("Status")">
         <Identity Context="account">
-<CollectionIdentity DisplayName="@account.UserName" Name="@account.PrincipalId.ToString()" IconName="user" /><small>@(account.Email ?? T("NoEmail"))</small></Identity>
-        <State Context="account">
-<StatusBadge Text="@T($"Status.{account.PrincipalStatus}")" Status="@(account.PrincipalStatus == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Warning)" /></State>
+<CollectionIdentity DisplayName="@account.UserName" Name="@account.PrincipalId.ToString()" IconName="user" ><IconBadges><StatusBadge Text="@T($"Status.{account.PrincipalStatus}")" Status="@(account.PrincipalStatus == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Warning)" IconOnly /></IconBadges></CollectionIdentity><small>@(account.Email ?? T("NoEmail"))</small></Identity>
         <Information Context="account">
             <CollectionValue Label="@T("Principal")">@account.DisplayName<br /><code>@account.PrincipalId</code></CollectionValue>
             <CollectionValue Label="@T("InstanceRole")">@(account.PlatformAdministrator ? T("PlatformAdministrator") : "—")</CollectionValue>
@@ -46,9 +44,7 @@ else
 {
     <CollectionView TItem="Agentstration.Identity.Contracts.OrganizationMemberResponse" Items="view.Members" InformationLabels="@(new string[] { T("Identity"), T("AssignedAccess") })" IdentityLabel="@T("Member")" StateLabel="@T("Membership")">
         <Identity Context="member">
-<CollectionIdentity DisplayName="@member.Principal.DisplayName" Name="@member.Principal.Id.ToString()" Href="@($"/settings/organization/members/{member.Principal.Id:D}")" IconName="user" /><small>@(member.Principal.Email ?? T("NoEmail"))</small></Identity>
-        <State Context="member">
-<StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></State>
+<CollectionIdentity DisplayName="@member.Principal.DisplayName" Name="@member.Principal.Id.ToString()" Href="@($"/settings/organization/members/{member.Principal.Id:D}")" IconName="user" ><IconBadges><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" IconOnly /></IconBadges></CollectionIdentity><small>@(member.Principal.Email ?? T("NoEmail"))</small></Identity>
         <Information Context="member">
             <CollectionValue Label="@T("Identity")">@(member.ExternalIdentities.Count == 0 ? T("Unlinked") : T("ExternalIdentityCount", member.ExternalIdentities.Count))</CollectionValue>
             <CollectionValue Label="@T("AssignedAccess")">@if(member.Roles.Count == 0){<span>@T("None")</span>}else{@foreach(var assigned in member.Roles){<div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div>}}</CollectionValue>

@@ -82,12 +82,9 @@ else
                     @foreach (var usage in usages)
                     {
                         <li class="model-profile-usage-card" data-testid="model-profile-usage">
-                            <a href="@AgentUrl(usage)">
-                                <span class="model-profile-usage-icon" aria-hidden="true"><TablerIcon Name="robot" /></span>
-                                <span class="model-profile-usage-identity"><strong>@usage.DisplayName</strong><code>@usage.Namespace/@usage.Name</code></span>
-                                <span class="model-profile-usage-scope"><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact />@if (!string.IsNullOrWhiteSpace(usage.ScopeDisplayName)) { <small>@usage.ScopeDisplayName</small> }</span>
-                                <span class="model-profile-usage-arrow" aria-hidden="true">→</span>
-                            </a>
+                            <CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usage.Namespace" Name="@usage.Name" Href="@AgentUrl(usage)" IconName="agent" Domain="agent">
+                                <IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" DisplayName="@usage.ScopeDisplayName" IconOnly /><ManagedResourceBadge IsManaged="@usage.IsManaged" IconOnly /></IconBadges>
+                            </CollectionIdentity>
                         </li>
                     }
                 </ul>

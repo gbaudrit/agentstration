@@ -35,8 +35,7 @@ else if (toolSet is not null)
             <article class="panel" data-testid="toolset-version">
                 <div class="panel-header"><div><h3>@T("VersionLabel", version.Version)</h3><code>@version.DefinitionHash</code></div><StatusBadge Text="@T("Immutable")" Status="UiStatus.Success" /></div>
                 <CollectionView TItem="PublishedToolSetMember" Items="version.Members" InformationLabels="@(new string[] { T("Capability"), T("Route"), T("Provider"), T("Generation"), T("Approval") })" IdentityLabel="@T("Tool")">
-        <Identity Context="member"><CollectionIdentity DisplayName="@member.ToolName" Namespace="@member.ToolNamespace.Value" Name="@member.ToolName" Href="@ToolUrl(member)" IconName="wrench" /></Identity>
-        <Scope Context="member"><ResourceScopeBadge ScopeRef="member.ToolScopeRef" /></Scope>
+        <Identity Context="member"><CollectionIdentity DisplayName="@member.ToolName" Namespace="@member.ToolNamespace.Value" Name="@member.ToolName" Href="@ToolUrl(member)" IconName="wrench" ><IconBadges><ResourceScopeBadge ScopeRef="member.ToolScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(member.ToolScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="member">
             <CollectionValue Label="@T("Capability")"><code>@member.Capability</code></CollectionValue>
             <CollectionValue Label="@T("Route")"><code>@member.Route</code></CollectionValue>

@@ -33,7 +33,7 @@ else
                         <div class="tool-category-provider-identity">
                             @if (group.Provider is { } provider)
                             {
-                                <div><CollectionIdentity DisplayName="@ProviderDisplayName(group)" Namespace="@provider.Namespace.Value" Name="@provider.Name" Href="@ProviderUrl(provider)" IconName="server"><Badges><ManagedResourceBadge IsManaged="@provider.Governance.IsManaged" /></Badges></CollectionIdentity><ResourceScopeBadge ScopeRef="provider.ScopeRef" /><small>@ProviderKind(group)</small></div>
+                                <div><CollectionIdentity DisplayName="@ProviderDisplayName(group)" Namespace="@provider.Namespace.Value" Name="@provider.Name" Href="@ProviderUrl(provider)" IconName="server"><IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@provider.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><small>@ProviderKind(group)</small></div>
                             }
                             else { <strong>@ProviderDisplayName(group)</strong> }
                         </div>
@@ -57,8 +57,7 @@ else
                             <div class="tool-category-member">
                                 <FormCheckbox id="@inputId" aria-label="@tool.Definition.DisplayName" Value="@assigned" disabled="@(!usable && !assigned)" ValueChanged="changed => Toggle(tool, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />
                                 <div class="tool-category-member-copy">
-                                    <CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><Badges><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" /></Badges></CollectionIdentity>
-                                    <ResourceScopeBadge ScopeRef="tool.ScopeRef" />
+                                    <CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>
                                     @if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }
                                     <StatusBadge Text="@Availability(tool)" Status="@(usable ? UiStatus.Success : assigned ? UiStatus.Warning : UiStatus.Danger)" />
                                 </div>

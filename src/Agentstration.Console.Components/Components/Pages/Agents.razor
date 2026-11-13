@@ -35,9 +35,7 @@ else if (Filtered.Count == 0)
 else
 {
     <CollectionView TItem="AgentSummary" Items="Filtered" InformationLabels="@(new[] { T("Definition"), T("ModelProfile"), T("Deployment"), T("LastActivity") })">
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@EditUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><Badges><ManagedResourceBadge IsManaged="@item.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="item"><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" /></Scope>
-        <State Context="item"><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" /></State>
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@EditUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="item">
             <CollectionValue Label="@T("Definition")"><strong>@ResourceName(item.Type)</strong></CollectionValue>
             <CollectionValue Label="@T("ModelProfile")"><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></CollectionValue>

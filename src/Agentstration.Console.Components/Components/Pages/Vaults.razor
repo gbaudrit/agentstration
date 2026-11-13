@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/vaults"
 @implements IDisposable
 @inject ISecretsClient Client
@@ -12,9 +13,7 @@ else if (items.Count == 0) { <EmptyState Title="@T("NoVaults")" Message="@T("NoV
 else
 {
     <CollectionView TItem="VaultResponse" Items="items" InformationLabels="@(new string[] { T("Provider"), T("Location") })" >
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Resource.Definition.DisplayName" Namespace="@item.Resource.Namespace.Value" Name="@item.Resource.Name" Href="@ResourceUrl(item.Resource)" IconName="lock" Domain="neutral" ><Badges><ManagedResourceBadge IsManaged="@item.Resource.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="item"><ResourceScopeBadge ScopeRef="item.Resource.ScopeRef" ShowName /></Scope>
-        <State Context="item"><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" /></State>
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Resource.Definition.DisplayName" Namespace="@item.Resource.Namespace.Value" Name="@item.Resource.Name" Href="@ResourceUrl(item.Resource)" IconName="lock" Domain="neutral" ><IconBadges><ResourceScopeBadge ScopeRef="item.Resource.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.Resource.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Resource.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="item">
             <CollectionValue Label="@T("Provider")">@ProviderText(item.Resource.Definition.ProviderType)</CollectionValue>
             <CollectionValue Label="@T("Location")">@T("Local")</CollectionValue>

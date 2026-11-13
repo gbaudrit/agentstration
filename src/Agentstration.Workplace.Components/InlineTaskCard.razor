@@ -1,8 +1,6 @@
 <article class="inline-task-card">
-    <CollectionIdentity DisplayName="@Task.Title" Name="@Task.Id.ToString()" Href="@DetailsUrl" IconName="tasks" class="resource-name-link inline-task-link" data-testid="workplace-inline-task" data-task-id="@Task.Id" data-task-status="@Task.Status" />
-    <ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(Task.WorkspaceId)" />
+    <CollectionIdentity DisplayName="@Task.Title" Name="@Task.Id.ToString()" Href="@DetailsUrl" IconName="tasks" class="resource-name-link inline-task-link" data-testid="workplace-inline-task" data-task-id="@Task.Id" data-task-status="@Task.Status" ><IconBadges><ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(Task.WorkspaceId)" IconOnly /><TaskStatusBadge Value="Task.Status" IconOnly /></IconBadges></CollectionIdentity>
     <small class="task-card-kind">@Localizer["Task"]</small>
-    <TaskStatusBadge Value="Task.Status" />
     <small>@Localizer["UpdatedAt", Task.UpdatedAt.LocalDateTime.ToString("g")]</small>
     <CollectionActions ResourceName="@Task.Title"><a href="@DetailsUrl">@Localizer["ViewTaskDetails", Task.Title]</a></CollectionActions>
 </article>

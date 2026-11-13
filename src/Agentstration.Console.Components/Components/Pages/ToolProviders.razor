@@ -10,11 +10,7 @@
 else if (providers.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
 else { <CollectionView TItem="ToolProviderResource" Items="providers" InformationLabels="@(new string[] { T("Type"), T("Tools"), T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
         <Identity Context="provider">
-<CollectionIdentity DisplayName="@provider.Definition.DisplayName" Namespace="@provider.Namespace.Value" Name="@provider.Name" Href="@ProviderUrl(provider)" IconName="server"><Badges><ManagedResourceBadge IsManaged="@provider.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="provider">
-<ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName /></Scope>
-        <State Context="provider">
-<StatusBadge Text="@StatusLabel(provider.Definition.Discovery.Status)" Status="@Tone(provider.Definition.Discovery.Status)" /></State>
+<CollectionIdentity DisplayName="@provider.Definition.DisplayName" Namespace="@provider.Namespace.Value" Name="@provider.Name" Href="@ProviderUrl(provider)" IconName="server"><IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusLabel(provider.Definition.Discovery.Status)" Status="@Tone(provider.Definition.Discovery.Status)" IconOnly /><ManagedResourceBadge IsManaged="@provider.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="provider">
             <CollectionValue Label="@T("Type")">@provider.Definition.ProviderType</CollectionValue>
             <CollectionValue Label="@T("Tools")">@provider.Definition.Discovery.ToolCount</CollectionValue>

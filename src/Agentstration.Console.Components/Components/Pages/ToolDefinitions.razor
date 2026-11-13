@@ -16,10 +16,7 @@ else
 {
     <CollectionView StateLabel="@T("Enabled")" TItem="ToolDefinitionResource" Items="definitions" InformationLabels="@(new string[] { T("FlowImplementation"), T("RequiresApproval") })" IdentityLabel="@T("Tool")">
         <Identity Context="definition">
-<CollectionIdentity DisplayName="@definition.Definition.DisplayName" Namespace="@definition.Namespace.Value" Name="@definition.Name" Href="@EditUrl(definition)" IconName="wrench"><Badges><ManagedResourceBadge IsManaged="@definition.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="definition">
-<ResourceScopeBadge ScopeRef="definition.ScopeRef" ShowName /></Scope>
-        <State Context="definition"><StatusBadge Text="@BooleanLabel(definition.Definition.Enabled)" Status="@(definition.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></State>
+<CollectionIdentity DisplayName="@definition.Definition.DisplayName" Namespace="@definition.Namespace.Value" Name="@definition.Name" Href="@EditUrl(definition)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="definition.ScopeRef" ShowName IconOnly /><StatusBadge Text="@BooleanLabel(definition.Definition.Enabled)" Status="@(definition.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@definition.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(definition.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="definition">
             <CollectionValue Label="@T("FlowImplementation")"><code>@Flow(definition)</code></CollectionValue>
             <CollectionValue Label="@T("RequiresApproval")">@BooleanLabel(definition.Definition.RequiresApproval)</CollectionValue>

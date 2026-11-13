@@ -151,10 +151,8 @@ else
         {
             <CollectionView TItem="RuntimeRun" Items="history" InformationLabels="@(new string[] { I("Date"), I("Duration"), I("Initiator"), I("Version"), I("Prompt"), I("Origin") })" IdentityLabel="@I("Run")" StateLabel="@I("Status")">
         <Identity Context="run">
-<CollectionIdentity DisplayName="@ShortId(run.Id)" Name="@run.Id" Href="@($"/runs/{run.Id}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}&context={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")" IconName="agent" /></Identity>
+<CollectionIdentity DisplayName="@ShortId(run.Id)" Name="@run.Id" Href="@($"/runs/{run.Id}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}&context={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")" IconName="agent" ><IconBadges><StatusBadge Text="@I($"RunState.{run.Status.State}")" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Scope Context="run"><ResourceScopeBadge ScopeRef="run.ExecutionScopeRef" /></Scope>
-        <State Context="run">
-<StatusBadge Text="@I($"RunState.{run.Status.State}")" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></State>
         <Information Context="run">
             <CollectionValue Label="@I("Date")">@run.Status.CreatedAt.LocalDateTime.ToString("g")</CollectionValue>
             <CollectionValue Label="@I("Duration")">@Duration(run)</CollectionValue>

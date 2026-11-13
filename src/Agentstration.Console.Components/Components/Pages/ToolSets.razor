@@ -16,11 +16,7 @@ else
 {
     <CollectionView TItem="ToolSetResource" Items="toolSets" InformationLabels="@(new string[] { T("Members"), T("Category") })" RowTestId="toolset-row" IdentityLabel="@T("ToolSet")" StateLabel="@T("State")">
         <Identity Context="toolSet">
-<CollectionIdentity DisplayName="@toolSet.Definition.DisplayName" Namespace="@toolSet.Namespace.Value" Name="@toolSet.Name" Href="@DetailsUrl(toolSet)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(toolSet.Definition.Version)" /></Versions><Badges><ManagedResourceBadge IsManaged="@toolSet.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="toolSet">
-<ResourceScopeBadge ScopeRef="toolSet.ScopeRef" ShowName /></Scope>
-        <State Context="toolSet">
-<StatusBadge Text="@T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(toolSet.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></State>
+<CollectionIdentity DisplayName="@toolSet.Definition.DisplayName" Namespace="@toolSet.Namespace.Value" Name="@toolSet.Name" Href="@DetailsUrl(toolSet)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@toolSet.PublishedVersion" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="toolSet.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(toolSet.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@toolSet.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(toolSet.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="toolSet">
             <CollectionValue Label="@T("Members")">@toolSet.Definition.Members.Count</CollectionValue>
             <CollectionValue Label="@T("Category")">@(toolSet.Definition.Category?.Name ?? "—")</CollectionValue>
