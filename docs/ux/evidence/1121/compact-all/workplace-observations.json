@@ -1,0 +1,146 @@
+{
+  "stats": {
+    "startTime": "2026-11-13T08:35:16.769Z",
+    "duration": 86959.129,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "captures": [
+    {
+      "file": "workplace-home.png",
+      "sha256": "82aa1264aac1e669fcc7489663b806ea637d6c8a2ee09187e150f1077829d68b",
+      "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
+      "checkpoint": "workplace-home",
+      "status": "passed",
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Local final executable; unedited success attachment",
+      "captureSize": {
+        "width": 1440,
+        "height": 2030
+      }
+    },
+    {
+      "file": "workplace-response-completed.png",
+      "sha256": "3aebb8968997db3218f9e4dd3957b2c90b63234bef78ca88fdb8578f11e1fabb",
+      "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
+      "checkpoint": "workplace-response-completed",
+      "status": "passed",
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Local final executable; unedited success attachment",
+      "captureSize": {
+        "width": 1440,
+        "height": 1021
+      }
+    },
+    {
+      "file": "collections-workplace-activity.png",
+      "sha256": "cca2f12c586093576cf9c4b6c9beda8db06c25cebaf3f7462432cddf05352891",
+      "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
+      "checkpoint": "collections-workplace-activity",
+      "status": "passed",
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Local final executable; unedited success attachment",
+      "captureSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "collections-workplace-tasks.png",
+      "sha256": "15a482ad56a4d499d95e7eeb9cf132820bccbe2e9babb555d1a9b5c7e60b38ae",
+      "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
+      "checkpoint": "collections-workplace-tasks",
+      "status": "passed",
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Local final executable; unedited success attachment",
+      "captureSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "collections-workplace-task.png",
+      "sha256": "eb658d93d5d7a6a4971df30c8e7c29fa9bc0fe18347fe8520480a69427043119",
+      "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
+      "checkpoint": "collections-workplace-task",
+      "status": "passed",
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Local final executable; unedited success attachment",
+      "captureSize": {
+        "width": 1440,
+        "height": 1301
+      }
+    },
+    {
+      "file": "collections-workplace-notifications.png",
+      "sha256": "5472de74bbebd34865909f855acd39be39620fc3d78dcbb002abb7971065f482",
+      "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
+      "checkpoint": "collections-workplace-notifications",
+      "status": "passed",
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Local final executable; unedited success attachment",
+      "captureSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  ],
+  "observations": [
+    {
+      "url": "http://127.0.0.1:34415/w/default/d/home",
+      "frames": 0,
+      "identities": 4,
+      "menus": 3,
+      "scopes": 4,
+      "states": 0
+    },
+    {
+      "url": "http://127.0.0.1:34415/w/default/d/home/conversations/d29ed308-2a82-4fd0-b87c-4cfe399cff70",
+      "frames": 0,
+      "identities": 1,
+      "menus": 1,
+      "scopes": 1,
+      "states": 1
+    },
+    {
+      "url": "http://127.0.0.1:34415/w/default/tasks",
+      "frames": 0,
+      "identities": 1,
+      "menus": 1,
+      "scopes": 1,
+      "states": 1
+    },
+    {
+      "url": "http://127.0.0.1:34415/w/default/tasks",
+      "frames": 0,
+      "identities": 1,
+      "menus": 1,
+      "scopes": 1,
+      "states": 1
+    },
+    {
+      "url": "http://127.0.0.1:34415/w/default/tasks/3e3f5424-42ed-9ced-6b8b-3a85787af805",
+      "frames": 0,
+      "identities": 0,
+      "menus": 0,
+      "scopes": 0,
+      "states": 1
+    },
+    {
+      "url": "http://127.0.0.1:34415/w/default/notifications",
+      "frames": 0,
+      "identities": 1,
+      "menus": 1,
+      "scopes": 1,
+      "states": 1
+    }
+  ]
+}

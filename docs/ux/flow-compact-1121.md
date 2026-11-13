@@ -14,4 +14,4 @@ The [complete matrix](all-list-adoption-1121.md) and [surface manifest](collecti
 
 ## Evidence
 
-Earlier [Flow screenshots](evidence/1121/flows-compact/README.md) and test totals describe the previous prototype, including rN and large glyphs. They do not validate this rollout. Fresh evidence and final validation are recorded separately in the implementation PR and the all-list compact evidence index. The normal implementation/coverage merge gate remains unchanged under the maintainer’s explicit exception allowing stacked draft preparation.
+Earlier [Flow screenshots](evidence/1121/flows-compact/README.md) and test totals describe the previous prototype, including rN and large glyphs. They do not validate this rollout. The [current all-list compact gallery](evidence/1121/compact-all/README.md) includes all four Flow pagination/inheritance variants and their unedited table/card/managed/inherited captures. [Final validation](evidence/1121/compact-all/validation.json) records the exact tested product source. The normal implementation/coverage merge gate remains unchanged under the maintainer’s explicit exception allowing stacked draft preparation.

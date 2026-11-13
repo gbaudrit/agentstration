@@ -1,0 +1,79 @@
+{
+  "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+  "restore": {
+    "command": "dotnet restore Agentstration.slnx --disable-parallel -m:1 -nr:false",
+    "result": "passed"
+  },
+  "build": {
+    "command": "dotnet build Agentstration.slnx --configuration Release --no-restore -m:1 -nr:false",
+    "result": "passed",
+    "warnings": 0,
+    "errors": 0
+  },
+  "fast": {
+    "command": "dotnet test --solution Agentstration.Tests.Fast.slnx --configuration Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4",
+    "passed": 993,
+    "failed": 0,
+    "skipped": 0
+  },
+  "integration": {
+    "command": "dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2",
+    "passed": 1017,
+    "failed": 0,
+    "skipped": 12,
+    "total": 1029,
+    "skipMeaning": "Existing optional external PostgreSQL/live-provider integrations; not replaced with deterministic success claims."
+  },
+  "typescript": {
+    "implementation": "passed",
+    "stackedCoverage": "passed"
+  },
+  "javascript": {
+    "portReservationTests": 5,
+    "collectionLifecycleTests": 6,
+    "result": "passed"
+  },
+  "finalLocalBrowser": {
+    "maintainedVersionPrimaryActionVariants": 4,
+    "populatedWorkplace": 1,
+    "result": "passed",
+    "browser": "Chromium 154.0.8037.57",
+    "productHostsBuiltBeforeRun": true,
+    "noRebuildDuringRun": true
+  },
+  "captureCIRuns": {
+    "implementation": {
+      "url": "https://github.com/gbaudrit/agentstration/actions/runs/43391465377",
+      "commit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "passed": 367,
+      "failed": 0,
+      "status": "success"
+    },
+    "stackedCoverage": {
+      "url": "https://github.com/gbaudrit/agentstration/actions/runs/43391503391",
+      "commit": "d3ccdf873b2d952b3f284d58883544f44486bb08",
+      "passed": 483,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "status": "success"
+    }
+  },
+  "executionNotes": [
+    "Two local concurrent MSBuild attempts ended with MSB4166 (child node exit). The cause was not established. The final restore/build used one MSBuild node and retained all analyzers and checks.",
+    "The full local campaign started on an earlier compact product build. Obsolete Trigger detail/scope-column assertions were repaired and their targeted reruns passed; final full CI on the product commit above passed. Earlier green pre-generalization runs are not current validation.",
+    "The historical French/mobile Blazor circuit closure from a previous session has no established cause; this work does not claim to fix it."
+  ],
+  "lifecycle": {
+    "issuesOpen": [
+      1121,
+      1122
+    ],
+    "draftPRs": [
+      1123,
+      1132
+    ],
+    "maintainerUXAcceptance": "pending",
+    "merged": false
+  }
+}
