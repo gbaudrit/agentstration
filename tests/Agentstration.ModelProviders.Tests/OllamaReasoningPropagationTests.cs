@@ -246,6 +246,9 @@ public sealed class OllamaReasoningPropagationTests
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.ConfigureServices(services =>
         {
+            services.AddHttpClient(OllamaInferenceOptions.HttpClientName, client =>
+                client.BaseAddress = new Uri("http://ollama.test"))
+                .ConfigurePrimaryHttpMessageHandler(() => capture);
             services.RemoveAll<OllamaApiClient>();
             services.AddSingleton(_ => new OllamaApiClient(new HttpClient(capture, disposeHandler: false)
             {
