@@ -19,7 +19,7 @@
 .worker-assignments-grid ::deep .data-grid-wrap { border: 0; border-radius: 0; box-shadow: none; }
 .worker-assignments-grid ::deep .data-grid { table-layout: fixed; white-space: normal; }
 .worker-assignments-grid ::deep th:first-child { width: 36%; }
-.worker-assignments-grid ::deep td { overflow-wrap: anywhere; vertical-align: top; }
+.worker-assignments-grid ::deep td { overflow-wrap: anywhere; }
 .worker-assignments-grid ::deep td small { display: block; margin-top: .25rem; color: var(--muted); }
 .worker-run-link { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .worker-empty { padding: 2rem; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); text-align: center; }
