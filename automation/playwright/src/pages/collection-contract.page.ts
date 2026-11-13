@@ -98,22 +98,36 @@ export class CollectionContractPage {
       expect((await state.textContent())?.trim()).not.toBe('');
       if ((await state.textContent())?.trim() === text.unknown) await expect(state).toHaveClass(/status-neutral/);
     }
-    for (const scope of await scopes.all()) {
-      if ((await scope.getAttribute('class'))?.split(/\s+/).includes('resource-owner-icon')) {
+    const scopeSnapshots = await scopes.evaluateAll(elements => elements.map(element => {
+      const button = element.querySelector('button');
+      const letter = element.querySelector('.scope-letter');
+      const visual = letter?.getBoundingClientRect();
+      const target = button?.getBoundingClientRect();
+      return {
+        icon: element.classList.contains('resource-owner-icon'),
+        name: button?.getAttribute('aria-label'),
+        disclosure: element.querySelector('[role=tooltip]')?.textContent?.trim(),
+        letter: letter?.textContent?.trim(),
+        hidden: letter?.getAttribute('aria-hidden'),
+        visualWidth: visual?.width,
+        targetWidth: target?.width,
+        targetHeight: target?.height,
+      };
+    }));
+    for (const [index, snapshot] of scopeSnapshots.entries()) {
+      const scope = scopes.nth(index);
+      if (snapshot.icon) {
         const button = scope.getByRole('button');
-        const name = await button.getAttribute('aria-label');
+        const name = snapshot.name;
         expect(text.scopeTypes.some(type => name === type || name?.startsWith(`${type} — `))).toBe(true);
         await expect(button).toHaveAccessibleName(name!);
-        await expect(scope.locator('[role=tooltip]')).toHaveText(name!);
-        const letter = scope.locator('.scope-letter');
-        await expect(letter).toHaveText(/^[ITW]$/);
-        await expect(letter).toHaveAttribute('aria-hidden', 'true');
-        const visual = await letter.boundingBox();
-        const target = await button.boundingBox();
-        expect(visual!.width).toBeGreaterThanOrEqual(10);
-        expect(visual!.width).toBeLessThanOrEqual(12);
-        expect(target!.width).toBeGreaterThanOrEqual(24);
-        expect(target!.height).toBeGreaterThanOrEqual(24);
+        expect(snapshot.disclosure).toBe(name);
+        expect(snapshot.letter).toMatch(/^[ITW]$/);
+        expect(snapshot.hidden).toBe('true');
+        expect(snapshot.visualWidth).toBeGreaterThanOrEqual(10);
+        expect(snapshot.visualWidth).toBeLessThanOrEqual(12);
+        expect(snapshot.targetWidth).toBeGreaterThanOrEqual(24);
+        expect(snapshot.targetHeight).toBeGreaterThanOrEqual(24);
         continue;
       }
       const kind = scope.locator('.resource-scope-badge');
