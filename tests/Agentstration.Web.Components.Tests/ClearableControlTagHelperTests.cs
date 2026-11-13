@@ -21,7 +21,7 @@ public sealed class ClearableControlTagHelperTests
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
             using var services = new ServiceCollection().AddLogging().AddLocalization(options => options.ResourcesPath = "Resources").BuildServiceProvider();
             var helper = new ClearableControlTagHelper(services.GetRequiredService<IStringLocalizer<SharedFormStrings>>())
-                { Label = "Password", ValidationId = "password-error" };
+            { Label = "Password", ValidationId = "password-error" };
             var output = Output("input", new() { { "name", "Input.Password" }, { "id", "Input_Password" }, { "type", "password" }, { "aria-describedby", "password-help" } });
             await helper.ProcessAsync(Context(), output);
             Assert.AreEqual("Input.Password", output.Attributes["name"].Value);

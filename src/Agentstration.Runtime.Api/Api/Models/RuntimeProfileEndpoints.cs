@@ -35,7 +35,8 @@ internal static class RuntimeProfileEndpoints
                     profile.Value.Definition,
                     usages.Count,
                     profile.Value.Namespace.Value,
-                    profile.Value.ScopeRef) { IsManaged = profile.Value.Governance.IsManaged });
+                    profile.Value.ScopeRef)
+                { IsManaged = profile.Value.Governance.IsManaged });
             }
             return Results.Ok(new ValueResponse<RuntimeProfileSummaryResponse>(values));
         });

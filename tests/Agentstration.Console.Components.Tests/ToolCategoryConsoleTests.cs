@@ -55,13 +55,16 @@ public sealed class ToolCategoryConsoleTests
         var owners = new[] { firstScope, secondScope };
         var providers = owners.Select((scope, index) => new ToolProviderResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider,
-            Metadata = new() { Name = "same-provider", Namespace = spaces[index] }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new() { Name = "same-provider", Namespace = spaces[index] },
+            ScopeRef = scope,
             Definition = new() { DisplayName = "Same provider", ProviderType = ToolProviderType.Mcp }
         }).ToArray();
         var tools = owners.Select((scope, index) => ToolsClient.Tool with
         {
-            Metadata = new() { Name = "same-tool", Namespace = spaces[index] }, ScopeRef = scope,
+            Metadata = new() { Name = "same-tool", Namespace = spaces[index] },
+            ScopeRef = scope,
             Definition = ToolsClient.Tool.Definition with { Provider = new("same-provider", scope, spaces[index]) }
         }).ToArray();
         context.Services.AddSingleton<IToolsClient>(new ToolsClient(tools, providers));

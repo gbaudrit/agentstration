@@ -100,7 +100,8 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 run.Properties.Agent.Namespace,
                 run.Status.State.ToString(),
                 run.Status.CompletedAt ?? run.Status.CreatedAt,
-                run.Properties.Agent.ResourceId) { ScopeRef = run.ExecutionScopeRef })
+                run.Properties.Agent.ResourceId)
+            { ScopeRef = run.ExecutionScopeRef })
             .ToArray();
     }
 
@@ -122,7 +123,8 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 run.FlowId.Namespace,
                 run.Status.ToString(),
                 run.CompletedAt ?? run.CreatedAt,
-                run.FlowVersion) { ScopeRef = run.ExecutionScopeRef })
+                run.FlowVersion)
+            { ScopeRef = run.ExecutionScopeRef })
             .ToArray();
     }
 
@@ -138,7 +140,8 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 entry.Value.Id.Namespace,
                 entry.Published is null ? "Draft" : "Published",
                 entry.Value.UpdatedAt,
-                entry.Value.Binding.ResourceId) { ScopeRef = ResourceScopeRef.Workspace(entry.Value.WorkspaceId.Value) })
+                entry.Value.Binding.ResourceId)
+            { ScopeRef = ResourceScopeRef.Workspace(entry.Value.WorkspaceId.Value) })
             .OrderBy(candidate => candidate.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
     }
@@ -169,7 +172,8 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 ResourceNamespace.Default,
                 task.Status.ToString(),
                 task.UpdatedAt,
-                task.EntryId) { ScopeRef = ResourceScopeRef.TryParse(task.WorkspaceId, out var taskScope) ? taskScope : null })
+                task.EntryId)
+            { ScopeRef = ResourceScopeRef.TryParse(task.WorkspaceId, out var taskScope) ? taskScope : null })
             .ToArray();
     }
 
@@ -191,7 +195,8 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 flow.Namespace,
                 flow.Enabled ? "Active" : "Disabled",
                 flow.UpdatedAt,
-                flow.ActiveVersion ?? flow.Version) { ScopeRef = flow.ScopeRef })
+                flow.ActiveVersion ?? flow.Version)
+            { ScopeRef = flow.ScopeRef })
             .OrderBy(candidate => candidate.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
     }
@@ -213,7 +218,8 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 agent.Namespace,
                 agent.Status.ProvisioningState.ToString(),
                 agent.Status.Conditions.Select(condition => condition.LastTransitionTime).OfType<DateTimeOffset>().DefaultIfEmpty(DateTimeOffset.MinValue).Max(),
-                agent.Definition.ModelProfile.ResourceId) { ScopeRef = agent.ScopeRef })
+                agent.Definition.ModelProfile.ResourceId)
+            { ScopeRef = agent.ScopeRef })
             .OrderBy(candidate => candidate.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
     }

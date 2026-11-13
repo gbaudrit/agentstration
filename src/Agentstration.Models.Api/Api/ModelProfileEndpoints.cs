@@ -42,7 +42,8 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
                         resolution.Status,
                         usagesByProfile[profile.Value.Uid].Count),
                     profile.Value.Namespace.Value,
-                    profile.Value.ScopeRef) { IsManaged = profile.Value.Governance.IsManaged });
+                    profile.Value.ScopeRef)
+                { IsManaged = profile.Value.Governance.IsManaged });
             }
             return Results.Ok(new ValueResponse<ModelProfileSummaryResponse>(responses));
         });
@@ -124,7 +125,8 @@ internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
                 value.DisplayName,
                 value.Namespace.Value,
                 value.ScopeRef,
-                value.ScopeDisplayName) { IsManaged = value.IsManaged }).ToArray();
+                value.ScopeDisplayName)
+            { IsManaged = value.IsManaged }).ToArray();
             return Results.Ok(new ModelProfileUsagesResponse(values, values.Length));
         });
 }

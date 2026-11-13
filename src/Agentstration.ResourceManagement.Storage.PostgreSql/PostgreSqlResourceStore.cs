@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Agentstration.Agents;
-using Agentstration.Models;
 using Agentstration.Identity.Contracts;
+using Agentstration.Models;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -239,7 +239,8 @@ public sealed class PostgreSqlResourceStore(
             ResourceNamespace.Parse(value.Namespace),
             value.Kind,
             value.Name,
-            value.UpdatedAt) { IsManaged = ReadGovernance(value.Payload).IsManaged }).ToArray();
+            value.UpdatedAt)
+        { IsManaged = ReadGovernance(value.Payload).IsManaged }).ToArray();
     }
 
     public async Task<AgentProfileUsageWindow> FindProfileCandidatesAsync(ResourceScopeRef scopeRef, string profileName, string? search, int offset, int take, CancellationToken cancellationToken)

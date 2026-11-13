@@ -22,9 +22,12 @@ public sealed partial class FlowDetailsDesignerTests
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConsoleNavigationContext>(new FlowCollectionNavigation(current));
-        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { PageLoader = (_, _) =>
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub
+        {
+            PageLoader = (_, _) =>
             Task.FromResult(new FlowSummaryPage([new("flow", "Flow", "Workflow", "1.0.0", "Active", 0, 0, FlowClientStub.Now)
-                { ScopeRef = ResourceScopeRef.Parse(owner), IsManaged = managed }], false)) });
+                { ScopeRef = ResourceScopeRef.Parse(owner), IsManaged = managed }], false))
+        });
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         void AssertLock()
         {
@@ -52,11 +55,14 @@ public sealed partial class FlowDetailsDesignerTests
         var rows = Enumerable.Range(1, 40).Select(index => new FlowSummary($"flow-{index}", "Same display name", "Workflow", "1.0.0", "Active", 0, 0, FlowClientStub.Now)
         { ScopeRef = owner, Namespace = new("team"), ActiveVersion = "1.0.0", IsManaged = true }).ToArray();
         var requests = new List<(int Skip, int Take)>();
-        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { PageLoader = (skip, take) =>
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub
+        {
+            PageLoader = (skip, take) =>
         {
             requests.Add((skip, take));
             return Task.FromResult(new FlowSummaryPage(rows.Skip(skip).Take(take).ToArray(), rows.Length > skip + take));
-        }});
+        }
+        });
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
         Assert.HasCount(4, cut.FindAll("th"));
@@ -91,12 +97,15 @@ public sealed partial class FlowDetailsDesignerTests
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var requests = new List<(int, int)>();
-        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { PageLoader = (skip, take) =>
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub
+        {
+            PageLoader = (skip, take) =>
         {
             requests.Add((skip, take));
             if (requests.Count == 2) throw new HttpRequestException("Offline");
             return Task.FromResult(new FlowSummaryPage([new($"flow-{skip}", "Flow", "Direct", "1.0.0", "Unknown", 0, 0, FlowClientStub.Now)], true));
-        }});
+        }
+        });
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         await cut.FindAll(".collection-pager button")[1].ClickAsync(new());
         Assert.AreEqual("default/flow-0", cut.Find(".collection-qualified-name code").TextContent);

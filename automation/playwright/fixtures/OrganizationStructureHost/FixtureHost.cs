@@ -1,11 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
+using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
-using Agentstration.Identity.Contracts;
-using Agentstration.Security.AspNetCoreIdentity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -67,18 +67,27 @@ internal static class FixtureHost
         var entry = await repository.GetEntryAsync(workspace, new EntryId("quick-answer"), token)
             ?? new EntryResource
             {
-                WorkspaceId = workspace, Id = new EntryId("forms-pending-input"), Name = "forms-pending-input",
-                DisplayName = "Pending input fixture", Presentation = new EntryPresentation
+                WorkspaceId = workspace,
+                Id = new EntryId("forms-pending-input"),
+                Name = "forms-pending-input",
+                DisplayName = "Pending input fixture",
+                Presentation = new EntryPresentation
                 {
                     Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Label = "Request", Role = EntryFieldRole.PrimaryInput }]
                 },
-                ResolvedTarget = new EntryResolvedTarget("system-direct-agent-dotnet-expert", "1.0.0"), PublishedAt = now
+                ResolvedTarget = new EntryResolvedTarget("system-direct-agent-dotnet-expert", "1.0.0"),
+                PublishedAt = now
             };
         await repository.UpsertEntryAsync(entry, token);
         if (await repository.GetDashboardAsync(workspace, new DashboardId("home"), token) is null)
             await repository.UpsertDashboardAsync(new WorkplaceDashboard
             {
-                Id = new DashboardId("home"), WorkspaceId = workspace, Name = "home", DisplayName = "Home", IsDefault = true, PublishedAt = now
+                Id = new DashboardId("home"),
+                WorkspaceId = workspace,
+                Name = "home",
+                DisplayName = "Home",
+                IsDefault = true,
+                PublishedAt = now
             }, token);
         var id = InteractionId.New();
         var actionId = PendingActionId.New();
@@ -86,15 +95,29 @@ internal static class FixtureHost
         const string resumeToken = "browser-fixture-pending-input-token";
         await repository.CreateInteractionAsync(new WorkplaceInteraction
         {
-            Id = id, WorkspaceId = workspace, OwnerPrincipalId = principalId, EntryId = entry.Id, EntrySnapshot = entry,
-            Status = InteractionStatus.WaitingForUser, StartedAt = now, LastActivityAt = now, PendingActionId = actionId,
+            Id = id,
+            WorkspaceId = workspace,
+            OwnerPrincipalId = principalId,
+            EntryId = entry.Id,
+            EntrySnapshot = entry,
+            Status = InteractionStatus.WaitingForUser,
+            StartedAt = now,
+            LastActivityAt = now,
+            PendingActionId = actionId,
             ImmediateResult = new RequestInputAction("What should the report focus on?", "A short answer is enough.", fields, actionId, resumeToken)
         }, token);
         await repository.CreatePendingActionAsync(new PendingAction
         {
-            Id = actionId, WorkspaceId = workspace, InteractionId = id, Kind = PendingActionKind.InputRequired,
-            Title = "What should the report focus on?", Fields = fields, CreatedAt = now, ExpiresAt = now.AddDays(1),
-            ResumeTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(resumeToken))), ResumeStep = 1
+            Id = actionId,
+            WorkspaceId = workspace,
+            InteractionId = id,
+            Kind = PendingActionKind.InputRequired,
+            Title = "What should the report focus on?",
+            Fields = fields,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(1),
+            ResumeTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(resumeToken))),
+            ResumeStep = 1
         }, token);
         await repository.AddMessageAsync(new ConversationMessage(Guid.NewGuid(), workspace, id, null,
             ConversationRole.User, "Prepare a report.", now), token);

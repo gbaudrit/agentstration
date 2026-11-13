@@ -61,11 +61,14 @@ public sealed class TriggerDetailsPermissionsTests
     {
         private readonly TriggerResource resource = new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = TriggerResourceKinds.Trigger,
-            Metadata = new() { Name = "permission-race" }, ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = TriggerResourceKinds.Trigger,
+            Metadata = new() { Name = "permission-race" },
+            ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
             Definition = new()
             {
-                DisplayName = "Permission race Trigger", Enabled = false,
+                DisplayName = "Permission race Trigger",
+                Enabled = false,
                 Source = new() { Schedule = new() { Type = TriggerScheduleType.Interval, Every = "PT1H" } },
                 Target = new() { Flow = new() { Name = "flow", ScopeRef = ResourceScopeRef.Instance } }
             }

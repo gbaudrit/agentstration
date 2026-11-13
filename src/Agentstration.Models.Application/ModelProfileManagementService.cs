@@ -222,7 +222,8 @@ public sealed class ModelProfileManagementService(
                         agent.Value.Metadata.Name,
                         agent.Value.Definition.DisplayName,
                         agentScopeRef,
-                        scope.DisplayName) { IsManaged = agent.Value.Governance.IsManaged });
+                        scope.DisplayName)
+                    { IsManaged = agent.Value.Governance.IsManaged });
             }
         }
         return usages.ToDictionary(

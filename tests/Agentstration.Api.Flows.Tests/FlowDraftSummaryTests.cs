@@ -1,5 +1,5 @@
-using Agentstration.Flows.Application;
 using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Resources;
 
 namespace Agentstration.Application.Tests;
@@ -45,8 +45,15 @@ public sealed partial class FlowTests
         {
             await fixture.Repository.CreateDraftAsync(new FlowDraft
             {
-                WorkspaceId = author, ScopeRef = scope, FlowId = flow, Id = "draft", DisplayName = "Flow",
-                Definition = FlowDraftTemplates.Create("empty"), Revision = revision, CreatedAt = Now, UpdatedAt = Now
+                WorkspaceId = author,
+                ScopeRef = scope,
+                FlowId = flow,
+                Id = "draft",
+                DisplayName = "Flow",
+                Definition = FlowDraftTemplates.Create("empty"),
+                Revision = revision,
+                CreatedAt = Now,
+                UpdatedAt = Now
             }, default);
         }
         foreach (var (scope, flow, author, revision) in new[] { (owner, id, workspace, 7L), (tenant, id, workspace, 11L), (owner, otherNamespace, workspace, 13L), (owner, id, otherWorkspace, 99L) })

@@ -12,8 +12,8 @@ using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
-using Microsoft.AspNetCore.Components;
 using Bunit.JSInterop;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;

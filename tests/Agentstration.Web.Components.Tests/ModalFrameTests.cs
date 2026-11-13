@@ -1,6 +1,6 @@
 using Bunit;
-using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
 
 namespace Agentstration.Web.Components.Tests;
 
@@ -19,7 +19,7 @@ public sealed class ModalFrameTests
         cut.Render(parameters => parameters.Add(value => value.Busy, true));
         try { Assert.AreEqual(1, runtime.Module.Opens); }
         finally { runtime.Module.Ready.SetResult(registration); }
-        await cut.InvokeAsync(() => {});
+        await cut.InvokeAsync(() => { });
         cut.Render(parameters => parameters.Add(value => value.IsOpen, false));
         cut.WaitForAssertion(() => Assert.AreEqual(1, registration.Releases));
         Assert.AreEqual(1, registration.Disposals);

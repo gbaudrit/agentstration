@@ -18,8 +18,12 @@ public sealed class LabelYamlDraftTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var model = new AgentEditorModel
         {
-            Name = "welcome", DisplayName = "Welcome", Instructions = "Hello",
-            ModelProfileName = "default", RuntimeProfileName = "maf-builtin", Tags = "environment=production"
+            Name = "welcome",
+            DisplayName = "Welcome",
+            Instructions = "Hello",
+            ModelProfileName = "default",
+            RuntimeProfileName = "maf-builtin",
+            Tags = "environment=production"
         };
         var edit = new EditContext(model);
         var cut = context.Render<CascadingValue<EditContext>>(parameters => parameters

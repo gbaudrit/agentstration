@@ -33,10 +33,16 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
                 identities.Add(parent.Value.Uid);
                 await store.PutExactAsync(ResourceScopeRef.Instance, new ToolSetVersionResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolSetVersion,
-                    Metadata = new() { Name = $"{name}-1.0.0" }, ScopeRef = ResourceScopeRef.Instance,
-                    ToolSetUid = parent.Value.Uid, ToolSetName = name, ToolSetGeneration = parent.Value.Generation,
-                    Version = "1.0.0", DefinitionHash = "fixture", PublishedAt = DateTimeOffset.UnixEpoch
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ToolResourceKinds.ToolSetVersion,
+                    Metadata = new() { Name = $"{name}-1.0.0" },
+                    ScopeRef = ResourceScopeRef.Instance,
+                    ToolSetUid = parent.Value.Uid,
+                    ToolSetName = name,
+                    ToolSetGeneration = parent.Value.Generation,
+                    Version = "1.0.0",
+                    DefinitionHash = "fixture",
+                    PublishedAt = DateTimeOffset.UnixEpoch
                 }, null, true, default);
                 if (name == "visible-publication")
                     await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
@@ -77,10 +83,16 @@ public sealed class ToolSetApiTests : ModelManagementApiTestBase
         {
             await store.PutExactAsync(scope, new ToolSetVersionResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolSetVersion,
-                Metadata = new() { Name = $"publication-list-{date}", Namespace = source.Namespace }, ScopeRef = scope,
-                ToolSetUid = source.Uid, ToolSetName = source.Name, ToolSetGeneration = source.Generation,
-                Version = version, DefinitionHash = "fixture", PublishedAt = DateTimeOffset.UnixEpoch.AddDays(date)
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolSetVersion,
+                Metadata = new() { Name = $"publication-list-{date}", Namespace = source.Namespace },
+                ScopeRef = scope,
+                ToolSetUid = source.Uid,
+                ToolSetName = source.Name,
+                ToolSetGeneration = source.Generation,
+                Version = version,
+                DefinitionHash = "fixture",
+                PublishedAt = DateTimeOffset.UnixEpoch.AddDays(date)
             }, null, true, default);
         }
         var resources = await factory.Services.GetRequiredService<ToolSetService>().ListAsync(default);
