@@ -29,9 +29,6 @@
   <Folder Name="/awp/">
     <Project Path="awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
   </Folder>
-  <Folder Name="/src/">
-    <Project Path="src/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
-  </Folder>
   <Folder Name="/src/Agents/">
     <Project Path="src/Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <Project Path="src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
@@ -80,6 +77,7 @@
     <Project Path="src/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
     <Project Path="src/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
     <Project Path="src/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
+    <Project Path="src/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
   </Folder>
   <Folder Name="/src/Flows/">
     <Project Path="src/Agentstration.Flows/Agentstration.Flows.csproj" />
@@ -202,9 +200,6 @@
     <Project Path="src/Agentstration.Workplace.Api/Agentstration.Workplace.Api.csproj" />
     <Project Path="src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
   </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/Agentstration.Extensions.PostgreSql.Tests/Agentstration.Extensions.PostgreSql.Tests.csproj" />
-  </Folder>
   <Folder Name="/tests/Api/">
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Flows.Tests/Agentstration.Api.Flows.Tests.csproj" />
@@ -229,6 +224,7 @@
     <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.OpenApi.Tests/Agentstration.Extensions.OpenApi.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.OpenDal.Tests/Agentstration.Extensions.OpenDal.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.PostgreSql.Tests/Agentstration.Extensions.PostgreSql.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/fixtures/">
     <Project Path="tests/fixtures/StorageVolumeProbe/StorageVolumeProbe.csproj" />
